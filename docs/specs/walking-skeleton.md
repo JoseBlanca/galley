@@ -402,6 +402,8 @@ def render(pdf: Path, page_index: int, dpi: int) -> RenderedPage: ...
 def strip_stride(buffer: bytes, width_px: int, height_px: int, stride: int) -> bytes: ...
     # The pixels of a grayscale bitmap whose rows are `stride` bytes apart,
     # row by row with the padding after each row's `width_px` bytes dropped.
+    # A stride below width_px, or a buffer whose length is not
+    # stride * height_px, is a ValueError.
 ```
 
 `render` gives 8-bit grayscale pixels at `scale = dpi / 72`, row by row
@@ -409,9 +411,12 @@ with no padding, through `strip_stride`. A file that is not a PDF, or a
 page index outside the document, is a `PdfError` naming the file and, for
 a page, the index and the page count.
 
-`page_size` gives pypdfium2's numbers, which are the crop box as 32-bit
-floats and can differ from pdfplumber's: Gierke's pages are 376.1000061 ×
-621.5 pt in pypdfium2 and 376.128 × 621.504 in pdfplumber. Word boxes
+`page_size` gives pypdfium2's numbers, those of `PdfPage.get_size()`:
+the crop box clipped to the media box, as 32-bit floats, which is the
+area `render` draws. They can differ from pdfplumber's: Gierke's pages
+are 376.1000061 × 621.5 pt in pypdfium2 and 376.128 × 621.504 in
+pdfplumber. Kadesh's crop box (508.3 × 728.2) is taller than its media
+box (508.32 × 728.16), so its pages are 508.3 × 728.16 pt in pypdfium2. Word boxes
 come from pdfplumber, so `pages.json` takes its sizes from pdfplumber
 (section 6) and no stage of the skeleton calls `page_size`. Only extract
 calls `render`, for the cover.
@@ -419,7 +424,7 @@ calls `render`, for the cover.
 Tests that call PDFium are marked `thread_unsafe`, the marker of
 pytest-run-parallel for a test that must run once rather than in 8
 threads at once under `pytest --parallel-threads=8`: `page_count` of
-both excerpts is 10; `page_size` of Kadesh page 0 is 508.32000732421875 ×
+both excerpts is 10; `page_size` of Kadesh page 0 is 508.29998779296875 ×
 728.1599731445312; `render` of Gierke page 0 at 300 dpi is 1568 × 2590
 pixels with `len(pixels) == width_px * height_px`; the same render called
 from 6 threads at once gives 6 times the bytes of one call alone; page
