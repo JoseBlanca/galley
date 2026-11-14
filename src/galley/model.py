@@ -392,6 +392,12 @@ def _tuple_item_type(annotation: object) -> object | None:
     return typing.get_args(annotation)[0]
 
 
+def _json_float(number: float) -> float:
+    """The float written for `number`: an int as the equal float, and -0.0
+    as 0.0 (adding 0.0 does it), so that equal numbers give equal bytes."""
+    return float(number) + 0.0
+
+
 def _mapping_types(annotation: object) -> tuple[object, object] | None:
     """The K and V of a `frozendict[K, V]` annotation; None for any other."""
     if typing.get_origin(annotation) is not frozendict:
@@ -405,9 +411,12 @@ def _encode(annotation: object, value: object) -> object:
     if value is None:
         return None
     if annotation is Box and isinstance(value, Box):
-        return [float(value.x0), float(value.top), float(value.x1), float(value.bottom)]
+        return [
+            _json_float(coordinate)
+            for coordinate in (value.x0, value.top, value.x1, value.bottom)
+        ]
     if annotation is float and isinstance(value, int | float):
-        return float(value)
+        return _json_float(value)
     if isinstance(value, StrEnum):
         return value.value
     if (item_type := _tuple_item_type(annotation)) is not None and isinstance(

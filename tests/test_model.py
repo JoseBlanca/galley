@@ -960,3 +960,52 @@ def test_frozendict_key_that_is_not_an_int_names_its_path(key: str) -> None:
     content = {"scores": {key: [1, 2, 3, 4]}, "names": {}}
     with pytest.raises(model._FieldError, match=re.escape("scores")):
         model._decode(_ScoresByPage, content, "")
+
+
+def test_negative_zero_is_written_as_zero(tmp_path: Path) -> None:
+    removal = WORDS.removals[0]
+    negative = replace(
+        WORDS, removals=(replace(removal, box=Box(-0.0, -0.0, 1.0, 2.0)),)
+    )
+    positive = replace(WORDS, removals=(replace(removal, box=Box(0.0, 0.0, 1.0, 2.0)),))
+    write_words(tmp_path / "negative.json", negative)
+    write_words(tmp_path / "positive.json", positive)
+    assert (tmp_path / "negative.json").read_bytes() == (
+        tmp_path / "positive.json"
+    ).read_bytes()
+
+
+def _pages_with_numbers(width_pt: float, score: float) -> PagesFile:
+    page = replace(PAGES.pages[0], width_pt=width_pt, text_layer_score=score)
+    return replace(PAGES, pages=(page, *PAGES.pages[1:]))
+
+
+def _words_with_confidence(confidence: float) -> WordsFile:
+    page = WORDS.pages[1]
+    word = replace(page.words[0], ocr_confidence=confidence)
+    return replace(WORDS, pages=(WORDS.pages[0], replace(page, words=(word,))))
+
+
+@pytest.mark.parametrize(
+    ("write", "of_integers", "of_floats"),
+    [
+        (write_pages, _pages_with_numbers(376, 1), _pages_with_numbers(376.0, 1.0)),
+        (write_pages, _pages_with_numbers(-0.0, 0), _pages_with_numbers(0.0, 0.0)),
+        (write_words, _words_with_confidence(91), _words_with_confidence(91.0)),
+        (write_words, _words_with_confidence(-0.0), _words_with_confidence(0.0)),
+    ],
+    ids=[
+        "width_and_score",
+        "negative_zero_width",
+        "confidence",
+        "negative_zero_confidence",
+    ],
+)
+def test_equal_numbers_in_float_fields_give_the_same_bytes(
+    tmp_path: Path, write: Callable[..., None], of_integers: object, of_floats: object
+) -> None:
+    write(tmp_path / "integers.json", of_integers)
+    write(tmp_path / "floats.json", of_floats)
+    assert (tmp_path / "integers.json").read_bytes() == (
+        tmp_path / "floats.json"
+    ).read_bytes()
