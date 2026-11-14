@@ -392,6 +392,14 @@ def _tuple_item_type(annotation: object) -> object | None:
     return typing.get_args(annotation)[0]
 
 
+def _mapping_types(annotation: object) -> tuple[object, object] | None:
+    """The K and V of a `frozendict[K, V]` annotation; None for any other."""
+    if typing.get_origin(annotation) is not frozendict:
+        return None
+    key_type, value_type = typing.get_args(annotation)
+    return key_type, value_type
+
+
 def _encode(annotation: object, value: object) -> object:
     """The JSON value of `value`, whose type is `annotation`."""
     if value is None:
@@ -408,6 +416,12 @@ def _encode(annotation: object, value: object) -> object:
         return [_encode(item_type, item) for item in value]
     if (optional := _optional_type(annotation)) is not None:
         return _encode(optional, value)
+    if (mapping := _mapping_types(annotation)) is not None and isinstance(
+        value, frozendict
+    ):
+        # Keys in their order, so that equal mappings give equal bytes; an
+        # int key is written as its string (architecture section 8).
+        return {str(key): _encode(mapping[1], value[key]) for key in sorted(value)}
     if isinstance(annotation, type) and dataclasses.is_dataclass(annotation):
         return {
             name: _encode(field_type, getattr(value, name))
@@ -537,12 +551,49 @@ def _decode(annotation: object, value: object, json_path: str) -> object:
             _decode(item_type, item, f"{json_path}[{position}]")
             for position, item in enumerate(value)
         )
+    if (mapping := _mapping_types(annotation)) is not None:
+        return _decode_mapping(mapping, value, json_path)
     if isinstance(annotation, type) and dataclasses.is_dataclass(annotation):
         return _decode_dataclass(annotation, value, json_path)
     # A field type of this module that the reader does not know: a defect
     # of model.py, not of the file.
     message = f"model.py cannot read a field of type {annotation!r}"
     raise TypeError(message)
+
+
+def _decode_mapping(
+    mapping: tuple[object, object], value: object, json_path: str
+) -> frozendict[object, object]:
+    key_type, value_type = mapping
+    if not isinstance(value, dict):
+        problem = f"expected an object, found {_found(value)}"
+        raise _FieldError(problem, json_path)
+    return frozendict(
+        {
+            _decode_key(key_type, key, json_path): _decode(
+                value_type, item, _join(json_path, key)
+            )
+            for key, item in value.items()
+        }
+    )
+
+
+def _decode_key(key_type: object, key: str, json_path: str) -> object:
+    """A mapping's key: an int written as its string, or a string."""
+    if key_type is str:
+        return key
+    if key_type is int:
+        # Only the string str() writes, so that reading and writing again
+        # gives the same bytes: "01" and "1.0" are not keys.
+        if not _INT_KEY.fullmatch(key):
+            problem = f"key {key!r} is not an integer"
+            raise _FieldError(problem, json_path)
+        return int(key)
+    message = f"model.py cannot read a mapping key of type {key_type!r}"
+    raise TypeError(message)
+
+
+_INT_KEY = re.compile("-?(0|[1-9][0-9]*)")
 
 
 def _decode_enum[E: StrEnum](enum: type[E], value: object, json_path: str) -> E:

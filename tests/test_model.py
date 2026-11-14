@@ -5,11 +5,12 @@ import json
 import math
 import re
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
 
+from galley import model
 from galley.errors import EditError, InputFileError
 from galley.model import (
     Block,
@@ -924,3 +925,38 @@ def test_edits_line_with_a_key_given_twice_names_the_line(tmp_path: Path) -> Non
         read_edits(path)
     assert "old" in str(caught.value)
     assert "given twice" in str(caught.value)
+
+
+# A frozendict with int keys is written as an object whose keys are the ints
+# as strings (architecture section 8). No format has one yet, so the test
+# goes through the encoder and decoder that every writer and reader uses.
+
+
+@dataclass(frozen=True, slots=True)
+class _ScoresByPage:
+    scores: frozendict[int, Box]
+    names: frozendict[str, PageKind]
+
+
+SCORES = _ScoresByPage(
+    scores=frozendict({12: Box(1, 2, 3, 4), 3: Box(5.0, 6.0, 7.0, 8.5)}),
+    names=frozendict({"b": PageKind.PLATE, "a": PageKind.TEXT}),
+)
+
+
+def test_frozendict_is_written_as_an_object_and_read_back() -> None:
+    content = model._encode(_ScoresByPage, SCORES)
+    assert content == {
+        "scores": {"3": [5.0, 6.0, 7.0, 8.5], "12": [1.0, 2.0, 3.0, 4.0]},
+        "names": {"a": "text", "b": "plate"},
+    }
+    # The keys in their order, so that equal mappings give equal bytes.
+    assert json.dumps(content).startswith('{"scores": {"3": ')
+    assert model._decode(_ScoresByPage, json.loads(json.dumps(content)), "") == SCORES
+
+
+@pytest.mark.parametrize("key", ["x", "01", "1.0", ""])
+def test_frozendict_key_that_is_not_an_int_names_its_path(key: str) -> None:
+    content = {"scores": {key: [1, 2, 3, 4]}, "names": {}}
+    with pytest.raises(model._FieldError, match=re.escape("scores")):
+        model._decode(_ScoresByPage, content, "")
