@@ -4,7 +4,7 @@ import os
 import threading
 import time
 from collections.abc import Callable, Generator
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import AbstractContextManager, contextmanager, suppress
 from dataclasses import dataclass, field
 
 import pytest
@@ -221,3 +221,22 @@ def test_open_source_that_raises_reaches_the_caller_and_other_sources_close() ->
 
     assert sources.opened != []
     assert sorted(sources.closed) == sorted(sources.opened)
+
+
+@contextmanager
+def swallowing_source() -> Generator[None]:
+    """A source whose closing swallows the exception of `function`, as a
+    defective source could: the worker then ends as if it had no item left."""
+    with suppress(ValueError):
+        yield
+
+
+def test_items_lost_to_a_source_that_swallows_an_error_raise_runtime_error() -> None:
+    def fail_on_3(_: None, item: int) -> int:
+        if item == 3:
+            message = "item 3 failed"
+            raise ValueError(message)
+        return item
+
+    with pytest.raises(RuntimeError, match=r"item indices \[3, 4, 5\] are missing"):
+        map_pages_with_source(swallowing_source, fail_on_3, tuple(range(6)), 1)

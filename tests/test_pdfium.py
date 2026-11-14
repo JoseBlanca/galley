@@ -244,3 +244,36 @@ def test_strip_stride_refuses_a_buffer_that_does_not_fit_its_shape(
 ) -> None:
     with pytest.raises(ValueError, match="stride"):
         strip_stride(buffer, width_px, height_px, stride)
+
+
+@pytest.mark.thread_unsafe
+@pytest.mark.parametrize("path_kind", ["missing", "directory"])
+@pytest.mark.parametrize(
+    "call",
+    [
+        pytest.param(page_count, id="page_count"),
+        pytest.param(lambda pdf: page_size(pdf, 0), id="page_size"),
+        pytest.param(lambda pdf: render(pdf, 0, 72), id="render"),
+    ],
+)
+def test_path_that_is_no_file_raises_pdf_error_naming_it(
+    tmp_path: Path, path_kind: str, call: Callable[[Path], object]
+) -> None:
+    pdf = tmp_path / "book.pdf"
+    if path_kind == "directory":
+        pdf.mkdir()
+
+    with pytest.raises(PdfError) as raised:
+        call(pdf)
+
+    assert str(pdf) in str(raised.value)
+    assert isinstance(raised.value.__cause__, OSError)
+
+
+@pytest.mark.thread_unsafe
+@pytest.mark.parametrize("dpi", [0, -72])
+def test_render_at_a_dpi_below_1_raises_value_error_naming_it(
+    excerpt_pdf: frozendict[str, Path], dpi: int
+) -> None:
+    with pytest.raises(ValueError, match=f"dpi must be at least 1, not {dpi}"):
+        render(excerpt_pdf[GIERKE], 0, dpi)
