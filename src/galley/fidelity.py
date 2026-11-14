@@ -486,9 +486,10 @@ def _joined_words(texts: tuple[_Text, ...]) -> tuple[MarkdownWord, ...]:
     return tuple(MarkdownWord(word, texts[0].block_id) for word in joined.split())
 
 
-def _pandoc_words(document: object) -> MarkdownWords:
-    """The words of the `blocks` of Pandoc's JSON, not of its `meta`, and
-    the number of its Note elements."""
+def _words_of_pandoc_json(pandoc_json: str) -> MarkdownWords:
+    """The words of the `blocks` of Pandoc's JSON, as `pandoc --to json`
+    writes it, not of its `meta`, and the number of its Note elements."""
+    document = json.loads(pandoc_json)
     match document:
         case {"blocks": list() as blocks}:
             tokens = _blocks_tokens(blocks, None)
@@ -525,20 +526,10 @@ def _stderr_text(stderr: str | bytes | None) -> str:
             assert_never(stderr)
 
 
-def read_markdown(markdown: str) -> MarkdownWords:
-    """The words of a Markdown text as Pandoc reads it (`pandoc --from
-    markdown-smart-auto_identifiers --to json --fail-if-warnings`), each with
-    the id of the innermost div or heading with an id it is in, and the
-    number of notes.
-
-    Words are split at spaces and line breaks and at the start and end of
-    every block and note; emphasis does not split a word. The metadata
-    header, the title and authors, gives no words. Raises
-    ExternalProgramError, with Pandoc's standard error, when `pandoc` is
-    missing, fails or warns (a note definition no reference uses), runs
-    longer than 60 s, or reads an element galley's Markdown does not make,
-    such as a list.
-    """
+def _pandoc_json(markdown: str) -> str:
+    """Pandoc's JSON of a Markdown text, as text; ExternalProgramError, with
+    Pandoc's standard error, when pandoc is missing, fails, warns or runs
+    longer than 60 s."""
     pandoc = shutil.which("pandoc")
     if pandoc is None:
         message = "pandoc is not installed; install it with `brew install pandoc`"
@@ -565,4 +556,21 @@ def read_markdown(markdown: str) -> MarkdownWords:
             f"{_stderr_text(error.stderr)}"
         )
         raise ExternalProgramError(message) from error
-    return _pandoc_words(json.loads(completed.stdout))
+    return completed.stdout
+
+
+def read_markdown(markdown: str) -> MarkdownWords:
+    """The words of a Markdown text as Pandoc reads it (`pandoc --from
+    markdown-smart-auto_identifiers --to json --fail-if-warnings`), each with
+    the id of the innermost div or heading with an id it is in, and the
+    number of notes.
+
+    Words are split at spaces and line breaks and at the start and end of
+    every block and note; emphasis does not split a word. The metadata
+    header, the title and authors, gives no words. Raises
+    ExternalProgramError, with Pandoc's standard error, when `pandoc` is
+    missing, fails or warns (a note definition no reference uses), runs
+    longer than 60 s, or reads an element galley's Markdown does not make,
+    such as a list.
+    """
+    return _words_of_pandoc_json(_pandoc_json(markdown))

@@ -10,7 +10,13 @@ from pathlib import Path
 import pytest
 
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
-from galley.fidelity import MarkdownWord, MarkdownWords, check_stage, read_markdown
+from galley.fidelity import (
+    MarkdownWord,
+    MarkdownWords,
+    _words_of_pandoc_json,
+    check_stage,
+    read_markdown,
+)
 from galley.model import (
     Block,
     BlockKind,
@@ -688,6 +694,56 @@ def test_read_markdown_keeps_a_reference_without_a_definition_as_text() -> None:
 def test_read_markdown_with_an_element_galley_does_not_write_raises() -> None:
     with pytest.raises(ExternalProgramError, match=r"BulletList.*b-p0000-001"):
         read_markdown("::: {#b-p0000-001}\n- an item\n:::\n")
+
+
+# The walk of Pandoc's JSON, on literal JSON as Pandoc 3.14 writes it
+
+
+def _str(text: str) -> str:
+    return f'{{"t":"Str","c":"{text}"}}'
+
+
+def _div(div_id: str, blocks: str) -> str:
+    return f'{{"t":"Div","c":[["{div_id}",[],[]],[{blocks}]]}}'
+
+
+def _pandoc_document(blocks: str) -> str:
+    return f'{{"pandoc-api-version":[1,23,1,2],"meta":{{}},"blocks":[{blocks}]}}'
+
+
+_SPACE = '{"t":"Space"}'
+
+
+def test_walk_joins_adjacent_text_and_splits_at_spaces_and_blocks() -> None:
+    paragraph_a = f'{{"t":"Para","c":[{_str("a")},{_SPACE},{_str("b")}]}}'
+    paragraph_c = f'{{"t":"Para","c":[{_str("c")},{_str("d")}]}}'
+
+    markdown = _words_of_pandoc_json(_pandoc_document(f"{paragraph_a},{paragraph_c}"))
+
+    assert _texts(markdown) == ("a", "b", "cd")
+    assert markdown.note_count == 0
+
+
+def test_walk_gives_words_of_nested_divs_the_innermost_id() -> None:
+    inner = _div("b-p0000-002", f'{{"t":"Para","c":[{_str("inner")}]}}')
+    outer = _div("b-p0000-001", f'{{"t":"Para","c":[{_str("outer")}]}},{inner}')
+
+    markdown = _words_of_pandoc_json(_pandoc_document(outer))
+
+    assert markdown.words == (
+        MarkdownWord("outer", "b-p0000-001"),
+        MarkdownWord("inner", "b-p0000-002"),
+    )
+
+
+def test_walk_counts_a_note_and_separates_its_words() -> None:
+    note = f'{{"t":"Note","c":[{{"t":"Para","c":[{_str("note")}]}}]}}'
+    paragraph = f'{{"t":"Para","c":[{_str("Greece,")},{note},{_str("and")}]}}'
+
+    markdown = _words_of_pandoc_json(_pandoc_document(paragraph))
+
+    assert _texts(markdown) == ("Greece,", "note", "and")
+    assert markdown.note_count == 1
 
 
 @pytest.mark.thread_unsafe(reason="changes PATH")
