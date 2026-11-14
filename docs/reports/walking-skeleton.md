@@ -55,3 +55,43 @@ What the stream did beyond the plan, each checked against the spec:
   box of floats give the same bytes, as spec §3's byte-identity rule asks.
 - ty 0.0.104 checks `frozendict` without complaint; no format needed
   `sentinel`.
+
+### Review of work package 1
+
+Four reviewers (spec, tests, fidelity, conventions) on fad593c. Every real
+word of both excerpts (9,527) and 27 hard texts (combining accents, long
+s, ligatures, bidirectional marks, zero-width characters, emoji, control
+characters) came back from the formats unchanged. Findings that held,
+fixed by the stream's agent test first in 12 commits (39bd97b to
+adb3d4f), the spec's section 3 first:
+
+- A word holding a lone surrogate made a writer crash after emptying the
+  file it was replacing. Files are now written whole or not at all (a
+  temporary file renamed over the old one), and readers refuse such text.
+- Readers accepted NaN and infinity as numbers, and the config accepted
+  them in a region's box, where NaN made the region exclude nothing in
+  silence. Refused now, and never written.
+- A JSON key given twice was read as its last value; an edits file that
+  is not UTF-8 gave Python's decoding error without the file's name.
+  Both are errors naming the file now.
+- The architecture promises how a `frozendict` is written; the reader
+  could not read it back. Done, though no field uses one yet.
+- Tests that could not fail: 8 of 22 deliberate breaks of the code passed
+  the whole suite, and 11 enum spellings of the formats were pinned by no
+  test. Each now has a test that fails when the code breaks.
+- Small spec changes decided by the orchestrator (no format or EPUB
+  change): the fidelity boundary is an enum, `FidelityBoundary`, in
+  `errors.py`; `check_source_pdf`'s parameter is `expected_pdf_sha256`;
+  an empty title or author list is an error; the PDF path is always
+  resolved; -0.0 is written as 0.0.
+
+Not taken: sorting the words in a fidelity error's message stays; the
+small type-check helpers stay duplicated in `config.py` and `model.py`,
+because they raise different errors.
+
+After the fixes: the six checks pass, 185 tests, none skipped, 0.28 s
+(1.13 s with 8 threads).
+
+For the next work package: pdfminer, under pdfplumber, decodes some text
+with `errors="ignore"` and can drop a broken character before galley
+sees it (`pdfminer/cmapdb.py`, line 190). That is for extract's spec.
