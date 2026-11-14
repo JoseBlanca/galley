@@ -7,7 +7,7 @@ excerpts, so that each excerpt gives an EPUB and the fidelity check (the
 test that no word is lost or invented between a stage's input and output)
 passes at the layout, structure and markdown boundaries. It builds on
 `docs/architecture.md` and `docs/glossary.md`. Dated 14 November 2026.
-State: draft.
+State: under way (approved by the owner on 14 November 2026).
 
 The four work packages are the breakdown the owner approved on 14
 November 2026, and the spec's sections 3 to 9 follow them. Every task is
@@ -39,9 +39,11 @@ the plan was approved.
 
 Checked by the orchestrator before task 1.1, in the worktree of the plan:
 
-- `pandoc --version` prints `pandoc 3.13` on its first line. The spec's
+- `pandoc --version` prints `pandoc 3.14` on its first line. The spec's
   statements about Pandoc's behaviour were checked with 3.13 (spec §5,
-  §8); another version may behave otherwise.
+  §8); Homebrew moved Pandoc to 3.14 on 14 November 2026, and the
+  orchestrator checked the same behaviours on 3.14 that day (see the
+  report). Another version may behave otherwise.
 - `uv run --locked pytest` passes, 5 tests, on the starting commit.
 - `uv.lock` holds pdfplumber 0.11.10 and pypdfium2 5.15.2, the versions
   the spec's counts were taken with (spec §2, §11).
