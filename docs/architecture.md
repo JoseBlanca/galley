@@ -81,8 +81,10 @@ then works page by page, then joins what runs over page breaks. correct
 works per block. markdown and epub run once.
 
 Every file a stage writes carries the SHA-256 of the PDF it came from.
-A stage that reads a file made from another PDF stops with an error that
-says which stage to rerun.
+Only analyze computes it, from the PDF; every later stage copies it from
+its input file and checks it against `pages.json`. A stage that reads a
+file made from another PDF stops with an error that says which stage to
+rerun.
 
 ## 5. The book folder
 
@@ -121,7 +123,7 @@ An unknown key or a wrong type is an error.
 | `title` | string, required | |
 | `authors` | list of strings, required | |
 | `language` | string, required | ISO 639-1 code: `en`, `es`, `fr`, `de`, `it`. `config.py` maps it to Tesseract's code (`eng`, `spa`…) and to the word list |
-| `ocr` | `auto` / `never` / `always`, `auto` | `auto`: the text layer where analyze scores it good, Tesseract elsewhere |
+| `ocr` | `verify` / `trust` / `redo`, `verify` | how far the book's own OCR is trusted (section 7b) |
 | `correct` | bool, `false` | whether `galley2epub run` runs the correct stage |
 | `exclude_pages` | list of page indices, `[]` | pages left out, as removals |
 | `exclude_regions` | list of `{page, box}`, `[]` | a library stamp, a label |
@@ -148,6 +150,43 @@ A stage spec adds the keys it needs, here and in `config.py` together.
   Spans of one block are separated by nothing, so a span carries the
   spaces it needs. Edits match against this text.
 
+## 7b. Trusting the book's own OCR
+
+Most scanned books already have a text layer, made by whoever scanned
+them. galley trusts it, but checks it (owner, 14 November 2026). The
+config's `ocr` key sets how far:
+
+| `ocr` | analyze does |
+|---|---|
+| `verify` (default) | the audit below |
+| `trust` | no audit of the text layer; pages without a layer are still checked as in the audit |
+| `redo` | ignores the text layer and marks every page for OCR |
+
+The audit runs Tesseract on two sets of pages:
+
+- **Every page without a text layer.** In the two whole public-domain
+  books, 26 pages have none: 13 are blank, and 13 have something printed
+  that the scanner's OCR left out (Kadesh page index 69: a running head,
+  about five lines of text and a captioned figure). A page where
+  Tesseract finds no words of the word list is blank, recorded with
+  `blank_checked_by_ocr`. A page where it finds text gets `text_source`
+  `ocr`, and extract reads it with Tesseract: the gap is filled, the run
+  goes on.
+- **A sample of pages with a text layer**, spread through the book. Each
+  is scored twice, the layer's words and Tesseract's, by the share found
+  in the word list. Tesseract is not taken as the truth: on
+  19th-century roman type the scanner's layer was better than a fresh
+  Tesseract run on all three control books of the owner's ocr_lab. When
+  the layer scores clearly below Tesseract, analyze stops with
+  `PdfError`, giving the scores, and the owner reruns with `ocr =
+  "redo"`. Replacing OCR that exists is the owner's choice; filling a gap
+  is not.
+
+The sample size and the thresholds are set in analyze's spec. ocr_lab's
+triage re-OCRed below a word-list share of 0.70 and checked between 0.70
+and 0.80, which tracked the measured gain closely (ρ = 0.90, as ocr_lab's notes report it)
+but was fitted on 16 books only.
+
 ## 8. The formats
 
 The formats are frozen dataclasses in `src/galley/model.py`, with tuples
@@ -172,8 +211,16 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
 - `PageKind`: `blank`, `text`, `plate` (mostly a picture), `excluded`.
 - `TextSource`: `text_layer`, `ocr`, `none` (blank and excluded pages).
 - `text_layer_score`: the share of the layer's words found in the word
-  list (section 12), from 0 to 1; `None` without a layer. The score below
-  which `auto` runs Tesseract is set in analyze's spec.
+  list (section 12), from 0 to 1; `None` without a layer.
+- `blank_checked_by_ocr: bool`: true for a page without a text layer that
+  the OCR audit read and found blank (section 7b), so that a blank page is
+  never a page nobody looked at.
+- `PagesFile` also has `ocr_audit: OcrAudit | None`: the pages sampled,
+  the score of the text layer and of Tesseract on each, and the verdict
+  (section 7b). `None` when `ocr` is `trust` or `redo`.
+- Page sizes are pdfplumber's (the media box). pypdfium2 reports the crop
+  box, which can differ slightly (Gierke: 376.128 pt against
+  376.1000061), so no stage takes a page size from pypdfium2.
 
 **words.json**, `WordsFile(pages: tuple[PageWords, ...], removals)`:
 
@@ -243,9 +290,13 @@ reason when it removes a new kind of text, and the reason names what the
 text is, never "noise": a plate's stray text-layer characters are removed
 as `plate_text` by structure, which the owner can review.
 
-**Edit**, one JSON object per line of a file under `edits/`: `block_id`,
-`block_sha256` (the first 12 hex digits of the SHA-256 of the block's text
-as structure wrote it), `old`, `new`, `author`, `reason`.
+**Edit**, one JSON object per line of a file under `edits/`:
+`format_version` (1), `block_id`, `block_sha256` (the first 12 hex digits
+of the SHA-256 of the block's text as structure wrote it), `old`, `new`,
+`author`, `reason`. The version is on every line, not in a header, so that
+`edits-from` and agents can append to a file. A missing `edits/` folder or
+file is no edits; a blank or malformed line is an error that names the
+file and line.
 
 **RenderedPage**, not a file but what `pdfium.render` returns:
 `page_index`, `dpi`, `width_px`, `height_px`, `pixels: bytes` (8-bit
@@ -254,15 +305,18 @@ makes a Pillow image from it.
 
 ## 9. The stages
 
-Each stage is called as `run(folder: BookFolder, config: BookConfig) ->
-None` from its subpackage. `BookFolder(root: Path)` gives the paths of
+Each stage is called as `run(folder: BookFolder, config: BookConfig, *,
+workers: int = DEFAULT_WORKERS) -> None` from its subpackage. layout,
+structure and markdown run their own fidelity check (section 13) before
+writing, so a stage rerun alone is checked as well as a full run. `BookFolder(root: Path)` gives the paths of
 section 5 as properties: `folder.pages_json`, `folder.edits_dir`, and so
 on. Everything else a stage does is pure functions over the frozen values
 it read (the `coding` skill, "Functional style").
 
 **analyze** measures each page: size, text layer, the layer's score,
-whether it is blank, text or a plate; and applies the config's
-`exclude_pages` and `exclude_regions`.
+whether it is blank, text or a plate; applies the config's
+`exclude_pages` and `exclude_regions`; and runs the OCR audit of section
+7b, which decides each page's `text_source`.
 
 **extract** gives every page its words. Text-layer pages are read with
 pdfplumber, one document per worker thread. OCR pages are rendered at 300
@@ -298,10 +352,12 @@ fenced div with its id inside the footnote, which Pandoc puts at the end
 of each chapter and the Kindle shows as pop-ups (section 17);
 notes with `referenced` false as ordinary blocks where they were printed,
 the marker first; figures as images. Pandoc runs with
-`--fail-if-warnings`, so that a note it would drop, or a reference it
-would print as text, is an error (checked with Pandoc 3.13: an unused
-note definition is dropped with only a warning, and the option makes it
-exit with 3). Text is escaped so that Pandoc reads
+`--fail-if-warnings`, so that a note it would drop is an error (checked
+with Pandoc 3.13: an unused note definition is dropped with only a
+warning, and the option makes it exit with 3). A reference with no note
+is not a warning: Pandoc prints it as text, `Greece,[^1]`, and exits with
+0 (checked the same way). The fidelity check catches it, as an invented
+word `Greece,[^1]` and a missing `Greece,`. Text is escaped so that Pandoc reads
 it back as written: "1. Of the three" at the start of a paragraph must
 not become a numbered list. `book.md` is read by Pandoc with smart quotes
 off (`-f markdown-smart`), so `"` stays `"`.
@@ -366,10 +422,10 @@ A stage imports these and nothing else of galley.
 | `book_folder.py` | `BookFolder` |
 | `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract or Pandoc), `EditError`, `FidelityError` |
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage` |
-| `parallel.py` | `DEFAULT_WORKERS` (6) and `map_pages(function, items, workers)`, which returns the results in input order |
+| `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `wordlist.py` | `word_list(language) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/` |
 | `fidelity.py` | the fidelity check, section 13 |
-| `cli.py` | the `galley2epub` command |
+| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract) and stops naming any that is missing |
 
 `src/galley/__init__.py` imports gilguard first: a library that stops a
 program at any import that turns Python's global lock back on, and names
@@ -387,6 +443,9 @@ lists the words, with the pages they came from where the origins say.
 
 - Words are compared as strings, split on white space, with nothing
   normalised: a changed letter or a lost accent is a difference.
+- A block's spans are split into words one by one, not joined first: a
+  note reference span is a word of its own. Joined, "Greece," and the
+  reference "1" would become "Greece,1" again and hide the word change.
 - It compares multisets over the whole book, not page by page, because a
   paragraph or a hyphen join can run over a page break and its words then
   belong to two pages. Order is not part of the check, because columns,
@@ -405,8 +464,9 @@ lists the words, with the pages they came from where the origins say.
 - The check stops at `book.md`: turning it into an EPUB is Pandoc's work,
   and epubcheck checks the EPUB's form.
 - The excerpt tests of every stage run the check, and the `whole_book`
-  tests run it on whole books. `galley2epub run` runs it after layout,
-  structure and markdown, which costs one pass over the words.
+  tests run it on whole books. layout, structure and markdown run it
+  inside their `run` before writing (section 9), which costs one pass
+  over the words.
 
 ## 14. The command
 
@@ -437,7 +497,7 @@ cost than one every run of `galley2epub` needs.
 | program | used by | when | why it is not rebuilt |
 |---|---|---|---|
 | Pandoc | markdown (to read `book.md` back for the fidelity check), epub | every run | writing a valid EPUB 3 with navigation, notes and metadata is a large, well-tested body of work |
-| Tesseract | extract (OCR pages), `wordlist.py` | runs that need OCR; the word list, once per language | OCR is not something to rebuild |
+| Tesseract | analyze (the OCR audit), extract (OCR pages), `wordlist.py` | runs that need OCR; the word list, once per language | OCR is not something to rebuild |
 | epubcheck | the tests of the epub stage and the `whole_book` tests | development only | it is the reference validator of EPUB, and needs Java, which a run of galley should not |
 
 The epub stage does not run epubcheck: an EPUB is checked while
@@ -453,6 +513,10 @@ with `brew install epubcheck` (5.4.0) before the epub stage is built.
   (section 3).
 - **epubcheck** is a development tool, not a requirement of a run
   (section 16).
+- **The book's own OCR** is trusted but checked (section 7b): pages
+  without a text layer are read by Tesseract and filled or recorded as
+  blank; a text layer that scores clearly worse than Tesseract stops the
+  run, and the owner decides whether to redo the OCR.
 - **Note markers** in the EPUB are Pandoc's numbers, 1, 2, 3 in each
   chapter. The printed markers stay in blocks.json and are not shown.
 - Earlier the same day, in chat: no italics yet (the `emphasis` field is
