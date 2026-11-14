@@ -142,21 +142,21 @@ Deliverables:
 
 Tasks:
 
-- [ ] 1.1 Write `errors.py` and `book_folder.py`, with their tests. From
+- [x] 1.1 Write `errors.py` and `book_folder.py`, with their tests. From
   spec §3, "errors.py" and "book_folder.py", and architecture §5 and §12.
   Serves deliverables 1, 4 and 5.
-- [ ] 1.2 Write `model.py`: every dataclass and enum, the four JSON
+- [x] 1.2 Write `model.py`: every dataclass and enum, the four JSON
   files' write and read functions with the round-trip tests, and
   `pdf_sha256`, `check_source_pdf`, `block_text` and `block_sha256`. The
   readers rebuild values from good JSON; their checks of bad input are
   task 1.3. From spec §3, "model.py", and architecture §7 and §8. Serves
   deliverables 2 and 5. Needs 1.1 (`InputFileError`).
-- [ ] 1.3 Make the four readers check their input and stop with
+- [x] 1.3 Make the four readers check their input and stop with
   `InputFileError` at the first problem, and write `write_edits` and
   `read_edits` with their `EditError` cases. From spec §3, "model.py",
   the list under "Reading checks everything" and the edits paragraph.
   Serves deliverable 2. Needs 1.2.
-- [ ] 1.4 Write `config.py`, with its tests. Its test configs are
+- [x] 1.4 Write `config.py`, with its tests. Its test configs are
   written into `tmp_path` or kept under `tests/fixtures/config/`, with
   absolute paths to the excerpt PDFs. From spec §3, "config.py", and
   architecture §6. Serves deliverables 3 and 5. Needs 1.1 and `Box` from
