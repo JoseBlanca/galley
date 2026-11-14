@@ -1,6 +1,6 @@
 ---
 name: coding
-description: How code is written in galley, a Python 3.15 free-threaded package run with uv. Use it before writing or changing any code or test. It covers the order of the work, the file formats between stages, keeping every word of the book, threads and PDFium, errors, types and names, dependencies and external programs, the tests, and the checks to run before the work is called done.
+description: How code is written in galley, a Python 3.15 free-threaded package run with uv. Use it before writing or changing any code or test. It covers the order of the work, the functional style (pure functions, frozen values), the file formats between stages, keeping every word of the book, threads and PDFium, errors, types and names, dependencies and external programs, the tests, and the checks to run before the work is called done.
 ---
 
 # Coding
@@ -40,6 +40,35 @@ commit of its own before the code.
 2. The code, as small as the task asks.
 3. The checks at the end of this file, all of them, with their real output.
 4. One commit, with the message the `writing` skill describes.
+
+## Functional style
+
+galley's data is small, a few thousand lines of a book, so the code is
+written as pure functions over frozen values, and copying a value is never
+a cost worth avoiding.
+
+- A function's result depends only on its arguments. It does not change
+  its arguments, read or write module state, or do I/O. A stage's work is
+  a chain of such functions, `page lines → lines without running heads →
+  blocks`, each tested with literal inputs and outputs and no mocks.
+- Side effects live at the edges: the stage's `run` function reads its
+  input files, calls the pure functions, writes its output file and logs;
+  the CLI parses arguments and calls `run`. PDFium, subprocesses, HTTP and
+  the thread pool are called from the edges, or from a function that does
+  nothing else, whose result is a frozen value the pure functions use.
+- Every value that leaves a function is frozen: frozen dataclasses, tuples,
+  `frozendict`, `frozenset`, strings, numbers, enums. A changed value is a
+  new one, made with `dataclasses.replace` or the constructor. Inside a
+  function, a local list built and returned as `tuple(...)` is fine:
+  what matters is that nothing that escapes can be mutated.
+- Classes hold data, functions hold behaviour. No class with mutable state,
+  no methods that change `self`, no inheritance except for exceptions and
+  enums. A `Protocol` when a function takes interchangeable things.
+- A generator is consumed where it is created; it is not stored in a value
+  or passed to another thread.
+- Pure functions are what makes the threads safe: a worker calls a pure
+  function on one page and returns a frozen value, and nothing it touches
+  is shared.
 
 ## The formats between stages
 
@@ -130,11 +159,18 @@ performance cores: 4.5 s with 1 thread, 1.2 s with 6, and no gain beyond
 - Tesseract and Pandoc run as subprocesses, and the vision model through
   HTTP; workers can wait on them in parallel.
 - A C extension that does not declare free-threading support turns the GIL
-  back on when imported, with only a `RuntimeWarning`. pytest turns every
-  warning into an error (`filterwarnings = ["error"]`), and
-  `tests/test_free_threading.py` asserts `sys._is_gil_enabled()` is False
-  after importing every module. Some imports happen late (Pillow plugins
-  on first open), so the end-to-end test asserts it again after a run.
+  back on when imported, with only a `RuntimeWarning`. Every pytest run
+  loads gilguard (`-p gilguard` in `pyproject.toml`), which turns that
+  into `gilguard.GILEnabledError` at the import that caused it, naming the
+  module, its package and the line of our code. The error derives from
+  `BaseException`, so an `except ImportError` or `except Exception` around
+  an optional import cannot swallow it. A warning turned into an error by
+  `filterwarnings` is a `RuntimeWarning`, which such an `except` does
+  swallow: on 14 November 2026 a test whose import sat in `try/except
+  Exception` passed without gilguard and failed with it.
+  `tests/test_free_threading.py` also asserts `sys._is_gil_enabled()` is
+  False after importing every module. Imports that happen late (Pillow
+  plugins on first open) are caught only on the code paths the tests run.
   Tests never run with `PYTHON_GIL=0` or `-X gil=0`, which hides the
   problem and risks crashes.
 
@@ -181,7 +217,8 @@ performance cores: 4.5 s with 1 thread, 1.2 s with 6, and no gain beyond
 
 - A new dependency installs on 3.15t as a wheel: `uv pip install
   --only-binary :all: <pkg>` in a scratch venv made with `uv venv --python
-  3.15t`, and importing it leaves `sys._is_gil_enabled()` False. The
+  3.15t`, and once added, `uv run python -m gilguard` reports no
+  package that turns the GIL back on at import. The
   commit that adds it says what it gives and why it is not a few lines of
   our own. The JSON formats use the standard library; msgspec installs on
   3.15t and is the fallback if parsing is ever measured as slow.

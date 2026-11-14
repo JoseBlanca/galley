@@ -19,6 +19,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "gilguard==0.2.0",
     "pytest==9.2.0",
     "pytest-run-parallel==0.10.0",
     "pytest-timeout==2.4.0",
@@ -71,7 +72,7 @@ all = "error"
 [tool.pytest]
 minversion = "9.0"
 testpaths = ["tests"]
-addopts = ["-ra", "--import-mode=importlib"]
+addopts = ["-ra", "--import-mode=importlib", "-p", "gilguard"]
 strict = true
 timeout = "300"
 # Every warning is an error, and with it the RuntimeWarning that CPython

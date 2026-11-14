@@ -61,8 +61,8 @@ the category that guards the first goal of the project.
 
 ## conventions
 
-The sections "Errors", "Types, names and defaults", "The formats between
-stages", "Threads and PDFium" and "Dependencies and external programs" of
+The sections "Functional style", "Errors", "Types, names and defaults",
+"The formats between stages", "Threads and PDFium" and "Dependencies and external programs" of
 the coding skill, against `docs/architecture.md`, and the docstrings as
 `.claude/skills/writing/SKILL.md` asks for them. Ruff and ty already
 enforce part of these, and their output is in your prompt: look for what
@@ -76,6 +76,15 @@ Errors:
   names the file, the page and the value?
 - A missing `tesseract` or `pandoc`: is it found before the work starts?
 - An error turned into a default, a page skipped without a record.
+
+Functional style:
+
+- A function that changes its arguments, reads or writes module state, or
+  does I/O while also computing something. I/O outside a stage's `run`,
+  the CLI, or a function that does only that.
+- A value that escapes a function mutable: a `list`, `dict` or `set` in a
+  return value or a field, a class with state that changes, a method that
+  changes `self`, a stored generator.
 
 Names and interfaces:
 
