@@ -271,13 +271,13 @@ BLOCKS = BlocksFile(
     ),
 )
 
-FILES: list[tuple[str, object, Callable[..., None], Callable[[Path], object]]] = [
+FILES: tuple[tuple[str, object, Callable[..., None], Callable[[Path], object]], ...] = (
     ("pages.json", PAGES, write_pages, read_pages),
     ("words.json", WORDS, write_words, read_words),
     ("lines.json", LINES, write_lines, read_lines),
     ("blocks.json", BLOCKS, write_blocks, read_blocks),
-]
-FILE_IDS = [name for name, *_ in FILES]
+)
+FILE_IDS = tuple(name for name, *_ in FILES)
 
 
 @pytest.mark.parametrize(("name", "value", "write", "read"), FILES, ids=FILE_IDS)
@@ -469,39 +469,49 @@ def _delete(path: Path, json_path: JsonPath) -> None:
     path.write_text(json.dumps(content), encoding="utf-8")
 
 
-READERS = {
-    "pages.json": read_pages,
-    "words.json": read_words,
-    "lines.json": read_lines,
-    "blocks.json": read_blocks,
-}
-NAMES = list(READERS)
+READERS = frozendict(
+    {
+        "pages.json": read_pages,
+        "words.json": read_words,
+        "lines.json": read_lines,
+        "blocks.json": read_blocks,
+    }
+)
+NAMES = tuple(READERS)
 
-WRITING_STAGE = {
-    "pages.json": "analyze",
-    "words.json": "extract",
-    "lines.json": "layout",
-    "blocks.json": "structure",
-}
+WRITING_STAGE = frozendict(
+    {
+        "pages.json": "analyze",
+        "words.json": "extract",
+        "lines.json": "layout",
+        "blocks.json": "structure",
+    }
+)
 
 # A field of each file whose value is a Word's box, or the nearest thing.
-SOME_BOX: dict[str, JsonPath] = {
-    "pages.json": ("pages", 0, "exclude_regions", 0),
-    "words.json": ("pages", 0, "words", 1, "box"),
-    "lines.json": ("pages", 0, "regions", 0, "lines", 0, "words", 1, "box"),
-    "blocks.json": ("blocks", 0, "origin", 0, "box"),
-}
-SOME_OBJECT: dict[str, JsonPath] = {
-    "pages.json": ("pages", 1),
-    "words.json": ("pages", 0, "words", 1),
-    "lines.json": ("pages", 0, "regions", 0, "lines", 0, "words", 1),
-    "blocks.json": ("notes", 0, "blocks", 1, "spans", 0),
-}
-SOME_ENUM: dict[str, JsonPath] = {
-    "pages.json": ("pages", 0, "kind"),
-    "words.json": ("pages", 1, "text_source"),
-    "blocks.json": ("blocks", 0, "kind"),
-}
+SOME_BOX: frozendict[str, JsonPath] = frozendict(
+    {
+        "pages.json": ("pages", 0, "exclude_regions", 0),
+        "words.json": ("pages", 0, "words", 1, "box"),
+        "lines.json": ("pages", 0, "regions", 0, "lines", 0, "words", 1, "box"),
+        "blocks.json": ("blocks", 0, "origin", 0, "box"),
+    }
+)
+SOME_OBJECT: frozendict[str, JsonPath] = frozendict(
+    {
+        "pages.json": ("pages", 1),
+        "words.json": ("pages", 0, "words", 1),
+        "lines.json": ("pages", 0, "regions", 0, "lines", 0, "words", 1),
+        "blocks.json": ("notes", 0, "blocks", 1, "spans", 0),
+    }
+)
+SOME_ENUM: frozendict[str, JsonPath] = frozendict(
+    {
+        "pages.json": ("pages", 0, "kind"),
+        "words.json": ("pages", 1, "text_source"),
+        "blocks.json": ("blocks", 0, "kind"),
+    }
+)
 
 
 def _dotted(json_path: JsonPath) -> str:
@@ -583,7 +593,7 @@ def test_unknown_field_names_its_path(tmp_path: Path, name: str) -> None:
     assert _dotted(json_path) in str(caught.value)
 
 
-@pytest.mark.parametrize("name", list(SOME_ENUM))
+@pytest.mark.parametrize("name", tuple(SOME_ENUM))
 def test_enum_value_that_is_not_a_member_names_its_path(
     tmp_path: Path, name: str
 ) -> None:

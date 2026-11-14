@@ -47,6 +47,9 @@ class Box:
 
 
 class PageKind(StrEnum):
+    """What a page is, as analyze finds it: blank, text, a plate (mostly a
+    picture), or excluded by the config."""
+
     BLANK = "blank"
     TEXT = "text"
     PLATE = "plate"  # mostly a picture
@@ -54,12 +57,18 @@ class PageKind(StrEnum):
 
 
 class TextSource(StrEnum):
+    """Where a page's words come from: the book's own text layer, galley's
+    OCR, or none (blank and excluded pages)."""
+
     TEXT_LAYER = "text_layer"
     OCR = "ocr"
     NONE = "none"  # blank and excluded pages
 
 
 class OcrVerdict(StrEnum):
+    """The outcome of the audit of the book's text layer (architecture
+    section 7b) when the run goes on."""
+
     LAYER_KEPT = "layer_kept"  # the layer scored as well as Tesseract
     LAYER_DOUBTFUL = "layer_doubtful"  # below, but not clearly; the run goes on
 
@@ -147,6 +156,9 @@ class PageWords:
 
 
 class RemovalReason(StrEnum):
+    """Why a stage took text out of the book. A stage spec adds a reason
+    when it removes a new kind of text."""
+
     EXCLUDED_PAGE = "excluded_page"
     EXCLUDED_REGION = "excluded_region"
     RUNNING_HEAD = "running_head"
@@ -219,6 +231,8 @@ class LinesFile:
 
 
 class BlockKind(StrEnum):
+    """What a block of the book is."""
+
     HEADING = "heading"
     PARAGRAPH = "paragraph"
     QUOTE = "quote"
@@ -228,6 +242,8 @@ class BlockKind(StrEnum):
 
 
 class Emphasis(StrEnum):
+    """The emphasis of a span; only none for now (no italics yet)."""
+
     NONE = "none"
 
 
@@ -268,8 +284,10 @@ class Block:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Note:
-    """A footnote or endnote. `marker` is as printed at the start of the
-    note; `referenced` is false when no reference to it was found."""
+    """A footnote or endnote. `id` is `n-p<page index, 4 digits>-<n, 3
+    digits>`, for the n-th note that starts on that page; `marker` is as
+    printed at the start of the note; `referenced` is false when no
+    reference to it was found."""
 
     id: str
     marker: str
@@ -279,13 +297,18 @@ class Note:
 
 
 class ChangeReason(StrEnum):
+    """Why structure changed words without losing a letter: a hyphen join,
+    or a note marker split off the word it was glued to."""
+
     HYPHEN_JOIN = "hyphen_join"
     NOTE_MARKER = "note_marker"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class WordChange:
-    """Words structure changed without losing a letter: `before` became `after`."""
+    """Words structure changed without losing a letter: `before` became
+    `after`. `page_index` is the page of the first word of `before`, also
+    when a hyphen join runs over a page break."""
 
     page_index: int
     before: tuple[str, ...]
@@ -294,6 +317,8 @@ class WordChange:
 
 
 class PageNumberPosition(StrEnum):
+    """Where a page number is printed: in the running head or at the foot."""
+
     HEAD = "head"
     FOOT = "foot"
 
@@ -358,7 +383,7 @@ class RenderedPage:
 # reading rebuilds the tuples, enums and boxes that JSON turned into lists
 # and strings.
 
-_JSON_INDENT = 1
+_JSON_INDENT = 1  # spec section 3
 _STAGE_OF_FILE = frozendict(
     {
         "pages.json": "analyze",
@@ -448,7 +473,8 @@ class _FieldError(Exception):
         super().__init__(f"{json_path}: {problem}" if json_path else problem)
 
 
-_FOUND_CHARACTERS = 40  # how much of a wrong value an error message quotes
+# How much of a wrong value an error message quotes; guessed, not measured.
+_FOUND_CHARACTERS = 40
 
 
 def _found(value: object) -> str:
@@ -481,6 +507,10 @@ _BOX_COORDINATES = 4
 
 
 def _decode_box(value: object, json_path: str) -> Box:
+    # A box with x0 >= x1 or top >= bottom is read as it is: boxes in these
+    # files come from the text layer or OCR, and a stage, not the reader,
+    # decides what such a word is. config.py refuses one, since the owner
+    # draws those boxes by hand.
     if not isinstance(value, list) or len(value) != _BOX_COORDINATES:
         problem = f"expected a box of four numbers, found {_found(value)}"
         raise _FieldError(problem, json_path)

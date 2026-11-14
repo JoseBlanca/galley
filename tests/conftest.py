@@ -31,9 +31,9 @@ def _main_checkout_samples() -> Path:
 
 
 @pytest.fixture(scope="session")
-def excerpt_pdf() -> dict[str, Path]:
+def excerpt_pdf() -> frozendict[str, Path]:
     """The committed excerpt PDFs, by name (the file name without .pdf)."""
-    return {path.stem: path for path in sorted(EXCERPTS_DIR.glob("*.pdf"))}
+    return frozendict({path.stem: path for path in sorted(EXCERPTS_DIR.glob("*.pdf"))})
 
 
 @pytest.fixture(scope="session")

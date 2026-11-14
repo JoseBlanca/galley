@@ -229,6 +229,9 @@ def _box(value: object, key: str, path: Path) -> Box:
             f"expected four finite numbers [x0, top, x1, bottom], found {value!r}",
         )
     x0, top, x1, bottom = (float(coordinate) for coordinate in value)
+    # The owner draws these boxes by hand, so an empty one is a mistake. The
+    # readers of model.py accept one, since their boxes come from the text
+    # layer or OCR, and a stage decides what such a word is.
     if not x0 < x1:
         raise _error(path, key, f"x0 {x0} is not left of x1 {x1}")
     if not top < bottom:

@@ -44,7 +44,7 @@ def _write_config(folder: Path, keys: dict[str, str]) -> Path:
 
 
 def test_config_with_every_key_is_read_into_its_values(
-    tmp_path: Path, excerpt_pdf: dict[str, Path]
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:
     pdf = excerpt_pdf[KADESH]
     path = _write_config(
@@ -79,7 +79,7 @@ def test_config_with_every_key_is_read_into_its_values(
 
 
 def test_config_with_only_the_required_keys_has_the_defaults(
-    tmp_path: Path, excerpt_pdf: dict[str, Path]
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:
     pdf = excerpt_pdf[KADESH]
     path = _write_config(tmp_path, _required_keys(pdf))
@@ -124,7 +124,7 @@ def test_absolute_pdf_is_resolved(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(("key", "value"), [("title", '""'), ("authors", "[]")])
 def test_empty_title_or_authors_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path], key: str, value: str
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path], key: str, value: str
 ) -> None:
     path = _write_config(tmp_path, _required_keys(excerpt_pdf[KADESH]) | {key: value})
     _assert_config_error(path, key)
@@ -157,7 +157,9 @@ def test_config_that_is_not_toml_is_an_error(tmp_path: Path) -> None:
     assert "line 1" in str(caught.value)
 
 
-def test_unknown_key_is_an_error(tmp_path: Path, excerpt_pdf: dict[str, Path]) -> None:
+def test_unknown_key_is_an_error(
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
+) -> None:
     path = _write_config(
         tmp_path, _required_keys(excerpt_pdf[KADESH]) | {"subtitle": '"x"'}
     )
@@ -165,7 +167,7 @@ def test_unknown_key_is_an_error(tmp_path: Path, excerpt_pdf: dict[str, Path]) -
 
 
 def test_unknown_key_inside_a_region_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path]
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:
     keys = _required_keys(excerpt_pdf[KADESH]) | {
         "exclude_regions": '[{page = 0, box = [1, 2, 3, 4], colour = "red"}]'
@@ -176,7 +178,7 @@ def test_unknown_key_inside_a_region_is_an_error(
 
 @pytest.mark.parametrize("key", ["pdf", "title", "authors", "language"])
 def test_missing_required_key_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path], key: str
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path], key: str
 ) -> None:
     keys = {
         name: value
@@ -188,7 +190,7 @@ def test_missing_required_key_is_an_error(
 
 
 def test_region_without_its_box_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path]
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:
     keys = _required_keys(excerpt_pdf[KADESH]) | {"exclude_regions": "[{page = 0}]"}
     path = _write_config(tmp_path, keys)
@@ -216,14 +218,18 @@ def test_region_without_its_box_is_an_error(
     ],
 )
 def test_value_of_the_wrong_type_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path], key: str, value: str, named_key: str
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    key: str,
+    value: str,
+    named_key: str,
 ) -> None:
     path = _write_config(tmp_path, _required_keys(excerpt_pdf[KADESH]) | {key: value})
     _assert_config_error(path, named_key)
 
 
 def test_language_that_is_not_one_of_its_values_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path]
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:
     path = _write_config(
         tmp_path, _required_keys(excerpt_pdf[KADESH]) | {"language": '"english"'}
@@ -232,7 +238,7 @@ def test_language_that_is_not_one_of_its_values_is_an_error(
 
 
 def test_ocr_that_is_not_one_of_its_values_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path]
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:
     path = _write_config(
         tmp_path, _required_keys(excerpt_pdf[KADESH]) | {"ocr": '"always"'}
@@ -253,7 +259,11 @@ def test_ocr_that_is_not_one_of_its_values_is_an_error(
     ],
 )
 def test_negative_page_index_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path], key: str, value: str, named_key: str
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    key: str,
+    value: str,
+    named_key: str,
 ) -> None:
     path = _write_config(tmp_path, _required_keys(excerpt_pdf[KADESH]) | {key: value})
     _assert_config_error(path, named_key)
@@ -264,7 +274,7 @@ def test_negative_page_index_is_an_error(
     ["[1, 2, 3]", "[1, 2, 3, 4, 5]", '[1, 2, "3", 4]', "[true, 2, 3, 4]", '"1 2 3 4"'],
 )
 def test_box_that_is_not_four_numbers_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path], box: str
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path], box: str
 ) -> None:
     keys = _required_keys(excerpt_pdf[KADESH]) | {
         "exclude_regions": f"[{{page = 0, box = {box}}}]"
@@ -275,7 +285,7 @@ def test_box_that_is_not_four_numbers_is_an_error(
 
 @pytest.mark.parametrize("box", ["[3, 2, 3, 4]", "[5, 2, 3, 4]"])
 def test_box_whose_x0_is_not_left_of_x1_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path], box: str
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path], box: str
 ) -> None:
     keys = _required_keys(excerpt_pdf[KADESH]) | {
         "exclude_regions": f"[{{page = 0, box = {box}}}]"
@@ -286,7 +296,7 @@ def test_box_whose_x0_is_not_left_of_x1_is_an_error(
 
 @pytest.mark.parametrize("box", ["[1, 4, 3, 4]", "[1, 5, 3, 4]"])
 def test_box_whose_top_is_not_above_bottom_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path], box: str
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path], box: str
 ) -> None:
     keys = _required_keys(excerpt_pdf[KADESH]) | {
         "exclude_regions": f"[{{page = 0, box = {box}}}]"
@@ -323,7 +333,7 @@ def test_tesseract_language_is_the_three_letter_code(
     "box", ["[nan, 2, 3, 4]", "[1, 2, inf, 4]", "[1, -inf, 3, 4]", "[1, 2, 3, nan]"]
 )
 def test_box_with_a_number_that_is_not_finite_is_an_error(
-    tmp_path: Path, excerpt_pdf: dict[str, Path], box: str
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path], box: str
 ) -> None:
     keys = _required_keys(excerpt_pdf[KADESH]) | {
         "exclude_regions": f"[{{page = 0, box = {box}}}]"
