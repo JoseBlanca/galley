@@ -5,6 +5,9 @@ The whole books are ignored by git, so a worktree does not have them. They
 are found through the GALLEY_SAMPLES environment variable, or else in
 `samples/` of the main checkout, which git reports as the parent of the
 common git directory. `scripts/fetch_samples.py` downloads them.
+
+`excerpt_books` runs the stages once per session on a book folder for each
+excerpt, so that the excerpt tests of every stage read the files of one run.
 """
 
 import os
@@ -14,7 +17,31 @@ from pathlib import Path
 
 import pytest
 
+from galley import analyze, extract
+from galley.book_folder import BookFolder
+from galley.config import read_config
+
 EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
+
+# The configs of spec section 9, "The end-to-end test", without `pdf`.
+# Kadesh page 9 has no text layer, and its region holds the page number 81.
+EXCERPT_CONFIGS = frozendict(
+    {
+        "kadesh_8-17": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["J. H. Breasted"]\n'
+            'language = "en"\n'
+            "cover_page = 0\n"
+            "exclude_pages = [9]\n"
+            "exclude_regions = [{page = 0, box = [240, 620, 252, 632]}]\n"
+        ),
+        "gierke_86-93_270-271": (
+            'title = "Political Theories of the Middle Age"\n'
+            'authors = ["O. Gierke", "F. W. Maitland"]\n'
+            'language = "en"\n'
+        ),
+    }
+)
 
 
 def _main_checkout_samples() -> Path:
@@ -34,6 +61,31 @@ def _main_checkout_samples() -> Path:
 def excerpt_pdf() -> frozendict[str, Path]:
     """The committed excerpt PDFs, by name (the file name without .pdf)."""
     return frozendict({path.stem: path for path in sorted(EXCERPTS_DIR.glob("*.pdf"))})
+
+
+@pytest.fixture(scope="session")
+def excerpt_books(
+    tmp_path_factory: pytest.TempPathFactory, excerpt_pdf: frozendict[str, Path]
+) -> frozendict[str, BookFolder]:
+    """A book folder for each excerpt, by excerpt name, with its `book.toml`
+    (the configs of spec section 9) and the files analyze and extract
+    wrote.
+
+    Session-scoped: the stages run once, also under --parallel-threads=8.
+    A test reads these folders and never writes in them.
+    """
+    folders = {}
+    for name, toml in EXCERPT_CONFIGS.items():
+        folder = BookFolder(tmp_path_factory.mktemp(name))
+        # A TOML literal string: no escapes, so any path but one with a quote.
+        folder.book_toml.write_text(
+            f"pdf = '{excerpt_pdf[name]}'\n{toml}", encoding="utf-8"
+        )
+        config = read_config(folder.book_toml)
+        analyze.run(folder, config)
+        extract.run(folder, config)
+        folders[name] = folder
+    return frozendict(folders)
 
 
 @pytest.fixture(scope="session")
