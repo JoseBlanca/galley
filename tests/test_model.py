@@ -381,14 +381,14 @@ def test_pdf_sha256_is_the_hash_of_the_bytes(tmp_path: Path) -> None:
 
 
 def test_check_source_pdf_with_the_same_hash_passes(tmp_path: Path) -> None:
-    check_source_pdf(tmp_path / "words.json", SHA, SHA)
+    check_source_pdf(tmp_path / "words.json", SHA, expected_pdf_sha256=SHA)
 
 
 def test_check_source_pdf_with_another_hash_names_the_file_and_the_stage(
     tmp_path: Path,
 ) -> None:
     with pytest.raises(InputFileError, match=r"words\.json") as caught:
-        check_source_pdf(tmp_path / "words.json", SHA, "b" * 64)
+        check_source_pdf(tmp_path / "words.json", SHA, expected_pdf_sha256="b" * 64)
     assert "galley2epub extract" in str(caught.value)
 
 

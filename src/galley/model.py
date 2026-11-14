@@ -641,12 +641,14 @@ def pdf_sha256(pdf: Path) -> str:
     return hashlib.sha256(pdf.read_bytes()).hexdigest()
 
 
-def check_source_pdf(path: Path, file_pdf_sha256: str, pdf_sha256: str) -> None:
+def check_source_pdf(
+    path: Path, file_pdf_sha256: str, expected_pdf_sha256: str
+) -> None:
     """Raises InputFileError when the file at `path`, whose
     `source_pdf_sha256` is `file_pdf_sha256`, was made from another PDF
-    than the one whose hash is `pdf_sha256`. The message names the stage
+    than the one whose hash is `expected_pdf_sha256`. The message names the stage
     to run again."""
-    if file_pdf_sha256 == pdf_sha256:
+    if file_pdf_sha256 == expected_pdf_sha256:
         return
     stage = _STAGE_OF_FILE.get(path.name)
     rerun = (
@@ -656,7 +658,7 @@ def check_source_pdf(path: Path, file_pdf_sha256: str, pdf_sha256: str) -> None:
     )
     message = (
         f"{path} was made from another PDF (SHA-256 {file_pdf_sha256}, "
-        f"expected {pdf_sha256}); {rerun}"
+        f"expected {expected_pdf_sha256}); {rerun}"
     )
     raise InputFileError(message)
 
