@@ -6,6 +6,7 @@ index past the end of the book is not checked here, since that needs the
 PDF opened: analyze checks it.
 """
 
+import math
 import tomllib
 from dataclasses import dataclass
 from enum import StrEnum
@@ -197,22 +198,27 @@ def _region(value: object, key: str, path: Path) -> ExcludedRegion:
 
 
 def _box(value: object, key: str, path: Path) -> Box:
-    # TOML true is a bool, which Python counts as an int; it is not a number.
+    # TOML true is a bool, which Python counts as an int; it is not a
+    # number. TOML has nan and inf, which no page has.
     if (
         not isinstance(value, list)
         or len(value) != _BOX_COORDINATES
         or any(
-            isinstance(coordinate, bool) or not isinstance(coordinate, int | float)
+            isinstance(coordinate, bool)
+            or not isinstance(coordinate, int | float)
+            or not math.isfinite(coordinate)
             for coordinate in value
         )
     ):
         raise _error(
-            path, key, f"expected four numbers [x0, top, x1, bottom], found {value!r}"
+            path,
+            key,
+            f"expected four finite numbers [x0, top, x1, bottom], found {value!r}",
         )
     x0, top, x1, bottom = (float(coordinate) for coordinate in value)
-    if x0 >= x1:
+    if not x0 < x1:
         raise _error(path, key, f"x0 {x0} is not left of x1 {x1}")
-    if top >= bottom:
+    if not top < bottom:
         raise _error(path, key, f"top {top} is not above bottom {bottom}")
     return Box(x0, top, x1, bottom)
 

@@ -290,3 +290,16 @@ def test_tesseract_language_is_the_three_letter_code(
     language: Language, code: str
 ) -> None:
     assert tesseract_language(language) == code
+
+
+@pytest.mark.parametrize(
+    "box", ["[nan, 2, 3, 4]", "[1, 2, inf, 4]", "[1, -inf, 3, 4]", "[1, 2, 3, nan]"]
+)
+def test_box_with_a_number_that_is_not_finite_is_an_error(
+    tmp_path: Path, excerpt_pdf: dict[str, Path], box: str
+) -> None:
+    keys = _required_keys(excerpt_pdf[KADESH]) | {
+        "exclude_regions": f"[{{page = 0, box = {box}}}]"
+    }
+    path = _write_config(tmp_path, keys)
+    _assert_config_error(path, "exclude_regions[0].box")

@@ -13,6 +13,7 @@ import dataclasses
 import functools
 import hashlib
 import json
+import math
 import types
 import typing
 from dataclasses import dataclass
@@ -437,9 +438,13 @@ def _join(json_path: str, name: str) -> str:
 
 def _number(value: object, json_path: str) -> float:
     # JSON true and false are bools, which Python counts as ints; they are
-    # not numbers here. An int is read as the equal float.
+    # not numbers here. An int is read as the equal float. Python's json
+    # reads NaN and Infinity, which are not JSON and no writer makes.
     if isinstance(value, bool) or not isinstance(value, int | float):
         problem = f"expected a number, found {_found(value)}"
+        raise _FieldError(problem, json_path)
+    if not math.isfinite(value):
+        problem = f"expected a finite number, found {_found(value)}"
         raise _FieldError(problem, json_path)
     return float(value)
 
@@ -563,7 +568,10 @@ def _decode_file[T](cls: type[T], content: object, current_version: int) -> T:
 
 def _write_json(path: Path, value: object) -> None:
     content = _encode(type(value), value)
-    text = json.dumps(content, ensure_ascii=False, indent=_JSON_INDENT) + "\n"
+    text = (
+        json.dumps(content, ensure_ascii=False, allow_nan=False, indent=_JSON_INDENT)
+        + "\n"
+    )
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
@@ -683,7 +691,8 @@ def write_edits(path: Path, edits: tuple[Edit, ...]) -> None:
     """Writes an edits file: JSON Lines, one edit per line, UTF-8, with
     `format_version` first on every line."""
     text = "".join(
-        json.dumps(_encode(Edit, edit), ensure_ascii=False) + "\n" for edit in edits
+        json.dumps(_encode(Edit, edit), ensure_ascii=False, allow_nan=False) + "\n"
+        for edit in edits
     )
     path.write_text(text, encoding="utf-8", newline="\n")
 

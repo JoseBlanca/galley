@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import math
 import re
 from collections.abc import Callable
 from dataclasses import replace
@@ -795,3 +796,26 @@ def test_edits_file_with_a_byte_order_mark_asks_for_utf8_without_one(
     with pytest.raises(EditError, match=r"owner\.jsonl") as caught:
         read_edits(path)
     assert "UTF-8 without a byte-order mark" in str(caught.value)
+
+
+@pytest.mark.parametrize("number", [math.nan, math.inf, -math.inf])
+@pytest.mark.parametrize(
+    "json_path",
+    [("removals", 0, "box", 2), ("pages", 1, "words", 0, "ocr_confidence")],
+)
+def test_number_that_is_not_finite_names_its_path(
+    tmp_path: Path, number: float, json_path: JsonPath
+) -> None:
+    path = _written(tmp_path, "words.json")
+    _set(path, json_path, number)  # json.dumps writes NaN and Infinity
+    with pytest.raises(InputFileError, match=re.escape(_dotted(json_path))):
+        read_words(path)
+
+
+@pytest.mark.parametrize("number", [math.nan, math.inf])
+def test_writer_refuses_a_number_that_is_not_finite(
+    tmp_path: Path, number: float
+) -> None:
+    removal = replace(WORDS.removals[0], box=Box(0.0, 1.0, number, 2.0))
+    with pytest.raises(ValueError, match="not JSON compliant"):
+        write_words(tmp_path / "words.json", replace(WORDS, removals=(removal,)))
