@@ -537,7 +537,10 @@ The two sides are compared as multisets. A difference is a
 invented, each with its count, and in `detail` where each came from: the
 page index for words and lines, the `origin` pages for a block, the block
 id for Markdown. At the markdown boundary the number of note references
-in the blocks is also compared with `note_count`.
+in the blocks is also compared with `note_count`; when only the counts
+differ, the error has no missing or invented word and gives both counts
+in `detail`. A removal's `text` is split into words like any other, so a
+running head removed as one line counts each of its words.
 
 **Reading the Markdown.** `read_markdown` runs `pandoc --from
 markdown-smart --to json --fail-if-warnings` with the Markdown on
@@ -551,6 +554,16 @@ every `Note`. Without the last rule, the last word of one paragraph and
 the first of the next come back glued, `Egypt.THE` on Kadesh pages 0 and
 1. `Emph`, `Strong` and `Span` do not separate words, so a word half in
 italics stays one word.
+
+The elements read are those galley's Markdown makes: the blocks `Para`,
+`Plain`, `Div`, `Header` and `BlockQuote`, and the inlines `Str`,
+`Space`, `SoftBreak`, `LineBreak`, `Emph`, `Strong`, `Span` and `Note`.
+Any other element, such as a list or a table that an unescaped character
+let through, is an `ExternalProgramError` that names it and the block id
+it is in, rather than words dropped or read wrongly; a later spec adds
+the elements its Markdown makes, such as an image for a figure. A div or
+heading without an id gives its words the id of the div or heading
+around it, or `None`.
 
 `--fail-if-warnings` makes a note definition that no reference uses an
 error (Pandoc 3.13 warns and drops it; the option makes it exit with 3).
