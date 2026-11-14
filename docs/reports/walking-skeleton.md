@@ -191,3 +191,48 @@ stage's escaping must handle C0 white space.
   reviews 255k, fixes 226k; work package 2, coding 243k (two streams),
   four reviews 256k, fixes 303k. A work package costs about three times
   its coding.
+
+## Work package 3: the six stages in their simplest form
+
+Three streams side by side, merged one after the other into the plan's
+branch: `structure` (1b3683e, e97e395, b2839ac; merge d15b872), `epub`
+(9cfe285, 5825ec8, 3e2a4af; merge d227e26) and `extract` (4b9b738,
+346b4bd, 5fdc2ca; merge 9782bab). Each changed only its own section of
+the spec, so the three merged without conflict.
+
+Deliverables, checked by the orchestrator on 9782bab:
+
+| deliverable | result |
+|---|---|
+| 1. analyze | 16 tests (at least 8) |
+| 2. extract | 25 tests (at least 4) |
+| 3. analyze and extract on the excerpts | every count, box and opening word of spec §2 and §6 matched; the Kadesh cover is 2118 × 3034 pixels, 2,358,031 bytes |
+| 4. their own runs | 7 thread_unsafe tests, among them 1 against 6 workers byte for byte |
+| 5. layout | 16 tests (at least 10); the line rule gives spec §2's 387 lines on Kadesh and 366 on Gierke |
+| 6. structure | 9 tests (at least 4) |
+| 7. markdown | 19 passed, none skipped (at least 9) |
+| 8. epub | 5 passed, none skipped (at least 4) |
+| 9. `style.css` in the package | `True`; also in the wheel |
+| 10. every stage's `run` | the import command exits 0 |
+| 11. a hand-written EPUB passes epubcheck | 1 passed; epubcheck fails on a copy without its language, so the test can fail |
+
+The six checks pass: 375 tests, none skipped, 8.23 s (8.95 s wall time);
+with 8 threads 10.89 s. Both under the 30 s budget.
+
+Choices the streams wrote into the spec, each before its code:
+
+- layout and structure check `pages.json` against the PDF's own hash as
+  well as their input against `pages.json` (0.4 ms on Kadesh), so that a
+  stale `pages.json` names analyze. Accepted by the orchestrator.
+- markdown turns tabs, line feeds and carriage returns into spaces and
+  trims them at the ends of a text: Pandoc 3.14 drops a carriage return
+  inside a word and reads a leading tab or four spaces as a code block.
+  Tested through Pandoc on 258 texts; all 55 C0 and C1 control characters
+  otherwise come back unchanged.
+- extract refuses a `pages.json` that holds a plate page or a page marked
+  for OCR, which the skeleton cannot read, rather than drop its words.
+
+For the extract stage's spec: Pandoc writes control characters such as
+NUL into the EPUB's pages, where XHTML forbids them; no word is lost, but
+the EPUB would fail epubcheck. What such characters become is extract's
+decision, with the pdfminer finding of work package 1.

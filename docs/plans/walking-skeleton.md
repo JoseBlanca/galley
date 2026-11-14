@@ -295,24 +295,24 @@ Deliverables:
 
 Tasks:
 
-- [ ] 3.1 Write analyze, with its unit tests, and add the session fixture
+- [x] 3.1 Write analyze, with its unit tests, and add the session fixture
   `excerpt_books` to `tests/conftest.py`: a book folder per excerpt
   under pytest's temporary directory, with the configs of spec §9, "The
   end-to-end test", on which analyze runs. Add the `pages.json` excerpt
   tests and analyze's runs of their own. From spec §6, "analyze" and
   "Their tests". Serves deliverables 1, 3, 4 and 10. Stream `extract`.
-- [ ] 3.2 Write extract, with its unit tests; make `excerpt_books` run
+- [x] 3.2 Write extract, with its unit tests; make `excerpt_books` run
   extract after analyze; add the `words.json` excerpt tests and extract's
   runs of their own. From spec §6, "extract" and "Their tests". Serves
   deliverables 2, 3, 4 and 10. Stream `extract`; needs 3.1.
-- [ ] 3.3 Write layout, with its tests. From spec §7, "layout" and
+- [x] 3.3 Write layout, with its tests. From spec §7, "layout" and
   "Their tests". Serves deliverables 5 and 10. Stream `structure`.
-- [ ] 3.4 Write structure, with its tests. From spec §7, "structure" and
+- [x] 3.4 Write structure, with its tests. From spec §7, "structure" and
   "Their tests". Serves deliverables 6 and 10. Stream `structure`;
   independent of 3.3, run after it.
-- [ ] 3.5 Write markdown, with its tests. From spec §8, "markdown" and
+- [x] 3.5 Write markdown, with its tests. From spec §8, "markdown" and
   "Their tests". Serves deliverables 7 and 10. Stream `epub`.
-- [ ] 3.6 Write epub and its empty `style.css`, with its tests. From spec
+- [x] 3.6 Write epub and its empty `style.css`, with its tests. From spec
   §8, "epub" and "Their tests". Serves deliverables 8, 9, 10 and 11.
   Stream `epub`; its tests write `book.md` by hand, so it does not need
   3.5.
