@@ -695,7 +695,8 @@ Before any page is measured, analyze raises `ConfigError` when `ocr` is
 `redo` ("ocr = redo needs OCR, which the walking skeleton does not have;
 use verify or trust"), and when a page index of `exclude_pages`,
 `exclude_regions` or `cover_page` is not below the page count, naming the
-key, the index and the count.
+key, the index and the count. `check_config_pages` makes both checks, the
+`ocr` one first.
 
 ```python
 # galley.analyze
@@ -732,6 +733,10 @@ each page its words, with `map_pages_with_source`:
   the words of a page or a region the config excludes.
 - `blank` page, which the skeleton's analyze never writes but a
   `pages.json` may hold: no words, and the PDF page is not read.
+- `plate` page, or a page whose `text_source` is `ocr`, which a
+  `pages.json` may hold but the skeleton cannot read (it cuts no figure
+  and has no OCR): extract raises `InputFileError` before reading any
+  page, naming `pages.json`, those pages, and analyze to run again.
 
 Every `PageWords` has `figures=()`: the skeleton cuts no figure. The
 removals are in page order, then in pdfplumber's order.
