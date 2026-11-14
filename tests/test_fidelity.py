@@ -464,6 +464,50 @@ def test_structure_word_holding_white_space_splits_the_same_on_both_sides(
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+def test_structure_with_a_word_once_in_the_input_and_twice_in_the_output_fails() -> (
+    None
+):
+    lines = _lines_file((("the cat",),))
+    blocks = _blocks_file((_block("b-p0000-001", (0,), (_span("the the cat"),)),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict({"the": 1})
+
+
+def test_structure_detail_names_the_word_change_that_produced_a_missing_word() -> None:
+    # The join is valid, but the block lost the word it produced.
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0, 1), (_span("to it."),)),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=("repli-", "cate"),
+                after=("replicate",),
+                reason=ChangeReason.HYPHEN_JOIN,
+            ),
+        ),
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, _HYPHEN_LINES, blocks)
+
+    assert raised.value.missing == frozendict({"replicate": 1})
+    assert raised.value.invented == frozendict()
+    assert "'replicate': input none, output word change page 0" in raised.value.detail
+
+
+def test_check_stage_with_files_of_the_wrong_boundary_raises_type_error() -> None:
+    lines = _lines_file((("a",),))
+
+    with pytest.raises(
+        TypeError, match="layout boundary was given LinesFile and LinesFile"
+    ):
+        check_stage(FidelityBoundary.LAYOUT, lines, lines)  # ty: ignore[no-matching-overload]
+
+
 # markdown: blocks.json against book.md as Pandoc reads it
 
 
@@ -587,6 +631,85 @@ def test_markdown_two_note_references_against_one_pandoc_note_fail() -> None:
     assert (
         "note references in blocks.json: 2; notes in the Markdown: 1"
         in raised.value.detail
+    )
+
+
+def test_markdown_with_a_word_twice_in_the_blocks_and_once_in_the_markdown_fails() -> (
+    None
+):
+    blocks = _blocks_file((_block("b-p0000-001", (0,), (_span("the the cat"),)),))
+    markdown = _markdown((("the", "b-p0000-001"), ("cat", "b-p0000-001")), note_count=0)
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+    assert raised.value.missing == frozendict({"the": 1})
+    assert raised.value.invented == frozendict()
+
+
+def test_markdown_reference_pandoc_left_as_text_is_an_invented_word() -> None:
+    # A reference with no definition comes back from Pandoc as the text
+    # "Greece,[^1]" and no note.
+    blocks = _greece_blocks("1", referenced=True)
+    markdown = _markdown(
+        (
+            ("as", "b-p0000-001"),
+            ("in", "b-p0000-001"),
+            ("Greece,[^1]", "b-p0000-001"),
+            ("and", "b-p0000-001"),
+            ("A", "b-p0000-001"),
+            ("note.", "b-p0000-001"),
+        ),
+        note_count=0,
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+    assert raised.value.missing == frozendict({"Greece,": 1})
+    assert raised.value.invented == frozendict({"Greece,[^1]": 1})
+    assert "note references in blocks.json: 1; notes in the Markdown: 0" in (
+        raised.value.detail
+    )
+
+
+def test_markdown_counts_note_references_inside_note_blocks() -> None:
+    # The body refers to note 1, and note 1 to note 2: two references.
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0,), (_span("Text"), _span("1", "n-p0000-001"))),),
+        notes=(
+            Note(
+                id="n-p0000-001",
+                marker="1",
+                blocks=(
+                    _block(
+                        "b-p0000-002",
+                        (0,),
+                        (_span("First"), _span("2", "n-p0000-002")),
+                    ),
+                ),
+                origin=(Origin(0, _BOX),),
+                referenced=True,
+            ),
+            Note(
+                id="n-p0000-002",
+                marker="2",
+                blocks=(_block("b-p0000-003", (0,), (_span("Second"),)),),
+                origin=(Origin(0, _BOX),),
+                referenced=True,
+            ),
+        ),
+    )
+    markdown = _markdown(
+        (("Text", "b-p0000-001"), ("First", "b-p0000-001"), ("Second", "b-p0000-001")),
+        note_count=1,
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+    assert "note references in blocks.json: 2; notes in the Markdown: 1" in (
+        raised.value.detail
     )
 
 
