@@ -468,8 +468,12 @@ When `function` raises, the worker's source is closed and the exception
 of the first failing item in input order, among those that ran, is
 raised in the calling thread; items not yet started may not run. When
 `open_source` raises, that exception is raised in the calling thread, and
-the sources other workers opened are closed. `workers` below 1 is a
-`ValueError`. With more workers than items, the extra workers do nothing.
+the sources other workers opened are closed; when `open_source` raises in
+one worker and `function` in another, the exception of `open_source` is
+the one raised. `workers` below 1 is a `ValueError`. With more workers
+than items, the extra workers do nothing: a worker opens its source only
+when it has taken an item, so no more sources are opened than there are
+items.
 
 Tests: results come back in input order when later items finish first
 (the function sleeps less for later items); 1, 3 and 8 workers give the
