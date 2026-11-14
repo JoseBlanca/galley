@@ -1143,8 +1143,11 @@ Before any stage runs, `main` finds the programs the command needs with
 `ExternalProgramError` saying "install it with `brew install pandoc`".
 `run` raises `ConfigError` when the config has `correct = true`, since
 the skeleton has no correct stage. The subcommands `correct` and
-`edits-from` do not exist yet; argparse rejects them. Errors propagate to
-`main`, which logs them and raises them again (architecture §14).
+`edits-from` do not exist yet; argparse rejects them, and it rejects a
+`--workers` below 1, which `parallel.py` would refuse only after analyze
+had deleted `pages.json`. `--workers` defaults to `DEFAULT_WORKERS`.
+Errors propagate to `main`, which logs them and raises them again
+(architecture §14).
 
 ### The end-to-end test
 
