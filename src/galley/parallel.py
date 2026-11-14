@@ -93,8 +93,22 @@ def map_pages_with_source[S, T, R](
         (entry for future in futures for entry in future.result()),
         key=lambda entry: entry[0],
     )
-    assert len(results) == len(items), (len(results), len(items))
+    _check_every_item_once([item_index for item_index, _ in results], len(items))
     return tuple(result for _, result in results)
+
+
+def _check_every_item_once(item_indices: Sequence[int], item_count: int) -> None:
+    # Not an assert, which python -O removes: a source whose closing
+    # swallows an exception of `function` ends its worker early with no
+    # failure, and its items would be lost without a word.
+    if list(item_indices) != list(range(item_count)):
+        missing = sorted(set(range(item_count)) - set(item_indices))
+        message = (
+            f"map_pages_with_source returned {len(item_indices)} results for "
+            f"{item_count} items; item indices {missing} are missing, or some "
+            "came twice (did a source swallow an exception?)"
+        )
+        raise RuntimeError(message)
 
 
 @dataclass(slots=True)

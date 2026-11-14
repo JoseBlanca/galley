@@ -38,7 +38,8 @@ class PageSize:
 
 
 def page_count(pdf: Path) -> int:
-    """The number of pages of `pdf`. A file that is not a PDF is a PdfError."""
+    """The number of pages of `pdf`. A file that is not a PDF, or a path
+    that is no file, is a PdfError."""
     return _in_pdfium_thread(_page_count, pdf)
 
 
@@ -47,8 +48,8 @@ def page_size(pdf: Path, page_index: int) -> PageSize:
 
     These numbers can differ from pdfplumber's in the last decimals, so a
     stage that places pdfplumber's word boxes takes its sizes from
-    pdfplumber. A file that is not a PDF, or a page index outside the
-    document, is a PdfError.
+    pdfplumber. A file that is not a PDF, a path that is no file, or a page
+    index outside the document, is a PdfError.
     """
     return _in_pdfium_thread(_page_size, pdf, page_index)
 
@@ -57,9 +58,12 @@ def render(pdf: Path, page_index: int, dpi: int) -> RenderedPage:
     """Page `page_index` (from 0) of `pdf` rendered at `dpi` dots per inch:
     8-bit grayscale pixels, row by row with no padding.
 
-    A file that is not a PDF, or a page index outside the document, is a
-    PdfError.
+    A file that is not a PDF, a path that is no file, or a page index
+    outside the document, is a PdfError; a `dpi` below 1 is a ValueError.
     """
+    if dpi < 1:
+        message = f"dpi must be at least 1, not {dpi}"
+        raise ValueError(message)
     return _in_pdfium_thread(_render, pdf, page_index, dpi)
 
 
@@ -102,6 +106,10 @@ def _open(pdf: Path) -> pypdfium2.PdfDocument:
         return pypdfium2.PdfDocument(pdf)
     except pypdfium2.PdfiumError as err:
         message = f"{pdf}: PDFium cannot read it as a PDF: {err}"
+        raise PdfError(message) from err
+    except (FileNotFoundError, IsADirectoryError) as err:
+        # pypdfium2 raises FileNotFoundError for a directory too.
+        message = f"{pdf}: no such PDF file (missing, or a directory)"
         raise PdfError(message) from err
 
 

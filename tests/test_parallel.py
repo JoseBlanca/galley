@@ -4,7 +4,7 @@ import os
 import threading
 import time
 from collections.abc import Callable, Generator
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import AbstractContextManager, contextmanager, suppress
 from dataclasses import dataclass, field
 
 import pytest
@@ -52,13 +52,32 @@ class CountingSource:
                 self.closed.append(source)
 
 
+@dataclass(slots=True)
+class SpreadSquare:
+    """`square` that sleeps a little, so that one worker cannot take every
+    item before the others start, and records the threads it ran in.
+    Mutable, as a recorder must be; it lives in one test."""
+
+    lock: threading.Lock = field(default_factory=threading.Lock)
+    threads: set[int] = field(default_factory=set)
+
+    def __call__(self, item: int) -> int:
+        with self.lock:
+            self.threads.add(threading.get_ident())
+        time.sleep(SLEEP_UNIT_S)
+        return item * item
+
+
 def test_default_workers_is_at_most_6_and_at_least_1() -> None:
     assert DEFAULT_WORKERS == min(6, os.process_cpu_count() or 1)
 
 
 @pytest.mark.parametrize("workers", [1, 3, 8])
 def test_map_pages_gives_the_results_in_input_order(workers: int) -> None:
-    assert map_pages(square, ITEMS, workers) == SQUARES
+    spread_square = SpreadSquare()
+
+    assert map_pages(spread_square, ITEMS, workers) == SQUARES
+    assert (len(spread_square.threads) > 1) == (workers > 1)
 
 
 def test_map_pages_keeps_input_order_when_later_items_finish_first() -> None:
@@ -70,9 +89,16 @@ def test_map_pages_keeps_input_order_when_later_items_finish_first() -> None:
 
 
 def test_map_pages_gives_the_same_tuple_with_1_3_and_8_workers() -> None:
-    results = {workers: map_pages(square, ITEMS, workers) for workers in (1, 3, 8)}
+    spread_squares = {workers: SpreadSquare() for workers in (1, 3, 8)}
+    results = {
+        workers: map_pages(spread_square, ITEMS, workers)
+        for workers, spread_square in spread_squares.items()
+    }
 
     assert results == {1: SQUARES, 3: SQUARES, 8: SQUARES}
+    assert len(spread_squares[1].threads) == 1
+    assert len(spread_squares[3].threads) > 1
+    assert len(spread_squares[8].threads) > 1
 
 
 def test_map_pages_of_no_items_is_empty() -> None:
@@ -106,22 +132,24 @@ def test_map_pages_raises_the_exception_of_the_failing_item() -> None:
 def test_workers_below_1_raises_value_error(
     call: Callable[[int], tuple[int, ...]], workers: int
 ) -> None:
-    with pytest.raises(ValueError, match=f"workers.*{workers}"):
+    with pytest.raises(ValueError, match=f"workers must be at least 1, not {workers}"):
         call(workers)
 
 
 @pytest.mark.parametrize("workers", [1, 3, 8])
 def test_map_pages_with_source_gives_the_results_in_input_order(workers: int) -> None:
     sources = CountingSource()
+    spread_square = SpreadSquare()
 
     def square_with_open_source(source: int, item: int) -> int:
         assert sources.is_open(source)
-        return item * item
+        return spread_square(item)
 
     assert (
         map_pages_with_source(sources.open, square_with_open_source, ITEMS, workers)
         == SQUARES
     )
+    assert (len(spread_square.threads) > 1) == (workers > 1)
 
 
 def test_map_pages_with_source_keeps_input_order_when_later_items_finish_first() -> (
@@ -221,3 +249,50 @@ def test_open_source_that_raises_reaches_the_caller_and_other_sources_close() ->
 
     assert sources.opened != []
     assert sorted(sources.closed) == sorted(sources.opened)
+
+
+@contextmanager
+def swallowing_source() -> Generator[None]:
+    """A source whose closing swallows the exception of `function`, as a
+    defective source could: the worker then ends as if it had no item left."""
+    with suppress(ValueError):
+        yield
+
+
+def test_items_lost_to_a_source_that_swallows_an_error_raise_runtime_error() -> None:
+    def fail_on_3(_: None, item: int) -> int:
+        if item == 3:
+            message = "item 3 failed"
+            raise ValueError(message)
+        return item
+
+    with pytest.raises(RuntimeError, match=r"item indices \[3, 4, 5\] are missing"):
+        map_pages_with_source(swallowing_source, fail_on_3, tuple(range(6)), 1)
+
+
+def test_open_source_error_wins_over_a_function_error_in_another_worker() -> None:
+    both_failing = threading.Barrier(2)
+    opened = CountingSource()
+
+    @contextmanager
+    def second_opening_fails() -> Generator[int]:
+        with opened.lock:
+            opening = len(opened.opened)
+            opened.opened.append(opening)
+        if opening == 1:
+            both_failing.wait(timeout=5)
+            message = "the second source cannot be opened"
+            raise OSError(message)
+        yield opening
+
+    def fail_on_0(_: int, item: int) -> int:
+        if item == 0:
+            # Fail only once the other worker is inside open_source, so
+            # that both fail whichever raises first.
+            both_failing.wait(timeout=5)
+            message = "item 0 failed"
+            raise ValueError(message)
+        return item
+
+    with pytest.raises(OSError, match="the second source cannot be opened"):
+        map_pages_with_source(second_opening_fails, fail_on_0, ITEMS, 2)
