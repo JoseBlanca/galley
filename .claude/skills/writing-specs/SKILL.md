@@ -48,7 +48,8 @@ architecture gives":
   owner on 14 November 2026);
 - the log of the correct stage, and how the vision model is called;
 - the word list that guards hyphen joins;
-- how tests find the samples, and the pytest markers.
+- the tiers of tests and the pytest markers (already in `pyproject.toml`
+  and the `coding` skill; the architecture points to them).
 
 `docs/glossary.md` is started with it: running head, page number
 (printed) and page index, line (a line of the PDF, not of the book once
@@ -70,7 +71,8 @@ running head, is not, and belongs in the spec.
 
 ## Before writing
 
-1. Look at real input. Open the sample books under `samples/` and the
+1. Look at real input. Open the excerpts under `tests/fixtures/pdf/`, the
+   whole books under `samples/public_domain/`, and the
    output the previous stage gives today, if it exists. Write down what
    you find that a reader of the format would not expect: a page with no
    text layer, a footnote that continues on the next page, a ligature
@@ -124,7 +126,9 @@ from the others (a running head is found by looking at many pages, so it
 is a pass over the whole book before the per-page work), and the rule
 that the output does not depend on the number of threads.
 
-**How it is verified.** The reference pages: excerpts of the sample books,
+**How it is verified.** The reference pages: pages of the committed
+excerpts (a case no excerpt has gets a new excerpt in
+`scripts/fetch_samples.py`, from a public-domain book),
 named by book and page, whose expected output the owner has checked by
 eye, and what is compared and how (exactly, for the words and their
 order; by kind, for the blocks). The fidelity check: which words of the

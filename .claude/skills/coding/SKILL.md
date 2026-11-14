@@ -21,10 +21,10 @@ the rule code; the prose is for what no tool catches.
 
 Code is written from a spec, usually from a task of a plan. Read the part
 of the spec, the parts of `docs/architecture.md` it stands on, and the
-sample pages it names.
+excerpt pages it names.
 
 When the spec can be read in two ways that give different output, run
-both readings on the sample page where they differ before choosing. When
+both readings on the excerpt page where they differ before choosing. When
 the spec does not say what happens in a case, the choice is not made in
 silence: a choice that changes what a reader of the EPUB sees or a shared
 format goes to the owner; a smaller one is written into the spec in a
@@ -222,7 +222,7 @@ exceptions below the top of the program.
   `docs/glossary.md`, and the same thing has the same name in every stage.
 - A value that changes the output, a threshold or a margin, is a named
   module constant (PLR2004) with a comment that says where it comes from:
-  "0.6, measured on Turney pages 20-60" or "guessed, not measured".
+  "0.6, measured on the Kadesh excerpt" or "guessed, not measured".
 - No `bool` parameter that switches behaviour (FBT); an enum with two named
   members.
 - Paths are `pathlib.Path` (PTH), files are opened with
@@ -252,9 +252,26 @@ exceptions below the top of the program.
 
 ## Tests
 
-- Fixtures are small files in the formats of `model.py`, written by hand
-  or cut from a sample, under `tests/fixtures/<stage>/`. A stage's tests
-  need only its own fixtures, never the output of another stage's code.
+- Tests come in three tiers, and the first two are the development loop:
+  1. **Unit tests** of the pure functions, with literal inputs and small
+     fixture files in the formats of `model.py` under
+     `tests/fixtures/<stage>/`, written by hand or cut from an excerpt.
+     Milliseconds each. A stage's unit tests need only its own fixtures,
+     never the output of another stage's code.
+  2. **Excerpt tests**: a stage, or the pipeline end to end, run on the
+     public-domain excerpt PDFs of `tests/fixtures/pdf/`, about ten pages
+     each. About a second each. These are the integration tests.
+  3. **Whole-book tests**, marked `whole_book`: a stage or the pipeline on
+     the whole public-domain books, for the fidelity check and timings.
+     Excluded from the default run; run with `uv run pytest -m whole_book`
+     at the end of a work package, not after every change.
+- Speed is part of the test's design. `uv run pytest` (tiers 1 and 2)
+  stays under 30 seconds in total, and pytest prints the five slowest
+  tests on every run (`--durations=5`). A unit test that reads a PDF, or
+  an excerpt test that needs more pages, is in the wrong tier: cut a
+  smaller fixture or a new excerpt. A fixture is never a copyrighted text;
+  excerpts come only from the public-domain books of
+  `scripts/fetch_samples.py`.
 - The expected values are literals: the words, the kinds of the blocks,
   the Markdown. They come from the spec or from a reference page the
   owner checked by eye, never from running the code under test.
@@ -271,12 +288,12 @@ exceptions below the top of the program.
   run the tests themselves in 8 threads at once with pytest-run-parallel,
   which catches state shared between calls; a test that calls PDFium is
   marked `thread_unsafe` and runs once.
-- Tests that need the sample PDFs, Tesseract or Pandoc are marked
-  `samples`, `tesseract` or `pandoc` (registered in `pyproject.toml`) and
-  skip with the reason when it is missing. The `samples_dir` fixture of
-  `tests/conftest.py` finds the samples through `GALLEY_SAMPLES` or in
-  `samples/` of the main checkout, so tests in a worktree find them too.
-  A skip is reported as a skip, never as a pass.
+- Tests that need Tesseract or Pandoc are marked `tesseract` or `pandoc`
+  and skip with the reason when the program is missing. The `books_dir`
+  fixture of `tests/conftest.py` finds the whole books through
+  `GALLEY_SAMPLES` or in `samples/` of the main checkout, so tests in a
+  worktree find them too, and skips when they were never downloaded. A
+  skip is reported as a skip, never as a pass.
 - A test's name says the behaviour and the outcome:
   `test_running_head_with_changing_page_number_is_removed`.
 
@@ -288,8 +305,11 @@ uv run --locked ruff format --check
 uv run --locked ruff check
 uv run --locked ty check
 uv run --locked pytest
-uv run --locked pytest --parallel-threads=8 -m "not samples"
+uv run --locked pytest --parallel-threads=8
 ```
+
+At the end of a work package, also `uv run --locked pytest -m whole_book`,
+after `uv run python scripts/fetch_samples.py` has downloaded the books.
 
 Report what each printed when it failed, and the counts of passed and
 skipped when it passed: "5 skipped" may be the whole of the new work.

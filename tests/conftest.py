@@ -1,9 +1,10 @@
 """Fixtures shared by every stage's tests.
 
-The sample PDFs are copyrighted and ignored by git, so a worktree does not
-have them. They are found through the GALLEY_SAMPLES environment variable,
-or else in `samples/` of the main checkout, which git reports as the parent
-of the common git directory.
+The excerpt PDFs are public domain and committed under tests/fixtures/pdf/.
+The whole books are ignored by git, so a worktree does not have them. They
+are found through the GALLEY_SAMPLES environment variable, or else in
+`samples/` of the main checkout, which git reports as the parent of the
+common git directory. `scripts/fetch_samples.py` downloads them.
 """
 
 import os
@@ -12,6 +13,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
+EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 
 
 def _main_checkout_samples() -> Path:
@@ -28,12 +31,24 @@ def _main_checkout_samples() -> Path:
 
 
 @pytest.fixture(scope="session")
-def samples_dir() -> Path:
-    """The directory of the sample PDFs; skips the test when it is missing."""
+def excerpt_pdf() -> dict[str, Path]:
+    """The committed excerpt PDFs, by name (the file name without .pdf)."""
+    return {path.stem: path for path in sorted(EXCERPTS_DIR.glob("*.pdf"))}
+
+
+@pytest.fixture(scope="session")
+def books_dir() -> Path:
+    """The directory of the whole public-domain books, for whole_book tests.
+
+    Skips the test, with the reason, when the books were never downloaded.
+    """
     env = os.environ.get("GALLEY_SAMPLES")
-    path = Path(env) if env is not None and env != "" else _main_checkout_samples()
+    samples = Path(env) if env is not None and env != "" else _main_checkout_samples()
+    path = samples / "public_domain"
     if not any(path.glob("*.pdf")):
-        pytest.skip(f"no sample PDFs found (looked in {path})")
+        pytest.skip(
+            f"no whole books in {path}; run `uv run python scripts/fetch_samples.py`"
+        )
     return path
 
 

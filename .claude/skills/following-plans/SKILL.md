@@ -25,8 +25,10 @@ stops only when it needs the owner.
    then `EnterWorktree` with that path, and `uv sync` inside it. All the
    work of the plan happens there.
 3. Check what the plan says must be in place by running it: `which
-   pandoc`, the sample PDFs under `samples/` of the main checkout (they are
-   not in git, so the worktree reaches them by absolute path). When
+   pandoc`, the whole public-domain books under `samples/public_domain/` of
+   the main checkout when the plan runs `whole_book` tests (they are not in
+   git; `scripts/fetch_samples.py` downloads them, and the tests reach them
+   from a worktree through `tests/conftest.py`). When
    something is missing, tell the owner what and stop. Do not build it on
    the side: that it is not part of this plan was somebody's decision.
 4. When `git worktree list` shows another session's worktree, read the

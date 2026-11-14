@@ -75,14 +75,16 @@ all = "error"
 [tool.pytest]
 minversion = "9.0"
 testpaths = ["tests"]
-addopts = ["-ra", "--import-mode=importlib", "-p", "gilguard"]
+addopts = ["-ra", "--import-mode=importlib", "-p", "gilguard", "-m", "not whole_book", "--durations=5"]
 strict = true
-timeout = "300"
+# A unit test takes milliseconds and an excerpt test about a second; a test
+# that needs more is a whole_book test or a defect.
+timeout = "30"
 # Every warning is an error, and with it the RuntimeWarning that CPython
 # prints when an extension turns the GIL back on.
 filterwarnings = ["error"]
 markers = [
-    "samples: needs the sample PDFs (found through GALLEY_SAMPLES or samples/ of the main checkout)",
+    "whole_book: runs on whole books from samples/ (GALLEY_SAMPLES or the main checkout); excluded by default, run with -m whole_book",
     "tesseract: needs the tesseract binary",
     "pandoc: needs the pandoc binary",
 ]

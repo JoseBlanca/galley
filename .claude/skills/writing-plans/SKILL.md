@@ -37,7 +37,7 @@ copy is wrong as soon as the spec changes.
 - Read the specs, `docs/architecture.md`, `docs/glossary.md`, and the code
   that exists. A plan written without looking at the code plans work that
   is done, or builds on something that is not there.
-- Run what the checks will run, once: the CLI command on a sample, `which
+- Run what the checks will run, once: the CLI command on an excerpt, `which
   pandoc`, `which tesseract`, `which epubcheck`. A program that is not
   installed is something that must be in place, listed in the plan.
 - Show the owner the breakdown in chat before writing the plan: the work
@@ -48,14 +48,14 @@ copy is wrong as soon as the spec changes.
 ## Work packages
 
 A work package ends with something that exists and can be run: the
-`extract` subcommand writes `lines.json` for the Turney sample; the EPUB
-of the Haynes sample passes `epubcheck` and Pandoc's table of contents has
-its chapters. How it looks on the Kindle is for the owner, at the end of
+`extract` subcommand writes `lines.json` for the Kadesh excerpt; the EPUB
+of the Gierke excerpt passes `epubcheck` and Pandoc's table of contents has
+its chapter. How it looks on the Kindle is for the owner, at the end of
 the plan, and is not a check. When it is done the project works, with every check of the
 `coding` skill passing.
 
-A work package goes as far as the CLI, so that it can be run on a sample
-book. One that stops inside a module, a helper another stage will call,
+A work package goes as far as the CLI, so that it can be run on an
+excerpt. One that stops inside a module, a helper another stage will call,
 says so and says which later work package runs it on a book.
 
 Each work package has:
@@ -113,8 +113,9 @@ run side by side.
 4. The work packages in order, numbered, with tasks numbered inside them
    and a box the orchestrator ticks: `- [ ] 2.3 Join hyphenated words`.
 5. How the whole plan is checked at the end, when that is more than its
-   work packages: the EPUB of both samples, built and opened, and the
-   pages the owner should look at on the Kindle.
+   work packages: `uv run pytest -m whole_book` on the public-domain
+   books, the EPUB of a whole book built, and the pages the owner should
+   look at on the Kindle.
 
 A plan says what and in what order, not how. No code and no signatures,
 which are in the spec.

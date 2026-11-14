@@ -80,11 +80,25 @@ holds in chat, and these are the principles that fail most often there:
   --check`, ruff format and check, ty, and pytest, once normally and once
   with 8 threads. ruff, ty and pytest are pinned to exact versions.
 
-## Samples
+## Samples and test speed
 
-`samples/` holds PDFs of copyrighted books and is ignored by git. Short
-excerpts used as test fixtures stay in this private repository and must not
-be published.
+The repository is public, so nothing from a copyrighted book is committed.
+Development and tests use public-domain scans from the Internet Archive,
+which have the same kind of OCR text layer, running heads and footnotes:
+
+- **Excerpts**, about ten pages each, committed under `tests/fixtures/pdf/`
+  and cut by `scripts/fetch_samples.py`, which lists the books, the pages
+  of each excerpt and what each excerpt covers. A new case is a new excerpt
+  added there, not a longer one.
+- **Whole books**, in `samples/public_domain/` (ignored by git), downloaded
+  by the same script. They are for the slow tests, marked `whole_book`.
+- The owner's own PDFs, which may be copyrighted, sit in `samples/` (ignored
+  by git) and are used by hand or by `whole_book` tests, never cut into a
+  fixture.
+
+The development loop must stay fast: `uv run pytest` runs everything but
+the `whole_book` tests and should take seconds, not minutes. The `coding`
+skill gives the budget.
 
 Earlier OCR and constrained-correction code worth reusing is in
 `~/devel/tomato_history_web_site/tools/ocr_lab/` (`lib/common.py`,
