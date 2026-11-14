@@ -341,3 +341,37 @@ analyze with `PdfminerException: /b'trailer'`, not repeated in 80 later
 runs. An agent is checking whether it is a race under free threading or
 a PDF deleted underneath by another agent's pytest pruning the shared
 temporary folder.
+
+### The pdfminer race
+
+The crash seen twice during the reviews, `PdfminerException:
+/b'trailer'` in analyze, is a race between threads inside pdfminer.six
+20260107, not in galley. `PSSymbolTable.intern` (pdfminer/psparser.py,
+lines 85-93) looks a keyword up in a module-level dict and stores it if
+missing, with no lock; two threads opening documents at the same moment
+can each store their own `trailer` keyword, and `pdfdocument.py` line 186
+then compares by identity and fails in one of them.
+
+Measured by an investigating agent on the whole Kadesh book, one fresh
+process per round: with galley's analyze and extract, 1 crash in 150
+rounds at 6 workers and 2 in 150 at 24, none at 1 worker; with plain
+pdfplumber, 3 and 4 in 150. In every round that did not crash, the
+output was byte-identical to the one-worker reference, so nothing was
+corrupted in silence. With a 1 ms delay added inside the table, 3 of 5
+runs failed with the same message. Deleting or truncating the PDF while
+it was read (240 cases) never gave this message, so the other
+explanation, another agent's pytest pruning the shared temporary folder,
+was ruled out.
+
+Fix (421c335, 7a12f69): `text_layer.open_pdf` opens every pdfplumber
+document under one lock; reading pages stays parallel. A test makes the
+race happen every time (threads held at the table until all have
+missed): `pdfplumber.open` fails in 3 of 4 threads, `open_pdf` in none,
+and with the lock removed `open_pdf` fails too. After the fix, 300 rounds
+at 6 and 24 workers: 0 crashes, all identical. A PDF that pdfplumber
+cannot read is now a `PdfError` naming the file. The coding skill's
+threading section records the lesson: a library's module-level table is
+shared state.
+
+For the owner: a draft issue for pdfminer.six (a lock in `intern`, or
+`dict.setdefault`) is ready; it is not posted.
