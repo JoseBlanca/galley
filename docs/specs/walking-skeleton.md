@@ -930,13 +930,28 @@ THE BATTLE OF KADESH A STUDY IN THE EARLIEST KNOWN MILITARY STRATEGY\* JAMES …
   ensure_ascii=False)`), which YAML reads as double-quoted strings.
 - The text of a block is written on one line, with a backslash before
   every ASCII punctuation character (`string.punctuation`) and nothing
-  else changed. Pandoc's Markdown reads any escaped ASCII punctuation as
+  else changed but the white space of the next point. Pandoc's Markdown reads any escaped ASCII punctuation as
   itself. Unescaped, Pandoc 3.13 changes words of both excerpts: Kadesh's
   `*Oampagne`, `me*ure` and `admits*` lose their asterisks to emphasis,
   Gierke's `jj^J^jjJJ` its carets to a superscript. Escaped, all 6,121
   Kadesh and 3,406 Gierke words come back from a round trip. The
   escaping makes `book.md` hard to proofread (`remarks\.`); the markdown
   spec chooses a lighter one with the same guarantee.
+- The white space that Pandoc's Markdown reads as layout is made plain:
+  each tab, line feed and carriage return in the text becomes a space,
+  and the spaces, tabs, line feeds and carriage returns at the start and
+  end of the text are dropped. No word changes, since `str.split()`,
+  which the fidelity check splits words with, splits at each of these
+  characters. Left as they are, Pandoc 3.14 drops a carriage return
+  inside a word (`ab\rcd` reads as the one word `abcd`), and reads a
+  line that starts with a tab or four spaces, at the start of the text
+  or after a blank line, as a code block. Every other character is kept:
+  checked on 14 November 2026 with Pandoc 3.14 through `read_markdown`,
+  each of the other 25 characters `str.split()` splits at (the vertical
+  tab, the form feed, U+001C to U+001F, U+0085 and the Unicode spaces
+  and line separators) and each C0 and C1 control character came back
+  as written, inside a word, at the start of the text and four times
+  before a word.
 - The skeleton writes no heading, footnote, margin note or figure:
   structure gives only paragraphs. markdown raises `GalleyError` with the
   block id when it meets another kind, a note, or a note reference,
@@ -998,9 +1013,13 @@ def pandoc_arguments(folder: BookFolder, config: BookConfig, style_sheet: Path) 
 Unit tests:
 
 - `escape_markdown`: `*x*` gives `\*x\*`; `1. Of` gives `1\. Of`; `«` and
-  `—` are unchanged; a text holding every ASCII punctuation character,
-  escaped and read back with `read_markdown` (marked `pandoc`), comes back
-  equal.
+  `—` are unchanged; `ab\rcd` gives `ab cd`, and `\tab` and `    ab`
+  give `ab`; a text holding every ASCII punctuation character, escaped
+  and read back with `read_markdown` (marked `pandoc`), comes back
+  equal; so do the words of texts holding each character `str.split()`
+  splits at and each control character, inside a word, at the start of
+  the text and four times before a word, and of texts with a tab or
+  four spaces after a blank line.
 - `render_markdown` on a literal `BlocksFile` of two paragraphs gives a
   literal Markdown text, header included; a heading block or a note
   raises.
