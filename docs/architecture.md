@@ -6,7 +6,7 @@ other, the data formats of those files, how edits to the text are kept,
 and the rules every stage follows so that no word of the book is lost or
 invented. The specs of the stages, `docs/specs/<stage>.md`, build on it,
 and the names of the things of the domain are those of `docs/glossary.md`.
-Dated 14 November 2026. Two points are left for the owner, in section 15;
+Dated 14 November 2026. Three points are left for the owner, in section 15;
 the rest is for the owner to approve.
 
 Decisions marked "owner, 14 November 2026" were taken by the owner in chat.
@@ -26,8 +26,9 @@ The layer gives words, not the lines of the book. pdfplumber groups words
 into lines by height alone, so a row that crosses two columns comes out as
 one line: on page 0 of the Kadesh excerpt, the two columns of footnotes
 give "Ori- 'There is, however, much material…", the end of one note and
-the start of another. Gierke prints headings in the right margin beside
-the body text, on the same rows. Finding columns, margins and lines is
+the start of another. Gierke prints short headings in the margin beside
+the body text, on the same rows, on the left of some pages and the right
+of others, and inside its endnotes too. Finding columns, margins and lines is
 therefore a stage of its own (layout, section 7).
 
 When a page has no text layer, or a poor one, galley makes its own with
@@ -58,8 +59,8 @@ can be built and tested on its own.
 | stage | reads | writes | work |
 |---|---|---|---|
 | analyze | PDF, config | `pages.json` | what each page is and where its words come from |
-| extract | PDF, config, `pages.json` | `words.json`, `images/` | the words of each page with their boxes; figures cut out |
-| layout | `pages.json`, `words.json` | `lines.json` | each page's words grouped into regions and lines, in reading order |
+| extract | PDF, config, `pages.json` | `words.json`, `images/` | the words of each page with their boxes; figures and the cover cut out |
+| layout | `pages.json`, `words.json` | `lines.json` | each page's words grouped into regions and lines, in reading order; the figures carried over |
 | structure | `pages.json`, `lines.json`, config | `blocks.json` | the book as ordered blocks and notes; what was removed |
 | correct | PDF, `words.json`, `blocks.json` | `edits/correct.jsonl` | proposed fixes to OCR errors (optional) |
 | markdown | `blocks.json`, `edits/`, config | `book.md` | Pandoc Markdown with the edits applied |
@@ -132,7 +133,8 @@ A stage spec adds the keys it needs, here and in `config.py` together.
   block (from 1) that starts on that page, counting body blocks and note
   blocks together in reading order: `b-p0012-003`. A paragraph that runs
   from page 12 to page 13 has the id of page 12. A **note id** is
-  `n-p<page index>-<n>` in the same way, for the n-th note on the page.
+  `n-p<page index, 4 digits>-<n, 3 digits>` in the same way, for the n-th
+  note that starts on the page.
 - The **text of a block** is the concatenation of the `text` of its spans.
   Spans of one block are separated by nothing, so a span carries the
   spaces it needs. Edits match against this text.
@@ -180,7 +182,8 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
 
 **lines.json**, `LinesFile(pages: tuple[PageLayout, ...])`:
 
-- `PageLayout`: `index`, `regions: tuple[Region, ...]`, in reading order.
+- `PageLayout`: `index`, `regions: tuple[Region, ...]`, in reading order,
+  and `figures`, copied from words.json so that structure need not read it.
 - `Region`: `box`, `lines: tuple[Line, ...]`. A region is a part of the
   page whose lines are read one after the other: the body column, a
   margin, a column of footnotes, the running head. layout does not say
@@ -188,7 +191,9 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
 - `Line`: `box`, `words: tuple[Word, ...]`, left to right.
 
 layout only regroups words: every word of words.json is in exactly one
-line of lines.json. It removes nothing.
+line of lines.json. It removes nothing. The removals of words.json are not
+repeated in lines.json or blocks.json: each file lists only the removals
+its own stage made.
 
 **blocks.json**, `BlocksFile(blocks, notes, removals, word_changes,
 page_numbers)`:
@@ -198,13 +203,17 @@ page_numbers)`:
   `origin: tuple[Origin, ...]`.
 - `BlockKind`: `heading`, `paragraph`, `quote`, `figure`, `margin_note`
   (section 15, point 1), `index_entry`.
-- `Span`: `text`, `emphasis: Emphasis`, `note_ref: str | None`, the id of
-  the note it points to; a span with a `note_ref` stands where the marker
-  was printed.
+- `Span`: `text`, `emphasis: Emphasis`, `note_ref: str | None`. A span
+  with a `note_ref` is a note reference: its `text` is the marker as
+  printed ("1", "*") and `note_ref` is the id of the note.
 - `Emphasis`: `none`, its only value for now (owner, 14 November 2026:
   no italics yet; the field is kept for them).
-- `Note`: `id`, `marker` (as printed: "8", "*"), `blocks: tuple[Block,
-  ...]` (a note may have several paragraphs), `origin`.
+- `Note`: `id`, `marker` (as printed at the start of the note: "8", "*",
+  or as OCR misread it), `blocks: tuple[Block, ...]` (a note may have
+  several paragraphs), `origin`, `referenced: bool`. A note whose
+  reference structure could not find (in Gierke's excerpt, endnotes whose
+  text is outside it) has `referenced` false. A marker in the text whose
+  note was not found is left in its word, unsplit.
 - `Origin`: `page_index`, `box`. A paragraph that runs over a page break
   has two.
 - `WordChange`: `page_index`, `before: tuple[str, ...]`, `after:
@@ -217,12 +226,13 @@ page_numbers)`:
   `page_numbers: tuple[PageNumber, ...]`, taken from the removals; the
   index stage uses it (section 10).
 
-**Removal**, in words.json and blocks.json: `page_index`, `box`, `text`,
+**Removal**, in words.json (excluded pages and regions) and blocks.json
+(the rest): `page_index`, `box`, `text`,
 `reason: RemovalReason`: `excluded_page`, `excluded_region`,
 `running_head`, `page_number`, `signature_mark`. A stage spec adds a
 reason when it removes a new kind of text, and the reason names what the
 text is, never "noise": a plate's stray text-layer characters are removed
-as `plate_text`, which the owner can review.
+as `plate_text` by structure, which the owner can review.
 
 **Edit**, one JSON object per line of a file under `edits/`: `block_id`,
 `block_sha256` (the first 12 hex digits of the SHA-256 of the block's text
@@ -249,17 +259,18 @@ whether it is blank, text or a plate; and applies the config's
 pdfplumber, one document per worker thread. OCR pages are rendered at 300
 dpi by `pdfium.py` and read by Tesseract in parallel; their pixel boxes are
 turned into points. Plate pages are rendered and their figure cut into
-`images/`.
+`images/`, and so is the `cover_page` of the config, as `images/cover.png`.
 
 **layout** groups each page's words into regions and lines, and orders
 them for reading: a column, then the next; the margin beside the body;
-the footnote columns at the foot.
+the footnote columns at the foot. It copies the page's figures through.
 
 **structure** turns regions and lines into blocks and notes. It first
 reads the whole book to find what repeats: running heads, page numbers,
 signature marks, the line heights of body and notes. Then, per page, it
 removes those, decides what each region is, groups lines into
-paragraphs, headings, quotes, margin notes and notes, joins hyphenated
+paragraphs, headings, quotes, margin notes and notes (a margin note goes
+just before the paragraph whose line it sits beside), joins hyphenated
 words where the word list or the book's own words allow it, and splits
 note markers off the words they are glued to. Last, it joins paragraphs
 and notes that run over a page break and matches each note reference to
@@ -273,14 +284,22 @@ page image. It is optional. Its spec is written later.
 **markdown** applies the edits (section 9) and writes `book.md`: a
 metadata header from the config; headings with their block id as anchor;
 every other block as a Pandoc fenced div with its id (`::: {#b-p0012-003}`);
-notes as Pandoc footnotes at the end of each chapter, which the Kindle
-shows as pop-ups; figures as images. Text is escaped so that Pandoc reads
+notes with `referenced` true as Pandoc footnotes, each of their blocks a
+fenced div with its id inside the footnote, which Pandoc puts at the end
+of each chapter and the Kindle shows as pop-ups (section 15, point 3);
+notes with `referenced` false as ordinary blocks where they were printed,
+the marker first; figures as images. Pandoc runs with
+`--fail-if-warnings`, so that a note it would drop, or a reference it
+would print as text, is an error (checked with Pandoc 3.13: an unused
+note definition is dropped with only a warning, and the option makes it
+exit with 3). Text is escaped so that Pandoc reads
 it back as written: "1. Of the three" at the start of a paragraph must
 not become a numbered list. `book.md` is read by Pandoc with smart quotes
 off (`-f markdown-smart`), so `"` stays `"`.
 
 **epub** runs Pandoc on `book.md` with the cover and a style sheet, then
-epubcheck on the result (section 15, point 2).
+epubcheck on the result (section 15, point 2). The cover is
+`images/cover.png` when the config has a `cover_page`.
 
 ## 9. Edits
 
@@ -292,8 +311,11 @@ November 2026: patches, usable by agents too).
 - An edit names a block (of the body or of a note) by id, carries the
   checksum of the block's text, and gives the text it replaces, `old`,
   and the new text, `new`, with who made it and why.
-- markdown applies `correct.jsonl` first, then the other files of
-  `edits/` by file name, each from its first line to its last.
+- markdown applies `correct.jsonl` first, then the agents' files by file
+  name, then `owner.jsonl` last, each from its first line to its last.
+  The owner's edits come last because `edits-from` finds them on a
+  `book.md` that already had every other edit applied. A missing file is
+  simply no edits.
 - An edit applies when its block exists, the checksum matches the block's
   text as structure wrote it, and `old` appears exactly once in the
   block's text as edited so far. Otherwise markdown stops with an error
@@ -334,7 +356,7 @@ A stage imports these and nothing else of galley.
 | `config.py` | `BookConfig`, `read_config(path)`, the language codes |
 | `book_folder.py` | `BookFolder` |
 | `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract, Pandoc, epubcheck), `EditError`, `FidelityError` |
-| `pdfium.py` | the one thread that calls PDFium, which is not thread-safe: `page_count`, `page_size`, `render(pdf, page_index, dpi) -> RenderedPage` |
+| `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage` |
 | `parallel.py` | `DEFAULT_WORKERS` (6) and `map_pages(function, items, workers)`, which returns the results in input order |
 | `wordlist.py` | `word_list(language) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/` |
 | `fidelity.py` | the fidelity check, section 12 |
@@ -347,27 +369,35 @@ the module. galley needs the lock off to run pages in parallel.
 ## 12. The fidelity check
 
 galley's first goal is that no word of the book is lost or invented. The
-fidelity check makes that testable at each stage. It works page by page:
-the words of a page in a stage's input must equal, as a multiset, the
-words with an origin on that page in its output, plus the removals of that
-page, with every recorded word change and edit applied. A difference is a
-`FidelityError` that names the page and the words.
+fidelity check, `fidelity.check_stage(stage, before, after)`, makes that
+testable at each stage boundary. It works on the whole book: the words of
+a stage's input must equal, as a multiset, the words of its output plus
+the removals that stage made, once the stage's word changes are applied
+(and, for markdown, the edits). A difference is a `FidelityError` that
+lists the words, with the pages they came from where the origins say.
 
 - Words are compared as strings, split on white space, with nothing
   normalised: a changed letter or a lost accent is a difference.
-- Order is not part of the check, because columns, margins and notes move
-  between stages. Order within a block is checked by structure's tests.
-- What each stage is compared on: extract, the text layer or Tesseract's
-  words against words.json; layout, words.json against lines.json;
-  structure, lines.json against blocks.json, where a note's marker counts
-  as a word of the note; markdown, blocks.json with the edits applied
-  against `book.md` as Pandoc reads it (its JSON document tree, `pandoc -f
-  markdown-smart -t json`), where a footnote reference is a reference and
-  not a number. The check stops at `book.md`: turning it into an EPUB is
-  Pandoc's work, and epubcheck checks the EPUB's form.
+- It compares multisets over the whole book, not page by page, because a
+  paragraph or a hyphen join can run over a page break and its words then
+  belong to two pages. Order is not part of the check, because columns,
+  margins and notes move between stages; order within a block is checked
+  by structure's tests.
+- The boundaries: layout, words.json against lines.json; structure,
+  lines.json against blocks.json (the text of every body and note block,
+  with a note's `marker` counted as a word of it); markdown, blocks.json
+  with the edits applied against `book.md` as Pandoc reads it (`pandoc -f
+  markdown-smart -t json`): a note reference is matched to Pandoc's note
+  element and its marker is not compared as a word, because Pandoc writes
+  its own numbers (section 15, point 3); likewise the `marker` of a
+  referenced note.
+- extract is where the words enter galley, so it has no boundary to check:
+  its excerpt tests compare its words with literals.
+- The check stops at `book.md`: turning it into an EPUB is Pandoc's work,
+  and epubcheck checks the EPUB's form.
 - The excerpt tests of every stage run the check, and the `whole_book`
-  tests run it on whole books. `galley2epub run` runs it after each stage
-  too, because the cost is small: one pass over the words.
+  tests run it on whole books. `galley2epub run` runs it after layout,
+  structure and markdown, which costs one pass over the words.
 
 ## 13. The command
 
@@ -398,7 +428,7 @@ margin.
 
 | option | the reader sees | costs |
 |---|---|---|
-| A. A small bold line before the paragraph it was beside | every margin heading, as a run-in title | none beyond the block kind |
+| A. A small bold line before the paragraph whose line it was beside | every margin heading, as a run-in title | none beyond the block kind |
 | B. Removed, as `margin_note` removals | the body only | the headings are lost to the reader, kept only in blocks.json |
 | C. A note attached to the paragraph | a pop-up marker per heading | many markers in the text |
 
@@ -418,6 +448,18 @@ version 5.4.0, which needs Java (Homebrew's `openjdk`, several hundred MB).
 Recommendation: A, since the Kindle's own errors are harder to read.
 Meanwhile: the epub stage's tests that need it are marked and skip.
 
+**3. Note markers.** Pandoc numbers footnotes itself, 1, 2, 3 in each
+chapter, whatever the book printed: Kadesh's "*" note becomes "1", and a
+chapter whose notes are 291-302 restarts at 1.
+
+| option | the reader sees | costs |
+|---|---|---|
+| A. Pandoc's numbers | clean numbers, restarting each chapter | the printed markers are lost to the reader (kept in blocks.json) |
+| B. The printed markers | what the book printed | Pandoc has no option for it: markdown writes the references and notes as raw HTML links, and the OCR misreadings of markers ("i" for "1", "•Pa" for "*") show unless an edit fixes them, which needs `Note.marker` to be editable |
+
+Recommendation: A. The pop-up does not depend on the number, and B costs
+raw HTML and a second kind of edit. Meanwhile: A.
+
 ## 16. Not in this document
 
 - How each stage does its work: the page score threshold, column
@@ -425,5 +467,7 @@ Meanwhile: the epub stage's tests that need it are marked and skip.
   cutting. That is in the stage specs.
 - What happens to a hyphen that structure cannot join safely ("neces-" and
   "sary" with no evidence): structure's spec, as an open point.
-- The `correct` and `index` stages and `edits-from`, specified later.
+- The `correct` stage, with its log and how it calls the vision model; the
+  `index` stage; and `edits-from`. Each is specified later, and section 7
+  gains their formats then.
 - The style sheet and cover of the EPUB, in the epub stage's spec.

@@ -23,9 +23,10 @@ committed under `tests/fixtures/pdf/`. The fixture of the excerpt tests.
 **figure**: a picture in the book, cut from the page render into
 `images/`. A **plate** is a page that is mostly a figure.
 
-**fidelity check**: the test, page by page, that the words of a stage's
-input are the words of its output plus its removals, once word changes and
-edits are applied: nothing lost, nothing invented.
+**fidelity check**: the test, over the whole book, that the words of a
+stage's input are the words of its output plus the removals that stage
+made, once its word changes and edits are applied: nothing lost, nothing
+invented.
 
 **hyphen join**: two parts of a word split at a line end, "repli-" and
 "cate", made into one, "replicate". A kind of word change.
