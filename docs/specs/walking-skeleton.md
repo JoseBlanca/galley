@@ -948,22 +948,23 @@ THE BATTLE OF KADESH A STUDY IN THE EARLIEST KNOWN MILITARY STRATEGY\* JAMES …
   spec chooses a lighter one with the same guarantee.
 - The white space that Pandoc's Markdown reads as layout is made plain:
   each tab, line feed and carriage return in the text becomes a space,
-  and the spaces, tabs, line feeds and carriage returns at the start and
-  end of the text are dropped. No word changes, since `str.split()`,
+  and so do the vertical tab, the form feed and U+001C to U+001F, which
+  XML 1.0 does not allow; then the spaces at the start and end of the
+  text are dropped. No word changes, since `str.split()`,
   which the fidelity check splits words with, splits at each of these
   characters. Left as they are, Pandoc 3.14 drops a carriage return
   inside a word (`ab\rcd` reads as the one word `abcd`), and reads a
   line that starts with a tab or four spaces, at the start of the text
   or after a blank line, as a code block. Every other character is kept:
   checked on 14 November 2026 with Pandoc 3.14 through `read_markdown`,
-  each of the other 25 characters `str.split()` splits at (the vertical
-  tab, the form feed, U+001C to U+001F, U+0085 and the Unicode spaces
-  and line separators) and each C0 and C1 control character came back
+  each of the other 19 characters `str.split()` splits at (U+0085 and
+  the Unicode spaces and line separators) and each C0 and C1 control
+  character came back
   as written, inside a word, at the start of the text and four times
   before a word.
-- A character that XML 1.0 does not allow, which is every C0 control
-  character but the tab, line feed and carriage return, U+FFFE, U+FFFF
-  and a lone surrogate, makes markdown raise `InputFileError` naming
+- A character that XML 1.0 does not allow and that is not made a space
+  above, which is every other C0 control character, U+FFFE, U+FFFF and
+  a lone surrogate, makes markdown raise `InputFileError` naming
   `blocks.json`, the block id and the code point (`U+FFFE`). Pandoc
   copies such a character into the EPUB's XHTML, which is then not
   well-formed (epubcheck: `FATAL(RSC-016)`), while the word check
@@ -1012,7 +1013,9 @@ pandoc <book.md> --from markdown-smart-auto_identifiers --to epub3 --output <boo
 with absolute paths, a timeout of 120 s and `check=True`. The input
 format is the one `read_markdown` reads with (section 5), so that the
 EPUB is made from the same reading of `book.md` that the word check
-passed. `style.css` is a
+passed. Making the paths absolute (`Path.resolve`) is a safety
+measure with no effect a test can see while Pandoc runs in the caller's
+directory, where relative paths also work. `style.css` is a
 file of the package, `src/galley/epub/style.css`, empty in the skeleton,
 found with `importlib.resources`; passing it tries now the path the real
 style sheet will take. With `--css`, Pandoc uses that sheet instead of
@@ -1045,7 +1048,10 @@ Unit tests:
   punctuation character, escaped and read back with `read_markdown`
   (marked `pandoc`), comes back equal, and so do `jj^J^jjJJ`, `H~2~O`,
   `a\\b`, `# 1 Of`, `see @doe`, `*x*`, `_x_`, `` `x` ``, `[x](y)`,
-  `$x$`, `<i>x</i>`, `<!--x-->`, `{x}` and `|a|b|`; so do the words of texts holding each character `str.split()`
+  `$x$`, `<i>x</i>`, `<!--x-->`, `{x}` and `|a|b|`; markdown `run` on a
+  block holding the vertical tab, the form feed and U+001C to U+001F,
+  inside a word and four times before one, writes a `book.md` whose
+  words are the block's; so do the words of texts holding each character `str.split()`
   splits at and each control character, inside a word, at the start of
   the text and four times before a word, and of texts with a tab or
   four spaces after a blank line.
@@ -1070,7 +1076,7 @@ Unit tests:
   `<dc:language>en</dc:language>`, and whose chapter holds both div ids;
   with no `book.md`, it raises `InputFileError` naming markdown; the
   style sheet `EPUB/styles/stylesheet1.css` is there and empty; a
-  relative book folder works; a `book.md` with `![](missing.png)` gives
+  `book.md` with `![](missing.png)` gives
   `ExternalProgramError` with Pandoc's "Could not fetch resource" and no
   `book.epub`; with no `pandoc` on the `PATH`, the error says it is not
   installed.
