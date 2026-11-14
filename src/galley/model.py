@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from galley.errors import InputFileError
+from galley.errors import EditError, InputFileError
 
 PAGES_FORMAT_VERSION = 1
 WORDS_FORMAT_VERSION = 1
@@ -412,38 +412,153 @@ def _encode(annotation: object, value: object) -> object:
     return value
 
 
-def _decode(annotation: object, value: object) -> object:
-    """The value of type `annotation` that `_encode` wrote as `value`."""
-    if value is None:
-        return None
-    if annotation is Box and isinstance(value, list):
-        return Box(*(float(coordinate) for coordinate in value))
-    if annotation is float and isinstance(value, int | float):
-        return float(value)
-    if isinstance(annotation, type) and issubclass(annotation, StrEnum):
-        return annotation(value)
-    if (item_type := _tuple_item_type(annotation)) is not None and isinstance(
-        value, list
-    ):
-        return tuple(_decode(item_type, item) for item in value)
+class _FieldError(Exception):
+    """A JSON value that does not fit its field, at `json_path` (such as
+    `pages[3].words[12].box`; empty for the file as a whole). The reader
+    adds the file and raises it again as InputFileError or EditError."""
+
+    def __init__(self, problem: str, json_path: str = "") -> None:
+        super().__init__(f"{json_path}: {problem}" if json_path else problem)
+
+
+_FOUND_CHARACTERS = 40  # how much of a wrong value an error message quotes
+
+
+def _found(value: object) -> str:
+    text = json.dumps(value, ensure_ascii=False)
+    if len(text) > _FOUND_CHARACTERS:
+        return text[:_FOUND_CHARACTERS] + "..."
+    return text
+
+
+def _join(json_path: str, name: str) -> str:
+    return f"{json_path}.{name}" if json_path else name
+
+
+def _number(value: object, json_path: str) -> float:
+    # JSON true and false are bools, which Python counts as ints; they are
+    # not numbers here. An int is read as the equal float.
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        problem = f"expected a number, found {_found(value)}"
+        raise _FieldError(problem, json_path)
+    return float(value)
+
+
+_BOX_COORDINATES = 4
+
+
+def _decode_box(value: object, json_path: str) -> Box:
+    if not isinstance(value, list) or len(value) != _BOX_COORDINATES:
+        problem = f"expected a box of four numbers, found {_found(value)}"
+        raise _FieldError(problem, json_path)
+    x0, top, x1, bottom = (
+        _number(coordinate, f"{json_path}[{position}]")
+        for position, coordinate in enumerate(value)
+    )
+    return Box(x0, top, x1, bottom)
+
+
+def _scalar_description(annotation: object) -> str | None:
+    """What a JSON value of an int, bool or str field must be; None for
+    other fields. Such a value is read as it is, checked by its exact type,
+    so that true is not an int."""
+    if annotation is int:
+        return "an integer"
+    if annotation is bool:
+        return "true or false"
+    if annotation is str:
+        return "a string"
+    return None
+
+
+def _decode(annotation: object, value: object, json_path: str) -> object:
+    """The value of type `annotation` that `_encode` wrote as `value`.
+
+    Raises _FieldError at the first value that does not fit."""
     if (optional := _optional_type(annotation)) is not None:
-        return _decode(optional, value)
-    if (
-        isinstance(annotation, type)
-        and dataclasses.is_dataclass(annotation)
-        and isinstance(value, dict)
-    ):
-        return _decode_dataclass(annotation, value)
-    return value
+        return None if value is None else _decode(optional, value, json_path)
+    if annotation is Box:
+        return _decode_box(value, json_path)
+    if annotation is float:
+        return _number(value, json_path)
+    if (description := _scalar_description(annotation)) is not None:
+        if type(value) is not annotation:
+            problem = f"expected {description}, found {_found(value)}"
+            raise _FieldError(problem, json_path)
+        return value
+    if isinstance(annotation, type) and issubclass(annotation, StrEnum):
+        return _decode_enum(annotation, value, json_path)
+    if (item_type := _tuple_item_type(annotation)) is not None:
+        if not isinstance(value, list):
+            problem = f"expected a list, found {_found(value)}"
+            raise _FieldError(problem, json_path)
+        return tuple(
+            _decode(item_type, item, f"{json_path}[{position}]")
+            for position, item in enumerate(value)
+        )
+    if isinstance(annotation, type) and dataclasses.is_dataclass(annotation):
+        return _decode_dataclass(annotation, value, json_path)
+    # A field type of this module that the reader does not know: a defect
+    # of model.py, not of the file.
+    message = f"model.py cannot read a field of type {annotation!r}"
+    raise TypeError(message)
 
 
-def _decode_dataclass[T](cls: type[T], content: dict[str, object]) -> T:
+def _decode_enum[E: StrEnum](enum: type[E], value: object, json_path: str) -> E:
+    members = tuple(member.value for member in enum)
+    if not isinstance(value, str) or value not in members:
+        problem = f"expected one of {', '.join(members)}, found {_found(value)}"
+        raise _FieldError(problem, json_path)
+    return enum(value)
+
+
+def _decode_dataclass[T](cls: type[T], value: object, json_path: str) -> T:
+    if not isinstance(value, dict):
+        problem = f"expected an object, found {_found(value)}"
+        raise _FieldError(problem, json_path)
+    fields = _fields(cls)
+    names = tuple(name for name, _ in fields)
+    for name in names:
+        if name not in value:
+            problem = "missing"
+            raise _FieldError(problem, _join(json_path, name))
+    for key in value:
+        if key not in names:
+            problem = f"not a field of {cls.__name__}"
+            raise _FieldError(problem, _join(json_path, str(key)))
     return cls(
         **{
-            name: _decode(field_type, content[name])
-            for name, field_type in _fields(cls)
+            name: _decode(field_type, value[name], _join(json_path, name))
+            for name, field_type in fields
         }
     )
+
+
+def _decode_file[T](cls: type[T], content: object, current_version: int) -> T:
+    """The value of `cls` in the parsed JSON `content` of a file of format
+    version `current_version`. Raises _FieldError at the first problem."""
+    if not isinstance(content, dict):
+        problem = f"is not a JSON object but {_found(content)}"
+        raise _FieldError(problem)
+    if "format_version" not in content:
+        problem = (
+            f"has no format_version; this galley reads format version {current_version}"
+        )
+        raise _FieldError(problem)
+    version = content["format_version"]
+    if type(version) is not int:
+        problem = (
+            f"format_version is {_found(version)}, not an integer; "
+            f"this galley reads format version {current_version}"
+        )
+        raise _FieldError(problem)
+    if version != current_version:
+        problem = (
+            f"is format version {version}; "
+            f"this galley reads format version {current_version}"
+        )
+        raise _FieldError(problem)
+    return _decode_dataclass(cls, content, "")
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -452,9 +567,30 @@ def _write_json(path: Path, value: object) -> None:
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
-def _read_json[T](path: Path, cls: type[T]) -> T:
-    content = json.loads(path.read_text(encoding="utf-8"))
-    return _decode_dataclass(cls, content)
+def _read_json[T](path: Path, cls: type[T], current_version: int, stage: str) -> T:
+    """The value of `cls` in the JSON file at `path`, written by `stage`,
+    every field checked. Raises InputFileError at the first problem."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError as err:
+        message = f"{path} does not exist; run `galley2epub {stage}` to write it"
+        raise InputFileError(message) from err
+    except UnicodeDecodeError as err:
+        message = f"{path} is not UTF-8 text: {err}"
+        raise InputFileError(message) from err
+    try:
+        content = json.loads(text)
+    except json.JSONDecodeError as err:
+        message = (
+            f"{path} is not valid JSON: {err.msg} at line {err.lineno}, "
+            f"column {err.colno}"
+        )
+        raise InputFileError(message) from err
+    try:
+        return _decode_file(cls, content, current_version)
+    except _FieldError as err:
+        message = f"{path}: {err}"
+        raise InputFileError(message) from err
 
 
 def write_pages(path: Path, pages: PagesFile) -> None:
@@ -464,7 +600,7 @@ def write_pages(path: Path, pages: PagesFile) -> None:
 
 def read_pages(path: Path) -> PagesFile:
     """Reads pages.json as write_pages wrote it."""
-    return _read_json(path, PagesFile)
+    return _read_json(path, PagesFile, PAGES_FORMAT_VERSION, "analyze")
 
 
 def write_words(path: Path, words: WordsFile) -> None:
@@ -474,7 +610,7 @@ def write_words(path: Path, words: WordsFile) -> None:
 
 def read_words(path: Path) -> WordsFile:
     """Reads words.json as write_words wrote it."""
-    return _read_json(path, WordsFile)
+    return _read_json(path, WordsFile, WORDS_FORMAT_VERSION, "extract")
 
 
 def write_lines(path: Path, lines: LinesFile) -> None:
@@ -484,7 +620,7 @@ def write_lines(path: Path, lines: LinesFile) -> None:
 
 def read_lines(path: Path) -> LinesFile:
     """Reads lines.json as write_lines wrote it."""
-    return _read_json(path, LinesFile)
+    return _read_json(path, LinesFile, LINES_FORMAT_VERSION, "layout")
 
 
 def write_blocks(path: Path, blocks: BlocksFile) -> None:
@@ -494,7 +630,7 @@ def write_blocks(path: Path, blocks: BlocksFile) -> None:
 
 def read_blocks(path: Path) -> BlocksFile:
     """Reads blocks.json as write_blocks wrote it."""
-    return _read_json(path, BlocksFile)
+    return _read_json(path, BlocksFile, BLOCKS_FORMAT_VERSION, "structure")
 
 
 # The hashes.
@@ -539,3 +675,48 @@ def block_sha256(block: Block) -> str:
     return hashlib.sha256(block_text(block).encode("utf-8")).hexdigest()[
         :_BLOCK_SHA256_DIGITS
     ]
+
+
+def write_edits(path: Path, edits: tuple[Edit, ...]) -> None:
+    """Writes an edits file: JSON Lines, one edit per line, UTF-8, with
+    `format_version` first on every line."""
+    text = "".join(
+        json.dumps(_encode(Edit, edit), ensure_ascii=False) + "\n" for edit in edits
+    )
+    path.write_text(text, encoding="utf-8", newline="\n")
+
+
+def read_edits(path: Path) -> tuple[Edit, ...]:
+    """The edits of an edits file, in the order of its lines.
+
+    Raises EditError, naming the file and the line, for a blank line, a
+    line that is not JSON, a format_version other than 1, or an object with
+    a missing, unknown or mistyped field. A missing file is the caller's
+    concern: architecture section 10 counts it as no edits."""
+    text = path.read_text(encoding="utf-8")
+    # Split on newlines only: str.splitlines also splits on characters such
+    # as U+2028, which json.dumps leaves unescaped inside a string.
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines = lines[:-1]
+    return tuple(
+        _edit_from_line(path, line_number, line)
+        for line_number, line in enumerate(lines, start=1)
+    )
+
+
+def _edit_from_line(path: Path, line_number: int, line: str) -> Edit:
+    where = f"{path}, line {line_number}"
+    if line.strip() == "":
+        message = f"{where}: blank line"
+        raise EditError(message)
+    try:
+        content = json.loads(line)
+    except json.JSONDecodeError as err:
+        message = f"{where}: not valid JSON: {err.msg} at column {err.colno}"
+        raise EditError(message) from err
+    try:
+        return _decode_file(Edit, content, EDITS_FORMAT_VERSION)
+    except _FieldError as err:
+        message = f"{where}: {err}"
+        raise EditError(message) from err
