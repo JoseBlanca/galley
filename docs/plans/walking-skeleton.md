@@ -7,7 +7,7 @@ excerpts, so that each excerpt gives an EPUB and the fidelity check (the
 test that no word is lost or invented between a stage's input and output)
 passes at the layout, structure and markdown boundaries. It builds on
 `docs/architecture.md` and `docs/glossary.md`. Dated 14 November 2026.
-State: draft.
+State: done, 14 November 2026 (approved by the owner the same day).
 
 The four work packages are the breakdown the owner approved on 14
 November 2026, and the spec's sections 3 to 9 follow them. Every task is
@@ -39,9 +39,11 @@ the plan was approved.
 
 Checked by the orchestrator before task 1.1, in the worktree of the plan:
 
-- `pandoc --version` prints `pandoc 3.13` on its first line. The spec's
+- `pandoc --version` prints `pandoc 3.14` on its first line. The spec's
   statements about Pandoc's behaviour were checked with 3.13 (spec §5,
-  §8); another version may behave otherwise.
+  §8); Homebrew moved Pandoc to 3.14 on 14 November 2026, and the
+  orchestrator checked the same behaviours on 3.14 that day (see the
+  report). Another version may behave otherwise.
 - `uv run --locked pytest` passes, 5 tests, on the starting commit.
 - `uv.lock` holds pdfplumber 0.11.10 and pypdfium2 5.15.2, the versions
   the spec's counts were taken with (spec §2, §11).
@@ -140,21 +142,21 @@ Deliverables:
 
 Tasks:
 
-- [ ] 1.1 Write `errors.py` and `book_folder.py`, with their tests. From
+- [x] 1.1 Write `errors.py` and `book_folder.py`, with their tests. From
   spec §3, "errors.py" and "book_folder.py", and architecture §5 and §12.
   Serves deliverables 1, 4 and 5.
-- [ ] 1.2 Write `model.py`: every dataclass and enum, the four JSON
+- [x] 1.2 Write `model.py`: every dataclass and enum, the four JSON
   files' write and read functions with the round-trip tests, and
   `pdf_sha256`, `check_source_pdf`, `block_text` and `block_sha256`. The
   readers rebuild values from good JSON; their checks of bad input are
   task 1.3. From spec §3, "model.py", and architecture §7 and §8. Serves
   deliverables 2 and 5. Needs 1.1 (`InputFileError`).
-- [ ] 1.3 Make the four readers check their input and stop with
+- [x] 1.3 Make the four readers check their input and stop with
   `InputFileError` at the first problem, and write `write_edits` and
   `read_edits` with their `EditError` cases. From spec §3, "model.py",
   the list under "Reading checks everything" and the edits paragraph.
   Serves deliverable 2. Needs 1.2.
-- [ ] 1.4 Write `config.py`, with its tests. Its test configs are
+- [x] 1.4 Write `config.py`, with its tests. Its test configs are
   written into `tmp_path` or kept under `tests/fixtures/config/`, with
   absolute paths to the excerpt PDFs. From spec §3, "config.py", and
   architecture §6. Serves deliverables 3 and 5. Needs 1.1 and `Box` from
@@ -205,18 +207,18 @@ Deliverables:
 
 Tasks:
 
-- [ ] 2.1 Write `pdfium.py`, with its tests. From spec §4, "pdfium.py",
+- [x] 2.1 Write `pdfium.py`, with its tests. From spec §4, "pdfium.py",
   architecture §8 ("RenderedPage") and §12, and the coding skill,
   "Threads and PDFium". Serves deliverable 1. Stream `pdfium`.
-- [ ] 2.2 Write `parallel.py`, with its tests. From spec §4,
+- [x] 2.2 Write `parallel.py`, with its tests. From spec §4,
   "parallel.py", and the coding skill, "Threads and PDFium". Serves
   deliverable 2. Stream `pdfium`; independent of 2.1, run after it in
   the same stream.
-- [ ] 2.3 Write `fidelity.check_stage` for the three boundaries, with its
+- [x] 2.3 Write `fidelity.check_stage` for the three boundaries, with its
   unit tests, which build `MarkdownWords` by hand. From spec §5, "The
   words of each side" and the paragraph after it, and architecture §13.
   Serves deliverable 3. Stream `fidelity`.
-- [ ] 2.4 Write `fidelity.read_markdown`, with its tests marked `pandoc`.
+- [x] 2.4 Write `fidelity.read_markdown`, with its tests marked `pandoc`.
   From spec §5, "Reading the Markdown". Serves deliverable 4. Stream
   `fidelity`; needs `MarkdownWords` from 2.3.
 
@@ -293,24 +295,24 @@ Deliverables:
 
 Tasks:
 
-- [ ] 3.1 Write analyze, with its unit tests, and add the session fixture
+- [x] 3.1 Write analyze, with its unit tests, and add the session fixture
   `excerpt_books` to `tests/conftest.py`: a book folder per excerpt
   under pytest's temporary directory, with the configs of spec §9, "The
   end-to-end test", on which analyze runs. Add the `pages.json` excerpt
   tests and analyze's runs of their own. From spec §6, "analyze" and
   "Their tests". Serves deliverables 1, 3, 4 and 10. Stream `extract`.
-- [ ] 3.2 Write extract, with its unit tests; make `excerpt_books` run
+- [x] 3.2 Write extract, with its unit tests; make `excerpt_books` run
   extract after analyze; add the `words.json` excerpt tests and extract's
   runs of their own. From spec §6, "extract" and "Their tests". Serves
   deliverables 2, 3, 4 and 10. Stream `extract`; needs 3.1.
-- [ ] 3.3 Write layout, with its tests. From spec §7, "layout" and
+- [x] 3.3 Write layout, with its tests. From spec §7, "layout" and
   "Their tests". Serves deliverables 5 and 10. Stream `structure`.
-- [ ] 3.4 Write structure, with its tests. From spec §7, "structure" and
+- [x] 3.4 Write structure, with its tests. From spec §7, "structure" and
   "Their tests". Serves deliverables 6 and 10. Stream `structure`;
   independent of 3.3, run after it.
-- [ ] 3.5 Write markdown, with its tests. From spec §8, "markdown" and
+- [x] 3.5 Write markdown, with its tests. From spec §8, "markdown" and
   "Their tests". Serves deliverables 7 and 10. Stream `epub`.
-- [ ] 3.6 Write epub and its empty `style.css`, with its tests. From spec
+- [x] 3.6 Write epub and its empty `style.css`, with its tests. From spec
   §8, "epub" and "Their tests". Serves deliverables 8, 9, 10 and 11.
   Stream `epub`; its tests write `book.md` by hand, so it does not need
   3.5.
@@ -376,12 +378,12 @@ Deliverables:
 
 Tasks:
 
-- [ ] 4.1 Write `cli.py`, add `[project.scripts]` to `pyproject.toml`
+- [x] 4.1 Write `cli.py`, add `[project.scripts]` to `pyproject.toml`
   (and `uv.lock` if `uv lock --check` asks), with the tests of the entry
   point and of the three errors. From spec §9, "cli.py" and "Other tests
   of this work package", and architecture §14. Serves deliverables 1 and
   2.
-- [ ] 4.2 Change `excerpt_books` to run `main(["run", folder])` on each
+- [x] 4.2 Change `excerpt_books` to run `main(["run", folder])` on each
   excerpt, and write the end-to-end tests and the test of the stages one
   by one. From spec §9, "The end-to-end test" and "Other tests of this
   work package". Serves deliverables 2 to 5. Needs 4.1.

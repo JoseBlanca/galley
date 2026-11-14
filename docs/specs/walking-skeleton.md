@@ -105,19 +105,26 @@ class PdfError(GalleyError): ...
 class ExternalProgramError(GalleyError): ...
 class EditError(GalleyError): ...
 
+class FidelityBoundary(StrEnum):
+    LAYOUT = "layout"; STRUCTURE = "structure"; MARKDOWN = "markdown"
+
 class FidelityError(GalleyError):
     def __init__(
         self,
-        boundary: str,
+        boundary: FidelityBoundary,
         missing: frozendict[str, int],
         invented: frozendict[str, int],
         detail: str,
     ) -> None: ...
-    # boundary: "layout", "structure" or "markdown"; missing and invented
+    # boundary: where the check ran; missing and invented
     # map a word to how many times it is missing from, or extra in, the
     # output; detail is the rest of the message (pages, note counts).
     # The attributes of the same names are set; the message lists them.
 ```
+
+`FidelityBoundary` is defined here, not in `fidelity.py`, because
+`FidelityError` needs it and `errors.py` imports no other module of
+galley; `fidelity.py` imports it from here.
 
 Tests: each subclass is a `GalleyError`; a `FidelityError` built with one
 missing and one invented word has them as attributes and names both, with
@@ -194,7 +201,20 @@ def read_edits(path: Path) -> tuple[Edit, ...]: ...
 Writing: one JSON object, UTF-8, `ensure_ascii=False`, `indent=1`, keys
 in the order of the dataclass fields, a newline at the end. A tuple is a
 list, an enum its value, `None` is `null`, a float what `json.dumps`
-writes. The same value gives the same bytes, whatever made it. An edits
+writes, and a `frozendict` with int keys an object whose keys are the
+ints as strings (architecture §8; no field has one yet). The same value
+gives the same bytes, whatever made it: a float field is written as a
+float when it holds an int, and `-0.0` as `0.0`.
+
+Every number must be finite: a NaN or an infinity is not JSON, and the
+writer refuses it (`json.dumps(..., allow_nan=False)` raises
+`ValueError`). A string that cannot be encoded as UTF-8, one holding a
+lone surrogate, makes the writer raise `ValueError` naming the field
+path: it is a defect, or bad input, of the stage that made the value,
+and extract's spec decides what a surrogate in a text layer becomes. The
+writer makes all the bytes before it touches the file, then writes them
+to a temporary file in the same folder and moves it over the old one
+(`os.replace`), so a failed write leaves the old file as it was. An edits
 file is JSON Lines, one object per edit and per line, with no indent,
 each with `format_version` 1 first (architecture §8).
 
@@ -211,27 +231,46 @@ in the JSON, `pages[3].words[12].box`:
 - a value has the wrong JSON type, an enum value is not a member, a `Box`
   is not four numbers. A JSON integer is accepted where a float is
   expected and becomes a float, so `81` and `81.0` read the same; `true`
-  is not accepted as a number.
+  is not accepted as a number;
+- a number is not finite (`NaN`, `Infinity`, which Python's `json`
+  reads although JSON has no such values);
+- a string holds a surrogate (written `\udc00` in the JSON), which no
+  writer of galley makes;
+- an object has the same key twice ("given twice").
 
 `read_edits` raises `EditError` instead, naming the file and the line,
-for a line that is not JSON, an object with a missing or unknown field,
-a `format_version` other than 1, or a blank line. A missing edits file is not its concern: the caller
+for a line that is not JSON, an object with a missing or unknown field
+or a key given twice, a value of the wrong type or a string holding a
+surrogate, a `format_version` other than 1, or a blank line; and,
+naming the file, for a file that is not UTF-8. A file that starts with
+a byte-order mark is refused with a message that asks for it to be
+saved as UTF-8 without one, since the owner may write edits by hand. A missing edits file is not its concern: the caller
 lists the files that exist (architecture §10: a missing file is no
 edits).
 
 The reader rebuilds the tuples and enums, so reading what was written
 gives an equal value.
 
-Four more functions, which several stages and `fidelity.py` call:
+Six more functions, which several stages and `fidelity.py` call:
 
 ```python
 def pdf_sha256(pdf: Path) -> str: ...
     # The SHA-256 of the file's bytes, 64 lowercase hex digits.
 
-def check_source_pdf(path: Path, file_pdf_sha256: str, pdf_sha256: str) -> None: ...
+def check_source_pdf(path: Path, file_pdf_sha256: str, expected_pdf_sha256: str) -> None: ...
     # Raises InputFileError when the file at `path` was made from another
     # PDF; the message names the file and the stage to rerun
     # (pages.json: analyze, words.json: extract, ...).
+
+def read_checked_pages(pages_json: Path, pdf: Path) -> PagesFile: ...
+    # read_pages(pages_json), then check_source_pdf of it against
+    # pdf_sha256(pdf).
+
+def read_checked_input[T: WordsFile | LinesFile | BlocksFile](
+    pages_json: Path, pdf: Path, input_path: Path, read_input: Callable[[Path], T]
+) -> tuple[PagesFile, T]: ...
+    # read_checked_pages, then read_input(input_path) and check_source_pdf
+    # of it against the hash in pages.json; returns both files.
 
 def block_text(block: Block) -> str: ...
     # The text of a block (architecture §7): its spans' text concatenated.
@@ -242,9 +281,16 @@ def block_sha256(block: Block) -> str: ...
 ```
 
 Only analyze computes the hash, from the PDF. Every later stage copies
-`source_pdf_sha256` from its input file into its output, and checks each
-file it reads against the hash in `pages.json`; extract, which also reads
-the PDF, checks `pages.json` against `pdf_sha256(config.pdf)`.
+`source_pdf_sha256` from its input file into its output, and every stage
+after analyze checks `pages.json` against `pdf_sha256(config.pdf)` and
+its input file against `pages.json`, through these two functions, so
+that the check is written once: extract, whose input is `pages.json`,
+calls `read_checked_pages`; layout, structure and markdown call
+`read_checked_input` with `words.json`, `lines.json` and `blocks.json`.
+A stale `pages.json` then names analyze, and a stale input file the stage
+that writes it. Without the first check, markdown run on a book folder
+made from one PDF, with a config that names another, wrote the first
+book's words under the second book's title.
 
 Tests, all unit tests with literal values written in the test:
 
@@ -268,8 +314,17 @@ Tests, all unit tests with literal values written in the test:
   line with `format_version` 2, and a blank line: an `EditError` naming
   the file and the line number;
 - `check_source_pdf` with two different hashes raises and names the stage;
+- `read_checked_input` returns both files when the hashes agree, raises
+  naming analyze when `pages.json` was made from another PDF, and naming
+  the stage of the input file when it was;
 - `block_sha256` of a block with two spans, against a literal computed
-  with `hashlib` in the test.
+  with `hashlib` in the test;
+- the rules above that the list does not name: a non-finite number, a
+  surrogate and a duplicate key in each reader, a file of edits that is
+  not UTF-8 or starts with a byte-order mark, a writer given a surrogate
+  or a NaN leaving the old file as it was, `-0.0` and an int in a float
+  field written as `0.0` and the float, a `frozendict` round trip, and
+  the value of every enum member as architecture §8 lists it.
 
 ### config.py
 
@@ -307,17 +362,20 @@ def tesseract_language(language: Language) -> str: ...
 ```
 
 In TOML an excluded region is `{page = 0, box = [240, 620, 252, 632]}`;
-the key `page` becomes the field `page_index`. `pdf` is resolved against
-the folder of `book.toml` when it is relative and kept when absolute;
-tests write absolute paths to the excerpts.
+the key `page` becomes the field `page_index`. A relative `pdf` is taken
+against the folder of `book.toml`; relative or absolute, it is then
+resolved (`Path.resolve`: made absolute, symbolic links followed). Tests
+write absolute paths to the excerpts.
 
 `read_config` raises `ConfigError`, naming the file and the key, when: the
 file is missing or is not valid TOML; a key is unknown, at the top level
 or inside a region; a required key (`pdf`, `title`, `authors`,
-`language`) is missing; a value has the wrong type (`authors =
+`language`) is missing; `title` is empty or `authors` an empty list
+("must not be empty"); a value has the wrong type (`authors =
 "Breasted"` instead of a list); `language` or `ocr` is not one of its
-values; a page index is negative; a box is not four numbers or has `x0 >=
-x1` or `top >= bottom`; the PDF does not exist. A page index past the end
+values; a page index is negative; a box is not four finite numbers (TOML
+has `nan` and `inf`) or does not have `x0 < x1` and `top < bottom`; the
+PDF does not exist or is not a file. A page index past the end
 of the book needs the PDF opened, so analyze checks it (section 6).
 
 Tests: a config with every key at a value other than its default, read
@@ -335,10 +393,35 @@ class BookFolder:
     # book_toml, pages_json, words_json, images_dir, cover_png
     # (images/cover.png), lines_json, blocks_json, edits_dir, book_md,
     # book_epub
+
+class Stage(StrEnum):
+    ANALYZE = "analyze"; EXTRACT = "extract"; LAYOUT = "layout"
+    STRUCTURE = "structure"; MARKDOWN = "markdown"; EPUB = "epub"
+
+def delete_stage_outputs(folder: BookFolder, stage: Stage) -> None: ...
 ```
 
-One test: every property is the path architecture §5 gives, under
-`root`.
+Tests: every property is the path architecture §5 gives, under `root`;
+`delete_stage_outputs` for each stage, on a folder holding every file,
+leaves exactly the files of the stages before it, `book.toml`, `edits/`
+with its file, and a file of the owner's; on an empty folder it raises
+nothing.
+
+The files the stages write, in pipeline order, are `pages.json`
+(analyze), `words.json` and `images/` (extract), `lines.json` (layout),
+`blocks.json` (structure), `book.md` (markdown) and `book.epub` (epub).
+Each stage's `run`, before it reads its inputs, calls
+`delete_stage_outputs`, which deletes the stage's own output and the
+outputs of every later stage, and nothing else of the folder: never
+`book.toml` or `edits/`. The order of the stages and the files of each
+are written once, in `book_folder.py`. So no file in the folder was made from
+an earlier version of the file it is made from, and a stage that fails
+leaves no later file behind. Without this, on Kadesh, removing
+`exclude_regions` from `book.toml` and running analyze and extract again
+gave a `words.json` with the page number `81`; markdown and epub, run
+alone, then made `book.md` and the EPUB from the old `blocks.json`,
+without `81` and without an error. Now markdown run there stops with
+`InputFileError`: `blocks.json` does not exist, run structure.
 
 ## 4. PDFium and threads: pdfium.py, parallel.py (work package 2a)
 
@@ -364,16 +447,23 @@ def render(pdf: Path, page_index: int, dpi: int) -> RenderedPage: ...
 def strip_stride(buffer: bytes, width_px: int, height_px: int, stride: int) -> bytes: ...
     # The pixels of a grayscale bitmap whose rows are `stride` bytes apart,
     # row by row with the padding after each row's `width_px` bytes dropped.
+    # A stride below width_px, or a buffer whose length is not
+    # stride * height_px, is a ValueError.
 ```
 
 `render` gives 8-bit grayscale pixels at `scale = dpi / 72`, row by row
-with no padding, through `strip_stride`. A file that is not a PDF, or a
-page index outside the document, is a `PdfError` naming the file and, for
-a page, the index and the page count.
+with no padding, through `strip_stride`. A file that is not a PDF, a path
+that does not exist or is a directory, or a page index outside the
+document, is a `PdfError` naming the path and, for a page, the index and
+the page count. A `dpi` below 1 is a `ValueError`, checked before PDFium
+is called.
 
-`page_size` gives pypdfium2's numbers, which are the crop box as 32-bit
-floats and can differ from pdfplumber's: Gierke's pages are 376.1000061 ×
-621.5 pt in pypdfium2 and 376.128 × 621.504 in pdfplumber. Word boxes
+`page_size` gives pypdfium2's numbers, those of `PdfPage.get_size()`:
+the crop box clipped to the media box, as 32-bit floats, which is the
+area `render` draws. They can differ from pdfplumber's: Gierke's pages
+are 376.1000061 × 621.5 pt in pypdfium2 and 376.128 × 621.504 in
+pdfplumber. Kadesh's crop box (508.3 × 728.2) is taller than its media
+box (508.32 × 728.16), so its pages are 508.3 × 728.16 pt in pypdfium2. Word boxes
 come from pdfplumber, so `pages.json` takes its sizes from pdfplumber
 (section 6) and no stage of the skeleton calls `page_size`. Only extract
 calls `render`, for the cover.
@@ -381,7 +471,7 @@ calls `render`, for the cover.
 Tests that call PDFium are marked `thread_unsafe`, the marker of
 pytest-run-parallel for a test that must run once rather than in 8
 threads at once under `pytest --parallel-threads=8`: `page_count` of
-both excerpts is 10; `page_size` of Kadesh page 0 is 508.32000732421875 ×
+both excerpts is 10; `page_size` of Kadesh page 0 is 508.29998779296875 ×
 728.1599731445312; `render` of Gierke page 0 at 300 dpi is 1568 × 2590
 pixels with `len(pixels) == width_px * height_px`; the same render called
 from 6 threads at once gives 6 times the bytes of one call alone; page
@@ -421,12 +511,27 @@ thread rather than per page: analyze and extract together on the Kadesh
 excerpt took 0.91 s that way against 1.36 s with one document per page,
 with 1 worker.
 
+Every pdfplumber document galley reads is opened with `open_pdf(pdf)` of
+`text_layer.py`, which holds one lock of the process while the document
+opens, and only then, because pdfminer.six 20260107 adds the keywords it
+meets to a dictionary that every thread shares, without a lock, and two
+threads opening their own documents at once made `pdfplumber.open` raise
+`PdfminerException: /b'trailer'` in 3 of 450 fresh processes running
+analyze and extract on the whole Kadesh book with 6, 12 and 24 workers.
+
 When `function` raises, the worker's source is closed and the exception
 of the first failing item in input order, among those that ran, is
 raised in the calling thread; items not yet started may not run. When
 `open_source` raises, that exception is raised in the calling thread, and
-the sources other workers opened are closed. `workers` below 1 is a
-`ValueError`. With more workers than items, the extra workers do nothing.
+the sources other workers opened are closed; when `open_source` raises in
+one worker and `function` in another, the exception of `open_source` is
+the one raised. `workers` below 1 is a `ValueError`. With more workers
+than items, the extra workers do nothing: a worker opens its source only
+when it has taken an item, so no more sources are opened than there are
+items. When no worker failed but the results do not cover every item
+exactly once (a source whose closing swallowed an exception of
+`function`), that is a `RuntimeError` naming the missing item indices,
+raised whatever Python's `-O` flag, never a shorter tuple.
 
 Tests: results come back in input order when later items finish first
 (the function sleeps less for later items); 1, 3 and 8 workers give the
@@ -444,8 +549,8 @@ skeleton's stages make none, because the real stages will, and its unit
 tests build those values by hand.
 
 ```python
-class Boundary(StrEnum):
-    LAYOUT = "layout"; STRUCTURE = "structure"; MARKDOWN = "markdown"
+# FidelityBoundary (layout, structure, markdown) is imported from
+# errors.py (section 3), since FidelityError carries it.
 
 @dataclass(frozen=True, slots=True)
 class MarkdownWord:
@@ -460,11 +565,11 @@ class MarkdownWords:
 def read_markdown(markdown: str) -> MarkdownWords: ...
 
 @overload
-def check_stage(stage: Literal[Boundary.LAYOUT], before: WordsFile, after: LinesFile) -> None: ...
+def check_stage(stage: Literal[FidelityBoundary.LAYOUT], before: WordsFile, after: LinesFile) -> None: ...
 @overload
-def check_stage(stage: Literal[Boundary.STRUCTURE], before: LinesFile, after: BlocksFile) -> None: ...
+def check_stage(stage: Literal[FidelityBoundary.STRUCTURE], before: LinesFile, after: BlocksFile) -> None: ...
 @overload
-def check_stage(stage: Literal[Boundary.MARKDOWN], before: BlocksFile, after: MarkdownWords) -> None: ...
+def check_stage(stage: Literal[FidelityBoundary.MARKDOWN], before: BlocksFile, after: MarkdownWords) -> None: ...
 ```
 
 `check_stage` is pure; it raises `FidelityError` or returns. At the
@@ -474,9 +579,12 @@ which in the skeleton is the file as structure wrote it (section 8).
 **The words of each side.** A text is split on white space
 (`str.split()`), nothing normalised.
 
-- `WordsFile`: the `text` of every word of every page. Its removals are
-  extract's, which no boundary checks.
-- `LinesFile`: the words of every line of every region.
+- `WordsFile`: the `text` of every word of every page, split like any
+  other text, so that a word holding a no-break space, `10\xa0000`,
+  counts as the same two words on both sides. Its removals are extract's,
+  which no boundary checks.
+- `LinesFile`: the `text` of the words of every line of every region,
+  split the same way.
 - `BlocksFile`, at the structure boundary: for each block of the body and
   of every note, the text of its spans with each note reference span
   replaced by a space, split; plus the `text` of each note reference span
@@ -494,15 +602,36 @@ which in the skeleton is the file as structure wrote it (section 8).
   removals or word changes: markdown makes none.
 - `MarkdownWords`: the `text` of each word.
 
+Before the words are compared, the structure boundary checks what
+structure recorded, because a wrong record would hide a lost or invented
+word. Each fails with a `FidelityError` that has no missing or invented
+word and names, in `detail`, the block and span or the word change:
+
+- A note reference span's `text` must be exactly the `marker` of the
+  note its `note_ref` names, and that note must exist. At the markdown
+  boundary the whole span becomes Pandoc's note and its text is not
+  counted, so a span `"1 and"` would lose `and` there unseen.
+- A word change must have words in `before` and in `after`, so that it
+  neither deletes nor invents words, and must say what its reason
+  allows: for `note_marker`, `before` and `after` joined are the same
+  text (`Greece,1` and `Greece,` `1`); for `hyphen_join`, `before` is two
+  words, the first ending with `-`, and the first without its hyphen
+  followed by the second is `after` joined (`repli-` `cate` and
+  `replicate`). A change outside these rules, `Greece` to `Greek`, is
+  the invented word the check is there to catch.
+
 The two sides are compared as multisets. A difference is a
 `FidelityError` with the words missing from the output and the words it
 invented, each with its count, and in `detail` where each came from: the
 page index for words and lines, the `origin` pages for a block, the block
 id for Markdown. At the markdown boundary the number of note references
-in the blocks is also compared with `note_count`.
+in the blocks is also compared with `note_count`; when only the counts
+differ, the error has no missing or invented word and gives both counts
+in `detail`. A removal's `text` is split into words like any other, so a
+running head removed as one line counts each of its words.
 
 **Reading the Markdown.** `read_markdown` runs `pandoc --from
-markdown-smart --to json --fail-if-warnings` with the Markdown on
+markdown-smart-auto_identifiers --to json --fail-if-warnings` with the Markdown on
 standard input, a timeout of 60 s and `check=True`; a missing `pandoc`,
 a non-zero exit or a timeout is an `ExternalProgramError` with Pandoc's
 standard error. It walks the `blocks` of Pandoc's JSON, not its `meta`,
@@ -513,6 +642,31 @@ every `Note`. Without the last rule, the last word of one paragraph and
 the first of the next come back glued, `Egypt.THE` on Kadesh pages 0 and
 1. `Emph`, `Strong` and `Span` do not separate words, so a word half in
 italics stays one word.
+
+The elements read are those galley's Markdown makes: the blocks `Para`,
+`Plain`, `Div`, `Header` and `BlockQuote`, and the inlines `Str`,
+`Space`, `SoftBreak`, `LineBreak`, `Emph`, `Strong`, `Span` and `Note`.
+Any other element, such as a list or a table that an unescaped character
+let through, is an `ExternalProgramError` that names it and the block id
+it is in ("outside any block" when there is none), rather than words
+dropped or read wrongly; a later spec adds the elements its Markdown
+makes, such as an image for a figure. A div or heading without an id
+gives its words the id of the div or heading around it, or `None`.
+Pandoc's `auto_identifiers` extension, on by default, would give every
+heading an id made from its text (`chapter-one`), which is no block of
+`book.md`; `-auto_identifiers` turns it off so that this rule holds for
+headings too.
+
+Some unescaped constructs make no element at all: a link reference
+definition (`[1]: beta gamma` on a line of its own) or a title block
+(`% Alpha beta` on the first line) leave their words out of Pandoc's
+`blocks`. An unescaped construct therefore either raises in
+`read_markdown`, as an element it does not read, or leaves its words to
+`check_stage`, which reports them missing.
+
+`read_markdown` is two functions: one runs Pandoc and returns its JSON
+as text, and a pure one walks the JSON, which unit tests call on literal
+JSON without Pandoc.
 
 `--fail-if-warnings` makes a note definition that no reference uses an
 error (Pandoc 3.13 warns and drops it; the option makes it exit with 3).
@@ -531,17 +685,29 @@ Tests, unit tests with literal values:
   missing words; a hyphen join `("repli-", "cate") → ("replicate",)`
   passes, and fails without its word change; a note reference span `"1"`
   after `"…Greece,"`, with the word change `("Greece,1",) → ("Greece,",
-  "1")`, passes; a note's marker counts as a word;
+  "1")`, passes; a note's marker counts as a word; a reference span
+  whose text is not its note's marker (`"1 and"`) or names no note
+  fails; a word change that deletes, invents, or does not follow its
+  reason (`Greece` to `Greek`) fails; a word holding a tab or no-break space splits the
+  same on both sides;
+- at each boundary, a word twice on one side and once on the other is a
+  difference; a wrong pair of files is a `TypeError`;
 - at the markdown boundary: a referenced note's marker and its reference
   span are not counted, an unreferenced note's marker is; two references
-  against one Pandoc note is a difference;
+  against one Pandoc note is a difference, and note references inside
+  note blocks are counted; a word of the Markdown the blocks lack is
+  invented;
 - `read_markdown`, marked `pandoc` (a marker of `pyproject.toml` that
   skips the test when the program is missing): two paragraphs `a b` and
   `c` give `a`, `b`, `c`, not `bc`; `\*x\*y` comes back as `*x*y`; a
   footnote's words are words; `note_count` of a text with two footnotes
   is 2; the words of a div `::: {#b-p0000-001}` carry that id; an unused
   note definition raises `ExternalProgramError`; `Greece,[^1]` with no
-  definition comes back as the one word `Greece,[^1]`.
+  definition comes back as the one word `Greece,[^1]`; a heading inside
+  a div carries the div's id;
+- the walk of Pandoc's JSON, on literal JSON without Pandoc: the words of
+  nested divs carry the innermost id; an element it does not read
+  outside any div raises, saying "outside any block".
 
 ## 6. analyze and extract (work package 3a)
 
@@ -582,7 +748,8 @@ Before any page is measured, analyze raises `ConfigError` when `ocr` is
 `redo` ("ocr = redo needs OCR, which the walking skeleton does not have;
 use verify or trust"), and when a page index of `exclude_pages`,
 `exclude_regions` or `cover_page` is not below the page count, naming the
-key, the index and the count.
+key, the index and the count. `check_config_pages` makes both checks, the
+`ocr` one first.
 
 ```python
 # galley.analyze
@@ -598,14 +765,15 @@ def require_text_layer(pages: tuple[PageInfo, ...]) -> None: ...
     # Raises the PdfError above, listing every blank page.
 ```
 
-`run` deletes `pages.json` first, so that a failed run leaves no old file
-behind, and writes it with `source_pdf_sha256 = pdf_sha256(config.pdf)`.
+`run` deletes `pages.json` and every later stage's file first (section
+3), so that a failed run leaves no old file behind, and writes it with `source_pdf_sha256 = pdf_sha256(config.pdf)`.
 Every stage's `run` takes the keyword `workers`, which the tests and the
 command set; a stage that works in one thread ignores it.
 
 ### extract
 
-extract reads `pages.json`, checks its hash against the PDF's, and gives
+extract reads `pages.json` with `read_checked_pages`, which checks its
+hash against the PDF's (section 3), and gives
 each page its words, with `map_pages_with_source`:
 
 - `text` page: the words of `page.extract_words()` with its default
@@ -619,6 +787,10 @@ each page its words, with `map_pages_with_source`:
   the words of a page or a region the config excludes.
 - `blank` page, which the skeleton's analyze never writes but a
   `pages.json` may hold: no words, and the PDF page is not read.
+- `plate` page, or a page whose `text_source` is `ocr`, which a
+  `pages.json` may hold but the skeleton cannot read (it cuts no figure
+  and has no OCR): extract raises `InputFileError` before reading any
+  page, naming `pages.json`, those pages, and analyze to run again.
 
 Every `PageWords` has `figures=()`: the skeleton cuts no figure. The
 removals are in page order, then in pdfplumber's order.
@@ -626,7 +798,8 @@ removals are in page order, then in pdfplumber's order.
 When the config has a `cover_page`, extract renders it at 300 dpi with
 `pdfium.render` and saves it as an 8-bit grayscale PNG,
 `images/cover.png`: 2118 × 3034 pixels and 2.36 MB for Kadesh page 0.
-extract deletes `words.json` and `images/` first, and always creates
+extract deletes `words.json`, `images/` and every later stage's file
+first (section 3), and always creates
 `images/`, empty when there is no cover, so that every book folder has
 the same files after a run.
 
@@ -644,6 +817,10 @@ def page_words(page: PageInfo, layer_words: tuple[Word, ...]) -> tuple[PageWords
 
 `page_words` is the pure part: given the page and the words pdfplumber
 read (empty for a blank page), it gives the page's words and removals.
+
+A PDF that pdfplumber cannot open, such as a truncated file, is a
+`PdfError` naming the file, in analyze and extract alike, with
+pdfplumber's `PdfminerException` as its cause.
 
 ### Their tests
 
@@ -681,7 +858,8 @@ the 8-thread run does it once:
 - analyze and extract on Kadesh with 1 worker and with 6 give
   byte-identical `pages.json` and `words.json` (10 pages, more than 6
   workers);
-- extract on a Kadesh folder holding the Gierke `pages.json` raises
+- extract on a Kadesh folder holding the Gierke `pages.json`, and extract
+  on a Kadesh folder whose config names the Gierke PDF, raise
   `InputFileError` naming analyze.
 
 ## 7. layout and structure (work package 3b)
@@ -718,10 +896,17 @@ Kadesh's footnote columns are read row by row, left note then right
 note, and Gierke's margin headings go into the body line beside them.
 No word is lost; the real layout spec fixes the order.
 
-layout reads `pages.json` and `words.json` and checks both hashes
-(section 3), runs per page with `map_pages`, and runs
-`check_stage(Boundary.LAYOUT, words, lines)` before writing `lines.json`;
-on a `FidelityError` it writes nothing. It deletes `lines.json` first.
+layout reads `pages.json` and `words.json` with `read_checked_input`,
+which checks both hashes (section 3): `pages.json` against
+`pdf_sha256(config.pdf)`, as extract does, then `words.json` against
+`pages.json`. A stale `pages.json` then
+names analyze and a stale `words.json` names extract; compared only with
+each other, the two files could not say which one is stale. Hashing the
+1 MB Kadesh excerpt took 0.4 ms. layout runs per page with `map_pages`,
+and runs
+`check_stage(FidelityBoundary.LAYOUT, words, lines)` before writing `lines.json`;
+on a `FidelityError` it writes nothing. It deletes `lines.json` and
+every later stage's file first (section 3).
 
 ```python
 # galley.layout
@@ -734,17 +919,20 @@ def layout_page(page: PageWords) -> PageLayout: ...
 ### structure
 
 structure makes one block of each region, in page order: a `paragraph`
-whose id is `b-p<page index, 4 digits>-001`, `level` `None`, `figure`
+whose id is `b-p<page index, 4 digits>-001`, or `-002` and on for the
+second region of a page and after (architecture §7; the skeleton's layout
+makes one region per page), `level` `None`, `figure`
 `None`, one span whose text is the words of the region, line after line,
 joined by single spaces, with `emphasis` `none` and `note_ref` `None`,
 and one `Origin` with the page index and the region's box. `notes`,
 `removals`, `word_changes` and `page_numbers` are empty. A page with no
 region gives no block.
 
-structure reads `pages.json` and `lines.json` and checks both hashes; it
-uses only `lines.json`. It runs `check_stage(Boundary.STRUCTURE, lines,
+structure reads `pages.json` and `lines.json` and checks both hashes as
+layout does, `lines.json` naming layout; it uses only `lines.json`. It runs `check_stage(FidelityBoundary.STRUCTURE, lines,
 blocks)` before writing `blocks.json`; on a `FidelityError` it writes
-nothing. It deletes `blocks.json` first.
+nothing. It deletes `blocks.json`, `book.md` and `book.epub` first
+(section 3).
 
 ```python
 # galley.structure
@@ -769,14 +957,18 @@ need no output of extract, so this work package runs beside 3a:
 - `layout_page`: the region's box holds every line; a page with no words
   has no region; figures are copied.
 - layout `run` on a hand-made `words.json` of 8 pages with 1 worker and
-  with 3 gives the same bytes; with a `pages.json` of another hash it
-  raises `InputFileError` naming analyze.
+  with 3 gives the same bytes; with a `pages.json` of another hash, or a
+  config whose `pdf` is another file, it raises `InputFileError` naming
+  analyze; so does structure `run`.
 - `page_blocks`: a region of two lines gives one paragraph with the words
   joined by single spaces and the id `b-p0012-001` on page 12; no region,
   no block.
 - the fidelity check passes on the hand-made inputs and outputs of both
   stages, and fails on a `LinesFile` made by `layout_page` with one word
   then dropped from a line.
+- each stage's `run`, with its pure function (`layout_page`,
+  `make_blocks`) replaced by one that drops a word, raises
+  `FidelityError` and writes no output file.
 
 The excerpt tests of layout and structure need extract's output, so they
 are in work package 4 (section 9).
@@ -807,20 +999,54 @@ THE BATTLE OF KADESH A STUDY IN THE EARLIEST KNOWN MILITARY STRATEGY\* JAMES …
 ```
 
 - The header's values are written as JSON strings (`json.dumps(value,
-  ensure_ascii=False)`), which YAML reads as double-quoted strings.
+  ensure_ascii=False)`), which YAML reads as double-quoted strings, of
+  the title and each author escaped as a block's text is (the next
+  point), since Pandoc reads metadata values as Markdown: unescaped,
+  `The Life of *Gargantua*` loses its asterisks to emphasis and
+  `C:\Windows` its backslash and the word after it.
 - The text of a block is written on one line, with a backslash before
   every ASCII punctuation character (`string.punctuation`) and nothing
-  else changed. Pandoc's Markdown reads any escaped ASCII punctuation as
+  else changed but the white space of the next point. Pandoc's Markdown reads any escaped ASCII punctuation as
   itself. Unescaped, Pandoc 3.13 changes words of both excerpts: Kadesh's
   `*Oampagne`, `me*ure` and `admits*` lose their asterisks to emphasis,
   Gierke's `jj^J^jjJJ` its carets to a superscript. Escaped, all 6,121
   Kadesh and 3,406 Gierke words come back from a round trip. The
   escaping makes `book.md` hard to proofread (`remarks\.`); the markdown
   spec chooses a lighter one with the same guarantee.
+- The white space that Pandoc's Markdown reads as layout is made plain:
+  each tab, line feed and carriage return in the text becomes a space,
+  and so do the vertical tab, the form feed and U+001C to U+001F, which
+  XML 1.0 does not allow; then the spaces at the start and end of the
+  text are dropped. No word changes, since `str.split()`,
+  which the fidelity check splits words with, splits at each of these
+  characters. Left as they are, Pandoc 3.14 drops a carriage return
+  inside a word (`ab\rcd` reads as the one word `abcd`), and reads a
+  line that starts with a tab or four spaces, at the start of the text
+  or after a blank line, as a code block. Every other character is kept:
+  checked on 14 November 2026 with Pandoc 3.14 through `read_markdown`,
+  each of the other 19 characters `str.split()` splits at (U+0085 and
+  the Unicode spaces and line separators) and each C0 and C1 control
+  character came back
+  as written, inside a word, at the start of the text and four times
+  before a word.
+- A character that XML 1.0 does not allow and that is not made a space
+  above, which is every other C0 control character, U+FFFE, U+FFFF and
+  a lone surrogate, makes markdown raise `InputFileError` naming
+  `blocks.json`, the block id and the code point (`U+FFFE`). Pandoc
+  copies such a character into the EPUB's XHTML, which is then not
+  well-formed (epubcheck: `FATAL(RSC-016)`), while the word check
+  passes; the text pdfium gives of both whole books holds U+FFFE
+  hundreds of times. What such a character becomes is for extract's
+  spec. The C1 control characters (U+007F to U+009F) and the other
+  noncharacters (U+FDD0 to U+FDEF, U+nFFFE and U+nFFFF of planes 1 to
+  16) are written as they are: checked on 14 November 2026 with Pandoc
+  3.14, Python's XML parser and epubcheck 5.4.0, an EPUB holding all of
+  them is well-formed and passes, while one holding the characters
+  above is not and fails.
 - The skeleton writes no heading, footnote, margin note or figure:
-  structure gives only paragraphs. markdown raises `GalleyError` with the
-  block id when it meets another kind, a note, or a note reference,
-  rather than write it wrongly.
+  structure gives only paragraphs. markdown raises `InputFileError`
+  naming `blocks.json` and the block or note when it meets another kind,
+  a note, or a note reference, rather than write it wrongly.
 - A blank line separates the header and every div.
 
 Edits: decided, the skeleton does not apply them, because no edit can
@@ -829,10 +1055,13 @@ with `read_edits`, and when any holds an edit it raises `EditError`
 naming the file and saying that edits are applied from the markdown spec
 on. A missing `edits/` folder, or empty files, is no edits.
 
-markdown reads `pages.json` and `blocks.json` and checks the hash of
-`blocks.json` against `pages.json`'s, as every stage after analyze does, makes the Markdown,
-runs `read_markdown` on it and `check_stage(Boundary.MARKDOWN, blocks,
-words)`, and only then writes `book.md`. It deletes `book.md` first.
+markdown reads `pages.json` and `blocks.json` with `read_checked_input`,
+which checks `pages.json` against `pdf_sha256(config.pdf)` and
+`blocks.json` against `pages.json`, as every stage after analyze does
+(section 3), makes the Markdown,
+runs `read_markdown` on it and `check_stage(FidelityBoundary.MARKDOWN, blocks,
+words)`, and only then writes `book.md`. It deletes `book.md` and
+`book.epub` first (section 3).
 
 ```python
 # galley.markdown
@@ -847,11 +1076,16 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str: ...
 epub runs
 
 ```
-pandoc <book.md> --from markdown-smart --to epub3 --output <book.epub>
+pandoc <book.md> --from markdown-smart-auto_identifiers --to epub3 --output <book.epub>
        --css <style.css> --fail-if-warnings [--epub-cover-image <images/cover.png>]
 ```
 
-with absolute paths, a timeout of 120 s and `check=True`. `style.css` is a
+with absolute paths, a timeout of 120 s and `check=True`. The input
+format is the one `read_markdown` reads with (section 5), so that the
+EPUB is made from the same reading of `book.md` that the word check
+passed. Making the paths absolute (`Path.resolve`) is a safety
+measure with no effect a test can see while Pandoc runs in the caller's
+directory, where relative paths also work. `style.css` is a
 file of the package, `src/galley/epub/style.css`, empty in the skeleton,
 found with `importlib.resources`; passing it tries now the path the real
 style sheet will take. With `--css`, Pandoc uses that sheet instead of
@@ -878,22 +1112,46 @@ def pandoc_arguments(folder: BookFolder, config: BookConfig, style_sheet: Path) 
 Unit tests:
 
 - `escape_markdown`: `*x*` gives `\*x\*`; `1. Of` gives `1\. Of`; `«` and
-  `—` are unchanged; a text holding every ASCII punctuation character,
-  escaped and read back with `read_markdown` (marked `pandoc`), comes back
-  equal.
+  `—` are unchanged; `ab\rcd` and `ab\tcd` give `ab cd`, and `\tab` and
+  `    ab` give `ab`; `string.punctuation` gives a literal with a
+  backslash before each character; a text holding every ASCII
+  punctuation character, escaped and read back with `read_markdown`
+  (marked `pandoc`), comes back equal, and so do `jj^J^jjJJ`, `H~2~O`,
+  `a\\b`, `# 1 Of`, `see @doe`, `*x*`, `_x_`, `` `x` ``, `[x](y)`,
+  `$x$`, `<i>x</i>`, `<!--x-->`, `{x}` and `|a|b|`; markdown `run` on a
+  block holding the vertical tab, the form feed and U+001C to U+001F,
+  inside a word and four times before one, writes a `book.md` whose
+  words are the block's; so do the words of texts holding each character `str.split()`
+  splits at and each control character, inside a word, at the start of
+  the text and four times before a word, and of texts with a tab or
+  four spaces after a blank line.
 - `render_markdown` on a literal `BlocksFile` of two paragraphs gives a
-  literal Markdown text, header included; a heading block or a note
-  raises.
+  literal Markdown text, header included; a heading block, a note or a
+  note reference raises `InputFileError`; a block holding a character
+  XML does not allow raises `InputFileError` naming its code point, and
+  one holding a C1 control character or U+FDD0 does not.
+- a title and an author holding `*`, `_`, `\`, `<`, `[x](y)` and a
+  non-ASCII letter come back unchanged in `content.opf`'s `dc:title`
+  and `dc:creator` (marked `pandoc`).
 - markdown `run` (marked `pandoc`, since it calls `read_markdown`) with an
   edit in `edits/owner.jsonl` raises `EditError` naming the file; with an
   empty `edits/owner.jsonl`, and with no `edits/` folder, it writes
+  `book.md`; with a config whose `pdf` is another file than the one
+  `pages.json` was made from, it raises `InputFileError` naming analyze
+  and writes no `book.md`; when the Markdown loses a word (`render_markdown` replaced
+  by one that drops it), `run` raises `FidelityError` and writes no
   `book.md`.
 - `pandoc_arguments` with and without a cover, against literal tuples.
 - epub `run` on a hand-written `book.md` of two divs (marked `pandoc`):
   `book.epub` is a zip whose first entry is `mimetype` holding
   `application/epub+zip`, whose `EPUB/content.opf` has the title and
   `<dc:language>en</dc:language>`, and whose chapter holds both div ids;
-  with no `book.md`, it raises `InputFileError` naming markdown.
+  with no `book.md`, it raises `InputFileError` naming markdown; the
+  style sheet `EPUB/styles/stylesheet1.css` is there and empty; a
+  `book.md` with `![](missing.png)` gives
+  `ExternalProgramError` with Pandoc's "Could not fetch resource" and no
+  `book.epub`; with no `pandoc` on the `PATH`, the error says it is not
+  installed.
 - the same EPUB passes epubcheck (marked `epubcheck`; it skips until
   epubcheck is installed, which architecture §16 asks for before the
   epub stage is built).
@@ -921,13 +1179,20 @@ structure and markdown, so it runs whether a stage is called alone or by
 `run`: after `edits-from`, the owner reruns markdown alone, and that is
 where edits enter the text.
 
-Before any stage runs, `main` finds the programs the command needs with
-`shutil.which`: for `run`, `markdown` and `epub`, a missing `pandoc` is an
-`ExternalProgramError` saying "install it with `brew install pandoc`".
-`run` raises `ConfigError` when the config has `correct = true`, since
-the skeleton has no correct stage. The subcommands `correct` and
-`edits-from` do not exist yet; argparse rejects them. Errors propagate to
-`main`, which logs them and raises them again (architecture §14).
+Before any stage runs, `main` reads the config and checks two things,
+in this order. `run` raises `ConfigError` when the config has `correct =
+true`, since the skeleton has no correct stage. Then `main` finds the
+programs the stages it runs need with `shutil.which`: a command that
+runs markdown or epub (`run`, `markdown`, `epub`) needs Pandoc, and a
+missing `pandoc` is an `ExternalProgramError` saying "install it with
+`brew install pandoc`". A folder argument that is a file, not a folder,
+is a `ConfigError` saying that the argument must be the book folder. The subcommands `correct` and
+`edits-from` do not exist yet; argparse rejects them, and it rejects a
+`--workers` below 1, which `parallel.py` would refuse only after analyze
+had deleted `pages.json`. `--workers` defaults to `DEFAULT_WORKERS`.
+Errors propagate to `main`, which logs them and raises them again
+(architecture §14). The logged line names the command and, once a stage
+has started, the stage: `galley2epub run failed in structure: …`.
 
 ### The end-to-end test
 
@@ -968,8 +1233,17 @@ Other tests of this work package:
 - `galley2epub` is an entry point of the installed package, and the
   script next to `sys.executable` runs `--help` with exit code 0;
 - the stages run one by one through `main` on a fresh Kadesh folder give
-  the same `blocks.json` and `book.md` bytes as `run` (marked
-  `thread_unsafe`);
+  the same `blocks.json` and `book.md` bytes as `run`, and the same
+  `EPUB/text/ch001.xhtml` in the EPUB (the whole EPUB differs by its
+  identifier and date); after each stage the folder holds exactly the
+  files of that stage and those before it (marked `thread_unsafe`);
+- `--workers 3` reaches every stage's `run`, and without the option
+  every stage gets `DEFAULT_WORKERS`;
+- after `run`, removing `exclude_regions` and running analyze and
+  extract, markdown raises `InputFileError` naming structure and leaves
+  no `book.md` or `book.epub`; a stage that fails leaves no later
+  stage's file; structure then markdown run again on unchanged inputs
+  write the same bytes;
 - `main(["layout", str(folder)])` on a folder with no `words.json` raises
   `InputFileError` naming extract; `main(["run", str(folder)])` with
   `correct = true` raises `ConfigError` before `pages.json` exists; a

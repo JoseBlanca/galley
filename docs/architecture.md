@@ -107,8 +107,12 @@ kadesh/
 ```
 
 The owner writes `book.toml` and, through `galley2epub edits-from`, the
-edits. Every other file is generated and is overwritten when its stage
-runs again. Edits are never overwritten by a stage. Folders of the owner's
+edits. Every other file is generated. A stage, before it reads its
+inputs, deletes its own file and the files of every later stage
+(`book_folder.delete_stage_outputs`), so that no file of a later stage
+can survive from an earlier run: in the review of the walking skeleton,
+markdown run alone after analyze and extract built `book.md` from a stale
+`blocks.json` and lost a word with no error. Edits are never overwritten by a stage. Folders of the owner's
 books live outside the repository or under `runs/`, which git ignores;
 tests make theirs under pytest's temporary directory.
 
@@ -425,6 +429,7 @@ A stage imports these and nothing else of galley.
 | `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract or Pandoc), `EditError`, `FidelityError` |
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage` |
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
+| `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file |
 | `wordlist.py` | `word_list(language) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/` |
 | `fidelity.py` | the fidelity check, section 13 |
 | `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract) and stops naming any that is missing |

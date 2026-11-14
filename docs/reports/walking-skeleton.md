@@ -1,0 +1,436 @@
+# Report: the walking skeleton
+
+The work report of `docs/plans/walking-skeleton.md`, written while the plan
+runs, for the owner. Started on 14 November 2026 on branch
+`plan/walking-skeleton`, from `main` at e60d2f3.
+
+## Where the plan stands
+
+The walking skeleton is done, on branch `plan/walking-skeleton`, and
+nothing is merged into `main` yet. Two things are asked of the owner, and
+they do not depend on each other: to order the merge (nothing else is
+needed for it), and to say whether to post the draft issue for
+pdfminer.six described below. Looking at the four EPUBs on the Kindle is
+the plan's last step and is not a condition of the merge.
+
+What exists now that did not: the `galley2epub` command, which turns a
+book folder holding a `book.toml` into `book.epub` through six stages
+(analyze, extract, layout, structure, markdown, epub; correct is not
+built), each in its simplest form. Every word of the PDF's text layer
+reaches the EPUB or is recorded as removed (for instance a word inside a
+region the config excludes), and layout, structure and markdown each
+check that no word was lost or invented before they write. 461 tests pass in 14.5 s (18.8 s
+with 8 threads), under the 30 s budget.
+
+The final check, run on 14 November 2026 on the owner's M5 Pro with
+Pandoc 3.14 and epubcheck 5.4.0:
+
+| book | pages excluded (no text layer) | words in the EPUB | blocks | time, 1 worker | time, 6 workers | epubcheck |
+|---|---|---|---|---|---|---|
+| Kadesh excerpt (10 pages) | 1 | 6,120 (of 6,121; the config removes the journal's page number `81`) | 9 | | 1.16 s | 0 errors, 0 warnings |
+| Gierke excerpt (10 pages) | 0 | 3,406 | 10 | | 0.67 s | 0 errors, 0 warnings |
+| Kadesh, whole (76 pages) | 14 | 25,467 | 62 | 4.20 s | 2.02 s | 0 errors, 0 warnings |
+| Gierke, whole (290 pages) | 12 | 113,996 | 278 | 18.04 s | 7.38 s | 0 errors, 0 warnings |
+
+The excerpts were timed with 6 workers only. For the whole books,
+`galley2epub run` first stopped in analyze and listed the pages without a
+text layer, as the skeleton is meant to; with those pages added to the
+config's `exclude_pages` it ran through. Excluding them dropped no word,
+since those pages have no words in the PDF to drop. But Kadesh page index
+69 holds about five printed lines that the scanner's OCR never turned
+into text, so they are in neither the PDF's text nor the EPUB; reading
+them needs OCR, which the OCR audit of architecture §7b, in analyze's own
+spec, will add. Until then, a book with such pages is complete as to its
+text layer, not as to its printed page.
+
+The four EPUBs are in `runs/walking-skeleton/` of the main checkout,
+ignored by git: the excerpts `kadesh.epub` (2.4 MB, with the cover) and
+`gierke.epub`, and the whole books `kadesh_book.epub` and
+`gierke_book.epub`. They read badly on purpose:
+one paragraph per page, running heads and page numbers in the text,
+Kadesh's two footnote columns read across the row, Gierke's margin
+headings in the line beside them. The stage specs that come next fix
+that.
+
+What is left open, each with where it goes:
+
+- Characters forbidden in XML stop markdown with an error naming the
+  block; pdfminer can drop a broken character before galley sees it.
+  What extract makes of such characters is for extract's spec.
+- A draft issue for pdfminer.six about the race below ("The pdfminer
+  race") is ready and not posted; posting it is the owner's choice.
+
+The cost of the work, for whoever plans the next one, is in the last
+section.
+
+## Before the first task
+
+Prerequisites, checked in the plan's worktree on 14 November 2026:
+
+- Pandoc is 3.14, not the 3.13 the plan named: Homebrew upgraded it when
+  epubcheck was installed. The behaviours the spec relies on were checked
+  again on 3.14 and hold: one chapter file per level-1 heading with the
+  block ids kept as `div` ids; note blocks keep their ids inside the
+  footnote `aside`; a link to `#b-p0000-002` from another chapter becomes
+  `ch001.xhtml#b-p0000-002`; with `-f markdown-smart`, `"quotes"` and `--`
+  are read back unchanged; an unused note definition with
+  `--fail-if-warnings` exits with 3; a reference with no definition is
+  printed as text, `Text.[^zz]`, with exit 0. The plan's prerequisite now
+  names 3.14.
+- `uv run --locked pytest`: 5 passed.
+- `uv.lock`: pdfplumber 0.11.10, pypdfium2 5.15.2.
+- epubcheck: `/opt/homebrew/bin/epubcheck`, EPUBCheck v5.4.0.
+- The whole books are in `samples/public_domain/` of the main checkout
+  (4,830,323 and 24,281,471 bytes).
+- No other session's worktree exists, so the board was not used.
+
+## Work package 1: the data formats
+
+One stream, `formats`, one subagent, four commits (488444c, e14f23b,
+56dcd16, 889d220), merged into the plan's branch as fad593c.
+
+Deliverables, checked by the orchestrator on fad593c's stream branch:
+
+| deliverable | command | result |
+|---|---|---|
+| 1. error classes | `pytest tests/test_errors.py --collect-only -q` | 7 tests (at least 2) |
+| 2. formats | `pytest tests/test_model.py --collect-only -q` | 80 tests (at least 24) |
+| 3. config | `pytest tests/test_config.py --collect-only -q` | 43 tests (at least 16) |
+| 4. book folder | `pytest tests/test_book_folder.py --collect-only -q` | 1 test (at least 1) |
+| 5. imports | `python -c "import galley.errors, galley.model, galley.config, galley.book_folder"` | exit 0 |
+
+The six checks of the coding skill pass: `uv run --locked pytest`, 136
+passed, 0 skipped, in 0.23 s; with `--parallel-threads=8`, 136 passed in
+0.98 s.
+
+What the stream did beyond the plan, each checked against the spec:
+
+- `RemovalReason.plate_text` is in the enum, as architecture §8 names it.
+- `Edit.format_version` is the first field, default 1, so that it is first
+  on every line of an edits file.
+- The readers also reject text that is not UTF-8 and a top level that is
+  not a JSON object; `read_edits` rejects unknown and wrongly typed fields.
+- Every float field is written as a float, so a box of ints and the same
+  box of floats give the same bytes, as spec §3's byte-identity rule asks.
+- ty 0.0.104 checks `frozendict` without complaint; no format needed
+  `sentinel`.
+
+### Review of work package 1
+
+Four reviewers (spec, tests, fidelity, conventions) on fad593c. Every real
+word of both excerpts (9,527) and 27 hard texts (combining accents, long
+s, ligatures, bidirectional marks, zero-width characters, emoji, control
+characters) came back from the formats unchanged. Findings that held,
+fixed by the stream's agent test first in 12 commits (39bd97b to
+adb3d4f), the spec's section 3 first:
+
+- A word holding a lone surrogate made a writer crash after emptying the
+  file it was replacing. Files are now written whole or not at all (a
+  temporary file renamed over the old one), and readers refuse such text.
+- Readers accepted NaN and infinity as numbers, and the config accepted
+  them in a region's box, where NaN made the region exclude nothing in
+  silence. Refused now, and never written.
+- A JSON key given twice was read as its last value; an edits file that
+  is not UTF-8 gave Python's decoding error without the file's name.
+  Both are errors naming the file now.
+- The architecture promises how a `frozendict` is written; the reader
+  could not read it back. Done, though no field uses one yet.
+- Tests that could not fail: 8 of 22 deliberate breaks of the code passed
+  the whole suite, and 11 enum spellings of the formats were pinned by no
+  test. Each now has a test that fails when the code breaks.
+- Small spec changes decided by the orchestrator (no format or EPUB
+  change): the fidelity boundary is an enum, `FidelityBoundary`, in
+  `errors.py`; `check_source_pdf`'s parameter is `expected_pdf_sha256`;
+  an empty title or author list is an error; the PDF path is always
+  resolved; -0.0 is written as 0.0.
+
+Not taken: sorting the words in a fidelity error's message stays; the
+small type-check helpers stay duplicated in `config.py` and `model.py`,
+because they raise different errors.
+
+After the fixes: the six checks pass, 185 tests, none skipped, 0.28 s
+(1.13 s with 8 threads).
+
+For the next work package: pdfminer, under pdfplumber, decodes some text
+with `errors="ignore"` and can drop a broken character before galley
+sees it (`pdfminer/cmapdb.py`, line 190). That is for extract's spec.
+
+## Work package 2: shared machinery
+
+Two streams side by side, each in its own worktree, merged into the
+plan's branch: `fidelity` (e1a6de2, 1685562, f218d16; merge 9373fe8) and
+`pdfium` (a26d5c2, 664c710, 0970fdf, d430f89; merge 9b3458f). The two
+streams edited different sections of the spec and merged without
+conflict.
+
+Deliverables, checked by the orchestrator:
+
+| deliverable | command | result |
+|---|---|---|
+| 1. PDFium in one thread | `pytest tests/test_pdfium.py --collect-only -q`; with `-m thread_unsafe` | 20 tests (at least 7); 15 thread_unsafe (at least 6) |
+| 2. the pool | `pytest tests/test_parallel.py --collect-only -q` | 22 tests (at least 6) |
+| 3. the word check | `pytest tests/test_fidelity.py -m "not pandoc"` | 15 passed (at least 11) |
+| 4. reading the Markdown | `pytest tests/test_fidelity.py -m pandoc -rs` | 11 passed, none skipped (at least 7), Pandoc 3.14 |
+
+After both merges the six checks pass: 253 tests, none skipped, 2.84 s
+(3.88 s with 8 threads).
+
+Spec changes the streams made before their code, each in a commit of its
+own:
+
+- Kadesh's page size as pypdfium2 gives it is 508.29998779296875 pt wide,
+  not 508.32 as the spec said: PDFium clips the crop box to the media box.
+  No stage calls `page_size`; page sizes in the files are pdfplumber's.
+- `strip_stride` refuses a buffer that does not fit its shape;
+  `map_pages_with_source` says which error it raises when two kinds happen.
+- The fidelity check: when only the note counts differ, the error gives
+  both counts; a removal's text is split into words; `read_markdown`
+  accepts only the Pandoc elements galley writes and stops on any other,
+  so that a list or a table made by a missing escape cannot drop words.
+
+Every PDFium object is closed in the PDFium thread: a test reads
+pypdfium2's log of closes (4 documents, 1 page, 1 bitmap closed
+explicitly, none by a finalizer), and another finds pypdfium2 running in
+one thread only; with the calls moved to the caller's thread, the test
+process crashed inside PDFium.
+
+Question for the review: `parallel.py` keeps a small mutable record per
+worker to find the first failing item without a `try`, against the
+coding skill's functional style.
+
+### Review of work package 2
+
+Four reviewers on 9b3458f. Building Markdown from every word of both
+excerpts, escaped as spec §8 says, and reading it back through
+`read_markdown` with Pandoc 3.14 gave 6,121 of 6,121 and 3,406 of 3,406
+words; one changed letter, a duplicate, a lost word, an added accent and
+an added zero-width space were each caught. The tests reviewer broke the
+code 50 ways: results in input order, every PDFium object closed
+explicitly, and note references counted as words of their own are
+guarded.
+
+Findings that held, fixed in two fix branches side by side (pdfium-fix:
+639e656, f22af19, 620f3d9; fidelity-fix: 7fe30db to d1c1f2f), the spec
+first in each:
+
+- Two holes in the fidelity check itself: a note reference span could
+  carry a body word away (counted at structure, never at markdown), and a
+  recorded word change was trusted whatever it said ("Greece" to "Greek"
+  as a hyphen join passed). A reference span must now be exactly its
+  note's marker, and each word change is checked by its reason.
+- A word invented in `book.md`, and a word duplicated at structure or
+  markdown, could pass without any test failing; tests added.
+- Words with white space inside were split on one side only; Pandoc's
+  automatic heading ids could name a block not in `book.md`; the Pandoc
+  call is now apart from the pure walk of its JSON.
+- The only guard against an item lost by the pool was an `assert`, which
+  `python -O` removes; an explicit check now. A missing PDF and a dpi
+  below 1 give errors that name them. The order tests now really use
+  several threads (they had run on one), and a test pins which error wins
+  when two workers fail.
+
+Kept on the reviewers' evidence: `parallel.py`'s per-worker record, written
+only by its worker and read after the join (300 rounds with the GIL off,
+the right failure every time). The coding skill now allows that pattern
+(55d1104).
+
+After the fixes: 284 tests, none skipped, 2.88 s (4.44 s with 8 threads).
+
+For work package 3: Pandoc drops a carriage return inside a word (`ab\rcd`
+becomes `abcd`) and reads a leading tab as a code block, so the markdown
+stage's escaping must handle C0 white space.
+
+### How the work went (for whoever next revises a skill or writes a plan)
+
+- Each coding agent's report was right about what it built; every
+  review still found real defects, most of them in tests that could not
+  fail (8 of 22 mutations survived in work package 1, several in work
+  package 2). A mutation pass by the tests reviewer is worth its cost.
+- Tokens, from the Agent results: work package 1, coding 153k, four
+  reviews 255k, fixes 226k; work package 2, coding 243k (two streams),
+  four reviews 256k, fixes 303k. A work package costs about three times
+  its coding.
+
+## Work package 3: the six stages in their simplest form
+
+Three streams side by side, merged one after the other into the plan's
+branch: `structure` (1b3683e, e97e395, b2839ac; merge d15b872), `epub`
+(9cfe285, 5825ec8, 3e2a4af; merge d227e26) and `extract` (4b9b738,
+346b4bd, 5fdc2ca; merge 9782bab). Each changed only its own section of
+the spec, so the three merged without conflict.
+
+Deliverables, checked by the orchestrator on 9782bab:
+
+| deliverable | result |
+|---|---|
+| 1. analyze | 16 tests (at least 8) |
+| 2. extract | 25 tests (at least 4) |
+| 3. analyze and extract on the excerpts | every count, box and opening word of spec §2 and §6 matched; the Kadesh cover is 2118 × 3034 pixels, 2,358,031 bytes |
+| 4. their own runs | 7 thread_unsafe tests, among them 1 against 6 workers byte for byte |
+| 5. layout | 16 tests (at least 10); the line rule gives spec §2's 387 lines on Kadesh and 366 on Gierke |
+| 6. structure | 9 tests (at least 4) |
+| 7. markdown | 19 passed, none skipped (at least 9) |
+| 8. epub | 5 passed, none skipped (at least 4) |
+| 9. `style.css` in the package | `True`; also in the wheel |
+| 10. every stage's `run` | the import command exits 0 |
+| 11. a hand-written EPUB passes epubcheck | 1 passed; epubcheck fails on a copy without its language, so the test can fail |
+
+The six checks pass: 375 tests, none skipped, 8.23 s (8.95 s wall time);
+with 8 threads 10.89 s. Both under the 30 s budget.
+
+Choices the streams wrote into the spec, each before its code:
+
+- layout and structure check `pages.json` against the PDF's own hash as
+  well as their input against `pages.json` (0.4 ms on Kadesh), so that a
+  stale `pages.json` names analyze. Accepted by the orchestrator.
+- markdown turns tabs, line feeds and carriage returns into spaces and
+  trims them at the ends of a text: Pandoc 3.14 drops a carriage return
+  inside a word and reads a leading tab or four spaces as a code block.
+  Tested through Pandoc on 258 texts; all 55 C0 and C1 control characters
+  otherwise come back unchanged.
+- extract refuses a `pages.json` that holds a plate page or a page marked
+  for OCR, which the skeleton cannot read, rather than drop its words.
+
+For the extract stage's spec: Pandoc writes control characters such as
+NUL into the EPUB's pages, where XHTML forbids them; no word is lost, but
+the EPUB would fail epubcheck. What such characters become is extract's
+decision, with the pdfminer finding of work package 1.
+
+### Review of work package 3
+
+Four reviewers on 9782bab. Two chained every stage on both excerpts:
+every word of pdfplumber's text layer is in `words.json` or its
+removals, and then in `lines.json`, `blocks.json`, `book.md` and the
+EPUB's text, in the same order; no curly quote, no visible backslash, no
+decoded entity; 30 hand-made Markdown-like words (`*emphasis*`, `<b>`,
+`[link](x)`, `| table |`, an HTML comment, entities, a URL, NBSP, a
+leading tab, a carriage return) came through unchanged. Both EPUBs pass
+epubcheck 5.4.0 with 0 errors and 0 warnings. Every literal of spec §2,
+§6 and §9 matched.
+
+Findings that held, fixed in three branches side by side (extract-fix
+21ff16e; structure-fix 8914920, 0434b88; epub-fix 4ae5a76 to c9acbae)
+and then one cross-stage round on the plan's branch (70126ad to 48c1eac):
+
+- Characters XML forbids reached the EPUB's chapter with no error, so a
+  strict reader would refuse it; pdfium's text of both whole books holds
+  U+FFFE hundreds of times. Vertical tab, form feed and U+001C-U+001F are
+  now written as spaces (Python splits words at them, so no word
+  changes); the rest of C0, U+FFFE and U+FFFF stop markdown with an
+  error naming the block and the character. C1 controls and the Unicode
+  noncharacters were checked with Pandoc, an XML parser and epubcheck
+  and pass, so they are kept. What extract makes of such characters is
+  for its own spec.
+- Pandoc read the title and authors as Markdown ("The Life of
+  *Gargantua*" lost its asterisks, "C:\Windows" became "C:"). They are
+  escaped now, and a test reads them back from the EPUB's metadata.
+- markdown checked `blocks.json` against `pages.json` but not
+  `pages.json` against the PDF: pointed at another PDF, it wrote Kadesh's
+  words under Gierke's title. One function in `model.py` now does both
+  checks for every stage after analyze.
+- Tests that could not fail: 17 of 66 deliberate breaks passed the suite.
+  Removing the fidelity check from layout, structure or markdown's `run`
+  failed no test; 16 of 32 escapes could be dropped (without `\` or `#` a
+  character is lost); Pandoc failing was untested; three parts of the
+  line rule were untested. Each has a test now that fails on the break.
+- Smaller: epub reads `book.md` with the same Pandoc options as the
+  fidelity check, one logger name and `__all__` in every stage.
+
+After the fixes: 409 tests, none skipped, 8.44 s (11.55 s with 8
+threads).
+
+## Work package 4: the command and the end-to-end test
+
+One stream, `cli` (7a228f3, 282b175, 64cd044; merge b0f54c1). The spec
+commit settles that the command refuses `--workers` below 1 before any
+stage runs, since analyze would otherwise delete `pages.json` before the
+pool refused the value.
+
+Deliverables, checked by the orchestrator on b0f54c1:
+
+| deliverable | result |
+|---|---|
+| 1. the command is installed | `uv run --locked galley2epub --help` exits with 0 |
+| 2. the command's own tests | 15 tests (at least 5), passed |
+| 3. the end-to-end test | 12 tests (at least 5), passed; the excerpt tests of work package 3 pass on the folders of the real run |
+| 4. both excerpt EPUBs pass epubcheck | 2 passed, none skipped |
+| 5. the speed budget | `uv run --locked pytest`: 436 passed in 13.3 s; with 8 threads 17.2 s; both under 30 s |
+
+The five slowest tests: the session fixture's setup, which runs the
+whole command on both excerpts (1.56 s); extract with 1 and 6 workers
+(1.38 s); epubcheck on each excerpt EPUB (1.35 s, 1.32 s) and on the
+hand-written one (1.34 s).
+
+The stages-one-by-one test compares the bytes of every file of the book
+folder (`pages.json`, `words.json`, the cover, `lines.json`,
+`blocks.json`, `book.md`) with those of `run`. The session fixture skips,
+and says so, when Pandoc is missing.
+
+### Review of work package 4
+
+Four reviewers on b0f54c1, running the real command. Both excerpts and
+the whole Kadesh book (76 pages; analyze listed the 14 pages without a
+text layer in 0.9 s; with those excluded, `run` took 2.15 s, wrote 25,467
+words in 62 blocks and a 60 KB EPUB) passed epubcheck with 0 errors and
+0 warnings, and every word was accounted for page by page from
+pdfplumber's text layer to the EPUB's text. Running the stages one by one
+gives the same bytes as `run`. Every bad input tried (no `book.toml`, an
+unknown key, a missing PDF, `--workers 0`, a stale `pages.json`) gives a
+message naming the file and a non-zero exit.
+
+Findings that held, fixed by the stream's agent (7eabe48, 6afcda6,
+3c2e8bc), the spec first:
+
+- A word lost with no error: after removing an excluded region and
+  rerunning analyze and extract, markdown and epub run alone built the
+  EPUB from the old `blocks.json`, and the restored word `81` was
+  missing. Each stage now deletes its own file and every later stage's
+  before it reads (`book_folder.delete_stage_outputs`), so a stale file
+  cannot feed a later stage; the architecture says so (section 5).
+- Under `run`, the error line named `run`, not the stage that failed; a
+  folder argument that is a file gave Python's error; `correct = true`
+  was checked after Pandoc. Fixed.
+- The stage order was written in two tables; one now.
+- Tests that could not fail: `--workers` reaching the stages, the log
+  line, a subcommand that also runs later stages, the EPUB's text against
+  the blocks. Each has a test now.
+
+An open question at the time of writing: twice, a run stopped once in
+analyze with `PdfminerException: /b'trailer'`, not repeated in 80 later
+runs. An agent is checking whether it is a race under free threading or
+a PDF deleted underneath by another agent's pytest pruning the shared
+temporary folder.
+
+### The pdfminer race
+
+The crash seen twice during the reviews, `PdfminerException:
+/b'trailer'` in analyze, is a race between threads inside pdfminer.six
+20260107, not in galley. `PSSymbolTable.intern` (pdfminer/psparser.py,
+lines 85-93) looks a keyword up in a module-level dict and stores it if
+missing, with no lock; two threads opening documents at the same moment
+can each store their own `trailer` keyword, and `pdfdocument.py` line 186
+then compares by identity and fails in one of them.
+
+Measured by an investigating agent on the whole Kadesh book, one fresh
+process per round: with galley's analyze and extract, 1 crash in 150
+rounds at 6 workers and 2 in 150 at 24, none at 1 worker; with plain
+pdfplumber, 3 and 4 in 150. In every round that did not crash, the
+output was byte-identical to the one-worker reference, so nothing was
+corrupted in silence. With a 1 ms delay added inside the table, 3 of 5
+runs failed with the same message. Deleting or truncating the PDF while
+it was read (240 cases) never gave this message, so the other
+explanation, another agent's pytest pruning the shared temporary folder,
+was ruled out.
+
+Fix (421c335, 7a12f69): `text_layer.open_pdf` opens every pdfplumber
+document under one lock; reading pages stays parallel. A test makes the
+race happen every time (threads held at the table until all have
+missed): `pdfplumber.open` fails in 3 of 4 threads, `open_pdf` in none,
+and with the lock removed `open_pdf` fails too. After the fix, 300 rounds
+at 6 and 24 workers: 0 crashes, all identical. A PDF that pdfplumber
+cannot read is now a `PdfError` naming the file. The coding skill's
+threading section records the lesson: a library's module-level table is
+shared state.
+
+For the owner: a draft issue for pdfminer.six (a lock in `intern`, or
+`dict.setdefault`) is ready; it is not posted.

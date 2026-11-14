@@ -137,13 +137,29 @@ performance cores: 4.5 s with 1 thread, 1.2 s with 6, and no gain beyond
   InterpreterPoolExecutor cannot load pdfplumber or Pillow, and a process
   pool was no faster (1.0 s against 1.2 s on the same pages).
 - Workers share no mutable state. A worker takes a page and returns its
-  result; the merging happens in the calling thread. `functools.lru_cache`
+  result; the merging happens in the calling thread. One exception, found
+  safe in the review of `parallel.py` on 14 November 2026: a small
+  mutable record per worker, written only by that worker and read by the
+  calling thread only after the pool has joined every worker (it holds the
+  index of the item the worker was running, so that the first failing item
+  is found without a broad `except`). It is never shared while it can
+  change, and it never leaves the function that made it. `functools.lru_cache`
   may be shared when computing a value twice is harmless; anything else
   shared and mutable takes a `threading.Lock`. No iterator or generator is
   shared between threads. A check-then-act on a shared dict (`if k not in
   d: d[k] = ...`) is a race even when each operation alone is safe.
 - pdfplumber's text extraction is pdfminer, pure Python, and runs in
-  workers, but each worker thread opens its own `pdfplumber.open(path)`
+  workers, but each worker thread opens its own document, always through
+  `text_layer.open_pdf`, never `pdfplumber.open` directly. Pure Python is
+  not thread-safe Python: pdfminer.six interns PDF keywords in a shared
+  dict with a check-then-act and no lock, and two threads opening
+  documents at once failed about 1 run in 100 with
+  `PdfminerException: /b'trailer'` (found on 14 November 2026 by a stress
+  loop of fresh processes; a test now forces the race with a barrier).
+  `open_pdf` opens under a lock and leaves page reading parallel. A
+  library's module-level cache or table is shared state: before calling
+  a library from workers, look for one. Each worker opens its own
+  document
   (through `threading.local` or the executor's `initializer`). A `PDF` or
   `Page` object is never shared between threads: sharing one raised
   `PdfminerException: pop from empty list` in 6 of 6 runs with 4 and 8
