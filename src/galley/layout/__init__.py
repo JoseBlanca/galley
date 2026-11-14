@@ -90,12 +90,19 @@ def run(
     """Reads pages.json and words.json from `folder`, lays out every page in
     `workers` threads, and writes lines.json.
 
-    lines.json is deleted first. pages.json must have been made from
+    lines.json and every later stage's file (blocks.json, book.md,
+    book.epub) are deleted first. pages.json must have been made from
     `config.pdf` and words.json from the same PDF, or InputFileError names
     the stage to run again. When the words of lines.json are not those of
     words.json, FidelityError is raised and nothing is written.
     """
-    folder.lines_json.unlink(missing_ok=True)
+    for generated in (
+        folder.lines_json,
+        folder.blocks_json,
+        folder.book_md,
+        folder.book_epub,
+    ):
+        generated.unlink(missing_ok=True)
     _, words = read_checked_input(
         folder.pages_json, config.pdf, folder.words_json, read_words
     )

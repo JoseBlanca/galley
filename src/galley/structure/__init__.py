@@ -76,14 +76,16 @@ def run(
 ) -> None:
     """Reads pages.json and lines.json from `folder` and writes blocks.json.
 
-    blocks.json is deleted first. pages.json must have been made from
+    blocks.json and every later stage's file (book.md, book.epub) are
+    deleted first. pages.json must have been made from
     `config.pdf` and lines.json from the same PDF, or InputFileError names
     the stage to run again. When the words of blocks.json are not those of
     lines.json, FidelityError is raised and nothing is written. structure
     runs in one thread; `workers` is taken as every stage takes it.
     """
     del workers  # one pass over the book, in this thread (spec section 10)
-    folder.blocks_json.unlink(missing_ok=True)
+    for generated in (folder.blocks_json, folder.book_md, folder.book_epub):
+        generated.unlink(missing_ok=True)
     _, lines = read_checked_input(
         folder.pages_json, config.pdf, folder.lines_json, read_lines
     )

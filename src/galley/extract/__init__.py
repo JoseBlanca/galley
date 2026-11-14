@@ -51,13 +51,21 @@ def run(
     as `folder.pages_json` describes them, and `images/cover.png` when the
     config has a `cover_page`.
 
-    Deletes the old words.json and images/ first, then always creates
+    Deletes words.json, images/ and every later stage's file first
+    (lines.json, blocks.json, book.md, book.epub), then always creates
     images/, empty without a cover. Raises InputFileError when pages.json
     is missing, malformed, made from another PDF, or holds a page the
     walking skeleton cannot read (a plate, or a page read by OCR).
     `workers` is the number of threads that read the pages.
     """
-    folder.words_json.unlink(missing_ok=True)
+    for generated in (
+        folder.words_json,
+        folder.lines_json,
+        folder.blocks_json,
+        folder.book_md,
+        folder.book_epub,
+    ):
+        generated.unlink(missing_ok=True)
     if folder.images_dir.exists():
         shutil.rmtree(folder.images_dir)
     pages_file = read_checked_pages(folder.pages_json, config.pdf)

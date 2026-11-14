@@ -2,9 +2,9 @@
 every stage, and a stage's name runs that stage alone (spec section 9).
 
 The command reads `book.toml` from the folder and calls each stage's `run`.
-Before any stage, it checks that Pandoc is installed when a stage it runs
-needs it. Errors propagate to `main`, which logs them and raises them
-again (architecture section 14).
+Before any stage, it refuses `correct = true` under `run` and checks that
+Pandoc is installed when a stage it runs needs it. Errors propagate to
+`main`, which logs them and raises them again (architecture section 14).
 """
 
 import argparse
@@ -12,7 +12,7 @@ import logging
 import shutil
 import sys
 from collections.abc import Sequence
-from enum import StrEnum
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -26,18 +26,8 @@ __all__ = ["main"]
 
 _logger = logging.getLogger(__name__)
 
-
-class _Command(StrEnum):
-    """The subcommands of galley2epub: `run` and the stages, in pipeline
-    order. The correct stage and `edits-from` are not in the skeleton."""
-
-    RUN = "run"
-    ANALYZE = "analyze"
-    EXTRACT = "extract"
-    LAYOUT = "layout"
-    STRUCTURE = "structure"
-    MARKDOWN = "markdown"
-    EPUB = "epub"
+_RUN = "run"
+_RUN_HELP = "every stage in order, from the PDF to book.epub"
 
 
 class _StageRun(Protocol):
@@ -46,32 +36,57 @@ class _StageRun(Protocol):
     ) -> None: ...
 
 
-# In the order `run` calls them.
-_STAGE_RUNS: frozendict[_Command, _StageRun] = frozendict(
-    {
-        _Command.ANALYZE: analyze.run,
-        _Command.EXTRACT: extract.run,
-        _Command.LAYOUT: layout.run,
-        _Command.STRUCTURE: structure.run,
-        _Command.MARKDOWN: markdown.run,
-        _Command.EPUB: epub.run,
-    }
-)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Stage:
+    """A stage the command runs: its subcommand, its help, its `run`, and
+    whether it calls Pandoc."""
 
-# markdown reads book.md back with Pandoc for the fidelity check; epub
-# writes the EPUB with it.
-_NEEDS_PANDOC = frozenset({_Command.RUN, _Command.MARKDOWN, _Command.EPUB})
+    name: str
+    help: str
+    run: _StageRun
+    needs_pandoc: bool
 
-_HELP = frozendict(
-    {
-        _Command.RUN: "every stage in order, from the PDF to book.epub",
-        _Command.ANALYZE: "what each page is: pages.json",
-        _Command.EXTRACT: "the words of every page and the cover: words.json, images/",
-        _Command.LAYOUT: "the words grouped into regions and lines: lines.json",
-        _Command.STRUCTURE: "the book as blocks: blocks.json",
-        _Command.MARKDOWN: "the Markdown to proofread: book.md",
-        _Command.EPUB: "the EPUB, built by Pandoc: book.epub",
-    }
+
+# The stages in the order `run` calls them. The correct stage and
+# `edits-from` are not in the skeleton. markdown reads book.md back with
+# Pandoc for the fidelity check; epub writes the EPUB with it.
+_STAGES: tuple[_Stage, ...] = (
+    _Stage(
+        name="analyze",
+        help="what each page is: pages.json",
+        run=analyze.run,
+        needs_pandoc=False,
+    ),
+    _Stage(
+        name="extract",
+        help="the words of every page and the cover: words.json, images/",
+        run=extract.run,
+        needs_pandoc=False,
+    ),
+    _Stage(
+        name="layout",
+        help="the words grouped into regions and lines: lines.json",
+        run=layout.run,
+        needs_pandoc=False,
+    ),
+    _Stage(
+        name="structure",
+        help="the book as blocks: blocks.json",
+        run=structure.run,
+        needs_pandoc=False,
+    ),
+    _Stage(
+        name="markdown",
+        help="the Markdown to proofread: book.md",
+        run=markdown.run,
+        needs_pandoc=True,
+    ),
+    _Stage(
+        name="epub",
+        help="the EPUB, built by Pandoc: book.epub",
+        run=epub.run,
+        needs_pandoc=True,
+    ),
 )
 
 
@@ -95,10 +110,9 @@ def _parser() -> argparse.ArgumentParser:
         "from a book folder that holds its book.toml.",
     )
     subcommands = parser.add_subparsers(dest="command", required=True)
-    for command in _Command:
-        subcommand = subcommands.add_parser(
-            command.value, help=_HELP[command], description=_HELP[command]
-        )
+    commands = ((_RUN, _RUN_HELP), *((stage.name, stage.help) for stage in _STAGES))
+    for name, help_text in commands:
+        subcommand = subcommands.add_parser(name, help=help_text, description=help_text)
         subcommand.add_argument(
             "folder", type=Path, help="the book folder, which holds book.toml"
         )
@@ -111,36 +125,46 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _stages(command: _Command) -> tuple[_Command, ...]:
+def _stages_of(command: str) -> tuple[_Stage, ...]:
     """The stages a command runs, in order."""
-    if command is _Command.RUN:
-        return tuple(_STAGE_RUNS)
-    return (command,)
+    if command == _RUN:
+        return _STAGES
+    return tuple(stage for stage in _STAGES if stage.name == command)
 
 
-def _require_pandoc(command: _Command) -> None:
-    """Raise ExternalProgramError when the command needs Pandoc and it is
-    not on the PATH."""
-    if command in _NEEDS_PANDOC and shutil.which("pandoc") is None:
+def _book_folder(path: Path) -> BookFolder:
+    """The book folder at `path`; ConfigError when `path` is a file."""
+    if path.is_file():
         message = (
-            f"galley2epub {command} needs pandoc, which is not installed; "
-            "install it with `brew install pandoc`"
+            f"{path} is a file; the argument must be the book folder, "
+            "which holds book.toml"
         )
-        raise ExternalProgramError(message)
+        raise ConfigError(message)
+    return BookFolder(path)
 
 
-def _run_command(command: _Command, folder: BookFolder, workers: int) -> None:
-    _require_pandoc(command)
-    config = read_config(folder.book_toml)
-    if command is _Command.RUN and config.correct:
+def _check_before_any_stage(
+    command: str, stages: tuple[_Stage, ...], folder: BookFolder, config: BookConfig
+) -> None:
+    """ConfigError for `correct = true` under run, then ExternalProgramError
+    when a stage needs Pandoc and it is not on the PATH (spec section 9)."""
+    if command == _RUN and config.correct:
         message = (
             f"{folder.book_toml} has correct = true, but the walking skeleton "
             "has no correct stage; set correct = false"
         )
         raise ConfigError(message)
-    for stage in _stages(command):
-        _logger.info("running %s on %s", stage, folder.root)
-        _STAGE_RUNS[stage](folder, config, workers=workers)
+    if any(stage.needs_pandoc for stage in stages) and shutil.which("pandoc") is None:
+        message = "pandoc is not installed; install it with `brew install pandoc`"
+        raise ExternalProgramError(message)
+
+
+def _failed(command: str, stage: str | None) -> str:
+    """What the logged error line starts with: the command and, under run,
+    the stage that was running."""
+    if stage is None or stage == command:
+        return f"galley2epub {command} failed"
+    return f"galley2epub {command} failed in {stage}"
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -148,7 +172,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     line when it is None.
 
     argparse exits with code 2 on arguments it rejects. Any other error is
-    logged and raised again, unchanged.
+    logged, with the stage that was running, and raised again unchanged.
     """
     arguments = _parser().parse_args(argv)
     logging.basicConfig(
@@ -156,11 +180,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         stream=sys.stderr,
         format="%(levelname)s %(name)s: %(message)s",
     )
-    command = _Command(arguments.command)
+    command = str(arguments.command)
+    running: str | None = None
     try:
-        _run_command(command, BookFolder(arguments.folder), arguments.workers)
+        folder = _book_folder(arguments.folder)
+        config = read_config(folder.book_toml)
+        stages = _stages_of(command)
+        _check_before_any_stage(command, stages, folder, config)
+        for stage in stages:
+            running = stage.name
+            _logger.info("running %s on %s", stage.name, folder.root)
+            stage.run(folder, config, workers=arguments.workers)
     # The one broad except of galley (coding skill, "Errors"): it only logs.
     except Exception as error:
         # Python prints the traceback once, when the error is raised again.
-        _logger.error("galley2epub %s failed: %s", command, error)  # noqa: TRY400
+        _logger.error("%s: %s", _failed(command, running), error)  # noqa: TRY400
         raise

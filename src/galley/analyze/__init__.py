@@ -8,6 +8,7 @@ owner checks it and adds it to `exclude_pages`.
 """
 
 import logging
+import shutil
 from contextlib import closing
 from dataclasses import dataclass
 
@@ -47,13 +48,25 @@ def run(
 ) -> None:
     """Writes `folder.pages_json`, what each page of `config.pdf` is.
 
-    Deletes the old pages.json first, so that a failed run leaves none.
+    Deletes pages.json and every later stage's file first (words.json,
+    images/, lines.json, blocks.json, book.md, book.epub), so that a failed
+    run leaves none and no later file outlives the pages.json it came from.
     Raises ConfigError when the config asks for OCR or names a page past
     the end of the PDF, and PdfError when a page that the config does not
     exclude has no text layer. `workers` is the number of threads that
     measure the pages.
     """
-    folder.pages_json.unlink(missing_ok=True)
+    for generated in (
+        folder.pages_json,
+        folder.words_json,
+        folder.lines_json,
+        folder.blocks_json,
+        folder.book_md,
+        folder.book_epub,
+    ):
+        generated.unlink(missing_ok=True)
+    if folder.images_dir.exists():
+        shutil.rmtree(folder.images_dir)
     page_count = pdfium.page_count(config.pdf)
     check_config_pages(config, page_count)
     measurements = map_pages_with_source(

@@ -136,4 +136,4 @@ def run(
     # as_file gives a path on disk even if the package is not a folder.
     with as_file(files(__package__).joinpath(_STYLE_SHEET)) as style_sheet:
         _run_pandoc(pandoc_arguments(absolute, config, style_sheet))
-    _logger.info("wrote %s", absolute.book_epub)
+    _logger.info("wrote %s", folder.book_epub)

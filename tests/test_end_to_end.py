@@ -51,6 +51,7 @@ BLOCK_IDS = frozendict(
     }
 )
 
+_XHTML = "http://www.w3.org/1999/xhtml"
 _OPF = {
     "opf": "http://www.idpf.org/2007/opf",
     "dc": "http://purl.org/dc/elements/1.1/",
@@ -200,6 +201,21 @@ def test_book_epub_is_an_epub_with_the_title_language_and_every_block(
             chapter = epub.read("EPUB/text/ch001.xhtml").decode("utf-8")
             for block_id in block_ids:
                 assert f'<div id="{block_id}">' in chapter
+
+
+def test_each_block_div_of_the_epub_holds_the_words_of_its_block(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    for folder in excerpt_books.values():
+        blocks = read_blocks(folder.blocks_json)
+        with zipfile.ZipFile(folder.book_epub) as epub:
+            chapter = ElementTree.fromstring(epub.read("EPUB/text/ch001.xhtml"))
+        divs = {
+            div.get("id"): "".join(div.itertext()).split()
+            for div in chapter.iter(f"{{{_XHTML}}}div")
+            if div.get("id") is not None
+        }
+        assert divs == {block.id: block_text(block).split() for block in blocks.blocks}
 
 
 def test_only_the_kadesh_epub_has_the_cover_extract_rendered(

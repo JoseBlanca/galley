@@ -169,15 +169,17 @@ def run(
     """Write book.md from blocks.json, after checking that no word is lost
     or invented between the two as Pandoc reads book.md.
 
-    Deletes book.md first. Reads pages.json and blocks.json, and raises
-    InputFileError when pages.json was not made from `config.pdf` or
+    Deletes book.md and book.epub, the file of the stage after it, first.
+    Reads pages.json and blocks.json, and raises InputFileError when
+    pages.json was not made from `config.pdf` or
     blocks.json was made from another PDF than pages.json; raises
     EditError when an edits file holds an edit; raises FidelityError when
     the words differ, and ExternalProgramError when Pandoc is missing or
     fails. markdown runs once, so `workers` is not used.
     """
     del workers  # every stage's run takes it; markdown is not per page
-    folder.book_md.unlink(missing_ok=True)
+    for generated in (folder.book_md, folder.book_epub):
+        generated.unlink(missing_ok=True)
     _, blocks = read_checked_input(
         folder.pages_json, config.pdf, folder.blocks_json, read_blocks
     )
