@@ -57,6 +57,34 @@ def test_the_installed_script_runs_help_with_exit_code_0() -> None:
         assert command in completed.stdout
 
 
+# The stages one by one
+
+
+# Runs every stage on an excerpt in a folder of its own.
+@pytest.mark.thread_unsafe
+def test_the_stages_one_by_one_write_the_same_bytes_as_run(
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    folder = _book(tmp_path, excerpt_book_toml[KADESH])
+
+    for stage in ("analyze", "extract", "layout", "structure", "markdown", "epub"):
+        main([stage, str(folder.root)])
+
+    by_run = excerpt_books[KADESH]
+    for written, written_by_run in (
+        (folder.pages_json, by_run.pages_json),
+        (folder.words_json, by_run.words_json),
+        (folder.cover_png, by_run.cover_png),
+        (folder.lines_json, by_run.lines_json),
+        (folder.blocks_json, by_run.blocks_json),
+        (folder.book_md, by_run.book_md),
+    ):
+        assert written.read_bytes() == written_by_run.read_bytes(), written.name
+    assert folder.book_epub.is_file()
+
+
 # The arguments argparse rejects
 
 
