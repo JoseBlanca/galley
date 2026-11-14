@@ -26,6 +26,7 @@ from galley.model import (
     write_pages,
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
+from galley.text_layer import open_pdf
 
 __all__ = ["check_config_pages", "classify_page", "require_text_layer", "run"]
 
@@ -59,7 +60,7 @@ def run(
     page_count = pdfium.page_count(config.pdf)
     check_config_pages(config, page_count)
     measurements = map_pages_with_source(
-        lambda: pdfplumber.open(config.pdf), _measure, range(page_count), workers
+        lambda: open_pdf(config.pdf), _measure, range(page_count), workers
     )
     pages = tuple(
         classify_page(

@@ -33,6 +33,7 @@ from galley.model import (
     write_words,
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
+from galley.text_layer import open_pdf
 
 __all__ = ["page_words", "run"]
 
@@ -69,7 +70,7 @@ def run(
         )
         raise InputFileError(message)
     results = map_pages_with_source(
-        lambda: pdfplumber.open(config.pdf), _read_page, pages_file.pages, workers
+        lambda: open_pdf(config.pdf), _read_page, pages_file.pages, workers
     )
     folder.images_dir.mkdir()
     if config.cover_page is not None:
