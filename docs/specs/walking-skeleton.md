@@ -626,7 +626,9 @@ removals are in page order, then in pdfplumber's order.
 When the config has a `cover_page`, extract renders it at 300 dpi with
 `pdfium.render` and saves it as an 8-bit grayscale PNG,
 `images/cover.png`: 2118 × 3034 pixels and 2.36 MB for Kadesh page 0.
-extract deletes `words.json` and `images/` first.
+extract deletes `words.json` and `images/` first, and always creates
+`images/`, empty when there is no cover, so that every book folder has
+the same files after a run.
 
 A word is excluded by its centre, not by touching the region, so that a
 word half inside a region the owner drew is not lost: the region `[240,
@@ -827,7 +829,8 @@ with `read_edits`, and when any holds an edit it raises `EditError`
 naming the file and saying that edits are applied from the markdown spec
 on. A missing `edits/` folder, or empty files, is no edits.
 
-markdown reads `blocks.json` and checks its hash, makes the Markdown,
+markdown reads `pages.json` and `blocks.json` and checks the hash of
+`blocks.json` against `pages.json`'s, as every stage after analyze does, makes the Markdown,
 runs `read_markdown` on it and `check_stage(Boundary.MARKDOWN, blocks,
 words)`, and only then writes `book.md`. It deletes `book.md` first.
 

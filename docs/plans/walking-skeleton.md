@@ -30,9 +30,10 @@ columns, the style sheet). The EPUB this plan makes keeps running heads,
 page numbers and footnotes in the text and has one paragraph per page;
 that is the spec, not a defect.
 
-The spec has no open point. Two places where it does not say enough for
-a coding agent are named in the task they affect (3.5 and 4.2), with
-what the task does about them.
+The spec has no open point. Two places where it said too little for a
+coding agent (what markdown checks the hash of `blocks.json` against, and
+whether extract makes an empty `images/`) were settled in the spec before
+the plan was approved.
 
 ## What must be in place
 
@@ -308,12 +309,7 @@ Tasks:
   "Their tests". Serves deliverables 6 and 10. Stream `structure`;
   independent of 3.3, run after it.
 - [ ] 3.5 Write markdown, with its tests. From spec §8, "markdown" and
-  "Their tests". Serves deliverables 7 and 10. Stream `epub`. The spec
-  says markdown "checks the hash" of `blocks.json` but not against what:
-  markdown reads no `pages.json` (architecture §4) and the PDF's hash is
-  `pdf_sha256(config.pdf)`. The task settles it as the coding skill says
-  for a small choice, written into spec §8 in a commit of its own before
-  the code, and reports which it chose.
+  "Their tests". Serves deliverables 7 and 10. Stream `epub`.
 - [ ] 3.6 Write epub and its empty `style.css`, with its tests. From spec
   §8, "epub" and "Their tests". Serves deliverables 8, 9, 10 and 11.
   Stream `epub`; its tests write `book.md` by hand, so it does not need
@@ -388,12 +384,7 @@ Tasks:
 - [ ] 4.2 Change `excerpt_books` to run `main(["run", folder])` on each
   excerpt, and write the end-to-end tests and the test of the stages one
   by one. From spec §9, "The end-to-end test" and "Other tests of this
-  work package". Serves deliverables 2 to 5. Needs 4.1. The spec says
-  every file of architecture §5 but `edits/` exists for both excerpts,
-  which includes `images/` for Gierke, which has no cover; extract does
-  not say whether it makes `images/` when there is nothing to put in it.
-  The task settles it as 3.5 does, in spec §6, and reports which it
-  chose.
+  work package". Serves deliverables 2 to 5. Needs 4.1.
 
 What could go wrong:
 
