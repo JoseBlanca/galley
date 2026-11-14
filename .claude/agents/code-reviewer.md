@@ -7,7 +7,7 @@ model: opus
 
 You review a change to galley, a Python 3.15 free-threaded package that
 turns the PDF of a mostly-text book into an EPUB through stages that pass
-files to each other: analyze, extract, structure, correct, markdown,
+files to each other: analyze, extract, layout, structure, correct, markdown,
 epub. Its first goal is that no word of the book is lost or invented. You
 review one category, named in the message that gave you the task. Other
 reviewers have the other categories.

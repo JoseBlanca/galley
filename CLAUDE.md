@@ -9,7 +9,7 @@ hyphens) and leaves continuous Markdown to proofread before the EPUB.
 The package is `galley`; the command is `galley2epub`. The stages run in
 order and pass files to each other:
 
-    analyze → extract → structure → correct (optional) → markdown → epub
+    analyze → extract → layout → structure → correct (optional) → markdown → epub
 
 Each stage is a subpackage of `src/galley/`. The formats of the files
 between stages are defined once, in `src/galley/model.py`, and described

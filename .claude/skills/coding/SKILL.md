@@ -5,8 +5,8 @@ description: How code is written in galley, a Python 3.15 free-threaded package 
 
 # Coding
 
-galley is a pipeline of stages, `analyze → extract → structure →
-correct → markdown → epub`, each a subpackage of `src/galley/`. The
+galley is a pipeline of stages, `analyze → extract → layout →
+structure → correct → markdown → epub`, each a subpackage of `src/galley/`. The
 stages talk only through files whose formats are the dataclasses of
 `src/galley/model.py`, described in `docs/architecture.md`. What a
 stage does is in its spec, `docs/specs/<stage>.md`. The goals, in order:

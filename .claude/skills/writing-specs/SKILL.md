@@ -12,7 +12,7 @@ build two stages at once: each one builds against the formats the specs
 give, and not against the other's code.
 
 A spec lives in `docs/specs/<stage>.md`: `analyze`, `extract`,
-`structure`, `correct`, `markdown`, `epub`. The formats shared by several
+`layout`, `structure`, `correct`, `markdown`, `epub`. The formats shared by several
 stages, the dataclasses of `src/galley/model.py`, are described in
 `docs/architecture.md`, and a spec points to them instead of copying them.
 
