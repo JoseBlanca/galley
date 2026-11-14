@@ -168,8 +168,9 @@ The audit runs Tesseract on two sets of pages:
   books, 26 pages have none: 13 are blank, and 13 have something printed
   that the scanner's OCR left out (Kadesh page index 69: a running head,
   about five lines of text and a captioned figure). A page where
-  Tesseract finds no words of the word list is blank, recorded with
-  `blank_checked_by_ocr`. A page where it finds text gets `text_source`
+  Tesseract finds no text at all is blank, recorded with
+  `blank_checked_by_ocr`; a page of numerals or names only is not blank.
+  The threshold for stray marks is set in analyze's spec. A page where it finds text gets `text_source`
   `ocr`, and extract reads it with Tesseract: the gap is filled, the run
   goes on.
 - **A sample of pages with a text layer**, spread through the book. Each
@@ -217,7 +218,8 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
   never a page nobody looked at.
 - `PagesFile` also has `ocr_audit: OcrAudit | None`: the pages sampled,
   the score of the text layer and of Tesseract on each, and the verdict
-  (section 7b). `None` when `ocr` is `trust` or `redo`.
+  (section 7b). `None` when `ocr` is `trust` or `redo`, and in the walking
+  skeleton, which has no audit.
 - Page sizes are pdfplumber's (the media box). pypdfium2 reports the crop
   box, which can differ slightly (Gierke: 376.128 pt against
   376.1000061), so no stage takes a page size from pypdfium2.
