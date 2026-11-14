@@ -261,7 +261,7 @@ def test_negative_page_index_is_an_error(
 
 @pytest.mark.parametrize(
     "box",
-    ["[1, 2, 3]", "[1, 2, 3, 4, 5]", '[1, 2, "3", 4]', "[1, 2, true, 4]", '"1 2 3 4"'],
+    ["[1, 2, 3]", "[1, 2, 3, 4, 5]", '[1, 2, "3", 4]', "[true, 2, 3, 4]", '"1 2 3 4"'],
 )
 def test_box_that_is_not_four_numbers_is_an_error(
     tmp_path: Path, excerpt_pdf: dict[str, Path], box: str

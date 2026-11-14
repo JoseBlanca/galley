@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from galley import model
+from galley.config import Language, OcrMode
 from galley.errors import EditError, InputFileError
 from galley.model import (
     Block,
@@ -537,6 +538,14 @@ def test_format_version_2_names_both_versions(tmp_path: Path, name: str) -> None
     assert "format version 1" in str(caught.value)
 
 
+@pytest.mark.parametrize("version", [0, True])
+def test_format_version_0_or_true_is_an_error(tmp_path: Path, version: object) -> None:
+    path = _written(tmp_path, "pages.json")
+    _set(path, ("format_version",), version)
+    with pytest.raises(InputFileError, match="format version 1"):
+        read_pages(path)
+
+
 @pytest.mark.parametrize("name", NAMES)
 def test_missing_format_version_is_an_error(tmp_path: Path, name: str) -> None:
     path = _written(tmp_path, name)
@@ -586,10 +595,13 @@ def test_enum_value_that_is_not_a_member_names_its_path(
     assert "'cover'" in str(caught.value) or '"cover"' in str(caught.value)
 
 
+@pytest.mark.parametrize("numbers", [[1.0, 2.0, 3.0], [1.0, 2.0, 3.0, 4.0, 5.0]])
 @pytest.mark.parametrize("name", NAMES)
-def test_box_of_three_numbers_names_its_path(tmp_path: Path, name: str) -> None:
+def test_box_of_three_or_five_numbers_names_its_path(
+    tmp_path: Path, name: str, numbers: list[float]
+) -> None:
     path = _written(tmp_path, name)
-    _set(path, SOME_BOX[name], [1.0, 2.0, 3.0])
+    _set(path, SOME_BOX[name], numbers)
     with pytest.raises(InputFileError, match=re.escape(name)) as caught:
         READERS[name](path)
     assert _dotted(SOME_BOX[name]) in str(caught.value)
@@ -779,6 +791,8 @@ def test_bad_edits_line_names_the_file_and_the_line(
     with pytest.raises(EditError, match=r"owner\.jsonl") as caught:
         read_edits(path)
     assert "line 2" in str(caught.value)
+    if second_line.strip() == "":
+        assert "blank" in str(caught.value)
 
 
 def test_edits_file_that_is_not_utf8_names_the_file(tmp_path: Path) -> None:
@@ -1009,3 +1023,114 @@ def test_equal_numbers_in_float_fields_give_the_same_bytes(
     assert (tmp_path / "integers.json").read_bytes() == (
         tmp_path / "floats.json"
     ).read_bytes()
+
+
+def test_edit_with_line_separators_in_its_text_is_read_back(tmp_path: Path) -> None:
+    # U+2028 and U+0085 are line ends for str.splitlines, and json.dumps
+    # writes them unescaped with ensure_ascii=False.
+    edit = replace(EDITS[0], old=f"Greece,{chr(0x2028)}x", new=f"Grèce,{chr(0x85)}y")
+    path = tmp_path / "owner.jsonl"
+    write_edits(path, (edit, EDITS[1]))
+    assert chr(0x2028) in path.read_text(encoding="utf-8")
+    assert read_edits(path) == (edit, EDITS[1])
+
+
+def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
+    values = {
+        enum.__name__: [member.value for member in enum]
+        for enum in (
+            PageKind,
+            TextSource,
+            OcrVerdict,
+            RemovalReason,
+            BlockKind,
+            Emphasis,
+            ChangeReason,
+            PageNumberPosition,
+            Language,
+            OcrMode,
+        )
+    }
+    assert values == {
+        "PageKind": ["blank", "text", "plate", "excluded"],
+        "TextSource": ["text_layer", "ocr", "none"],
+        "OcrVerdict": ["layer_kept", "layer_doubtful"],
+        "RemovalReason": [
+            "excluded_page",
+            "excluded_region",
+            "running_head",
+            "page_number",
+            "signature_mark",
+            "plate_text",
+        ],
+        "BlockKind": [
+            "heading",
+            "paragraph",
+            "quote",
+            "figure",
+            "margin_note",
+            "index_entry",
+        ],
+        "Emphasis": ["none"],
+        "ChangeReason": ["hyphen_join", "note_marker"],
+        "PageNumberPosition": ["head", "foot"],
+        "Language": ["en", "es", "fr", "de", "it"],
+        "OcrMode": ["verify", "trust", "redo"],
+    }
+
+
+# Files that use every member of every enum of their format, and a note
+# that is not referenced.
+EVERY_MEMBER_PAGES = tuple(
+    replace(
+        PAGES,
+        pages=tuple(
+            replace(
+                PAGES.pages[0],
+                index=index,
+                kind=kind,
+                text_source=tuple(TextSource)[index % len(TextSource)],
+            )
+            for index, kind in enumerate(PageKind)
+        ),
+        ocr_audit=replace(PAGES.ocr_audit, verdict=verdict)
+        if PAGES.ocr_audit
+        else None,
+    )
+    for verdict in OcrVerdict
+)
+EVERY_MEMBER_BLOCKS = replace(
+    BLOCKS,
+    blocks=tuple(
+        replace(BLOCKS.blocks[1], id=f"b-p0003-{number:03}", kind=kind)
+        for number, kind in enumerate(BlockKind, start=1)
+    ),
+    notes=(replace(BLOCKS.notes[0], referenced=False),),
+    removals=tuple(
+        replace(BLOCKS.removals[0], reason=reason) for reason in RemovalReason
+    ),
+    word_changes=tuple(
+        replace(BLOCKS.word_changes[0], reason=reason) for reason in ChangeReason
+    ),
+    page_numbers=tuple(
+        replace(BLOCKS.page_numbers[0], position=position)
+        for position in PageNumberPosition
+    ),
+)
+
+
+@pytest.mark.parametrize("pages", EVERY_MEMBER_PAGES)
+def test_pages_with_every_member_is_read_back_equal(
+    tmp_path: Path, pages: PagesFile
+) -> None:
+    write_pages(tmp_path / "pages.json", pages)
+    assert read_pages(tmp_path / "pages.json") == pages
+
+
+def test_blocks_with_every_member_and_an_unreferenced_note_is_read_back_equal(
+    tmp_path: Path,
+) -> None:
+    write_blocks(tmp_path / "blocks.json", EVERY_MEMBER_BLOCKS)
+    content = json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
+    assert content["notes"][0]["referenced"] is False
+    assert read_blocks(tmp_path / "blocks.json") == EVERY_MEMBER_BLOCKS
