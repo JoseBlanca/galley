@@ -511,6 +511,14 @@ thread rather than per page: analyze and extract together on the Kadesh
 excerpt took 0.91 s that way against 1.36 s with one document per page,
 with 1 worker.
 
+Every pdfplumber document galley reads is opened with `open_pdf(pdf)` of
+`text_layer.py`, which holds one lock of the process while the document
+opens, and only then, because pdfminer.six 20260107 adds the keywords it
+meets to a dictionary that every thread shares, without a lock, and two
+threads opening their own documents at once made `pdfplumber.open` raise
+`PdfminerException: /b'trailer'` in 3 of 450 fresh processes running
+analyze and extract on the whole Kadesh book with 6, 12 and 24 workers.
+
 When `function` raises, the worker's source is closed and the exception
 of the first failing item in input order, among those that ran, is
 raised in the calling thread; items not yet started may not run. When
@@ -809,6 +817,10 @@ def page_words(page: PageInfo, layer_words: tuple[Word, ...]) -> tuple[PageWords
 
 `page_words` is the pure part: given the page and the words pdfplumber
 read (empty for a blank page), it gives the page's words and removals.
+
+A PDF that pdfplumber cannot open, such as a truncated file, is a
+`PdfError` naming the file, in analyze and extract alike, with
+pdfplumber's `PdfminerException` as its cause.
 
 ### Their tests
 
