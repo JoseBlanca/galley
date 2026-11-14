@@ -14,6 +14,9 @@ import functools
 import hashlib
 import json
 import math
+import os
+import re
+import threading
 import types
 import typing
 from dataclasses import dataclass
@@ -490,6 +493,9 @@ def _decode(annotation: object, value: object, json_path: str) -> object:
         if type(value) is not annotation:
             problem = f"expected {description}, found {_found(value)}"
             raise _FieldError(problem, json_path)
+        if isinstance(value, str) and _SURROGATE.search(value):
+            problem = "holds a surrogate (\\ud800 to \\udfff), which is not text"
+            raise _FieldError(problem, json_path)
         return value
     if isinstance(annotation, type) and issubclass(annotation, StrEnum):
         return _decode_enum(annotation, value, json_path)
@@ -566,13 +572,68 @@ def _decode_file[T](cls: type[T], content: object, current_version: int) -> T:
     return _decode_dataclass(cls, content, "")
 
 
+# A surrogate code point (U+D800 to U+DFFF) cannot be encoded as UTF-8; a
+# lone one gets into a str from a bad text layer or a bad decoding.
+_SURROGATE = re.compile("[\ud800-\udfff]")
+
+
+def _surrogate_path(content: object, json_path: str) -> str | None:
+    """The path of the first string in the JSON `content` that holds a
+    surrogate; None when no string does."""
+    if isinstance(content, str):
+        return json_path if _SURROGATE.search(content) else None
+    if isinstance(content, dict):
+        children = tuple(
+            (_join(json_path, str(key)), value) for key, value in content.items()
+        )
+    elif isinstance(content, list):
+        children = tuple(
+            (f"{json_path}[{position}]", item) for position, item in enumerate(content)
+        )
+    else:
+        return None
+    for child_path, child in children:
+        if (found := _surrogate_path(child, child_path)) is not None:
+            return found
+    return None
+
+
+def _utf8(text: str, content: object, json_path: str) -> bytes:
+    """`text`, the JSON of `content`, as UTF-8. Raises ValueError naming the
+    field that holds a surrogate: a defect, or bad input, of the stage that
+    made the value."""
+    try:
+        return text.encode("utf-8")
+    except UnicodeEncodeError as err:
+        message = (
+            f"{_surrogate_path(content, json_path)}: holds a surrogate, "
+            "which UTF-8 cannot encode"
+        )
+        raise ValueError(message) from err
+
+
+def _replace_file(path: Path, data: bytes) -> None:
+    """Writes `data` to a temporary file beside `path`, then moves it over
+    `path`, so that a failed write leaves the old file as it was. The
+    temporary name is unique to the process and the thread."""
+    temporary = path.with_name(
+        f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp"
+    )
+    try:
+        temporary.write_bytes(data)
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
+    temporary.replace(path)
+
+
 def _write_json(path: Path, value: object) -> None:
     content = _encode(type(value), value)
     text = (
         json.dumps(content, ensure_ascii=False, allow_nan=False, indent=_JSON_INDENT)
         + "\n"
     )
-    path.write_text(text, encoding="utf-8", newline="\n")
+    _replace_file(path, _utf8(text, content, ""))
 
 
 def _read_json[T](path: Path, cls: type[T], current_version: int, stage: str) -> T:
@@ -690,11 +751,14 @@ def block_sha256(block: Block) -> str:
 def write_edits(path: Path, edits: tuple[Edit, ...]) -> None:
     """Writes an edits file: JSON Lines, one edit per line, UTF-8, with
     `format_version` first on every line."""
-    text = "".join(
-        json.dumps(_encode(Edit, edit), ensure_ascii=False, allow_nan=False) + "\n"
-        for edit in edits
-    )
-    path.write_text(text, encoding="utf-8", newline="\n")
+    data = b"".join(_edit_line(edit, position) for position, edit in enumerate(edits))
+    _replace_file(path, data)
+
+
+def _edit_line(edit: Edit, position: int) -> bytes:
+    content = _encode(Edit, edit)
+    text = json.dumps(content, ensure_ascii=False, allow_nan=False) + "\n"
+    return _utf8(text, content, f"edits[{position}]")
 
 
 _BYTE_ORDER_MARK = "\ufeff"

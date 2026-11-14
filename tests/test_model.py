@@ -819,3 +819,74 @@ def test_writer_refuses_a_number_that_is_not_finite(
     removal = replace(WORDS.removals[0], box=Box(0.0, 1.0, number, 2.0))
     with pytest.raises(ValueError, match="not JSON compliant"):
         write_words(tmp_path / "words.json", replace(WORDS, removals=(removal,)))
+
+
+LONE_SURROGATE = "\udc00"
+
+
+def _words_with_text(text: str) -> WordsFile:
+    page = WORDS.pages[0]
+    word = replace(page.words[1], text=text)
+    return replace(
+        WORDS, pages=(replace(page, words=(page.words[0], word)), *WORDS.pages[1:])
+    )
+
+
+def test_writer_given_a_surrogate_names_the_field_and_keeps_the_old_file(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "words.json"
+    write_words(path, WORDS)
+    old_bytes = path.read_bytes()
+    with pytest.raises(ValueError, match=re.escape("pages[0].words[1].text")):
+        write_words(path, _words_with_text(f"ü{LONE_SURROGATE}ber"))
+    assert path.read_bytes() == old_bytes
+    assert [child.name for child in tmp_path.iterdir()] == ["words.json"]
+
+
+def test_writer_given_a_number_that_is_not_finite_keeps_the_old_file(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "words.json"
+    write_words(path, WORDS)
+    old_bytes = path.read_bytes()
+    removal = replace(WORDS.removals[0], box=Box(0.0, 1.0, math.nan, 2.0))
+    with pytest.raises(ValueError, match="not JSON compliant"):
+        write_words(path, replace(WORDS, removals=(removal,)))
+    assert path.read_bytes() == old_bytes
+
+
+def test_writer_leaves_no_other_file_in_the_folder(tmp_path: Path) -> None:
+    for name, value, write, _read in FILES:
+        write(tmp_path / name, value)
+    write_edits(tmp_path / "owner.jsonl", EDITS)
+    assert sorted(child.name for child in tmp_path.iterdir()) == sorted(
+        [*(name for name, *_ in FILES), "owner.jsonl"]
+    )
+
+
+def test_edits_writer_given_a_surrogate_names_the_edit_and_keeps_the_old_file(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "owner.jsonl"
+    write_edits(path, EDITS)
+    old_bytes = path.read_bytes()
+    bad = replace(EDITS[1], new=LONE_SURROGATE)
+    with pytest.raises(ValueError, match=re.escape("edits[1].new")):
+        write_edits(path, (EDITS[0], bad))
+    assert path.read_bytes() == old_bytes
+
+
+def test_string_holding_a_surrogate_names_its_path(tmp_path: Path) -> None:
+    path = _written(tmp_path, "words.json")
+    _set(path, ("pages", 0, "words", 1, "text"), f"ü{LONE_SURROGATE}ber")
+    assert "\\udc00" in path.read_text(encoding="utf-8")
+    with pytest.raises(InputFileError, match=re.escape("pages[0].words[1].text")):
+        read_words(path)
+
+
+def test_edits_line_with_a_surrogate_names_the_line(tmp_path: Path) -> None:
+    path = _edits_with_second_line(tmp_path, _edit_line(old=f"ii{LONE_SURROGATE}"))
+    with pytest.raises(EditError, match=r"line 2") as caught:
+        read_edits(path)
+    assert "old" in str(caught.value)
