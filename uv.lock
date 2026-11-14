@@ -158,6 +158,7 @@ name = "galley"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "gilguard" },
     { name = "pdfplumber" },
     { name = "pillow" },
     { name = "pypdfium2" },
@@ -165,7 +166,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "gilguard" },
     { name = "pytest" },
     { name = "pytest-run-parallel" },
     { name = "pytest-timeout" },
@@ -175,6 +175,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "gilguard", specifier = "==0.2.0" },
     { name = "pdfplumber", specifier = ">=0.11.10" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "pypdfium2", specifier = ">=5.15.2" },
@@ -182,7 +183,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "gilguard", specifier = "==0.2.0" },
     { name = "pytest", specifier = "==9.2.0" },
     { name = "pytest-run-parallel", specifier = "==0.10.0" },
     { name = "pytest-timeout", specifier = "==2.4.0" },

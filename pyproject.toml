@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.15"
 dependencies = [
+    "gilguard==0.2.0",
     "pdfplumber>=0.11.10",
     "pillow>=13.0.0",
     "pypdfium2>=5.15.2",
@@ -19,7 +20,6 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "gilguard==0.2.0",
     "pytest==9.2.0",
     "pytest-run-parallel==0.10.0",
     "pytest-timeout==2.4.0",
@@ -48,6 +48,9 @@ extend-select = [
     "PLR2004", # thresholds are named constants
     "PT",      # all pytest-style rules
     "PTH",     # pathlib
+    "S110",    # no try/except/pass
+    "S112",    # no try/except/continue
+    "SIM105",  # no contextlib.suppress in place of a handled error
     "RET",     # return consistency
     "T20",     # no print outside the CLI
     "TID251",  # banned APIs, below

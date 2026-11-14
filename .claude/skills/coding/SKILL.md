@@ -159,7 +159,10 @@ performance cores: 4.5 s with 1 thread, 1.2 s with 6, and no gain beyond
 - Tesseract and Pandoc run as subprocesses, and the vision model through
   HTTP; workers can wait on them in parallel.
 - A C extension that does not declare free-threading support turns the GIL
-  back on when imported, with only a `RuntimeWarning`. Every pytest run
+  back on when imported, with only a `RuntimeWarning`. The first line of
+  `src/galley/__init__.py` imports gilguard, a runtime dependency with no
+  dependencies of its own, so a run of `galley2epub` stops at such an
+  import too; that import stays first. Every pytest run also
   loads gilguard (`-p gilguard` in `pyproject.toml`), which turns that
   into `gilguard.GILEnabledError` at the import that caused it, naming the
   module, its package and the line of our code. The error derives from
@@ -176,6 +179,25 @@ performance cores: 4.5 s with 1 thread, 1.2 s with 6, and no gain beyond
 
 ## Errors
 
+Errors never pass silently. This is the owner's rule, and it has no
+exceptions below the top of the program.
+
+- A `try` is written only for a particular exception that is expected at
+  that line, named in the `except`, and handled in a way that keeps the
+  failure visible: raised again as a `GalleyError` with context, or turned
+  into a record in the output (a page that cannot be read becomes a
+  removed-text record with its reason), never into a default value, an
+  empty result, a skip or a `pass`.
+- When no particular exception is in mind, there is no `try`. The error
+  propagates.
+- The one place that may catch broadly is the outermost function of the
+  CLI, and only to log or report the error before raising it again. It
+  does not exit quietly and does not change the exception.
+- `contextlib.suppress` is an `except: pass` and follows the same rule.
+- Ruff enforces part of this: no bare `except` (E722), no `except
+  Exception` or `BaseException` unless re-raised (BLE001), no
+  `try/except/pass` or `continue` (S110, S112, SIM105). What it cannot see,
+  an `except ValueError: return None`, is for the writer and the reviewer.
 - One exception class for the package, `GalleyError`, in `errors.py`,
   with a subclass for each kind of failure a user would handle
   differently. The message says which file, which page, which value, and
@@ -185,9 +207,6 @@ performance cores: 4.5 s with 1 thread, 1.2 s with 6, and no gain beyond
 - External programs are found with `shutil.which` at start-up; a missing
   `tesseract` or `pandoc` is an error that names it and how to install it,
   raised before any work starts.
-- No bare `except`, no `except Exception` that goes on (BLE). An error is
-  not turned into a default value, and a page is not skipped without a
-  record.
 
 ## Types, names and defaults
 

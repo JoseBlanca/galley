@@ -14,17 +14,16 @@ from pathlib import Path
 import pytest
 
 
-def _main_checkout_samples() -> Path | None:
-    try:
-        common = subprocess.run(
-            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=10,
-        ).stdout.strip()
-    except OSError, subprocess.SubprocessError:
-        return None
+def _main_checkout_samples() -> Path:
+    # The tests run inside a git checkout or one of its worktrees; if git
+    # fails here, that is an error to see, not a reason to skip.
+    common = subprocess.run(
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    ).stdout.strip()
     return Path(common).parent / "samples"
 
 
@@ -33,7 +32,7 @@ def samples_dir() -> Path:
     """The directory of the sample PDFs; skips the test when it is missing."""
     env = os.environ.get("GALLEY_SAMPLES")
     path = Path(env) if env is not None and env != "" else _main_checkout_samples()
-    if path is None or not any(path.glob("*.pdf")):
+    if not any(path.glob("*.pdf")):
         pytest.skip(f"no sample PDFs found (looked in {path})")
     return path
 

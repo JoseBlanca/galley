@@ -43,10 +43,9 @@ architecture gives":
 - coordinates (PDF points, origin top left), page index from 0 against
   printed page number, and how the DPI travels with a value in pixels;
 - the entry point of a stage, `run(...)` or other, the CLI command
-  `galley2epub` with its subcommands, and `[project.scripts]`; whether the
-  CLI imports gilguard first, so that a user's run also stops at a
-  dependency that turns the GIL back on (gilguard would then be a runtime
-  dependency, with no dependencies of its own);
+  `galley2epub` with its subcommands, and `[project.scripts]` (gilguard
+  is already imported first by `src/galley/__init__.py`, decided by the
+  owner on 14 November 2026);
 - the log of the correct stage, and how the vision model is called;
 - the word list that guards hyphen joins;
 - how tests find the samples, and the pytest markers.

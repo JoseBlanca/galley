@@ -75,7 +75,12 @@ Errors:
   the end), what does the user see? Is it a `GalleyError` whose message
   names the file, the page and the value?
 - A missing `tesseract` or `pandoc`: is it found before the work starts?
-- An error turned into a default, a page skipped without a record.
+- Every `try`: which particular exception was in mind, and does the
+  failure stay visible? An `except` that returns a default, an empty
+  result or `None`, skips, or passes is a finding; so is a `try` with no
+  particular exception in mind. Only the outermost CLI function may catch
+  broadly, and only to log and raise again.
+- A page skipped without a record.
 
 Functional style:
 
