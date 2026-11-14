@@ -236,3 +236,46 @@ For the extract stage's spec: Pandoc writes control characters such as
 NUL into the EPUB's pages, where XHTML forbids them; no word is lost, but
 the EPUB would fail epubcheck. What such characters become is extract's
 decision, with the pdfminer finding of work package 1.
+
+### Review of work package 3
+
+Four reviewers on 9782bab. Two chained every stage on both excerpts:
+every word of pdfplumber's text layer is in `words.json` or its
+removals, and then in `lines.json`, `blocks.json`, `book.md` and the
+EPUB's text, in the same order; no curly quote, no visible backslash, no
+decoded entity; 30 hand-made Markdown-like words (`*emphasis*`, `<b>`,
+`[link](x)`, `| table |`, an HTML comment, entities, a URL, NBSP, a
+leading tab, a carriage return) came through unchanged. Both EPUBs pass
+epubcheck 5.4.0 with 0 errors and 0 warnings. Every literal of spec §2,
+§6 and §9 matched.
+
+Findings that held, fixed in three branches side by side (extract-fix
+21ff16e; structure-fix 8914920, 0434b88; epub-fix 4ae5a76 to c9acbae)
+and then one cross-stage round on the plan's branch (70126ad to 48c1eac):
+
+- Characters XML forbids reached the EPUB's chapter with no error, so a
+  strict reader would refuse it; pdfium's text of both whole books holds
+  U+FFFE hundreds of times. Vertical tab, form feed and U+001C-U+001F are
+  now written as spaces (Python splits words at them, so no word
+  changes); the rest of C0, U+FFFE and U+FFFF stop markdown with an
+  error naming the block and the character. C1 controls and the Unicode
+  noncharacters were checked with Pandoc, an XML parser and epubcheck
+  and pass, so they are kept. What extract makes of such characters is
+  for its own spec.
+- Pandoc read the title and authors as Markdown ("The Life of
+  *Gargantua*" lost its asterisks, "C:\Windows" became "C:"). They are
+  escaped now, and a test reads them back from the EPUB's metadata.
+- markdown checked `blocks.json` against `pages.json` but not
+  `pages.json` against the PDF: pointed at another PDF, it wrote Kadesh's
+  words under Gierke's title. One function in `model.py` now does both
+  checks for every stage after analyze.
+- Tests that could not fail: 17 of 66 deliberate breaks passed the suite.
+  Removing the fidelity check from layout, structure or markdown's `run`
+  failed no test; 16 of 32 escapes could be dropped (without `\` or `#` a
+  character is lost); Pandoc failing was untested; three parts of the
+  line rule were untested. Each has a test now that fails on the break.
+- Smaller: epub reads `book.md` with the same Pandoc options as the
+  fidelity check, one logger name and `__all__` in every stage.
+
+After the fixes: 409 tests, none skipped, 8.44 s (11.55 s with 8
+threads).
