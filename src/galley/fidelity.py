@@ -172,12 +172,19 @@ def _markdown_words(markdown: MarkdownWords) -> tuple[_PlacedWord, ...]:
     )
 
 
-def _note_reference_count(blocks: BlocksFile) -> int:
-    all_blocks = blocks.blocks + tuple(
+def _all_blocks(blocks: BlocksFile) -> tuple[Block, ...]:
+    """The blocks of the body, then those of every note."""
+    return blocks.blocks + tuple(
         block for note in blocks.notes for block in note.blocks
     )
+
+
+def _note_reference_count(blocks: BlocksFile) -> int:
     return sum(
-        1 for block in all_blocks for span in block.spans if span.note_ref is not None
+        1
+        for block in _all_blocks(blocks)
+        for span in block.spans
+        if span.note_ref is not None
     )
 
 
@@ -214,6 +221,33 @@ def _check_words(
     )
     detail = "; ".join(word_details + ((note_detail,) if note_detail else ()))
     raise FidelityError(boundary, missing, invented, detail)
+
+
+def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
+    """The note reference spans whose text is not exactly the marker of the
+    note they name, or that name no note. At the markdown boundary a
+    reference span becomes Pandoc's note and its text is not counted, so
+    any other word in it would be lost there unseen."""
+    markers = {note.id: note.marker for note in blocks.notes}
+    return tuple(
+        (
+            f"block {block.id}: the note reference span {span.text!r} names "
+            f"{span.note_ref}, which is no note"
+            if span.note_ref not in markers
+            else f"block {block.id}: the note reference span {span.text!r} is not "
+            f"the marker {markers[span.note_ref]!r} of note {span.note_ref}"
+        )
+        for block in _all_blocks(blocks)
+        for span in block.spans
+        if span.note_ref is not None and markers.get(span.note_ref) != span.text
+    )
+
+
+def _check_records(boundary: FidelityBoundary, problems: tuple[str, ...]) -> None:
+    """Raise FidelityError, with no missing or invented word, when a record
+    of the stage is wrong; `problems` says which and where."""
+    if problems:
+        raise FidelityError(boundary, frozendict(), frozendict(), "; ".join(problems))
 
 
 def _wrong_types(stage: FidelityBoundary, before: object, after: object) -> TypeError:
@@ -265,6 +299,7 @@ def check_stage(
         case FidelityBoundary.STRUCTURE:
             if not (isinstance(before, LinesFile) and isinstance(after, BlocksFile)):
                 raise _wrong_types(stage, before, after)
+            _check_records(stage, _reference_problems(after))
             _check_words(
                 stage,
                 _lines_file_words(before),

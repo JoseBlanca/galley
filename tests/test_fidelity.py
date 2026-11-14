@@ -4,6 +4,7 @@ The values are built by hand: the stages of the walking skeleton make no
 removal, word change or note, and the check must handle them already.
 """
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -293,6 +294,50 @@ def test_structure_note_marker_counts_as_a_word() -> None:
 
     assert raised.value.missing == frozendict()
     assert raised.value.invented == frozendict({"1": 1})
+
+
+def _greece_blocks_with_reference(reference: Span) -> BlocksFile:
+    """The Greece paragraph whose note reference span is `reference`, with
+    nothing after it."""
+    blocks = _greece_blocks("1", referenced=True)
+    return replace(
+        blocks,
+        blocks=(replace(blocks.blocks[0], spans=(_span("as in Greece,"), reference)),),
+    )
+
+
+def test_structure_note_reference_span_holding_a_body_word_fails() -> None:
+    # "and" is counted at structure but would vanish into Pandoc's note at
+    # the markdown boundary.
+    blocks = _greece_blocks_with_reference(_span("1 and", "n-p0000-001"))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, _GREECE_LINES, blocks)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict()
+    assert "block b-p0000-001" in raised.value.detail
+    assert "'1 and'" in raised.value.detail
+    assert "marker '1'" in raised.value.detail
+
+
+def test_structure_note_reference_to_no_note_fails() -> None:
+    blocks = replace(
+        _greece_blocks("1", referenced=True),
+        blocks=(
+            _block(
+                "b-p0000-001",
+                (0,),
+                (_span("as in Greece,"), _span("1", "n-p0009-001"), _span(" and")),
+            ),
+        ),
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, _GREECE_LINES, blocks)
+
+    assert "block b-p0000-001" in raised.value.detail
+    assert "n-p0009-001" in raised.value.detail
 
 
 # markdown: blocks.json against book.md as Pandoc reads it
