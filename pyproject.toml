@@ -1,7 +1,7 @@
 [project]
-name = "book2epub"
+name = "galley"
 version = "0.1.0"
-description = "Add your description here"
+description = "Turns the PDF of a mostly-text book into an EPUB"
 readme = "README.md"
 authors = [
     { name = "Jose Blanca", email = "jblanca@upv.es" }
