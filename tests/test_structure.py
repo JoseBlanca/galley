@@ -189,8 +189,30 @@ def _replace_hash(path: Path) -> None:
 def test_run_writes_the_blocks_of_every_region(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     structure.run(folder, config, workers=1)
-    assert read_blocks(folder.blocks_json) == replace(
-        make_blocks(_LINES), source_pdf_sha256=_PDF_HASH
+    assert read_blocks(folder.blocks_json) == BlocksFile(
+        source_pdf_sha256=_PDF_HASH,
+        blocks=(
+            Block(
+                id="b-p0000-001",
+                kind=BlockKind.PARAGRAPH,
+                level=None,
+                spans=(Span("Alpha beta, gamma delta.", Emphasis.NONE, None),),
+                figure=None,
+                origin=(Origin(0, Box(40, 100, 130, 132)),),
+            ),
+            Block(
+                id="b-p0002-001",
+                kind=BlockKind.PARAGRAPH,
+                level=None,
+                spans=(Span("gamma delta.", Emphasis.NONE, None),),
+                figure=None,
+                origin=(Origin(2, Box(40, 100, 130, 132)),),
+            ),
+        ),
+        notes=(),
+        removals=(),
+        word_changes=(),
+        page_numbers=(),
     )
 
 
@@ -209,5 +231,26 @@ def test_run_with_a_lines_json_of_another_pdf_names_layout(tmp_path: Path) -> No
     folder, config = _book(tmp_path)
     _replace_hash(folder.lines_json)
     with pytest.raises(InputFileError, match=r"lines\.json.*galley2epub layout"):
+        structure.run(folder, config, workers=1)
+    assert not folder.blocks_json.exists()
+
+
+@pytest.mark.thread_unsafe
+def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder, config = _book(tmp_path)
+
+    def make_blocks_losing_a_word(lines: LinesFile) -> BlocksFile:
+        blocks = make_blocks(lines)
+        first = blocks.blocks[0]
+        shorter = replace(
+            first,
+            spans=(replace(first.spans[0], text=first.spans[0].text.split(" ", 1)[1]),),
+        )
+        return replace(blocks, blocks=(shorter, *blocks.blocks[1:]))
+
+    monkeypatch.setattr(structure, "make_blocks", make_blocks_losing_a_word)
+    with pytest.raises(FidelityError):
         structure.run(folder, config, workers=1)
     assert not folder.blocks_json.exists()

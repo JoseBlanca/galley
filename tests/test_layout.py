@@ -109,6 +109,41 @@ def test_words_with_the_same_top_and_x0_keep_their_given_order() -> None:
     assert _texts(group_lines(words)) == (("first", "second"),)
 
 
+def test_words_of_a_line_are_sorted_by_x0() -> None:
+    # "right" comes first by top and anchors the band 10-20; "left" has its
+    # centre at 16, joins, and goes before "right" by x0.
+    words = (_word("right", 50, 10, 70, 20), _word("left", 10, 11, 30, 21))
+    lines = group_lines(words)
+    assert _texts(lines) == (("left", "right"),)
+    assert lines[0].box == Box(10, 10, 70, 21)
+
+
+def test_a_line_keeps_the_band_of_its_first_word() -> None:
+    # Each word 4 pt lower than the one before: "b" (centre 9) is in the
+    # band of "a" (0-10), "c" (centre 13) is not, though it is in b's.
+    words = (
+        _word("a", 10, 0, 20, 10),
+        _word("b", 30, 4, 40, 14),
+        _word("c", 50, 8, 60, 18),
+    )
+    lines = group_lines(words)
+    assert _texts(lines) == (("a", "b"), ("c",))
+    assert tuple(line.box for line in lines) == (Box(10, 0, 40, 14), Box(50, 8, 60, 18))
+
+
+def test_words_with_the_same_top_are_taken_by_x0() -> None:
+    # "short" goes first by x0 and anchors the band 10-14; the centre of
+    # "tall", 20, is outside it. Taken in the given order, "tall" would
+    # anchor the band 10-30 and "short" (centre 12) would join it.
+    words = (_word("tall", 50, 10, 60, 30), _word("short", 10, 10, 20, 14))
+    lines = group_lines(words)
+    assert _texts(lines) == (("short",), ("tall",))
+    assert tuple(line.box for line in lines) == (
+        Box(10, 10, 20, 14),
+        Box(50, 10, 60, 30),
+    )
+
+
 def test_no_words_give_no_lines() -> None:
     assert group_lines(()) == ()
 
@@ -274,5 +309,20 @@ def test_run_with_a_words_json_of_another_pdf_names_extract(tmp_path: Path) -> N
     )
     folder.words_json.write_text(stale, encoding="utf-8")
     with pytest.raises(InputFileError, match=r"words\.json.*galley2epub extract"):
+        layout.run(folder, config, workers=1)
+    assert not folder.lines_json.exists()
+
+
+@pytest.mark.thread_unsafe
+def test_run_that_loses_a_word_raises_and_writes_no_lines_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder, config = _book(tmp_path)
+
+    def layout_page_losing_a_word(page: PageWords) -> PageLayout:
+        return layout_page(replace(page, words=page.words[1:]))
+
+    monkeypatch.setattr(layout, "layout_page", layout_page_losing_a_word)
+    with pytest.raises(FidelityError):
         layout.run(folder, config, workers=1)
     assert not folder.lines_json.exists()
