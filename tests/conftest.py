@@ -64,8 +64,21 @@ def excerpt_pdf() -> frozendict[str, Path]:
 
 
 @pytest.fixture(scope="session")
+def excerpt_book_toml(excerpt_pdf: frozendict[str, Path]) -> frozendict[str, str]:
+    """The `book.toml` of each excerpt, by excerpt name: the configs of spec
+    section 9, with the absolute path of the excerpt's PDF."""
+    # A TOML literal string: no escapes, so any path but one with a quote.
+    return frozendict(
+        {
+            name: f"pdf = '{excerpt_pdf[name]}'\n{toml}"
+            for name, toml in EXCERPT_CONFIGS.items()
+        }
+    )
+
+
+@pytest.fixture(scope="session")
 def excerpt_books(
-    tmp_path_factory: pytest.TempPathFactory, excerpt_pdf: frozendict[str, Path]
+    tmp_path_factory: pytest.TempPathFactory, excerpt_book_toml: frozendict[str, str]
 ) -> frozendict[str, BookFolder]:
     """A book folder for each excerpt, by excerpt name, with its `book.toml`
     (the configs of spec section 9) and the files analyze and extract
@@ -75,12 +88,9 @@ def excerpt_books(
     A test reads these folders and never writes in them.
     """
     folders = {}
-    for name, toml in EXCERPT_CONFIGS.items():
+    for name, toml in excerpt_book_toml.items():
         folder = BookFolder(tmp_path_factory.mktemp(name))
-        # A TOML literal string: no escapes, so any path but one with a quote.
-        folder.book_toml.write_text(
-            f"pdf = '{excerpt_pdf[name]}'\n{toml}", encoding="utf-8"
-        )
+        folder.book_toml.write_text(toml, encoding="utf-8")
         config = read_config(folder.book_toml)
         analyze.run(folder, config)
         extract.run(folder, config)
