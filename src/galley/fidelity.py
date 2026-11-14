@@ -8,12 +8,16 @@ as Pandoc reads it). Architecture section 13 and the walking-skeleton spec,
 section 5, say which words each side holds.
 """
 
+import json
+import shutil
+import subprocess
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Literal, assert_never, overload
 
-from galley.errors import FidelityBoundary, FidelityError
+from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
 from galley.model import Block, BlocksFile, LinesFile, Origin, WordsFile
 
 
@@ -291,3 +295,179 @@ def check_stage(
             )
         case _:
             assert_never(stage)
+
+
+# Reading book.md with Pandoc
+
+# Spec section 5: Pandoc reads a whole book's Markdown in about a second;
+# a minute means it hangs.
+_PANDOC_TIMEOUT_S = 60
+_PANDOC_ARGUMENTS = ("--from", "markdown-smart", "--to", "json", "--fail-if-warnings")
+
+
+class _Boundary(StrEnum):
+    """Where a word of Pandoc's JSON ends: at a space or line break or the
+    start or end of a block element, or at the start of a note, which is
+    also counted."""
+
+    BREAK = "break"
+    NOTE = "note"
+
+
+@dataclass(frozen=True, slots=True)
+class _Text:
+    """The text of one Str element, in the div or heading of `block_id`."""
+
+    text: str
+    block_id: str | None
+
+
+type _Token = _Text | _Boundary
+
+
+def _not_read(element: str, block_id: str | None) -> ExternalProgramError:
+    message = (
+        f"Pandoc read the Markdown as a {element} element in block {block_id}, "
+        "which galley's Markdown does not make, so its words cannot be checked"
+    )
+    return ExternalProgramError(message)
+
+
+def _inline_tokens(inline: object, block_id: str | None) -> tuple[_Token, ...]:
+    match inline:
+        case {"t": "Str", "c": str() as text}:
+            return (_Text(text, block_id),)
+        case {"t": "Space" | "SoftBreak" | "LineBreak"}:
+            return (_Boundary.BREAK,)
+        case {"t": "Emph" | "Strong", "c": list() as inlines}:
+            return _inlines_tokens(inlines, block_id)
+        case {"t": "Span", "c": [_, list() as inlines]}:
+            return _inlines_tokens(inlines, block_id)
+        case {"t": "Note", "c": list() as blocks}:
+            return (_Boundary.NOTE, *_blocks_tokens(blocks, block_id), _Boundary.BREAK)
+        case {"t": str() as element}:
+            raise _not_read(element, block_id)
+        case _:
+            raise _not_read(repr(inline)[:80], block_id)
+
+
+def _inlines_tokens(inlines: list[object], block_id: str | None) -> tuple[_Token, ...]:
+    return tuple(
+        token for inline in inlines for token in _inline_tokens(inline, block_id)
+    )
+
+
+def _block_tokens(block: object, block_id: str | None) -> tuple[_Token, ...]:
+    """The tokens of a block element, between two breaks. A div or heading
+    with an id gives it to the words inside; one without keeps `block_id`."""
+    match block:
+        case {"t": "Para" | "Plain", "c": list() as inlines}:
+            content = _inlines_tokens(inlines, block_id)
+        case {"t": "BlockQuote", "c": list() as blocks}:
+            content = _blocks_tokens(blocks, block_id)
+        case {"t": "Div", "c": [[str() as div_id, *_], list() as blocks]}:
+            content = _blocks_tokens(blocks, div_id or block_id)
+        case {
+            "t": "Header",
+            "c": [int(), [str() as heading_id, *_], list() as inlines],
+        }:
+            content = _inlines_tokens(inlines, heading_id or block_id)
+        case {"t": str() as element}:
+            raise _not_read(element, block_id)
+        case _:
+            raise _not_read(repr(block)[:80], block_id)
+    return (_Boundary.BREAK, *content, _Boundary.BREAK)
+
+
+def _blocks_tokens(blocks: list[object], block_id: str | None) -> tuple[_Token, ...]:
+    return tuple(token for block in blocks for token in _block_tokens(block, block_id))
+
+
+def _joined_words(texts: tuple[_Text, ...]) -> tuple[MarkdownWord, ...]:
+    """The words of adjacent Str elements: their text joined, then split on
+    white space. Every element of one run is in the same block."""
+    if not texts:
+        return ()
+    joined = "".join(text.text for text in texts)
+    return tuple(MarkdownWord(word, texts[0].block_id) for word in joined.split())
+
+
+def _pandoc_words(document: object) -> MarkdownWords:
+    """The words of the `blocks` of Pandoc's JSON, not of its `meta`, and
+    the number of its Note elements."""
+    match document:
+        case {"blocks": list() as blocks}:
+            tokens = _blocks_tokens(blocks, None)
+        case _:
+            message = f"Pandoc's JSON has no list of blocks: {repr(document)[:80]}"
+            raise ExternalProgramError(message)
+    words: list[MarkdownWord] = []
+    run: list[_Text] = []
+    for token in tokens:
+        match token:
+            case _Text():
+                run.append(token)
+            case _Boundary.BREAK | _Boundary.NOTE:
+                words.extend(_joined_words(tuple(run)))
+                run = []
+            case _:
+                assert_never(token)
+    words.extend(_joined_words(tuple(run)))
+    return MarkdownWords(
+        words=tuple(words),
+        note_count=sum(1 for token in tokens if token is _Boundary.NOTE),
+    )
+
+
+def _stderr_text(stderr: str | bytes | None) -> str:
+    match stderr:
+        case None:
+            return ""
+        case bytes():
+            return stderr.decode("utf-8", errors="replace").strip()
+        case str():
+            return stderr.strip()
+        case _:
+            assert_never(stderr)
+
+
+def read_markdown(markdown: str) -> MarkdownWords:
+    """The words of a Markdown text as Pandoc reads it (`pandoc --from
+    markdown-smart --to json --fail-if-warnings`), each with the id of the
+    innermost div or heading it is in, and the number of notes.
+
+    Words are split at spaces and line breaks and at the start and end of
+    every block and note; emphasis does not split a word. The metadata
+    header, the title and authors, gives no words. Raises
+    ExternalProgramError, with Pandoc's standard error, when `pandoc` is
+    missing, fails or warns (a note definition no reference uses), runs
+    longer than 60 s, or reads an element galley's Markdown does not make,
+    such as a list.
+    """
+    pandoc = shutil.which("pandoc")
+    if pandoc is None:
+        message = "pandoc is not installed; install it with `brew install pandoc`"
+        raise ExternalProgramError(message)
+    try:
+        completed = subprocess.run(
+            [pandoc, *_PANDOC_ARGUMENTS],
+            input=markdown,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=True,
+            timeout=_PANDOC_TIMEOUT_S,
+        )
+    except subprocess.CalledProcessError as error:
+        message = (
+            f"pandoc exited with {error.returncode} reading the Markdown: "
+            f"{_stderr_text(error.stderr)}"
+        )
+        raise ExternalProgramError(message) from error
+    except subprocess.TimeoutExpired as error:
+        message = (
+            f"pandoc did not finish reading the Markdown in {_PANDOC_TIMEOUT_S} s: "
+            f"{_stderr_text(error.stderr)}"
+        )
+        raise ExternalProgramError(message) from error
+    return _pandoc_words(json.loads(completed.stdout))

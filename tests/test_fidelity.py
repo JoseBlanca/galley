@@ -4,10 +4,12 @@ The values are built by hand: the stages of the walking skeleton make no
 removal, word change or note, and the check must handle them already.
 """
 
+from pathlib import Path
+
 import pytest
 
-from galley.errors import FidelityBoundary, FidelityError
-from galley.fidelity import MarkdownWord, MarkdownWords, check_stage
+from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
+from galley.fidelity import MarkdownWord, MarkdownWords, check_stage, read_markdown
 from galley.model import (
     Block,
     BlockKind,
@@ -417,3 +419,107 @@ def test_markdown_two_note_references_against_one_pandoc_note_fail() -> None:
         "note references in blocks.json: 2; notes in the Markdown: 1"
         in raised.value.detail
     )
+
+
+# read_markdown: book.md as Pandoc reads it
+
+
+def _texts(markdown: MarkdownWords) -> tuple[str, ...]:
+    return tuple(word.text for word in markdown.words)
+
+
+@pytest.mark.pandoc
+def test_read_markdown_separates_the_last_word_of_a_paragraph_from_the_next() -> None:
+    markdown = read_markdown("a b\n\nc\n")
+
+    assert _texts(markdown) == ("a", "b", "c")
+    assert markdown.note_count == 0
+
+
+@pytest.mark.pandoc
+def test_read_markdown_reads_escaped_punctuation_as_itself() -> None:
+    assert _texts(read_markdown("\\*x\\*y\n")) == ("*x*y",)
+
+
+@pytest.mark.pandoc
+def test_read_markdown_keeps_a_word_half_in_emphasis_as_one_word() -> None:
+    assert _texts(read_markdown("re*mark*able **bold**ly\n")) == (
+        "remarkable",
+        "boldly",
+    )
+
+
+@pytest.mark.pandoc
+def test_read_markdown_counts_the_words_of_a_footnote_apart_from_the_text() -> None:
+    markdown = read_markdown("Text[^1] and.\n\n[^1]: A *short* note.\n")
+
+    assert _texts(markdown) == ("Text", "A", "short", "note.", "and.")
+
+
+@pytest.mark.pandoc
+def test_read_markdown_counts_two_footnotes() -> None:
+    markdown = read_markdown("One[^1] two[^2].\n\n[^1]: First.\n\n[^2]: Second.\n")
+
+    assert markdown.note_count == 2
+
+
+@pytest.mark.pandoc
+def test_read_markdown_gives_each_word_the_id_of_its_div() -> None:
+    markdown = read_markdown(
+        "Before.\n\n::: {#b-p0000-001}\nIn the div.\n:::\n\n# A heading {#b-p0001-001}\n"
+    )
+
+    assert markdown.words == (
+        MarkdownWord("Before.", None),
+        MarkdownWord("In", "b-p0000-001"),
+        MarkdownWord("the", "b-p0000-001"),
+        MarkdownWord("div.", "b-p0000-001"),
+        MarkdownWord("A", "b-p0001-001"),
+        MarkdownWord("heading", "b-p0001-001"),
+    )
+
+
+@pytest.mark.pandoc
+def test_read_markdown_gives_a_div_without_an_id_the_id_around_it() -> None:
+    markdown = read_markdown(":::: {#b-p0000-001}\n::: quote\n> Quoted.\n:::\n::::\n")
+
+    assert markdown.words == (MarkdownWord("Quoted.", "b-p0000-001"),)
+
+
+@pytest.mark.pandoc
+def test_read_markdown_leaves_out_the_metadata() -> None:
+    markdown = read_markdown(
+        '---\ntitle: "The Title"\nauthor:\n- "An Author"\n---\n\nText.\n'
+    )
+
+    assert _texts(markdown) == ("Text.",)
+
+
+@pytest.mark.pandoc
+def test_read_markdown_with_an_unused_note_definition_raises() -> None:
+    with pytest.raises(ExternalProgramError, match="not used"):
+        read_markdown("Text.\n\n[^1]: A note nobody refers to.\n")
+
+
+@pytest.mark.pandoc
+def test_read_markdown_keeps_a_reference_without_a_definition_as_text() -> None:
+    markdown = read_markdown("Greece,[^1]\n")
+
+    assert _texts(markdown) == ("Greece,[^1]",)
+    assert markdown.note_count == 0
+
+
+@pytest.mark.pandoc
+def test_read_markdown_with_an_element_galley_does_not_write_raises() -> None:
+    with pytest.raises(ExternalProgramError, match=r"BulletList.*b-p0000-001"):
+        read_markdown("::: {#b-p0000-001}\n- an item\n:::\n")
+
+
+@pytest.mark.thread_unsafe(reason="changes PATH")
+def test_read_markdown_without_pandoc_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("PATH", str(tmp_path))
+
+    with pytest.raises(ExternalProgramError, match="pandoc"):
+        read_markdown("Text.\n")
