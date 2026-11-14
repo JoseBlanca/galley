@@ -95,11 +95,14 @@ work package. It says:
 A task is between an hour and a day of a person's work. A smaller one is
 part of its neighbour.
 
-Tasks that touch different files and do not need each other are marked
-as able to run side by side, and so are work packages of different
-stages: this is what the file formats between stages are for. Two tasks
-that change `model.py`, `docs/architecture.md` or `docs/glossary.md` never
-run side by side.
+Tasks that touch different files and do not need each other can run side
+by side, as streams (the `following-plans` skill, "Parallel streams"),
+and so can work packages of different stages: this is what the file
+formats between stages are for. A plan names each stream, the tasks it
+holds and the files and folders it may change. Two or three streams at
+once, no more. Two streams that change the same file never run side by
+side, and `model.py`, `pyproject.toml`, `docs/architecture.md` and
+`docs/glossary.md` are changed by one stream at a time.
 
 ## The shape of the document
 

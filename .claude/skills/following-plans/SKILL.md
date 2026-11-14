@@ -65,9 +65,28 @@ on its own, because the subagent knows nothing of the session:
   last line of each check, what it did differently from the task and why,
   and any question it could not settle.
 
-Tasks the plan marks as able to run side by side go to several subagents
-at once only when they touch different files. One writer per file in a
-tree.
+## Parallel streams
+
+Work the plan marks as able to run side by side is a **stream**: a task,
+or a group of tasks, that one subagent carries out. Two or three streams
+run at once, no more. Each stream works in a worktree and branch of its
+own, made by the orchestrator from the plan's branch:
+
+    git worktree add .claude/worktrees/<plan>-<stream> -b plan/<plan>-<stream> plan/<plan>
+
+and the subagent is given that path instead of the plan's worktree. Two
+agents never work in the same checkout at once: they would commit over
+each other's index and run their tests on each other's half-written
+files.
+
+When a stream is done and checked, the orchestrator merges its branch
+into the plan's branch (`git merge --no-ff plan/<plan>-<stream>` in the
+plan's worktree), runs the checks there, and removes the stream's
+worktree and branch. Streams that change the same file are not run side
+by side; the plan says which files each stream may change, and a stream
+that needs another file stops and asks. Shared files, `model.py`,
+`pyproject.toml`, `docs/architecture.md`, `docs/glossary.md`, are changed
+by one stream at a time.
 
 Several small tasks of one work package can go to one subagent in one
 prompt, and a small work package can go whole. A task never goes to a
