@@ -388,7 +388,15 @@ def check_stage(
 # Spec section 5: Pandoc reads a whole book's Markdown in about a second;
 # a minute means it hangs.
 _PANDOC_TIMEOUT_S = 60
-_PANDOC_ARGUMENTS = ("--from", "markdown-smart", "--to", "json", "--fail-if-warnings")
+# -auto_identifiers: Pandoc would otherwise give every heading an id made
+# from its text, chapter-one, which is no block of book.md (spec section 5).
+_PANDOC_ARGUMENTS = (
+    "--from",
+    "markdown-smart-auto_identifiers",
+    "--to",
+    "json",
+    "--fail-if-warnings",
+)
 
 
 class _Boundary(StrEnum):
@@ -519,8 +527,9 @@ def _stderr_text(stderr: str | bytes | None) -> str:
 
 def read_markdown(markdown: str) -> MarkdownWords:
     """The words of a Markdown text as Pandoc reads it (`pandoc --from
-    markdown-smart --to json --fail-if-warnings`), each with the id of the
-    innermost div or heading it is in, and the number of notes.
+    markdown-smart-auto_identifiers --to json --fail-if-warnings`), each with
+    the id of the innermost div or heading with an id it is in, and the
+    number of notes.
 
     Words are split at spaces and line breaks and at the start and end of
     every block and note; emphasis does not split a word. The metadata

@@ -650,6 +650,18 @@ def test_read_markdown_gives_a_div_without_an_id_the_id_around_it() -> None:
 
 
 @pytest.mark.pandoc
+def test_read_markdown_gives_a_heading_without_an_id_the_id_of_its_div() -> None:
+    # Pandoc's auto_identifiers would give the heading the id chapter-one,
+    # which is no block of book.md.
+    markdown = read_markdown("::: {#b-p0000-001}\n# Chapter one\n:::\n")
+
+    assert markdown.words == (
+        MarkdownWord("Chapter", "b-p0000-001"),
+        MarkdownWord("one", "b-p0000-001"),
+    )
+
+
+@pytest.mark.pandoc
 def test_read_markdown_leaves_out_the_metadata() -> None:
     markdown = read_markdown(
         '---\ntitle: "The Title"\nauthor:\n- "An Author"\n---\n\nText.\n'
