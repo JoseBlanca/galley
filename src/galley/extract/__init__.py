@@ -8,7 +8,6 @@ record. It cuts no figure, and renders only the cover.
 """
 
 import logging
-import shutil
 from contextlib import closing
 from pathlib import Path
 from typing import Final, assert_never
@@ -17,7 +16,7 @@ import pdfplumber
 from PIL import Image
 
 from galley import pdfium
-from galley.book_folder import BookFolder
+from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
 from galley.errors import InputFileError
 from galley.model import (
@@ -58,16 +57,7 @@ def run(
     walking skeleton cannot read (a plate, or a page read by OCR).
     `workers` is the number of threads that read the pages.
     """
-    for generated in (
-        folder.words_json,
-        folder.lines_json,
-        folder.blocks_json,
-        folder.book_md,
-        folder.book_epub,
-    ):
-        generated.unlink(missing_ok=True)
-    if folder.images_dir.exists():
-        shutil.rmtree(folder.images_dir)
+    delete_stage_outputs(folder, Stage.EXTRACT)
     pages_file = read_checked_pages(folder.pages_json, config.pdf)
     unreadable = tuple(page.index for page in pages_file.pages if _unreadable(page))
     if unreadable:

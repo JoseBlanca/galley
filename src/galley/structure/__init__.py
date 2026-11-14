@@ -8,7 +8,7 @@ page numbers and footnotes stay in the text.
 
 import logging
 
-from galley.book_folder import BookFolder
+from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
 from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage
@@ -84,8 +84,7 @@ def run(
     runs in one thread; `workers` is taken as every stage takes it.
     """
     del workers  # one pass over the book, in this thread (spec section 10)
-    for generated in (folder.blocks_json, folder.book_md, folder.book_epub):
-        generated.unlink(missing_ok=True)
+    delete_stage_outputs(folder, Stage.STRUCTURE)
     _, lines = read_checked_input(
         folder.pages_json, config.pdf, folder.lines_json, read_lines
     )

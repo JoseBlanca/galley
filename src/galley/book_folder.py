@@ -1,7 +1,10 @@
 """The book folder: the folder that holds a book's config, every file the
-stages write, and the edits (architecture section 5)."""
+stages write, and the edits (architecture section 5), and the deletion of
+what a stage and the stages after it wrote."""
 
+import shutil
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 
@@ -63,3 +66,43 @@ class BookFolder:
     def book_epub(self) -> Path:
         """Written by epub."""
         return self.root / "book.epub"
+
+
+class Stage(StrEnum):
+    """The stages that write files in the book folder, in pipeline order.
+    The correct stage, which writes only into edits/, is not one."""
+
+    ANALYZE = "analyze"
+    EXTRACT = "extract"
+    LAYOUT = "layout"
+    STRUCTURE = "structure"
+    MARKDOWN = "markdown"
+    EPUB = "epub"
+
+
+def _stage_outputs(folder: BookFolder) -> tuple[tuple[Stage, tuple[Path, ...]], ...]:
+    """Each stage with the files it writes, in pipeline order (spec section 3)."""
+    return (
+        (Stage.ANALYZE, (folder.pages_json,)),
+        (Stage.EXTRACT, (folder.words_json, folder.images_dir)),
+        (Stage.LAYOUT, (folder.lines_json,)),
+        (Stage.STRUCTURE, (folder.blocks_json,)),
+        (Stage.MARKDOWN, (folder.book_md,)),
+        (Stage.EPUB, (folder.book_epub,)),
+    )
+
+
+def delete_stage_outputs(folder: BookFolder, stage: Stage) -> None:
+    """Delete the files `stage` writes and those of every later stage, so
+    that no file in the folder outlives the file it was made from (spec
+    section 3). A file that does not exist is skipped; `images/` is deleted
+    with what it holds. Nothing else is touched: never book.toml or edits/.
+    """
+    outputs = _stage_outputs(folder)
+    first = [listed for listed, _ in outputs].index(stage)
+    for _, paths in outputs[first:]:
+        for path in paths:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink(missing_ok=True)

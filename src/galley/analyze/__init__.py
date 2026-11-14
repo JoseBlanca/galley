@@ -8,14 +8,13 @@ owner checks it and adds it to `exclude_pages`.
 """
 
 import logging
-import shutil
 from contextlib import closing
 from dataclasses import dataclass
 
 import pdfplumber
 
 from galley import pdfium
-from galley.book_folder import BookFolder
+from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig, OcrMode
 from galley.errors import ConfigError, PdfError
 from galley.model import (
@@ -56,17 +55,7 @@ def run(
     exclude has no text layer. `workers` is the number of threads that
     measure the pages.
     """
-    for generated in (
-        folder.pages_json,
-        folder.words_json,
-        folder.lines_json,
-        folder.blocks_json,
-        folder.book_md,
-        folder.book_epub,
-    ):
-        generated.unlink(missing_ok=True)
-    if folder.images_dir.exists():
-        shutil.rmtree(folder.images_dir)
+    delete_stage_outputs(folder, Stage.ANALYZE)
     page_count = pdfium.page_count(config.pdf)
     check_config_pages(config, page_count)
     measurements = map_pages_with_source(

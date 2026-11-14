@@ -393,17 +393,28 @@ class BookFolder:
     # book_toml, pages_json, words_json, images_dir, cover_png
     # (images/cover.png), lines_json, blocks_json, edits_dir, book_md,
     # book_epub
+
+class Stage(StrEnum):
+    ANALYZE = "analyze"; EXTRACT = "extract"; LAYOUT = "layout"
+    STRUCTURE = "structure"; MARKDOWN = "markdown"; EPUB = "epub"
+
+def delete_stage_outputs(folder: BookFolder, stage: Stage) -> None: ...
 ```
 
-One test: every property is the path architecture §5 gives, under
-`root`.
+Tests: every property is the path architecture §5 gives, under `root`;
+`delete_stage_outputs` for each stage, on a folder holding every file,
+leaves exactly the files of the stages before it, `book.toml`, `edits/`
+with its file, and a file of the owner's; on an empty folder it raises
+nothing.
 
 The files the stages write, in pipeline order, are `pages.json`
 (analyze), `words.json` and `images/` (extract), `lines.json` (layout),
 `blocks.json` (structure), `book.md` (markdown) and `book.epub` (epub).
-Each stage's `run`, before it reads its inputs, deletes its own output
-and the outputs of every later stage, and nothing else of the folder:
-never `book.toml` or `edits/`. So no file in the folder was made from
+Each stage's `run`, before it reads its inputs, calls
+`delete_stage_outputs`, which deletes the stage's own output and the
+outputs of every later stage, and nothing else of the folder: never
+`book.toml` or `edits/`. The order of the stages and the files of each
+are written once, in `book_folder.py`. So no file in the folder was made from
 an earlier version of the file it is made from, and a stage that fails
 leaves no later file behind. Without this, on Kadesh, removing
 `exclude_regions` from `book.toml` and running analyze and extract again

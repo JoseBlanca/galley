@@ -13,7 +13,7 @@ from importlib.resources import as_file, files
 from pathlib import Path
 from typing import assert_never
 
-from galley.book_folder import BookFolder
+from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
 from galley.errors import ExternalProgramError, InputFileError
 from galley.parallel import DEFAULT_WORKERS
@@ -131,7 +131,7 @@ def run(
     """
     del workers  # every stage's run takes it; epub is not per page
     absolute = BookFolder(folder.root.resolve())
-    absolute.book_epub.unlink(missing_ok=True)
+    delete_stage_outputs(absolute, Stage.EPUB)
     _check_inputs(absolute, config)
     # as_file gives a path on disk even if the package is not a folder.
     with as_file(files(__package__).joinpath(_STYLE_SHEET)) as style_sheet:

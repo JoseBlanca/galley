@@ -10,7 +10,7 @@ lost, and the real layout spec fixes the order.
 
 import logging
 
-from galley.book_folder import BookFolder
+from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
 from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage
@@ -96,13 +96,7 @@ def run(
     the stage to run again. When the words of lines.json are not those of
     words.json, FidelityError is raised and nothing is written.
     """
-    for generated in (
-        folder.lines_json,
-        folder.blocks_json,
-        folder.book_md,
-        folder.book_epub,
-    ):
-        generated.unlink(missing_ok=True)
+    delete_stage_outputs(folder, Stage.LAYOUT)
     _, words = read_checked_input(
         folder.pages_json, config.pdf, folder.words_json, read_words
     )

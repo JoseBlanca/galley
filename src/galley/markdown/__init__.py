@@ -12,7 +12,7 @@ import logging
 import re
 import string
 
-from galley.book_folder import BookFolder
+from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
 from galley.errors import EditError, FidelityBoundary, InputFileError
 from galley.fidelity import check_stage, read_markdown
@@ -178,8 +178,7 @@ def run(
     fails. markdown runs once, so `workers` is not used.
     """
     del workers  # every stage's run takes it; markdown is not per page
-    for generated in (folder.book_md, folder.book_epub):
-        generated.unlink(missing_ok=True)
+    delete_stage_outputs(folder, Stage.MARKDOWN)
     _, blocks = read_checked_input(
         folder.pages_json, config.pdf, folder.blocks_json, read_blocks
     )
