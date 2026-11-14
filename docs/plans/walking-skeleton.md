@@ -7,7 +7,7 @@ excerpts, so that each excerpt gives an EPUB and the fidelity check (the
 test that no word is lost or invented between a stage's input and output)
 passes at the layout, structure and markdown boundaries. It builds on
 `docs/architecture.md` and `docs/glossary.md`. Dated 14 November 2026.
-State: under way (approved by the owner on 14 November 2026).
+State: done, 14 November 2026 (approved by the owner the same day).
 
 The four work packages are the breakdown the owner approved on 14
 November 2026, and the spec's sections 3 to 9 follow them. Every task is

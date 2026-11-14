@@ -4,6 +4,56 @@ The work report of `docs/plans/walking-skeleton.md`, written while the plan
 runs, for the owner. Started on 14 November 2026 on branch
 `plan/walking-skeleton`, from `main` at e60d2f3.
 
+## Where the plan stands
+
+The walking skeleton is done, on branch `plan/walking-skeleton`, and
+nothing is merged into `main` yet. What is asked of the owner: to look at
+the four EPUBs below on the Kindle, and to order the merge.
+
+What exists now that did not: the `galley2epub` command, which turns a
+book folder holding a `book.toml` into `book.epub` through the seven
+stages, each in its simplest form. Every word of the PDF's text layer
+reaches the EPUB or is recorded as removed, and each stage checks that it
+lost or invented none before it writes. 461 tests pass in 14.5 s (18.8 s
+with 8 threads), under the 30 s budget.
+
+The final check, run on 14 November 2026 on the owner's M5 Pro with
+Pandoc 3.14 and epubcheck 5.4.0:
+
+| book | pages excluded (no text layer) | words | blocks | time, 1 worker | time, 6 workers | epubcheck |
+|---|---|---|---|---|---|---|
+| Kadesh excerpt (10 pages) | 1 | 6,120 | 9 | | 1.16 s | 0 errors, 0 warnings |
+| Gierke excerpt (10 pages) | 0 | 3,406 | 10 | | 0.67 s | 0 errors, 0 warnings |
+| Kadesh, whole (76 pages) | 14 | 25,467 | 62 | 4.20 s | 2.02 s | 0 errors, 0 warnings |
+| Gierke, whole (290 pages) | 12 | 113,996 | 278 | 18.04 s | 7.38 s | 0 errors, 0 warnings |
+
+For the whole books, `galley2epub run` first stopped in analyze and
+listed the pages without a text layer, as the skeleton is meant to; with
+those pages in `exclude_pages` it ran through. None of them had a text
+layer, so nothing was removed, but Kadesh page index 69 holds about five
+printed lines the scanner's OCR left out, and they are not in the EPUB:
+the OCR audit of architecture §7b, in analyze's own spec, is what fills
+that gap.
+
+The four EPUBs are in `runs/walking-skeleton/` of the main checkout,
+ignored by git: `kadesh.epub` (2.4 MB, with the cover), `gierke.epub`,
+`kadesh_book.epub` and `gierke_book.epub`. They read badly on purpose:
+one paragraph per page, running heads and page numbers in the text,
+Kadesh's two footnote columns read across the row, Gierke's margin
+headings in the line beside them. The stage specs that come next fix
+that.
+
+What is left open, each with where it goes:
+
+- Characters forbidden in XML stop markdown with an error naming the
+  block; pdfminer can drop a broken character before galley sees it.
+  What extract makes of such characters is for extract's spec.
+- A draft issue for pdfminer.six about the race below is ready and not
+  posted; posting it is the owner's choice.
+- Each work package cost about three times its coding in tokens, with
+  the reviews and fixes; every review found real defects (see the last
+  section).
+
 ## Before the first task
 
 Prerequisites, checked in the plan's worktree on 14 November 2026:
