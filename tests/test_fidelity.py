@@ -437,6 +437,27 @@ def test_structure_word_change_that_breaks_its_rules_fails(
     assert repr(change.before) in raised.value.detail
 
 
+@pytest.mark.parametrize("text", ["10\xa0000", "a\tb"], ids=["no-break-space", "tab"])
+def test_structure_word_holding_white_space_splits_the_same_on_both_sides(
+    text: str,
+) -> None:
+    # The helpers split on white space, so the line is built by hand to
+    # keep the text as one word of lines.json.
+    lines = LinesFile(
+        source_pdf_sha256=_SHA,
+        pages=(
+            PageLayout(
+                index=0,
+                regions=(Region(_BOX, (Line(_BOX, (Word(text, _BOX, None),)),)),),
+                figures=(),
+            ),
+        ),
+    )
+    blocks = _blocks_file((_block("b-p0000-001", (0,), (_span(text),)),))
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
 # markdown: blocks.json against book.md as Pandoc reads it
 
 

@@ -72,20 +72,25 @@ def _pages(origin: tuple[Origin, ...]) -> str:
 
 
 def _words_file_words(words: WordsFile) -> tuple[_PlacedWord, ...]:
+    """The words of words.json, each word's text split like every other
+    text, so that "10\xa0000" counts as the same two words as in a block."""
     return tuple(
-        _PlacedWord(word.text, f"page {page.index}")
+        placed
         for page in words.pages
         for word in page.words
+        for placed in _placed(word.text, f"page {page.index}")
     )
 
 
 def _lines_file_words(lines: LinesFile) -> tuple[_PlacedWord, ...]:
+    """The words of lines.json, split as those of words.json are."""
     return tuple(
-        _PlacedWord(word.text, f"page {page.index}")
+        placed
         for page in lines.pages
         for region in page.regions
         for line in region.lines
         for word in line.words
+        for placed in _placed(word.text, f"page {page.index}")
     )
 
 
