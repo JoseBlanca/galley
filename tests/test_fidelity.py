@@ -340,6 +340,103 @@ def test_structure_note_reference_to_no_note_fails() -> None:
     assert "n-p0009-001" in raised.value.detail
 
 
+@pytest.mark.parametrize(
+    ("lines", "block_text", "change"),
+    [
+        # A letter changed: Greece became Greek.
+        (
+            ("as in Greece",),
+            "as in Greek",
+            WordChange(
+                page_index=0,
+                before=("Greece",),
+                after=("Greek",),
+                reason=ChangeReason.NOTE_MARKER,
+            ),
+        ),
+        # A deletion: "Greece" dropped with nothing after it.
+        (
+            ("as in Greece",),
+            "as in",
+            WordChange(
+                page_index=0,
+                before=("Greece",),
+                after=(),
+                reason=ChangeReason.HYPHEN_JOIN,
+            ),
+        ),
+        # An invention: "Greece" added from nothing.
+        (
+            ("as in",),
+            "as in Greece",
+            WordChange(
+                page_index=0,
+                before=(),
+                after=("Greece",),
+                reason=ChangeReason.NOTE_MARKER,
+            ),
+        ),
+        # A hyphen join whose first part has no hyphen.
+        (
+            ("to repli", "cate it."),
+            "to replicate it.",
+            WordChange(
+                page_index=0,
+                before=("repli", "cate"),
+                after=("replicate",),
+                reason=ChangeReason.HYPHEN_JOIN,
+            ),
+        ),
+        # A hyphen join that invents letters: the tomatoda of ocr_lab.
+        (
+            ("toma-", "to da"),
+            "tomatoda da",
+            WordChange(
+                page_index=0,
+                before=("toma-", "to"),
+                after=("tomatoda",),
+                reason=ChangeReason.HYPHEN_JOIN,
+            ),
+        ),
+        # A hyphen join of three words.
+        (
+            ("re-", "pli-", "cate"),
+            "replicate",
+            WordChange(
+                page_index=0,
+                before=("re-", "pli-", "cate"),
+                after=("replicate",),
+                reason=ChangeReason.HYPHEN_JOIN,
+            ),
+        ),
+    ],
+    ids=[
+        "changed-letter",
+        "deletion",
+        "invention",
+        "no-hyphen",
+        "tomatoda",
+        "three-words",
+    ],
+)
+def test_structure_word_change_that_breaks_its_rules_fails(
+    lines: tuple[str, ...], block_text: str, change: WordChange
+) -> None:
+    # Each change accounts for the words exactly, so only its rules can
+    # make the check fail.
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0,), (_span(block_text),)),), word_changes=(change,)
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, _lines_file((lines,)), blocks)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict()
+    assert "word change on page 0" in raised.value.detail
+    assert repr(change.before) in raised.value.detail
+
+
 # markdown: blocks.json against book.md as Pandoc reads it
 
 

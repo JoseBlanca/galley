@@ -18,7 +18,15 @@ from enum import StrEnum
 from typing import Literal, assert_never, overload
 
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
-from galley.model import Block, BlocksFile, LinesFile, Origin, WordsFile
+from galley.model import (
+    Block,
+    BlocksFile,
+    ChangeReason,
+    LinesFile,
+    Origin,
+    WordChange,
+    WordsFile,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,6 +251,41 @@ def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
     )
 
 
+# A hyphen join is two parts of a word split at a line end (glossary).
+_HYPHEN_JOIN_PARTS = 2
+
+
+def _change_follows_its_reason(change: WordChange) -> bool:
+    """Whether a word change keeps every letter as its reason allows: a note
+    marker split off its word keeps the text; a hyphen join of two parts
+    drops only the hyphen ending the first."""
+    if not change.before or not change.after:
+        return False
+    joined_after = "".join(change.after)
+    match change.reason:
+        case ChangeReason.NOTE_MARKER:
+            return "".join(change.before) == joined_after
+        case ChangeReason.HYPHEN_JOIN:
+            return (
+                len(change.before) == _HYPHEN_JOIN_PARTS
+                and change.before[0].endswith("-")
+                and change.before[0][:-1] + change.before[1] == joined_after
+            )
+        case _:
+            assert_never(change.reason)
+
+
+def _change_problems(blocks: BlocksFile) -> tuple[str, ...]:
+    """The word changes that delete or invent words or change a letter,
+    which the multiset comparison would take on trust."""
+    return tuple(
+        f"word change on page {change.page_index}: {change.before!r} to "
+        f"{change.after!r} is not a {change.reason.value}"
+        for change in blocks.word_changes
+        if not _change_follows_its_reason(change)
+    )
+
+
 def _check_records(boundary: FidelityBoundary, problems: tuple[str, ...]) -> None:
     """Raise FidelityError, with no missing or invented word, when a record
     of the stage is wrong; `problems` says which and where."""
@@ -287,7 +330,10 @@ def check_stage(
     split on white space, nothing normalised.
 
     Raises FidelityError with the missing and invented words, their counts,
-    and the pages or blocks each came from.
+    and the pages or blocks each came from. At the structure boundary it
+    also raises, with no word, when a note reference span is not its note's
+    marker or a word change does more than its reason allows (a hyphen join
+    of two parts, a marker split off its word).
     """
     match stage:
         case FidelityBoundary.LAYOUT:
@@ -299,7 +345,7 @@ def check_stage(
         case FidelityBoundary.STRUCTURE:
             if not (isinstance(before, LinesFile) and isinstance(after, BlocksFile)):
                 raise _wrong_types(stage, before, after)
-            _check_records(stage, _reference_problems(after))
+            _check_records(stage, _reference_problems(after) + _change_problems(after))
             _check_words(
                 stage,
                 _lines_file_words(before),
