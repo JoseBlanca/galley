@@ -138,3 +138,56 @@ process crashed inside PDFium.
 Question for the review: `parallel.py` keeps a small mutable record per
 worker to find the first failing item without a `try`, against the
 coding skill's functional style.
+
+### Review of work package 2
+
+Four reviewers on 9b3458f. Building Markdown from every word of both
+excerpts, escaped as spec §8 says, and reading it back through
+`read_markdown` with Pandoc 3.14 gave 6,121 of 6,121 and 3,406 of 3,406
+words; one changed letter, a duplicate, a lost word, an added accent and
+an added zero-width space were each caught. The tests reviewer broke the
+code 50 ways: results in input order, every PDFium object closed
+explicitly, and note references counted as words of their own are
+guarded.
+
+Findings that held, fixed in two fix branches side by side (pdfium-fix:
+639e656, f22af19, 620f3d9; fidelity-fix: 7fe30db to d1c1f2f), the spec
+first in each:
+
+- Two holes in the fidelity check itself: a note reference span could
+  carry a body word away (counted at structure, never at markdown), and a
+  recorded word change was trusted whatever it said ("Greece" to "Greek"
+  as a hyphen join passed). A reference span must now be exactly its
+  note's marker, and each word change is checked by its reason.
+- A word invented in `book.md`, and a word duplicated at structure or
+  markdown, could pass without any test failing; tests added.
+- Words with white space inside were split on one side only; Pandoc's
+  automatic heading ids could name a block not in `book.md`; the Pandoc
+  call is now apart from the pure walk of its JSON.
+- The only guard against an item lost by the pool was an `assert`, which
+  `python -O` removes; an explicit check now. A missing PDF and a dpi
+  below 1 give errors that name them. The order tests now really use
+  several threads (they had run on one), and a test pins which error wins
+  when two workers fail.
+
+Kept on the reviewers' evidence: `parallel.py`'s per-worker record, written
+only by its worker and read after the join (300 rounds with the GIL off,
+the right failure every time). The coding skill now allows that pattern
+(55d1104).
+
+After the fixes: 284 tests, none skipped, 2.88 s (4.44 s with 8 threads).
+
+For work package 3: Pandoc drops a carriage return inside a word (`ab\rcd`
+becomes `abcd`) and reads a leading tab as a code block, so the markdown
+stage's escaping must handle C0 white space.
+
+### How the work went (for whoever next revises a skill or writes a plan)
+
+- Each coding agent's report was right about what it built; every
+  review still found real defects, most of them in tests that could not
+  fail (8 of 22 mutations survived in work package 1, several in work
+  package 2). A mutation pass by the tests reviewer is worth its cost.
+- Tokens, from the Agent results: work package 1, coding 153k, four
+  reviews 255k, fixes 226k; work package 2, coding 243k (two streams),
+  four reviews 256k, fixes 303k. A work package costs about three times
+  its coding.
