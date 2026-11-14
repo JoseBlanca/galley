@@ -890,3 +890,37 @@ def test_edits_line_with_a_surrogate_names_the_line(tmp_path: Path) -> None:
     with pytest.raises(EditError, match=r"line 2") as caught:
         read_edits(path)
     assert "old" in str(caught.value)
+
+
+def test_key_given_twice_names_its_path(tmp_path: Path) -> None:
+    path = _written(tmp_path, "words.json")
+    text = path.read_text(encoding="utf-8")
+    # The second word of page 0 gets its text twice, the second one wrong.
+    text = text.replace('"text": "über",', '"text": "über",\n      "text": "uber",', 1)
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(
+        InputFileError, match=re.escape("pages[0].words[1].text")
+    ) as caught:
+        read_words(path)
+    assert "given twice" in str(caught.value)
+
+
+def test_top_level_key_given_twice_is_an_error(tmp_path: Path) -> None:
+    path = _written(tmp_path, "lines.json")
+    text = path.read_text(encoding="utf-8")
+    text = text.replace(
+        '"format_version": 1,', '"format_version": 1,\n "format_version": 1,', 1
+    )
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(InputFileError, match="format_version") as caught:
+        read_lines(path)
+    assert "given twice" in str(caught.value)
+
+
+def test_edits_line_with_a_key_given_twice_names_the_line(tmp_path: Path) -> None:
+    line = _edit_line()[:-1] + ', "old": "ii. 6"}'
+    path = _edits_with_second_line(tmp_path, line)
+    with pytest.raises(EditError, match=r"line 2") as caught:
+        read_edits(path)
+    assert "old" in str(caught.value)
+    assert "given twice" in str(caught.value)

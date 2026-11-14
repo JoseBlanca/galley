@@ -429,7 +429,8 @@ _FOUND_CHARACTERS = 40  # how much of a wrong value an error message quotes
 
 
 def _found(value: object) -> str:
-    text = json.dumps(value, ensure_ascii=False)
+    # repr for a _KeyGivenTwice inside a value of the wrong type.
+    text = json.dumps(value, ensure_ascii=False, default=repr)
     if len(text) > _FOUND_CHARACTERS:
         return text[:_FOUND_CHARACTERS] + "..."
     return text
@@ -440,6 +441,7 @@ def _join(json_path: str, name: str) -> str:
 
 
 def _number(value: object, json_path: str) -> float:
+    _check_keys_once(value, json_path)
     # JSON true and false are bools, which Python counts as ints; they are
     # not numbers here. An int is read as the equal float. Python's json
     # reads NaN and Infinity, which are not JSON and no writer makes.
@@ -479,10 +481,38 @@ def _scalar_description(annotation: object) -> str | None:
     return None
 
 
+@dataclass(frozen=True, slots=True)
+class _KeyGivenTwice:
+    """What the JSON parser makes, in place of the object, of an object that
+    has `key` twice; the decoder raises it with the object's path."""
+
+    key: str
+
+
+def _object_pairs(
+    pairs: list[tuple[str, object]],
+) -> dict[str, object] | _KeyGivenTwice:
+    """The object_pairs_hook of json.loads: the object, or the first key it
+    has twice. Python's json would keep the last value without a word."""
+    content: dict[str, object] = {}
+    for key, value in pairs:
+        if key in content:
+            return _KeyGivenTwice(key)
+        content[key] = value
+    return content
+
+
+def _check_keys_once(value: object, json_path: str) -> None:
+    if isinstance(value, _KeyGivenTwice):
+        problem = "given twice"
+        raise _FieldError(problem, _join(json_path, value.key))
+
+
 def _decode(annotation: object, value: object, json_path: str) -> object:
     """The value of type `annotation` that `_encode` wrote as `value`.
 
     Raises _FieldError at the first value that does not fit."""
+    _check_keys_once(value, json_path)
     if (optional := _optional_type(annotation)) is not None:
         return None if value is None else _decode(optional, value, json_path)
     if annotation is Box:
@@ -548,6 +578,7 @@ def _decode_dataclass[T](cls: type[T], value: object, json_path: str) -> T:
 def _decode_file[T](cls: type[T], content: object, current_version: int) -> T:
     """The value of `cls` in the parsed JSON `content` of a file of format
     version `current_version`. Raises _FieldError at the first problem."""
+    _check_keys_once(content, "")
     if not isinstance(content, dict):
         problem = f"is not a JSON object but {_found(content)}"
         raise _FieldError(problem)
@@ -648,7 +679,7 @@ def _read_json[T](path: Path, cls: type[T], current_version: int, stage: str) ->
         message = f"{path} is not UTF-8 text: {err}"
         raise InputFileError(message) from err
     try:
-        content = json.loads(text)
+        content = json.loads(text, object_pairs_hook=_object_pairs)
     except json.JSONDecodeError as err:
         message = (
             f"{path} is not valid JSON: {err.msg} at line {err.lineno}, "
@@ -801,7 +832,7 @@ def _edit_from_line(path: Path, line_number: int, line: str) -> Edit:
         message = f"{where}: blank line"
         raise EditError(message)
     try:
-        content = json.loads(line)
+        content = json.loads(line, object_pairs_hook=_object_pairs)
     except json.JSONDecodeError as err:
         message = f"{where}: not valid JSON: {err.msg} at column {err.colno}"
         raise EditError(message) from err
