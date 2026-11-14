@@ -746,6 +746,15 @@ def test_walk_counts_a_note_and_separates_its_words() -> None:
     assert markdown.note_count == 1
 
 
+def test_walk_of_an_element_outside_any_div_raises_saying_so() -> None:
+    bullet_list = f'{{"t":"BulletList","c":[[{{"t":"Plain","c":[{_str("item")}]}}]]}}'
+
+    with pytest.raises(
+        ExternalProgramError, match="BulletList element outside any block"
+    ):
+        _words_of_pandoc_json(_pandoc_document(bullet_list))
+
+
 @pytest.mark.thread_unsafe(reason="changes PATH")
 def test_read_markdown_without_pandoc_raises(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path

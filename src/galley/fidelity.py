@@ -420,8 +420,9 @@ type _Token = _Text | _Boundary
 
 
 def _not_read(element: str, block_id: str | None) -> ExternalProgramError:
+    where = f"in block {block_id}" if block_id is not None else "outside any block"
     message = (
-        f"Pandoc read the Markdown as a {element} element in block {block_id}, "
+        f"Pandoc read the Markdown as a {element} element {where}, "
         "which galley's Markdown does not make, so its words cannot be checked"
     )
     return ExternalProgramError(message)
