@@ -26,13 +26,16 @@ _logger = logging.getLogger(__name__)
 # minutes means it hangs.
 _PANDOC_TIMEOUT_S = 120
 _STYLE_SHEET = "style.css"
+# Spec section 8: the format fidelity.read_markdown reads book.md with, so
+# that the EPUB is made from the reading the word check passed.
+_INPUT_FORMAT = "markdown-smart-auto_identifiers"
 
 
 def pandoc_arguments(
     folder: BookFolder, config: BookConfig, style_sheet: Path
 ) -> tuple[str, ...]:
     """The arguments Pandoc runs with, after the program's name: book.md
-    read as Markdown with smart quotes off, written as EPUB 3 to book.epub
+    read as Markdown with smart quotes and automatic heading ids off, written as EPUB 3 to book.epub
     with `style_sheet` in place of Pandoc's own, failing on any warning,
     and with images/cover.png as the cover when the config has a
     `cover_page`. The paths are written as given; run gives absolute ones.
@@ -45,7 +48,7 @@ def pandoc_arguments(
     return (
         str(folder.book_md),
         "--from",
-        "markdown-smart",
+        _INPUT_FORMAT,
         "--to",
         "epub3",
         "--output",
@@ -88,7 +91,7 @@ def _stderr_text(stderr: str | bytes | None) -> str:
 def _run_pandoc(arguments: tuple[str, ...]) -> None:
     """Run pandoc with `arguments`; ExternalProgramError, with Pandoc's
     standard error, when pandoc is missing, fails, warns or runs longer
-    than 120 s."""
+    than _PANDOC_TIMEOUT_S."""
     pandoc = shutil.which("pandoc")
     if pandoc is None:
         message = "pandoc is not installed; install it with `brew install pandoc`"
