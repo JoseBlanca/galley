@@ -8,7 +8,7 @@ PDF opened: analyze checks it.
 
 import math
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import assert_never
@@ -68,12 +68,13 @@ _BOX_COORDINATES = 4
 def read_config(path: Path) -> BookConfig:
     """The config in the `book.toml` at `path`.
 
-    A relative `pdf` is resolved against the folder of `path`; an absolute
-    one is kept. Raises ConfigError, naming the file and the key, when the
-    file is missing or not TOML, a key is unknown or a required one
-    missing, a value has the wrong type or is not one of its values, a page
-    index is negative, a box is not four numbers with x0 < x1 and top <
-    bottom, or the PDF does not exist.
+    A relative `pdf` is taken against the folder of `path`; either is then
+    resolved (made absolute, symbolic links followed). Raises ConfigError,
+    naming the file and the key, when the file is missing or not TOML, a
+    key is unknown or a required one missing, `title` or `authors` is
+    empty, a value has the wrong type or is not one of its values, a page
+    index is negative, a box is not four finite numbers with x0 < x1 and
+    top < bottom, or the PDF is not a file.
     """
     try:
         text = path.read_text(encoding="utf-8")
@@ -89,30 +90,36 @@ def read_config(path: Path) -> BookConfig:
         message = f"{path} is not valid TOML: {err}"
         raise ConfigError(message) from err
     config = _config_from_toml(content, path)
-    if not config.pdf.is_file():
-        message = f"{path}: key `pdf`: {config.pdf} does not exist"
+    pdf = config.pdf.resolve()
+    if not pdf.is_file():
+        message = f"{path}: key `pdf`: {pdf} does not exist or is not a file"
         raise ConfigError(message)
-    return config
+    return replace(config, pdf=pdf)
 
 
 def _config_from_toml(content: dict[str, object], path: Path) -> BookConfig:
-    """The config in the parsed TOML `content` of the file at `path`, which
-    only names the file in a ConfigError and resolves a relative `pdf`."""
+    """The config in the parsed TOML `content` of the file at `path`, whose
+    folder a relative `pdf` is joined to, unresolved: this function does not
+    touch the file system. `path` also names the file in a ConfigError."""
     _check_keys(content, _REQUIRED_KEYS, _OPTIONAL_KEYS, "", path)
     pdf = Path(_string(content["pdf"], "pdf", path))
     if not pdf.is_absolute():
-        pdf = (path.parent / pdf).resolve()
+        pdf = path.parent / pdf
     regions = _list(content.get("exclude_regions", []), "exclude_regions", path)
     pages = _list(content.get("exclude_pages", []), "exclude_pages", path)
     cover_page = content.get("cover_page")
     return BookConfig(
         pdf=pdf,
-        title=_string(content["title"], "title", path),
-        authors=tuple(
-            _string(author, f"authors[{position}]", path)
-            for position, author in enumerate(
-                _list(content["authors"], "authors", path)
-            )
+        title=_not_empty(_string(content["title"], "title", path), "title", path),
+        authors=_not_empty(
+            tuple(
+                _string(author, f"authors[{position}]", path)
+                for position, author in enumerate(
+                    _list(content["authors"], "authors", path)
+                )
+            ),
+            "authors",
+            path,
         ),
         language=_enum(Language, content["language"], "language", path),
         ocr=_enum(OcrMode, content.get("ocr", OcrMode.VERIFY.value), "ocr", path),
@@ -154,6 +161,12 @@ def _check_keys(
 def _string(value: object, key: str, path: Path) -> str:
     if not isinstance(value, str):
         raise _error(path, key, f"expected a string, found {value!r}")
+    return value
+
+
+def _not_empty[T: (str, tuple[str, ...])](value: T, key: str, path: Path) -> T:
+    if len(value) == 0:
+        raise _error(path, key, "must not be empty")
     return value
 
 

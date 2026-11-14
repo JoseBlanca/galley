@@ -102,13 +102,40 @@ def test_relative_pdf_is_resolved_against_the_folder_of_the_config(
 ) -> None:
     (tmp_path / "scans").mkdir()
     (tmp_path / "scans" / "book.pdf").write_bytes(b"%PDF-1.4")
-    keys = _required_keys(tmp_path) | {"pdf": '"scans/book.pdf"'}
-    path = _write_config(tmp_path, keys)
+    (tmp_path / "config").mkdir()
+    keys = _required_keys(tmp_path) | {"pdf": '"../scans/book.pdf"'}
+    path = _write_config(tmp_path / "config", keys)
 
     config = read_config(path)
 
     assert config.pdf == (tmp_path / "scans" / "book.pdf").resolve()
+    assert ".." not in config.pdf.parts
     assert config.pdf.is_absolute()
+
+
+def test_absolute_pdf_is_resolved(tmp_path: Path) -> None:
+    (tmp_path / "scans").mkdir()
+    (tmp_path / "scans" / "book.pdf").write_bytes(b"%PDF-1.4")
+    (tmp_path / "link.pdf").symlink_to(tmp_path / "scans" / "book.pdf")
+    path = _write_config(tmp_path, _required_keys(tmp_path / "link.pdf"))
+
+    assert read_config(path).pdf == (tmp_path / "scans" / "book.pdf").resolve()
+
+
+@pytest.mark.parametrize(("key", "value"), [("title", '""'), ("authors", "[]")])
+def test_empty_title_or_authors_is_an_error(
+    tmp_path: Path, excerpt_pdf: dict[str, Path], key: str, value: str
+) -> None:
+    path = _write_config(tmp_path, _required_keys(excerpt_pdf[KADESH]) | {key: value})
+    _assert_config_error(path, key)
+    with pytest.raises(ConfigError, match="must not be empty"):
+        read_config(path)
+
+
+def test_pdf_that_is_a_directory_is_an_error(tmp_path: Path) -> None:
+    (tmp_path / "scans.pdf").mkdir()
+    path = _write_config(tmp_path, _required_keys(tmp_path / "scans.pdf"))
+    _assert_config_error(path, "pdf")
 
 
 def _assert_config_error(path: Path, key: str) -> None:
