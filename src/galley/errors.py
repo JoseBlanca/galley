@@ -5,6 +5,8 @@ command catches GalleyError to report any of them. The message of each says
 which file, page or value was at fault.
 """
 
+from enum import StrEnum
+
 
 class GalleyError(Exception):
     """Any failure galley reports; a subclass says what kind."""
@@ -36,11 +38,21 @@ def _word_counts(counts: frozendict[str, int]) -> str:
     return ", ".join(f"{word!r} ({count})" for word, count in sorted(counts.items()))
 
 
+class FidelityBoundary(StrEnum):
+    """The stage boundaries where the fidelity check runs: words.json against
+    lines.json (layout), lines.json against blocks.json (structure),
+    blocks.json against book.md (markdown)."""
+
+    LAYOUT = "layout"
+    STRUCTURE = "structure"
+    MARKDOWN = "markdown"
+
+
 class FidelityError(GalleyError):
     """The words of a stage's output are not those of its input plus its
     removals: some are missing, some invented, or both.
 
-    `boundary` is "layout", "structure" or "markdown". `missing` maps a word
+    `boundary` is where the check ran. `missing` maps a word
     to how many times it is missing from the output, `invented` to how many
     times it is extra in it. `detail` is the rest of the message (pages,
     note counts). All four are kept as attributes so that a test can assert
@@ -49,7 +61,7 @@ class FidelityError(GalleyError):
 
     def __init__(
         self,
-        boundary: str,
+        boundary: FidelityBoundary,
         missing: frozendict[str, int],
         invented: frozendict[str, int],
         detail: str,
@@ -59,7 +71,7 @@ class FidelityError(GalleyError):
         self.invented = invented
         self.detail = detail
         message = (
-            f"the fidelity check failed at the {boundary} boundary; "
+            f"the fidelity check failed at the {boundary.value} boundary; "
             f"missing from the output: {_word_counts(missing) or 'none'}; "
             f"invented in the output: {_word_counts(invented) or 'none'}; "
             f"{detail}"
