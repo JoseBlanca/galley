@@ -279,3 +279,30 @@ and then one cross-stage round on the plan's branch (70126ad to 48c1eac):
 
 After the fixes: 409 tests, none skipped, 8.44 s (11.55 s with 8
 threads).
+
+## Work package 4: the command and the end-to-end test
+
+One stream, `cli` (7a228f3, 282b175, 64cd044; merge b0f54c1). The spec
+commit settles that the command refuses `--workers` below 1 before any
+stage runs, since analyze would otherwise delete `pages.json` before the
+pool refused the value.
+
+Deliverables, checked by the orchestrator on b0f54c1:
+
+| deliverable | result |
+|---|---|
+| 1. the command is installed | `uv run --locked galley2epub --help` exits with 0 |
+| 2. the command's own tests | 15 tests (at least 5), passed |
+| 3. the end-to-end test | 12 tests (at least 5), passed; the excerpt tests of work package 3 pass on the folders of the real run |
+| 4. both excerpt EPUBs pass epubcheck | 2 passed, none skipped |
+| 5. the speed budget | `uv run --locked pytest`: 436 passed in 13.3 s; with 8 threads 17.2 s; both under 30 s |
+
+The five slowest tests: the session fixture's setup, which runs the
+whole command on both excerpts (1.56 s); extract with 1 and 6 workers
+(1.38 s); epubcheck on each excerpt EPUB (1.35 s, 1.32 s) and on the
+hand-written one (1.34 s).
+
+The stages-one-by-one test compares the bytes of every file of the book
+folder (`pages.json`, `words.json`, the cover, `lines.json`,
+`blocks.json`, `book.md`) with those of `run`. The session fixture skips,
+and says so, when Pandoc is missing.

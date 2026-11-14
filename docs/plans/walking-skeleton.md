@@ -378,12 +378,12 @@ Deliverables:
 
 Tasks:
 
-- [ ] 4.1 Write `cli.py`, add `[project.scripts]` to `pyproject.toml`
+- [x] 4.1 Write `cli.py`, add `[project.scripts]` to `pyproject.toml`
   (and `uv.lock` if `uv lock --check` asks), with the tests of the entry
   point and of the three errors. From spec §9, "cli.py" and "Other tests
   of this work package", and architecture §14. Serves deliverables 1 and
   2.
-- [ ] 4.2 Change `excerpt_books` to run `main(["run", folder])` on each
+- [x] 4.2 Change `excerpt_books` to run `main(["run", folder])` on each
   excerpt, and write the end-to-end tests and the test of the stages one
   by one. From spec §9, "The end-to-end test" and "Other tests of this
   work package". Serves deliverables 2 to 5. Needs 4.1.
