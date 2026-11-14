@@ -105,19 +105,26 @@ class PdfError(GalleyError): ...
 class ExternalProgramError(GalleyError): ...
 class EditError(GalleyError): ...
 
+class FidelityBoundary(StrEnum):
+    LAYOUT = "layout"; STRUCTURE = "structure"; MARKDOWN = "markdown"
+
 class FidelityError(GalleyError):
     def __init__(
         self,
-        boundary: str,
+        boundary: FidelityBoundary,
         missing: frozendict[str, int],
         invented: frozendict[str, int],
         detail: str,
     ) -> None: ...
-    # boundary: "layout", "structure" or "markdown"; missing and invented
+    # boundary: where the check ran; missing and invented
     # map a word to how many times it is missing from, or extra in, the
     # output; detail is the rest of the message (pages, note counts).
     # The attributes of the same names are set; the message lists them.
 ```
+
+`FidelityBoundary` is defined here, not in `fidelity.py`, because
+`FidelityError` needs it and `errors.py` imports no other module of
+galley; `fidelity.py` imports it from here.
 
 Tests: each subclass is a `GalleyError`; a `FidelityError` built with one
 missing and one invented word has them as attributes and names both, with
@@ -194,7 +201,20 @@ def read_edits(path: Path) -> tuple[Edit, ...]: ...
 Writing: one JSON object, UTF-8, `ensure_ascii=False`, `indent=1`, keys
 in the order of the dataclass fields, a newline at the end. A tuple is a
 list, an enum its value, `None` is `null`, a float what `json.dumps`
-writes. The same value gives the same bytes, whatever made it. An edits
+writes, and a `frozendict` with int keys an object whose keys are the
+ints as strings (architecture §8; no field has one yet). The same value
+gives the same bytes, whatever made it: a float field is written as a
+float when it holds an int, and `-0.0` as `0.0`.
+
+Every number must be finite: a NaN or an infinity is not JSON, and the
+writer refuses it (`json.dumps(..., allow_nan=False)` raises
+`ValueError`). A string that cannot be encoded as UTF-8, one holding a
+lone surrogate, makes the writer raise `ValueError` naming the field
+path: it is a defect, or bad input, of the stage that made the value,
+and extract's spec decides what a surrogate in a text layer becomes. The
+writer makes all the bytes before it touches the file, then writes them
+to a temporary file in the same folder and moves it over the old one
+(`os.replace`), so a failed write leaves the old file as it was. An edits
 file is JSON Lines, one object per edit and per line, with no indent,
 each with `format_version` 1 first (architecture §8).
 
@@ -211,11 +231,20 @@ in the JSON, `pages[3].words[12].box`:
 - a value has the wrong JSON type, an enum value is not a member, a `Box`
   is not four numbers. A JSON integer is accepted where a float is
   expected and becomes a float, so `81` and `81.0` read the same; `true`
-  is not accepted as a number.
+  is not accepted as a number;
+- a number is not finite (`NaN`, `Infinity`, which Python's `json`
+  reads although JSON has no such values);
+- a string holds a surrogate (written `\udc00` in the JSON), which no
+  writer of galley makes;
+- an object has the same key twice ("given twice").
 
 `read_edits` raises `EditError` instead, naming the file and the line,
-for a line that is not JSON, an object with a missing or unknown field,
-a `format_version` other than 1, or a blank line. A missing edits file is not its concern: the caller
+for a line that is not JSON, an object with a missing or unknown field
+or a key given twice, a value of the wrong type or a string holding a
+surrogate, a `format_version` other than 1, or a blank line; and,
+naming the file, for a file that is not UTF-8. A file that starts with
+a byte-order mark is refused with a message that asks for it to be
+saved as UTF-8 without one, since the owner may write edits by hand. A missing edits file is not its concern: the caller
 lists the files that exist (architecture §10: a missing file is no
 edits).
 
@@ -228,7 +257,7 @@ Four more functions, which several stages and `fidelity.py` call:
 def pdf_sha256(pdf: Path) -> str: ...
     # The SHA-256 of the file's bytes, 64 lowercase hex digits.
 
-def check_source_pdf(path: Path, file_pdf_sha256: str, pdf_sha256: str) -> None: ...
+def check_source_pdf(path: Path, file_pdf_sha256: str, expected_pdf_sha256: str) -> None: ...
     # Raises InputFileError when the file at `path` was made from another
     # PDF; the message names the file and the stage to rerun
     # (pages.json: analyze, words.json: extract, ...).
@@ -269,7 +298,13 @@ Tests, all unit tests with literal values written in the test:
   the file and the line number;
 - `check_source_pdf` with two different hashes raises and names the stage;
 - `block_sha256` of a block with two spans, against a literal computed
-  with `hashlib` in the test.
+  with `hashlib` in the test;
+- the rules above that the list does not name: a non-finite number, a
+  surrogate and a duplicate key in each reader, a file of edits that is
+  not UTF-8 or starts with a byte-order mark, a writer given a surrogate
+  or a NaN leaving the old file as it was, `-0.0` and an int in a float
+  field written as `0.0` and the float, a `frozendict` round trip, and
+  the value of every enum member as architecture §8 lists it.
 
 ### config.py
 
@@ -307,17 +342,20 @@ def tesseract_language(language: Language) -> str: ...
 ```
 
 In TOML an excluded region is `{page = 0, box = [240, 620, 252, 632]}`;
-the key `page` becomes the field `page_index`. `pdf` is resolved against
-the folder of `book.toml` when it is relative and kept when absolute;
-tests write absolute paths to the excerpts.
+the key `page` becomes the field `page_index`. A relative `pdf` is taken
+against the folder of `book.toml`; relative or absolute, it is then
+resolved (`Path.resolve`: made absolute, symbolic links followed). Tests
+write absolute paths to the excerpts.
 
 `read_config` raises `ConfigError`, naming the file and the key, when: the
 file is missing or is not valid TOML; a key is unknown, at the top level
 or inside a region; a required key (`pdf`, `title`, `authors`,
-`language`) is missing; a value has the wrong type (`authors =
+`language`) is missing; `title` is empty or `authors` an empty list
+("must not be empty"); a value has the wrong type (`authors =
 "Breasted"` instead of a list); `language` or `ocr` is not one of its
-values; a page index is negative; a box is not four numbers or has `x0 >=
-x1` or `top >= bottom`; the PDF does not exist. A page index past the end
+values; a page index is negative; a box is not four finite numbers (TOML
+has `nan` and `inf`) or does not have `x0 < x1` and `top < bottom`; the
+PDF does not exist or is not a file. A page index past the end
 of the book needs the PDF opened, so analyze checks it (section 6).
 
 Tests: a config with every key at a value other than its default, read
@@ -444,8 +482,8 @@ skeleton's stages make none, because the real stages will, and its unit
 tests build those values by hand.
 
 ```python
-class Boundary(StrEnum):
-    LAYOUT = "layout"; STRUCTURE = "structure"; MARKDOWN = "markdown"
+# FidelityBoundary (layout, structure, markdown) is imported from
+# errors.py (section 3), since FidelityError carries it.
 
 @dataclass(frozen=True, slots=True)
 class MarkdownWord:
@@ -460,11 +498,11 @@ class MarkdownWords:
 def read_markdown(markdown: str) -> MarkdownWords: ...
 
 @overload
-def check_stage(stage: Literal[Boundary.LAYOUT], before: WordsFile, after: LinesFile) -> None: ...
+def check_stage(stage: Literal[FidelityBoundary.LAYOUT], before: WordsFile, after: LinesFile) -> None: ...
 @overload
-def check_stage(stage: Literal[Boundary.STRUCTURE], before: LinesFile, after: BlocksFile) -> None: ...
+def check_stage(stage: Literal[FidelityBoundary.STRUCTURE], before: LinesFile, after: BlocksFile) -> None: ...
 @overload
-def check_stage(stage: Literal[Boundary.MARKDOWN], before: BlocksFile, after: MarkdownWords) -> None: ...
+def check_stage(stage: Literal[FidelityBoundary.MARKDOWN], before: BlocksFile, after: MarkdownWords) -> None: ...
 ```
 
 `check_stage` is pure; it raises `FidelityError` or returns. At the
@@ -720,7 +758,7 @@ No word is lost; the real layout spec fixes the order.
 
 layout reads `pages.json` and `words.json` and checks both hashes
 (section 3), runs per page with `map_pages`, and runs
-`check_stage(Boundary.LAYOUT, words, lines)` before writing `lines.json`;
+`check_stage(FidelityBoundary.LAYOUT, words, lines)` before writing `lines.json`;
 on a `FidelityError` it writes nothing. It deletes `lines.json` first.
 
 ```python
@@ -742,7 +780,7 @@ and one `Origin` with the page index and the region's box. `notes`,
 region gives no block.
 
 structure reads `pages.json` and `lines.json` and checks both hashes; it
-uses only `lines.json`. It runs `check_stage(Boundary.STRUCTURE, lines,
+uses only `lines.json`. It runs `check_stage(FidelityBoundary.STRUCTURE, lines,
 blocks)` before writing `blocks.json`; on a `FidelityError` it writes
 nothing. It deletes `blocks.json` first.
 
@@ -831,7 +869,7 @@ on. A missing `edits/` folder, or empty files, is no edits.
 
 markdown reads `pages.json` and `blocks.json` and checks the hash of
 `blocks.json` against `pages.json`'s, as every stage after analyze does, makes the Markdown,
-runs `read_markdown` on it and `check_stage(Boundary.MARKDOWN, blocks,
+runs `read_markdown` on it and `check_stage(FidelityBoundary.MARKDOWN, blocks,
 words)`, and only then writes `book.md`. It deletes `book.md` first.
 
 ```python
