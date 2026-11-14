@@ -6,8 +6,9 @@ are found through the GALLEY_SAMPLES environment variable, or else in
 `samples/` of the main checkout, which git reports as the parent of the
 common git directory. `scripts/fetch_samples.py` downloads them.
 
-`excerpt_books` runs the stages once per session on a book folder for each
-excerpt, so that the excerpt tests of every stage read the files of one run.
+`excerpt_books` runs `galley2epub run` once per session on a book folder
+for each excerpt, so that the excerpt tests of every stage read the files of
+one run.
 """
 
 import os
@@ -17,9 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from galley import analyze, extract
 from galley.book_folder import BookFolder
-from galley.config import read_config
+from galley.cli import main
 
 EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 
@@ -64,26 +64,36 @@ def excerpt_pdf() -> frozendict[str, Path]:
 
 
 @pytest.fixture(scope="session")
+def excerpt_book_toml(excerpt_pdf: frozendict[str, Path]) -> frozendict[str, str]:
+    """The `book.toml` of each excerpt, by excerpt name: the configs of spec
+    section 9, with the absolute path of the excerpt's PDF."""
+    # A TOML literal string: no escapes, so any path but one with a quote.
+    return frozendict(
+        {
+            name: f"pdf = '{excerpt_pdf[name]}'\n{toml}"
+            for name, toml in EXCERPT_CONFIGS.items()
+        }
+    )
+
+
+@pytest.fixture(scope="session")
 def excerpt_books(
-    tmp_path_factory: pytest.TempPathFactory, excerpt_pdf: frozendict[str, Path]
+    tmp_path_factory: pytest.TempPathFactory, excerpt_book_toml: frozendict[str, str]
 ) -> frozendict[str, BookFolder]:
     """A book folder for each excerpt, by excerpt name, with its `book.toml`
-    (the configs of spec section 9) and the files analyze and extract
-    wrote.
+    (the configs of spec section 9) and the files `galley2epub run` wrote
+    in it, book.epub last (spec section 9, "The end-to-end test").
 
     Session-scoped: the stages run once, also under --parallel-threads=8.
-    A test reads these folders and never writes in them.
+    A test reads these folders and never writes in them. Skips every test
+    that uses it when Pandoc is missing, which markdown and epub need.
     """
+    _require_program("pandoc")
     folders = {}
-    for name, toml in EXCERPT_CONFIGS.items():
+    for name, toml in excerpt_book_toml.items():
         folder = BookFolder(tmp_path_factory.mktemp(name))
-        # A TOML literal string: no escapes, so any path but one with a quote.
-        folder.book_toml.write_text(
-            f"pdf = '{excerpt_pdf[name]}'\n{toml}", encoding="utf-8"
-        )
-        config = read_config(folder.book_toml)
-        analyze.run(folder, config)
-        extract.run(folder, config)
+        folder.book_toml.write_text(toml, encoding="utf-8")
+        main(["run", str(folder.root)])
         folders[name] = folder
     return frozendict(folders)
 
