@@ -251,7 +251,7 @@ edits).
 The reader rebuilds the tuples and enums, so reading what was written
 gives an equal value.
 
-Four more functions, which several stages and `fidelity.py` call:
+Six more functions, which several stages and `fidelity.py` call:
 
 ```python
 def pdf_sha256(pdf: Path) -> str: ...
@@ -262,6 +262,16 @@ def check_source_pdf(path: Path, file_pdf_sha256: str, expected_pdf_sha256: str)
     # PDF; the message names the file and the stage to rerun
     # (pages.json: analyze, words.json: extract, ...).
 
+def read_checked_pages(pages_json: Path, pdf: Path) -> PagesFile: ...
+    # read_pages(pages_json), then check_source_pdf of it against
+    # pdf_sha256(pdf).
+
+def read_checked_input[T: WordsFile | LinesFile | BlocksFile](
+    pages_json: Path, pdf: Path, input_path: Path, read_input: Callable[[Path], T]
+) -> tuple[PagesFile, T]: ...
+    # read_checked_pages, then read_input(input_path) and check_source_pdf
+    # of it against the hash in pages.json; returns both files.
+
 def block_text(block: Block) -> str: ...
     # The text of a block (architecture §7): its spans' text concatenated.
 
@@ -271,9 +281,16 @@ def block_sha256(block: Block) -> str: ...
 ```
 
 Only analyze computes the hash, from the PDF. Every later stage copies
-`source_pdf_sha256` from its input file into its output, and checks each
-file it reads against the hash in `pages.json`; extract, which also reads
-the PDF, checks `pages.json` against `pdf_sha256(config.pdf)`.
+`source_pdf_sha256` from its input file into its output, and every stage
+after analyze checks `pages.json` against `pdf_sha256(config.pdf)` and
+its input file against `pages.json`, through these two functions, so
+that the check is written once: extract, whose input is `pages.json`,
+calls `read_checked_pages`; layout, structure and markdown call
+`read_checked_input` with `words.json`, `lines.json` and `blocks.json`.
+A stale `pages.json` then names analyze, and a stale input file the stage
+that writes it. Without the first check, markdown run on a book folder
+made from one PDF, with a config that names another, wrote the first
+book's words under the second book's title.
 
 Tests, all unit tests with literal values written in the test:
 
@@ -297,6 +314,9 @@ Tests, all unit tests with literal values written in the test:
   line with `format_version` 2, and a blank line: an `EditError` naming
   the file and the line number;
 - `check_source_pdf` with two different hashes raises and names the stage;
+- `read_checked_input` returns both files when the hashes agree, raises
+  naming analyze when `pages.json` was made from another PDF, and naming
+  the stage of the input file when it was;
 - `block_sha256` of a block with two spans, against a literal computed
   with `hashlib` in the test;
 - the rules above that the list does not name: a non-finite number, a
@@ -719,7 +739,8 @@ command set; a stage that works in one thread ignores it.
 
 ### extract
 
-extract reads `pages.json`, checks its hash against the PDF's, and gives
+extract reads `pages.json` with `read_checked_pages`, which checks its
+hash against the PDF's (section 3), and gives
 each page its words, with `map_pages_with_source`:
 
 - `text` page: the words of `page.extract_words()` with its default
@@ -799,7 +820,8 @@ the 8-thread run does it once:
 - analyze and extract on Kadesh with 1 worker and with 6 give
   byte-identical `pages.json` and `words.json` (10 pages, more than 6
   workers);
-- extract on a Kadesh folder holding the Gierke `pages.json` raises
+- extract on a Kadesh folder holding the Gierke `pages.json`, and extract
+  on a Kadesh folder whose config names the Gierke PDF, raise
   `InputFileError` naming analyze.
 
 ## 7. layout and structure (work package 3b)
@@ -836,9 +858,10 @@ Kadesh's footnote columns are read row by row, left note then right
 note, and Gierke's margin headings go into the body line beside them.
 No word is lost; the real layout spec fixes the order.
 
-layout reads `pages.json` and `words.json` and checks both hashes
-(section 3): `pages.json` against `pdf_sha256(config.pdf)`, as extract
-does, then `words.json` against `pages.json`. A stale `pages.json` then
+layout reads `pages.json` and `words.json` with `read_checked_input`,
+which checks both hashes (section 3): `pages.json` against
+`pdf_sha256(config.pdf)`, as extract does, then `words.json` against
+`pages.json`. A stale `pages.json` then
 names analyze and a stale `words.json` names extract; compared only with
 each other, the two files could not say which one is stale. Hashing the
 1 MB Kadesh excerpt took 0.4 ms. layout runs per page with `map_pages`,
@@ -894,8 +917,9 @@ need no output of extract, so this work package runs beside 3a:
 - `layout_page`: the region's box holds every line; a page with no words
   has no region; figures are copied.
 - layout `run` on a hand-made `words.json` of 8 pages with 1 worker and
-  with 3 gives the same bytes; with a `pages.json` of another hash it
-  raises `InputFileError` naming analyze.
+  with 3 gives the same bytes; with a `pages.json` of another hash, or a
+  config whose `pdf` is another file, it raises `InputFileError` naming
+  analyze; so does structure `run`.
 - `page_blocks`: a region of two lines gives one paragraph with the words
   joined by single spaces and the id `b-p0012-001` on page 12; no region,
   no block.
@@ -991,8 +1015,10 @@ with `read_edits`, and when any holds an edit it raises `EditError`
 naming the file and saying that edits are applied from the markdown spec
 on. A missing `edits/` folder, or empty files, is no edits.
 
-markdown reads `pages.json` and `blocks.json` and checks the hash of
-`blocks.json` against `pages.json`'s, as every stage after analyze does, makes the Markdown,
+markdown reads `pages.json` and `blocks.json` with `read_checked_input`,
+which checks `pages.json` against `pdf_sha256(config.pdf)` and
+`blocks.json` against `pages.json`, as every stage after analyze does
+(section 3), makes the Markdown,
 runs `read_markdown` on it and `check_stage(FidelityBoundary.MARKDOWN, blocks,
 words)`, and only then writes `book.md`. It deletes `book.md` first.
 
@@ -1069,7 +1095,9 @@ Unit tests:
 - markdown `run` (marked `pandoc`, since it calls `read_markdown`) with an
   edit in `edits/owner.jsonl` raises `EditError` naming the file; with an
   empty `edits/owner.jsonl`, and with no `edits/` folder, it writes
-  `book.md`; when the Markdown loses a word (`render_markdown` replaced
+  `book.md`; with a config whose `pdf` is another file than the one
+  `pages.json` was made from, it raises `InputFileError` naming analyze
+  and writes no `book.md`; when the Markdown loses a word (`render_markdown` replaced
   by one that drops it), `run` raises `FidelityError` and writes no
   `book.md`.
 - `pandoc_arguments` with and without a cover, against literal tuples.
