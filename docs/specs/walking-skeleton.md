@@ -526,9 +526,12 @@ which in the skeleton is the file as structure wrote it (section 8).
 **The words of each side.** A text is split on white space
 (`str.split()`), nothing normalised.
 
-- `WordsFile`: the `text` of every word of every page. Its removals are
-  extract's, which no boundary checks.
-- `LinesFile`: the words of every line of every region.
+- `WordsFile`: the `text` of every word of every page, split like any
+  other text, so that a word holding a no-break space, `10\xa0000`,
+  counts as the same two words on both sides. Its removals are extract's,
+  which no boundary checks.
+- `LinesFile`: the `text` of the words of every line of every region,
+  split the same way.
 - `BlocksFile`, at the structure boundary: for each block of the body and
   of every note, the text of its spans with each note reference span
   replaced by a space, split; plus the `text` of each note reference span
@@ -546,6 +549,24 @@ which in the skeleton is the file as structure wrote it (section 8).
   removals or word changes: markdown makes none.
 - `MarkdownWords`: the `text` of each word.
 
+Before the words are compared, the structure boundary checks what
+structure recorded, because a wrong record would hide a lost or invented
+word. Each fails with a `FidelityError` that has no missing or invented
+word and names, in `detail`, the block and span or the word change:
+
+- A note reference span's `text` must be exactly the `marker` of the
+  note its `note_ref` names, and that note must exist. At the markdown
+  boundary the whole span becomes Pandoc's note and its text is not
+  counted, so a span `"1 and"` would lose `and` there unseen.
+- A word change must have words in `before` and in `after`, so that it
+  neither deletes nor invents words, and must say what its reason
+  allows: for `note_marker`, `before` and `after` joined are the same
+  text (`Greece,1` and `Greece,` `1`); for `hyphen_join`, `before` is two
+  words, the first ending with `-`, and the first without its hyphen
+  followed by the second is `after` joined (`repli-` `cate` and
+  `replicate`). A change outside these rules, `Greece` to `Greek`, is
+  the invented word the check is there to catch.
+
 The two sides are compared as multisets. A difference is a
 `FidelityError` with the words missing from the output and the words it
 invented, each with its count, and in `detail` where each came from: the
@@ -557,7 +578,7 @@ in `detail`. A removal's `text` is split into words like any other, so a
 running head removed as one line counts each of its words.
 
 **Reading the Markdown.** `read_markdown` runs `pandoc --from
-markdown-smart --to json --fail-if-warnings` with the Markdown on
+markdown-smart-auto_identifiers --to json --fail-if-warnings` with the Markdown on
 standard input, a timeout of 60 s and `check=True`; a missing `pandoc`,
 a non-zero exit or a timeout is an `ExternalProgramError` with Pandoc's
 standard error. It walks the `blocks` of Pandoc's JSON, not its `meta`,
@@ -574,10 +595,25 @@ The elements read are those galley's Markdown makes: the blocks `Para`,
 `Space`, `SoftBreak`, `LineBreak`, `Emph`, `Strong`, `Span` and `Note`.
 Any other element, such as a list or a table that an unescaped character
 let through, is an `ExternalProgramError` that names it and the block id
-it is in, rather than words dropped or read wrongly; a later spec adds
-the elements its Markdown makes, such as an image for a figure. A div or
-heading without an id gives its words the id of the div or heading
-around it, or `None`.
+it is in ("outside any block" when there is none), rather than words
+dropped or read wrongly; a later spec adds the elements its Markdown
+makes, such as an image for a figure. A div or heading without an id
+gives its words the id of the div or heading around it, or `None`.
+Pandoc's `auto_identifiers` extension, on by default, would give every
+heading an id made from its text (`chapter-one`), which is no block of
+`book.md`; `-auto_identifiers` turns it off so that this rule holds for
+headings too.
+
+Some unescaped constructs make no element at all: a link reference
+definition (`[1]: beta gamma` on a line of its own) or a title block
+(`% Alpha beta` on the first line) leave their words out of Pandoc's
+`blocks`. An unescaped construct therefore either raises in
+`read_markdown`, as an element it does not read, or leaves its words to
+`check_stage`, which reports them missing.
+
+`read_markdown` is two functions: one runs Pandoc and returns its JSON
+as text, and a pure one walks the JSON, which unit tests call on literal
+JSON without Pandoc.
 
 `--fail-if-warnings` makes a note definition that no reference uses an
 error (Pandoc 3.13 warns and drops it; the option makes it exit with 3).
@@ -596,17 +632,29 @@ Tests, unit tests with literal values:
   missing words; a hyphen join `("repli-", "cate") → ("replicate",)`
   passes, and fails without its word change; a note reference span `"1"`
   after `"…Greece,"`, with the word change `("Greece,1",) → ("Greece,",
-  "1")`, passes; a note's marker counts as a word;
+  "1")`, passes; a note's marker counts as a word; a reference span
+  whose text is not its note's marker (`"1 and"`) or names no note
+  fails; a word change that deletes, invents, or does not follow its
+  reason (`Greece` to `Greek`) fails; a word holding a tab or no-break space splits the
+  same on both sides;
+- at each boundary, a word twice on one side and once on the other is a
+  difference; a wrong pair of files is a `TypeError`;
 - at the markdown boundary: a referenced note's marker and its reference
   span are not counted, an unreferenced note's marker is; two references
-  against one Pandoc note is a difference;
+  against one Pandoc note is a difference, and note references inside
+  note blocks are counted; a word of the Markdown the blocks lack is
+  invented;
 - `read_markdown`, marked `pandoc` (a marker of `pyproject.toml` that
   skips the test when the program is missing): two paragraphs `a b` and
   `c` give `a`, `b`, `c`, not `bc`; `\*x\*y` comes back as `*x*y`; a
   footnote's words are words; `note_count` of a text with two footnotes
   is 2; the words of a div `::: {#b-p0000-001}` carry that id; an unused
   note definition raises `ExternalProgramError`; `Greece,[^1]` with no
-  definition comes back as the one word `Greece,[^1]`.
+  definition comes back as the one word `Greece,[^1]`; a heading inside
+  a div carries the div's id;
+- the walk of Pandoc's JSON, on literal JSON without Pandoc: the words of
+  nested divs carry the innermost id; an element it does not read
+  outside any div raises, saying "outside any block".
 
 ## 6. analyze and extract (work package 3a)
 

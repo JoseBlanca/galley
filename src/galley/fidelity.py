@@ -18,7 +18,15 @@ from enum import StrEnum
 from typing import Literal, assert_never, overload
 
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
-from galley.model import Block, BlocksFile, LinesFile, Origin, WordsFile
+from galley.model import (
+    Block,
+    BlocksFile,
+    ChangeReason,
+    LinesFile,
+    Origin,
+    WordChange,
+    WordsFile,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,20 +72,25 @@ def _pages(origin: tuple[Origin, ...]) -> str:
 
 
 def _words_file_words(words: WordsFile) -> tuple[_PlacedWord, ...]:
+    """The words of words.json, each word's text split like every other
+    text, so that "10\xa0000" counts as the same two words as in a block."""
     return tuple(
-        _PlacedWord(word.text, f"page {page.index}")
+        placed
         for page in words.pages
         for word in page.words
+        for placed in _placed(word.text, f"page {page.index}")
     )
 
 
 def _lines_file_words(lines: LinesFile) -> tuple[_PlacedWord, ...]:
+    """The words of lines.json, split as those of words.json are."""
     return tuple(
-        _PlacedWord(word.text, f"page {page.index}")
+        placed
         for page in lines.pages
         for region in page.regions
         for line in region.lines
         for word in line.words
+        for placed in _placed(word.text, f"page {page.index}")
     )
 
 
@@ -172,12 +185,19 @@ def _markdown_words(markdown: MarkdownWords) -> tuple[_PlacedWord, ...]:
     )
 
 
-def _note_reference_count(blocks: BlocksFile) -> int:
-    all_blocks = blocks.blocks + tuple(
+def _all_blocks(blocks: BlocksFile) -> tuple[Block, ...]:
+    """The blocks of the body, then those of every note."""
+    return blocks.blocks + tuple(
         block for note in blocks.notes for block in note.blocks
     )
+
+
+def _note_reference_count(blocks: BlocksFile) -> int:
     return sum(
-        1 for block in all_blocks for span in block.spans if span.note_ref is not None
+        1
+        for block in _all_blocks(blocks)
+        for span in block.spans
+        if span.note_ref is not None
     )
 
 
@@ -214,6 +234,68 @@ def _check_words(
     )
     detail = "; ".join(word_details + ((note_detail,) if note_detail else ()))
     raise FidelityError(boundary, missing, invented, detail)
+
+
+def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
+    """The note reference spans whose text is not exactly the marker of the
+    note they name, or that name no note. At the markdown boundary a
+    reference span becomes Pandoc's note and its text is not counted, so
+    any other word in it would be lost there unseen."""
+    markers = {note.id: note.marker for note in blocks.notes}
+    return tuple(
+        (
+            f"block {block.id}: the note reference span {span.text!r} names "
+            f"{span.note_ref}, which is no note"
+            if span.note_ref not in markers
+            else f"block {block.id}: the note reference span {span.text!r} is not "
+            f"the marker {markers[span.note_ref]!r} of note {span.note_ref}"
+        )
+        for block in _all_blocks(blocks)
+        for span in block.spans
+        if span.note_ref is not None and markers.get(span.note_ref) != span.text
+    )
+
+
+# A hyphen join is two parts of a word split at a line end (glossary).
+_HYPHEN_JOIN_PARTS = 2
+
+
+def _change_follows_its_reason(change: WordChange) -> bool:
+    """Whether a word change keeps every letter as its reason allows: a note
+    marker split off its word keeps the text; a hyphen join of two parts
+    drops only the hyphen ending the first."""
+    if not change.before or not change.after:
+        return False
+    joined_after = "".join(change.after)
+    match change.reason:
+        case ChangeReason.NOTE_MARKER:
+            return "".join(change.before) == joined_after
+        case ChangeReason.HYPHEN_JOIN:
+            return (
+                len(change.before) == _HYPHEN_JOIN_PARTS
+                and change.before[0].endswith("-")
+                and change.before[0][:-1] + change.before[1] == joined_after
+            )
+        case _:
+            assert_never(change.reason)
+
+
+def _change_problems(blocks: BlocksFile) -> tuple[str, ...]:
+    """The word changes that delete or invent words or change a letter,
+    which the multiset comparison would take on trust."""
+    return tuple(
+        f"word change on page {change.page_index}: {change.before!r} to "
+        f"{change.after!r} is not a {change.reason.value}"
+        for change in blocks.word_changes
+        if not _change_follows_its_reason(change)
+    )
+
+
+def _check_records(boundary: FidelityBoundary, problems: tuple[str, ...]) -> None:
+    """Raise FidelityError, with no missing or invented word, when a record
+    of the stage is wrong; `problems` says which and where."""
+    if problems:
+        raise FidelityError(boundary, frozendict(), frozendict(), "; ".join(problems))
 
 
 def _wrong_types(stage: FidelityBoundary, before: object, after: object) -> TypeError:
@@ -253,7 +335,10 @@ def check_stage(
     split on white space, nothing normalised.
 
     Raises FidelityError with the missing and invented words, their counts,
-    and the pages or blocks each came from.
+    and the pages or blocks each came from. At the structure boundary it
+    also raises, with no word, when a note reference span is not its note's
+    marker or a word change does more than its reason allows (a hyphen join
+    of two parts, a marker split off its word).
     """
     match stage:
         case FidelityBoundary.LAYOUT:
@@ -265,6 +350,7 @@ def check_stage(
         case FidelityBoundary.STRUCTURE:
             if not (isinstance(before, LinesFile) and isinstance(after, BlocksFile)):
                 raise _wrong_types(stage, before, after)
+            _check_records(stage, _reference_problems(after) + _change_problems(after))
             _check_words(
                 stage,
                 _lines_file_words(before),
@@ -302,7 +388,15 @@ def check_stage(
 # Spec section 5: Pandoc reads a whole book's Markdown in about a second;
 # a minute means it hangs.
 _PANDOC_TIMEOUT_S = 60
-_PANDOC_ARGUMENTS = ("--from", "markdown-smart", "--to", "json", "--fail-if-warnings")
+# -auto_identifiers: Pandoc would otherwise give every heading an id made
+# from its text, chapter-one, which is no block of book.md (spec section 5).
+_PANDOC_ARGUMENTS = (
+    "--from",
+    "markdown-smart-auto_identifiers",
+    "--to",
+    "json",
+    "--fail-if-warnings",
+)
 
 
 class _Boundary(StrEnum):
@@ -326,8 +420,9 @@ type _Token = _Text | _Boundary
 
 
 def _not_read(element: str, block_id: str | None) -> ExternalProgramError:
+    where = f"in block {block_id}" if block_id is not None else "outside any block"
     message = (
-        f"Pandoc read the Markdown as a {element} element in block {block_id}, "
+        f"Pandoc read the Markdown as a {element} element {where}, "
         "which galley's Markdown does not make, so its words cannot be checked"
     )
     return ExternalProgramError(message)
@@ -392,9 +487,10 @@ def _joined_words(texts: tuple[_Text, ...]) -> tuple[MarkdownWord, ...]:
     return tuple(MarkdownWord(word, texts[0].block_id) for word in joined.split())
 
 
-def _pandoc_words(document: object) -> MarkdownWords:
-    """The words of the `blocks` of Pandoc's JSON, not of its `meta`, and
-    the number of its Note elements."""
+def _words_of_pandoc_json(pandoc_json: str) -> MarkdownWords:
+    """The words of the `blocks` of Pandoc's JSON, as `pandoc --to json`
+    writes it, not of its `meta`, and the number of its Note elements."""
+    document = json.loads(pandoc_json)
     match document:
         case {"blocks": list() as blocks}:
             tokens = _blocks_tokens(blocks, None)
@@ -431,19 +527,10 @@ def _stderr_text(stderr: str | bytes | None) -> str:
             assert_never(stderr)
 
 
-def read_markdown(markdown: str) -> MarkdownWords:
-    """The words of a Markdown text as Pandoc reads it (`pandoc --from
-    markdown-smart --to json --fail-if-warnings`), each with the id of the
-    innermost div or heading it is in, and the number of notes.
-
-    Words are split at spaces and line breaks and at the start and end of
-    every block and note; emphasis does not split a word. The metadata
-    header, the title and authors, gives no words. Raises
-    ExternalProgramError, with Pandoc's standard error, when `pandoc` is
-    missing, fails or warns (a note definition no reference uses), runs
-    longer than 60 s, or reads an element galley's Markdown does not make,
-    such as a list.
-    """
+def _pandoc_json(markdown: str) -> str:
+    """Pandoc's JSON of a Markdown text, as text; ExternalProgramError, with
+    Pandoc's standard error, when pandoc is missing, fails, warns or runs
+    longer than 60 s."""
     pandoc = shutil.which("pandoc")
     if pandoc is None:
         message = "pandoc is not installed; install it with `brew install pandoc`"
@@ -470,4 +557,21 @@ def read_markdown(markdown: str) -> MarkdownWords:
             f"{_stderr_text(error.stderr)}"
         )
         raise ExternalProgramError(message) from error
-    return _pandoc_words(json.loads(completed.stdout))
+    return completed.stdout
+
+
+def read_markdown(markdown: str) -> MarkdownWords:
+    """The words of a Markdown text as Pandoc reads it (`pandoc --from
+    markdown-smart-auto_identifiers --to json --fail-if-warnings`), each with
+    the id of the innermost div or heading with an id it is in, and the
+    number of notes.
+
+    Words are split at spaces and line breaks and at the start and end of
+    every block and note; emphasis does not split a word. The metadata
+    header, the title and authors, gives no words. Raises
+    ExternalProgramError, with Pandoc's standard error, when `pandoc` is
+    missing, fails or warns (a note definition no reference uses), runs
+    longer than 60 s, or reads an element galley's Markdown does not make,
+    such as a list.
+    """
+    return _words_of_pandoc_json(_pandoc_json(markdown))
