@@ -6,8 +6,7 @@ other, the data formats of those files, how edits to the text are kept,
 and the rules every stage follows so that no word of the book is lost or
 invented. The specs of the stages, `docs/specs/<stage>.md`, build on it,
 and the names of the things of the domain are those of `docs/glossary.md`.
-Dated 14 November 2026. Three points are left for the owner, in section 15;
-the rest is for the owner to approve.
+Dated 14 November 2026.
 
 Decisions marked "owner, 14 November 2026" were taken by the owner in chat.
 The others were taken while writing, from what the two committed excerpts
@@ -29,7 +28,7 @@ give "Ori- 'There is, however, much material…", the end of one note and
 the start of another. Gierke prints short headings in the margin beside
 the body text, on the same rows, on the left of some pages and the right
 of others, and inside its endnotes too. Finding columns, margins and lines is
-therefore a stage of its own (layout, section 7).
+therefore a stage of its own (layout, section 9).
 
 When a page has no text layer, or a poor one, galley makes its own with
 Tesseract, which gives the same thing: words with boxes, plus a confidence.
@@ -50,7 +49,17 @@ Archive and a ten-page excerpt of each, committed under
   between the book title and the section; headings in the margin; a
   signature mark (a printer's "I — 2" at a page foot); endnotes.
 
-## 3. The pipeline
+## 3. Text and meaning, not typography
+
+galley extracts the text of a book and what each part of it is (a
+heading, a paragraph, a note, a margin heading), and then lays it out in
+its own way. It keeps nothing of the book's typography: fonts, sizes,
+margins and the place of things on the page are evidence for structure
+to read, never something to reproduce. A kind of block is rendered the
+same way in every book, by markdown and the style sheet of the epub stage
+(owner, 14 November 2026). The books are mostly text, so little is lost.
+
+## 4. The pipeline
 
 Seven stages, each a subpackage of `src/galley/`. A stage reads the files
 listed for it, writes one file, and imports no other stage, so that each
@@ -75,7 +84,7 @@ Every file a stage writes carries the SHA-256 of the PDF it came from.
 A stage that reads a file made from another PDF stops with an error that
 says which stage to rerun.
 
-## 4. The book folder
+## 5. The book folder
 
 Everything about one book lives in one folder, given to the command:
 
@@ -89,7 +98,7 @@ kadesh/
   blocks.json          structure
   edits/
     correct.jsonl      correct
-    owner.jsonl        the owner's edits (section 9)
+    owner.jsonl        the owner's edits (section 10)
     <agent>.jsonl      edits proposed by an agent
   book.md              markdown
   book.epub            epub
@@ -101,7 +110,7 @@ runs again. Edits are never overwritten by a stage. Folders of the owner's
 books live outside the repository or under `runs/`, which git ignores;
 tests make theirs under pytest's temporary directory.
 
-## 5. The book config
+## 6. The book config
 
 `book.toml` is read in one place, `config.py`, into a frozen `BookConfig`.
 An unknown key or a wrong type is an error.
@@ -120,7 +129,7 @@ An unknown key or a wrong type is an error.
 
 A stage spec adds the keys it needs, here and in `config.py` together.
 
-## 6. Units, identifiers and the text of a block
+## 7. Units, identifiers and the text of a block
 
 - Positions are in PDF points (1/72 inch), as floats, with the origin at
   the top left of the page and `top` growing downwards, as pdfplumber
@@ -139,7 +148,7 @@ A stage spec adds the keys it needs, here and in `config.py` together.
   Spans of one block are separated by nothing, so a span carries the
   spaces it needs. Edits match against this text.
 
-## 7. The formats
+## 8. The formats
 
 The formats are frozen dataclasses in `src/galley/model.py`, with tuples
 for sequences, `frozendict` (a built-in type of Python 3.15) for
@@ -163,7 +172,7 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
 - `PageKind`: `blank`, `text`, `plate` (mostly a picture), `excluded`.
 - `TextSource`: `text_layer`, `ocr`, `none` (blank and excluded pages).
 - `text_layer_score`: the share of the layer's words found in the word
-  list (section 11), from 0 to 1; `None` without a layer. The score below
+  list (section 12), from 0 to 1; `None` without a layer. The score below
   which `auto` runs Tesseract is set in analyze's spec.
 
 **words.json**, `WordsFile(pages: tuple[PageWords, ...], removals)`:
@@ -202,7 +211,7 @@ page_numbers)`:
   1), `spans: tuple[Span, ...]`, `figure: str | None` (figure blocks),
   `origin: tuple[Origin, ...]`.
 - `BlockKind`: `heading`, `paragraph`, `quote`, `figure`, `margin_note`
-  (section 15, point 1), `index_entry`.
+  (section 17), `index_entry`.
 - `Span`: `text`, `emphasis: Emphasis`, `note_ref: str | None`. A span
   with a `note_ref` is a note reference: its `text` is the marker as
   printed ("1", "*") and `note_ref` is the id of the note.
@@ -224,7 +233,7 @@ page_numbers)`:
   one.
 - `PageNumber`: `page_index`, `text`, `position: head | foot`.
   `page_numbers: tuple[PageNumber, ...]`, taken from the removals; the
-  index stage uses it (section 10).
+  index stage uses it (section 11).
 
 **Removal**, in words.json (excluded pages and regions) and blocks.json
 (the rest): `page_index`, `box`, `text`,
@@ -243,11 +252,11 @@ as structure wrote it), `old`, `new`, `author`, `reason`.
 grayscale, row by row). Frozen, so it can go to a worker thread, which
 makes a Pillow image from it.
 
-## 8. The stages
+## 9. The stages
 
 Each stage is called as `run(folder: BookFolder, config: BookConfig) ->
 None` from its subpackage. `BookFolder(root: Path)` gives the paths of
-section 4 as properties: `folder.pages_json`, `folder.edits_dir`, and so
+section 5 as properties: `folder.pages_json`, `folder.edits_dir`, and so
 on. Everything else a stage does is pure functions over the frozen values
 it read (the `coding` skill, "Functional style").
 
@@ -281,12 +290,12 @@ its note.
 words.json and, possibly, the local vision model reading a word on the
 page image. It is optional. Its spec is written later.
 
-**markdown** applies the edits (section 9) and writes `book.md`: a
+**markdown** applies the edits (section 10) and writes `book.md`: a
 metadata header from the config; headings with their block id as anchor;
 every other block as a Pandoc fenced div with its id (`::: {#b-p0012-003}`);
 notes with `referenced` true as Pandoc footnotes, each of their blocks a
 fenced div with its id inside the footnote, which Pandoc puts at the end
-of each chapter and the Kindle shows as pop-ups (section 15, point 3);
+of each chapter and the Kindle shows as pop-ups (section 17);
 notes with `referenced` false as ordinary blocks where they were printed,
 the marker first; figures as images. Pandoc runs with
 `--fail-if-warnings`, so that a note it would drop, or a reference it
@@ -297,11 +306,11 @@ it back as written: "1. Of the three" at the start of a paragraph must
 not become a numbered list. `book.md` is read by Pandoc with smart quotes
 off (`-f markdown-smart`), so `"` stays `"`.
 
-**epub** runs Pandoc on `book.md` with the cover and a style sheet, then
-epubcheck on the result (section 15, point 2). The cover is
+**epub** runs Pandoc on `book.md` with the cover and a style sheet.
+epubcheck validates the result in the tests, not in a run (section 16). The cover is
 `images/cover.png` when the config has a `cover_page`.
 
-## 9. Edits
+## 10. Edits
 
 Edits are how anything that is not a stage changes the text of the book:
 the correct stage, the owner proofreading, an agent. They are kept outside
@@ -333,7 +342,7 @@ November 2026: patches, usable by agents too).
 - An agent writes edits the same way, from blocks.json, into
   `edits/<agent name>.jsonl`.
 
-## 10. The book's index
+## 11. The book's index
 
 An index printed in the book points to page numbers, which mean nothing in
 an EPUB. For now it is kept as text: its entries are `index_entry` blocks
@@ -345,28 +354,28 @@ link to `#b-p0008-002` written in another chapter became
 `ch001.xhtml#b-p0008-002`). An index built from the blocks, for books that
 have none, comes after that (owner, 14 November 2026).
 
-## 11. Shared modules
+## 12. Shared modules
 
 Besides the stages, the package root holds the modules every stage uses.
 A stage imports these and nothing else of galley.
 
 | module | gives |
 |---|---|
-| `model.py` | the formats of section 7, with their read and write functions |
+| `model.py` | the formats of section 8, with their read and write functions |
 | `config.py` | `BookConfig`, `read_config(path)`, the language codes |
 | `book_folder.py` | `BookFolder` |
-| `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract, Pandoc, epubcheck), `EditError`, `FidelityError` |
+| `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract or Pandoc), `EditError`, `FidelityError` |
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage` |
 | `parallel.py` | `DEFAULT_WORKERS` (6) and `map_pages(function, items, workers)`, which returns the results in input order |
 | `wordlist.py` | `word_list(language) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/` |
-| `fidelity.py` | the fidelity check, section 12 |
+| `fidelity.py` | the fidelity check, section 13 |
 | `cli.py` | the `galley2epub` command |
 
 `src/galley/__init__.py` imports gilguard first: a library that stops a
 program at any import that turns Python's global lock back on, and names
 the module. galley needs the lock off to run pages in parallel.
 
-## 12. The fidelity check
+## 13. The fidelity check
 
 galley's first goal is that no word of the book is lost or invented. The
 fidelity check, `fidelity.check_stage(stage, before, after)`, makes that
@@ -389,7 +398,7 @@ lists the words, with the pages they came from where the origins say.
   with the edits applied against `book.md` as Pandoc reads it (`pandoc -f
   markdown-smart -t json`): a note reference is matched to Pandoc's note
   element and its marker is not compared as a word, because Pandoc writes
-  its own numbers (section 15, point 3); likewise the `marker` of a
+  its own numbers (section 17); likewise the `marker` of a
   referenced note.
 - extract is where the words enter galley, so it has no boundary to check:
   its excerpt tests compare its words with literals.
@@ -399,7 +408,7 @@ lists the words, with the pages they came from where the origins say.
   tests run it on whole books. `galley2epub run` runs it after layout,
   structure and markdown, which costs one pass over the words.
 
-## 13. The command
+## 14. The command
 
 ```
 galley2epub run <book folder>          every stage in order (correct only if the config says)
@@ -411,56 +420,46 @@ Errors propagate to `cli.main`, the one place that catches broadly, which
 logs the error and raises it again. The `[project.scripts]` entry is added
 by the first plan, with `cli.py`.
 
-## 14. Tests
+## 15. Tests
 
 The three tiers of tests (unit, excerpt, whole book), the excerpts and the
 pytest markers are in the `coding` skill, "Tests", and in
 `pyproject.toml`.
 
-## 15. Open points
+## 16. External programs
 
-The owner decides these. Meanwhile the work follows the "meanwhile" of
-each.
+galley prefers to be self-contained (owner, 14 November 2026). An external
+program is adopted when it gives a large amount of well-tested work that
+would be costly to rebuild; when what it gives is small, galley does it
+itself. A program needed only while developing or testing is a smaller
+cost than one every run of `galley2epub` needs.
 
-**1. Gierke's margin headings.** Gierke prints a short heading in the
-margin beside most paragraphs ("Unity of development"). An EPUB has no
-margin.
+| program | used by | when | why it is not rebuilt |
+|---|---|---|---|
+| Pandoc | markdown (to read `book.md` back for the fidelity check), epub | every run | writing a valid EPUB 3 with navigation, notes and metadata is a large, well-tested body of work |
+| Tesseract | extract (OCR pages), `wordlist.py` | runs that need OCR; the word list, once per language | OCR is not something to rebuild |
+| epubcheck | the tests of the epub stage and the `whole_book` tests | development only | it is the reference validator of EPUB, and needs Java, which a run of galley should not |
 
-| option | the reader sees | costs |
-|---|---|---|
-| A. A small bold line before the paragraph whose line it was beside | every margin heading, as a run-in title | none beyond the block kind |
-| B. Removed, as `margin_note` removals | the body only | the headings are lost to the reader, kept only in blocks.json |
-| C. A note attached to the paragraph | a pop-up marker per heading | many markers in the text |
+The epub stage does not run epubcheck: an EPUB is checked while
+developing, on the excerpts and the whole books, and the tests that need
+it are marked `epubcheck` and skip when it is missing. It is installed
+with `brew install epubcheck` (5.4.0) before the epub stage is built.
 
-Recommendation: A. They are the author's own summaries and help a reader
-find their way. Meanwhile: the format has the `margin_note` block kind,
-and markdown renders it as A.
+## 17. Decided by the owner on 14 November 2026
 
-**2. epubcheck.** It checks that the EPUB is valid, which catches what the
-Kindle may reject. It is not installed; `brew install epubcheck` installs
-version 5.4.0, which needs Java (Homebrew's `openjdk`, several hundred MB).
+- **Margin headings** are a kind of block, `margin_note`, which markdown
+  renders in galley's own way: for now a small bold line before the
+  paragraph whose line it was beside. Their printed form is not kept
+  (section 3).
+- **epubcheck** is a development tool, not a requirement of a run
+  (section 16).
+- **Note markers** in the EPUB are Pandoc's numbers, 1, 2, 3 in each
+  chapter. The printed markers stay in blocks.json and are not shown.
+- Earlier the same day, in chat: no italics yet (the `emphasis` field is
+  kept for them); edits as patch files, usable by agents too; the book's
+  index kept as text now, linked to blocks later.
 
-| option | gives | costs |
-|---|---|---|
-| A. Required: the epub stage fails without it | every EPUB checked | Java on the machine |
-| B. Run when installed; when missing, the epub stage stops unless the config sets `validate_epub = false` | no Java needed; an unchecked EPUB is a choice the config states | an EPUB the Kindle may reject is possible |
-
-Recommendation: A, since the Kindle's own errors are harder to read.
-Meanwhile: the epub stage's tests that need it are marked and skip.
-
-**3. Note markers.** Pandoc numbers footnotes itself, 1, 2, 3 in each
-chapter, whatever the book printed: Kadesh's "*" note becomes "1", and a
-chapter whose notes are 291-302 restarts at 1.
-
-| option | the reader sees | costs |
-|---|---|---|
-| A. Pandoc's numbers | clean numbers, restarting each chapter | the printed markers are lost to the reader (kept in blocks.json) |
-| B. The printed markers | what the book printed | Pandoc has no option for it: markdown writes the references and notes as raw HTML links, and the OCR misreadings of markers ("i" for "1", "•Pa" for "*") show unless an edit fixes them, which needs `Note.marker` to be editable |
-
-Recommendation: A. The pop-up does not depend on the number, and B costs
-raw HTML and a second kind of edit. Meanwhile: A.
-
-## 16. Not in this document
+## 18. Not in this document
 
 - How each stage does its work: the page score threshold, column
   detection, running heads, paragraphs, notes, OCR settings, figure
@@ -468,6 +467,6 @@ raw HTML and a second kind of edit. Meanwhile: A.
 - What happens to a hyphen that structure cannot join safely ("neces-" and
   "sary" with no evidence): structure's spec, as an open point.
 - The `correct` stage, with its log and how it calls the vision model; the
-  `index` stage; and `edits-from`. Each is specified later, and section 7
+  `index` stage; and `edits-from`. Each is specified later, and section 8
   gains their formats then.
 - The style sheet and cover of the EPUB, in the epub stage's spec.

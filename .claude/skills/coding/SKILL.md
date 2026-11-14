@@ -234,6 +234,13 @@ exceptions below the top of the program.
 
 ## Dependencies and external programs
 
+- galley prefers to be self-contained (the owner's rule). A dependency or
+  an external program is adopted when it gives a large amount of
+  well-tested work that would be costly to rebuild; when what it would
+  give is a few functions, galley writes them. A tool needed only while
+  developing or testing costs less than one every run needs.
+  `docs/architecture.md`, "External programs", lists the ones adopted and
+  why.
 - A new dependency installs on 3.15t as a wheel: `uv pip install
   --only-binary :all: <pkg>` in a scratch venv made with `uv venv --python
   3.15t`, and once added, `uv run python -m gilguard` reports no
@@ -288,7 +295,8 @@ exceptions below the top of the program.
   run the tests themselves in 8 threads at once with pytest-run-parallel,
   which catches state shared between calls; a test that calls PDFium is
   marked `thread_unsafe` and runs once.
-- Tests that need Tesseract or Pandoc are marked `tesseract` or `pandoc`
+- Tests that need Tesseract, Pandoc or epubcheck are marked `tesseract`,
+  `pandoc` or `epubcheck`
   and skip with the reason when the program is missing. The `books_dir`
   fixture of `tests/conftest.py` finds the whole books through
   `GALLEY_SAMPLES` or in `samples/` of the main checkout, so tests in a

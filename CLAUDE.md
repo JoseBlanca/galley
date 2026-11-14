@@ -74,8 +74,11 @@ holds in chat, and these are the principles that fail most often there:
   TOML.
 - Work is parallel by threads. PDFium (pypdfium2) is not thread-safe: every
   call into it runs in one thread, and the rendered images go to the workers.
-- Pandoc builds the EPUB; Tesseract does the OCR; epubcheck validates the
-  EPUB. All three are Homebrew binaries (epubcheck is not installed yet).
+- galley prefers to be self-contained: an external program only for a
+  large body of well-tested work, and development-only tools before
+  run-time ones. Pandoc builds the EPUB and Tesseract does the OCR, at run
+  time; epubcheck validates EPUBs in the tests only (not installed yet:
+  `brew install epubcheck` before the epub stage).
 - The checks are listed at the end of the `coding` skill: `uv lock
   --check`, ruff format and check, ty, and pytest, once normally and once
   with 8 threads. ruff, ty and pytest are pinned to exact versions.

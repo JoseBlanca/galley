@@ -58,6 +58,6 @@ def _require_program(name: str) -> None:
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
-    for program in ("tesseract", "pandoc"):
+    for program in ("tesseract", "pandoc", "epubcheck"):
         if item.get_closest_marker(program) is not None:
             _require_program(program)

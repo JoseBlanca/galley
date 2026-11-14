@@ -87,4 +87,5 @@ markers = [
     "whole_book: runs on whole books from samples/ (GALLEY_SAMPLES or the main checkout); excluded by default, run with -m whole_book",
     "tesseract: needs the tesseract binary",
     "pandoc: needs the pandoc binary",
+    "epubcheck: needs epubcheck, a development tool (brew install epubcheck)",
 ]
