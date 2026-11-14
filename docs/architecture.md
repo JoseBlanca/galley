@@ -107,8 +107,12 @@ kadesh/
 ```
 
 The owner writes `book.toml` and, through `galley2epub edits-from`, the
-edits. Every other file is generated and is overwritten when its stage
-runs again. Edits are never overwritten by a stage. Folders of the owner's
+edits. Every other file is generated. A stage, before it reads its
+inputs, deletes its own file and the files of every later stage
+(`book_folder.delete_stage_outputs`), so that no file of a later stage
+can survive from an earlier run: in the review of the walking skeleton,
+markdown run alone after analyze and extract built `book.md` from a stale
+`blocks.json` and lost a word with no error. Edits are never overwritten by a stage. Folders of the owner's
 books live outside the repository or under `runs/`, which git ignores;
 tests make theirs under pytest's temporary directory.
 

@@ -306,3 +306,38 @@ The stages-one-by-one test compares the bytes of every file of the book
 folder (`pages.json`, `words.json`, the cover, `lines.json`,
 `blocks.json`, `book.md`) with those of `run`. The session fixture skips,
 and says so, when Pandoc is missing.
+
+### Review of work package 4
+
+Four reviewers on b0f54c1, running the real command. Both excerpts and
+the whole Kadesh book (76 pages; analyze listed the 14 pages without a
+text layer in 0.9 s; with those excluded, `run` took 2.15 s, wrote 25,467
+words in 62 blocks and a 60 KB EPUB) passed epubcheck with 0 errors and
+0 warnings, and every word was accounted for page by page from
+pdfplumber's text layer to the EPUB's text. Running the stages one by one
+gives the same bytes as `run`. Every bad input tried (no `book.toml`, an
+unknown key, a missing PDF, `--workers 0`, a stale `pages.json`) gives a
+message naming the file and a non-zero exit.
+
+Findings that held, fixed by the stream's agent (7eabe48, 6afcda6,
+3c2e8bc), the spec first:
+
+- A word lost with no error: after removing an excluded region and
+  rerunning analyze and extract, markdown and epub run alone built the
+  EPUB from the old `blocks.json`, and the restored word `81` was
+  missing. Each stage now deletes its own file and every later stage's
+  before it reads (`book_folder.delete_stage_outputs`), so a stale file
+  cannot feed a later stage; the architecture says so (section 5).
+- Under `run`, the error line named `run`, not the stage that failed; a
+  folder argument that is a file gave Python's error; `correct = true`
+  was checked after Pandoc. Fixed.
+- The stage order was written in two tables; one now.
+- Tests that could not fail: `--workers` reaching the stages, the log
+  line, a subcommand that also runs later stages, the EPUB's text against
+  the blocks. Each has a test now.
+
+An open question at the time of writing: twice, a run stopped once in
+analyze with `PdfminerException: /b'trailer'`, not repeated in 80 later
+runs. An agent is checking whether it is a race under free threading or
+a PDF deleted underneath by another agent's pytest pruning the shared
+temporary folder.
