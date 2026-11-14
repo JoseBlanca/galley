@@ -398,6 +398,20 @@ class BookFolder:
 One test: every property is the path architecture §5 gives, under
 `root`.
 
+The files the stages write, in pipeline order, are `pages.json`
+(analyze), `words.json` and `images/` (extract), `lines.json` (layout),
+`blocks.json` (structure), `book.md` (markdown) and `book.epub` (epub).
+Each stage's `run`, before it reads its inputs, deletes its own output
+and the outputs of every later stage, and nothing else of the folder:
+never `book.toml` or `edits/`. So no file in the folder was made from
+an earlier version of the file it is made from, and a stage that fails
+leaves no later file behind. Without this, on Kadesh, removing
+`exclude_regions` from `book.toml` and running analyze and extract again
+gave a `words.json` with the page number `81`; markdown and epub, run
+alone, then made `book.md` and the EPUB from the old `blocks.json`,
+without `81` and without an error. Now markdown run there stops with
+`InputFileError`: `blocks.json` does not exist, run structure.
+
 ## 4. PDFium and threads: pdfium.py, parallel.py (work package 2a)
 
 ### pdfium.py
@@ -732,8 +746,8 @@ def require_text_layer(pages: tuple[PageInfo, ...]) -> None: ...
     # Raises the PdfError above, listing every blank page.
 ```
 
-`run` deletes `pages.json` first, so that a failed run leaves no old file
-behind, and writes it with `source_pdf_sha256 = pdf_sha256(config.pdf)`.
+`run` deletes `pages.json` and every later stage's file first (section
+3), so that a failed run leaves no old file behind, and writes it with `source_pdf_sha256 = pdf_sha256(config.pdf)`.
 Every stage's `run` takes the keyword `workers`, which the tests and the
 command set; a stage that works in one thread ignores it.
 
@@ -765,7 +779,8 @@ removals are in page order, then in pdfplumber's order.
 When the config has a `cover_page`, extract renders it at 300 dpi with
 `pdfium.render` and saves it as an 8-bit grayscale PNG,
 `images/cover.png`: 2118 × 3034 pixels and 2.36 MB for Kadesh page 0.
-extract deletes `words.json` and `images/` first, and always creates
+extract deletes `words.json`, `images/` and every later stage's file
+first (section 3), and always creates
 `images/`, empty when there is no cover, so that every book folder has
 the same files after a run.
 
@@ -867,7 +882,8 @@ each other, the two files could not say which one is stale. Hashing the
 1 MB Kadesh excerpt took 0.4 ms. layout runs per page with `map_pages`,
 and runs
 `check_stage(FidelityBoundary.LAYOUT, words, lines)` before writing `lines.json`;
-on a `FidelityError` it writes nothing. It deletes `lines.json` first.
+on a `FidelityError` it writes nothing. It deletes `lines.json` and
+every later stage's file first (section 3).
 
 ```python
 # galley.layout
@@ -892,7 +908,8 @@ region gives no block.
 structure reads `pages.json` and `lines.json` and checks both hashes as
 layout does, `lines.json` naming layout; it uses only `lines.json`. It runs `check_stage(FidelityBoundary.STRUCTURE, lines,
 blocks)` before writing `blocks.json`; on a `FidelityError` it writes
-nothing. It deletes `blocks.json` first.
+nothing. It deletes `blocks.json`, `book.md` and `book.epub` first
+(section 3).
 
 ```python
 # galley.structure
@@ -1020,7 +1037,8 @@ which checks `pages.json` against `pdf_sha256(config.pdf)` and
 `blocks.json` against `pages.json`, as every stage after analyze does
 (section 3), makes the Markdown,
 runs `read_markdown` on it and `check_stage(FidelityBoundary.MARKDOWN, blocks,
-words)`, and only then writes `book.md`. It deletes `book.md` first.
+words)`, and only then writes `book.md`. It deletes `book.md` and
+`book.epub` first (section 3).
 
 ```python
 # galley.markdown
@@ -1138,16 +1156,20 @@ structure and markdown, so it runs whether a stage is called alone or by
 `run`: after `edits-from`, the owner reruns markdown alone, and that is
 where edits enter the text.
 
-Before any stage runs, `main` finds the programs the command needs with
-`shutil.which`: for `run`, `markdown` and `epub`, a missing `pandoc` is an
-`ExternalProgramError` saying "install it with `brew install pandoc`".
-`run` raises `ConfigError` when the config has `correct = true`, since
-the skeleton has no correct stage. The subcommands `correct` and
+Before any stage runs, `main` reads the config and checks two things,
+in this order. `run` raises `ConfigError` when the config has `correct =
+true`, since the skeleton has no correct stage. Then `main` finds the
+programs the stages it runs need with `shutil.which`: a command that
+runs markdown or epub (`run`, `markdown`, `epub`) needs Pandoc, and a
+missing `pandoc` is an `ExternalProgramError` saying "install it with
+`brew install pandoc`". A folder argument that is a file, not a folder,
+is a `ConfigError` saying that the argument must be the book folder. The subcommands `correct` and
 `edits-from` do not exist yet; argparse rejects them, and it rejects a
 `--workers` below 1, which `parallel.py` would refuse only after analyze
 had deleted `pages.json`. `--workers` defaults to `DEFAULT_WORKERS`.
 Errors propagate to `main`, which logs them and raises them again
-(architecture §14).
+(architecture §14). The logged line names the command and, once a stage
+has started, the stage: `galley2epub run failed in structure: …`.
 
 ### The end-to-end test
 
@@ -1188,8 +1210,17 @@ Other tests of this work package:
 - `galley2epub` is an entry point of the installed package, and the
   script next to `sys.executable` runs `--help` with exit code 0;
 - the stages run one by one through `main` on a fresh Kadesh folder give
-  the same `blocks.json` and `book.md` bytes as `run` (marked
-  `thread_unsafe`);
+  the same `blocks.json` and `book.md` bytes as `run`, and the same
+  `EPUB/text/ch001.xhtml` in the EPUB (the whole EPUB differs by its
+  identifier and date); after each stage the folder holds exactly the
+  files of that stage and those before it (marked `thread_unsafe`);
+- `--workers 3` reaches every stage's `run`, and without the option
+  every stage gets `DEFAULT_WORKERS`;
+- after `run`, removing `exclude_regions` and running analyze and
+  extract, markdown raises `InputFileError` naming structure and leaves
+  no `book.md` or `book.epub`; a stage that fails leaves no later
+  stage's file; structure then markdown run again on unchanged inputs
+  write the same bytes;
 - `main(["layout", str(folder)])` on a folder with no `words.json` raises
   `InputFileError` naming extract; `main(["run", str(folder)])` with
   `correct = true` raises `ConfigError` before `pages.json` exists; a
