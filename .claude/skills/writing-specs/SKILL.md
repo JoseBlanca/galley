@@ -1,6 +1,6 @@
 ---
 name: writing-specs
-description: How a module spec is written in galley. Use it when writing or revising a document under docs/specs/, which says what one stage of the pipeline does, the format of the file it reads and the file it writes, its public functions, the cases that matter, how it is verified, and what is left for the owner to decide. The prose follows the writing skill, read first.
+description: How a stage spec, and the architecture document, are written in galley. Use it when writing or revising docs/architecture.md, docs/glossary.md or a document under docs/specs/, which says what one stage of the pipeline does, the format of the file it reads and the file it writes, its public functions, the cases that matter, how it is verified, and what is left for the owner to decide. The prose follows the writing skill, read first.
 ---
 
 # Writing specs
@@ -15,6 +15,42 @@ A spec lives in `docs/specs/<stage>.md`: `analyze`, `extract`,
 `structure`, `correct`, `markdown`, `epub`. The formats shared by several
 stages, the dataclasses of `src/galley/model.py`, are described in
 `docs/architecture.md`, and a spec points to them instead of copying them.
+
+## The architecture document
+
+`docs/architecture.md` is written first, before any spec, because every
+spec, plan and stage stands on it, and `src/galley/model.py` is written
+with it. It is written and reviewed as a spec is, with the same readers,
+the first reader and the spec reviewer, and the owner settles it before
+the first spec. It defines what the skills refer to as "what the
+architecture gives":
+
+- each stage: the files it reads (the PDF, the book config, the file of
+  the stage before) and the one file it writes, with its name, and where
+  a run of a book writes its files;
+- what the markdown stage reads when correct is skipped;
+- the dataclasses of each format in `model.py`, their `format_version`,
+  and the one pair of read and write functions for each;
+- the record of removed text: its fields (page, box, reason) and the enum
+  of reasons;
+- the fidelity check: its module and function, how a text is split into
+  words, and how it reads the Markdown and the EPUB;
+- the one PDFium module: its name and what it offers (open, page sizes,
+  render at a DPI);
+- the other modules of the package root: the config reader, `errors.py`
+  and its subclasses of `GalleyError`, the worker-count constant;
+- the book config: its TOML keys, their defaults and the dataclass;
+- coordinates (PDF points, origin top left), page index from 0 against
+  printed page number, and how the DPI travels with a value in pixels;
+- the entry point of a stage, `run(...)` or other, the CLI command
+  `galley2epub` with its subcommands, and `[project.scripts]`;
+- the log of the correct stage, and how the vision model is called;
+- the word list that guards hyphen joins;
+- how tests find the samples, and the pytest markers.
+
+`docs/glossary.md` is started with it: running head, page number
+(printed) and page index, line (a line of the PDF, not of the book once
+hyphens are joined), block, removed text, reference page.
 
 ## The two readers
 

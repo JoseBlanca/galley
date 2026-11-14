@@ -1,6 +1,6 @@
 ---
 name: reviewing-code
-description: How code is reviewed in galley and what is done with the findings. Use it after the tasks of a work package are committed and before the work package is reported as done, or when the owner asks for a review of a commit, a branch or a stage. The session sends one code-reviewer subagent per category, each with a fresh context, then evaluates every finding and has the ones that hold fixed.
+description: How code is reviewed in galley and what is done with the findings. In this project use it, not the built-in code-review skill. Use it after the tasks of a work package are committed and before the work package is reported as done, or when the owner asks for a review of a commit, a branch or a stage. The session sends one code-reviewer subagent per category, each with a fresh context, then evaluates every finding and has the ones that hold fixed.
 ---
 
 # Reviewing code
@@ -25,17 +25,18 @@ it sends them out and acts on what they find.
 
 ## The categories
 
-Each is described in `categories.md`, beside this file. Send every one
-that applies, in parallel, in one message.
+Each is described in `categories.md`, beside this file. The four run on
+every review, in parallel, in one message; this table is the one place that
+says which run. The review follows the size of the work: a work package of
+an afternoon can be reviewed together with the next one when the two are
+one piece of code, but nothing reaches the end of a plan unreviewed.
 
 | category | applies when |
 |---|---|
 | `spec` | always: the code against the spec, run on the sample pages |
 | `tests` | always: can each test fail, are the claimed numbers true |
 | `fidelity` | always: can a word be lost, duplicated, reordered or invented |
-| `errors` | always: what a user sees when an input is wrong |
-| `api` | the change adds or alters functions, names, defaults, docstrings |
-| `architecture` | the change touches the formats, `model.py`, threads, PDFium, a dependency, a subprocess |
+| `conventions` | always: errors, names, docstrings, formats, threads, PDFium, dependencies, read only |
 
 The subagent is `code-reviewer`. Its prompt gives the category, the
 commit under review, the files in scope, the path of the spec, the output
@@ -43,8 +44,10 @@ of the checks, the paths of the sample PDFs, and the context of step 4.
 `spec`, `tests` and `fidelity` change code to see what happens, so they
 are sent with `isolation: "worktree"`, each in its own tree; the prompt
 tells the reviewer to check out the commit under review and confirm it
-with `git rev-parse HEAD`, and to run `uv sync` there. The others only
-read and share the checkout.
+with `git rev-parse HEAD`, and to run `uv sync` there. `conventions`
+only reads and shares the checkout. Scratch files of every reviewer go
+under `tmp/`, which git ignores. The reviewers' worktrees are removed when
+the review is over (`git worktree remove`).
 
 ## Acting on the findings
 

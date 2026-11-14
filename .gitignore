@@ -6,3 +6,4 @@ runs/
 .claude/board/*
 !.claude/board/README.md
 .DS_Store
+tmp/

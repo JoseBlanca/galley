@@ -16,7 +16,7 @@ Another subagent has already checked that the text can be understood.
 Your question is whether it is right and complete.
 
 Read the spec, then `docs/architecture.md`, `docs/glossary.md`, the specs
-of the stages before and after this one, and
+of the stages before and after this one when they exist, and
 `.claude/skills/writing-specs/SKILL.md`. Then look at the sample pages the
 spec talks about. You may run Python on them with `uv run python` in the
 repository, using pypdfium2 or pdfplumber, and run `tesseract` or `pandoc`.

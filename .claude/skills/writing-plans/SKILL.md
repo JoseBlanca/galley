@@ -38,7 +38,8 @@ copy is wrong as soon as the spec changes.
   that exists. A plan written without looking at the code plans work that
   is done, or builds on something that is not there.
 - Run what the checks will run, once: the CLI command on a sample, `which
-  pandoc`, `which tesseract`.
+  pandoc`, `which tesseract`, `which epubcheck`. A program that is not
+  installed is something that must be in place, listed in the plan.
 - Show the owner the breakdown in chat before writing the plan: the work
   packages in order, what each gives, what it stands on, how many tasks,
   and what is left out. The owner corrects ten lines faster than a
@@ -48,8 +49,9 @@ copy is wrong as soon as the spec changes.
 
 A work package ends with something that exists and can be run: the
 `extract` subcommand writes `lines.json` for the Turney sample; the EPUB
-of the Haynes sample opens in Calibre with its chapters in the table of
-contents. When it is done the project works, with every check of the
+of the Haynes sample passes `epubcheck` and Pandoc's table of contents has
+its chapters. How it looks on the Kindle is for the owner, at the end of
+the plan, and is not a check. When it is done the project works, with every check of the
 `coding` skill passing.
 
 A work package goes as far as the CLI, so that it can be run on a sample
@@ -124,6 +126,7 @@ which are in the spec.
 - Could a subagent that reads only one task, the spec and the skills do
   it? Read two tasks that way.
 - Nothing in the plan decides what a spec left to the owner.
-- The `first-reader` subagent reads it as the orchestrator: what is the
+- The owner approved the breakdown in chat, so a plan does not go to the
+  `first-reader`. Read it once yourself as the orchestrator: what is the
   first thing to do, how do I know work package 2 is done.
 - The owner approves the plan before it is run.

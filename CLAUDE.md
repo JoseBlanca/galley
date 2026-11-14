@@ -13,9 +13,10 @@ order and pass files to each other:
 
 Each stage is a subpackage of `src/galley/`. The formats of the files
 between stages are defined once, in `src/galley/model.py`, and described
-in `docs/architecture.md` (both still to be written). A stage reads only its
-input file and writes only its output file, so each one can be built and
-tested on its own, with fixture files in `tests/`.
+in `docs/architecture.md` (both still to be written). A stage reads the
+PDF, the book config and the file of the stage before it, writes one file,
+and imports no other stage, so each one can be built and tested on its
+own, with fixture files in `tests/`.
 
 ## How the assistant works here
 
@@ -31,16 +32,17 @@ The skills are under `.claude/skills/` and the subagents under
 | writing code or tests | `coding` |
 | reviewing a work package or a commit | `reviewing-code` |
 
-A document under `docs/` goes to the `first-reader` subagent before it is
+A document under `docs/`, except a plan, goes to the `first-reader` subagent before it is
 handed over, and a spec also to `spec-reviewer`.
 
 A session that writes in the repository, a spec, a plan, a skill or code,
 works in a git worktree and branch of its own under `.claude/worktrees/`,
 made before its first edit, because two sessions editing the main checkout
-at once leave their changes mixed in the same files. Before its first
-edit it reads the messages on the board, `.claude/board/` (see the README
-there), and posts one that says what it works on and which shared files it
-may change. Nothing is merged into `main` without the owner's order.
+at once leave their changes mixed in the same files. When `git worktree
+list` shows that another session is working, it reads the messages on the
+board, `.claude/board/` (see the README there), before its first edit, and
+posts one that says what it works on and which shared files it may change.
+Nothing is merged into `main` without the owner's order.
 
 ## Replies in chat
 
@@ -63,7 +65,8 @@ holds in chat, and these are the principles that fail most often there:
 
 ## Environment
 
-- uv for everything: `uv run`, `uv add`, `uv run pytest`, `uv run ruff`.
+- uv for everything: `uv run`, `uv add`, `uv run pytest`, `uv run ruff`,
+  `uv run ty check`.
 - Python 3.15 free-threaded (`3.15t`, pinned in `.python-version`). A new
   dependency must install on it as a wheel; check with
   `uv pip install --only-binary :all: <pkg>` before adding it. PyMuPDF and
@@ -71,7 +74,11 @@ holds in chat, and these are the principles that fail most often there:
   TOML.
 - Work is parallel by threads. PDFium (pypdfium2) is not thread-safe: every
   call into it runs in one thread, and the rendered images go to the workers.
-- Pandoc builds the EPUB; Tesseract does the OCR. Both are Homebrew binaries.
+- Pandoc builds the EPUB; Tesseract does the OCR; epubcheck validates the
+  EPUB. All three are Homebrew binaries (epubcheck is not installed yet).
+- The checks are listed at the end of the `coding` skill: `uv lock
+  --check`, ruff format and check, ty, and pytest, once normally and once
+  with 8 threads. ruff, ty and pytest are pinned to exact versions.
 
 ## Samples
 

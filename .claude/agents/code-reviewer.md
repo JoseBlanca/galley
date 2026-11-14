@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Reviews a change to galley in ONE category, with a fresh context, and reports findings with their evidence. The categories are spec, tests, fidelity, errors, api and architecture. Give it the category, the commit under review, the files in scope, the path of the spec, the output of the checks, the paths of the sample PDFs, and any context the code does not show. The reviewing-code skill says when and how to send it.
+description: Reviews a change to galley in ONE category, with a fresh context, and reports findings with their evidence. The categories are spec, tests, fidelity and conventions. Give it the category, the commit under review, the files in scope, the path of the spec, the output of the checks, the paths of the sample PDFs, and any context the code does not show. The reviewing-code skill says when and how to send it.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---

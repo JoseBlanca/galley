@@ -59,47 +59,49 @@ the category that guards the first goal of the project.
 - Text from a model: can any reach the output except through the
   `correct` stage and its log?
 
-## errors
+## conventions
 
-The section "Errors" of the coding skill.
+The sections "Errors", "Types, names and defaults", "The formats between
+stages", "Threads and PDFium" and "Dependencies and external programs" of
+the coding skill, against `docs/architecture.md`, and the docstrings as
+`.claude/skills/writing/SKILL.md` asks for them. Ruff and ty already
+enforce part of these, and their output is in your prompt: look for what
+they cannot see. This reviewer only reads.
+
+Errors:
 
 - For each way the input can be wrong (a missing file, a PDF with no text
   layer, an encrypted PDF, a config with an unknown key, a page range past
   the end), what does the user see? Is it a `GalleyError` whose message
   names the file, the page and the value?
 - A missing `tesseract` or `pandoc`: is it found before the work starts?
-- An `except` that goes on, an error turned into a default, a page skipped
-  without a record.
+- An error turned into a default, a page skipped without a record.
 
-## api
-
-The section "Types, names and defaults" of the coding skill, and the
-docstrings as `.claude/skills/writing/SKILL.md` asks for them.
+Names and interfaces:
 
 - Read every new name as someone who has not seen the code: does it say
   what the value is, in the words of `docs/glossary.md`, the same in every
   stage?
-- Signatures against the spec. Defaults: a named constant with its source,
-  or hidden in a function body?
-- Strings for a finite set, `bool` parameters, a public name that could be
-  private.
+- Signatures against the spec. A default that changes the output: a named
+  constant with its source, or hidden in a function body?
 - Docstrings: the units (points or pixels, page index or page number), and
   what a caller must know.
-- A function longer than a screen, the same logic in two stages, dead code.
+- The same logic in two stages, dead code, a public name that could be
+  private.
 
-## architecture
+Formats, threads and dependencies:
 
-The sections "The formats between stages", "Threads and PDFium" and
-"Dependencies and external programs" of the coding skill, against
-`docs/architecture.md`.
-
-- A stage that imports another stage, or reads a file other than its
-  input. JSON written by hand outside `model.py`. A field of a shared
-  format changed without `docs/architecture.md`.
-- A call into pypdfium2, or pdfplumber's `to_image`, outside the one PDFium
-  module.
-- Mutable state shared between workers, a cache without a lock, output
-  whose order depends on which worker finished first.
-- A new dependency: does it install on 3.15t as a wheel, does importing
-  it turn the GIL back on?
-- A subprocess without `check=True`, a timeout, or a list of arguments.
+- A stage that imports another stage, or reads a file the architecture
+  does not list for it. JSON written outside `model.py`. A shared format
+  changed without `docs/architecture.md`. A `list` or `dict` field in a
+  frozen format.
+- A call into pypdfium2 outside the one PDFium module, a use of
+  pdfplumber's `to_image`, a PDFium object not closed explicitly. A
+  pdfplumber `PDF` or `Page` shared between threads.
+- Mutable state shared between workers without a lock, a check-then-act on
+  a shared dict, a shared iterator, output whose order depends on which
+  worker finished first, a worker count that is not the named constant.
+- A new dependency: does it install on 3.15t as a wheel, and does
+  importing it turn the GIL back on? Is a tool unpinned?
+- A subprocess without a timeout, or a program not found with
+  `shutil.which` at start-up.

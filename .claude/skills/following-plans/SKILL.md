@@ -27,11 +27,13 @@ stops only when it needs the owner.
 3. Check what the plan says must be in place by running it: `which
    pandoc`, the sample PDFs under `samples/` of the main checkout (they are
    not in git, so the worktree reaches them by absolute path). When
-   something is missing, tell the owner what and stop.
-4. Read the board, `.claude/board/` of the main checkout (see the README
-   there). A message that names a file this plan will change goes to the
-   owner before the first task touches it. Post the start message of the
-   plan.
+   something is missing, tell the owner what and stop. Do not build it on
+   the side: that it is not part of this plan was somebody's decision.
+4. When `git worktree list` shows another session's worktree, read the
+   board, `.claude/board/` of the main checkout (see the README there). A
+   message that names a file this plan will change goes to the owner
+   before the first task touches it. Post the start message of the plan.
+   When no other session is working, the board is skipped.
 5. Start the work report and commit it, with the plan's state changed to
    under way.
 
@@ -65,6 +67,10 @@ Tasks the plan marks as able to run side by side go to several subagents
 at once only when they touch different files. One writer per file in a
 tree.
 
+Several small tasks of one work package can go to one subagent in one
+prompt, and a small work package can go whole. A task never goes to a
+subagent together with a task of another work package.
+
 ## Checking what comes back
 
 What a subagent says is a claim, and a claim the next step rests on is
@@ -90,15 +96,15 @@ Then tick the task in the plan, note it in the report, commit both.
 1. Run each deliverable's check yourself and put the command and its
    result in the report. A deliverable that does not pass is not done.
 2. Have the work package reviewed, as the `reviewing-code` skill says.
-   `spec`, `tests` and `fidelity` always run.
 3. Evaluate the findings yourself; that judgement is the orchestrator's.
    The fixes go to a subagent, the one that wrote the code when it is
    still there, with the verdict on each finding. It may answer that a
    finding does not hold, with evidence.
 4. Run the checks and the deliverables again after the fixes.
 5. Write the work package into the report.
-6. Post to the board what this work package learned that another session
-   would otherwise find again, and any change to a shared file.
+6. When other sessions are working, post to the board what this work
+   package learned that another session would otherwise find again, and
+   any change to a shared file.
 
 ## Changing the plan
 
@@ -149,7 +155,10 @@ report goes to the `first-reader` before the owner is told.
    owner's. After they give it, merge, and run the checks on `main`.
 4. After the merge, `ExitWorktree` with `keep`, then
    `git worktree remove .claude/worktrees/<plan>`,
-   `git branch -d plan/<plan>`, and remove the plan's board messages.
+   `git branch -d plan/<plan>`, any reviewer worktree left, and the plan's
+   board messages. Something on the branch that was not merged and that
+   the owner has to judge (an experiment, a measurement) is not removed:
+   say what it is and where.
 
 ## When a session ends before the plan
 
