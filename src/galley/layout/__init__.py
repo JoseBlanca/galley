@@ -28,6 +28,8 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
 
+__all__ = ["group_lines", "layout_page", "run"]
+
 _logger = logging.getLogger(__name__)
 
 

@@ -35,11 +35,13 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 
+__all__ = ["page_words", "run"]
+
 _logger = logging.getLogger(__name__)
 
 # Architecture section 9: pages are rendered at 300 dpi; spec section 6
 # gives 2118 x 3034 pixels for the Kadesh cover.
-COVER_DPI: Final[int] = 300
+_COVER_DPI: Final[int] = 300
 
 
 def run(
@@ -127,7 +129,7 @@ def _layer_words(pdf: pdfplumber.PDF, page_index: int) -> tuple[Word, ...]:
 def _save_cover(pdf: Path, cover_page: int, cover_png: Path) -> None:
     # analyze checked cover_page against the page count; pdfium.render
     # raises PdfError if the PDF has fewer pages now.
-    rendered = pdfium.render(pdf, cover_page, COVER_DPI)
+    rendered = pdfium.render(pdf, cover_page, _COVER_DPI)
     Image.frombytes("L", (rendered.width_px, rendered.height_px), rendered.pixels).save(
         cover_png, format="PNG"
     )

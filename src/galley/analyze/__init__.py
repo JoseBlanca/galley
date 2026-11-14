@@ -27,6 +27,8 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 
+__all__ = ["check_config_pages", "classify_page", "require_text_layer", "run"]
+
 _logger = logging.getLogger(__name__)
 
 
