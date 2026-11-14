@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from galley import analyze
+from galley import analyze, extract
 from galley.book_folder import BookFolder
 from galley.config import read_config
 
@@ -68,7 +68,8 @@ def excerpt_books(
     tmp_path_factory: pytest.TempPathFactory, excerpt_pdf: frozendict[str, Path]
 ) -> frozendict[str, BookFolder]:
     """A book folder for each excerpt, by excerpt name, with its `book.toml`
-    (the configs of spec section 9) and the files analyze wrote.
+    (the configs of spec section 9) and the files analyze and extract
+    wrote.
 
     Session-scoped: the stages run once, also under --parallel-threads=8.
     A test reads these folders and never writes in them.
@@ -82,6 +83,7 @@ def excerpt_books(
         )
         config = read_config(folder.book_toml)
         analyze.run(folder, config)
+        extract.run(folder, config)
         folders[name] = folder
     return frozendict(folders)
 
