@@ -902,6 +902,9 @@ need no output of extract, so this work package runs beside 3a:
 - the fidelity check passes on the hand-made inputs and outputs of both
   stages, and fails on a `LinesFile` made by `layout_page` with one word
   then dropped from a line.
+- each stage's `run`, with its pure function (`layout_page`,
+  `make_blocks`) replaced by one that drops a word, raises
+  `FidelityError` and writes no output file.
 
 The excerpt tests of layout and structure need extract's output, so they
 are in work package 4 (section 9).
