@@ -407,9 +407,11 @@ def strip_stride(buffer: bytes, width_px: int, height_px: int, stride: int) -> b
 ```
 
 `render` gives 8-bit grayscale pixels at `scale = dpi / 72`, row by row
-with no padding, through `strip_stride`. A file that is not a PDF, or a
-page index outside the document, is a `PdfError` naming the file and, for
-a page, the index and the page count.
+with no padding, through `strip_stride`. A file that is not a PDF, a path
+that does not exist or is a directory, or a page index outside the
+document, is a `PdfError` naming the path and, for a page, the index and
+the page count. A `dpi` below 1 is a `ValueError`, checked before PDFium
+is called.
 
 `page_size` gives pypdfium2's numbers, those of `PdfPage.get_size()`:
 the crop box clipped to the media box, as 32-bit floats, which is the
@@ -473,7 +475,10 @@ one worker and `function` in another, the exception of `open_source` is
 the one raised. `workers` below 1 is a `ValueError`. With more workers
 than items, the extra workers do nothing: a worker opens its source only
 when it has taken an item, so no more sources are opened than there are
-items.
+items. When no worker failed but the results do not cover every item
+exactly once (a source whose closing swallowed an exception of
+`function`), that is a `RuntimeError` naming the missing item indices,
+raised whatever Python's `-O` flag, never a shorter tuple.
 
 Tests: results come back in input order when later items finish first
 (the function sleeps less for later items); 1, 3 and 8 workers give the
