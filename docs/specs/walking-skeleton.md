@@ -935,7 +935,11 @@ THE BATTLE OF KADESH A STUDY IN THE EARLIEST KNOWN MILITARY STRATEGY\* JAMES …
 ```
 
 - The header's values are written as JSON strings (`json.dumps(value,
-  ensure_ascii=False)`), which YAML reads as double-quoted strings.
+  ensure_ascii=False)`), which YAML reads as double-quoted strings, of
+  the title and each author escaped as a block's text is (the next
+  point), since Pandoc reads metadata values as Markdown: unescaped,
+  `The Life of *Gargantua*` loses its asterisks to emphasis and
+  `C:\Windows` its backslash and the word after it.
 - The text of a block is written on one line, with a backslash before
   every ASCII punctuation character (`string.punctuation`) and nothing
   else changed but the white space of the next point. Pandoc's Markdown reads any escaped ASCII punctuation as
@@ -947,23 +951,38 @@ THE BATTLE OF KADESH A STUDY IN THE EARLIEST KNOWN MILITARY STRATEGY\* JAMES …
   spec chooses a lighter one with the same guarantee.
 - The white space that Pandoc's Markdown reads as layout is made plain:
   each tab, line feed and carriage return in the text becomes a space,
-  and the spaces, tabs, line feeds and carriage returns at the start and
-  end of the text are dropped. No word changes, since `str.split()`,
+  and so do the vertical tab, the form feed and U+001C to U+001F, which
+  XML 1.0 does not allow; then the spaces at the start and end of the
+  text are dropped. No word changes, since `str.split()`,
   which the fidelity check splits words with, splits at each of these
   characters. Left as they are, Pandoc 3.14 drops a carriage return
   inside a word (`ab\rcd` reads as the one word `abcd`), and reads a
   line that starts with a tab or four spaces, at the start of the text
   or after a blank line, as a code block. Every other character is kept:
   checked on 14 November 2026 with Pandoc 3.14 through `read_markdown`,
-  each of the other 25 characters `str.split()` splits at (the vertical
-  tab, the form feed, U+001C to U+001F, U+0085 and the Unicode spaces
-  and line separators) and each C0 and C1 control character came back
+  each of the other 19 characters `str.split()` splits at (U+0085 and
+  the Unicode spaces and line separators) and each C0 and C1 control
+  character came back
   as written, inside a word, at the start of the text and four times
   before a word.
+- A character that XML 1.0 does not allow and that is not made a space
+  above, which is every other C0 control character, U+FFFE, U+FFFF and
+  a lone surrogate, makes markdown raise `InputFileError` naming
+  `blocks.json`, the block id and the code point (`U+FFFE`). Pandoc
+  copies such a character into the EPUB's XHTML, which is then not
+  well-formed (epubcheck: `FATAL(RSC-016)`), while the word check
+  passes; the text pdfium gives of both whole books holds U+FFFE
+  hundreds of times. What such a character becomes is for extract's
+  spec. The C1 control characters (U+007F to U+009F) and the other
+  noncharacters (U+FDD0 to U+FDEF, U+nFFFE and U+nFFFF of planes 1 to
+  16) are written as they are: checked on 14 November 2026 with Pandoc
+  3.14, Python's XML parser and epubcheck 5.4.0, an EPUB holding all of
+  them is well-formed and passes, while one holding the characters
+  above is not and fails.
 - The skeleton writes no heading, footnote, margin note or figure:
-  structure gives only paragraphs. markdown raises `GalleyError` with the
-  block id when it meets another kind, a note, or a note reference,
-  rather than write it wrongly.
+  structure gives only paragraphs. markdown raises `InputFileError`
+  naming `blocks.json` and the block or note when it meets another kind,
+  a note, or a note reference, rather than write it wrongly.
 - A blank line separates the header and every div.
 
 Edits: decided, the skeleton does not apply them, because no edit can
@@ -990,11 +1009,16 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str: ...
 epub runs
 
 ```
-pandoc <book.md> --from markdown-smart --to epub3 --output <book.epub>
+pandoc <book.md> --from markdown-smart-auto_identifiers --to epub3 --output <book.epub>
        --css <style.css> --fail-if-warnings [--epub-cover-image <images/cover.png>]
 ```
 
-with absolute paths, a timeout of 120 s and `check=True`. `style.css` is a
+with absolute paths, a timeout of 120 s and `check=True`. The input
+format is the one `read_markdown` reads with (section 5), so that the
+EPUB is made from the same reading of `book.md` that the word check
+passed. Making the paths absolute (`Path.resolve`) is a safety
+measure with no effect a test can see while Pandoc runs in the caller's
+directory, where relative paths also work. `style.css` is a
 file of the package, `src/galley/epub/style.css`, empty in the skeleton,
 found with `importlib.resources`; passing it tries now the path the real
 style sheet will take. With `--css`, Pandoc uses that sheet instead of
@@ -1021,26 +1045,44 @@ def pandoc_arguments(folder: BookFolder, config: BookConfig, style_sheet: Path) 
 Unit tests:
 
 - `escape_markdown`: `*x*` gives `\*x\*`; `1. Of` gives `1\. Of`; `«` and
-  `—` are unchanged; `ab\rcd` gives `ab cd`, and `\tab` and `    ab`
-  give `ab`; a text holding every ASCII punctuation character, escaped
-  and read back with `read_markdown` (marked `pandoc`), comes back
-  equal; so do the words of texts holding each character `str.split()`
+  `—` are unchanged; `ab\rcd` and `ab\tcd` give `ab cd`, and `\tab` and
+  `    ab` give `ab`; `string.punctuation` gives a literal with a
+  backslash before each character; a text holding every ASCII
+  punctuation character, escaped and read back with `read_markdown`
+  (marked `pandoc`), comes back equal, and so do `jj^J^jjJJ`, `H~2~O`,
+  `a\\b`, `# 1 Of`, `see @doe`, `*x*`, `_x_`, `` `x` ``, `[x](y)`,
+  `$x$`, `<i>x</i>`, `<!--x-->`, `{x}` and `|a|b|`; markdown `run` on a
+  block holding the vertical tab, the form feed and U+001C to U+001F,
+  inside a word and four times before one, writes a `book.md` whose
+  words are the block's; so do the words of texts holding each character `str.split()`
   splits at and each control character, inside a word, at the start of
   the text and four times before a word, and of texts with a tab or
   four spaces after a blank line.
 - `render_markdown` on a literal `BlocksFile` of two paragraphs gives a
-  literal Markdown text, header included; a heading block or a note
-  raises.
+  literal Markdown text, header included; a heading block, a note or a
+  note reference raises `InputFileError`; a block holding a character
+  XML does not allow raises `InputFileError` naming its code point, and
+  one holding a C1 control character or U+FDD0 does not.
+- a title and an author holding `*`, `_`, `\`, `<`, `[x](y)` and a
+  non-ASCII letter come back unchanged in `content.opf`'s `dc:title`
+  and `dc:creator` (marked `pandoc`).
 - markdown `run` (marked `pandoc`, since it calls `read_markdown`) with an
   edit in `edits/owner.jsonl` raises `EditError` naming the file; with an
   empty `edits/owner.jsonl`, and with no `edits/` folder, it writes
+  `book.md`; when the Markdown loses a word (`render_markdown` replaced
+  by one that drops it), `run` raises `FidelityError` and writes no
   `book.md`.
 - `pandoc_arguments` with and without a cover, against literal tuples.
 - epub `run` on a hand-written `book.md` of two divs (marked `pandoc`):
   `book.epub` is a zip whose first entry is `mimetype` holding
   `application/epub+zip`, whose `EPUB/content.opf` has the title and
   `<dc:language>en</dc:language>`, and whose chapter holds both div ids;
-  with no `book.md`, it raises `InputFileError` naming markdown.
+  with no `book.md`, it raises `InputFileError` naming markdown; the
+  style sheet `EPUB/styles/stylesheet1.css` is there and empty; a
+  `book.md` with `![](missing.png)` gives
+  `ExternalProgramError` with Pandoc's "Could not fetch resource" and no
+  `book.epub`; with no `pandoc` on the `PATH`, the error says it is not
+  installed.
 - the same EPUB passes epubcheck (marked `epubcheck`; it skips until
   epubcheck is installed, which architecture §16 asks for before the
   epub stage is built).
