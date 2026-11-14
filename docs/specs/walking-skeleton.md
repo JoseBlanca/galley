@@ -21,14 +21,13 @@ lock back on), and the empty stage subpackages. Sections 3 to 9 follow
 the plan's four work packages, approved by the owner on 14 November
 2026, and each heading names its work package. `wordlist.py`, the
 correct stage, `galley2epub edits-from` and the index stage are not in
-the skeleton (section 13). Section 12 lists where the spec goes beyond
-the architecture, and section 14 the one open point.
+the skeleton (section 12). Nothing is left open for the owner.
 
 ## 1. What the skeleton does, stage by stage
 
 | stage | the skeleton's rule |
 |---|---|
-| analyze | page size from pdfplumber; a page with text-layer words is `text`; a page without stops the run unless the config excludes it |
+| analyze | page size from pdfplumber; a page with text-layer words is `text`; a page without stops the run unless the config excludes it; no OCR audit |
 | extract | pdfplumber's `extract_words()` on `text` pages; words of excluded pages and regions become removals; the cover page rendered |
 | layout | one region per page; lines grouped by the vertical centre of each word |
 | structure | one paragraph block per region, its words joined by single spaces; nothing removed, no notes, no hyphen joins |
@@ -64,8 +63,8 @@ of pdfplumber 0.11.10's `page.extract_words()` with its default options:
 these pages hold that a reader of the formats would not expect:
 
 - **Kadesh page 9 has no text layer**: 0 characters. It is a blank page
-  of the book, and the skeleton has no OCR, so the Kadesh config of every
-  test excludes it (section 6).
+  of the book. The skeleton has no OCR to confirm that, so the Kadesh
+  config of every test excludes it (section 6).
 - **Kadesh page 8 is a plate**, a full-page drawing, whose layer holds 4
   stray words, `,`, `'`, `..` and `^U;L`. The skeleton does not detect
   plates, so these words reach the EPUB as a paragraph. The real
@@ -132,7 +131,9 @@ names, types and order it gives: `Box`, `PageKind`, `TextSource`,
 `Line`, `Region`, `PageLayout`, `LinesFile`, `BlockKind`, `Emphasis`,
 `Span`, `Origin`, `Block`, `Note`, `ChangeReason`, `WordChange`,
 `PageNumberPosition` (the `head | foot` of `PageNumber`), `PageNumber`,
-`RemovalReason`, `Removal`, `BlocksFile`, `Edit` and `RenderedPage`.
+`RemovalReason`, `Removal`, `BlocksFile`, `Edit` and `RenderedPage`,
+with `PageInfo.blank_checked_by_ocr: bool` and `PagesFile.ocr_audit:
+OcrAudit | None`.
 
 What architecture §8 leaves to this spec:
 
@@ -150,6 +151,30 @@ What architecture §8 leaves to this spec:
   without the others.
 - `Figure.image` is a `str`, the path relative to the book folder with
   `/` as separator, so that `words.json` is the same on every system.
+- `OcrAudit`, the record of the audit of architecture §7b, which the
+  skeleton never fills (section 6). Its fields are the smallest set that
+  architecture §7b describes; analyze's spec may add to them, as a change to
+  this format:
+
+  ```python
+  class OcrVerdict(StrEnum):
+      LAYER_KEPT = "layer_kept"          # the layer scored as well as Tesseract
+      LAYER_DOUBTFUL = "layer_doubtful"  # below, but not clearly; the run goes on
+
+  @dataclass(frozen=True, slots=True)
+  class SampledPage:
+      page_index: int
+      layer_score: float       # share of the layer's words in the word list, 0 to 1
+      tesseract_score: float   # the same share for Tesseract's words of the page
+
+  @dataclass(frozen=True, slots=True)
+  class OcrAudit:
+      sampled: tuple[SampledPage, ...]
+      verdict: OcrVerdict
+  ```
+
+  A layer clearly worse than Tesseract has no verdict here: analyze stops
+  with `PdfError` and writes no `pages.json` (architecture §7b).
 
 The write and read functions, one pair per file:
 
@@ -170,7 +195,8 @@ Writing: one JSON object, UTF-8, `ensure_ascii=False`, `indent=1`, keys
 in the order of the dataclass fields, a newline at the end. A tuple is a
 list, an enum its value, `None` is `null`, a float what `json.dumps`
 writes. The same value gives the same bytes, whatever made it. An edits
-file is JSON Lines, one object per edit and per line, with no indent.
+file is JSON Lines, one object per edit and per line, with no indent,
+each with `format_version` 1 first (architecture §8).
 
 Reading checks everything and stops at the first problem with an
 `InputFileError` whose message names the file and, for a field, its path
@@ -189,7 +215,7 @@ in the JSON, `pages[3].words[12].box`:
 
 `read_edits` raises `EditError` instead, naming the file and the line,
 for a line that is not JSON, an object with a missing or unknown field,
-or a blank line. A missing edits file is not its concern: the caller
+a `format_version` other than 1, or a blank line. A missing edits file is not its concern: the caller
 lists the files that exist (architecture §10: a missing file is no
 edits).
 
@@ -223,17 +249,24 @@ the PDF, checks `pages.json` against `pdf_sha256(config.pdf)`.
 Tests, all unit tests with literal values written in the test:
 
 - for each of the four JSON files, a value that fills every field,
-  including a `Note` with two blocks, a `WordChange`, a `PageNumber` and a
-  `Removal` in `blocks.json`, written and read back equal; written twice,
-  the same bytes;
+  including an `OcrAudit` of two sampled pages and a page with
+  `blank_checked_by_ocr` true in `pages.json`, and a `Note` with two
+  blocks, a `WordChange`, a `PageNumber` and a `Removal` in
+  `blocks.json`, written and read back equal; written twice, the same
+  bytes; `ocr_audit` `None` is written as `null` and read back;
 - the JSON of a `Box` is a list of four numbers, of an enum its string;
 - for each reader: a truncated file (the first half of a valid one), a
   `format_version` of 2, a missing field (`box` deleted from one word), an
   unknown field, an enum value that is not a member (`"kind": "cover"`),
   a `Box` of three numbers, a missing file, each an `InputFileError` whose
   message holds the file name and the field path;
-- `read_edits` on a line that is not JSON, a line that lacks `old`, and a
-  blank line: an `EditError` naming the file and the line number;
+- `read_pages` with `blank_checked_by_ocr` missing, or `0` instead of a
+  boolean; with an `ocr_audit` whose verdict is `"redo"`, and one whose
+  sampled page lacks `tesseract_score`: each an `InputFileError` with the
+  field path (`ocr_audit.sampled[0].tesseract_score`);
+- `read_edits` on a line that is not JSON, a line that lacks `old`, a
+  line with `format_version` 2, and a blank line: an `EditError` naming
+  the file and the line number;
 - `check_source_pdf` with two different hashes raises and names the stage;
 - `block_sha256` of a block with two spans, against a literal computed
   with `hashlib` in the test.
@@ -249,7 +282,7 @@ class Language(StrEnum):
     EN = "en"; ES = "es"; FR = "fr"; DE = "de"; IT = "it"
 
 class OcrMode(StrEnum):
-    AUTO = "auto"; NEVER = "never"; ALWAYS = "always"
+    VERIFY = "verify"; TRUST = "trust"; REDO = "redo"
 
 @dataclass(frozen=True, slots=True)
 class ExcludedRegion:
@@ -262,7 +295,7 @@ class BookConfig:
     title: str
     authors: tuple[str, ...]
     language: Language
-    ocr: OcrMode = OcrMode.AUTO
+    ocr: OcrMode = OcrMode.VERIFY
     correct: bool = False
     exclude_pages: tuple[int, ...] = ()
     exclude_regions: tuple[ExcludedRegion, ...] = ()
@@ -528,20 +561,28 @@ Then, when any page is `blank`, analyze stops with a `PdfError` that
 lists every such page and says: "these pages have no text layer, and the
 walking skeleton has no OCR; add them to `exclude_pages` once you have
 checked that they hold no text". It writes no `pages.json`. So the
-skeleton never writes a `blank` page (**Open 1**, section 14).
+skeleton never writes a `blank` page. Decided by the owner on 14
+November 2026: the real analyze reads such a page with Tesseract and
+fills it or records it as blank (the audit of architecture §7b, in
+analyze's own spec); without that audit, stopping is the only answer
+that cannot drop a printed page. Page index 69 of the whole Kadesh book
+has a running head, about five lines of text and a captioned figure, and
+no text layer.
 
-`text_layer_score` is `None` on every page, with a layer or not. Decided:
-the score needs the word list, which is not in the skeleton, and no
-stage of the skeleton reads it; the analyze spec fills it.
+The skeleton runs no part of the audit, with `verify` or `trust` alike:
+`blank_checked_by_ocr` is false on every page and `ocr_audit` is `None`,
+although architecture §8 gives `None` only for `trust` and `redo`.
+`text_layer_score` is `None` on every page, with a layer or not: the
+score needs the word list, which is not in the skeleton, and no stage of
+the skeleton reads it. The analyze spec fills all three.
 `exclude_regions` holds the boxes of the config's regions for that page,
 in the config's order.
 
 Before any page is measured, analyze raises `ConfigError` when `ocr` is
-`always` ("ocr = always needs OCR, which the walking skeleton does not
-have; use auto"), and when a page index of `exclude_pages`,
+`redo` ("ocr = redo needs OCR, which the walking skeleton does not have;
+use verify or trust"), and when a page index of `exclude_pages`,
 `exclude_regions` or `cover_page` is not below the page count, naming the
-key, the index and the count. `auto` and `never` both mean the text
-layer.
+key, the index and the count.
 
 ```python
 # galley.analyze
@@ -606,7 +647,7 @@ read (empty for a blank page), it gives the page's words and removals.
 
 Unit tests of `classify_page`, `check_config_pages`, `require_text_layer`
 and `page_words`, with literal values: each of the three kinds;
-`require_text_layer` naming both blank pages of four; `ocr = always`; an
+`require_text_layer` naming both blank pages of four; `ocr = redo`; an
 `exclude_pages`, a region and a `cover_page` index equal to the page
 count; a word inside a region, one touching it with its centre outside,
 one with its centre on the edge; an excluded page with three words gives
@@ -961,33 +1002,7 @@ the Markdown round trip escaped the words as section 8 says, ran `pandoc
 multisets split as section 5 says. These pages have not been checked by
 eye by the owner: they are counts, not reference pages.
 
-## 12. Where this spec goes beyond the architecture
-
-These are additions or corrections to `docs/architecture.md` found while
-writing this spec. The architecture is not changed by this spec; the
-owner decides whether they go into it.
-
-- Architecture §9: every stage's `run` takes the keyword `workers`, and
-  layout, structure and markdown run their own fidelity check before
-  writing (section 9), where architecture §13 names only `galley2epub
-  run`.
-- Architecture §12: `parallel.py` also has `map_pages_with_source`
-  (section 4).
-- Architecture §12: `cli.py` finds the external programs at start-up
-  (section 9).
-- Architecture §13: a note reference span is a word of its own (section
-  5).
-- Architecture §9: `--fail-if-warnings` does not catch a reference with
-  no definition, which Pandoc prints as text with exit 0; the fidelity
-  check does (section 5).
-- Architecture §4 and §8: only analyze computes the PDF hash; later
-  stages copy it and check it against `pages.json` (section 3).
-- Architecture §7 and §8: page sizes are pdfplumber's, which can differ
-  from pypdfium2's (section 4).
-- Architecture §8: the edits files carry no `format_version`; the
-  orchestrator proposes one on every line.
-
-## 13. Not in this spec
+## 12. Not in this spec
 
 - `wordlist.py`, the correct stage, `galley2epub edits-from`, the index
   stage, OCR with Tesseract, figures cut from plates: later specs.
@@ -999,20 +1014,3 @@ owner decides whether they go into it.
 - A stage that notices its input is older than the config (an
   `exclude_pages` added after analyze ran): not handled; the owner reruns
   from analyze.
-
-## 14. Open point
-
-1. **What the skeleton does with a page that has no text layer.** (a)
-   analyze stops with a `PdfError` that lists every such page and asks
-   for them in `exclude_pages` (section 6). (b) It reads such a page as
-   `blank` and logs a warning naming it. (a) never hides text: page
-   index 69 of the whole Kadesh book has a running head, about five lines
-   of text and a captioned figure, and no text layer, which (b) would
-   drop behind a warning. Nor can the ink on a render tell such a page
-   from a blank one: at 50 dpi, 0.00003 of its pixels are darker than
-   128, within the range of the 13 blank pages without a layer in the two
-   whole books (0 to 0.00006). The cost of (a) is that a book runs only
-   once its pages without a layer are excluded: Kadesh page 9 in the
-   excerpt's config, 14 pages of the whole Kadesh book and 12 of
-   Gierke's. The skeleton runs only on the excerpts, and the extract spec
-   brings OCR for those pages. Recommended: (a). Meanwhile (a).
