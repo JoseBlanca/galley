@@ -324,48 +324,90 @@ def kadesh_folder(root: Path, pdf: Path, settings: str) -> BookFolder:
     return folder
 
 
-@pytest.mark.thread_unsafe
-def test_kadesh_with_plate_page_excluded_has_its_4_words_as_the_only_removals(
-    tmp_path: Path,
-    excerpt_pdf: frozendict[str, Path],
-    excerpt_books: frozendict[str, BookFolder],
-) -> None:
-    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "exclude_pages = [8, 9]\n")
-    config = read_config(folder.book_toml)
+# Removals on two pages, so that their order is tested: the page number 81
+# in the region of page 0, and the 4 words of the plate on page 8.
+TWO_PAGES_OF_REMOVALS = (
+    "exclude_pages = [8, 9]\n"
+    "exclude_regions = [{page = 0, box = [240, 620, 252, 632]}]\n"
+)
 
+# The boxes of pdfplumber 0.11.10's extract_words() on Kadesh pages 0 and 8,
+# read with pdfplumber directly, not through galley (spec section 11).
+KADESH_REMOVALS = (
+    Removal(
+        page_index=0,
+        box=Box(241.68, 622.509, 249.07648, 629.509),
+        text="81",
+        reason=RemovalReason.EXCLUDED_REGION,
+    ),
+    Removal(
+        page_index=8,
+        box=Box(488.4, 222.33399999999995, 490.15455, 227.33399999999995),
+        text=",",
+        reason=RemovalReason.EXCLUDED_PAGE,
+    ),
+    Removal(
+        page_index=8,
+        box=Box(492.23999999999995, 222.33399999999995, 494.05375, 227.33399999999995),
+        text="'",
+        reason=RemovalReason.EXCLUDED_PAGE,
+    ),
+    Removal(
+        page_index=8,
+        box=Box(
+            496.31999999999994,
+            222.33399999999995,
+            497.8957999999999,
+            227.33399999999995,
+        ),
+        text="..",
+        reason=RemovalReason.EXCLUDED_PAGE,
+    ),
+    Removal(
+        page_index=8,
+        box=Box(330.48, 627.21, 351.6124, 637.21),
+        text="^U;L",
+        reason=RemovalReason.EXCLUDED_PAGE,
+    ),
+)
+
+
+@pytest.mark.thread_unsafe
+def test_kadesh_with_plate_page_excluded_has_81_and_its_4_words_as_the_removals(
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
+) -> None:
+    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], TWO_PAGES_OF_REMOVALS)
+    config = read_config(folder.book_toml)
     analyze.run(folder, config)
+    # A file left by an earlier run, which extract must delete.
+    folder.images_dir.mkdir()
+    (folder.images_dir / "stale.png").write_bytes(b"not an image")
+
     extract.run(folder, config)
 
     words = read_words(folder.words_json)
-    plate_words = read_words(excerpt_books[KADESH].words_json).pages[8].words
     assert words.pages[8] == PageWords(
         index=8, text_source=TextSource.NONE, words=(), figures=()
     )
-    assert words.removals == tuple(
-        Removal(
-            page_index=8,
-            box=plate_word.box,
-            text=plate_word.text,
-            reason=RemovalReason.EXCLUDED_PAGE,
-        )
-        for plate_word in plate_words
-    )
-    assert tuple(removal.text for removal in words.removals) == (",", "'", "..", "^U;L")
+    assert words.removals == KADESH_REMOVALS
+    assert list(folder.images_dir.iterdir()) == []
 
 
 @pytest.mark.thread_unsafe
 def test_kadesh_with_1_worker_and_with_6_gives_the_same_bytes(
     tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:
-    settings = "exclude_pages = [9]\nexclude_regions = [{page = 0, box = [240, 620, 252, 632]}]\n"
     folders = {}
     for workers in (1, 6):
-        folder = kadesh_folder(tmp_path / str(workers), excerpt_pdf[KADESH], settings)
+        folder = kadesh_folder(
+            tmp_path / str(workers), excerpt_pdf[KADESH], TWO_PAGES_OF_REMOVALS
+        )
         config = read_config(folder.book_toml)
         analyze.run(folder, config, workers=workers)
         extract.run(folder, config, workers=workers)
         folders[workers] = folder
 
+    assert read_words(folders[1].words_json).removals == KADESH_REMOVALS
     assert folders[1].pages_json.read_bytes() == folders[6].pages_json.read_bytes()
     assert folders[1].words_json.read_bytes() == folders[6].words_json.read_bytes()
 
