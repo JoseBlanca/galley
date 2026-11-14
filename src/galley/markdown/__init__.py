@@ -37,27 +37,31 @@ _logger = logging.getLogger(__name__)
 _ESCAPED = frozendict(
     {ord(character): "\\" + character for character in string.punctuation}
 )
-# Spec section 8: the white space Pandoc's Markdown reads as layout. Pandoc
-# 3.14 drops a carriage return inside a word and reads a tab or four spaces
-# at the start of a line as a code block; str.split(), which the fidelity
-# check splits words with, splits at all four, so no word changes.
-_LAYOUT_WHITE_SPACE = " \t\n\r"
-_PLAIN_WHITE_SPACE = frozendict({ord(character): " " for character in "\t\n\r"})
+# Spec section 8: white space made a space. Pandoc 3.14 drops a carriage
+# return inside a word and reads a tab or four spaces at the start of a line
+# as a code block; XML 1.0 does not allow the vertical tab, the form feed
+# and U+001C to U+001F. str.split(), which the fidelity check splits words
+# with, splits at all of them, so no word changes.
+_PLAIN_WHITE_SPACE = frozendict(
+    {ord(character): " " for character in "\t\n\r\x0b\x0c\x1c\x1d\x1e\x1f"}
+)
 
 
 def escape_markdown(text: str) -> str:
     """The text of a block as one line of Pandoc Markdown that Pandoc reads
     back with the same words: a backslash before every ASCII punctuation
-    character, each tab, line feed and carriage return made a space, and
-    those and spaces dropped at the start and end. Every other character is
-    kept as it is."""
-    plain = text.strip(_LAYOUT_WHITE_SPACE).translate(_PLAIN_WHITE_SPACE)
+    character; each tab, line feed, carriage return, vertical tab, form feed
+    and U+001C to U+001F made a space, then the spaces at the start and end
+    dropped. Every other character is kept as it is."""
+    plain = text.translate(_PLAIN_WHITE_SPACE).strip(" ")
     return plain.translate(_ESCAPED)
 
 
 # Spec section 8: the characters XML 1.0 does not allow, which Pandoc
 # copies into the EPUB's XHTML, leaving it not well-formed: C0 controls but
 # tab, line feed and carriage return, U+FFFE, U+FFFF and lone surrogates.
+# It is matched on the escaped text, where the white space among them is
+# already a space.
 # C1 controls and the other noncharacters were checked to pass epubcheck.
 _NOT_IN_XML = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff\ud800-\udfff]")
 
@@ -76,7 +80,9 @@ def _block_problems(block: Block) -> tuple[str, ...]:
     )
     characters = tuple(
         f"block {block.id} holds U+{ord(character):04X}, which XML 1.0 does not allow"
-        for character in dict.fromkeys(_NOT_IN_XML.findall(block_text(block)))
+        for character in dict.fromkeys(
+            _NOT_IN_XML.findall(escape_markdown(block_text(block)))
+        )
     )
     return kind + reference + characters
 

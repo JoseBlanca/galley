@@ -56,6 +56,8 @@ CONFIG = BookConfig(
         ("« — »", "« — »"),
         ("ab\rcd", "ab cd"),
         ("ab\tcd", "ab cd"),
+        ("ab\x0bcd\x0c\x1c\x1d\x1e\x1fef", "ab cd     ef"),
+        ("\x0b\x0c\x1c\x1fab\x1d", "ab"),
         ("\tab", "ab"),
         ("    ab", "ab"),
         ("ab\n\n    cd\t", "ab      cd"),
@@ -293,8 +295,8 @@ def test_render_markdown_refuses_what_the_skeleton_does_not_write(
     [
         ("\x00", "U+0000"),
         ("\x08", "U+0008"),
-        ("\x0b", "U+000B"),
-        ("\x1f", "U+001F"),
+        ("\x0e", "U+000E"),
+        ("\x1b", "U+001B"),
         ("\ufffe", "U+FFFE"),
         ("\uffff", "U+FFFF"),
         ("\ud800", "U+D800"),
@@ -437,6 +439,26 @@ def test_run_with_a_word_lost_in_the_markdown_raises_and_writes_no_book_md(
 
     assert raised.value.missing == frozendict({"THEORIES": 1})
     assert not folder.book_md.exists()
+
+
+# Spec section 8: white space to str.split() that XML 1.0 does not allow.
+XML_FORBIDDEN_WHITE_SPACE = "\x0b\x0c\x1c\x1d\x1e\x1f"
+
+
+@pytest.mark.pandoc
+def test_run_writes_xml_forbidden_white_space_as_spaces_keeping_every_word(
+    tmp_path: Path,
+) -> None:
+    text = " ".join(
+        f"a{character}b {character * 4}c" for character in XML_FORBIDDEN_WHITE_SPACE
+    )
+    folder = _book_folder(tmp_path, _blocks_file((_paragraph("b-p0000-001", text),)))
+
+    markdown.run(folder, CONFIG)
+
+    book_md = folder.book_md.read_text(encoding="utf-8")
+    assert [word.text for word in read_markdown(book_md).words] == text.split()
+    assert not any(character in book_md for character in XML_FORBIDDEN_WHITE_SPACE)
 
 
 def test_run_on_blocks_of_another_pdf_raises_naming_structure(tmp_path: Path) -> None:

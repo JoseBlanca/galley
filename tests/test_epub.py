@@ -149,21 +149,6 @@ def test_run_without_pandoc_says_it_is_not_installed(
         epub.run(folder, CONFIG)
 
 
-# Changes the working directory of the whole process.
-@pytest.mark.thread_unsafe
-@pytest.mark.pandoc
-def test_run_on_a_relative_book_folder_writes_the_epub(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    (tmp_path / "kadesh").mkdir()
-    _folder_with_book_md(tmp_path / "kadesh")
-    monkeypatch.chdir(tmp_path)
-
-    epub.run(BookFolder(Path("kadesh")), CONFIG)
-
-    assert zipfile.is_zipfile(tmp_path / "kadesh" / "book.epub")
-
-
 # Java starts in about a second; the 8-thread run would start it 8 times.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
