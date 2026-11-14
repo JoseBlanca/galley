@@ -30,9 +30,7 @@ from galley.model import (
     TextSource,
     Word,
     WordsFile,
-    check_source_pdf,
-    pdf_sha256,
-    read_pages,
+    read_checked_pages,
     write_words,
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
@@ -60,10 +58,7 @@ def run(
     folder.words_json.unlink(missing_ok=True)
     if folder.images_dir.exists():
         shutil.rmtree(folder.images_dir)
-    pages_file = read_pages(folder.pages_json)
-    check_source_pdf(
-        folder.pages_json, pages_file.source_pdf_sha256, pdf_sha256(config.pdf)
-    )
+    pages_file = read_checked_pages(folder.pages_json, config.pdf)
     unreadable = tuple(page.index for page in pages_file.pages if _unreadable(page))
     if unreadable:
         message = (

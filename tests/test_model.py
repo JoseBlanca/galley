@@ -49,6 +49,8 @@ from galley.model import (
     check_source_pdf,
     pdf_sha256,
     read_blocks,
+    read_checked_input,
+    read_checked_pages,
     read_edits,
     read_lines,
     read_pages,
@@ -393,6 +395,50 @@ def test_check_source_pdf_with_another_hash_names_the_file_and_the_stage(
     with pytest.raises(InputFileError, match=r"words\.json") as caught:
         check_source_pdf(tmp_path / "words.json", SHA, expected_pdf_sha256="b" * 64)
     assert "galley2epub extract" in str(caught.value)
+
+
+def _checked_folder(root: Path, pdf_bytes: bytes) -> tuple[Path, Path, Path]:
+    """book.pdf, which holds `%PDF-1.4 the book`, and pages.json and
+    lines.json made from a PDF whose bytes are `pdf_bytes`."""
+    pdf = root / "book.pdf"
+    pdf.write_bytes(b"%PDF-1.4 the book")
+    sha = hashlib.sha256(pdf_bytes).hexdigest()
+    pages_json = root / "pages.json"
+    lines_json = root / "lines.json"
+    write_pages(pages_json, replace(PAGES, source_pdf_sha256=sha))
+    write_lines(lines_json, replace(LINES, source_pdf_sha256=sha))
+    return pdf, pages_json, lines_json
+
+
+def test_read_checked_input_of_the_same_pdf_returns_both_files(
+    tmp_path: Path,
+) -> None:
+    pdf, pages_json, lines_json = _checked_folder(tmp_path, b"%PDF-1.4 the book")
+    sha = hashlib.sha256(b"%PDF-1.4 the book").hexdigest()
+    assert read_checked_pages(pages_json, pdf) == replace(PAGES, source_pdf_sha256=sha)
+    assert read_checked_input(pages_json, pdf, lines_json, read_lines) == (
+        replace(PAGES, source_pdf_sha256=sha),
+        replace(LINES, source_pdf_sha256=sha),
+    )
+
+
+def test_read_checked_input_with_pages_json_of_another_pdf_names_analyze(
+    tmp_path: Path,
+) -> None:
+    pdf, pages_json, lines_json = _checked_folder(tmp_path, b"%PDF-1.4 another")
+    with pytest.raises(InputFileError, match=r"pages\.json.*galley2epub analyze"):
+        read_checked_pages(pages_json, pdf)
+    with pytest.raises(InputFileError, match=r"pages\.json.*galley2epub analyze"):
+        read_checked_input(pages_json, pdf, lines_json, read_lines)
+
+
+def test_read_checked_input_with_an_input_of_another_pdf_names_its_stage(
+    tmp_path: Path,
+) -> None:
+    pdf, pages_json, lines_json = _checked_folder(tmp_path, b"%PDF-1.4 the book")
+    write_lines(lines_json, replace(LINES, source_pdf_sha256="b" * 64))
+    with pytest.raises(InputFileError, match=r"lines\.json.*galley2epub layout"):
+        read_checked_input(pages_json, pdf, lines_json, read_lines)
 
 
 def test_block_text_concatenates_the_spans() -> None:

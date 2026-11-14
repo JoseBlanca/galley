@@ -22,9 +22,7 @@ from galley.model import (
     PageWords,
     Region,
     Word,
-    check_source_pdf,
-    pdf_sha256,
-    read_pages,
+    read_checked_input,
     read_words,
     write_lines,
 )
@@ -96,11 +94,8 @@ def run(
     words.json, FidelityError is raised and nothing is written.
     """
     folder.lines_json.unlink(missing_ok=True)
-    pages = read_pages(folder.pages_json)
-    check_source_pdf(folder.pages_json, pages.source_pdf_sha256, pdf_sha256(config.pdf))
-    words = read_words(folder.words_json)
-    check_source_pdf(
-        folder.words_json, words.source_pdf_sha256, pages.source_pdf_sha256
+    _, words = read_checked_input(
+        folder.pages_json, config.pdf, folder.words_json, read_words
     )
     lines = LinesFile(
         source_pdf_sha256=words.source_pdf_sha256,

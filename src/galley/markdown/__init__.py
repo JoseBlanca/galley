@@ -21,10 +21,9 @@ from galley.model import (
     BlockKind,
     BlocksFile,
     block_text,
-    check_source_pdf,
     read_blocks,
+    read_checked_input,
     read_edits,
-    read_pages,
 )
 from galley.parallel import DEFAULT_WORKERS
 
@@ -171,19 +170,16 @@ def run(
     or invented between the two as Pandoc reads book.md.
 
     Deletes book.md first. Reads pages.json and blocks.json, and raises
-    InputFileError when blocks.json was made from another PDF; raises
+    InputFileError when pages.json was not made from `config.pdf` or
+    blocks.json was made from another PDF than pages.json; raises
     EditError when an edits file holds an edit; raises FidelityError when
     the words differ, and ExternalProgramError when Pandoc is missing or
     fails. markdown runs once, so `workers` is not used.
     """
     del workers  # every stage's run takes it; markdown is not per page
     folder.book_md.unlink(missing_ok=True)
-    pages = read_pages(folder.pages_json)
-    blocks = read_blocks(folder.blocks_json)
-    check_source_pdf(
-        folder.blocks_json,
-        blocks.source_pdf_sha256,
-        expected_pdf_sha256=pages.source_pdf_sha256,
+    _, blocks = read_checked_input(
+        folder.pages_json, config.pdf, folder.blocks_json, read_blocks
     )
     _check_no_edits(folder)
     book_markdown = render_markdown(blocks, config)

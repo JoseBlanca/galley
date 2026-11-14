@@ -19,6 +19,7 @@ import re
 import threading
 import types
 import typing
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -851,6 +852,27 @@ def check_source_pdf(
         f"expected {expected_pdf_sha256}); {rerun}"
     )
     raise InputFileError(message)
+
+
+def read_checked_pages(pages_json: Path, pdf: Path) -> PagesFile:
+    """Reads pages.json and checks that it was made from `pdf`; raises
+    InputFileError naming analyze when it was not."""
+    pages = read_pages(pages_json)
+    check_source_pdf(pages_json, pages.source_pdf_sha256, pdf_sha256(pdf))
+    return pages
+
+
+def read_checked_input[T: WordsFile | LinesFile | BlocksFile](
+    pages_json: Path, pdf: Path, input_path: Path, read_input: Callable[[Path], T]
+) -> tuple[PagesFile, T]:
+    """Reads pages.json with read_checked_pages, then the stage's input file
+    at `input_path` with `read_input`, and checks that the input was made
+    from the PDF pages.json was made from; raises InputFileError naming the
+    stage that writes the stale file. Returns both files."""
+    pages = read_checked_pages(pages_json, pdf)
+    stage_input = read_input(input_path)
+    check_source_pdf(input_path, stage_input.source_pdf_sha256, pages.source_pdf_sha256)
+    return pages, stage_input
 
 
 def block_text(block: Block) -> str:

@@ -1,10 +1,12 @@
 """Tests of the markdown stage: escaping, rendering and run (spec section 8)."""
 
+import hashlib
 import re
 import string
 import xml.etree.ElementTree as ET
 import zipfile
 from collections import defaultdict
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -34,7 +36,8 @@ from galley.model import (
     write_pages,
 )
 
-SOURCE_PDF_SHA256 = "a" * 64
+_PDF_BYTES = b"%PDF-1.4 a stand-in: markdown reads only its hash"
+SOURCE_PDF_SHA256 = hashlib.sha256(_PDF_BYTES).hexdigest()
 OTHER_PDF_SHA256 = "b" * 64
 
 CONFIG = BookConfig(
@@ -346,7 +349,13 @@ def test_title_and_author_reach_the_epub_unchanged(tmp_path: Path) -> None:
 # run
 
 
-def _book_folder(root: Path, blocks: BlocksFile = TWO_PARAGRAPHS) -> BookFolder:
+def _book(
+    root: Path, blocks: BlocksFile = TWO_PARAGRAPHS
+) -> tuple[BookFolder, BookConfig]:
+    """A book folder with book.pdf, pages.json of two pages made from it,
+    and `blocks`, and CONFIG with book.pdf as its PDF."""
+    pdf = root / "book.pdf"
+    pdf.write_bytes(_PDF_BYTES)
     folder = BookFolder(root)
     write_pages(
         folder.pages_json,
@@ -369,7 +378,7 @@ def _book_folder(root: Path, blocks: BlocksFile = TWO_PARAGRAPHS) -> BookFolder:
         ),
     )
     write_blocks(folder.blocks_json, blocks)
-    return folder
+    return folder, replace(CONFIG, pdf=pdf)
 
 
 EDIT = Edit(
@@ -385,14 +394,14 @@ EDIT = Edit(
 def test_run_with_an_edit_raises_naming_the_file_and_leaves_no_book_md(
     tmp_path: Path,
 ) -> None:
-    folder = _book_folder(tmp_path)
+    folder, config = _book(tmp_path)
     folder.edits_dir.mkdir()
     write_edits(folder.edits_dir / "correct.jsonl", ())
     write_edits(folder.edits_dir / "owner.jsonl", (EDIT,))
     folder.book_md.write_text("an old book.md\n", encoding="utf-8")
 
     with pytest.raises(EditError, match="owner.jsonl") as raised:
-        markdown.run(folder, CONFIG)
+        markdown.run(folder, config)
 
     assert "correct.jsonl" not in str(raised.value)
     assert not folder.book_md.exists()
@@ -400,21 +409,21 @@ def test_run_with_an_edit_raises_naming_the_file_and_leaves_no_book_md(
 
 @pytest.mark.pandoc
 def test_run_with_an_empty_edits_file_writes_book_md(tmp_path: Path) -> None:
-    folder = _book_folder(tmp_path)
+    folder, config = _book(tmp_path)
     folder.edits_dir.mkdir()
     write_edits(folder.edits_dir / "owner.jsonl", ())
 
-    markdown.run(folder, CONFIG)
+    markdown.run(folder, config)
 
     assert folder.book_md.read_text(encoding="utf-8") == TWO_PARAGRAPHS_MARKDOWN
 
 
 @pytest.mark.pandoc
 def test_run_without_an_edits_folder_writes_book_md(tmp_path: Path) -> None:
-    folder = _book_folder(tmp_path)
+    folder, config = _book(tmp_path)
     folder.book_md.write_text("an old book.md\n", encoding="utf-8")
 
-    markdown.run(folder, CONFIG)
+    markdown.run(folder, config)
 
     assert folder.book_md.read_text(encoding="utf-8") == TWO_PARAGRAPHS_MARKDOWN
 
@@ -425,7 +434,7 @@ def test_run_without_an_edits_folder_writes_book_md(tmp_path: Path) -> None:
 def test_run_with_a_word_lost_in_the_markdown_raises_and_writes_no_book_md(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    folder = _book_folder(tmp_path)
+    folder, config = _book(tmp_path)
 
     render = markdown.render_markdown
 
@@ -435,7 +444,7 @@ def test_run_with_a_word_lost_in_the_markdown_raises_and_writes_no_book_md(
     monkeypatch.setattr(markdown, "render_markdown", render_without_a_word)
 
     with pytest.raises(FidelityError) as raised:
-        markdown.run(folder, CONFIG)
+        markdown.run(folder, config)
 
     assert raised.value.missing == frozendict({"THEORIES": 1})
     assert not folder.book_md.exists()
@@ -452,9 +461,9 @@ def test_run_writes_xml_forbidden_white_space_as_spaces_keeping_every_word(
     text = " ".join(
         f"a{character}b {character * 4}c" for character in XML_FORBIDDEN_WHITE_SPACE
     )
-    folder = _book_folder(tmp_path, _blocks_file((_paragraph("b-p0000-001", text),)))
+    folder, config = _book(tmp_path, _blocks_file((_paragraph("b-p0000-001", text),)))
 
-    markdown.run(folder, CONFIG)
+    markdown.run(folder, config)
 
     book_md = folder.book_md.read_text(encoding="utf-8")
     assert [word.text for word in read_markdown(book_md).words] == text.split()
@@ -462,20 +471,34 @@ def test_run_writes_xml_forbidden_white_space_as_spaces_keeping_every_word(
 
 
 def test_run_on_blocks_of_another_pdf_raises_naming_structure(tmp_path: Path) -> None:
-    folder = _book_folder(
+    folder, config = _book(
         tmp_path,
         _blocks_file(TWO_PARAGRAPHS.blocks, source_pdf_sha256=OTHER_PDF_SHA256),
     )
 
     with pytest.raises(InputFileError, match="galley2epub structure"):
-        markdown.run(folder, CONFIG)
+        markdown.run(folder, config)
+
+    assert not folder.book_md.exists()
+
+
+def test_run_with_a_config_of_another_pdf_raises_naming_analyze(
+    tmp_path: Path,
+) -> None:
+    folder, config = _book(tmp_path)
+    other_pdf = tmp_path / "other.pdf"
+    other_pdf.write_bytes(b"%PDF-1.4 another book")
+    folder.book_md.write_text("an old book.md\n", encoding="utf-8")
+
+    with pytest.raises(InputFileError, match=r"pages\.json.*galley2epub analyze"):
+        markdown.run(folder, replace(config, pdf=other_pdf))
 
     assert not folder.book_md.exists()
 
 
 def test_run_without_blocks_json_raises_naming_structure(tmp_path: Path) -> None:
-    folder = _book_folder(tmp_path)
+    folder, config = _book(tmp_path)
     folder.blocks_json.unlink()
 
     with pytest.raises(InputFileError, match="galley2epub structure"):
-        markdown.run(folder, CONFIG)
+        markdown.run(folder, config)

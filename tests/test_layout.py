@@ -289,6 +289,16 @@ def test_run_with_1_worker_and_with_3_writes_the_same_bytes(tmp_path: Path) -> N
 
 
 @pytest.mark.thread_unsafe
+def test_run_with_a_config_of_another_pdf_names_analyze(tmp_path: Path) -> None:
+    folder, config = _book(tmp_path)
+    other_pdf = tmp_path / "other.pdf"
+    other_pdf.write_bytes(b"%PDF-1.4 another book")
+    with pytest.raises(InputFileError, match=r"pages\.json.*galley2epub analyze"):
+        layout.run(folder, replace(config, pdf=other_pdf), workers=1)
+    assert not folder.lines_json.exists()
+
+
+@pytest.mark.thread_unsafe
 def test_run_with_a_pages_json_of_another_pdf_names_analyze(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     write_lines(folder.lines_json, LinesFile(source_pdf_sha256="0" * 64, pages=()))

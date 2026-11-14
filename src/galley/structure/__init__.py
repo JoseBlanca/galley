@@ -22,10 +22,8 @@ from galley.model import (
     PageLayout,
     Region,
     Span,
-    check_source_pdf,
-    pdf_sha256,
+    read_checked_input,
     read_lines,
-    read_pages,
     write_blocks,
 )
 from galley.parallel import DEFAULT_WORKERS
@@ -84,11 +82,8 @@ def run(
     """
     del workers  # one pass over the book, in this thread (spec section 10)
     folder.blocks_json.unlink(missing_ok=True)
-    pages = read_pages(folder.pages_json)
-    check_source_pdf(folder.pages_json, pages.source_pdf_sha256, pdf_sha256(config.pdf))
-    lines = read_lines(folder.lines_json)
-    check_source_pdf(
-        folder.lines_json, lines.source_pdf_sha256, pages.source_pdf_sha256
+    _, lines = read_checked_input(
+        folder.pages_json, config.pdf, folder.lines_json, read_lines
     )
     blocks = make_blocks(lines)
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)

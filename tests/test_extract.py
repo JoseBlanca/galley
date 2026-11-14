@@ -433,6 +433,25 @@ def test_extract_on_a_kadesh_folder_holding_the_gierke_pages_json_names_analyze(
 
 
 @pytest.mark.thread_unsafe
+def test_extract_on_a_kadesh_folder_whose_config_names_the_gierke_pdf_names_analyze(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "exclude_pages = [9]\n")
+    shutil.copyfile(excerpt_books[KADESH].pages_json, folder.pages_json)
+    config = replace(read_config(folder.book_toml), pdf=excerpt_pdf[GIERKE])
+
+    with pytest.raises(
+        InputFileError,
+        match=r"pages\.json was made from another PDF .* run `galley2epub analyze`",
+    ):
+        extract.run(folder, config)
+
+    assert not folder.words_json.exists()
+
+
+@pytest.mark.thread_unsafe
 def test_extract_without_pages_json_names_analyze(
     tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:
