@@ -35,7 +35,7 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 
-_LOG = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 # Architecture section 9: pages are rendered at 300 dpi; spec section 6
 # gives 2118 x 3034 pixels for the Kadesh cover.
@@ -82,7 +82,7 @@ def run(
             removals=tuple(removal for _, removals in results for removal in removals),
         ),
     )
-    _LOG.info(
+    _logger.info(
         "extract: %d words and %d removals from %d pages of %s",
         sum(len(page.words) for page, _ in results),
         sum(len(removals) for _, removals in results),

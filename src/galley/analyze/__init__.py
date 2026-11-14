@@ -27,7 +27,7 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 
-_LOG = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,7 +74,7 @@ def run(
             source_pdf_sha256=pdf_sha256(config.pdf), pages=pages, ocr_audit=None
         ),
     )
-    _LOG.info(
+    _logger.info(
         "analyze: %d pages of %s, %d excluded",
         page_count,
         config.pdf,

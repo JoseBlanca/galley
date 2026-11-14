@@ -28,7 +28,7 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS
 
-_log = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 def _paragraph(page_index: int, number: int, region: Region) -> Block:
@@ -88,6 +88,6 @@ def run(
     blocks = make_blocks(lines)
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
     write_blocks(folder.blocks_json, blocks)
-    _log.info(
+    _logger.info(
         "structure: %d blocks written to %s", len(blocks.blocks), folder.blocks_json
     )

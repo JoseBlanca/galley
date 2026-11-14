@@ -28,7 +28,7 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
 
-_log = logging.getLogger(__name__)
+_logger = logging.getLogger(__name__)
 
 
 def _enclosing_box(boxes: tuple[Box, ...]) -> Box:
@@ -103,7 +103,7 @@ def run(
     )
     check_stage(FidelityBoundary.LAYOUT, words, lines)
     write_lines(folder.lines_json, lines)
-    _log.info(
+    _logger.info(
         "layout: %d pages, %d lines written to %s",
         len(lines.pages),
         sum(len(region.lines) for page in lines.pages for region in page.regions),
