@@ -832,7 +832,12 @@ note, and Gierke's margin headings go into the body line beside them.
 No word is lost; the real layout spec fixes the order.
 
 layout reads `pages.json` and `words.json` and checks both hashes
-(section 3), runs per page with `map_pages`, and runs
+(section 3): `pages.json` against `pdf_sha256(config.pdf)`, as extract
+does, then `words.json` against `pages.json`. A stale `pages.json` then
+names analyze and a stale `words.json` names extract; compared only with
+each other, the two files could not say which one is stale. Hashing the
+1 MB Kadesh excerpt took 0.4 ms. layout runs per page with `map_pages`,
+and runs
 `check_stage(FidelityBoundary.LAYOUT, words, lines)` before writing `lines.json`;
 on a `FidelityError` it writes nothing. It deletes `lines.json` first.
 
@@ -847,15 +852,17 @@ def layout_page(page: PageWords) -> PageLayout: ...
 ### structure
 
 structure makes one block of each region, in page order: a `paragraph`
-whose id is `b-p<page index, 4 digits>-001`, `level` `None`, `figure`
+whose id is `b-p<page index, 4 digits>-001`, or `-002` and on for the
+second region of a page and after (architecture §7; the skeleton's layout
+makes one region per page), `level` `None`, `figure`
 `None`, one span whose text is the words of the region, line after line,
 joined by single spaces, with `emphasis` `none` and `note_ref` `None`,
 and one `Origin` with the page index and the region's box. `notes`,
 `removals`, `word_changes` and `page_numbers` are empty. A page with no
 region gives no block.
 
-structure reads `pages.json` and `lines.json` and checks both hashes; it
-uses only `lines.json`. It runs `check_stage(FidelityBoundary.STRUCTURE, lines,
+structure reads `pages.json` and `lines.json` and checks both hashes as
+layout does, `lines.json` naming layout; it uses only `lines.json`. It runs `check_stage(FidelityBoundary.STRUCTURE, lines,
 blocks)` before writing `blocks.json`; on a `FidelityError` it writes
 nothing. It deletes `blocks.json` first.
 
