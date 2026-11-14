@@ -777,3 +777,21 @@ def test_bad_edits_line_names_the_file_and_the_line(
     with pytest.raises(EditError, match=r"owner\.jsonl") as caught:
         read_edits(path)
     assert "line 2" in str(caught.value)
+
+
+def test_edits_file_that_is_not_utf8_names_the_file(tmp_path: Path) -> None:
+    path = tmp_path / "owner.jsonl"
+    path.write_bytes(_edit_line().encode("utf-8") + b"\n" + b'{"old": "\xff"}\n')
+    with pytest.raises(EditError, match=r"owner\.jsonl") as caught:
+        read_edits(path)
+    assert "UTF-8" in str(caught.value)
+
+
+def test_edits_file_with_a_byte_order_mark_asks_for_utf8_without_one(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "owner.jsonl"
+    path.write_bytes(b"\xef\xbb\xbf" + _edit_line().encode("utf-8") + b"\n")
+    with pytest.raises(EditError, match=r"owner\.jsonl") as caught:
+        read_edits(path)
+    assert "UTF-8 without a byte-order mark" in str(caught.value)

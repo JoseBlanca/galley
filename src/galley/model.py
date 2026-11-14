@@ -688,14 +688,29 @@ def write_edits(path: Path, edits: tuple[Edit, ...]) -> None:
     path.write_text(text, encoding="utf-8", newline="\n")
 
 
+_BYTE_ORDER_MARK = "\ufeff"
+
+
 def read_edits(path: Path) -> tuple[Edit, ...]:
     """The edits of an edits file, in the order of its lines.
 
-    Raises EditError, naming the file and the line, for a blank line, a
-    line that is not JSON, a format_version other than 1, or an object with
-    a missing, unknown or mistyped field. A missing file is the caller's
-    concern: architecture section 10 counts it as no edits."""
-    text = path.read_text(encoding="utf-8")
+    Raises EditError, naming the file, for a file that is not UTF-8 or
+    starts with a byte-order mark; and naming the line too, for a blank
+    line, a line that is not JSON, a format_version other than 1, or an
+    object with a missing, unknown or mistyped field. A missing file is the
+    caller's concern: architecture section 10 counts it as no edits."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as err:
+        message = f"{path} is not UTF-8 text: {err}"
+        raise EditError(message) from err
+    if text.startswith(_BYTE_ORDER_MARK):
+        # Edits may be written by hand, and some editors add the mark.
+        message = (
+            f"{path} starts with a byte-order mark; "
+            "save it as UTF-8 without a byte-order mark"
+        )
+        raise EditError(message)
     # Split on newlines only: str.splitlines also splits on characters such
     # as U+2028, which json.dumps leaves unescaped inside a string.
     lines = text.split("\n")
