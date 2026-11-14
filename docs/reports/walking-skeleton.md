@@ -95,3 +95,46 @@ After the fixes: the six checks pass, 185 tests, none skipped, 0.28 s
 For the next work package: pdfminer, under pdfplumber, decodes some text
 with `errors="ignore"` and can drop a broken character before galley
 sees it (`pdfminer/cmapdb.py`, line 190). That is for extract's spec.
+
+## Work package 2: shared machinery
+
+Two streams side by side, each in its own worktree, merged into the
+plan's branch: `fidelity` (e1a6de2, 1685562, f218d16; merge 9373fe8) and
+`pdfium` (a26d5c2, 664c710, 0970fdf, d430f89; merge 9b3458f). The two
+streams edited different sections of the spec and merged without
+conflict.
+
+Deliverables, checked by the orchestrator:
+
+| deliverable | command | result |
+|---|---|---|
+| 1. PDFium in one thread | `pytest tests/test_pdfium.py --collect-only -q`; with `-m thread_unsafe` | 20 tests (at least 7); 15 thread_unsafe (at least 6) |
+| 2. the pool | `pytest tests/test_parallel.py --collect-only -q` | 22 tests (at least 6) |
+| 3. the word check | `pytest tests/test_fidelity.py -m "not pandoc"` | 15 passed (at least 11) |
+| 4. reading the Markdown | `pytest tests/test_fidelity.py -m pandoc -rs` | 11 passed, none skipped (at least 7), Pandoc 3.14 |
+
+After both merges the six checks pass: 253 tests, none skipped, 2.84 s
+(3.88 s with 8 threads).
+
+Spec changes the streams made before their code, each in a commit of its
+own:
+
+- Kadesh's page size as pypdfium2 gives it is 508.29998779296875 pt wide,
+  not 508.32 as the spec said: PDFium clips the crop box to the media box.
+  No stage calls `page_size`; page sizes in the files are pdfplumber's.
+- `strip_stride` refuses a buffer that does not fit its shape;
+  `map_pages_with_source` says which error it raises when two kinds happen.
+- The fidelity check: when only the note counts differ, the error gives
+  both counts; a removal's text is split into words; `read_markdown`
+  accepts only the Pandoc elements galley writes and stops on any other,
+  so that a list or a table made by a missing escape cannot drop words.
+
+Every PDFium object is closed in the PDFium thread: a test reads
+pypdfium2's log of closes (4 documents, 1 page, 1 bitmap closed
+explicitly, none by a finalizer), and another finds pypdfium2 running in
+one thread only; with the calls moved to the caller's thread, the test
+process crashed inside PDFium.
+
+Question for the review: `parallel.py` keeps a small mutable record per
+worker to find the first failing item without a `try`, against the
+coding skill's functional style.

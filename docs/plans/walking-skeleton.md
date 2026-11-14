@@ -207,18 +207,18 @@ Deliverables:
 
 Tasks:
 
-- [ ] 2.1 Write `pdfium.py`, with its tests. From spec §4, "pdfium.py",
+- [x] 2.1 Write `pdfium.py`, with its tests. From spec §4, "pdfium.py",
   architecture §8 ("RenderedPage") and §12, and the coding skill,
   "Threads and PDFium". Serves deliverable 1. Stream `pdfium`.
-- [ ] 2.2 Write `parallel.py`, with its tests. From spec §4,
+- [x] 2.2 Write `parallel.py`, with its tests. From spec §4,
   "parallel.py", and the coding skill, "Threads and PDFium". Serves
   deliverable 2. Stream `pdfium`; independent of 2.1, run after it in
   the same stream.
-- [ ] 2.3 Write `fidelity.check_stage` for the three boundaries, with its
+- [x] 2.3 Write `fidelity.check_stage` for the three boundaries, with its
   unit tests, which build `MarkdownWords` by hand. From spec §5, "The
   words of each side" and the paragraph after it, and architecture §13.
   Serves deliverable 3. Stream `fidelity`.
-- [ ] 2.4 Write `fidelity.read_markdown`, with its tests marked `pandoc`.
+- [x] 2.4 Write `fidelity.read_markdown`, with its tests marked `pandoc`.
   From spec §5, "Reading the Markdown". Serves deliverable 4. Stream
   `fidelity`; needs `MarkdownWords` from 2.3.
 
