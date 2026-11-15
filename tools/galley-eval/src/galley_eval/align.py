@@ -23,6 +23,19 @@ How the spec is read here, where it leaves a choice:
   body token before it, else after it; the tokens of each provisional
   page are aligned in the reference's order, the pages in increasing
   order, so that galley tokens a page took are not offered to the next.
+- In passes 2 and 3, every provisional page is aligned with the galley
+  tokens of its own page before any is offered the pages either side, so
+  that a page does not take a token its neighbour would have paired on
+  the neighbour's own page; the pages either side are offered the
+  tokens left after that, without the provisional page's own leftovers,
+  which the first round has already compared.
+- In a replaced stretch, when neither a join nor a changed pair is found
+  and one of the two current tokens has an empty key, that one is left
+  unpaired, whatever its position: such a token can join nothing and
+  pair only with another empty key, while the token across may still
+  join or pair. On Haskins' note 40, galley's "*" before
+  "GiraldusCambrensis" otherwise left "Giraldus" missing and paired
+  "Cambrensis" with the glued word as changed.
 - `reference_correction` is the subkind of any pairing other than
   matched whose reference tokens include a marked correction, missing,
   split and glued ones too, so that all of them are counted apart from
@@ -632,11 +645,11 @@ def _near_page_pass(
 ) -> tuple[Pairing, ...]:
     """The pairings of a pass that works near the page (passes 2 and 3):
     the reference tokens are taken page by page of their provisional page,
-    from the pairings `found` before, and each page's are aligned by an
-    anchored pass with the galley tokens still unpaired on that page, the
-    page before or the page after, in book order (`galley_indices` is in
-    book order). A reference token with no provisional page is left
-    unpaired."""
+    from the pairings `found` before. First each page's are aligned by an
+    anchored pass with the galley tokens still unpaired on that page; then
+    the reference tokens every page left unpaired, with the galley tokens
+    still unpaired on the page before and the page after, in book order (`galley_indices` is in book order). A reference token with
+    no provisional page is left unpaired."""
     provisional = _provisional_pages(sides, reference, found)
     by_page: dict[int, list[int]] = {}
     for index in reference_indices:
@@ -648,24 +661,34 @@ def _near_page_pass(
         galley_by_page.setdefault(sides.galley[index].page_index, []).append(index)
     taken: set[int] = set()
     pairings: list[Pairing] = []
-    for page in sorted(by_page):
-        candidates = tuple(
-            index
-            for near in range(page - _NEAR_PAGES, page + _NEAR_PAGES + 1)
-            for index in galley_by_page.get(near, ())
-            if index not in taken
+    for offsets in ((0,), _EITHER_SIDE):
+        paired = frozenset(
+            index for pairing in pairings for index in pairing.reference_indices
         )
-        page_pairings = _pass(found_in, sides, tuple(by_page[page]), candidates)
-        taken.update(
-            index for pairing in page_pairings for index in pairing.galley_indices
-        )
-        pairings.extend(page_pairings)
+        for page in sorted(by_page):
+            candidates = tuple(
+                index
+                for offset in offsets
+                for index in galley_by_page.get(page + offset, ())
+                if index not in taken
+            )
+            page_pairings = _pass(
+                found_in,
+                sides,
+                tuple(index for index in by_page[page] if index not in paired),
+                candidates,
+            )
+            taken.update(
+                index for pairing in page_pairings for index in pairing.galley_indices
+            )
+            pairings.extend(page_pairings)
     return tuple(pairings)
 
 
-# Passes 2 and 3 pair a reference token only with galley tokens within this
-# many pages of its provisional page (spec section 5).
-_NEAR_PAGES = 1
+# Passes 2 and 3 pair a reference token only with galley tokens within one
+# page of its provisional page (spec section 5): these are the offsets of
+# the pages either side, offered after the provisional page itself.
+_EITHER_SIDE = (-1, 1)
 
 
 def _provisional_pages(
@@ -827,10 +850,10 @@ def _replaced(
 ) -> tuple[Pairing, ...]:
     """The pairings of a replaced stretch, walked in order on both sides at
     once. At each step: a split or glued at the current positions; else a
-    changed pair when the two current tokens are alike; else the token
+    changed pair when the two current tokens are alike; else, when one of
+    the two has an empty key, that one is left unpaired; else the token
     further behind on its side, as _reference_behind measures it, is left
-    unpaired. The tokens
-    left unpaired are offered to the next pass."""
+    unpaired. The tokens left unpaired are offered to the next pass."""
     reference_keys = tuple(sides.reference_keys[index] for index in reference_stretch)
     galley_keys = tuple(sides.galley_keys[index] for index in galley_stretch)
     reference_count, galley_count = len(reference_stretch), len(galley_stretch)
@@ -861,6 +884,10 @@ def _replaced(
                 )
             )
             reference_at, galley_at = reference_at + 1, galley_at + 1
+        elif not reference_keys[reference_at] and galley_keys[galley_at]:
+            reference_at += 1
+        elif not galley_keys[galley_at] and reference_keys[reference_at]:
+            galley_at += 1
         elif _reference_behind(reference_at, reference_count, galley_at, galley_count):
             reference_at += 1
         else:

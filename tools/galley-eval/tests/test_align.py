@@ -544,6 +544,27 @@ def test_empty_keys_pair_only_with_empty_keys() -> None:
     assert _pairing_of_reference(alignment, 1).state is State.CHANGED
 
 
+def test_mark_before_glued_words_does_not_hide_the_glued() -> None:
+    # Haskins' note 40: the text layer reads the note's marker as "*" and
+    # glues "Giraldus Cambrensis"; the "*" is left extra, not "Giraldus".
+    alignment, _ = _align(
+        _reference(_paragraph("one Giraldus Cambrensis two")),
+        _galley("one * GiraldusCambrensis two"),
+    )
+    assert _pairing_of_reference(alignment, 1).state is State.GLUED
+    assert _pairing_of_reference(alignment, 2).state is State.GLUED
+    assert _pairing_of_galley(alignment, 1).state is State.EXTRA
+
+
+def test_mark_in_the_reference_before_a_split_does_not_hide_the_split() -> None:
+    alignment, _ = _align(
+        _reference(_paragraph("one — replicate two")),
+        _galley("one repli- cate two"),
+    )
+    assert _pairing_of_reference(alignment, 2).state is State.SPLIT
+    assert _pairing_of_reference(alignment, 1).state is State.MISSING
+
+
 def test_split_is_looked_for_only_at_the_current_position() -> None:
     # By the time the walk reaches "p" "our" in galley, it has passed "pour"
     # in the reference: no split.
@@ -681,6 +702,49 @@ def test_leftover_is_paired_with_a_token_on_the_next_page() -> None:
     )
     alignment, _ = _align(reference, galley)
     assert _pairing_of_reference(alignment, 3).galley_indices == (4,)
+
+
+def test_leftover_is_paired_on_its_own_page_before_the_page_before() -> None:
+    # As on Haskins' printed page 119: the reference's "alpha", whose
+    # provisional page is 3, is alike both a stray "alphx" on page 2 and
+    # galley's "alphz" on page 3; the token on its own page is its partner.
+    reference = _reference(_paragraph("one two three alpha four"))
+    galley = (
+        _galley("one two alphx", page_index=2)
+        + _galley("three four", page_index=3)
+        + _galley("alphz", page_index=3, stream=GalleyStream.NOTES)
+    )
+    alignment, _ = _align(reference, galley)
+    assert _pairing_of_reference(alignment, 3).galley_indices == (5,)
+    assert _pairing_of_galley(alignment, 2).state is State.EXTRA
+
+
+def test_page_either_side_is_offered_only_what_its_own_tokens_left() -> None:
+    # "alpha" (provisional page 3) and "alphb" (provisional page 4) are both
+    # alike page 4's "alphz". Page 4's own token takes it, although page 3
+    # comes first; "alpha" is left missing.
+    reference = _reference(_paragraph("one alpha two alphb three"))
+    galley = (
+        _galley("one", page_index=3)
+        + _galley("two three", page_index=4)
+        + _galley("alphz", page_index=4, stream=GalleyStream.NOTES)
+    )
+    alignment, _ = _align(reference, galley)
+    assert _pairing_of_reference(alignment, 3).galley_indices == (3,)
+    assert _pairing_of_reference(alignment, 1).state is State.MISSING
+
+
+def test_page_either_side_is_offered_what_the_own_page_did_not_pair() -> None:
+    # "alpha" (provisional page 3) has no partner on page 3; page 4's
+    # "alphz" is.
+    reference = _reference(_paragraph("one alpha two three"))
+    galley = (
+        _galley("one", page_index=3)
+        + _galley("two three", page_index=4)
+        + _galley("alphz", page_index=4, stream=GalleyStream.NOTES)
+    )
+    alignment, _ = _align(reference, galley)
+    assert _pairing_of_reference(alignment, 1).galley_indices == (3,)
 
 
 def test_note_is_looked_for_near_the_page_of_its_reference() -> None:
