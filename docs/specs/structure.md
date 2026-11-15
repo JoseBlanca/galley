@@ -362,12 +362,16 @@ paragraph that holds the last line of a page's body stream, which may
 have started on an earlier page or run on to a later one, come that
 page's margin notes, by the order of their regions. A page's notes
 follow in `notes`, in the order of their regions and lines; markdown
-writes the notes of a page after the last block of `blocks` whose
-origin includes that page, which is that paragraph or the page's last
-margin note, or, when no block does, after the last block whose first
-origin is on an earlier page, or first of all (section 10). So the side
+writes a note after the last block, in the order of `blocks`, whose
+first origin is on the note's first page or an earlier one, or first of
+all when there is none (section 10). A paragraph that runs over a page
+break counts for the page it starts on. With a paragraph from page 3 to
+page 4, then page 3's margin note, a note of page 4 comes after that
+margin note and after page 3's notes, not between the paragraph and page
+3's side text, as it would if a note followed the last block with a line
+on its page. So the side
 text of a page is read after the paragraph in which the page's body
-ends, never inside it. A page whose body stream is
+ends, never inside it, and in page order. A page whose body stream is
 empty puts its side text after the last block so far.
 
 **Ids and origins.** A block's id counts the blocks that start on its
@@ -588,7 +592,9 @@ note, and because the evaluation tool reads a block's kind.
   block as a fenced div with its id and the class `margin-note`, where
   it is in `blocks`, and a note with `referenced` false as a fenced div
   with its id and the class `note`, holding its blocks' divs, after the
-  last block whose origin includes the note's first page. That is what
+  last block, in the order of `blocks`, whose first origin is on the
+  note's first page or an earlier one, or first of all when there is
+  none (section 6, "Order"). That is what
   architecture §9 and §17 already decide for these kinds, without the
   styling, which the epub stage's style sheet gives later, and without
   §17's placement: a margin note stands after the paragraph in which its
