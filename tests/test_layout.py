@@ -5,6 +5,7 @@ The excerpt tests of layout are in work package 4.
 """
 
 import hashlib
+from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
@@ -1081,9 +1082,21 @@ def _layout_of_pdf(pdf: Path, root: Path) -> tuple[WordsFile, LinesFile]:
 
 
 def _assert_laid_out_in_regions(words: WordsFile, lines: LinesFile) -> None:
-    """The fidelity check passes, and some page has more than one region:
-    the book was measured and its pages cut."""
+    """The fidelity check passes; each page's words, with their boxes, are
+    those of the same page in words.json, since layout never moves a word
+    to another page; and some page has more than one region: the book was
+    measured and its pages cut."""
     check_stage(FidelityBoundary.LAYOUT, words, lines)
+    assert tuple(page.index for page in lines.pages) == tuple(
+        page.index for page in words.pages
+    )
+    for page_lines, page_words in zip(lines.pages, words.pages, strict=True):
+        assert Counter(
+            (word.text, word.box)
+            for region in page_lines.regions
+            for line in region.lines
+            for word in line.words
+        ) == Counter((word.text, word.box) for word in page_words.words)
     assert any(len(page.regions) > 1 for page in lines.pages)
 
 
