@@ -605,12 +605,14 @@ def _is_drop_capital(word: Word, left: float, measures: BookMeasures) -> bool:
 def _with_drop_capital(
     regions: tuple[Region, ...], capital: Word
 ) -> tuple[Region, ...] | None:
-    """`regions` with `capital` placed first in the topmost line whose box
-    overlaps the capital's vertically and starts right of its middle (step
-    6). None when no line does."""
+    """`regions` with `capital` placed first in a line beside it (step 6):
+    a line whose box overlaps the capital's vertically and starts at or
+    right of its middle. The line is the topmost beside it in the region
+    whose line beside it starts nearest the capital. None when no line is
+    beside it."""
     capital_middle = (capital.box.x0 + capital.box.x1) / 2
     beside = tuple(
-        (line.box.top, region_index, line_index)
+        (line.box.x0, region_index, line.box.top, line_index)
         for region_index, region in enumerate(regions)
         for line_index, line in enumerate(region.lines)
         if line.box.top < capital.box.bottom
@@ -619,7 +621,10 @@ def _with_drop_capital(
     )
     if not beside:
         return None
-    _, region_index, line_index = min(beside)
+    _, region_index, _, _ = min(beside)
+    _, line_index = min(
+        (top, index) for _, region, top, index in beside if region == region_index
+    )
     lines = regions[region_index].lines
     line = lines[line_index]
     placed = Line(_enclosing_box((capital.box, line.box)), (capital, *line.words))

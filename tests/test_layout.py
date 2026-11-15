@@ -788,6 +788,25 @@ def test_drop_capital_whose_top_is_below_the_upper_lines_centre_joins_that_line(
     assert _texts(body.lines)[:2] == (("IN", "a0", "b0"), ("a1", "b1"))
 
 
+def test_drop_capital_beside_two_columns_goes_to_the_left_column() -> None:
+    # Rows 0 and 1 of the left column start at 75, beside a capital from
+    # 50 to 70 and 100.5 to 124.5; the right column's first line, from 98,
+    # is higher than the left's, from 100, and overlaps the capital too.
+    words = tuple(
+        replace(word, box=replace(word.box, x0=75))
+        if word.text in {"L0", "L1"}
+        else replace(word, box=replace(word.box, top=98, bottom=106))
+        if word.text == "R0"
+        else word
+        for word in _two_column_rows(10)
+    )
+    capital = _word("T", 50, 100.5, 70, 124.5)
+    result = layout_page(_page(0, (capital, *words)), _MEASURES)
+    left, right = result.regions
+    assert _texts(left.lines)[:2] == (("T", "L0"), ("L1",))
+    assert _texts(right.lines)[0] == ("R0",)
+
+
 def test_tall_word_away_from_the_left_edge_is_no_drop_capital() -> None:
     # 4 pt right of the left edge: its rows are grouped as the skeleton did.
     words = tuple(
