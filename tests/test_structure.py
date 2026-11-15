@@ -21,6 +21,7 @@ from galley.model import (
     BlockKind,
     BlocksFile,
     Box,
+    ChangeReason,
     Emphasis,
     Line,
     LinesFile,
@@ -37,13 +38,14 @@ from galley.model import (
     Span,
     TextSource,
     Word,
+    WordChange,
     block_text,
     read_blocks,
     write_blocks,
     write_lines,
     write_pages,
 )
-from galley.structure import make_blocks, survey_book
+from galley.structure import HyphenJoin, join_hyphen, make_blocks, survey_book
 
 
 def _word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
@@ -75,6 +77,7 @@ def _paragraph(block_id: str, text: str, page_index: int, box: Box) -> Block:
 # Pages written by hand. A word is 5 pt wide per character and 10 pt high,
 # with one character's width between words, unless given otherwise.
 
+_NO_WORDS: frozenset[str] = frozenset()
 _CHAR_PT = 5.0
 _WORD_HEIGHT_PT = 10.0
 _PITCH_PT = 15.0
@@ -252,7 +255,7 @@ def test_head_with_a_page_number_and_a_mark_above_is_removed_in_three_parts() ->
         _page_with_head(230, "THE COMING OF THE NORMANS 215"),
         _page_with_head(231, "216 NORMANS IN EUROPEAN HISTORY"),
     )
-    blocks = make_blocks(_lines_of(page, *others), workers=1)
+    blocks = make_blocks(_lines_of(page, *others), _NO_WORDS, workers=1)
     assert _removals_of(229, blocks) == (
         Removal(
             page_index=229, box=mark.box, text=";", reason=RemovalReason.STRAY_MARK
@@ -287,7 +290,7 @@ def test_marks_above_a_head_line_that_is_no_running_head_stay() -> None:
         ),
         (),
     )
-    blocks = make_blocks(_lines_of(page), workers=1)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
     assert blocks.removals == ()
     assert block_text(blocks.blocks[0]) == "; A TITLE"
 
@@ -299,7 +302,7 @@ def test_misread_head_number_goes_with_the_running_head_and_gives_no_page_number
         _page_with_head(130, "THE BOOK ii8"),
         _page_with_head(131, "THE BOOK 119"),
     )
-    blocks = make_blocks(_lines_of(*pages), workers=1)
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     assert _removals_of(130, blocks) == (
         Removal(
             page_index=130,
@@ -318,7 +321,7 @@ def test_roman_head_number_counts_only_before_the_first_arabic_one() -> None:
         _page_with_head(20, "THE EARLY KINGS 3"),
         _page_with_head(21, "THE EARLY KINGS. ch. i."),
     )
-    blocks = make_blocks(_lines_of(*pages), workers=1)
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     assert blocks.page_numbers == (
         PageNumber(5, "xi", PageNumberPosition.HEAD),
         PageNumber(6, "xii", PageNumberPosition.HEAD),
@@ -333,7 +336,7 @@ def test_of_two_head_numbers_the_one_the_offset_gives_is_the_page_number() -> No
         _page_with_head(21, "THE BOOK 6"),
         _page_with_head(22, "12 THE BOOK 7"),
     )
-    blocks = make_blocks(_lines_of(*pages), workers=1)
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     assert blocks.page_numbers[-1] == PageNumber(22, "7", PageNumberPosition.HEAD)
     assert tuple(removal.text for removal in _removals_of(22, blocks)) == (
         "12 THE BOOK",
@@ -384,7 +387,7 @@ def _centred(text: str) -> tuple[str, float]:
 @pytest.mark.parametrize("number", ["(49)", "U9)", "83"])
 def test_centred_page_number_at_the_foot_is_removed(number: str) -> None:
     foot = _foot_line(_FOOT_TOP_PT, _centred(number))
-    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), workers=1)
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
     assert blocks.removals == (
         Removal(
             page_index=4, box=foot.box, text=number, reason=RemovalReason.PAGE_NUMBER
@@ -402,7 +405,7 @@ def test_signature_mark_at_the_foot_is_removed(
     words: tuple[tuple[str, float], ...],
 ) -> None:
     foot = _foot_line(_FOOT_TOP_PT, *words)
-    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), workers=1)
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
     assert blocks.removals == (
         Removal(
             page_index=4,
@@ -428,7 +431,7 @@ def test_foot_line_that_is_no_page_number_or_mark_stays(
     words: tuple[tuple[str, float], ...],
 ) -> None:
     foot = _foot_line(_FOOT_TOP_PT, *words)
-    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), workers=1)
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
     assert blocks.removals == ()
     assert blocks.page_numbers == ()
 
@@ -436,7 +439,9 @@ def test_foot_line_that_is_no_page_number_or_mark_stays(
 def test_signature_mark_above_a_page_number_is_removed_with_it() -> None:
     mark = _foot_line(_FOOT_TOP_PT - _PITCH_PT, ("4—2", 252))
     number = _foot_line(_FOOT_TOP_PT, _centred("83"))
-    blocks = make_blocks(_lines_of(_page_with_foot(4, mark, number)), workers=1)
+    blocks = make_blocks(
+        _lines_of(_page_with_foot(4, mark, number)), _NO_WORDS, workers=1
+    )
     assert tuple((removal.text, removal.reason) for removal in blocks.removals) == (
         ("4—2", RemovalReason.SIGNATURE_MARK),
         ("83", RemovalReason.PAGE_NUMBER),
@@ -461,7 +466,7 @@ def test_signature_line_on_two_pages_gives_a_page_number_and_a_mark_each() -> No
         _signature_line("UAMiàjoL.", "CmOl", "da", "Médidib", "(l93)", "13"),
     )
     pages = tuple(_page_with_foot(index, line) for index, line in enumerate(lines))
-    blocks = make_blocks(_lines_of(*pages), workers=1)
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     assert tuple(
         (removal.page_index, removal.text, removal.reason)
         for removal in blocks.removals
@@ -487,8 +492,168 @@ def test_note_line_starting_with_its_marker_on_two_pages_is_no_signature_line() 
         ),
     )
     pages = tuple(_page_with_foot(index, line) for index, line in enumerate(lines))
-    blocks = make_blocks(_lines_of(*pages), workers=1)
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     assert blocks.removals == ()
+
+
+# join_hyphen
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "book_words", "word_list", "expected"),
+    [
+        (
+            "neces-",
+            "sary",
+            frozenset(),
+            frozenset({"necessary"}),
+            HyphenJoin("necessary", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "Anglo-",
+            "Saxon",
+            frozenset({"anglo-saxon"}),
+            frozenset(),
+            HyphenJoin("Anglo-Saxon", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "Bal-",
+            "hazar",
+            frozenset(),
+            frozenset(),
+            HyphenJoin("Balhazar", ChangeReason.HYPHEN_JOIN_GUESSED),
+        ),
+        (
+            "neces-",
+            "sary,",
+            frozenset({"necessary"}),
+            frozenset(),
+            HyphenJoin("necessary,", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "Nor-",
+            "mandy.",
+            frozenset(),
+            frozenset({"normandy"}),
+            HyphenJoin("Normandy.", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "1830-",
+            "40,",
+            frozenset(),
+            frozenset(),
+            HyphenJoin("1830-40,", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "d'in-",
+            "signes",
+            frozenset(),
+            frozenset({"insignes"}),
+            HyphenJoin("d'insignes", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "Wil-",
+            "liam's",
+            frozenset(),
+            frozenset({"s"}),
+            HyphenJoin("William's", ChangeReason.HYPHEN_JOIN_GUESSED),
+        ),
+        (
+            "sea-",
+            "faring",
+            frozenset({"sea-faring", "seafaring"}),
+            frozenset(),
+            HyphenJoin("seafaring", ChangeReason.HYPHEN_JOIN),
+        ),
+    ],
+    ids=[
+        "word list",
+        "book's compound",
+        "guessed",
+        "punctuation after",
+        "word list in lower case",
+        "two numbers",
+        "after the apostrophe",
+        "apostrophe in the second part",
+        "printed both ways",
+    ],
+)
+def test_join_hyphen_gives_the_word_and_its_reason(
+    first: str,
+    second: str,
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    expected: HyphenJoin,
+) -> None:
+    assert join_hyphen(first, second, book_words, word_list) == expected
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [("—", "and"), ("rep-", "(1)"), ("-", "and"), ("word", "and")],
+    ids=["dash", "bracket after", "hyphen alone", "no hyphen"],
+)
+def test_join_hyphen_does_not_join(first: str, second: str) -> None:
+    assert join_hyphen(first, second, frozenset(), frozenset({"and"})) is None
+
+
+# Hyphens in the blocks
+
+
+def test_hyphen_at_a_line_end_is_joined_inside_a_block_and_recorded() -> None:
+    page = PageLayout(
+        3,
+        (
+            _body(
+                70,
+                "it is neces-",
+                "sary that the Anglo-",
+                "Saxon king of Bal-",
+                "hazar",
+            ),
+        ),
+        (),
+    )
+    blocks = make_blocks(
+        _lines_of(page, PageLayout(4, (_body(70, "an Anglo-Saxon thing"),), ())),
+        frozenset({"Necessary"}),
+        workers=1,
+    )
+    assert block_text(blocks.blocks[0]) == (
+        "it is necessary that the Anglo-Saxon king of Balhazar"
+    )
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=3,
+            before=("neces-", "sary"),
+            after=("necessary",),
+            reason=ChangeReason.HYPHEN_JOIN,
+        ),
+        WordChange(
+            page_index=3,
+            before=("Anglo-", "Saxon"),
+            after=("Anglo-Saxon",),
+            reason=ChangeReason.HYPHEN_KEPT,
+        ),
+        WordChange(
+            page_index=3,
+            before=("Bal-", "hazar"),
+            after=("Balhazar",),
+            reason=ChangeReason.HYPHEN_JOIN_GUESSED,
+        ),
+    )
+
+
+def test_line_of_one_word_between_two_hyphens_is_joined_twice() -> None:
+    page = PageLayout(0, (_body(70, "the pre-", "Anglo-", "Saxon age"),), ())
+    lines = _lines_of(page)
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert block_text(blocks.blocks[0]) == "the preAngloSaxon age"
+    assert tuple(change.before for change in blocks.word_changes) == (
+        ("pre-", "Anglo-"),
+        ("preAnglo-", "Saxon"),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
 # make_blocks
@@ -505,7 +670,7 @@ _LINES = LinesFile(
 
 
 def test_make_blocks_gives_the_paragraphs_in_page_order_and_nothing_else() -> None:
-    assert make_blocks(_LINES, workers=1) == BlocksFile(
+    assert make_blocks(_LINES, _NO_WORDS, workers=1) == BlocksFile(
         source_pdf_sha256=_HASH,
         blocks=(
             _paragraph("b-p0000-001", "Alpha beta, gamma delta.", 0, _REGION.box),
@@ -522,7 +687,9 @@ def test_make_blocks_gives_the_paragraphs_in_page_order_and_nothing_else() -> No
 
 
 def test_fidelity_check_passes_on_the_blocks_of_hand_made_lines() -> None:
-    check_stage(FidelityBoundary.STRUCTURE, _LINES, make_blocks(_LINES, workers=1))
+    check_stage(
+        FidelityBoundary.STRUCTURE, _LINES, make_blocks(_LINES, _NO_WORDS, workers=1)
+    )
 
 
 def test_fidelity_check_fails_when_a_word_is_dropped_from_a_line() -> None:
@@ -536,7 +703,9 @@ def test_fidelity_check_fails_when_a_word_is_dropped_from_a_line() -> None:
     )
     with pytest.raises(FidelityError) as raised:
         check_stage(
-            FidelityBoundary.STRUCTURE, lines_without_alpha, make_blocks(_LINES)
+            FidelityBoundary.STRUCTURE,
+            lines_without_alpha,
+            make_blocks(_LINES, _NO_WORDS, workers=1),
         )
     assert raised.value.missing == frozendict()
     assert raised.value.invented == frozendict({"Alpha": 1})
@@ -585,6 +754,7 @@ def _replace_hash(path: Path) -> None:
 
 
 @pytest.mark.thread_unsafe
+@pytest.mark.tesseract
 def test_run_writes_the_blocks_of_every_region(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     structure.run(folder, config, workers=1)
@@ -616,6 +786,7 @@ def test_run_writes_the_blocks_of_every_region(tmp_path: Path) -> None:
 
 
 @pytest.mark.thread_unsafe
+@pytest.mark.tesseract
 def test_run_with_a_config_of_another_pdf_names_analyze(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     other_pdf = tmp_path / "other.pdf"
@@ -626,9 +797,10 @@ def test_run_with_a_config_of_another_pdf_names_analyze(tmp_path: Path) -> None:
 
 
 @pytest.mark.thread_unsafe
+@pytest.mark.tesseract
 def test_run_with_a_pages_json_of_another_pdf_names_analyze(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
-    write_blocks(folder.blocks_json, make_blocks(_LINES, workers=1))
+    write_blocks(folder.blocks_json, make_blocks(_LINES, _NO_WORDS, workers=1))
     _replace_hash(folder.pages_json)
     with pytest.raises(InputFileError, match=r"pages\.json.*galley2epub analyze"):
         structure.run(folder, config, workers=1)
@@ -636,6 +808,7 @@ def test_run_with_a_pages_json_of_another_pdf_names_analyze(tmp_path: Path) -> N
 
 
 @pytest.mark.thread_unsafe
+@pytest.mark.tesseract
 def test_run_with_a_lines_json_of_another_pdf_names_layout(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     _replace_hash(folder.lines_json)
@@ -645,13 +818,16 @@ def test_run_with_a_lines_json_of_another_pdf_names_layout(tmp_path: Path) -> No
 
 
 @pytest.mark.thread_unsafe
+@pytest.mark.tesseract
 def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     folder, config = _book(tmp_path)
 
-    def make_blocks_losing_a_word(lines: LinesFile, *, workers: int) -> BlocksFile:
-        blocks = make_blocks(lines, workers=workers)
+    def make_blocks_losing_a_word(
+        lines: LinesFile, word_list: frozenset[str], *, workers: int
+    ) -> BlocksFile:
+        blocks = make_blocks(lines, word_list, workers=workers)
         first = blocks.blocks[0]
         shorter = replace(
             first,
