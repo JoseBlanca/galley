@@ -342,8 +342,11 @@ margin note.
   in its `origin`. A block that runs over two pages thus has tokens on
   both. A token made by a word change, such as "replicate" from
   "repli-" and "cate", has the page of the first word it was made from.
-  A note reference span and a note's `marker` are not tokens, as in the
-  fidelity check at the markdown boundary.
+  A note reference span, and the `marker` of a note whose `referenced` is
+  true, are not tokens, as in the fidelity check at the markdown
+  boundary. The marker of an unreferenced note is a word of the book,
+  which markdown prints before the note (architecture §9): its words are
+  the first tokens of the note's first block.
 - **markdown**: `book.md` read by `galley.fidelity.read_markdown`, the
   public function with which the markdown stage's fidelity check reads
   it. Each word comes with its block id, so it has the stream and pages
@@ -354,8 +357,11 @@ index, and within a page by stream, body first, then margin notes, then
 notes, and by position in the stream.
 
 A token of words or lines on the first or last line of its page in
-`lines.json` is flagged `edge_of_page`, since running heads, page
-numbers and signature marks sit there.
+`lines.json` that holds a token with a non-empty alignment key is
+flagged `edge_of_page`, since running heads, page numbers and signature
+marks sit there. A line of marks only above the running head, a "!" or
+";" from a speck on the scan (93 of Stubbs' 324 pages), is flagged too,
+and does not take the flag from the line under it.
 
 ### Alignment
 
@@ -378,8 +384,11 @@ A galley token is aligned to at most one reference token. Three passes:
    those still unaligned against the reference's margin notes of the
    body. This finds a note wherever each side put it, at the end of a
    chapter or among the words of its page.
-3. Whatever is still unaligned on each side, against each other. This
-   finds, for instance, a margin note that galley put among the notes.
+3. Whatever is still unaligned on each side, against each other, both
+   sides in book order: the reference's tokens by provisional page, then
+   in the order of the reference. This finds, for instance, a margin note
+   that galley put among the notes, or a footnote's words galley left on
+   its page.
 
 Passes 2 and 3 work **near the page**. Each reference token has a
 provisional page from what the passes before it aligned: a note's, the
@@ -451,8 +460,12 @@ Each reference token, and each galley token, ends in one of these states:
 
 A replaced stretch is walked in order on both sides at once. At each
 step, a `split` or a `glued` is tried at the current position of each
-side, joining 2 to 4 consecutive tokens with non-empty keys (4 is a
-choice: no case of more was seen); else the two current tokens are
+side, joining consecutive tokens with non-empty keys for as long as
+their joined keys are a beginning of the other side's key, up to 12
+tokens. The text layer glues long runs: Haskins page index 28 has
+"Thelandisnotthewholeofnature'sgifttoNormandy;", ten words, and with a
+limit of 4 such runs were reported as `missing` words, 576 of Haskins'
+1,606 (a third), although the words are in galley's output; else the two current tokens are
 paired as `changed` when they are alike; else the one with the lower
 position, relative to its side's stretch, is `missing` or `extra`. Two
 tokens are alike when the similarity of their keys, as
@@ -514,8 +527,12 @@ does not yet remove running heads:
 The six extras are attributed to words, the first output of an
 unbroken run to markdown, and written to `differences.jsonl` with stage
 words and `edge_of_page`. Separately, `summary.md` groups the
-differences by the work they call for, and lists extras on the edge of
-the page under structure's, which is to remove such lines. Once structure removes running heads, they are extra at words and
+differences by the work they call for: extras on the edge of the page,
+and splits whose first galley token ends with "-", under structure's,
+which removes such lines and joins such words; glued tokens under
+extract's, which reads the spaces between words; the other differences
+of words under analyze's and extract's, which read the text; and each
+later stage's own differences under that stage. Once structure removes running heads, they are extra at words and
 lines only, and do not reach markdown: no difference is written.
 
 A word split by a hyphen at a line end, "repli-" "cate", which
@@ -550,6 +567,10 @@ of that page.
   `reference_correction`, `unplaced`: counts of tokens. A split or glued
   difference counts the reference's tokens: 1 for "repli-" "cate", 3 for
   "pamphletspublishedon".
+- `not_scored`: the reference tokens on pages of `exclude_pages` or
+  `not_in_reference`; and `galley_tokens`, the tokens of the stage
+  output. With them, the states, `unplaced` and `not_scored` add up to
+  the reference's tokens, and the galley side to `galley_tokens`.
 - `token_error_rate`: missing, extra, changed without `convention` and
   `reference_correction`, split and glued, divided by the reference's
   tokens. Lower is better.
@@ -607,18 +628,26 @@ evaluation/
 ```
 
 `runs/evaluation/summary.md` puts the books side by side, one row per
-book and score. Each `scorecard.json` holds galley's commit, the date,
-the reference's ebook number and the tool's version. A plan's work
+book and score; a book whose last comparison failed is shown as failed,
+not with its earlier scores. Each `scorecard.json` holds the commit of
+galley that made the book's files, which `run` records in the book
+folder and `compare` reads from there, the commit of the comparison,
+the date, the reference's ebook number and the tool's version. A book's
+files are written to temporary files and moved into place, so that a
+run cut short leaves the earlier files whole. A plan's work
 report quotes the scores before and after its work.
 
 Each line of `differences.jsonl` is one difference:
 
-- `stage`, `state`, `subkind`, and `part`;
+- `stage`, the stage it is attributed to; `state` and `subkind`, at
+  markdown, which is the error of the book; `state_at_stage` and
+  `subkind_at_stage`, at the attributed stage; and `part`;
 - `page_index`, and `printed_page` where an anchor gives it;
 - `reference`: the reference's tokens;
-- `galley`: galley's tokens;
-- `context`: up to 8 reference tokens before and after (a choice, enough
-  to find the place in the book);
+- `galley`: galley's tokens at markdown;
+- `context`: up to 8 tokens before and after (a choice, enough to find
+  the place in the book): the reference's of the same stream, or, for an
+  extra, galley's of its page;
 - `block_id` and `note_id` where galley's side has them;
 - `edge_of_page`.
 
@@ -640,7 +669,8 @@ Measured against the reference, at words, without the tokens flagged
   as a hyphen at a line end, is a word read right (Haskins' words hold
   1,886 hyphens).
 - `ocr_precision`: the share of the page's galley tokens that are aligned
-  to a reference token with the same alignment key. It falls when the
+  to a reference token with the same alignment key, or are part of a
+  `split`. It falls when the
   page is scrambled: many galley tokens, few of them words of the
   reference.
 
@@ -715,11 +745,11 @@ galley-eval summary                rewrite runs/evaluation/summary.md from the s
 `galley2epub run` on the book folder as a separate process, so that the
 command itself is what is tested. A stage that fails is reported for
 that book with its error, and the other books go on. The four books take
-about 40 s of galley (section 2). The comparison of a book is estimated
-at about 1.5 s, from 0.14 s to read Domesday's HTML and 0.26 s to align
-one output, four times; not measured.
-Books are compared one after another; one book's comparison is too short
-to need threads.
+about 40 s of galley (section 2). The first build compared a book in
+3.0 s (Haskins) to 13.5 s (Mariéjol), of which about 4 s for Domesday is
+reading galley's JSON; the alignment keys of the reference are computed
+once per book, not once per output. Books are compared one after
+another.
 
 The function the tests call:
 
