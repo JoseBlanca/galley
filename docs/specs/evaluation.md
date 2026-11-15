@@ -193,8 +193,13 @@ gives:
   (Mariéjol: 14–16);
 - `margin_notes_moved`, true when Gutenberg moved the margin notes, so
   that their position is not scored (Domesday);
-- `expected_counts`: the number of notes, margin notes, note references
-  and page anchors the reader must find, checked by a test (section 10).
+- `html_sha256`: the SHA-256 of the HTML file the rules and counts were
+  written for. Gutenberg may publish a new version of a book; the reader
+  stops with an error when the file differs, so that the counts are not
+  silently wrong;
+- `expected_counts`: the number of notes, margin notes, note references,
+  page anchors and headings the reader must find, and the first five
+  tokens of the body, checked by a test (section 10).
   They are counted from the HTML by hand, with a search for each class,
   when the entry is written, never by running the reader.
 
@@ -214,9 +219,9 @@ footnotes, blackletter running heads and Greek, and are added when a
 stage needs them. Adding a book means writing its reading rules, which
 takes a look at its HTML.
 
-`scripts/fetch_samples.py` downloads the PDFs to `samples/public_domain/`
-and the HTML editions to `samples/public_domain/gutenberg/pg<n>-images.html`
-(both ignored by git).
+`scripts/fetch_samples.py` reads `books.toml` and downloads the PDFs to
+`samples/public_domain/` and the HTML editions to
+`samples/public_domain/gutenberg/pg<n>-images.html` (both ignored by git).
 
 `exclude_pages` lists the pages that have no text layer, because the
 walking skeleton stops on them. When analyze has its OCR audit
@@ -245,8 +250,9 @@ one list of selectors for each of these:
 | rule | what it matches | the four books |
 |---|---|---|
 | `start` | reading starts at the first element that matches; what comes before is left out | by default the first element after `header.pg-boilerplate`; Domesday starts at its title, after Gutenberg's own paragraph and table |
-| `drop` | elements whose text is left out, with everything inside them | the licence (`footer.pg-boilerplate`), transcriber's notes (`div.transnote`), Gutenberg's headings (`.footnotes > h2`, "FOOTNOTES", "NOTES"), note labels (`a.label`, `span.label`) |
-| `drop_text` | text left out wherever it occurs, given as regular expressions that match a whole run of text | Mariéjol `Note \d+:?` (note 230 has no colon) and `\(retour\)`; Haskins "FOOTNOTES", which no selector singles out |
+| `drop` | elements whose text is left out, with everything inside them | the licence (`footer.pg-boilerplate`), transcriber's notes (`div.transnote`), Gutenberg's headings (`.footnotes > h2`: "FOOTNOTES", "NOTES"), note labels (`a.label`, `span.label`), the asterisks Haskins puts at a section break, where the print has a blank line (`div.tb`, 34), and the "[Larger map]" links of Domesday's maps (`div.larger-version`) |
+| `drop_text` | text left out wherever it occurs, given as regular expressions that match a whole run of text | Mariéjol `Note \d+:?` (note 230 has no colon) and `\(retour\)` |
+| `separate` | inline elements whose start and end separate words, as a space would | Stubbs' table of contents, whose page column `span.float-right` follows the title with no space ("years’ work<span…>Page"); without the rule the reader would make "workPage" |
 | `page_anchor` | page anchors; the number from `id="Page_N"`, else from `title` | `span.pagenum`, `a.pagenum`; their own text, "47" or "[Pg 47]", is dropped |
 | `heading` | headings | `h1`–`h6`; Stubbs adds `p.ph3` |
 | `margin_note` | margin notes | `div.sidenote`, `p.sidenote`, `span.sidenote` |
@@ -264,7 +270,10 @@ or replaces them.
 - **Which rule wins.** The outermost element that a rule matches owns
   everything inside it: a `p` inside a `div.sidenote` is part of the
   margin note. Four things are found inside any element: page anchors,
-  note references, `drop` and `drop_text`.
+  note references, `drop` and `drop_text`. Any element with text of its
+  own that no rule matches and that is inside no block is a paragraph,
+  whatever its tag; text outside every block, at the top of the document,
+  is an error that names its line.
 - **Notes.** A note is paired with its reference by the `id` its
   reference's `href` points to, which may be on the note or on any
   element inside it, a dropped label included: `drop` leaves out text,
@@ -272,9 +281,17 @@ or replaces them.
   its number.
 - **A margin note inside a paragraph**, as Domesday's 3 `span.sidenote`,
   is a block of its own placed before that paragraph, whose text runs on
-  around it.
+  around it. Only margin notes move: another block inside a paragraph,
+  such as the verse inside Mariéjol's note 1423, ends the paragraph
+  where it stands, and the text after it is a new paragraph, so that the
+  order of the words is the book's.
 - **Text between two notes**, left there by a misplaced end tag (after
-  Domesday's note 101, `</p>.’]`), belongs to the note before it.
+  Domesday's note 101, `</p>.’]`), runs on into the last block of the
+  note before it, with no space when it starts with punctuation:
+  "interlined.’]" stays one token.
+- **A page anchor inside the notes**, as Domesday's anchor of printed
+  page 357 between notes 1198 and 1199, is out of its place: it is not
+  used for pages (section 5), and `summary.md` lists it.
 - **Paragraphs.** Any other `p`, or `div` with text of its own, is a
   paragraph. An element left with no token, such as a `p` that holds
   only a page anchor (36 in Haskins, 47 in Stubbs), is not a block.
@@ -289,6 +306,13 @@ or replaces them.
   book, and is not a token.
 - An element of Gutenberg's typographic markup gives its text only:
   small capitals, superscripts, `span[lang]`. "M^{r}" is "Mr".
+- A fraction written with a superscript, the fraction slash `⁄` and a
+  subscript, `2<sup>1</sup>⁄<sub>2</sub>`, is written as printed, "2½",
+  with the Unicode fraction character when there is one, else as
+  "2 1⁄2" with a space. Domesday has 94 of them; read as their text only,
+  "21⁄2" would be another number.
+- A soft hyphen (U+00AD) is removed, and a zero-width space (U+200B)
+  separates words. None is in the four books.
 - A correction marked in the text (`<ins class="correction"
   title="original: …">`) keeps the corrected text. Its tokens are tagged,
   so that a difference on them is reported as `reference_correction`
@@ -377,7 +401,7 @@ Every reference token gets a page index, from the alignment at words:
   moves notes to the end of the book, so the page anchors around them
   say nothing of where they were printed.
 - An unaligned token of the body, in a book with page anchors, takes the
-  page of the anchor before it. An anchor's page is its printed page
+  page of the body's anchor before it. An anchor's page is its printed page
   number plus its offset: the median of page index minus printed page
   number over the aligned tokens between this anchor and the next,
   which is constant over runs of pages (section 2).
