@@ -50,7 +50,7 @@ from difflib import SequenceMatcher
 from enum import StrEnum
 from typing import assert_never
 
-from galley_eval.errors import AlignmentError
+from galley_eval.errors import AlignmentInvariantError
 from galley_eval.reader import ReferenceKind, ReferenceText, ReferenceToken, Stream
 
 __all__ = [
@@ -61,6 +61,7 @@ __all__ = [
     "Operation",
     "Pairing",
     "ReferencePlace",
+    "ReferenceSide",
     "State",
     "Stretch",
     "Subkind",
@@ -72,6 +73,7 @@ __all__ = [
     "equal_key_share",
     "extra_tokens",
     "reference_places",
+    "reference_side",
     "reference_states",
 ]
 
@@ -442,19 +444,42 @@ def reference_places(reference: ReferenceText) -> tuple[ReferencePlace, ...]:
     return body + notes
 
 
-def align(reference: ReferenceText, galley: tuple[GalleyToken, ...]) -> Alignment:
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ReferenceSide:
+    """The reference's places and their alignment keys, computed once per
+    book and given to align for each of its stage outputs."""
+
+    places: tuple[ReferencePlace, ...]
+    keys: tuple[str, ...]
+
+
+def reference_side(reference: ReferenceText) -> ReferenceSide:
+    """The places of `reference` and the alignment key of each."""
+    places = reference_places(reference)
+    return ReferenceSide(
+        places=places, keys=tuple(alignment_key(place.token.text) for place in places)
+    )
+
+
+def align(
+    reference: ReferenceText,
+    galley: tuple[GalleyToken, ...],
+    prepared: ReferenceSide | None = None,
+) -> Alignment:
     """A stage output aligned with `reference` by the three passes of spec
     section 5. The tokens of each galley stream must come in `galley` in
     the stream's order; the streams may be interleaved or one after
     another. The reference's tokens are counted as reference_places gives
-    them. Each galley token is in exactly one pairing, and so is each
-    reference token; AlignmentError says which one is not, should the
-    passes ever break that."""
-    places = reference_places(reference)
+    them; `prepared`, the reference_side of `reference`, saves computing
+    it again for each output. Each galley token is in exactly one pairing,
+    and so is each reference token; AlignmentInvariantError says which one
+    is not, should the passes ever break that."""
+    side = prepared if prepared is not None else reference_side(reference)
+    places = side.places
     sides = _Sides(
         places=places,
         galley=galley,
-        reference_keys=tuple(alignment_key(place.token.text) for place in places),
+        reference_keys=side.keys,
         galley_keys=tuple(alignment_key(token.text) for token in galley),
     )
     book_order = tuple(
@@ -578,7 +603,7 @@ def _pairing_of_each(
     side_name: str,
 ) -> tuple[int, ...]:
     """For each of the `count` tokens of a side, the index of the one
-    pairing that holds it. Raises AlignmentError when a token is in no
+    pairing that holds it. Raises AlignmentInvariantError when a token is in no
     pairing or in two."""
     found: dict[int, int] = {}
     for pairing_index, pairing in enumerate(pairings):
@@ -588,12 +613,12 @@ def _pairing_of_each(
                     f"{side_name} token {index} is in pairings {found[index]} "
                     f"and {pairing_index}"
                 )
-                raise AlignmentError(message)
+                raise AlignmentInvariantError(message)
             found[index] = pairing_index
     lost = tuple(index for index in range(count) if index not in found)
     if lost or len(found) != count:
         message = f"{side_name} tokens in no pairing: {lost[:10]}"
-        raise AlignmentError(message)
+        raise AlignmentInvariantError(message)
     return tuple(found[index] for index in range(count))
 
 
@@ -703,7 +728,7 @@ def _provisional_pages(
 def _note_index(place: ReferencePlace) -> int:
     if place.note_index is None:
         message = "a token of the notes stream has no note"
-        raise AlignmentError(message)
+        raise AlignmentInvariantError(message)
     return place.note_index
 
 
@@ -784,9 +809,9 @@ def _pair(
     )
 
 
-# The most tokens a split or glued joins: a choice, no case of more was seen
-# (spec section 5).
-_MOST_JOINED = 4
+# The most tokens a split or glued joins (spec section 5): the text layer
+# glued ten words into one on Haskins page index 28; 12 leaves room.
+_MOST_JOINED = 12
 
 # Two tokens are alike, and may be paired as changed, when difflib's ratio
 # of their keys' characters is at least this: a guess, to be checked on the
@@ -864,28 +889,32 @@ def _join_at(
     galley_at: int,
 ) -> tuple[State, int, int] | None:
     """A split or glued starting at the current positions, with its state
-    and the ends it reaches on each side; None when there is neither. Only
-    tokens with a non-empty key are joined, 2 to 4 of them."""
-    key = reference_keys[reference_at]
-    if key:
-        for end in range(
-            galley_at + 2, min(galley_at + _MOST_JOINED, len(galley_keys)) + 1
-        ):
-            parts = galley_keys[galley_at:end]
-            if not all(parts):
-                break
-            if "".join(parts) == key:
-                return State.SPLIT, reference_at + 1, end
-    key = galley_keys[galley_at]
-    if key:
-        for end in range(
-            reference_at + 2, min(reference_at + _MOST_JOINED, len(reference_keys)) + 1
-        ):
-            parts = reference_keys[reference_at:end]
-            if not all(parts):
-                break
-            if "".join(parts) == key:
-                return State.GLUED, end, galley_at + 1
+    and the ends it reaches on each side; None when there is neither."""
+    split_end = _joined_end(galley_keys, galley_at, reference_keys[reference_at])
+    if split_end is not None:
+        return State.SPLIT, reference_at + 1, split_end
+    glued_end = _joined_end(reference_keys, reference_at, galley_keys[galley_at])
+    if glued_end is not None:
+        return State.GLUED, glued_end, galley_at + 1
+    return None
+
+
+def _joined_end(keys: tuple[str, ...], start: int, whole: str) -> int | None:
+    """The end of the run of 2 to _MOST_JOINED tokens of `keys` from
+    `start` whose joined keys equal `whole`, joining tokens with a
+    non-empty key while what they join is a beginning of `whole`; None
+    when there is no such run."""
+    if not whole:
+        return None
+    joined = ""
+    for end in range(start, min(start + _MOST_JOINED, len(keys))):
+        if not keys[end]:
+            return None
+        joined += keys[end]
+        if not whole.startswith(joined):
+            return None
+        if joined == whole:
+            return end + 1 if end > start else None
     return None
 
 

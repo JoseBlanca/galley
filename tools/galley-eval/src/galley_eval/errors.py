@@ -19,8 +19,16 @@ class ReferenceReadError(EvaluationError):
 
 
 class AlignmentError(EvaluationError):
-    """A stage output cannot be aligned with the reference: a token ended
-    in no pairing or in two, which is a fault of the alignment's code."""
+    """galley's words of a book align less than half of the reference's
+    tokens to a token with the same key: a wrong scan or a broken reading
+    rule is likelier than galley being that far off (spec section 5)."""
+
+
+class AlignmentInvariantError(Exception):
+    """The alignment broke its own rule: a token ended in no pairing or in
+    two. A fault of the tool's code, not of a book, so it is not an
+    EvaluationError and stops the command instead of being reported for
+    one book and passed over."""
 
 
 class GalleyFilesError(EvaluationError):

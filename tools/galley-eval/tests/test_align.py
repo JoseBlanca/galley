@@ -553,28 +553,54 @@ def test_split_is_looked_for_only_at_the_current_position() -> None:
     assert _pairing_of_reference(alignment, 1).state is State.MISSING
 
 
-def test_split_joins_up_to_four_tokens() -> None:
-    alignment, _ = _align(
-        _reference(_paragraph("one interesting two")), _galley("one in ter est ing two")
-    )
-    assert _pairing_of_reference(alignment, 1).state is State.SPLIT
-    assert _pairing_of_reference(alignment, 1).galley_indices == (1, 2, 3, 4)
+def test_split_joins_five_tokens() -> None:
     alignment, _ = _align(
         _reference(_paragraph("one interestingly two")),
         _galley("one in ter est ing ly two"),
     )
-    assert _pairing_of_reference(alignment, 1).state is not State.SPLIT
+    assert _pairing_of_reference(alignment, 1).state is State.SPLIT
+    assert _pairing_of_reference(alignment, 1).galley_indices == (1, 2, 3, 4, 5)
 
 
-def test_glued_joins_up_to_four_tokens() -> None:
+def test_glued_joins_the_eleven_words_of_haskins_page_28() -> None:
+    # Haskins page index 28: the text layer glued eleven words into one.
     alignment, _ = _align(
-        _reference(_paragraph("one a b c d two")), _galley("one abcd two")
+        _reference(
+            _paragraph("so The land is not the whole of nature’s gift to Normandy; it")
+        ),
+        _galley("so Thelandisnotthewholeofnature'sgifttoNormandy; it"),
+    )
+    pairing = _pairing_of_reference(alignment, 1)
+    assert pairing.state is State.GLUED
+    assert pairing.reference_indices == tuple(range(1, 12))
+
+
+def test_glued_joins_twelve_tokens_but_not_thirteen() -> None:
+    letters = tuple("abcdefghijklm")
+    alignment, _ = _align(
+        _reference(_paragraph("one " + " ".join(letters[:12]) + " two")),
+        _galley("one " + "".join(letters[:12]) + " two"),
     )
     assert _pairing_of_reference(alignment, 1).state is State.GLUED
     alignment, _ = _align(
-        _reference(_paragraph("one a b c d e two")), _galley("one abcde two")
+        _reference(_paragraph("one " + " ".join(letters) + " two")),
+        _galley("one " + "".join(letters) + " two"),
     )
     assert _pairing_of_reference(alignment, 1).state is not State.GLUED
+
+
+def test_split_joins_twelve_tokens_but_not_thirteen() -> None:
+    letters = tuple("abcdefghijklm")
+    alignment, _ = _align(
+        _reference(_paragraph("one " + "".join(letters[:12]) + " two")),
+        _galley("one " + " ".join(letters[:12]) + " two"),
+    )
+    assert _pairing_of_reference(alignment, 1).state is State.SPLIT
+    alignment, _ = _align(
+        _reference(_paragraph("one " + "".join(letters) + " two")),
+        _galley("one " + " ".join(letters) + " two"),
+    )
+    assert _pairing_of_reference(alignment, 1).state is not State.SPLIT
 
 
 def test_split_never_joins_a_token_with_an_empty_key() -> None:

@@ -41,7 +41,7 @@ from galley_eval.align import (
     Subkind,
     align,
     equal_key_share,
-    reference_places,
+    reference_side,
     reference_states,
 )
 from galley_eval.books import EvaluationBook
@@ -202,9 +202,10 @@ def evaluation_of(
 ) -> Evaluation:
     """The comparison of galley's side `side` with `reference`, for
     `book`; `dictionary` holds the lowered words of its language."""
-    places = reference_places(reference)
+    prepared = reference_side(reference)
+    places = prepared.places
     outputs = (side.words, side.lines, side.blocks, side.markdown)
-    words_alignment = align(reference, side.words)
+    words_alignment = align(reference, side.words, prepared)
     share = equal_key_share(words_alignment, places, side.words)
     if share < _LEAST_EQUAL_KEY_SHARE:
         message = (
@@ -215,7 +216,7 @@ def evaluation_of(
         )
         raise AlignmentError(message)
     alignments = (words_alignment,) + tuple(
-        align(reference, galley) for galley in outputs[1:]
+        align(reference, galley, prepared) for galley in outputs[1:]
     )
     pages = reference_pages(
         reference, words_alignment, side.words, frozenset(book.exclude_pages)
