@@ -22,8 +22,11 @@ title = "The Normans in European History"
 authors = ["Charles Homer Haskins"]
 language = "en"
 exclude_pages = [0, 3]
-expected_counts = { notes = 72, margin_notes = 0, note_references = 72, page_anchors = 260 }
+html_sha256 = "d88ef036c5def555a899a2df51aea1d337cd2583ca9ae5d154c06185ed552ea7"
+expected_counts = { notes = 72, margin_notes = 0, note_references = 72, page_anchors = 260, headings = 21, first_tokens = ["THE", "NORMANS", "IN", "EUROPEAN", "HISTORY"] }
 """
+
+HASKINS_SHA256 = "d88ef036c5def555a899a2df51aea1d337cd2583ca9ae5d154c06185ed552ea7"
 
 
 def _write(folder: Path, text: str) -> Path:
@@ -48,7 +51,12 @@ def test_the_evaluation_set_has_the_four_books_of_the_spec() -> None:
     assert mariejol.pdf_name == "catherinedemedic00mariuoft.pdf"
     assert books[2].margin_notes_moved
     assert books[2].expected_counts == ExpectedCounts(
-        notes=1729, margin_notes=593, note_references=1731, page_anchors=537
+        notes=1729,
+        margin_notes=593,
+        note_references=1731,
+        page_anchors=537,
+        headings=28,
+        first_tokens=("DOMESDAY", "BOOK", "AND", "BEYOND", "THREE"),
     )
 
 
@@ -64,8 +72,14 @@ def test_book_with_only_required_keys_takes_the_defaults(tmp_path: Path) -> None
         exclude_pages=(0, 3),
         not_in_reference=(),
         margin_notes_moved=False,
+        html_sha256=HASKINS_SHA256,
         expected_counts=ExpectedCounts(
-            notes=72, margin_notes=0, note_references=72, page_anchors=260
+            notes=72,
+            margin_notes=0,
+            note_references=72,
+            page_anchors=260,
+            headings=21,
+            first_tokens=("THE", "NORMANS", "IN", "EUROPEAN", "HISTORY"),
         ),
         rules=DEFAULT_RULES,
     )
@@ -135,15 +149,29 @@ def test_selector_of_another_form_is_a_value_error(text: str) -> None:
         ("not_in_reference = 14", "book[0].not_in_reference", "expected a list"),
         ("margin_notes_moved = 1", "book[0].margin_notes_moved", "true or false"),
         (
-            "expected_counts = { notes = 1, margin_notes = 0, note_references = 1 }",
+            "expected_counts = { notes = 1, margin_notes = 0, note_references = 1, headings = 0, first_tokens = ['a', 'b', 'c', 'd', 'e'] }",
             "book[0].expected_counts.page_anchors",
             "missing",
         ),
         (
-            "expected_counts = { notes = -1, margin_notes = 0, note_references = 1, page_anchors = 0 }",
+            "expected_counts = { notes = -1, margin_notes = 0, note_references = 1, page_anchors = 0, headings = 0, first_tokens = ['a', 'b', 'c', 'd', 'e'] }",
             "book[0].expected_counts.notes",
             "0 or more",
         ),
+        (
+            "expected_counts = { notes = 1, margin_notes = 0, note_references = 1, page_anchors = 0, headings = 0, first_tokens = ['a', 'b'] }",
+            "book[0].expected_counts.first_tokens",
+            "five tokens",
+        ),
+        (
+            "expected_counts = { notes = 1, margin_notes = 0, note_references = 1, page_anchors = 0, headings = 0, first_tokens = ['a', 'b', 'c d', 'e', 'f'] }",
+            "book[0].expected_counts.first_tokens[2]",
+            "white space",
+        ),
+        ("html_sha256 = 'd88ef036'", "book[0].html_sha256", "64 hexadecimal"),
+        ("html_sha256 = 72514", "book[0].html_sha256", "expected a string"),
+        ("title = ''", "book[0].title", "must not be empty"),
+        ("archive_id = ''", "book[0].archive_id", "must not be empty"),
         ("rules = { remove = {} }", "book[0].rules.remove", "unknown"),
         (
             "rules = { add = { header = ['h1'] } }",

@@ -13,7 +13,6 @@ from typing import cast
 
 __all__ = [
     "DEFAULT_RULES",
-    "RULE_NAMES",
     "ReadingRules",
     "RuleChange",
     "Selector",
@@ -78,12 +77,14 @@ class ReadingRules:
     Gutenberg's header, `header.pg-boilerplate`. `drop_text` holds regular
     expressions that must match a whole run of text, its white space at
     both ends aside; `note_reference` holds regular expressions that must
-    match the whole `href` of an `a`.
+    match the whole `href` of an `a`. `separate` names inline elements
+    whose start and end separate words, as a space would.
     """
 
     start: tuple[Selector, ...]
     drop: tuple[Selector, ...]
     drop_text: tuple[re.Pattern[str], ...]
+    separate: tuple[Selector, ...]
     page_anchor: tuple[Selector, ...]
     heading: tuple[Selector, ...]
     margin_note: tuple[Selector, ...]
@@ -109,8 +110,11 @@ DEFAULT_RULES = ReadingRules(
         ".footnotes > h2",
         "a.label",
         "span.label",
+        "div.tb",
+        "div.larger-version",
     ),
     drop_text=(),
+    separate=(),
     page_anchor=_selectors("span.pagenum", "a.pagenum"),
     heading=_selectors("h1", "h2", "h3", "h4", "h5", "h6"),
     margin_note=_selectors("div.sidenote", "p.sidenote", "span.sidenote"),
@@ -125,7 +129,7 @@ DEFAULT_RULES = ReadingRules(
     table=_selectors("table"),
 )
 
-RULE_NAMES = tuple(field.name for field in fields(ReadingRules))
+_RULE_NAMES = tuple(field.name for field in fields(ReadingRules))
 _PATTERN_RULES = ("drop_text", "note_reference")
 
 
@@ -141,11 +145,12 @@ def change_rules(
 ) -> ReadingRules:
     """`rules` with the rule named `rule` added to or replaced by `values`,
     written as in books.toml: selectors, or regular expressions for
-    `drop_text` and `note_reference`. Raises ValueError for an unknown rule, a selector that does not parse or a
-    regular expression that does not compile; the reader of books.toml
+    `drop_text` and `note_reference`. Raises ValueError for an unknown
+    rule, a selector that does not parse or a regular expression that does
+    not compile; the reader of books.toml
     turns it into a BooksFileError that names the file and the key."""
-    if rule not in RULE_NAMES:
-        message = f"unknown rule {rule!r}; the rules are {', '.join(RULE_NAMES)}"
+    if rule not in _RULE_NAMES:
+        message = f"unknown rule {rule!r}; the rules are {', '.join(_RULE_NAMES)}"
         raise ValueError(message)
     if rule in _PATTERN_RULES:
         new: tuple[object, ...] = tuple(_pattern(value) for value in values)

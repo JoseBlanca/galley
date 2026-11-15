@@ -3,10 +3,13 @@ section 4), on small pieces of HTML written after the four books' HTML,
 one per rule and per case the reviews of the spec found (spec section 10,
 plan work package 1)."""
 
+import hashlib
 import re
+from pathlib import Path
 
 import pytest
 
+from galley.model import BlockKind
 from galley_eval.errors import ReferenceReadError
 from galley_eval.reader import (
     Gap,
@@ -19,6 +22,7 @@ from galley_eval.reader import (
     ReferenceToken,
     Stream,
     read_reference,
+    read_reference_file,
 )
 from galley_eval.rules import DEFAULT_RULES, ReadingRules, RuleChange, change_rules
 
@@ -123,10 +127,14 @@ def test_note_label_that_holds_the_pairing_id_is_dropped_and_pairs_the_note() ->
     # Haskins: one div.footnote per note; the id is on the dropped a.label.
     reference = _read(
         '<p>So wrote Michelet<a class="fnanchor" href="#Footnote_1" id="FNanchor_1">1</a>.</p>'
+        # As in pg72514: Gutenberg's heading inside div.chapter.footnotes,
+        # after a p holding only a page anchor.
+        '<div class="chapter footnotes">'
+        '<p><span class="pagenum" id="Page_250">250</span></p>'
         '<h2 class="nobreak" id="FOOTNOTES">FOOTNOTES</h2>'
         '<div class="footnote"><p class="fn1"><a class="label" href="#FNanchor_1"'
-        ' id="Footnote_1">1</a> <i>La France</i>, p. 161.</p></div>',
-        change_rules(HASKINS_RULES, RuleChange.ADD, "drop_text", ("FOOTNOTES",)),
+        ' id="Footnote_1">1</a> <i>La France</i>, p. 161.</p></div></div>',
+        HASKINS_RULES,
     )
     assert reference.blocks == (_paragraph("So wrote Michelet."),)
     assert reference.notes == (
@@ -162,30 +170,36 @@ def test_note_continued_by_an_element_without_an_id_is_one_note() -> None:
     )
 
 
-def test_text_left_between_notes_by_a_misplaced_end_tag_continues_the_note() -> None:
-    # Domesday's note 101 ends `interlined</em></p>.’]`.
+def test_text_left_between_notes_runs_on_into_the_note_before() -> None:
+    # Domesday's note 101 ends `interlined</em></p>.’]`: no space before
+    # punctuation, a space before a word.
     reference = _read(
-        '<p>one<a href="#Footnote_101">[101]</a></p><div class="footnote">'
+        '<p>one<a href="#Footnote_101">[101]</a> two<a href="#Footnote_102">[102]</a></p>'
+        '<div class="footnote">'
         '<p><a id="Footnote_101"><span class="label">[101]</span></a>'
-        " [vel bures <em>interlined</em></p>.’]\n</div>",
+        " [vel bures <em>interlined</em></p>.\u2019]\n"
+        '<p><a id="Footnote_102"><span class="label">[102]</span></a> Hist.</p>Eng. Law'
+        "\n</div>",
         DOMESDAY_RULES,
     )
     assert reference.notes == (
-        ReferenceNote(
-            "Footnote_101", (_paragraph("[vel bures interlined"), _paragraph(".’]"))
-        ),
+        ReferenceNote("Footnote_101", (_paragraph("[vel bures interlined.\u2019]"),)),
+        ReferenceNote("Footnote_102", (_paragraph("Hist. Eng. Law"),)),
     )
 
 
-def test_page_anchor_between_notes_is_placed_in_the_notes_stream() -> None:
+def test_page_anchor_between_notes_is_kept_apart_from_the_body_anchors() -> None:
+    # Domesday's anchor of printed page 357, between notes 1198 and 1199.
     reference = _read(
         '<p>one<a href="#Footnote_1">1</a> two<a href="#Footnote_2">2</a></p>'
-        '<div class="footnote"><p><a id="Footnote_1"><span class="label">[1]</span></a> mark-men.</p>'
+        '<div class="footnote"><p><a id="Footnote_1"><span class="label">[1]</span></a>'
+        " mark-men.</p>"
         '<a class="pagenum" title="357" id="Page_357"></a>'
         '<p><a id="Footnote_2"><span class="label">[2]</span></a> D. B. ii.</p></div>',
         DOMESDAY_RULES,
     )
-    assert reference.page_anchors == (PageAnchor("357", Gap(Stream.NOTES, 1)),)
+    assert reference.page_anchors == ()
+    assert reference.anchors_in_notes == (PageAnchor("357", Gap(Stream.NOTES, 1)),)
 
 
 def test_link_from_one_note_to_another_is_text_not_a_note_reference() -> None:
@@ -255,10 +269,54 @@ def test_margin_note_inside_a_paragraph_comes_before_it_and_the_text_runs_on() -
     )
 
 
+def test_other_block_inside_a_paragraph_ends_it_and_the_rest_is_a_new_one() -> None:
+    # Mariéjol's note 1423, pg36315 lines 23460-23476: a verse inside the
+    # div of the note, between two runs of prose.
+    reference = _read(
+        '<p>one<a href="#footnote1423">1423</a></p>'
+        '<blockquote class="footnote"><div><a id="footnote1423"><b>Note 1423: </b></a>'
+        '<a href="#footnotetag1423">(retour) </a> ne contredit pas ce témoin:\n'
+        '<div class="poem"><div class="stanza"><p class="i14"><i>Cor junctum</i></p>'
+        '<p class="i14"><i>Ante homines</i></p></div></div>\n'
+        "<p><i>Amor</i>, en langage poétique.</p></div></blockquote>",
+        MARIEJOL_RULES,
+    )
+    assert reference.notes == (
+        ReferenceNote(
+            "footnote1423",
+            (
+                _paragraph("ne contredit pas ce témoin:"),
+                _block(ReferenceKind.QUOTE, "Cor junctum Ante homines"),
+                _paragraph("Amor, en langage poétique."),
+            ),
+        ),
+    )
+
+
+def test_poetry_holding_verse_lines_is_one_quote() -> None:
+    # Haskins, pg72514 lines 6483-6492: div.poetry and div.verse are both
+    # quotes, and the outermost owns the verses.
+    reference = _read(
+        "<p>pilgrim\u2019s chorus:\u2014</p>"
+        '<div class="poetry-container"><div class="poetry"><div class="stanza">'
+        '<div class="verse indent2">O Roma nobilis, orbis et domina,</div>'
+        '<div class="verse indent0">Cunctarum urbium excellentissima,</div>'
+        "</div></div></div>"
+    )
+    assert reference.blocks == (
+        _paragraph("pilgrim\u2019s chorus:\u2014"),
+        _block(
+            ReferenceKind.QUOTE,
+            "O Roma nobilis, orbis et domina, Cunctarum urbium excellentissima,",
+        ),
+    )
+
+
 def test_marked_correction_keeps_the_corrected_text_and_tags_its_tokens() -> None:
     reference = _read(
         '<p>on the <ins class="correction" title="original: roial">royal</ins>'
-        " demesne</p>"
+        ' demesne, <ins class="correction" title="original: Demesne">demesne</ins>,'
+        " held</p>"
     )
     assert reference.blocks == (
         ReferenceBlock(
@@ -267,10 +325,32 @@ def test_marked_correction_keeps_the_corrected_text_and_tags_its_tokens() -> Non
                 ReferenceToken("on", marked_correction=False),
                 ReferenceToken("the", marked_correction=False),
                 ReferenceToken("royal", marked_correction=True),
-                ReferenceToken("demesne", marked_correction=False),
+                ReferenceToken("demesne,", marked_correction=False),
+                # The correction covers part of the token.
+                ReferenceToken("demesne,", marked_correction=True),
+                ReferenceToken("held", marked_correction=False),
             ),
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("html", "text"),
+    [
+        ("54<sup>1</sup>\u2044<sub>2</sub> teams", "54\u00bd teams"),
+        ("2<sup>1</sup>\u2044<sub>7</sub> hides", "2\u2150 hides"),
+        ("2<sup>5</sup>\u2044<sub>7</sub> hides", "2 5\u20447 hides"),
+        ("<sup>2</sup>\u2044<sub>3</sub>", "\u2154"),
+        ("M<sup>r</sup> Round", "Mr Round"),
+    ],
+)
+def test_fraction_is_written_as_printed(html: str, text: str) -> None:
+    assert _read(f"<p>{html}</p>").blocks == (_paragraph(text),)
+
+
+def test_soft_hyphen_is_removed_and_zero_width_space_separates_words() -> None:
+    reference = _read("<p>house\u00adholders and\u200btheir</p>")
+    assert reference.blocks == (_paragraph("householders and their"),)
 
 
 def test_typographic_markup_gives_its_text_only() -> None:
@@ -363,11 +443,146 @@ def test_added_heading_rule_makes_a_heading_of_a_p() -> None:
     )
 
 
-def test_text_outside_every_block_is_an_error() -> None:
-    with pytest.raises(ReferenceReadError, match="text outside every block"):
-        _read("<p>Text</p>stray words<p>More</p>")
+def test_text_outside_every_block_is_an_error_naming_its_line() -> None:
+    with pytest.raises(ReferenceReadError, match="text outside every block") as raised:
+        read_reference(
+            f"<html><body>{HEADER}\n<p>Text</p>\n\n  stray words<p>More</p></body></html>",
+            DEFAULT_RULES,
+        )
+    assert "line 4" in str(raised.value)
+    assert "stray words" in str(raised.value)
+
+
+def test_text_that_drop_text_matches_is_no_error_outside_every_block() -> None:
+    rules = change_rules(DEFAULT_RULES, RuleChange.ADD, "drop_text", (r"Note \d+:",))
+    assert _read("<p>Text</p>Note 1:<p>More</p>", rules).blocks == (
+        _paragraph("Text"),
+        _paragraph("More"),
+    )
 
 
 def test_end_tag_that_closes_nothing_is_an_error() -> None:
     with pytest.raises(ReferenceReadError, match="closes no open element"):
         _read("<p>Text</p></div>")
+
+
+def test_section_break_asterisks_and_map_links_are_dropped() -> None:
+    reference = _read(
+        '<p>several periods</p><div class="tb">* * * * *</div><p>The interest</p>'
+        '<div class="larger-version">[<a href="images/map1_large.jpg">Larger map</a>]'
+        "</div>"
+    )
+    assert reference.blocks == (
+        _paragraph("several periods"),
+        _paragraph("The interest"),
+    )
+
+
+def test_separate_rule_makes_an_inline_element_separate_words() -> None:
+    # Stubbs' table of contents, pg70828 line 453.
+    html = (
+        '<p>years\u2019 work<span class="float-right"><i>Page</i> '
+        '<a href="#Page_34">34</a></span></p>'
+    )
+    assert _read(html).blocks == (_paragraph("years\u2019 workPage 34"),)
+    rules = change_rules(
+        DEFAULT_RULES, RuleChange.ADD, "separate", ("span.float-right",)
+    )
+    assert _read(html, rules).blocks == (_paragraph("years\u2019 work Page 34"),)
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def test_reference_file_is_read_when_its_sha256_is_the_expected_one(
+    tmp_path: Path,
+) -> None:
+    html = f"<html><body>{HEADER}<p>Text</p></body></html>".encode()
+    path = tmp_path / "pg1-images.html"
+    path.write_bytes(html)
+    reference = read_reference_file(path, DEFAULT_RULES, _sha256(html))
+    assert reference.blocks == (_paragraph("Text"),)
+
+
+def test_reference_file_of_another_sha256_is_an_error(tmp_path: Path) -> None:
+    path = tmp_path / "pg1-images.html"
+    path.write_bytes(f"<html><body>{HEADER}<p>Text</p></body></html>".encode())
+    with pytest.raises(ReferenceReadError, match=f"{re.escape(str(path))}.*SHA-256"):
+        read_reference_file(path, DEFAULT_RULES, _sha256(b"another version"))
+
+
+def test_missing_reference_file_is_an_error_naming_the_fetch_command(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "pg1-images.html"
+    with pytest.raises(ReferenceReadError, match="fetch_samples.py") as raised:
+        read_reference_file(path, DEFAULT_RULES, _sha256(b""))
+    assert str(path) in str(raised.value)
+
+
+def test_reference_file_that_is_not_utf8_is_an_error(tmp_path: Path) -> None:
+    data = "<p>Médicis</p>".encode("latin-1")
+    path = tmp_path / "pg1-images.html"
+    path.write_bytes(data)
+    with pytest.raises(ReferenceReadError, match="not UTF-8"):
+        read_reference_file(path, DEFAULT_RULES, _sha256(data))
+
+
+def test_reference_kinds_are_galleys_block_kinds_and_table() -> None:
+    assert {kind.value for kind in ReferenceKind} == {
+        kind.value for kind in BlockKind
+    } | {"table"}
+
+
+@pytest.mark.parametrize(
+    ("rule", "html", "kind"),
+    [
+        ("heading", '<p class="sidenote">Kent.</p>', ReferenceKind.MARGIN_NOTE),
+        ("table", '<p class="sidenote">Kent.</p>', ReferenceKind.MARGIN_NOTE),
+        ("figure", "<table><tr><td>Hides</td></tr></table>", ReferenceKind.TABLE),
+        ("quote", '<div class="figcenter">MAP</div>', ReferenceKind.FIGURE),
+        ("heading", '<div class="blockquot">Verse</div>', ReferenceKind.QUOTE),
+    ],
+)
+def test_element_two_rules_match_takes_the_kind_of_the_first_in_order(
+    rule: str, html: str, kind: ReferenceKind
+) -> None:
+    # The order: margin note, table, figure, quote, heading.
+    element = html[1 : html.index(">")].replace(' class="', ".").rstrip('"')
+    rules = change_rules(DEFAULT_RULES, RuleChange.ADD, rule, (element,))
+    assert [block.kind for block in _read(html, rules).blocks] == [kind]
+
+
+def test_content_before_the_first_note_of_a_notes_section_is_an_error() -> None:
+    with pytest.raises(ReferenceReadError, match="before its first note"):
+        _read(
+            '<p>one<a href="#Footnote_1">1</a></p><div class="footnote">'
+            "<p>Gathered notes</p>"
+            '<p><a id="Footnote_1"><span class="label">[1]</span></a> Text.</p></div>',
+            DOMESDAY_RULES,
+        )
+
+
+def test_note_with_text_of_its_own_is_one_paragraph() -> None:
+    reference = _read(
+        '<p>one<a href="#Footnote_1">1</a></p>'
+        '<div class="footnote"><a class="label" id="Footnote_1">1</a> <i>La France</i>,'
+        " p. 161.<br>Ibid.</div>",
+        HASKINS_RULES,
+    )
+    assert reference.notes == (
+        ReferenceNote("Footnote_1", (_paragraph("La France, p. 161. Ibid."),)),
+    )
+
+
+def test_note_inside_a_note_is_text_of_the_outer_note() -> None:
+    reference = _read(
+        '<p>one<a href="#Footnote_1">1</a></p>'
+        '<div class="footnote"><p><a class="label" id="Footnote_1">1</a> Outer.</p>'
+        '<div class="footnote"><p>Inner.</p></div></div>',
+        HASKINS_RULES,
+    )
+    assert reference.notes == (
+        ReferenceNote("Footnote_1", (_paragraph("Outer."), _paragraph("Inner."))),
+    )

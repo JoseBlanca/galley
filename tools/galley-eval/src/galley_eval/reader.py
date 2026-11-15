@@ -10,10 +10,11 @@ and tables included, or the notes, every note's blocks in order.
 
 How the rules apply, beyond the spec's words:
 
-- An element that a rule of the table matches wins over a paragraph that
-  holds it: a `span.sidenote` inside a `p` is a margin note of its own,
-  placed just before that paragraph, whose text runs on without it.
-  Inside an element that a rule matches, the outermost wins.
+- A margin note inside a paragraph, as a `span.sidenote` inside a `p`,
+  is a block of its own placed just before that paragraph, whose text
+  runs on without it. Any other element inside a paragraph that a rule
+  matches ends the paragraph there, and the text after it is a new
+  paragraph. Inside an element that a rule matches, the outermost wins.
 - Any element other than `p` with text of its own is a paragraph, not
   only a `div`: text of its own is text outside its child elements other
   than inline ones (`span`, `i`, `a`, `sup`, ...). Inside an index, such an
@@ -21,19 +22,22 @@ How the rules apply, beyond the spec's words:
 - Text outside every block, such as text directly in `body`, and content
   of a notes section before its first note, are a ReferenceReadError, so
   that no word is lost unseen. Text that a misplaced end tag leaves
-  between two elements of a notes section is a paragraph of the note
-  before it.
+  between two elements of a notes section runs on into the last block of
+  the note before it.
 - A page anchor or note reference inside a dropped element is dropped
   with it.
-- Elements other than inline ones separate words, as `<br>` does.
+- Elements other than inline ones separate words, as `<br>` does, and so
+  do the inline ones of the `separate` rule.
 """
 
+import hashlib
 import re
+import unicodedata
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import override
+from typing import assert_never, override
 
 from galley_eval.errors import ReferenceReadError
 from galley_eval.rules import ReadingRules, Selector, SimpleSelector
@@ -127,19 +131,48 @@ class PageAnchor:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ReferenceText:
-    """A book's reference text (spec section 4)."""
+    """A book's reference text (spec section 4). `page_anchors` are those
+    of the body, in order. `anchors_in_notes` are page anchors that
+    Gutenberg left among the notes it gathered, out of their place, so
+    that they are not used to find pages but listed apart."""
 
     blocks: tuple[ReferenceBlock, ...]
     notes: tuple[ReferenceNote, ...]
     note_references: tuple[NoteReference, ...]
     page_anchors: tuple[PageAnchor, ...]
+    anchors_in_notes: tuple[PageAnchor, ...]
 
 
-def read_reference_file(path: Path, rules: ReadingRules) -> ReferenceText:
+def read_reference_file(
+    path: Path, rules: ReadingRules, html_sha256: str
+) -> ReferenceText:
     """The reference text of the Gutenberg HTML file at `path`, read by
-    `rules`. Raises ReferenceReadError as read_reference does, with the
-    file's path in the message."""
-    html = path.read_text(encoding="utf-8")
+    `rules`, which were written for the file whose SHA-256 is
+    `html_sha256` (64 hexadecimal digits). Raises ReferenceReadError, with
+    the file's path in the message, when the file is missing, is not
+    UTF-8, has another SHA-256 (Gutenberg published a new version), or
+    cannot be read as read_reference says."""
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError as err:
+        message = (
+            f"{path} does not exist; download it with "
+            "`uv run python scripts/fetch_samples.py`"
+        )
+        raise ReferenceReadError(message) from err
+    found = hashlib.sha256(data).hexdigest()
+    if found != html_sha256:
+        message = (
+            f"{path} has the SHA-256 {found}, not {html_sha256}, that of the "
+            "file its reading rules and expected counts were written for; "
+            "check them against the new file before changing html_sha256"
+        )
+        raise ReferenceReadError(message)
+    try:
+        html = data.decode("utf-8")
+    except UnicodeDecodeError as err:
+        message = f"{path} is not UTF-8 text: {err}"
+        raise ReferenceReadError(message) from err
     try:
         return read_reference(html, rules)
     except ReferenceReadError as err:
@@ -175,7 +208,16 @@ class _Element:
     tag: str
     attributes: frozendict[str, str]
     classes: frozenset[str]
-    children: tuple[_Element | str, ...]
+    children: tuple[_Element | _Data, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _Data:
+    """A run of text between two tags, and the line of the HTML where its
+    first character other than white space is, counted from 1."""
+
+    text: str
+    line: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,7 +231,7 @@ class _EndTag:
     tag: str
 
 
-type _Event = _StartTag | _EndTag | str
+type _Event = _StartTag | _EndTag | _Data
 
 _VOID_TAGS = frozenset(
     ("area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta")
@@ -225,7 +267,9 @@ def _events(html: str) -> tuple[_Event, ...]:
 
         @override
         def handle_data(self, data: str) -> None:
-            events.append(data)
+            # getpos() is where the data starts.
+            leading = data[: len(data) - len(data.lstrip())]
+            events.append(_Data(data, self.getpos()[0] + leading.count("\n")))
 
     collector = _Collector(convert_charrefs=True)
     collector.feed(html)
@@ -240,7 +284,7 @@ class _Open:
 
     tag: str
     attributes: frozendict[str, str]
-    children: list[_Element | str]
+    children: list[_Element | _Data]
 
 
 def _tree(events: tuple[_Event, ...]) -> _Element:
@@ -251,7 +295,7 @@ def _tree(events: tuple[_Event, ...]) -> _Element:
     stack = [_Open("#document", frozendict(), [])]
     for event in events:
         match event:
-            case str():
+            case _Data():
                 stack[-1].children.append(event)
             case _StartTag(tag=tag, attributes=attributes):
                 if tag in _VOID_TAGS:
@@ -271,7 +315,7 @@ def _tree(events: tuple[_Event, ...]) -> _Element:
                     if closed.tag == tag:
                         break
             case _:
-                raise AssertionError(event)
+                assert_never(event)
     while len(stack) > 1:
         closed = stack.pop()
         stack[-1].children.append(_element(closed))
@@ -335,7 +379,7 @@ def _prune(
     `selectors` match, that descendant too when `keep_match` is true; None
     when no descendant matches."""
     for position, child in enumerate(element.children):
-        if isinstance(child, str):
+        if isinstance(child, _Data):
             continue
         after = element.children[position + 1 :]
         if _matches(selectors, child, element):
@@ -404,11 +448,23 @@ class _Text:
 
 @dataclass(frozen=True, slots=True)
 class _Lifted:
+    """A margin note inside a paragraph, placed before it."""
+
     element: _Element
     parent: _Element
 
 
-type _Piece = _Text | _Anchor | _Reference | _Lifted
+@dataclass(frozen=True, slots=True)
+class _Split:
+    """Another block inside a paragraph, which ends it there."""
+
+    element: _Element
+    parent: _Element
+
+
+# What a block is made of, and what _pieces gives: those and the splits.
+type _BlockPiece = _Text | _Anchor | _Reference | _Lifted
+type _Piece = _BlockPiece | _Split
 
 
 @dataclass(frozen=True, slots=True)
@@ -484,16 +540,19 @@ def _is_dropped_text(text: str, rules: ReadingRules) -> bool:
 
 
 def _container(
-    children: tuple[_Element | str, ...], parent: _Element, context: _Context
+    children: tuple[_Element | _Data, ...], parent: _Element, context: _Context
 ) -> tuple[_Item, ...]:
     """The blocks and notes of `children` of `parent`, an element that is
     no block itself, in document order."""
     rules = context.rules
     items: list[_Item] = []
     for child in children:
-        if isinstance(child, str):
-            if not _is_dropped_text(child, rules):
-                message = f"text outside every block, in <{parent.tag}>: {child.strip()[:80]!r}"
+        if isinstance(child, _Data):
+            if not _is_dropped_text(child.text, rules):
+                message = (
+                    f"text outside every block, in <{parent.tag}>, line {child.line}: "
+                    f"{child.text.strip()[:80]!r}"
+                )
                 raise ReferenceReadError(message)
             continue
         if _matches(rules.drop, child, parent):
@@ -557,8 +616,8 @@ def _has_own_text(element: _Element, context: _Context) -> bool:
     anchors and note references."""
     rules = context.rules
     for child in element.children:
-        if isinstance(child, str):
-            if not _is_dropped_text(child, rules):
+        if isinstance(child, _Data):
+            if not _is_dropped_text(child.text, rules):
                 return True
         elif (
             child.tag in _INLINE_TAGS
@@ -574,35 +633,51 @@ def _has_own_text(element: _Element, context: _Context) -> bool:
 def _block(
     kind: ReferenceKind, element: _Element, context: _Context, *, lift: bool
 ) -> tuple[_Item, ...]:
-    """The block of `kind` that `element` owns. With `lift`, an element
-    inside it that a rule matches is taken out as a block or note of its
-    own, placed before this one."""
+    """The block of `kind` that `element` owns. With `lift`, as for a
+    paragraph, a margin note inside it is taken out as a block of its own,
+    placed before the part of the paragraph that held it; any other
+    element inside it that a rule matches ends the paragraph there, and
+    the text after it is a new paragraph of the same kind."""
     pieces = _pieces(element, context, lift=lift)
-    lifted = tuple(
-        item
-        for piece in pieces
-        if isinstance(piece, _Lifted)
-        for item in _container((piece.element,), piece.parent, context)
-    )
-    return (*lifted, _raw_block(kind, pieces))
+    items: list[_Item] = []
+    segment: list[_BlockPiece] = []
+    for piece in (*pieces, None):
+        if piece is not None and not isinstance(piece, _Split):
+            segment.append(piece)
+            continue
+        items.extend(
+            item
+            for lifted in segment
+            if isinstance(lifted, _Lifted)
+            for item in _container((lifted.element,), lifted.parent, context)
+        )
+        items.append(_raw_block(kind, tuple(segment)))
+        segment = []
+        if piece is not None:
+            items.extend(_container((piece.element,), piece.parent, context))
+    return tuple(items)
 
 
 def _pieces(element: _Element, context: _Context, *, lift: bool) -> tuple[_Piece, ...]:
     """The text, markers and lifted elements inside `element`, in order."""
     rules = context.rules
     pieces: list[_Piece] = []
-    for child in element.children:
-        if isinstance(child, str):
-            if not any(pattern.fullmatch(child.strip()) for pattern in rules.drop_text):
-                pieces.append(_Text(child, context.correction))
+    for child in _with_fractions(element.children):
+        if isinstance(child, _Data):
+            if not any(
+                pattern.fullmatch(child.text.strip()) for pattern in rules.drop_text
+            ):
+                pieces.append(_Text(child.text, context.correction))
             continue
         if _matches(rules.drop, child, element):
             continue
         marker = _marker(child, element, context)
         if marker is not None:
             pieces.append(marker)
-        elif lift and _is_rule_block(child, element, rules):
+        elif lift and _matches(rules.margin_note, child, element):
             pieces.append(_Lifted(child, element))
+        elif lift and _is_rule_block(child, element, rules):
+            pieces.append(_Split(child, element))
         elif child.tag == "br":
             pieces.append(_SPACE)
         else:
@@ -612,21 +687,97 @@ def _pieces(element: _Element, context: _Context, *, lift: bool) -> tuple[_Piece
                 else context
             )
             inner = _pieces(child, inner_context, lift=lift)
-            if child.tag in _INLINE_TAGS:
+            if child.tag in _INLINE_TAGS and not _matches(
+                rules.separate, child, element
+            ):
                 pieces.extend(inner)
             else:
                 pieces.extend((_SPACE, *inner, _SPACE))
     return tuple(pieces)
 
 
-def _raw_block(kind: ReferenceKind, pieces: tuple[_Piece, ...]) -> _RawBlock:
+_FRACTION_SLASH = "\u2044"
+# Unicode's vulgar fraction characters, by (numerator, denominator).
+_VULGAR_FRACTIONS = frozendict(
+    {
+        (1, 2): "½",
+        (1, 3): "⅓",
+        (2, 3): "⅔",
+        (1, 4): "¼",
+        (3, 4): "¾",
+        (1, 5): "⅕",
+        (2, 5): "⅖",
+        (3, 5): "⅗",
+        (4, 5): "⅘",
+        (1, 6): "⅙",
+        (5, 6): "⅚",
+        (1, 7): "⅐",
+        (1, 8): "⅛",
+        (3, 8): "⅜",
+        (5, 8): "⅝",
+        (7, 8): "⅞",
+        (1, 9): "⅑",
+        (1, 10): "⅒",
+        (0, 3): "↉",
+    }
+)
+
+
+def _digits(node: _Element | _Data, tag: str) -> str | None:
+    """The digits that `node` holds when it is a `tag` holding only digits."""
+    if isinstance(node, _Data) or node.tag != tag or len(node.children) != 1:
+        return None
+    text = node.children[0]
+    return text.text if isinstance(text, _Data) and text.text.isdigit() else None
+
+
+def _with_fractions(
+    children: tuple[_Element | _Data, ...],
+) -> tuple[_Element | _Data, ...]:
+    """`children` with each fraction written with a superscript, the
+    fraction slash and a subscript, `<sup>1</sup>⁄<sub>2</sub>`, made into
+    its text as printed: the vulgar fraction character when Unicode has
+    one, "½", else " 1⁄2" with a space, so that "2" before it does not
+    become another number."""
+    result: list[_Element | _Data] = []
+    position = 0
+    while position < len(children):
+        numerator = _digits(children[position], "sup")
+        middle = children[position + 1] if position + 1 < len(children) else None
+        denominator = (
+            _digits(children[position + 2], "sub")
+            if position + 2 < len(children)
+            else None
+        )
+        if (
+            numerator is not None
+            and isinstance(middle, _Data)
+            and middle.text == _FRACTION_SLASH
+            and denominator is not None
+        ):
+            vulgar = _VULGAR_FRACTIONS.get((int(numerator), int(denominator)))
+            fraction = f" {numerator}{_FRACTION_SLASH}{denominator}"
+            result.append(_Data(fraction if vulgar is None else vulgar, middle.line))
+            position += 3
+        else:
+            result.append(children[position])
+            position += 1
+    return tuple(result)
+
+
+# A soft hyphen is removed; a zero-width space separates words.
+_INVISIBLE = str.maketrans({"\u00ad": None, "\u200b": " "})
+
+
+def _raw_block(kind: ReferenceKind, pieces: tuple[_BlockPiece, ...]) -> _RawBlock:
     text_parts: list[str] = []
     corrections: list[tuple[int, int]] = []
     markers: list[tuple[int, _Marker]] = []
     length = 0
     for piece in pieces:
         match piece:
-            case _Text(text=text, correction=correction):
+            case _Text(text=raw_text, correction=correction):
+                text = raw_text.translate(_INVISIBLE)
                 if correction:
                     corrections.append((length, length + len(text)))
                 text_parts.append(text)
@@ -637,7 +788,7 @@ def _raw_block(kind: ReferenceKind, pieces: tuple[_Piece, ...]) -> _RawBlock:
                 text_parts.append(" ")
                 length += 1
             case _:
-                raise AssertionError(piece)
+                assert_never(piece)
     return _RawBlock(kind, "".join(text_parts), tuple(corrections), tuple(markers))
 
 
@@ -649,21 +800,33 @@ def _notes_section(section: _Element, context: _Context) -> tuple[_Item, ...]:
     end tag (Domesday's note 101 ends `</p>.’]`)."""
     if len(context.rules.note) > 0:
         return _container(section.children, section, context)
-    groups: list[list[_Element | str]] = []
+    groups: list[tuple[str, list[_Element | _Data]]] = []
     for child in section.children:
-        if isinstance(child, _Element) and _note_id(child, context.targets) is not None:
-            groups.append([child])
-        elif isinstance(child, str) and _is_dropped_text(child, context.rules):
+        note_id = (
+            _note_id(child, context.targets) if isinstance(child, _Element) else None
+        )
+        if note_id is not None:
+            groups.append((note_id, [child]))
+        elif isinstance(child, _Data) and _is_dropped_text(child.text, context.rules):
             continue
         elif len(groups) > 0:
-            groups[-1].append(child)
-        elif isinstance(child, str) or not _matches(context.rules.drop, child, section):
+            groups[-1][1].append(child)
+        elif isinstance(child, _Data) or not _matches(
+            context.rules.drop, child, section
+        ):
+            where = (
+                f"line {child.line}" if isinstance(child, _Data) else f"<{child.tag}>"
+            )
             message = (
-                "a notes section holds content before its first note, an "
-                f"element with an id that a note reference points to: {child!r:.80}"
+                f"a notes section holds content before its first note ({where}); "
+                "a note starts at an element with an id that a note reference "
+                "points to"
             )
             raise ReferenceReadError(message)
-    return tuple(_grouped_note(section, tuple(group), context) for group in groups)
+    return tuple(
+        _grouped_note(section, note_id, tuple(group), context)
+        for note_id, group in groups
+    )
 
 
 def _rule_note(element: _Element, context: _Context) -> _RawNote:
@@ -681,26 +844,33 @@ def _rule_note(element: _Element, context: _Context) -> _RawNote:
 
 
 def _grouped_note(
-    section: _Element, group: tuple[_Element | str, ...], context: _Context
+    section: _Element,
+    note_id: str,
+    group: tuple[_Element | _Data, ...],
+    context: _Context,
 ) -> _RawNote:
-    """The note made of `group`, consecutive children of a notes section,
-    the first an element with the note's id. A text among them is a
-    paragraph of the note."""
-    first = group[0]
-    note_id = None if isinstance(first, str) else _note_id(first, context.targets)
-    if note_id is None:
-        raise AssertionError(first)  # a group starts at an element with one
+    """The note `note_id` made of `group`, consecutive children of a notes
+    section. A text among them runs on into the note's last block, with no
+    space when it starts with punctuation."""
     note_context = replace(context, in_note=True)
-    items = tuple(
-        item
-        for child in group
-        for item in (
-            (_raw_block(ReferenceKind.PARAGRAPH, (_Text(child, correction=False),)),)
-            if isinstance(child, str)
-            else _container((child,), section, note_context)
-        )
-    )
-    return _raw_note(note_id, items)
+    items: list[_Item] = []
+    for child in group:
+        if isinstance(child, _Element):
+            items.extend(_container((child,), section, note_context))
+        else:
+            items.append(_run_on(items, child.text.strip()))
+    return _raw_note(note_id, tuple(items))
+
+
+def _run_on(items: list[_Item], text: str) -> _Item:
+    """The last block of `items`, taken out of it, with `text` after its
+    text; a paragraph of `text` alone when `items` ends with no block."""
+    last = items[-1] if len(items) > 0 else None
+    if not isinstance(last, _RawBlock) or last.kind is None:
+        return _raw_block(ReferenceKind.PARAGRAPH, (_Text(text, correction=False),))
+    items.pop()
+    joint = "" if unicodedata.category(text[0]).startswith("P") else " "
+    return replace(last, text=last.text.rstrip() + joint + text)
 
 
 def _raw_note(note_id: str, items: tuple[_Item, ...]) -> _RawNote:
@@ -757,6 +927,7 @@ def _assemble(items: tuple[_Item, ...]) -> ReferenceText:
     notes: list[ReferenceNote] = []
     references: list[NoteReference] = []
     anchors: list[PageAnchor] = []
+    anchors_in_notes: list[PageAnchor] = []
     counts = {Stream.BODY: 0, Stream.NOTES: 0}
 
     def place(raw: _RawBlock, stream: Stream) -> ReferenceBlock | None:
@@ -764,10 +935,14 @@ def _assemble(items: tuple[_Item, ...]) -> ReferenceText:
         for index, marker in markers:
             gap = Gap(stream, counts[stream] + index)
             match marker:
-                case _Anchor(printed_page=printed_page):
+                case _Anchor(printed_page=printed_page) if stream is Stream.BODY:
                     anchors.append(PageAnchor(printed_page, gap))
+                case _Anchor(printed_page=printed_page):
+                    anchors_in_notes.append(PageAnchor(printed_page, gap))
                 case _Reference(note_id=note_id):
                     references.append(NoteReference(note_id, gap))
+                case _:
+                    assert_never(marker)
         counts[stream] += len(tokens)
         if raw.kind is None or len(tokens) == 0:
             return None
@@ -786,9 +961,12 @@ def _assemble(items: tuple[_Item, ...]) -> ReferenceText:
                         note_id, tuple(block for block in placed if block is not None)
                     )
                 )
+            case _:
+                assert_never(item)
     return ReferenceText(
         blocks=tuple(blocks),
         notes=tuple(notes),
         note_references=tuple(references),
         page_anchors=tuple(anchors),
+        anchors_in_notes=tuple(anchors_in_notes),
     )

@@ -6,8 +6,9 @@ Gutenberg ebook number and Internet Archive identifier, the title, authors
 and language that galley's `book.toml` needs, the pages without a text
 layer (`exclude_pages`), the pages whose text Gutenberg left out
 (`not_in_reference`), whether Gutenberg moved the margin notes
-(`margin_notes_moved`), the counts the reader must find in the HTML
-(`expected_counts`), and the reading rules, as changes to the defaults of
+(`margin_notes_moved`), the SHA-256 of the HTML file the rules and counts
+were written for (`html_sha256`), the counts the reader must find in the
+HTML and the first five tokens of its body (`expected_counts`), and the reading rules, as changes to the defaults of
 `galley_eval.rules`:
 
     [book.rules.add]
@@ -19,6 +20,7 @@ An unknown key or a value of the wrong type is a BooksFileError that names
 the file and the key.
 """
 
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,12 +36,16 @@ __all__ = ["EvaluationBook", "ExpectedCounts", "read_books"]
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ExpectedCounts:
     """What the reader must find in a book's HTML, counted by hand: notes,
-    margin notes, note references in the body, and page anchors."""
+    margin notes, note references in the body, page anchors (in the body
+    and among the notes), headings in the body, and the first five tokens
+    of the body."""
 
     notes: int
     margin_notes: int
     note_references: int
     page_anchors: int
+    headings: int
+    first_tokens: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -56,6 +62,7 @@ class EvaluationBook:
     exclude_pages: tuple[int, ...]
     not_in_reference: tuple[int, ...]
     margin_notes_moved: bool
+    html_sha256: str
     expected_counts: ExpectedCounts
     rules: ReadingRules
 
@@ -78,10 +85,13 @@ _REQUIRED_KEYS = (
     "authors",
     "language",
     "exclude_pages",
+    "html_sha256",
     "expected_counts",
 )
 _OPTIONAL_KEYS = ("not_in_reference", "margin_notes_moved", "rules")
-_COUNT_KEYS = ("notes", "margin_notes", "note_references", "page_anchors")
+_COUNT_KEYS = ("notes", "margin_notes", "note_references", "page_anchors", "headings")
+_FIRST_TOKENS = 5
+_SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
 def read_books(path: Path) -> tuple[EvaluationBook, ...]:
@@ -104,10 +114,10 @@ def read_books(path: Path) -> tuple[EvaluationBook, ...]:
     except tomllib.TOMLDecodeError as err:
         message = f"{path} is not valid TOML: {err}"
         raise BooksFileError(message) from err
-    return books_from_toml(content, path)
+    return _books_from_toml(content, path)
 
 
-def books_from_toml(
+def _books_from_toml(
     content: dict[str, object], path: Path
 ) -> tuple[EvaluationBook, ...]:
     """The books in the parsed TOML `content`; `path` names the file in a
@@ -157,6 +167,7 @@ def _book(table: object, key: str, path: Path) -> EvaluationBook:
         margin_notes_moved=_bool(
             book.get("margin_notes_moved", False), f"{key}.margin_notes_moved", path
         ),
+        html_sha256=_sha256(book["html_sha256"], f"{key}.html_sha256", path),
         expected_counts=_counts(
             book["expected_counts"], f"{key}.expected_counts", path
         ),
@@ -166,14 +177,39 @@ def _book(table: object, key: str, path: Path) -> EvaluationBook:
 
 def _counts(value: object, key: str, path: Path) -> ExpectedCounts:
     table = _table(value, key, path)
-    _check_keys(table, _COUNT_KEYS, (), f"{key}.", path)
+    _check_keys(table, (*_COUNT_KEYS, "first_tokens"), (), f"{key}.", path)
     counts = {name: _count(table[name], f"{key}.{name}", path) for name in _COUNT_KEYS}
     return ExpectedCounts(
         notes=counts["notes"],
         margin_notes=counts["margin_notes"],
         note_references=counts["note_references"],
         page_anchors=counts["page_anchors"],
+        headings=counts["headings"],
+        first_tokens=_first_tokens(table["first_tokens"], f"{key}.first_tokens", path),
     )
+
+
+def _first_tokens(value: object, key: str, path: Path) -> tuple[str, ...]:
+    tokens = _strings(value, key, path)
+    if len(tokens) != _FIRST_TOKENS:
+        raise _error(path, key, f"expected five tokens, found {len(tokens)}")
+    for position, token in enumerate(tokens):
+        if token == "" or len(token.split()) != 1:
+            raise _error(
+                path,
+                f"{key}[{position}]",
+                f"a token has no white space, found {token!r}",
+            )
+    return tokens
+
+
+def _sha256(value: object, key: str, path: Path) -> str:
+    text = _string(value, key, path)
+    if _SHA256.fullmatch(text) is None:
+        raise _error(
+            path, key, f"expected 64 hexadecimal digits in lower case, found {text!r}"
+        )
+    return text
 
 
 def _rules(value: object, key: str, path: Path) -> ReadingRules:
