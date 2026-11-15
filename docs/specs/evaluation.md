@@ -246,7 +246,7 @@ one list of selectors for each of these:
 |---|---|---|
 | `start` | reading starts at the first element that matches; what comes before is left out | by default the first element after `header.pg-boilerplate`; Domesday starts at its title, after Gutenberg's own paragraph and table |
 | `drop` | elements whose text is left out, with everything inside them | the licence (`footer.pg-boilerplate`), transcriber's notes (`div.transnote`), Gutenberg's headings (`.footnotes > h2`, "FOOTNOTES", "NOTES"), note labels (`a.label`, `span.label`) |
-| `drop_text` | text left out wherever it occurs, given as regular expressions that match a whole run of text | Mariéjol `Note \d+:` and `\(retour\)` |
+| `drop_text` | text left out wherever it occurs, given as regular expressions that match a whole run of text | Mariéjol `Note \d+:?` (note 230 has no colon) and `\(retour\)`; Haskins "FOOTNOTES", which no selector singles out |
 | `page_anchor` | page anchors; the number from `id="Page_N"`, else from `title` | `span.pagenum`, `a.pagenum`; their own text, "47" or "[Pg 47]", is dropped |
 | `heading` | headings | `h1`–`h6`; Stubbs adds `p.ph3` |
 | `margin_note` | margin notes | `div.sidenote`, `p.sidenote`, `span.sidenote` |
@@ -270,6 +270,11 @@ or replaces them.
   element inside it, a dropped label included: `drop` leaves out text,
   not `id`s. A note is matched to its reference by that `id`, never by
   its number.
+- **A margin note inside a paragraph**, as Domesday's 3 `span.sidenote`,
+  is a block of its own placed before that paragraph, whose text runs on
+  around it.
+- **Text between two notes**, left there by a misplaced end tag (after
+  Domesday's note 101, `</p>.’]`), belongs to the note before it.
 - **Paragraphs.** Any other `p`, or `div` with text of its own, is a
   paragraph. An element left with no token, such as a `p` that holds
   only a page anchor (36 in Haskins, 47 in Stubbs), is not a block.
@@ -648,7 +653,8 @@ tool in its development dependencies, so that `uv run galley-eval` works
 from the root, and adds `tools/galley-eval/tests` to pytest's
 `testpaths`, so that `uv run pytest` runs the tool's tests with galley's. It uses only galley's public modules: `galley.model` and
 `galley.book_folder`, to read galley's files; `galley.fidelity.read_markdown`,
-to read `book.md`; and `galley.wordlist`.
+to read `book.md`; `galley.config`, for the language codes; and
+`galley.wordlist`.
 
 ```
 galley-eval run [<name> ...]       run galley on each book, then compare; all books when none is named
