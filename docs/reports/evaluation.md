@@ -120,3 +120,57 @@ Not taken:
 - The fidelity reviewer, adapted to "does the reader lose or invent a
   word", found the most serious defects; its method (an independent
   parse, diffed word by word) is worth naming in the categories.
+
+## Work package 3: aligning and finding differences
+
+Tasks 3.1 and 3.2 in c1967bb and 0eeeabc; review fixes in f4ce70e,
+1cbf9d8, 6098098, 28c8709, after the spec was settled in a334ddf.
+
+Deliverables, checked on the branch: the unit tests of spec §5's
+alignment, differences, pages and stages pass, the spec's two worked
+examples among them (in `pytest`: 659 passed, 8 deselected, 15.3 s;
+`-m whole_book`: 8 passed). Deliverable 4, timed by the author's script
+on galley's words of each book, M5 Pro, one thread, after the fixes:
+
+| book | three passes | reference tokens aligned to an equal key | unplaced | anchor mismatches | changed / missing / extra |
+|---|---|---|---|---|---|
+| Haskins | 0.33 s | 90.4% | 1 | 0 of 260 | 2,225 / 1,617 / 2,310 |
+| Stubbs | 0.59 s | 87.6% | 17 | 0 of 322 | 4,303 / 3,600 / 15,467 |
+| Domesday | 1.29 s | 95.3% | 3 | 2 of 536 | 12,450 / 2,613 / 14,258 |
+| Mariéjol | 1.75 s | 76.6% | 0 | no anchors | 33,211 / 24,091 / 33,404 |
+
+Domesday's two anchor mismatches are real gaps in Gutenberg's anchors
+(no anchor for printed page 132; 357 sits among the notes).
+
+### What the review found
+
+Every token had exactly one state and the counts added up on all four
+books. What mattered:
+
+- The leftover passes paired words pages apart (200–540 per book), and a
+  replaced stretch paired every token in order whatever it was: 10,175 of
+  Mariéjol's 21,769 changed pairs had nothing alike ("son" with "'"), and
+  half of Mariéjol's running heads stopped being extras. The spec now
+  aligns the leftovers within a page of where they belong, and pairs only
+  tokens that are alike (a key similarity of at least 0.5, a guess to
+  check on the baseline). Changed pairs fell by a third in Mariéjol and
+  missing and extra rose: closer to what a person would call them.
+- Punctuation-only tokens anchored alignments and paired with words; now
+  they are never anchors and pair only with each other.
+- A margin note inside a note could be aligned twice (no book has one).
+  `align` now raises an error if any token is in no pairing or in two,
+  and a test checks it on 300 generated inputs.
+- "Serfs." against "serfs" was a diacritic difference; it is now
+  punctuation, which the OCR table counts as read.
+- Fifteen rules could be broken with every test passing (the tests
+  reviewer ran 62 mutations); each now has a test that fails.
+
+Not taken: the `repaired` score is noisy when the alignment moves
+between outputs (a test that only damaged the text gave 123 "repairs");
+to be watched on the baseline. The alignment is quadratic when a text
+has almost no word that occurs once (a synthetic uniform vocabulary);
+real prose is far from that.
+
+The fixes were checked by the orchestrator, not reviewed again; the
+review of work package 4 also covers them, since it runs them on whole
+books.
