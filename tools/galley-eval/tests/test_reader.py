@@ -259,6 +259,49 @@ def test_margin_note_inside_a_paragraph_comes_before_it_and_the_text_runs_on() -
     )
 
 
+def test_other_block_inside_a_paragraph_ends_it_and_the_rest_is_a_new_one() -> None:
+    # Mariéjol's note 1423, pg36315 lines 23460-23476: a verse inside the
+    # div of the note, between two runs of prose.
+    reference = _read(
+        '<p>one<a href="#footnote1423">1423</a></p>'
+        '<blockquote class="footnote"><div><a id="footnote1423"><b>Note 1423: </b></a>'
+        '<a href="#footnotetag1423">(retour) </a> ne contredit pas ce témoin:\n'
+        '<div class="poem"><div class="stanza"><p class="i14"><i>Cor junctum</i></p>'
+        '<p class="i14"><i>Ante homines</i></p></div></div>\n'
+        "<p><i>Amor</i>, en langage poétique.</p></div></blockquote>",
+        MARIEJOL_RULES,
+    )
+    assert reference.notes == (
+        ReferenceNote(
+            "footnote1423",
+            (
+                _paragraph("ne contredit pas ce témoin:"),
+                _block(ReferenceKind.QUOTE, "Cor junctum Ante homines"),
+                _paragraph("Amor, en langage poétique."),
+            ),
+        ),
+    )
+
+
+def test_poetry_holding_verse_lines_is_one_quote() -> None:
+    # Haskins, pg72514 lines 6483-6492: div.poetry and div.verse are both
+    # quotes, and the outermost owns the verses.
+    reference = _read(
+        "<p>pilgrim\u2019s chorus:\u2014</p>"
+        '<div class="poetry-container"><div class="poetry"><div class="stanza">'
+        '<div class="verse indent2">O Roma nobilis, orbis et domina,</div>'
+        '<div class="verse indent0">Cunctarum urbium excellentissima,</div>'
+        "</div></div></div>"
+    )
+    assert reference.blocks == (
+        _paragraph("pilgrim\u2019s chorus:\u2014"),
+        _block(
+            ReferenceKind.QUOTE,
+            "O Roma nobilis, orbis et domina, Cunctarum urbium excellentissima,",
+        ),
+    )
+
+
 def test_marked_correction_keeps_the_corrected_text_and_tags_its_tokens() -> None:
     reference = _read(
         '<p>on the <ins class="correction" title="original: roial">royal</ins>'

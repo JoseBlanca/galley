@@ -10,10 +10,11 @@ and tables included, or the notes, every note's blocks in order.
 
 How the rules apply, beyond the spec's words:
 
-- An element that a rule of the table matches wins over a paragraph that
-  holds it: a `span.sidenote` inside a `p` is a margin note of its own,
-  placed just before that paragraph, whose text runs on without it.
-  Inside an element that a rule matches, the outermost wins.
+- A margin note inside a paragraph, as a `span.sidenote` inside a `p`,
+  is a block of its own placed just before that paragraph, whose text
+  runs on without it. Any other element inside a paragraph that a rule
+  matches ends the paragraph there, and the text after it is a new
+  paragraph. Inside an element that a rule matches, the outermost wins.
 - Any element other than `p` with text of its own is a paragraph, not
   only a `div`: text of its own is text outside its child elements other
   than inline ones (`span`, `i`, `a`, `sup`, ...). Inside an index, such an
@@ -33,7 +34,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import override
+from typing import assert_never, override
 
 from galley_eval.errors import ReferenceReadError
 from galley_eval.rules import ReadingRules, Selector, SimpleSelector
@@ -404,11 +405,21 @@ class _Text:
 
 @dataclass(frozen=True, slots=True)
 class _Lifted:
+    """A margin note inside a paragraph, placed before it."""
+
     element: _Element
     parent: _Element
 
 
-type _Piece = _Text | _Anchor | _Reference | _Lifted
+@dataclass(frozen=True, slots=True)
+class _Split:
+    """Another block inside a paragraph, which ends it there."""
+
+    element: _Element
+    parent: _Element
+
+
+type _Piece = _Text | _Anchor | _Reference | _Lifted | _Split
 
 
 @dataclass(frozen=True, slots=True)
@@ -574,17 +585,29 @@ def _has_own_text(element: _Element, context: _Context) -> bool:
 def _block(
     kind: ReferenceKind, element: _Element, context: _Context, *, lift: bool
 ) -> tuple[_Item, ...]:
-    """The block of `kind` that `element` owns. With `lift`, an element
-    inside it that a rule matches is taken out as a block or note of its
-    own, placed before this one."""
+    """The block of `kind` that `element` owns. With `lift`, as for a
+    paragraph, a margin note inside it is taken out as a block of its own,
+    placed before the part of the paragraph that held it; any other
+    element inside it that a rule matches ends the paragraph there, and
+    the text after it is a new paragraph of the same kind."""
     pieces = _pieces(element, context, lift=lift)
-    lifted = tuple(
-        item
-        for piece in pieces
-        if isinstance(piece, _Lifted)
-        for item in _container((piece.element,), piece.parent, context)
-    )
-    return (*lifted, _raw_block(kind, pieces))
+    items: list[_Item] = []
+    segment: list[_Piece] = []
+    for piece in (*pieces, None):
+        if piece is not None and not isinstance(piece, _Split):
+            segment.append(piece)
+            continue
+        items.extend(
+            item
+            for lifted in segment
+            if isinstance(lifted, _Lifted)
+            for item in _container((lifted.element,), lifted.parent, context)
+        )
+        items.append(_raw_block(kind, tuple(segment)))
+        segment = []
+        if piece is not None:
+            items.extend(_container((piece.element,), piece.parent, context))
+    return tuple(items)
 
 
 def _pieces(element: _Element, context: _Context, *, lift: bool) -> tuple[_Piece, ...]:
@@ -601,8 +624,10 @@ def _pieces(element: _Element, context: _Context, *, lift: bool) -> tuple[_Piece
         marker = _marker(child, element, context)
         if marker is not None:
             pieces.append(marker)
-        elif lift and _is_rule_block(child, element, rules):
+        elif lift and _matches(rules.margin_note, child, element):
             pieces.append(_Lifted(child, element))
+        elif lift and _is_rule_block(child, element, rules):
+            pieces.append(_Split(child, element))
         elif child.tag == "br":
             pieces.append(_SPACE)
         else:
@@ -638,8 +663,10 @@ def _raw_block(kind: ReferenceKind, pieces: tuple[_Piece, ...]) -> _RawBlock:
             case _Lifted():
                 text_parts.append(" ")
                 length += 1
+            case _Split():
+                raise AssertionError(piece)  # _block cuts the pieces there
             case _:
-                raise AssertionError(piece)
+                assert_never(piece)
     return _RawBlock(kind, "".join(text_parts), tuple(corrections), tuple(markers))
 
 
