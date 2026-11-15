@@ -97,6 +97,12 @@ _MEASURED_PAGE_ROWS_FALLBACK: Final[int] = 3
 _COMMONEST_EDGE_PT: Final[float] = 2.0
 # Guessed: a full line is the column width.
 _WIDE_ROW_SHARE: Final[float] = 0.8
+# Guessed, not measured: a page places its column itself when 3 of its rows
+# are wide; a common edge has a third of the commonest edge's rows and lies
+# more than 4 pt from the others (twice the commonest edge's 2 pt).
+_PAGE_EDGE_ROWS: Final[int] = 3
+_COMMON_EDGE_SHARE: Final[float] = 3.0
+_COMMON_EDGE_APART_PT: Final[float] = 4.0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -142,14 +148,58 @@ def _row_word_height(row: Line) -> float:
     return median(word.box.bottom - word.box.top for word in row.words)
 
 
-def _wide_rows_left_edge(rows: tuple[Line, ...], column_width: float) -> float | None:
-    """The left edge of the body column on a page of `rows` (layout spec
-    section 3, step 1): the commonest left side of the rows at least 0.8 of
-    `column_width` wide. None when no row is that wide."""
-    return _commonest(
-        row.box.x0
-        for row in rows
-        if row.box.x1 - row.box.x0 >= _WIDE_ROW_SHARE * column_width
+def _edge_counts(edges: Iterable[float]) -> dict[float, int]:
+    """Each value of `edges`, rounded to the point, with the number of
+    edges within `_COMMONEST_EDGE_PT` of it."""
+    rounded = sorted(float(round(edge)) for edge in edges)
+    return {
+        value: bisect_right(rounded, value + _COMMONEST_EDGE_PT)
+        - bisect_left(rounded, value - _COMMONEST_EDGE_PT)
+        for value in dict.fromkeys(rounded)
+    }
+
+
+def _common_edges(edges: Iterable[float]) -> tuple[float, ...]:
+    """The common edges of `edges` (layout spec section 3, step 1): the
+    commonest value, then the commonest of the values apart from every
+    edge found, and so on, while a value has `_COMMON_EDGE_SHARE` of the
+    first one's count."""
+    by_count = sorted(
+        _edge_counts(edges).items(),
+        key=lambda value_count: (-value_count[1], value_count[0]),
+    )
+    if not by_count:
+        return ()
+    least = by_count[0][1] / _COMMON_EDGE_SHARE
+    peaks: list[float] = []
+    for value, count in by_count:
+        if count < least:
+            break
+        if all(abs(value - peak) > _COMMON_EDGE_APART_PT for peak in peaks):
+            peaks.append(value)
+    return tuple(peaks)
+
+
+def _wide_rows_edges(
+    rows: tuple[Line, ...], column_width: float
+) -> tuple[float, float] | None:
+    """The left and right edges of the body column on a page of `rows`,
+    from its wide rows (step 1): of the common edges of their left sides
+    and of their right sides, the pair whose distance is nearest
+    `column_width`, the smaller left and then right on a tie. None when
+    too few rows are wide."""
+    wide = tuple(
+        row for row in rows if row.box.x1 - row.box.x0 >= _WIDE_ROW_SHARE * column_width
+    )
+    if len(wide) < _PAGE_EDGE_ROWS:
+        return None
+    return min(
+        (
+            (left, right)
+            for left in _common_edges(row.box.x0 for row in wide)
+            for right in _common_edges(row.box.x1 for row in wide)
+        ),
+        key=lambda pair: (abs(pair[1] - pair[0] - column_width), pair[0], pair[1]),
     )
 
 
@@ -175,13 +225,14 @@ def _usual_left_edges(
     column_width: float,
 ) -> frozendict[int, float]:
     """The usual left edge for even (0) and odd (1) page indices: the median
-    of the left edges step 1 finds on the pages of that parity, else the
+    of the left edges step 1 finds on the pages of that parity that place
+    their column themselves, else the
     other parity's, else the median of the commonest left edges of the
     `measured` pages."""
     found = tuple(
-        (page.index % 2, edge)
+        (page.index % 2, edges[0])
         for page, rows in zip(pages, rows_by_page, strict=True)
-        if (edge := _wide_rows_left_edge(rows, column_width)) is not None
+        if (edges := _wide_rows_edges(rows, column_width)) is not None
     )
     either_parity = (
         median(edge for _, edge in found)
@@ -190,8 +241,8 @@ def _usual_left_edges(
     )
 
     def of_parity(parity: int) -> float:
-        edges = tuple(edge for edge_parity, edge in found if edge_parity == parity)
-        return median(edges) if edges else either_parity
+        lefts = tuple(edge for edge_parity, edge in found if edge_parity == parity)
+        return median(lefts) if lefts else either_parity
 
     return frozendict({0: of_parity(0), 1: of_parity(1)})
 
@@ -262,14 +313,18 @@ def _region_of_rows(rows: tuple[Line, ...]) -> Region:
     return _region(group_lines(_words_of(rows)))
 
 
-def _body_left_edge(
+def _column_edges(
     rows: tuple[Line, ...], page_index: int, measures: BookMeasures
-) -> float:
-    """The left edge of the body column on the page of `rows`, in points:
-    step 1's, or the usual left edge of the page index's parity when no
-    row is wide enough."""
-    edge = _wide_rows_left_edge(rows, measures.column_width)
-    return measures.usual_left_edge[page_index % 2] if edge is None else edge
+) -> tuple[float, float]:
+    """The left and right edges of the body column on the page of `rows`,
+    in points (step 1): the page's own, or, when too few rows are wide,
+    the usual left edge of the page index's parity and that plus the
+    column width."""
+    edges = _wide_rows_edges(rows, measures.column_width)
+    if edges is None:
+        left = measures.usual_left_edge[page_index % 2]
+        return left, left + measures.column_width
+    return edges
 
 
 def _margin_regions(words: tuple[Word, ...], pitch: float) -> tuple[Region, ...]:
@@ -609,8 +664,7 @@ def _page_regions(
     regions, the margin regions by their top, the left side first, and the
     band's regions."""
     pitch = measures.body_line_pitch
-    left = _body_left_edge(group_lines(words), page_index, measures)
-    right = left + measures.column_width
+    left, right = _column_edges(group_lines(words), page_index, measures)
     left_margin = tuple(w for w in words if w.box.x1 <= left - _MARGIN_WORD_PT)
     right_margin = tuple(w for w in words if w.box.x0 >= right + _MARGIN_WORD_PT)
     column = tuple(

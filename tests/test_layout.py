@@ -405,6 +405,72 @@ def test_page_without_a_wide_row_places_the_column_at_its_paritys_usual_left_edg
     )
 
 
+def test_rows_with_margin_notes_joined_outnumbering_the_body_rows_keep_the_column() -> (
+    None
+):
+    # 14 body rows from 50 to 250, then 16 rows whose note word at 12 to
+    # 44 the text layer joined to the row (Gierke's endnotes). The common
+    # left edges are 12 and 50; with the right edge 250, the pair 50-250
+    # is the column's width, so the notes are margin words.
+    joined = tuple(
+        word
+        for row in range(16)
+        for word in (
+            _word(f"note{row}", 12, 268 + row * _PITCH, 44, 276 + row * _PITCH),
+            *_full_row(row + 14, 50, 200, 268 + row * _PITCH),
+        )
+    )
+    result = layout_page(_page(0, (*_rows(14), *joined)), _MEASURES)
+    texts = _region_texts(result)
+    assert len(texts[0]) == 30
+    assert all(not line[0].startswith("note") for line in texts[0])
+    assert sum(len(region) for region in texts[1:]) == 16
+
+
+def test_page_set_wider_than_the_book_keeps_its_line_ends_in_the_body() -> None:
+    # Rows from 50 to 270 on a book whose column is 200 wide: the last
+    # word, from 254, would be 4 pt outside the column 50-250.
+    rows = tuple(
+        word
+        for row in range(16)
+        for word in (
+            *_full_row(row, 50, 200, 100 + row * _PITCH),
+            _word(f"d{row}", 254, 100 + row * _PITCH, 270, 108 + row * _PITCH),
+        )
+    )
+    result = layout_page(_page(0, rows), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 16
+
+
+def test_table_rows_outvoting_the_body_rows_do_not_move_the_column() -> None:
+    # 20 table rows from 63 to 240 and 15 body rows from 50 to 250 (Domesday
+    # page 28). The pair 50-250 is the column's width; "is" at 50 to 58
+    # stays in the body.
+    table = tuple(
+        _word(f"t{row}", 63, 100 + row * _PITCH, 240, 108 + row * _PITCH)
+        for row in range(20)
+    )
+    body = _rows(15, top=100 + 20 * _PITCH)
+    alone = _word("is", 50, 100 + 35 * _PITCH, 58, 108 + 35 * _PITCH)
+    result = layout_page(_page(0, (*table, *body, alone)), _MEASURES)
+    (region,) = result.regions
+    assert _texts(region.lines)[-1] == ("is",)
+
+
+def test_page_with_2_wide_rows_takes_the_usual_left_edge() -> None:
+    # Two wide rows start at 20; page 1's usual left edge is 50, so the
+    # word at 20 to 44 on the first row is a margin word.
+    rows = (
+        _word("Note", 20, 100, 44, 108),
+        *_full_row(0, 50, 200, 100),
+        *_full_row(1, 20, 230, 112),
+        _word("short", 50, 124, 120, 132),
+    )
+    result = layout_page(_page(1, rows), _MEASURES)
+    assert _region_texts(result)[-1] == (("Note",),)
+
+
 def test_head_row_1_4_pitches_above_the_body_is_a_running_head_region_first() -> None:
     head = _word("HEAD", 120, 100 - 1.4 * _PITCH, 180, 100 - 1.4 * _PITCH + 8)
     result = layout_page(_page(0, (head, *_rows(20))), _MEASURES)
