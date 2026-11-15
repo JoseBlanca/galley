@@ -424,8 +424,11 @@ in page order. Then
 `layout_page` runs on every page with `map_pages`. A page needs nothing
 from the others but the book's measures, so the output does not depend
 on the number of workers. The measures pass adds one grouping of rows
-per page; on Domesday, 558 pages, it is expected to cost less than the
-layout itself (not measured).
+per page. Measured on 15 November 2026 on Domesday's 558 pages, on an
+Apple M5 Pro with 6 workers (1 worker in brackets): the measures pass
+takes 0.07 s (0.17 s) and the layout of the pages 0.19 s (0.62 s);
+reading words.json takes 1.1 s, and `galley2epub layout`, which also
+runs the fidelity check and writes lines.json, 2.5 s in all.
 
 ## 6. The cases
 
