@@ -6,6 +6,7 @@ owner has checked those pages.
 """
 
 import hashlib
+import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -13,9 +14,11 @@ import pytest
 
 from galley import structure, wordlist
 from galley.book_folder import BookFolder
+from galley.cli import main
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
 from galley.fidelity import check_stage
+from galley.layout import measure_book
 from galley.model import (
     Block,
     BlockKind,
@@ -42,6 +45,8 @@ from galley.model import (
     WordChange,
     block_text,
     read_blocks,
+    read_lines,
+    read_words,
     write_blocks,
     write_lines,
     write_pages,
@@ -231,7 +236,7 @@ def test_survey_book_words_leave_out_the_parts_of_a_hyphenated_word() -> None:
     )
 
 
-def test_survey_body_word_height_is_the_median_of_the_lines_medians() -> None:
+def test_survey_body_word_height_is_the_median_of_the_rows_medians() -> None:
     small = _region(
         *(_line("a small note", 50, 300 + 10 * n, height=7.0) for n in range(3))
     )
@@ -789,6 +794,271 @@ def test_line_of_one_word_between_two_hyphens_is_joined_twice() -> None:
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+# Cases the review of work package 3 found untested
+
+
+def test_indented_first_line_after_a_short_last_line_starts_at_a_page_break() -> None:
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first"), _short("its end.", 145)),
+        _body_page(1, _indented("A new one", 70), *_five_full_lines(85, "next")),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(block.id for block in blocks.blocks) == ("b-p0000-001", "b-p0001-001")
+
+
+def test_lone_number_at_the_left_of_the_foot_stays() -> None:
+    foot = _foot_line(_FOOT_TOP_PT, ("4", 28))
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
+    assert blocks.removals == ()
+
+
+def test_number_in_brackets_off_the_middle_of_the_column_stays() -> None:
+    # The column is 274 pt wide: 0.15 of it is 41.1 pt; "(49)" is 50 pt off.
+    foot = _foot_line(_FOOT_TOP_PT, ("(49)", 162 + 50 - 10))
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
+    assert blocks.removals == ()
+
+
+def test_bracket_lines_not_alike_are_no_signature_lines() -> None:
+    lines = (
+        _signature_line("MARIÉJOL.", "Cath.", "de", "Médicis.", "(49)", "4"),
+        _signature_line("Voyez", "aussi", "les", "lettres", "(12)", "x"),
+    )
+    pages = tuple(_page_with_foot(index, line) for index, line in enumerate(lines))
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert blocks.removals == ()
+
+
+def test_band_region_of_two_notes_gives_two_notes() -> None:
+    band = _region(
+        _spread("1 A note in small type", 50, 300, 300, height=7.0),
+        _spread("that ends.", 50, 120, 309, height=7.0),
+        _spread("2 Another note in small", 60, 300, 318, height=7.0),
+        _spread("type.", 50, 80, 327, height=7.0),
+    )
+    page = PageLayout(0, (_region(*_five_full_lines(70, "first")), band), ())
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert len(blocks.notes) == 2
+
+
+@pytest.mark.parametrize(
+    ("pitches", "running"), [(1.5, True), (2.0, True), (2.85, False)]
+)
+def test_head_below_the_median_by_pitches(pitches: float, running: bool) -> None:
+    pages = (
+        *(_page_with_head(index, "THE BOOK") for index in range(10, 14)),
+        _page_with_head(14, "THE BOOK", head_top=36 + pitches * _PITCH_PT),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert survey.body_line_pitch == _PITCH_PT
+    assert (14 in survey.running_heads) is running
+
+
+@pytest.mark.parametrize(
+    ("heads", "running"),
+    [
+        (("ABCDEFGH", "ABCDEFXY"), True),
+        (("ABCDEFGHIJ", "ABCDEFGXYZ"), False),
+        (("ABCD", "ABCD"), True),
+        (("ABC", "ABC"), False),
+        (
+            (
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDE",
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLM",
+            ),
+            True,
+        ),
+        (
+            (
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDE",
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMN",
+            ),
+            False,
+        ),
+    ],
+    ids=[
+        "0.75 alike",
+        "0.70 alike",
+        "4 letters",
+        "3 letters",
+        "31 and 39 letters",
+        "31 and 40 letters",
+    ],
+)
+def test_heads_alike_at_the_bounds(heads: tuple[str, str], running: bool) -> None:
+    pages = tuple(
+        _page_with_head(index, head) for index, head in enumerate(heads, start=10)
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert survey.running_heads == (frozenset({10, 11}) if running else frozenset())
+
+
+def test_head_offset_of_a_tie_is_the_smaller() -> None:
+    pages = (_page_with_head(10, "25 THE BOOK"), _page_with_head(11, "THE BOOK 24"))
+    assert survey_book(_lines_of(*pages), workers=1).head_page_offset == -15
+
+
+def test_of_two_head_numbers_and_no_offset_the_first_is_the_page_number() -> None:
+    pages = (_page_with_head(3, "xii THE BOOK vii"), _page_with_head(4, "THE BOOK ix"))
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert blocks.page_numbers[0] == PageNumber(3, "xii", PageNumberPosition.HEAD)
+
+
+def _page_of_rows(index: int, rows: int, height: float) -> PageLayout:
+    return _body_page(
+        index,
+        *(
+            _line("a row of words", 50, 70 + 15 * row, height=height)
+            for row in range(rows)
+        ),
+    )
+
+
+def test_body_word_height_is_measured_on_pages_of_15_rows() -> None:
+    pages = (
+        _page_of_rows(0, 15, 10.0),
+        _page_of_rows(1, 14, 7.0),
+        _page_of_rows(2, 14, 7.0),
+    )
+    assert survey_book(_lines_of(*pages), workers=1).body_word_height == 10.0
+
+
+@pytest.mark.parametrize(("indent", "starts"), [(40.0, True), (41.0, False)])
+def test_indent_of_at_most_40_pt_starts_a_paragraph(
+    indent: float, starts: bool
+) -> None:
+    page = _body_page(
+        0,
+        *_five_full_lines(70, "first"),
+        _short("the end.", 145),
+        _spread("A new one", _BODY_LEFT_PT + indent, _RIGHT_PT, 160),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert len(blocks.blocks) == (2 if starts else 1)
+
+
+@pytest.mark.parametrize(("right_inset", "centred"), [(30.0, True), (31.0, False)])
+def test_insets_differing_by_at_most_10_pt_are_centred(
+    right_inset: float, centred: bool
+) -> None:
+    lines = _five_full_lines(70, "first")
+    page = _body_page(
+        0,
+        *lines[:3],
+        _spread("A TITLE", _BODY_LEFT_PT + 20, _RIGHT_PT - right_inset, 115),
+        *_five_full_lines(130, "after")[:3],
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert len(blocks.blocks) == (3 if centred else 1)
+
+
+@pytest.mark.parametrize(
+    ("words", "removed"),
+    [
+        ((("MA.", 200), ("4567", 230)), True),
+        ((("MAB.", 200), ("4567", 230)), False),
+        ((("b", 200), ("c", 215), ("4", 230)), True),
+        ((("a", 185), ("b", 200), ("c", 215), ("4", 230)), False),
+    ],
+    ids=["6 letters and digits", "7", "3 words", "4 words"],
+)
+def test_signature_mark_limits(
+    words: tuple[tuple[str, float], ...], removed: bool
+) -> None:
+    foot = _foot_line(_FOOT_TOP_PT, *words)
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
+    assert bool(blocks.removals) is removed
+
+
+@pytest.mark.parametrize(("shift", "removed"), [(0.05, True), (-0.05, False)])
+def test_signature_mark_at_0_3_of_the_column_from_its_left_edge(
+    shift: float, removed: bool
+) -> None:
+    # The column runs from 25 to 299 pt: 0.3 of it from its left edge is at
+    # 107.2 pt; "4—2" is 15 pt wide.
+    middle = _COLUMN_LEFT_PT + 0.3 * (_COLUMN_RIGHT_PT - _COLUMN_LEFT_PT) + shift
+    foot = _foot_line(_FOOT_TOP_PT, ("4—2", middle - 7.5))
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
+    assert bool(blocks.removals) is removed
+
+
+@pytest.mark.parametrize(("width", "margin"), [(62.4, True), (62.5, False)])
+def test_margin_region_is_narrower_than_a_quarter_of_the_widest(
+    width: float, margin: bool
+) -> None:
+    page = PageLayout(
+        0,
+        (
+            _region(*_five_full_lines(70, "first")),
+            _region(_spread("Margin note", 310, 310 + width, 85)),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert (BlockKind.MARGIN_NOTE in {block.kind for block in blocks.blocks}) is margin
+
+
+def test_word_changes_are_in_page_order_a_band_join_before_the_next_page() -> None:
+    band = _region(
+        _spread("1 It was neces-", 50, 200, 300, height=7.0),
+        _spread("sary.", 50, 80, 309, height=7.0),
+    )
+    pages = (
+        PageLayout(0, (_region(*_five_full_lines(70, "first")), band), ()),
+        _body_page(1, *_five_full_lines(70, "second"), _full("a hyphen-", 145)),
+        _body_page(2, _full("ated word", 70), *_five_full_lines(85, "third")),
+    )
+    blocks = make_blocks(
+        _lines_of(*pages), frozenset({"necessary", "hyphenated"}), workers=1
+    )
+    assert tuple(change.page_index for change in blocks.word_changes) == (0, 1)
+
+
+def test_page_after_a_plate_and_a_blank_page_starts_a_paragraph() -> None:
+    plate = PageLayout(
+        1,
+        (_region(_spread(", ' ..", 60, 90, 300)),),
+        (Figure(Box(40, 40, 300, 500), "images/p0001.png", 150),),
+    )
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first")),
+        plate,
+        PageLayout(2, (), ()),
+        _body_page(3, *_five_full_lines(70, "third")),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert blocks.blocks[-1].id == "b-p0003-001"
+
+
+def test_u_and_a_digit_centred_at_the_foot_is_a_page_number() -> None:
+    foot = _foot_line(_FOOT_TOP_PT, _centred("U9"))
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
+    assert blocks.page_numbers == (PageNumber(4, "U9", PageNumberPosition.FOOT),)
+
+
+def test_side_text_keeps_the_order_of_its_regions_and_lines() -> None:
+    band = _region(
+        _spread("1 The first note.", 50, 150, 300, height=7.0),
+        _spread("2 The second note.", 60, 160, 309, height=7.0),
+    )
+    page = PageLayout(
+        0,
+        (
+            _region(*_five_full_lines(70, "first")),
+            _region(_spread("Upper", 310, 340, 75)),
+            _region(_spread("Lower", 310, 340, 120)),
+            band,
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _texts(blocks.blocks)[1:] == ("Upper", "Lower")
+    assert tuple(block_text(note.blocks[0]) for note in blocks.notes) == (
+        "1 The first note.",
+        "2 The second note.",
+    )
+
+
 # make_blocks
 
 _HASH = "a" * 64
@@ -1339,3 +1609,37 @@ def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
     with pytest.raises(FidelityError):
         structure.run(folder, config, workers=1)
     assert not folder.blocks_json.exists()
+
+
+# Structure's measures against layout's, on every excerpt (structure spec,
+# section 2: the same rule, written in both stages)
+
+_EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
+# The pages without a text layer, which analyze refuses unless excluded.
+_EXCLUDED_PAGES = frozendict({"kadesh_8-17": "9", "haskins_eval": "8"})
+
+
+@pytest.mark.thread_unsafe
+@pytest.mark.parametrize(
+    "excerpt", sorted(path.stem for path in _EXCERPTS_DIR.glob("*.pdf"))
+)
+def test_structure_measures_the_body_as_layout_does(
+    excerpt: str, tmp_path: Path
+) -> None:
+    folder = BookFolder(tmp_path)
+    pdf = _EXCERPTS_DIR / f"{excerpt}.pdf"
+    folder.book_toml.write_text(
+        f"pdf = {json.dumps(str(pdf))}\n"
+        f"title = {json.dumps(excerpt)}\n"
+        'authors = ["An Author"]\n'
+        'language = "en"\n'
+        f"exclude_pages = [{_EXCLUDED_PAGES.get(excerpt, '')}]\n",
+        encoding="utf-8",
+    )
+    for stage in ("analyze", "extract", "layout"):
+        main([stage, str(tmp_path)])
+    measures = measure_book(read_words(folder.words_json), workers=1)
+    survey = survey_book(read_lines(folder.lines_json), workers=1)
+    assert measures is not None
+    assert survey.body_word_height == measures.body_word_height
+    assert survey.body_line_pitch == measures.body_line_pitch
