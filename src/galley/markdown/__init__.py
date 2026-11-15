@@ -111,21 +111,20 @@ def _block_problems(block: Block, kinds: frozenset[BlockKind]) -> tuple[str, ...
 def _note_problems(note: Note) -> tuple[str, ...]:
     """Why a note cannot be written; empty when it can."""
     referenced = (f"note {note.id} is referenced",) if note.referenced else ()
-    empty = (f"note {note.id} has no blocks",) if not note.blocks else ()
-    placeless = (f"note {note.id} has no origin",) if not note.origin else ()
     marker = _character_problems(f"the marker of note {note.id}", note.marker)
     blocks = tuple(
         problem
         for block in note.blocks
         for problem in _block_problems(block, _NOTE_KINDS)
     )
-    return referenced + empty + placeless + marker + blocks
+    return referenced + marker + blocks
 
 
-def _check_ids(blocks: BlocksFile) -> None:
-    """Raise InputFileError, naming blocks.json, when an id is given more
-    than once among the blocks, the notes and the notes' blocks, since each
-    becomes the id of a div in book.md and the EPUB."""
+def _check_well_formed(blocks: BlocksFile) -> None:
+    """Raise InputFileError, naming blocks.json, when it is malformed: an
+    id given more than once among the blocks, the notes and the notes'
+    blocks (each becomes the id of a div in book.md and the EPUB), or a
+    note without blocks or without origin, which cannot be placed."""
     id_counts = Counter(
         (
             *(block.id for block in blocks.blocks),
@@ -138,17 +137,23 @@ def _check_ids(blocks: BlocksFile) -> None:
         for given_id, count in id_counts.items()
         if count > 1
     )
-    if repeated:
-        message = f"blocks.json is malformed: {'; '.join(repeated)}"
+    empty = tuple(
+        f"note {note.id} has no blocks" for note in blocks.notes if not note.blocks
+    )
+    placeless = tuple(
+        f"note {note.id} has no origin" for note in blocks.notes if not note.origin
+    )
+    problems = repeated + empty + placeless
+    if problems:
+        message = f"blocks.json is malformed: {'; '.join(problems)}"
         raise InputFileError(message)
 
 
 def _check_writable(blocks: BlocksFile) -> None:
     """Raise InputFileError, naming blocks.json, at what markdown does not
     write yet, rather than write it wrongly: a block that is not a paragraph
-    or a margin note, a note reference, a referenced note, a note without
-    blocks or origin or with a block that is not a paragraph, or a character
-    XML 1.0 does not allow."""
+    or a margin note, a note reference, a referenced note, a note block that
+    is not a paragraph, or a character XML 1.0 does not allow."""
     problems = tuple(
         problem
         for block in blocks.blocks
@@ -156,9 +161,7 @@ def _check_writable(blocks: BlocksFile) -> None:
     ) + tuple(problem for note in blocks.notes for problem in _note_problems(note))
     if problems:
         message = (
-            "blocks.json holds what markdown does not write yet (paragraphs, "
-            "margin notes and notes without references, in XML's characters): "
-            f"{'; '.join(problems)}"
+            f"blocks.json holds what markdown does not write yet: {'; '.join(problems)}"
         )
         raise InputFileError(message)
 
@@ -253,14 +256,14 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     the same place keep the order of blocks.json.
 
     The title and each author are escaped by escape_markdown too. Raises
-    InputFileError, naming blocks.json and the id, for an id given twice,
-    and, naming the block or note, for a heading,
-    quote, figure or index entry, a note reference, a referenced note, a
-    note without blocks or origin or with a block that is not a paragraph,
-    or a character XML 1.0 does not allow (named as U+FFFE): markdown does
-    not write them yet.
+    InputFileError, naming blocks.json, when it is malformed: an id given
+    twice, or a note without blocks or origin. Raises InputFileError, naming
+    blocks.json and the block or note, for what markdown does not write
+    yet: a heading, quote, figure or index entry, a note reference, a
+    referenced note, a note block that is not a paragraph, or a character
+    XML 1.0 does not allow (named as U+FFFE).
     """
-    _check_ids(blocks)
+    _check_well_formed(blocks)
     _check_writable(blocks)
     positions = _note_positions(blocks.blocks, blocks.notes)
     note_divs: dict[int, list[str]] = {}
@@ -292,9 +295,9 @@ def _check_no_edits(folder: BookFolder) -> None:
     )
     if with_edits:
         message = (
-            f"{', '.join(str(path) for path in with_edits)} hold edits; the walking "
-            "skeleton does not apply edits, which are applied from the markdown "
-            "spec on"
+            f"{', '.join(str(path) for path in with_edits)} hold edits; markdown "
+            "does not apply edits yet: that comes with the markdown spec, not "
+            "written yet, and with `galley2epub edits-from`, not built yet"
         )
         raise EditError(message)
 

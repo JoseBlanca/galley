@@ -334,14 +334,6 @@ HEADING = replace(_block_of_kind("b-p0000-001", BlockKind.HEADING), level=1)
             ),
             "b-p0000-007",
         ),
-        (
-            _blocks_file((), (replace(NOTE, referenced=False, blocks=()),)),
-            "n-p0000-001",
-        ),
-        (
-            _blocks_file((), (replace(NOTE, referenced=False, origin=()),)),
-            "n-p0000-001",
-        ),
     ],
     ids=[
         "heading",
@@ -353,15 +345,34 @@ HEADING = replace(_block_of_kind("b-p0000-001", BlockKind.HEADING), level=1)
         "heading in a note",
         "margin note in a note",
         "note reference in a note",
-        "note without blocks",
-        "note without origin",
     ],
 )
 def test_render_markdown_refuses_what_it_does_not_write_yet(
     blocks: BlocksFile, named: str
 ) -> None:
-    with pytest.raises(InputFileError, match=f"blocks.json.*{named}"):
+    with pytest.raises(
+        InputFileError,
+        match=f"blocks.json holds what markdown does not write yet: .*{named}",
+    ):
         render_markdown(blocks, CONFIG)
+
+
+@pytest.mark.parametrize(
+    ("note", "problem"),
+    [
+        (replace(NOTE, referenced=False, blocks=()), "has no blocks"),
+        (replace(NOTE, referenced=False, origin=()), "has no origin"),
+    ],
+    ids=["without blocks", "without origin"],
+)
+def test_render_markdown_refuses_a_note_without_blocks_or_origin_as_malformed(
+    note: Note, problem: str
+) -> None:
+    with pytest.raises(
+        InputFileError,
+        match=f"blocks.json is malformed: note n-p0000-001 {problem}",
+    ):
+        render_markdown(_blocks_file((), (note,)), CONFIG)
 
 
 # Structure spec section 10, option (b): margin notes and notes with
@@ -741,7 +752,9 @@ def test_run_with_an_edit_raises_naming_the_file_and_leaves_no_book_md(
     write_edits(folder.edits_dir / "owner.jsonl", (EDIT,))
     folder.book_md.write_text("an old book.md\n", encoding="utf-8")
 
-    with pytest.raises(EditError, match="owner.jsonl") as raised:
+    with pytest.raises(
+        EditError, match="owner.jsonl.*markdown does not apply edits yet"
+    ) as raised:
         markdown.run(folder, config)
 
     assert "correct.jsonl" not in str(raised.value)
