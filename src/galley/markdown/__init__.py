@@ -20,6 +20,7 @@ import json
 import logging
 import re
 import string
+from collections import Counter
 from typing import assert_never
 
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
@@ -119,6 +120,27 @@ def _note_problems(note: Note) -> tuple[str, ...]:
         for problem in _block_problems(block, _NOTE_KINDS)
     )
     return referenced + empty + placeless + marker + blocks
+
+
+def _check_ids(blocks: BlocksFile) -> None:
+    """Raise InputFileError, naming blocks.json, when an id is given more
+    than once among the blocks, the notes and the notes' blocks, since each
+    becomes the id of a div in book.md and the EPUB."""
+    id_counts = Counter(
+        (
+            *(block.id for block in blocks.blocks),
+            *(note.id for note in blocks.notes),
+            *(block.id for note in blocks.notes for block in note.blocks),
+        )
+    )
+    repeated = tuple(
+        f"id {given_id} is given {count} times"
+        for given_id, count in id_counts.items()
+        if count > 1
+    )
+    if repeated:
+        message = f"blocks.json is malformed: {'; '.join(repeated)}"
+        raise InputFileError(message)
 
 
 def _check_writable(blocks: BlocksFile) -> None:
@@ -231,12 +253,14 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     the same place keep the order of blocks.json.
 
     The title and each author are escaped by escape_markdown too. Raises
-    InputFileError, naming blocks.json and the block or note, for a heading,
+    InputFileError, naming blocks.json and the id, for an id given twice,
+    and, naming the block or note, for a heading,
     quote, figure or index entry, a note reference, a referenced note, a
     note without blocks or origin or with a block that is not a paragraph,
     or a character XML 1.0 does not allow (named as U+FFFE): markdown does
     not write them yet.
     """
+    _check_ids(blocks)
     _check_writable(blocks)
     positions = _note_positions(blocks.blocks, blocks.notes)
     note_divs: dict[int, list[str]] = {}

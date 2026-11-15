@@ -863,6 +863,70 @@ SIDE_TEXT_ON_TWO_PAGES = _blocks_file(
 )
 
 
+@pytest.mark.parametrize(
+    ("blocks", "repeated"),
+    [
+        (
+            _blocks_file(
+                (
+                    _block("b-p0003-001", BlockKind.PARAGRAPH, "One.", 3),
+                    _block("b-p0003-001", BlockKind.MARGIN_NOTE, "Two.", 3),
+                ),
+            ),
+            "b-p0003-001",
+        ),
+        (
+            _blocks_file(
+                (_block("b-p0003-001", BlockKind.PARAGRAPH, "One.", 3),),
+                (
+                    _unreferenced_note(
+                        "n-p0003-001",
+                        3,
+                        _block("b-p0003-001", BlockKind.PARAGRAPH, "Two.", 3),
+                    ),
+                ),
+            ),
+            "b-p0003-001",
+        ),
+        (
+            _blocks_file(
+                (_block("n-p0003-001", BlockKind.PARAGRAPH, "One.", 3),),
+                (
+                    _unreferenced_note(
+                        "n-p0003-001",
+                        3,
+                        _block("b-p0003-002", BlockKind.PARAGRAPH, "Two.", 3),
+                    ),
+                ),
+            ),
+            "n-p0003-001",
+        ),
+        (
+            _blocks_file(
+                (),
+                tuple(
+                    _unreferenced_note(
+                        "n-p0003-001",
+                        3,
+                        _block(block_id, BlockKind.PARAGRAPH, "A note.", 3),
+                    )
+                    for block_id in ("b-p0003-001", "b-p0003-002")
+                ),
+            ),
+            "n-p0003-001",
+        ),
+    ],
+    ids=["two blocks", "a note block and a block", "a note and a block", "two notes"],
+)
+def test_render_markdown_refuses_an_id_given_twice(
+    blocks: BlocksFile, repeated: str
+) -> None:
+    with pytest.raises(
+        InputFileError, match=rf"blocks.json.*id {repeated} is given 2 times"
+    ):
+        render_markdown(blocks, CONFIG)
+
+
 def test_render_markdown_refuses_a_marker_with_a_character_xml_does_not_allow() -> None:
     note = replace(SIDE_TEXT.notes[0], marker="\ufffe")
     blocks = replace(SIDE_TEXT, notes=(note,))
