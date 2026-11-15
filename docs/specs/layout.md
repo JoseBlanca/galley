@@ -352,7 +352,7 @@ other rule as before, the words in each kind of region:
 | | after | 1,444 | 110,261 | 1,163 | 1,072 | 56 |
 
 Gierke's margin words fall from 32 to 1 on page 13 (the introduction),
-and on page 235 from 69 body-line ends ("est", "the popu-",
+and on page 235 from 65 words, mostly body-line ends ("est", "the popu-",
 "similis;") to the 21 words of its margin notes ("Convey- / ance",
 "Nullity"). On Domesday's page 28, "is" and "a" return to their lines.
 The new margin words of Haskins are on two pages of specks (2, 278).
@@ -436,11 +436,13 @@ layout itself (not measured).
   the head line. Structure removes them (structure §4).
 - **A page number alone at the foot** (Mariéjol's "(49)"; Kadesh's
   second sequence, the page numbers of the journal it was printed in) and **signature marks**
-  ("M. 4", "4—2"): layout gives them no region of their own. The gap
+  ("M. 4", "4—2"): layout looks for no region of their own. The gap
   above a page's last line does not tell them from the last line of
   text: it is below 0.9 body line pitches for a tenth of the page numbers
   and signature marks of the four books. They end as the last line of
-  the body or the band, and structure finds them there.
+  the body or the band, and structure finds them there; below a column
+  cut, as on Kadesh's page 10 ("83"), they are the row after the run and
+  so a region of their own, which structure reads the same way.
 - **A margin note level with the running head**: its words are margin
   words (step 2) and never join the head.
 - **Domesday's short notes side by side**: one line per row, read left
@@ -468,6 +470,21 @@ layout itself (not measured).
   until the first plan's evaluation shows how much it matters.
 - **A margin region beside a column cut**: it is placed by its own top,
   after all the body regions, whatever columns it lies beside.
+- **A margin word whose box reaches into the column**: the text layer
+  sometimes gives a margin note's word a box that runs on into the body
+  column, past its edge (Domesday's page 75, "land." from 52.6 to 80.0 pt
+  against the edge at 53; page 83, "Eng-" from 46.3 to 73.4 pt against
+  69). Such a word crosses the edge, so it stays in the body line beside
+  it, as a hung quotation mark does; the rest of its note is a margin
+  region.
+- **A margin note cut in two**: where the OCR lost a line of a note, the
+  gap between its lines passes 1.5 pitches and the note becomes two
+  margin regions (Gierke's page 270). Structure reads them one after the
+  other.
+- **A table of contents** (Mariéjol's page 450): titles on the left and
+  page numbers on the right, with an empty strip between them over 8
+  rows, are cut into a column of titles and a column of numbers. Reading
+  them as entries is left to structure's second plan.
 
 ## 7. Fidelity
 
@@ -526,7 +543,7 @@ differ slightly from the whole book's.
 | `stubbs_51_56-64` | 9 (64) | a cut-in note at the right |
 | `domesday_74-83` (new) | 2 (76) | an outer margin note on the right, short notes side by side, signature "4—2" |
 | `domesday_74-83` | 0 (74) | an outer margin note on the right, signature "M. 4" |
-| `domesday_74-83` | 1 (75) | outer margin notes on the left |
+| `domesday_74-83` | 1 (75) | outer margin notes on the left; one word of a note, "land.", whose box reaches into the column, stays in its body line |
 | `domesday_74-83` | 9 (83) | short notes side by side in three rows, read row by row |
 | `mariejol_210-219` (new) | 0 (210) | footnotes of 9-pt OCR lines; a foot line holding the signature and the page number "(l93)" |
 | `mariejol_210-219` | 4 (214) | a foot line the OCR garbled |
