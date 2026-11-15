@@ -23,6 +23,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "galley-eval",
     "pytest==9.2.0",
     "pytest-run-parallel==0.10.0",
     "pytest-timeout==2.4.0",
@@ -33,9 +34,19 @@ dev = [
 [tool.uv]
 required-version = ">=0.13.7"
 
+# The evaluation tool (docs/specs/evaluation.md, section 9) is a second
+# package of the repository, a development tool that galley never imports.
+[tool.uv.workspace]
+members = ["tools/galley-eval"]
+
+[tool.uv.sources]
+galley-eval = { workspace = true }
+
 [tool.ruff]
 # Markdown code blocks in specs and skills are sketches, not code to format.
 extend-exclude = ["*.md"]
+# galley_eval is first-party code too, for the sorting of imports.
+src = ["src", "tools/galley-eval/src"]
 
 [tool.ruff.lint]
 # Ruff >= 0.16 already enables about 400 rules by default (B, UP, RUF, SIM,
@@ -61,7 +72,7 @@ extend-select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["PLR2004", "FBT"]
+"**/tests/**" = ["PLR2004", "FBT"]
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "__future__.annotations".msg = "Not needed on 3.14+: annotations are deferred (PEP 649/749)."
@@ -77,7 +88,7 @@ all = "error"
 
 [tool.pytest]
 minversion = "9.0"
-testpaths = ["tests"]
+testpaths = ["tests", "tools/galley-eval/tests"]
 addopts = ["-ra", "--import-mode=importlib", "-p", "gilguard", "-m", "not whole_book", "--durations=5"]
 strict = true
 # A unit test takes milliseconds and an excerpt test about a second; a test

@@ -1,0 +1,84 @@
+# The evaluation set of galley-eval (docs/specs/evaluation.md, section 3).
+#
+# Each book is an Internet Archive scan and the Project Gutenberg edition
+# that Distributed Proofreaders made from it. Page indices count from 0 in
+# the PDF. `exclude_pages` are the pages without a text layer, with which
+# `galley2epub run` succeeded on 15 November 2026. `expected_counts` were
+# counted by hand in the HTML, with a search for each class and href, never
+# by running the reader. The reading rules change the defaults of
+# tools/galley-eval/src/galley_eval/rules.py, which are those of the spec's
+# table in section 4.
+
+[[book]]
+name = "haskins"
+gutenberg_number = 72514
+archive_id = "normansineuropea00hask"
+title = "The Normans in European History"
+authors = ["Charles Homer Haskins"]
+language = "en"
+exclude_pages = [0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279]
+expected_counts = { notes = 72, margin_notes = 0, note_references = 72, page_anchors = 260 }
+
+[book.rules.add]
+# Each note is a div.footnote whose label a.label holds the pairing id.
+note = ["div.footnote"]
+# Gutenberg's heading over the notes it gathered, an h2 of its own.
+drop_text = ["FOOTNOTES"]
+
+[[book]]
+name = "stubbs"
+gutenberg_number = 70828
+archive_id = "earlyplantagenet01stub"
+title = "The Early Plantagenets"
+authors = ["William Stubbs"]
+language = "en"
+exclude_pages = [0, 2, 3, 4, 5, 8, 9, 10, 11, 52, 53, 54, 55, 338, 339, 340, 341, 342, 343]
+expected_counts = { notes = 0, margin_notes = 467, note_references = 0, page_anchors = 322 }
+
+[book.rules.add]
+# The chapter titles are p.ph3, not h1-h6.
+heading = ["p.ph3"]
+
+[[book]]
+name = "domesday"
+gutenberg_number = 43255
+archive_id = "domesdaybook00maituoft"
+title = "Domesday Book and Beyond"
+authors = ["Frederic William Maitland"]
+language = "en"
+exclude_pages = [0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557]
+# The transcriber put each margin note at the start of its paragraph.
+margin_notes_moved = true
+expected_counts = { notes = 1729, margin_notes = 593, note_references = 1731, page_anchors = 537 }
+
+[book.rules.replace]
+# Gutenberg's own paragraph, table and transcriber's note come before the title.
+start = ["h1"]
+
+[book.rules.add]
+# Every note is a p inside the one div.footnote; a note starts at each p
+# that holds an id a note reference points to.
+notes_section = ["div.footnote"]
+
+[[book]]
+name = "mariejol"
+gutenberg_number = 36315
+archive_id = "catherinedemedic00mariuoft"
+title = "Catherine de Médicis"
+authors = ["Jean H. Mariéjol"]
+language = "fr"
+exclude_pages = [0, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456]
+# Gutenberg leaves out the bibliography.
+not_in_reference = [14, 15, 16]
+expected_counts = { notes = 1432, margin_notes = 0, note_references = 1432, page_anchors = 0 }
+
+[book.rules.add]
+# Each note is a blockquote.footnote after its paragraph.
+note = ["blockquote.footnote"]
+# Gutenberg's label of each note and its link back to the reference. The
+# label of note 230 has no colon.
+drop_text = ['Note \d+:?', '\(retour\)']
+
+[book.rules.replace]
+# The references point to #footnoteN; the links back point to #footnotetagN.
+note_reference = ['#footnote\d+']
