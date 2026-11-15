@@ -192,12 +192,13 @@ _PITCH = 12.0
 
 
 def _full_row(row: int, left: float, width: float, top: float) -> tuple[Word, ...]:
-    """Three words of height 8 that fill `width` from `left`."""
+    """Three words of height 8 that fill `width` from `left`, 4 pt apart as
+    word spaces are, too close for a gutter."""
     bottom = top + _ROW_HEIGHT
     return (
-        _word(f"a{row}", left, top, left + 60, bottom),
-        _word(f"b{row}", left + 70, top, left + 130, bottom),
-        _word(f"c{row}", left + 140, top, left + width, bottom),
+        _word(f"a{row}", left, top, left + 65, bottom),
+        _word(f"b{row}", left + 69, top, left + 135, bottom),
+        _word(f"c{row}", left + 139, top, left + width, bottom),
     )
 
 
@@ -445,6 +446,248 @@ def test_margin_note_level_with_the_head_never_joins_the_head() -> None:
     result = layout_page(_page(0, (head, note, *_rows(20))), _MEASURES)
     assert _region_texts(result)[0] == (("HEAD",),)
     assert _region_texts(result)[2] == (("Note",),)
+
+
+# layout_page: the footnote band, columns and the drop capital (layout spec
+# section 3, steps 4 to 6)
+
+_SMALL_HEIGHT = 0.7 * _ROW_HEIGHT
+
+
+def _small_rows(count: int, top: float, pitch: float = 9.0) -> tuple[Word, ...]:
+    """`count` rows of words 0.7 of the body word height high, `pitch` apart."""
+    return tuple(
+        _word(f"n{row}", 50, top + row * pitch, 250, top + row * pitch + _SMALL_HEIGHT)
+        for row in range(count)
+    )
+
+
+# 20 body rows at tops 100 to 328.
+_LAST_BODY_TOP = 100 + 19 * _PITCH
+
+
+def test_small_rows_1_5_pitches_below_the_body_are_a_band_region() -> None:
+    band = _small_rows(5, _LAST_BODY_TOP + 1.5 * _PITCH)
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    body, band_region = result.regions
+    assert len(body.lines) == 20
+    assert _texts(band_region.lines) == tuple((f"n{row}",) for row in range(5))
+
+
+def test_small_rows_without_the_gap_are_no_band() -> None:
+    band = _small_rows(5, _LAST_BODY_TOP + _PITCH)
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 25
+
+
+def test_page_of_small_rows_only_has_no_band() -> None:
+    rows = (*_small_rows(10, 100), *_small_rows(10, 100 + 9 * 9 + 1.5 * _PITCH))
+    result = layout_page(_page(0, rows), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 20
+
+
+def test_small_row_set_apart_but_followed_by_body_rows_is_no_band() -> None:
+    # One small row in four from there down: under two thirds.
+    small = _small_rows(1, _LAST_BODY_TOP + 1.5 * _PITCH)
+    after = _rows(3, top=_LAST_BODY_TOP + 1.5 * _PITCH + _PITCH)
+    result = layout_page(_page(0, (*_rows(20), *small, *after)), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 24
+
+
+def _two_column_rows(
+    count: int, top: float = 100.0, height: float = _ROW_HEIGHT, pitch: float = _PITCH
+) -> tuple[Word, ...]:
+    """`count` rows of a left word from 50 to 146 and a right word from 154
+    to 250: an empty strip 8 pt wide at the middle of the column."""
+    return tuple(
+        word
+        for row in range(count)
+        for word in (
+            _word(f"L{row}", 50, top + row * pitch, 146, top + row * pitch + height),
+            _word(f"R{row}", 154, top + row * pitch, 250, top + row * pitch + height),
+        )
+    )
+
+
+def test_10_rows_with_an_empty_strip_at_the_middle_are_two_columns_left_first() -> None:
+    result = layout_page(_page(0, _two_column_rows(10)), _MEASURES)
+    assert _region_texts(result) == (
+        tuple((f"L{row}",) for row in range(10)),
+        tuple((f"R{row}",) for row in range(10)),
+    )
+
+
+def test_7_rows_with_an_empty_strip_at_the_middle_are_one_region() -> None:
+    result = layout_page(_page(0, _two_column_rows(7)), _MEASURES)
+    assert _region_texts(result) == (tuple((f"L{row}", f"R{row}") for row in range(7)),)
+
+
+def test_column_cut_keeps_the_rows_above_and_below_as_regions_of_their_own() -> None:
+    title = _word("INDEX", 120, 76, 180, 84)  # spans the strip
+    columns = _two_column_rows(10)
+    footer = _word("END", 120, 100 + 10 * _PITCH, 180, 108 + 10 * _PITCH)
+    result = layout_page(_page(0, (title, *columns, footer)), _MEASURES)
+    assert _region_texts(result) == (
+        (("INDEX",),),
+        tuple((f"L{row}",) for row in range(10)),
+        tuple((f"R{row}",) for row in range(10)),
+        (("END",),),
+    )
+
+
+def test_blank_left_cell_and_a_word_over_the_gutter_keep_the_columns_one_run() -> None:
+    # Rows 0 to 4 and 7 to 11 are open. Row 5 has a word on the right only;
+    # row 6 a word from 100 to 152, across the strip but with its middle,
+    # 126, more than 6 pt from the strip's. Both are compatible.
+    rows = tuple(
+        word for word in _two_column_rows(12) if word.text not in {"L5", "L6", "R5"}
+    )
+    rows += (
+        _word("R5", 200, 100 + 5 * _PITCH, 250, 108 + 5 * _PITCH),
+        _word("X6", 100, 100 + 6 * _PITCH, 152, 108 + 6 * _PITCH),
+    )
+    result = layout_page(_page(0, rows), _MEASURES)
+    left, right = result.regions
+    assert _texts(left.lines) == (
+        *((f"L{row}",) for row in range(5)),
+        ("X6",),
+        *((f"L{row}",) for row in range(7, 12)),
+    )
+    assert _texts(right.lines) == tuple((f"R{row}",) for row in range(12))
+
+
+def test_word_across_the_middle_of_the_gutter_ends_the_run() -> None:
+    # Row 5 holds one word from 140 to 160: its middle is the strip's. Two
+    # runs of 5 open rows are too short to cut.
+    rows = tuple(
+        word for word in _two_column_rows(11) if word.text not in {"L5", "R5"}
+    ) + (_word("X5", 140, 100 + 5 * _PITCH, 160, 108 + 5 * _PITCH),)
+    result = layout_page(_page(0, rows), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 11
+
+
+def test_3_band_rows_justified_to_the_gutter_are_two_band_columns() -> None:
+    band = _two_column_rows(
+        3, top=_LAST_BODY_TOP + 1.5 * _PITCH, height=_SMALL_HEIGHT, pitch=9.0
+    )
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    assert _region_texts(result)[1:] == (
+        tuple((f"L{row}",) for row in range(3)),
+        tuple((f"R{row}",) for row in range(3)),
+    )
+
+
+def test_3_band_rows_of_short_notes_side_by_side_stay_three_rows() -> None:
+    # The left notes end at 90: the leftmost strip open on every row is at
+    # the start of the middle third, its middle at 116.7, 33 pt from the
+    # column's middle, 150.
+    top = _LAST_BODY_TOP + 1.5 * _PITCH
+    band = tuple(
+        word
+        for row in range(3)
+        for word in (
+            _word(f"{2 * row + 1}", 50, top + row * 9, 90, top + row * 9 + 5.6),
+            _word(f"{2 * row + 2}", 154, top + row * 9, 200, top + row * 9 + 5.6),
+        )
+    )
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    assert _region_texts(result)[1:] == ((("1", "2"), ("3", "4"), ("5", "6")),)
+
+
+def test_band_rows_with_a_gutter_11_pt_off_the_middle_stay_rows() -> None:
+    # Left notes end at 157.5 and right notes start at 166: the strips'
+    # middles step by 1 pt from 116.7, so the gutter's middle is at 160.7
+    # (strip 157.7 to 163.7), 10.7 pt right of the column's middle, though
+    # every left part ends within 3 pt of the strip. With the left notes
+    # ending at 156.5, the gutter is at 159.7, 9.7 pt off the middle, and
+    # the band is cut.
+    top = _LAST_BODY_TOP + 1.5 * _PITCH
+
+    def band(left_end: float) -> tuple[Word, ...]:
+        return tuple(
+            word
+            for row in range(3)
+            for word in (
+                _word(f"L{row}", 50, top + row * 9, left_end, top + row * 9 + 5.6),
+                _word(f"R{row}", 166, top + row * 9, 250, top + row * 9 + 5.6),
+            )
+        )
+
+    off = layout_page(_page(0, (*_rows(20), *band(157.5))), _MEASURES)
+    assert _region_texts(off)[1:] == (
+        tuple((f"L{row}", f"R{row}") for row in range(3)),
+    )
+    centred = layout_page(_page(0, (*_rows(20), *band(156.5))), _MEASURES)
+    assert _region_texts(centred)[1:] == (
+        tuple((f"L{row}",) for row in range(3)),
+        tuple((f"R{row}",) for row in range(3)),
+    )
+
+
+def _drop_capital_page(capital_top: float) -> tuple[Word, ...]:
+    """A drop capital 3 body word heights tall at the left edge, beside rows
+    0 and 1, which start at 75; 18 full rows below them."""
+    beside = tuple(
+        word
+        for row in range(2)
+        for word in (
+            _word(f"a{row}", 75, 100 + row * _PITCH, 130, 108 + row * _PITCH),
+            _word(f"b{row}", 140, 100 + row * _PITCH, 250, 108 + row * _PITCH),
+        )
+    )
+    capital = _word("IN", 50, capital_top, 70, capital_top + 3 * _ROW_HEIGHT)
+    return (capital, *beside, *_rows(18, top=100 + 2 * _PITCH))
+
+
+def test_drop_capital_is_the_first_word_of_the_upper_line_it_spans() -> None:
+    result = layout_page(_page(0, _drop_capital_page(100)), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[:3] == (
+        ("IN", "a0", "b0"),
+        ("a1", "b1"),
+        ("a0", "b0", "c0"),
+    )
+    assert len(body.lines) == 20
+    assert body.lines[0].box == Box(50, 100, 250, 124)
+
+
+def test_drop_capital_whose_top_is_below_the_upper_lines_centre_joins_that_line() -> (
+    None
+):
+    # The upper line is 100 to 108; the capital's top, 104.5, is 0.5 pt
+    # below its centre.
+    result = layout_page(_page(0, _drop_capital_page(104.5)), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[:2] == (("IN", "a0", "b0"), ("a1", "b1"))
+
+
+def test_tall_word_away_from_the_left_edge_is_no_drop_capital() -> None:
+    # 4 pt right of the left edge: its rows are grouped as the skeleton did.
+    words = tuple(
+        replace(word, box=replace(word.box, x0=54, x1=74))
+        if word.text == "IN"
+        else word
+        for word in _drop_capital_page(100)
+    )
+    result = layout_page(_page(0, words), _MEASURES)
+    # The tall word's row holds both rows beside it; the next row, 24 pt
+    # below its top, sets it apart as a running-head region.
+    assert _region_texts(result)[0] == (("IN", "a0", "a1", "b0", "b1"),)
+
+
+def test_drop_capital_with_no_line_beside_it_is_laid_out_as_a_body_word() -> None:
+    # A word 3 body word heights tall at the left edge, alone between rows
+    # 9 and 10 of the body: no line overlaps it to its right.
+    tall = _word("A", 50, 220, 70, 244)
+    words = (*_rows(10), tall, *_rows(10, top=256))
+    result = layout_page(_page(0, words), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[10] == ("A",)
+    assert len(body.lines) == 21
 
 
 # The fidelity check at the layout boundary

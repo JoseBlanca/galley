@@ -7,18 +7,22 @@ of the column. `group_lines` groups words into lines by the walking
 skeleton's rule: a word joins the line of the word that started it, its
 anchor, when the word's vertical centre lies within the anchor's top and
 bottom. `layout_page` places the body column on the page, takes the
-words outside it as margin regions and the first row set apart at the top
-as the running-head region, and puts the rest in one body region. run does
+words outside it as margin regions, the first row set apart at the top as
+the running-head region and the small rows at the foot as the footnote
+band, cuts the body and the band into two columns where a gutter runs
+down them, and puts a drop capital first in the line beside it. run does
 not give it the measures yet.
 """
 
 import logging
+import math
 from bisect import bisect_left, bisect_right
 from collections.abc import Iterable
 from dataclasses import dataclass
-from itertools import pairwise
+from enum import Enum
+from itertools import groupby, pairwise
 from statistics import median
-from typing import Final
+from typing import Final, assert_never
 
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
@@ -303,25 +307,313 @@ def _running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
     return first + 1 if gap >= _RUNNING_HEAD_GAP_PITCHES * pitch else 0
 
 
+# Measured: the median height of a line's words over the book's is at
+# most 0.85 for 57 of Haskins' 57 lines of notes and 8 of its 6,144 lines
+# of body (layout spec section 2).
+_SMALL_ROW_SHARE: Final[float] = 0.85
+# Guessed: Mariéjol's note lines are small on 769 of 911.
+_BAND_SMALL_ROWS_SHARE: Final[float] = 2 / 3
+# Measured: the 10th percentile of the gap from the last body line to the
+# first note line is 1.16 pitches in Haskins, 1.24 in Domesday, 1.39 in
+# Mariéjol.
+_BAND_GAP_PITCHES: Final[float] = 1.1
+# Measured on the six books (layout spec section 3, "Where the thresholds
+# come from"): a gutter is a strip 6 pt wide in the middle third of the
+# column, moved in steps of 1 pt; a word across it whose middle is more
+# than 6 pt from the strip's is an OCR word that ran over the gutter.
+_GUTTER_WIDTH_PT: Final[float] = 6.0
+_GUTTER_STEP_PT: Final[float] = 1.0
+_GUTTER_CROSSING_WORD_PT: Final[float] = 6.0
+# Measured: with 8 open rows the cut fires on the index pages and tables of
+# the six books and on no page of running text, with 5 on 14 pages of
+# Mariéjol's text. Two columns of notes are often only 3 rows long.
+_BODY_OPEN_ROWS: Final[int] = 8
+_BAND_OPEN_ROWS: Final[int] = 3
+# Measured on the six books: the gutter of two columns of notes is within
+# 8 pt of the column's middle (Kadesh, 30 runs of 3 open rows or more); that
+# of Domesday's short notes printed side by side 13 to 46 pt from it.
+_BAND_GUTTER_OFF_CENTRE_PT: Final[float] = 10.0
+# Measured: Haskins' drop capitals are 2.67 ("IN", page 163) to 4 times the
+# body word height.
+_DROP_CAPITAL_HEIGHTS: Final[float] = 2.2
+_DROP_CAPITAL_EDGE_PT: Final[float] = 3.0
+
+
+class _Part(Enum):
+    """The part of the column that is cut into columns: the body or the
+    footnote band, which need different numbers of open rows."""
+
+    BODY = "body"
+    BAND = "band"
+
+
+def _open_rows_to_cut(part: _Part) -> int:
+    """The open rows a run of `part` needs to be cut into columns."""
+    match part:
+        case _Part.BODY:
+            return _BODY_OPEN_ROWS
+        case _Part.BAND:
+            return _BAND_OPEN_ROWS
+        case _:
+            assert_never(part)
+
+
+class _AtGutter(Enum):
+    """How a row lies at a gutter: open (words on both sides, none across),
+    on one side only, with one word across it far from its middle, or
+    blocked. All but the last are compatible with a column cut."""
+
+    OPEN = "open"
+    ONE_SIDE = "one side"
+    CROSSED_ASIDE = "crossed aside"
+    BLOCKED = "blocked"
+
+
+def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
+    """The index in `rows` of the first row of the footnote band (step 4),
+    or len(rows) when there is no band."""
+    small = tuple(
+        _row_word_height(row) <= _SMALL_ROW_SHARE * measures.body_word_height
+        for row in rows
+    )
+    if all(small):
+        return len(rows)
+    return next(
+        (
+            index
+            for index in range(1, len(rows))
+            if small[index]
+            and rows[index].box.top - rows[index - 1].box.top
+            >= _BAND_GAP_PITCHES * measures.body_line_pitch
+            and sum(small[index:]) >= _BAND_SMALL_ROWS_SHARE * (len(rows) - index)
+        ),
+        len(rows),
+    )
+
+
+def _row_gaps(row: Line) -> tuple[tuple[float, float], ...]:
+    """The empty stretches of `row` between its words, as (left, right) in
+    points, with words on both sides."""
+    gaps = []
+    reach = None
+    for word in sorted(row.words, key=lambda word: word.box.x0):
+        if reach is not None and word.box.x0 > reach:
+            gaps.append((reach, word.box.x0))
+        reach = word.box.x1 if reach is None else max(reach, word.box.x1)
+    return tuple(gaps)
+
+
+def _gutter_middle(rows: tuple[Line, ...], left: float, width: float) -> float | None:
+    """The middle of the gutter of `rows`, in points: of the strips 6 pt
+    wide whose middles step by 1 pt across the middle third of the column
+    from `left`, `width` wide, the leftmost at which most rows are open.
+    None when no row is open at any."""
+    start = left + width / 3
+    count = int(width / 3 / _GUTTER_STEP_PT) + 1
+    half = _GUTTER_WIDTH_PT / 2
+    open_rows = [0] * count
+    for row in rows:
+        opened = {
+            step
+            for gap_left, gap_right in _row_gaps(row)
+            for step in range(
+                max(0, math.floor((gap_left + half - start) / _GUTTER_STEP_PT)),
+                min(count, math.ceil((gap_right - half - start) / _GUTTER_STEP_PT) + 1),
+            )
+            if gap_left <= start + step * _GUTTER_STEP_PT - half
+            and start + step * _GUTTER_STEP_PT + half <= gap_right
+        }
+        for step in opened:
+            open_rows[step] += 1
+    most = max(open_rows)
+    return None if most == 0 else start + open_rows.index(most) * _GUTTER_STEP_PT
+
+
+def _at_gutter(row: Line, middle: float) -> _AtGutter:
+    """How `row` lies at the strip 6 pt wide around `middle`."""
+    half = _GUTTER_WIDTH_PT / 2
+    across = tuple(
+        word
+        for word in row.words
+        if word.box.x0 < middle + half and word.box.x1 > middle - half
+    )
+    if not across:
+        both_sides = any(w.box.x1 <= middle - half for w in row.words) and any(
+            w.box.x0 >= middle + half for w in row.words
+        )
+        return _AtGutter.OPEN if both_sides else _AtGutter.ONE_SIDE
+    if (
+        len(across) == 1
+        and abs((across[0].box.x0 + across[0].box.x1) / 2 - middle)
+        > _GUTTER_CROSSING_WORD_PT
+    ):
+        return _AtGutter.CROSSED_ASIDE
+    return _AtGutter.BLOCKED
+
+
+def _run_is_cut(run: tuple[tuple[Line, _AtGutter], ...], part: _Part) -> bool:
+    """Whether a run of compatible rows has the open rows to be cut into two
+    columns (step 5)."""
+    open_rows = sum(at is _AtGutter.OPEN for _, at in run)
+    return open_rows >= _open_rows_to_cut(part)
+
+
+def _cut_run(rows: tuple[Line, ...], middle: float) -> tuple[Region, Region]:
+    """The left and right columns of a cut run: each word goes by its own
+    middle, left of `middle` or not."""
+    words = _words_of(rows)
+    return (
+        _region(
+            group_lines(tuple(w for w in words if (w.box.x0 + w.box.x1) / 2 < middle))
+        ),
+        _region(
+            group_lines(tuple(w for w in words if (w.box.x0 + w.box.x1) / 2 >= middle))
+        ),
+    )
+
+
+def _column_cut_regions(
+    rows: tuple[Line, ...], left: float, width: float, part: _Part
+) -> tuple[Region, ...]:
+    """The regions of the body or the band, top to bottom: each run of
+    rows cut at the gutter gives its left and its right column, and the
+    rows between such runs a region each (step 5)."""
+    if not rows:
+        return ()
+    middle = _gutter_middle(rows, left, width)
+    if middle is None or (
+        part is _Part.BAND
+        and abs(middle - (left + width / 2)) > _BAND_GUTTER_OFF_CENTRE_PT
+    ):
+        return (_region_of_rows(rows),)
+    regions: list[Region] = []
+    pending: list[Line] = []
+    for compatible, group in groupby(
+        ((row, _at_gutter(row, middle)) for row in rows),
+        key=lambda row_at: row_at[1] is not _AtGutter.BLOCKED,
+    ):
+        run = tuple(group)
+        if compatible and _run_is_cut(run, part):
+            if pending:
+                regions.append(_region_of_rows(tuple(pending)))
+                pending = []
+            regions.extend(_cut_run(tuple(row for row, _ in run), middle))
+        else:
+            pending.extend(row for row, _ in run)
+    if pending:
+        regions.append(_region_of_rows(tuple(pending)))
+    return tuple(regions)
+
+
+def _column_regions(
+    words: tuple[Word, ...], left: float, measures: BookMeasures
+) -> tuple[tuple[Region, ...], tuple[Region, ...]]:
+    """The regions of the body column's `words`, a drop capital set aside:
+    the running-head region and the body's regions, then the band's (steps
+    3 to 5 and 7)."""
+    rows = group_lines(words)
+    head_count = _running_head_row_count(rows, measures.body_line_pitch)
+    head, rest = rows[:head_count], rows[head_count:]
+    band_start = _band_start(rest, measures)
+    width = measures.column_width
+    return (
+        (
+            *((_region_of_rows(head),) if head else ()),
+            *_column_cut_regions(rest[:band_start], left, width, _Part.BODY),
+        ),
+        _column_cut_regions(rest[band_start:], left, width, _Part.BAND),
+    )
+
+
+def _is_drop_capital(word: Word, left: float, measures: BookMeasures) -> bool:
+    return (
+        word.box.bottom - word.box.top
+        > _DROP_CAPITAL_HEIGHTS * measures.body_word_height
+        and abs(word.box.x0 - left) <= _DROP_CAPITAL_EDGE_PT
+    )
+
+
+def _with_drop_capital(
+    regions: tuple[Region, ...], capital: Word
+) -> tuple[Region, ...] | None:
+    """`regions` with `capital` placed first in the topmost line whose box
+    overlaps the capital's vertically and starts right of its middle (step
+    6). None when no line does."""
+    capital_middle = (capital.box.x0 + capital.box.x1) / 2
+    beside = tuple(
+        (line.box.top, region_index, line_index)
+        for region_index, region in enumerate(regions)
+        for line_index, line in enumerate(region.lines)
+        if line.box.top < capital.box.bottom
+        and line.box.bottom > capital.box.top
+        and line.box.x0 >= capital_middle
+    )
+    if not beside:
+        return None
+    _, region_index, line_index = min(beside)
+    lines = regions[region_index].lines
+    line = lines[line_index]
+    placed = Line(_enclosing_box((capital.box, line.box)), (capital, *line.words))
+    region = _region((*lines[:line_index], placed, *lines[line_index + 1 :]))
+    return (*regions[:region_index], region, *regions[region_index + 1 :])
+
+
+def _column_regions_with_drop_capitals(
+    words: tuple[Word, ...],
+    set_aside: frozenset[int],
+    left: float,
+    measures: BookMeasures,
+) -> tuple[tuple[Region, ...], tuple[Region, ...]]:
+    """`_column_regions` of `words` without the drop capitals at the
+    indices `set_aside`, each then placed in the line beside it. A capital
+    with no line beside it is laid out again as a word of the body."""
+    upper, band = _column_regions(
+        tuple(word for index, word in enumerate(words) if index not in set_aside),
+        left,
+        measures,
+    )
+    regions = (*upper, *band)
+    unplaced = set()
+    for index in sorted(set_aside):
+        placed = _with_drop_capital(regions, words[index])
+        if placed is None:
+            unplaced.add(index)
+        else:
+            regions = placed
+    if unplaced:
+        return _column_regions_with_drop_capitals(
+            words, set_aside - unplaced, left, measures
+        )
+    return regions[: len(upper)], regions[len(upper) :]
+
+
 def _page_regions(
     words: tuple[Word, ...], page_index: int, measures: BookMeasures
 ) -> tuple[Region, ...]:
     """The regions of a page of `words`, which are not empty, in reading
-    order (layout spec section 3, steps 1 to 7)."""
+    order (layout spec section 3): the running-head region, the body's
+    regions, the margin regions by their top, the left side first, and the
+    band's regions."""
     pitch = measures.body_line_pitch
     left = _body_left_edge(group_lines(words), page_index, measures)
     right = left + measures.column_width
     left_margin = tuple(w for w in words if w.box.x1 <= left - _MARGIN_WORD_PT)
     right_margin = tuple(w for w in words if w.box.x0 >= right + _MARGIN_WORD_PT)
-    rows = group_lines(
-        tuple(
-            w
-            for w in words
-            if left - _MARGIN_WORD_PT < w.box.x1 and w.box.x0 < right + _MARGIN_WORD_PT
-        )
+    column = tuple(
+        w
+        for w in words
+        if left - _MARGIN_WORD_PT < w.box.x1 and w.box.x0 < right + _MARGIN_WORD_PT
     )
-    head_count = _running_head_row_count(rows, pitch)
-    head, body = rows[:head_count], rows[head_count:]
+    upper, band = _column_regions_with_drop_capitals(
+        column,
+        frozenset(
+            index
+            for index, word in enumerate(column)
+            if _is_drop_capital(word, left, measures)
+        ),
+        left,
+        measures,
+    )
     margins = sorted(
         (
             *((0, region) for region in _margin_regions(left_margin, pitch)),
@@ -329,11 +621,7 @@ def _page_regions(
         ),
         key=lambda side_region: (side_region[1].box.top, side_region[0]),
     )
-    return (
-        *((_region_of_rows(head),) if head else ()),
-        *((_region_of_rows(body),) if body else ()),
-        *(region for _, region in margins),
-    )
+    return (*upper, *(region for _, region in margins), *band)
 
 
 def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout:
