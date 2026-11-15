@@ -35,7 +35,7 @@ The plan is done, on branch `plan/evaluation`, not merged. Finished on
   text that structure should have removed.
 - Structure has the most to gain: 1,243–1,841 running-head and
   page-number words per book that galley keeps and the book does not
-  have (1.9% of Haskins' words, 0.8% of Domesday's), 985–3,600 hyphens left split, and
+  have (1.9% of Haskins' words, 0.8% of Domesday's), 781–1,450 hyphens left split at line ends, and
   no paragraph, note or margin note found: about 1 in 10 of galley's
   paragraph breaks is one the book has.
 - Extract's spacing: text run together is the commonest error of
@@ -364,8 +364,11 @@ What the baseline says about galley:
 - Words run together by the text layer ("ThekingsofFrance,"): the
   commonest error of Haskins, 1,328, and 2,315 in Stubbs; extract's
   spacing.
-- Hyphens at line ends left split: 985 in Haskins, 1,918 in Stubbs,
-  3,600 in Domesday; structure's hyphen join.
+- Hyphens at line ends left split: 1,005 in Haskins, 1,235 in Stubbs,
+  781 in Domesday, 1,450 in Mariéjol; structure's hyphen join. (Counted
+  after the plan, on 15 November 2026: the tool's `split` also holds
+  words the OCR spaced apart, "E dward", so its totals are higher: 3,600
+  in Domesday.)
 - Scrambled text: Stubbs' two-column index gives most of its 10,903
   extra tokens; Domesday's tables most of its 11,077.
 - Mariéjol's text layer is poor: 26,257 misread words and 21,526 missing
