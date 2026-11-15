@@ -215,11 +215,11 @@ is laid out as one region, as the skeleton did.
    across the middle third, at which the most rows are open; a tie takes
    the leftmost. A **run** is a longest stretch of consecutive compatible
    rows; it is cut when it holds at least 8 open rows in the body, or 3
-   in the band, and in the band only when at least half of its open rows
-   have their left part ending within 3 pt of the strip's left side (the
-   left column is justified to the gutter; Domesday's short notes printed
-   side by side in a row are not, and must be read row by row, 1, 2, 3,
-   4, not 1, 3, 2, 4). A cut run becomes two regions: each word goes
+   in the band, and in the band only when the gutter's middle lies within
+   10 pt of the middle of the body column (two columns of notes are set
+   on either side of the middle; Domesday's short notes printed side by
+   side in a row are not, and must be read row by row, 1, 2, 3, 4, not 1,
+   3, 2, 4). A cut run becomes two regions: each word goes
    left or right of the strip's middle by its own middle. The rows
    before and after it stay regions of their own: an index page whose
    title spans the column gives the title, then the left column, then
@@ -227,11 +227,14 @@ is laid out as one region, as the skeleton did.
 6. **Drop capital.** A word of the body taller than 2.2 times the body
    word height, whose left side is within 3 pt of the left edge, is set
    aside before the rows of steps 3 to 5 and the lines of step 7 are
-   made. Once its region's lines are made, it is placed first in the
-   topmost line whose box overlaps the word's box vertically and lies to
-   its right. (Haskins' "IN" on page 163 has its top 0.5 pt below the
+   made. Once the regions' lines are made, it is placed first in the
+   topmost line, of any region but a margin region, whose box overlaps
+   the word's box vertically and lies to its right, that is whose left
+   side is at or right of the word's middle; the line's box then holds
+   the word. (Haskins' "IN" on page 163 has its top 0.5 pt below the
    first line's centre, so a rule on the line's centre would put it on
-   the second line.)
+   the second line.) A word with no such line is not set aside: the
+   page is laid out again with it as a word of the body.
 7. **Lines.** Inside each region, words are grouped into lines by the
    skeleton's rule, the lines ordered by their top and the words of each
    line by their left side.
@@ -258,7 +261,7 @@ Where the thresholds come from:
 | band rows small | two thirds | guessed: Mariéjol's note lines are small on 769 of 911 |
 | gap above the band | 1.1 body line pitches | measured: the 10th percentile of the gap from the last body line to the first note line is 1.16 pitches in Haskins, 1.24 in Domesday, 1.39 in Mariéjol |
 | gutter | 6 pt wide, middle third, 8 open rows in the body, 3 in the band | measured, below |
-| left column justified | 3 pt | guessed |
+| band gutter off the column's middle | 10 pt | measured, below |
 | drop capital | 2.2 times the body word height, within 3 pt of the edge | measured: Haskins' are 2.67 ("IN", page 163) to 4 times |
 
 An earlier form of the column rule, which asked every row of a run to
@@ -281,8 +284,27 @@ Stubbs' index pages a full-size catchword row under the head ("BUR
 CON") makes the small-type columns below it a band, so the band's
 3-row rule applies there. The band needs only 3 rows because two
 columns of notes are often short, as in Kadesh; with 3 rows and no
-justification test, the band rule cut Domesday's side-by-side notes
+further test, the band rule cut Domesday's side-by-side notes
 into columns on 19 pages (83 and 139 among them) and Mariéjol's on 10.
+
+The further test was first that at least half of the open rows have
+their left part ending within 3 pt of the strip's left side (the left
+column justified to the gutter). Run on the six whole books on 15
+November 2026, it failed on two reference pages. On Domesday's page 83,
+notes 3 and 5 end within 2 pt of the strip, being of the same length, so
+two of its three open rows passed and the notes were cut into columns.
+On Kadesh's page 10, the text layer's word boxes end 4 to 12 pt short of
+the gutter, so three of its seven open rows passed and its two columns
+of notes were read across. The gutter's position tells them apart: in
+the band runs of 3 open rows or more, its middle lies within 8 pt of the
+column's middle on all 30 of Kadesh's, and 13 to 46 pt from it in the
+nine of Domesday's short notes side by side (pages 83, 111, 122, 139,
+236, 240, 404, 504, 506). With the 10 pt test, the band is cut into
+columns on 30 of Kadesh's pages, Stubbs' 10 index pages (312 to 321),
+four of Domesday's (354, two columns of notes; 418, a table; 547 and 552,
+the index) and four of Mariéjol's (14, the bibliography; 71, two columns
+of notes; 169 and 261, pages whose OCR is garbled), and on no page of
+Haskins or Gierke.
 
 ### What the rules give, measured
 
@@ -371,7 +393,7 @@ layout itself (not measured).
 - **A margin note level with the running head**: its words are margin
   words (step 2) and never join the head.
 - **Domesday's short notes side by side**: one line per row, read left
-  to right, which is their order; the justification test of step 5 keeps
+  to right, which is their order; the gutter test of step 5 keeps
   three or more such rows from being cut into columns (page 83, a
   reference page).
 - **Index pages**: two columns, each read top to bottom (step 5). An
@@ -426,8 +448,8 @@ with their boxes, with a `BookMeasures` given in the test:
   is a drop capital whose top lies 0.5 pt below the upper line's centre;
 - in the body, 10 open rows, a blank row in the left column and one word
   crossing the gutter keep one run and give two regions; in a band,
-  three rows of two short notes whose left parts end 20 pt and more
-  before the strip stay three rows;
+  three rows of two short notes whose gutter lies more than 10 pt from
+  the column's middle stay three rows;
 - `measure_book` on 20 hand-made pages gives the medians, and `None` on
   pages of 2 rows;
 - `run` on a hand-made `words.json` of 8 pages with 1 worker and with 3
