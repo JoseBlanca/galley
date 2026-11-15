@@ -281,9 +281,13 @@ page_numbers)`:
 - `WordChange`: `page_index`, `before: tuple[str, ...]`, `after:
   tuple[str, ...]`, `reason: ChangeReason`: a word that structure changed
   without losing any letter. `hyphen_join`: ("repli-", "cate") becomes
-  ("replicate",). `note_marker`: ("Greece,1",) becomes ("Greece,", "1"),
-  the "1" going to the note reference. A spec adds a reason when it needs
-  one.
+  ("replicate",), because the word list or the book's own words hold the
+  joined word. `hyphen_join_guessed`: the same, when neither holds it
+  (structure §5), recorded so that the guessed joins can be reviewed.
+  `hyphen_kept`: ("Anglo-", "Saxon") becomes ("Anglo-Saxon",), a
+  compound the book prints with its hyphen. `note_marker`: ("Greece,1",)
+  becomes ("Greece,", "1"), the "1" going to the note reference. A spec
+  adds a reason when it needs one.
 - `PageNumber`: `page_index`, `text`, `position: head | foot`.
   `page_numbers: tuple[PageNumber, ...]`, taken from the removals; the
   index stage uses it (section 11).
@@ -291,7 +295,9 @@ page_numbers)`:
 **Removal**, in words.json (excluded pages and regions) and blocks.json
 (the rest): `page_index`, `box`, `text`,
 `reason: RemovalReason`: `excluded_page`, `excluded_region`,
-`running_head`, `page_number`, `signature_mark`. A stage spec adds a
+`running_head`, `page_number`, `signature_mark`, `plate_text`,
+`stray_mark` (a line with no letter or digit above a running head, a
+speck of the scan). A stage spec adds a
 reason when it removes a new kind of text, and the reason names what the
 text is, never "noise": a plate's stray text-layer characters are removed
 as `plate_text` by structure, which the owner can review.
@@ -340,7 +346,9 @@ signature marks, the line heights of body and notes. Then, per page, it
 removes those, decides what each region is, groups lines into
 paragraphs, headings, quotes, margin notes and notes (a margin note goes
 just before the paragraph whose line it sits beside), joins hyphenated
-words where the word list or the book's own words allow it, and splits
+words (dropping the hyphen where the word list or the book's own words
+allow it, keeping it in a compound the book prints, and dropping it as a
+recorded guess where neither decides; `docs/specs/structure.md` §5), and splits
 note markers off the words they are glued to. Last, it joins paragraphs
 and notes that run over a page break and matches each note reference to
 its note.

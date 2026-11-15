@@ -262,19 +262,26 @@ _HYPHEN_JOIN_PARTS = 2
 
 def _change_follows_its_reason(change: WordChange) -> bool:
     """Whether a word change keeps every letter as its reason allows: a note
-    marker split off its word keeps the text; a hyphen join of two parts
-    drops only the hyphen ending the first."""
+    marker split off its word keeps the text; a hyphen join of two parts,
+    on evidence or guessed, drops only the hyphen ending the first; a kept
+    hyphen joins two parts, the first ending with a hyphen, as they are."""
     if not change.before or not change.after:
         return False
     joined_after = "".join(change.after)
     match change.reason:
         case ChangeReason.NOTE_MARKER:
             return "".join(change.before) == joined_after
-        case ChangeReason.HYPHEN_JOIN:
+        case ChangeReason.HYPHEN_JOIN | ChangeReason.HYPHEN_JOIN_GUESSED:
             return (
                 len(change.before) == _HYPHEN_JOIN_PARTS
                 and change.before[0].endswith("-")
                 and change.before[0][:-1] + change.before[1] == joined_after
+            )
+        case ChangeReason.HYPHEN_KEPT:
+            return (
+                len(change.before) == _HYPHEN_JOIN_PARTS
+                and change.before[0].endswith("-")
+                and change.before[0] + change.before[1] == joined_after
             )
         case _:
             assert_never(change.reason)
@@ -338,7 +345,8 @@ def check_stage(
     and the pages or blocks each came from. At the structure boundary it
     also raises, with no word, when a note reference span is not its note's
     marker or a word change does more than its reason allows (a hyphen join
-    of two parts, a marker split off its word).
+    of two parts, with the hyphen dropped or kept, a marker split off its
+    word).
     """
     match stage:
         case FidelityBoundary.LAYOUT:

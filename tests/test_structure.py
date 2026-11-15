@@ -1,7 +1,8 @@
-"""Tests of galley.structure (spec section 7, "structure" and "Their tests").
+"""Tests of galley.structure (docs/specs/structure.md, section 9).
 
 Every value is written by hand: structure's tests need no output of layout.
-The excerpt tests of structure are in work package 4.
+The excerpt tests of structure on the reference pages come later, once the
+owner has checked those pages.
 """
 
 import hashlib
@@ -20,24 +21,32 @@ from galley.model import (
     BlockKind,
     BlocksFile,
     Box,
+    ChangeReason,
     Emphasis,
+    Figure,
     Line,
     LinesFile,
     Origin,
     PageInfo,
     PageKind,
     PageLayout,
+    PageNumber,
+    PageNumberPosition,
     PagesFile,
     Region,
+    Removal,
+    RemovalReason,
     Span,
     TextSource,
     Word,
+    WordChange,
+    block_text,
     read_blocks,
     write_blocks,
     write_lines,
     write_pages,
 )
-from galley.structure import make_blocks, page_blocks
+from galley.structure import HyphenJoin, join_hyphen, make_blocks, survey_book
 
 
 def _word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
@@ -66,30 +75,586 @@ def _paragraph(block_id: str, text: str, page_index: int, box: Box) -> Block:
     )
 
 
-# page_blocks
+# Pages written by hand. A word is 5 pt wide per character and 10 pt high,
+# with one character's width between words, unless given otherwise.
+
+_NO_WORDS: frozenset[str] = frozenset()
+_CHAR_PT = 5.0
+_WORD_HEIGHT_PT = 10.0
+_PITCH_PT = 15.0
+_BODY_LEFT_PT = 50.0
 
 
-def test_region_of_two_lines_gives_one_paragraph_of_its_words() -> None:
-    page = PageLayout(12, (_REGION,), ())
-    assert page_blocks(page) == (
-        _paragraph("b-p0012-001", "Alpha beta, gamma delta.", 12, _REGION.box),
+def _words_at(
+    text: str, x0: float, top: float, height: float = _WORD_HEIGHT_PT
+) -> tuple[Word, ...]:
+    words = []
+    left = x0
+    for part in text.split(" "):
+        right = left + _CHAR_PT * len(part)
+        words.append(Word(part, Box(left, top, right, top + height), None))
+        left = right + _CHAR_PT
+    return tuple(words)
+
+
+def _box(boxes: tuple[Box, ...]) -> Box:
+    return Box(
+        min(box.x0 for box in boxes),
+        min(box.top for box in boxes),
+        max(box.x1 for box in boxes),
+        max(box.bottom for box in boxes),
     )
 
 
-def test_page_with_no_region_gives_no_block() -> None:
-    assert page_blocks(PageLayout(3, (), ())) == ()
+def _line(text: str, x0: float, top: float, height: float = _WORD_HEIGHT_PT) -> Line:
+    words = _words_at(text, x0, top, height)
+    return Line(_box(tuple(word.box for word in words)), words)
 
 
-def test_second_region_of_a_page_gives_the_block_id_002() -> None:
-    lower = Region(
-        Box(40, 300, 80, 312),
-        (Line(Box(40, 300, 80, 312), (_word("Omega", 40, 300, 80, 312),)),),
+def _region(*lines: Line) -> Region:
+    return Region(_box(tuple(line.box for line in lines)), lines)
+
+
+def _body(top: float, *texts: str, x0: float = _BODY_LEFT_PT) -> Region:
+    """A region of one line per text, 15 pt apart, from `top`."""
+    return _region(
+        *(
+            _line(text, x0, top + _PITCH_PT * number)
+            for number, text in enumerate(texts)
+        )
     )
-    page = PageLayout(7, (_REGION, lower), ())
-    assert page_blocks(page) == (
-        _paragraph("b-p0007-001", "Alpha beta, gamma delta.", 7, _REGION.box),
-        _paragraph("b-p0007-002", "Omega", 7, lower.box),
+
+
+_BODY_TEXTS = (
+    "the first line of the body",
+    "the second line of the body",
+    "the third line of the body",
+    "the fourth line of the body",
+    "the fifth line of the body",
+    "the sixth line of the body",
+)
+
+
+def _page_with_head(index: int, head: str, head_top: float = 36.0) -> PageLayout:
+    """A page with a head line at `head_top` and six body lines from 34 pt
+    below it."""
+    return PageLayout(
+        index,
+        (
+            _region(_line(head, _BODY_LEFT_PT, head_top)),
+            _body(head_top + 34, *_BODY_TEXTS),
+        ),
+        (),
     )
+
+
+# Heads that differ from one another, each at least 0.75 alike to another.
+_HEADS_WITHOUT_NUMBERS = (
+    "THE BOOK",
+    "THE BOKO",
+    "TIIE BOOK",
+    "THE BOOKS",
+    "THF BOOK",
+    "THE BQOK",
+)
+
+
+def _lines_of(*pages: PageLayout) -> LinesFile:
+    return LinesFile(source_pdf_sha256=_HASH, pages=pages)
+
+
+def _numbered_heads() -> tuple[PageLayout, ...]:
+    """Pages 10 to 15 printed 25 to 30, the number first on even pages."""
+    return tuple(
+        _page_with_head(
+            index,
+            f"{index + 15} THE BOOK" if index % 2 == 0 else f"THE BOOK {index + 15}",
+        )
+        for index in range(10, 16)
+    )
+
+
+# survey_book
+
+
+def test_survey_finds_numbered_heads_running_heads_and_the_offset() -> None:
+    survey = survey_book(_lines_of(*_numbered_heads()), workers=1)
+    assert survey.running_heads == frozenset(range(10, 16))
+    assert survey.head_page_offset == -15
+    assert survey.first_arabic_page == 10
+    assert survey.body_word_height == _WORD_HEIGHT_PT
+    assert survey.body_line_pitch == _PITCH_PT
+
+
+def test_survey_finds_heads_without_numbers_running_heads_by_their_letters() -> None:
+    pages = tuple(
+        _page_with_head(index, head)
+        for index, head in enumerate(_HEADS_WITHOUT_NUMBERS, start=10)
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert survey.running_heads == frozenset(range(10, 16))
+    assert survey.head_page_offset is None
+    assert survey.first_arabic_page is None
+
+
+def test_survey_does_not_take_a_head_line_alike_to_no_other_for_a_running_head() -> (
+    None
+):
+    pages = (
+        _page_with_head(10, "THE BOOK"),
+        _page_with_head(11, "THE BOOK"),
+        _page_with_head(12, "CHAPTER ON NORMANDY"),
+    )
+    assert survey_book(_lines_of(*pages), workers=1).running_heads == frozenset(
+        {10, 11}
+    )
+
+
+def test_survey_does_not_take_the_same_title_70_pt_lower_for_a_running_head() -> None:
+    pages = (
+        *(
+            _page_with_head(index, head)
+            for index, head in enumerate(_HEADS_WITHOUT_NUMBERS, start=10)
+        ),
+        _page_with_head(16, "THE BOOK", head_top=106.0),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert survey.running_heads == frozenset(range(10, 16))
+
+
+def test_survey_book_words_leave_out_the_parts_of_a_hyphenated_word() -> None:
+    page = PageLayout(
+        0, (_body(70, "Of the neces-", "sary Anglo-Saxon things,", "and so"),), ()
+    )
+    assert survey_book(_lines_of(page), workers=1).book_words == frozenset(
+        {"of", "the", "anglo-saxon", "things", "and", "so"}
+    )
+
+
+def test_survey_body_word_height_is_the_median_of_the_lines_medians() -> None:
+    small = _region(
+        *(_line("a small note", 50, 300 + 10 * n, height=7.0) for n in range(3))
+    )
+    page = PageLayout(0, (_body(70, *_BODY_TEXTS[:4]), small), ())
+    assert survey_book(_lines_of(page), workers=1).body_word_height == _WORD_HEIGHT_PT
+
+
+# Running heads and page numbers in the head
+
+
+def _removals_of(page_index: int, blocks: BlocksFile) -> tuple[Removal, ...]:
+    return tuple(
+        removal for removal in blocks.removals if removal.page_index == page_index
+    )
+
+
+def test_head_with_a_page_number_and_a_mark_above_is_removed_in_three_parts() -> None:
+    mark = _line(";", 120, 20)
+    head = _line("214 NORMANS IN EUROPEAN HISTORY", _BODY_LEFT_PT, 36)
+    page = PageLayout(229, (_region(mark, head), _body(70, *_BODY_TEXTS)), ())
+    others = (
+        _page_with_head(230, "THE COMING OF THE NORMANS 215"),
+        _page_with_head(231, "216 NORMANS IN EUROPEAN HISTORY"),
+    )
+    blocks = make_blocks(_lines_of(page, *others), _NO_WORDS, workers=1)
+    assert _removals_of(229, blocks) == (
+        Removal(
+            page_index=229, box=mark.box, text=";", reason=RemovalReason.STRAY_MARK
+        ),
+        Removal(
+            page_index=229,
+            box=head.words[0].box,
+            text="214",
+            reason=RemovalReason.PAGE_NUMBER,
+        ),
+        Removal(
+            page_index=229,
+            box=_box(tuple(word.box for word in head.words[1:])),
+            text="NORMANS IN EUROPEAN HISTORY",
+            reason=RemovalReason.RUNNING_HEAD,
+        ),
+    )
+    assert blocks.page_numbers == (
+        PageNumber(229, "214", PageNumberPosition.HEAD),
+        PageNumber(230, "215", PageNumberPosition.HEAD),
+        PageNumber(231, "216", PageNumberPosition.HEAD),
+    )
+    assert all("NORMANS" not in block_text(block) for block in blocks.blocks)
+
+
+def test_marks_above_a_head_line_that_is_no_running_head_stay() -> None:
+    page = PageLayout(
+        3,
+        (
+            _region(_line(";", 120, 20), _line("A TITLE", 80, 36)),
+            _body(70, *_BODY_TEXTS),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert blocks.removals == ()
+    assert block_text(blocks.blocks[0]).startswith("; A TITLE the first line")
+
+
+def test_misread_head_number_goes_with_the_running_head_and_gives_no_page_number() -> (
+    None
+):
+    pages = (
+        _page_with_head(130, "THE BOOK ii8"),
+        _page_with_head(131, "THE BOOK 119"),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert _removals_of(130, blocks) == (
+        Removal(
+            page_index=130,
+            box=pages[0].regions[0].box,
+            text="THE BOOK ii8",
+            reason=RemovalReason.RUNNING_HEAD,
+        ),
+    )
+    assert blocks.page_numbers == (PageNumber(131, "119", PageNumberPosition.HEAD),)
+
+
+def test_roman_head_number_counts_only_before_the_first_arabic_one() -> None:
+    pages = (
+        _page_with_head(5, "PREFACE xi"),
+        _page_with_head(6, "PREFACE xii"),
+        _page_with_head(20, "THE EARLY KINGS 3"),
+        _page_with_head(21, "THE EARLY KINGS. ch. i."),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert blocks.page_numbers == (
+        PageNumber(5, "xi", PageNumberPosition.HEAD),
+        PageNumber(6, "xii", PageNumberPosition.HEAD),
+        PageNumber(20, "3", PageNumberPosition.HEAD),
+    )
+    assert _removals_of(21, blocks)[0].text == "THE EARLY KINGS. ch. i."
+
+
+def test_of_two_head_numbers_the_one_the_offset_gives_is_the_page_number() -> None:
+    pages = (
+        _page_with_head(20, "5 THE BOOK"),
+        _page_with_head(21, "THE BOOK 6"),
+        _page_with_head(22, "12 THE BOOK 7"),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert blocks.page_numbers[-1] == PageNumber(22, "7", PageNumberPosition.HEAD)
+    assert tuple(removal.text for removal in _removals_of(22, blocks)) == (
+        "12 THE BOOK",
+        "7",
+    )
+
+
+# Page numbers at the foot and signature marks, on a column from x 25 to
+# 299 pt (its middle at 162 pt)
+
+_COLUMN_LEFT_PT = 25.0
+_COLUMN_RIGHT_PT = 299.0
+_FOOT_TOP_PT = 400.0
+
+
+def _column_line(top: float) -> Line:
+    words = (
+        Word("Body", Box(_COLUMN_LEFT_PT, top, 60, top + _WORD_HEIGHT_PT), None),
+        Word("text.", Box(264, top, _COLUMN_RIGHT_PT, top + _WORD_HEIGHT_PT), None),
+    )
+    return Line(_box(tuple(word.box for word in words)), words)
+
+
+def _foot_line(top: float, *words: tuple[str, float]) -> Line:
+    """A line of the words (text, left side), each 5 pt wide a character."""
+    placed = tuple(
+        Word(
+            text,
+            Box(x0, top, x0 + _CHAR_PT * len(text), top + _WORD_HEIGHT_PT),
+            None,
+        )
+        for text, x0 in words
+    )
+    return Line(_box(tuple(word.box for word in placed)), placed)
+
+
+def _page_with_foot(index: int, *foot_lines: Line) -> PageLayout:
+    """A page of six body lines across the column, then the foot lines in a
+    region of their own, as layout gives a foot set apart."""
+    body = _region(*(_column_line(70 + _PITCH_PT * number) for number in range(6)))
+    return PageLayout(index, (body, _region(*foot_lines)), ())
+
+
+def _centred(text: str) -> tuple[str, float]:
+    return text, 162 - _CHAR_PT * len(text) / 2
+
+
+@pytest.mark.parametrize("number", ["(49)", "U9)", "83"])
+def test_centred_page_number_at_the_foot_is_removed(number: str) -> None:
+    foot = _foot_line(_FOOT_TOP_PT, _centred(number))
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
+    assert blocks.removals == (
+        Removal(
+            page_index=4, box=foot.box, text=number, reason=RemovalReason.PAGE_NUMBER
+        ),
+    )
+    assert blocks.page_numbers == (PageNumber(4, number, PageNumberPosition.FOOT),)
+
+
+@pytest.mark.parametrize(
+    "words",
+    [(("M.", 37), ("4", 266)), (("4—2", 252),)],
+    ids=["M. 4", "4—2"],
+)
+def test_signature_mark_at_the_foot_is_removed(
+    words: tuple[tuple[str, float], ...],
+) -> None:
+    foot = _foot_line(_FOOT_TOP_PT, *words)
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
+    assert blocks.removals == (
+        Removal(
+            page_index=4,
+            box=foot.box,
+            text=" ".join(text for text, _ in words),
+            reason=RemovalReason.SIGNATURE_MARK,
+        ),
+    )
+    assert blocks.page_numbers == ()
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        (("4", 28), ("Ibid.", 38), ("29.", 68)),
+        (("(5)", 28), ("Ibid.,", 48), ("p.", 83), ("3.", 98)),
+        (("p.", 28), ("83.", 43)),
+        (_centred("1907"),),
+    ],
+    ids=["note line", "note line with a marker", "short note line", "year"],
+)
+def test_foot_line_that_is_no_page_number_or_mark_stays(
+    words: tuple[tuple[str, float], ...],
+) -> None:
+    foot = _foot_line(_FOOT_TOP_PT, *words)
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
+    assert blocks.removals == ()
+    assert blocks.page_numbers == ()
+
+
+def test_signature_mark_above_a_page_number_is_removed_with_it() -> None:
+    mark = _foot_line(_FOOT_TOP_PT - _PITCH_PT, ("4—2", 252))
+    number = _foot_line(_FOOT_TOP_PT, _centred("83"))
+    blocks = make_blocks(
+        _lines_of(_page_with_foot(4, mark, number)), _NO_WORDS, workers=1
+    )
+    assert tuple((removal.text, removal.reason) for removal in blocks.removals) == (
+        ("4—2", RemovalReason.SIGNATURE_MARK),
+        ("83", RemovalReason.PAGE_NUMBER),
+    )
+
+
+def _signature_line(*words: str) -> Line:
+    """Mariéjol's signature line: the words, its page number in brackets
+    centred, and the signature's number."""
+    *signature, number, sheet = words
+    left = 30.0
+    placed = []
+    for text in signature:
+        placed.append((text, left))
+        left += _CHAR_PT * (len(text) + 1)
+    return _foot_line(_FOOT_TOP_PT, *placed, _centred(number), (sheet, 280))
+
+
+def test_signature_line_on_two_pages_gives_a_page_number_and_a_mark_each() -> None:
+    lines = (
+        _signature_line("MARIÉJOL.", "Cath.", "de", "Médicis.", "(49)", "4"),
+        _signature_line("UAMiàjoL.", "CmOl", "da", "Médidib", "(l93)", "13"),
+    )
+    pages = tuple(_page_with_foot(index, line) for index, line in enumerate(lines))
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(
+        (removal.page_index, removal.text, removal.reason)
+        for removal in blocks.removals
+    ) == (
+        (0, "MARIÉJOL. Cath. de Médicis. 4", RemovalReason.SIGNATURE_MARK),
+        (0, "(49)", RemovalReason.PAGE_NUMBER),
+        (1, "UAMiàjoL. CmOl da Médidib 13", RemovalReason.SIGNATURE_MARK),
+        (1, "(l93)", RemovalReason.PAGE_NUMBER),
+    )
+    assert blocks.page_numbers == (
+        PageNumber(0, "(49)", PageNumberPosition.FOOT),
+        PageNumber(1, "(l93)", PageNumberPosition.FOOT),
+    )
+
+
+def test_note_line_starting_with_its_marker_on_two_pages_is_no_signature_line() -> None:
+    lines = (
+        _foot_line(
+            _FOOT_TOP_PT, _centred("(5)"), ("Ibid.,", 200), ("p.", 240), ("3.", 255)
+        ),
+        _foot_line(
+            _FOOT_TOP_PT, _centred("(5)"), ("Ibid.,", 200), ("p.", 240), ("3.", 255)
+        ),
+    )
+    pages = tuple(_page_with_foot(index, line) for index, line in enumerate(lines))
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert blocks.removals == ()
+
+
+# join_hyphen
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "book_words", "word_list", "expected"),
+    [
+        (
+            "neces-",
+            "sary",
+            frozenset(),
+            frozenset({"necessary"}),
+            HyphenJoin("necessary", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "Anglo-",
+            "Saxon",
+            frozenset({"anglo-saxon"}),
+            frozenset(),
+            HyphenJoin("Anglo-Saxon", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "Bal-",
+            "hazar",
+            frozenset(),
+            frozenset(),
+            HyphenJoin("Balhazar", ChangeReason.HYPHEN_JOIN_GUESSED),
+        ),
+        (
+            "neces-",
+            "sary,",
+            frozenset({"necessary"}),
+            frozenset(),
+            HyphenJoin("necessary,", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "Nor-",
+            "mandy.",
+            frozenset(),
+            frozenset({"normandy"}),
+            HyphenJoin("Normandy.", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "1830-",
+            "40,",
+            frozenset(),
+            frozenset(),
+            HyphenJoin("1830-40,", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "d'in-",
+            "signes",
+            frozenset(),
+            frozenset({"insignes"}),
+            HyphenJoin("d'insignes", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "Wil-",
+            "liam's",
+            frozenset(),
+            frozenset({"s"}),
+            HyphenJoin("William's", ChangeReason.HYPHEN_JOIN_GUESSED),
+        ),
+        (
+            "sea-",
+            "faring",
+            frozenset({"sea-faring", "seafaring"}),
+            frozenset(),
+            HyphenJoin("seafaring", ChangeReason.HYPHEN_JOIN),
+        ),
+    ],
+    ids=[
+        "word list",
+        "book's compound",
+        "guessed",
+        "punctuation after",
+        "word list in lower case",
+        "two numbers",
+        "after the apostrophe",
+        "apostrophe in the second part",
+        "printed both ways",
+    ],
+)
+def test_join_hyphen_gives_the_word_and_its_reason(
+    first: str,
+    second: str,
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    expected: HyphenJoin,
+) -> None:
+    assert join_hyphen(first, second, book_words, word_list) == expected
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [("—", "and"), ("rep-", "(1)"), ("-", "and"), ("word", "and")],
+    ids=["dash", "bracket after", "hyphen alone", "no hyphen"],
+)
+def test_join_hyphen_does_not_join(first: str, second: str) -> None:
+    assert join_hyphen(first, second, frozenset(), frozenset({"and"})) is None
+
+
+# Hyphens in the blocks
+
+
+def test_hyphen_at_a_line_end_is_joined_inside_a_block_and_recorded() -> None:
+    page = PageLayout(
+        3,
+        (
+            _body(
+                70,
+                "it is neces-",
+                "sary that the Anglo-",
+                "Saxon king of Bal-",
+                "hazar",
+            ),
+        ),
+        (),
+    )
+    blocks = make_blocks(
+        _lines_of(page, PageLayout(4, (_body(70, "an Anglo-Saxon thing"),), ())),
+        frozenset({"Necessary"}),
+        workers=1,
+    )
+    assert block_text(blocks.blocks[0]) == (
+        "it is necessary that the Anglo-Saxon king of Balhazar an Anglo-Saxon thing"
+    )
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=3,
+            before=("neces-", "sary"),
+            after=("necessary",),
+            reason=ChangeReason.HYPHEN_JOIN,
+        ),
+        WordChange(
+            page_index=3,
+            before=("Anglo-", "Saxon"),
+            after=("Anglo-Saxon",),
+            reason=ChangeReason.HYPHEN_KEPT,
+        ),
+        WordChange(
+            page_index=3,
+            before=("Bal-", "hazar"),
+            after=("Balhazar",),
+            reason=ChangeReason.HYPHEN_JOIN_GUESSED,
+        ),
+    )
+
+
+def test_line_of_one_word_between_two_hyphens_is_joined_twice() -> None:
+    page = PageLayout(0, (_body(70, "the pre-", "Anglo-", "Saxon age"),), ())
+    lines = _lines_of(page)
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert block_text(blocks.blocks[0]) == "the preAngloSaxon age"
+    assert tuple(change.before for change in blocks.word_changes) == (
+        ("pre-", "Anglo-"),
+        ("preAnglo-", "Saxon"),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
 # make_blocks
@@ -105,17 +670,268 @@ _LINES = LinesFile(
 )
 
 
-def test_make_blocks_gives_the_paragraphs_in_page_order_and_nothing_else() -> None:
-    assert make_blocks(_LINES) == BlocksFile(
-        source_pdf_sha256=_HASH,
-        blocks=(
-            _paragraph("b-p0000-001", "Alpha beta, gamma delta.", 0, _REGION.box),
-            _paragraph("b-p0002-001", "gamma delta.", 2, _REGION.box),
+# Paragraphs, side text and the order of the blocks. The body's lines run
+# from 50 to 300 pt; a full line reaches 300.
+
+_RIGHT_PT = 300.0
+
+
+def _spread(text: str, x0: float, x1: float, top: float, height: float = 10.0) -> Line:
+    """A line of the words of `text`, the first starting at `x0` and the last
+    ending at `x1`."""
+    parts = text.split(" ")
+    step = (x1 - x0) / len(parts)
+    words = tuple(
+        Word(part, Box(x0 + step * n, top, x0 + step * (n + 1) - 2, top + height), None)
+        for n, part in enumerate(parts)
+    )
+    words = (*words[:-1], replace(words[-1], box=replace(words[-1].box, x1=x1)))
+    return Line(_box(tuple(word.box for word in words)), words)
+
+
+def _full(text: str, top: float) -> Line:
+    return _spread(text, _BODY_LEFT_PT, _RIGHT_PT, top)
+
+
+def _short(text: str, top: float) -> Line:
+    return _spread(text, _BODY_LEFT_PT, 150, top)
+
+
+def _indented(text: str, top: float) -> Line:
+    return _spread(text, _BODY_LEFT_PT + 20, _RIGHT_PT, top)
+
+
+def _texts(blocks: tuple[Block, ...]) -> tuple[str, ...]:
+    return tuple(block_text(block) for block in blocks)
+
+
+def test_indented_line_after_a_short_one_starts_a_paragraph_after_a_full_one_not() -> (
+    None
+):
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _full("Alpha beta gamma delta", 70),
+                _full("epsilon zeta eta theta", 85),
+                _short("iota kappa.", 100),
+                _indented("Lambda mu nu xi", 115),
+                _full("omicron pi rho sigma", 130),
+                _indented("Tau upsilon phi", 145),
+            ),
         ),
-        notes=(),
-        removals=(),
-        word_changes=(),
-        page_numbers=(),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _texts(blocks.blocks) == (
+        "Alpha beta gamma delta epsilon zeta eta theta iota kappa.",
+        "Lambda mu nu xi omicron pi rho sigma Tau upsilon phi",
+    )
+    assert tuple(block.id for block in blocks.blocks) == ("b-p0000-001", "b-p0000-002")
+
+
+def test_centred_line_is_a_paragraph_of_its_own() -> None:
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _full("Alpha beta gamma delta", 70),
+                _full("epsilon zeta eta theta", 85),
+                _spread("CHAPTER II", 150, 200, 100),
+                _full("iota kappa lambda mu", 115),
+                _full("nu xi omicron pi", 130),
+            ),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _texts(blocks.blocks) == (
+        "Alpha beta gamma delta epsilon zeta eta theta",
+        "CHAPTER II",
+        "iota kappa lambda mu nu xi omicron pi",
+    )
+
+
+def test_indented_line_after_a_hyphen_does_not_start_a_paragraph() -> None:
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _full("Alpha beta gamma delta", 70),
+                _full("epsilon zeta eta theta", 85),
+                _short("the work of neces-", 100),
+                _indented("sary things here", 115),
+                _full("omicron pi rho sigma", 130),
+            ),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), frozenset({"necessary"}), workers=1)
+    assert _texts(blocks.blocks) == (
+        (
+            "Alpha beta gamma delta epsilon zeta eta theta the work of necessary "
+            "things here omicron pi rho sigma"
+        ),
+    )
+
+
+def _body_page(index: int, *lines: Line) -> PageLayout:
+    return PageLayout(index, (_region(*lines),), ())
+
+
+def _five_full_lines(top: float, word: str) -> tuple[Line, ...]:
+    return tuple(
+        _full(f"{word} {n} of the page", top + _PITCH_PT * n) for n in range(5)
+    )
+
+
+def test_page_not_indented_continues_the_paragraph_across_a_blank_page() -> None:
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first"), _full("and a hyphen-", 145)),
+        PageLayout(1, (), ()),
+        _body_page(
+            2,
+            _full("ated word goes on", 70),
+            *_five_full_lines(85, "third")[:3],
+            _short("the end.", 130),
+            _indented("A new one", 145),
+        ),
+    )
+    lines = _lines_of(*pages)
+    blocks = make_blocks(lines, frozenset({"hyphenated"}), workers=1)
+    first, second = blocks.blocks
+    assert first.id == "b-p0000-001"
+    assert tuple(origin.page_index for origin in first.origin) == (0, 2)
+    assert first.origin[1].box == _box(
+        tuple(line.box for line in pages[2].regions[0].lines[:5])
+    )
+    assert "and a hyphenated word goes on" in block_text(first)
+    assert block_text(first).endswith("the end.")
+    assert (second.id, block_text(second)) == ("b-p0002-001", "A new one")
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=0,
+            before=("hyphen-", "ated"),
+            after=("hyphenated",),
+            reason=ChangeReason.HYPHEN_JOIN,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_words_of_a_plate_are_a_paragraph_of_their_own() -> None:
+    plate = PageLayout(
+        1,
+        (_region(_spread(", ' ..", 60, 90, 300)),),
+        (Figure(Box(40, 40, 300, 500), "images/p0001.png", 150),),
+    )
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first")),
+        plate,
+        _body_page(2, *_five_full_lines(70, "third")),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(block.id for block in blocks.blocks) == (
+        "b-p0000-001",
+        "b-p0001-001",
+        "b-p0002-001",
+    )
+    assert block_text(blocks.blocks[1]) == ", ' .."
+
+
+def _side_text_pages() -> tuple[PageLayout, ...]:
+    """Page 0: a body whose last paragraph runs on to page 1, a margin note
+    right of the body, and a band of small type below it; page 1: the
+    paragraph's end and a new paragraph."""
+    margin = _region(_spread("Margin", 310, 340, 85), _spread("note", 310, 330, 97))
+    band = _region(
+        _spread("1 A note in small", 50, 300, 300, height=7.0),
+        _spread("type.", 50, 80, 309, height=7.0),
+    )
+    page_0 = PageLayout(
+        0,
+        (
+            _region(*_five_full_lines(70, "first"), _full("runs on to", 145)),
+            margin,
+            band,
+        ),
+        (),
+    )
+    page_1 = _body_page(
+        1,
+        _full("the next page", 70),
+        *_five_full_lines(85, "second")[:3],
+        _short("its end.", 130),
+        _indented("Another paragraph", 145),
+    )
+    return page_0, page_1
+
+
+def test_margin_and_band_follow_the_paragraph_in_which_the_page_ends() -> None:
+    lines = _lines_of(*_side_text_pages())
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert tuple((block.id, block.kind) for block in blocks.blocks) == (
+        ("b-p0000-001", BlockKind.PARAGRAPH),
+        ("b-p0000-002", BlockKind.MARGIN_NOTE),
+        ("b-p0001-001", BlockKind.PARAGRAPH),
+    )
+    assert tuple(origin.page_index for origin in blocks.blocks[0].origin) == (0, 1)
+    assert block_text(blocks.blocks[1]) == "Margin note"
+    assert block_text(blocks.blocks[2]) == "Another paragraph"
+    (note,) = blocks.notes
+    assert (note.id, note.marker, note.referenced) == ("n-p0000-001", "", False)
+    # Markdown writes the note after the margin note, the last block whose
+    # origin includes page 0, so its block is the third to start there.
+    assert tuple((block.id, block.kind) for block in note.blocks) == (
+        ("b-p0000-003", BlockKind.PARAGRAPH),
+    )
+    assert block_text(note.blocks[0]) == "1 A note in small type."
+    assert note.origin == note.blocks[0].origin
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_margin_note_of_a_page_whose_body_is_empty_follows_the_last_block() -> None:
+    # Page 1's one body line is its page number, removed; a mark 2 pt wide
+    # right of it is a margin region.
+    page_number = _region(_spread("83", 142, 182, 600))
+    mark = _region(_spread("x", 300, 302, 300))
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first")),
+        PageLayout(1, (page_number, mark), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple((block.id, block.kind) for block in blocks.blocks) == (
+        ("b-p0000-001", BlockKind.PARAGRAPH),
+        ("b-p0001-001", BlockKind.MARGIN_NOTE),
+    )
+    assert blocks.page_numbers == (PageNumber(1, "83", PageNumberPosition.FOOT),)
+
+
+def test_two_index_columns_of_equal_width_give_no_margin_note() -> None:
+    left = _region(*(_spread(f"Entry {n}, 12", 50, 170, 70 + 15 * n) for n in range(6)))
+    right = _region(
+        *(_spread(f"Other {n}, 40", 180, 300, 70 + 15 * n) for n in range(6))
+    )
+    blocks = make_blocks(
+        _lines_of(PageLayout(0, (left, right), ())), _NO_WORDS, workers=1
+    )
+    assert all(block.kind is BlockKind.PARAGRAPH for block in blocks.blocks)
+    assert blocks.notes == ()
+
+
+def test_make_blocks_with_1_worker_and_with_3_gives_the_same_value() -> None:
+    pages = (
+        *_side_text_pages(),
+        *(
+            replace(page, index=page.index + 2 * n)
+            for n in range(1, 4)
+            for page in _side_text_pages()
+        ),
+        *_numbered_heads(),
+    )
+    lines = _lines_of(*pages)
+    assert make_blocks(lines, _NO_WORDS, workers=1) == make_blocks(
+        lines, _NO_WORDS, workers=3
     )
 
 
@@ -123,7 +939,9 @@ def test_make_blocks_gives_the_paragraphs_in_page_order_and_nothing_else() -> No
 
 
 def test_fidelity_check_passes_on_the_blocks_of_hand_made_lines() -> None:
-    check_stage(FidelityBoundary.STRUCTURE, _LINES, make_blocks(_LINES))
+    check_stage(
+        FidelityBoundary.STRUCTURE, _LINES, make_blocks(_LINES, _NO_WORDS, workers=1)
+    )
 
 
 def test_fidelity_check_fails_when_a_word_is_dropped_from_a_line() -> None:
@@ -137,7 +955,9 @@ def test_fidelity_check_fails_when_a_word_is_dropped_from_a_line() -> None:
     )
     with pytest.raises(FidelityError) as raised:
         check_stage(
-            FidelityBoundary.STRUCTURE, lines_without_alpha, make_blocks(_LINES)
+            FidelityBoundary.STRUCTURE,
+            lines_without_alpha,
+            make_blocks(_LINES, _NO_WORDS, workers=1),
         )
     assert raised.value.missing == frozendict()
     assert raised.value.invented == frozendict({"Alpha": 1})
@@ -186,7 +1006,8 @@ def _replace_hash(path: Path) -> None:
 
 
 @pytest.mark.thread_unsafe
-def test_run_writes_the_blocks_of_every_region(tmp_path: Path) -> None:
+@pytest.mark.tesseract
+def test_run_writes_a_paragraph_that_runs_over_a_blank_page(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     structure.run(folder, config, workers=1)
     assert read_blocks(folder.blocks_json) == BlocksFile(
@@ -196,17 +1017,14 @@ def test_run_writes_the_blocks_of_every_region(tmp_path: Path) -> None:
                 id="b-p0000-001",
                 kind=BlockKind.PARAGRAPH,
                 level=None,
-                spans=(Span("Alpha beta, gamma delta.", Emphasis.NONE, None),),
+                spans=(
+                    Span("Alpha beta, gamma delta. gamma delta.", Emphasis.NONE, None),
+                ),
                 figure=None,
-                origin=(Origin(0, Box(40, 100, 130, 132)),),
-            ),
-            Block(
-                id="b-p0002-001",
-                kind=BlockKind.PARAGRAPH,
-                level=None,
-                spans=(Span("gamma delta.", Emphasis.NONE, None),),
-                figure=None,
-                origin=(Origin(2, Box(40, 100, 130, 132)),),
+                origin=(
+                    Origin(0, Box(40, 100, 130, 132)),
+                    Origin(2, Box(40, 120, 130, 132)),
+                ),
             ),
         ),
         notes=(),
@@ -217,6 +1035,7 @@ def test_run_writes_the_blocks_of_every_region(tmp_path: Path) -> None:
 
 
 @pytest.mark.thread_unsafe
+@pytest.mark.tesseract
 def test_run_with_a_config_of_another_pdf_names_analyze(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     other_pdf = tmp_path / "other.pdf"
@@ -227,9 +1046,10 @@ def test_run_with_a_config_of_another_pdf_names_analyze(tmp_path: Path) -> None:
 
 
 @pytest.mark.thread_unsafe
+@pytest.mark.tesseract
 def test_run_with_a_pages_json_of_another_pdf_names_analyze(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
-    write_blocks(folder.blocks_json, make_blocks(_LINES))
+    write_blocks(folder.blocks_json, make_blocks(_LINES, _NO_WORDS, workers=1))
     _replace_hash(folder.pages_json)
     with pytest.raises(InputFileError, match=r"pages\.json.*galley2epub analyze"):
         structure.run(folder, config, workers=1)
@@ -237,6 +1057,7 @@ def test_run_with_a_pages_json_of_another_pdf_names_analyze(tmp_path: Path) -> N
 
 
 @pytest.mark.thread_unsafe
+@pytest.mark.tesseract
 def test_run_with_a_lines_json_of_another_pdf_names_layout(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     _replace_hash(folder.lines_json)
@@ -246,13 +1067,16 @@ def test_run_with_a_lines_json_of_another_pdf_names_layout(tmp_path: Path) -> No
 
 
 @pytest.mark.thread_unsafe
+@pytest.mark.tesseract
 def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     folder, config = _book(tmp_path)
 
-    def make_blocks_losing_a_word(lines: LinesFile) -> BlocksFile:
-        blocks = make_blocks(lines)
+    def make_blocks_losing_a_word(
+        lines: LinesFile, word_list: frozenset[str], *, workers: int
+    ) -> BlocksFile:
+        blocks = make_blocks(lines, word_list, workers=workers)
         first = blocks.blocks[0]
         shorter = replace(
             first,

@@ -1,9 +1,14 @@
 """structure: the book as ordered blocks and notes, and what was removed.
 
-The walking skeleton's rule (spec section 7): each region of a page becomes
-one paragraph, its words joined by single spaces, line after line. Nothing
-is removed, no note is found and no hyphen is joined, so running heads,
-page numbers and footnotes stay in the text.
+structure turns the regions and lines of lines.json into blocks.json
+(`docs/specs/structure.md`). It surveys the whole book (`survey_book`);
+removes from each page its running head, with the page number and the
+stray marks above it, and the page number, signature line or printer's
+signature mark at its foot, each kept as a removal with its reason; finds
+the paragraphs of the body, which run over page breaks; joins the hyphens
+at line ends (`join_hyphen`), each join kept as a word change; and keeps
+the text of the margins as margin notes and that of the footnote band as
+notes, after the paragraph in which their page's body ends.
 """
 
 import logging
@@ -13,61 +18,48 @@ from galley.config import BookConfig
 from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage
 from galley.model import (
-    Block,
-    BlockKind,
     BlocksFile,
-    Emphasis,
     LinesFile,
-    Origin,
-    PageLayout,
-    Region,
-    Span,
     read_checked_input,
     read_lines,
     write_blocks,
 )
-from galley.parallel import DEFAULT_WORKERS
+from galley.parallel import DEFAULT_WORKERS, map_pages
+from galley.structure._hyphens import HyphenJoin, join_hyphen
+from galley.structure._paragraphs import assemble, page_parts
+from galley.structure._survey import BookSurvey, survey_book
+from galley.wordlist import word_list
 
-__all__ = ["make_blocks", "page_blocks", "run"]
+__all__ = [
+    "BookSurvey",
+    "HyphenJoin",
+    "join_hyphen",
+    "make_blocks",
+    "run",
+    "survey_book",
+]
 
 _logger = logging.getLogger(__name__)
 
 
-def _paragraph(page_index: int, number: int, region: Region) -> Block:
-    """The paragraph of `region`, the `number`-th (from 1) of its page."""
-    text = " ".join(word.text for line in region.lines for word in line.words)
-    return Block(
-        id=f"b-p{page_index:04d}-{number:03d}",
-        kind=BlockKind.PARAGRAPH,
-        level=None,
-        spans=(Span(text, Emphasis.NONE, None),),
-        figure=None,
-        origin=(Origin(page_index, region.box),),
-    )
-
-
-def page_blocks(page: PageLayout) -> tuple[Block, ...]:
-    """One paragraph block for each region of `page`, in the order of its
-    regions: the region's words, line after line, joined by single spaces,
-    in one span without emphasis or note reference. The n-th region gets
-    the id `b-p<page index, 4 digits>-<n, 3 digits>`, n from 1. A page
-    without regions gives no block."""
-    return tuple(
-        _paragraph(page.index, number, region)
-        for number, region in enumerate(page.regions, start=1)
-    )
-
-
-def make_blocks(lines: LinesFile) -> BlocksFile:
-    """The blocks of every page of `lines`, in page order, with no note,
-    removal, word change or page number, and the PDF hash of `lines`."""
+def make_blocks(
+    lines: LinesFile, word_list: frozenset[str], *, workers: int = DEFAULT_WORKERS
+) -> BlocksFile:
+    """The blocks of the book, what was removed, the words changed and the
+    page numbers, in a pool of `workers` threads; the result does not
+    depend on `workers`. `word_list` is the word list of the book's
+    language as `wordlist.word_list` gives it, in any case."""
+    survey = survey_book(lines, workers=workers)
+    lower_word_list = frozenset(word.lower() for word in word_list)
+    pages = map_pages(lambda page: page_parts(page, survey), lines.pages, workers)
+    assembled = assemble(pages, survey.book_words, lower_word_list)
     return BlocksFile(
         source_pdf_sha256=lines.source_pdf_sha256,
-        blocks=tuple(block for page in lines.pages for block in page_blocks(page)),
-        notes=(),
-        removals=(),
-        word_changes=(),
-        page_numbers=(),
+        blocks=assembled.blocks,
+        notes=assembled.notes,
+        removals=tuple(removal for page in pages for removal in page.removals),
+        word_changes=assembled.word_changes,
+        page_numbers=tuple(number for page in pages for number in page.page_numbers),
     )
 
 
@@ -77,18 +69,18 @@ def run(
     """Reads pages.json and lines.json from `folder` and writes blocks.json.
 
     blocks.json and every later stage's file (book.md, book.epub) are
-    deleted first. pages.json must have been made from
-    `config.pdf` and lines.json from the same PDF, or InputFileError names
-    the stage to run again. When the words of blocks.json are not those of
-    lines.json, FidelityError is raised and nothing is written. structure
-    runs in one thread; `workers` is taken as every stage takes it.
+    deleted first. pages.json must have been made from `config.pdf` and
+    lines.json from the same PDF, or InputFileError names the stage to run
+    again. The word list of `config.language` is taken from Tesseract's
+    data, which needs Tesseract the first time a language is used. When the words of blocks.json are not those of lines.json less
+    the removals, FidelityError is raised and nothing is written. The pages
+    are worked on in a pool of `workers` threads.
     """
-    del workers  # one pass over the book, in this thread (spec section 10)
     delete_stage_outputs(folder, Stage.STRUCTURE)
     _, lines = read_checked_input(
         folder.pages_json, config.pdf, folder.lines_json, read_lines
     )
-    blocks = make_blocks(lines)
+    blocks = make_blocks(lines, word_list(config.language), workers=workers)
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
     write_blocks(folder.blocks_json, blocks)
     _logger.info(
