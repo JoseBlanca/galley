@@ -71,12 +71,20 @@ says what a region's edges are); its middle is halfway between.
 1. **Survey the book** (one pass over every page): the head lines, the
    book's own words for the hyphen rule, the body word height and body
    line pitch, and the offset between page index and printed page
-   number. The body word height is the median, over all lines of the
-   book pooled, of the median height of a line's words; the body line
-   pitch is the median distance from the top of a line to the top of the
-   next line of the same region, over the regions of 5 lines or more (over
-   every region when none has 5 lines; 0 when no region has two lines,
-   and the body word height is 0 in a book without words). The survey
+   number. The body word height and body line pitch are measured as
+   layout measures them (layout §3, "The book's measures"), on the same
+   words: each page's words, from every region, are grouped into rows by
+   the row rule of layout §1; on the pages of at least 15 rows (of 3 rows
+   when no page has 15), the body word height is the median, over all
+   their rows pooled, of the median height of a row's words, and the
+   pitch the median distance from the top of a row to the top of the
+   next. A book with no page of 3 rows takes the median over all its
+   lines for the height, 0 without words, and 0 for the pitch. (Owner,
+   15 November 2026: the median over all lines, the first rule, found
+   8.1 pt on the Kadesh excerpt, whose note lines outnumber its body
+   lines, against 11.0 pt for the whole book, and so no band; layout's
+   rule gives 11.0 pt on both. structure imports no stage, so it repeats
+   the rule.) The survey
    also finds the pages whose lowest line is a signature line (section
    4), which takes the other pages' lowest lines.
 2. **Per page**: decide what each region is (below); remove the running
