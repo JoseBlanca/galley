@@ -127,8 +127,21 @@ pitches below the median top of the head lines of the book, and either:
   letters and at least 0.75 alike (`difflib.SequenceMatcher` ratio) to
   those of the head line of at least one other page within the same 2
   pitches; or
-- its first or last word is a page-number form; or
-- it is a page-number form alone.
+- its first or last word is a page-number form that the book's head
+  numbers confirm: an arabic one whose value plus the offset (below)
+  gives the page index within 2, or one whose line without it is alike,
+  by the rule above, to the line of another such head without its
+  number. A roman form counts only on pages before the first arabic head
+  number, here too.
+
+A number alone does not make a running head: a top line that ends with
+a word that is also a roman form ("vi", "mix", "dix", "d", "c.", "i.")
+or with a number of the text stays in the text. On Stubbs' page 267 a
+speck read as "d" is the head line; under the first form of this rule
+it was a running head and its page number "d", and the real head below
+stayed in the body. The offset is taken first, from every head line
+within the 2 pitches that has an arabic page-number form at an end, so
+that it does not depend on which heads are running heads.
 
 The first condition keeps a chapter's title from being taken for a
 running head on the chapter's first page, where Haskins prints it as its
@@ -162,13 +175,14 @@ marks stay in the text. When both end words are page-number forms, the
 page number is the one whose value plus the **offset** gives the page
 index, where the offset is the commonest page index minus printed number
 of the book's arabic head numbers (each arabic page-number form at the
-first or last word of a running head, both when both are; Haskins 15;
+first or last word of a head line within the 2 pitches, both when both
+are; Haskins 15;
 Stubbs 17 on pages 19 to 51 and 21 from page 56, so 21; Domesday 25; a
 tie takes the smaller), or the first word when no offset is known or
 neither gives the page index. A roman numeral counts as a
 page number only on pages before the first page whose head has an arabic
-one, so that Stubbs' "The Early Plantagenets. ch. i." gives no page
-number "i.". A page number the OCR misread ("ii8" for 118) is not a
+one that the offset confirms, so that Stubbs' "The Early Plantagenets.
+ch. i." gives no page number "i.". A page number the OCR misread ("ii8" for 118) is not a
 page-number form: it is removed with the running head, and the page has
 no `page_numbers` entry.
 
