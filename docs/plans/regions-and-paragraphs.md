@@ -13,7 +13,7 @@ This plan builds the first part of the book's structure:
 It is built from `docs/specs/layout.md` and `docs/specs/structure.md`,
 both settled by the owner on 15 November 2026. It ends with the
 evaluation tool's scores on the four evaluation books against the
-targets of structure §9. Dated 15 November 2026. State: under way
+targets of structure §9. Dated 15 November 2026. State: done, 15 November 2026
 (approved by the owner on 15 November 2026).
 
 The six work packages are the breakdown the owner approved in chat on
@@ -259,7 +259,7 @@ fails first, and work package 6 is run again.
 - [x] 5.1 Build the sheet from the six excerpts' outputs, and check each
   page against the spec before it goes to the owner. Spec: layout §8 and
   structure §9, "Excerpt tests". Deliverable 1.
-- [ ] 5.2 Turn the owner's answer into the expected outputs and the
+- [x] 5.2 Turn the owner's answer into the expected outputs and the
   tests. Deliverables 2, 3.
 
 ## 6. Measurement

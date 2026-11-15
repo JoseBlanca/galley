@@ -1,8 +1,68 @@
 # Report: regions and paragraphs
 
 The work report of `docs/plans/regions-and-paragraphs.md`, written as
-the work goes, for the owner. Started 15 November 2026. State: under
-way.
+the work goes, for the owner. Started and finished 15 November 2026.
+State: done, on branch `plan/regions-and-paragraphs`, not merged.
+
+## Summary
+
+**Done.** galley now cuts each page into regions (layout) and turns
+them into the book's structure: running heads, page numbers, signature
+marks and specks are removed and recorded; line-end hyphens are joined,
+on evidence, kept, or as a recorded guess; paragraphs run across page
+breaks; margin notes and footnotes are separate blocks, written by
+markdown after the paragraph in which their page ends. No word is lost
+or invented at any stage on the six whole books, and their EPUBs pass
+epubcheck.
+
+**Measured** by the evaluation tool on the four evaluation books, body
+text at blocks, against the baseline (galley at cc481d1) and the
+targets of structure §9. Every target is met:
+
+| score | Haskins | Stubbs | Domesday | Mariéjol |
+|---|---|---|---|---|
+| extra words: baseline → now (target) | 1,893 → 684 (≤1,000) | 5,593 → 3,661 (≤4,300) | 11,178 → 9,666 (≤9,900) | 28,921 → 27,204 (≤28,400) |
+| hyphens left split | 1,005 → 1 (≤150) | 1,235 → 10 (≤300) | 781 → 17 (≤150) | 1,450 → 25 (≤400) |
+| paragraph precision / recall | .11/.11 → .84/.86 (.75/.75) | .13/.07 → .72/.72 (.55/.60) | .12/.08 → .80/.83 (.70/.70) | .09/.04 → .69/.74 (.55/.60) |
+| notes found as notes | 0 → 65 of 72 (55) | (none) | 0 → 1,659 of 1,729 (1,300) | 0 → 1,008 of 1,432 (900) |
+| margin notes as margin notes | (none) | 0 of 467 (0, left to the second plan) | 0 → 514 of 593 (400) | (none) |
+
+**What exists now:** layout and structure as their specs give them;
+markdown writing margin notes and unreferenced notes; three new
+excerpts (Stubbs, Domesday, Mariéjol); 17 reference pages as exact
+tests, 13 checked by the owner and 4 by the orchestrator against the
+page images; 1,049 tests in about 24 s (budget 30 s), 16 whole-book
+tests.
+
+**Decided by the orchestrator, which the owner may reverse:** spec
+corrections that restored each spec's stated aim (note placement, column
+runs, per-page column edges, body height measured as layout does, head
+lines checked against the head offset, capital-start hyphen pairs left
+unjoined without evidence, chapter titles, short bands, split page
+numbers); task 2.5 (margin words at a line's start go to their note) and
+the handling of the two pages an excerpt cannot get right (Gierke 270,
+Mariéjol 210), both taken while the owner was away.
+
+**Left open:**
+
+- Stubbs' cut-in margin notes, note markers and references, headings,
+  quotes, index entries (Stubbs' index is now read as 106 notes: its
+  index error rate went from 2.22 to 3.13), plates: the second plan.
+- Guessed hyphen joins (Haskins 142, Stubbs 256, Domesday 201, Mariéjol
+  738): most are words the OCR damaged; for the correct stage or a local
+  model.
+- The OCR itself: Gierke's margin notes, Mariéjol's notes and many words
+  are garbled in the scans' text layers; the re-OCR of bad pages the
+  owner asked for.
+- A proposal: one root module for the rule that measures body text,
+  which layout and structure each keep a copy of today (a test checks
+  they agree). It changes architecture §12.
+
+**Asked of the owner:** the order to merge `plan/regions-and-paragraphs`
+into `main` (it holds the layout and structure specs too, from
+`spec/structure`); a look at the EPUBs in
+`runs/regions-and-paragraphs/epubs/` of the main checkout, around
+Domesday book page 76, Haskins 132–133 and Mariéjol 214.
 
 ## Before the first task
 
@@ -393,3 +453,39 @@ slips in the spec. Not taken: none.
 
 Checks after the fixes: `uv run pytest` 1,010 passed in 25.2 s; with 8
 threads 40.9 s; `-m whole_book` 14 passed in 49.7 s.
+
+## 5. The reference pages, finished
+
+Done, commit 099a54f. The 15 reference pages and 2 page-break pairs are
+exact tests: 15 layout and 15 structure tests, 2 pair tests, 6 fidelity
+tests (one per excerpt, at every boundary), a test that every expected
+file is there, and 2 `whole_book` tests that Gierke 270 and Mariéjol 210
+give the whole book's result. The expected outputs are 17 files in
+`tests/fixtures/expected/`, each saying who checked it and when. Before
+writing them, galley's output was compared with the sheet the owner
+checked: the only differences came from tasks 2.5 and 3.6 (Domesday
+74–76 and 83, Gierke 88's paragraph ending on 89, Haskins 266), each
+checked against the page image. Each excerpt now runs once per test
+session, which brought the default run from 25.5 s to 24 s.
+
+Review (tests): no defect; each of seven rules changed makes reference
+tests fail. One known case was named: Stubbs 51's chapter summary, a
+hanging-indent paragraph, comes out in two, its second half joined to
+the chapter's first paragraph (structure §9, commit 844c6df).
+
+## 6. Measurement, final
+
+At 099a54f, the table in the summary. Since the first measurement:
+Domesday's paragraph recall from 0.62 to 0.83 and precision from 0.75 to
+0.80, its margin notes found from 462 to 514; one more hyphen left split
+in Domesday ("half- virgate", page 34) and one more extra word in
+Mariéjol. Of Domesday's 754 paragraph breaks 129 are missed: about 50
+beside tables, quotes and headings, about 22 where the alignment or the
+OCR differs, about 16 with a margin word still at the line's start, 13
+across a page break, 13 not indented after a full line, 9 after a line
+that reaches the right edge, 2 first lines of a region.
+`uv run pytest -m whole_book`: 16 passed in 78.5 s. The six EPUBs were
+rebuilt and pass epubcheck: `runs/regions-and-paragraphs/epubs/` of the
+main checkout (Kadesh and Gierke with the pages analyze reports without
+a text layer excluded: Kadesh 1–3, 17, 23, 35, 43, 57, 69–73, 75; Gierke
+0, 2–5, 51, 283–287, 289).
