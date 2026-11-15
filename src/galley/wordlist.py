@@ -47,6 +47,17 @@ _LIST_LANGS_HEADER = re.compile(r'List of available languages in "(.+)" \(\d+\):
 _DELETE_CACHE = "delete it to extract it again"
 
 
+def is_cached(language: Language, cache_dir: Path = DEFAULT_CACHE_DIR) -> bool:
+    """Whether the word list of `language` is in `cache_dir`, so that
+    `word_list` reads it without running Tesseract's tools."""
+    return _cache_file(language, cache_dir).exists()
+
+
+def _cache_file(language: Language, cache_dir: Path) -> Path:
+    """The cached list of `language`, named by Tesseract's code for it."""
+    return cache_dir / f"{tesseract_language(language)}.txt"
+
+
 def word_list(
     language: Language, cache_dir: Path = DEFAULT_CACHE_DIR
 ) -> frozenset[str]:
@@ -59,7 +70,7 @@ def word_list(
     fail, and InputFileError when the cached list is empty or not UTF-8.
     """
     tesseract_code = tesseract_language(language)
-    cache_file = cache_dir / f"{tesseract_code}.txt"
+    cache_file = _cache_file(language, cache_dir)
     with _EXTRACTION_LOCK:
         if not cache_file.exists():
             _extract(tesseract_code, cache_file)

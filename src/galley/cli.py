@@ -173,11 +173,12 @@ _WORD_LIST_TOOLS = ("tesseract", "combine_tessdata", "dawg2wordlist")
 def _check_word_list_tools(config: BookConfig) -> None:
     """ExternalProgramError when the word list of the book's language is
     not in the word list's cache folder and Tesseract's tools are not on
-    the PATH (structure spec, section 8). The cached file is named as
-    wordlist.word_list names it, by Tesseract's code of the language."""
-    code = tesseract_language(config.language)
-    if (wordlist.DEFAULT_CACHE_DIR / f"{code}.txt").exists():
+    the PATH (structure spec, section 8)."""
+    # The cache folder is read here, not bound at import, so that a test
+    # can point it elsewhere.
+    if wordlist.is_cached(config.language, wordlist.DEFAULT_CACHE_DIR):
         return
+    code = tesseract_language(config.language)
     missing = tuple(tool for tool in _WORD_LIST_TOOLS if shutil.which(tool) is None)
     if not missing:
         return
