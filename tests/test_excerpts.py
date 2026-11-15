@@ -10,6 +10,9 @@ EXPECTED_EXCERPT_PAGES = {
     "kadesh_8-17": 10,
     "gierke_86-93_270-271": 10,
     "haskins_eval": 10,
+    "stubbs_51_56-64": 10,
+    "domesday_74-83": 10,
+    "mariejol_210-219": 10,
 }
 
 
