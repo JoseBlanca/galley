@@ -23,6 +23,7 @@ from galley.model import (
     Box,
     ChangeReason,
     Emphasis,
+    Figure,
     Line,
     LinesFile,
     Origin,
@@ -292,7 +293,7 @@ def test_marks_above_a_head_line_that_is_no_running_head_stay() -> None:
     )
     blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
     assert blocks.removals == ()
-    assert block_text(blocks.blocks[0]) == "; A TITLE"
+    assert block_text(blocks.blocks[0]).startswith("; A TITLE the first line")
 
 
 def test_misread_head_number_goes_with_the_running_head_and_gives_no_page_number() -> (
@@ -620,7 +621,7 @@ def test_hyphen_at_a_line_end_is_joined_inside_a_block_and_recorded() -> None:
         workers=1,
     )
     assert block_text(blocks.blocks[0]) == (
-        "it is necessary that the Anglo-Saxon king of Balhazar"
+        "it is necessary that the Anglo-Saxon king of Balhazar an Anglo-Saxon thing"
     )
     assert blocks.word_changes == (
         WordChange(
@@ -669,17 +670,268 @@ _LINES = LinesFile(
 )
 
 
-def test_make_blocks_gives_the_paragraphs_in_page_order_and_nothing_else() -> None:
-    assert make_blocks(_LINES, _NO_WORDS, workers=1) == BlocksFile(
-        source_pdf_sha256=_HASH,
-        blocks=(
-            _paragraph("b-p0000-001", "Alpha beta, gamma delta.", 0, _REGION.box),
-            _paragraph("b-p0002-001", "gamma delta.", 2, _SECOND_LINE.box),
+# Paragraphs, side text and the order of the blocks. The body's lines run
+# from 50 to 300 pt; a full line reaches 300.
+
+_RIGHT_PT = 300.0
+
+
+def _spread(text: str, x0: float, x1: float, top: float, height: float = 10.0) -> Line:
+    """A line of the words of `text`, the first starting at `x0` and the last
+    ending at `x1`."""
+    parts = text.split(" ")
+    step = (x1 - x0) / len(parts)
+    words = tuple(
+        Word(part, Box(x0 + step * n, top, x0 + step * (n + 1) - 2, top + height), None)
+        for n, part in enumerate(parts)
+    )
+    words = (*words[:-1], replace(words[-1], box=replace(words[-1].box, x1=x1)))
+    return Line(_box(tuple(word.box for word in words)), words)
+
+
+def _full(text: str, top: float) -> Line:
+    return _spread(text, _BODY_LEFT_PT, _RIGHT_PT, top)
+
+
+def _short(text: str, top: float) -> Line:
+    return _spread(text, _BODY_LEFT_PT, 150, top)
+
+
+def _indented(text: str, top: float) -> Line:
+    return _spread(text, _BODY_LEFT_PT + 20, _RIGHT_PT, top)
+
+
+def _texts(blocks: tuple[Block, ...]) -> tuple[str, ...]:
+    return tuple(block_text(block) for block in blocks)
+
+
+def test_indented_line_after_a_short_one_starts_a_paragraph_after_a_full_one_not() -> (
+    None
+):
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _full("Alpha beta gamma delta", 70),
+                _full("epsilon zeta eta theta", 85),
+                _short("iota kappa.", 100),
+                _indented("Lambda mu nu xi", 115),
+                _full("omicron pi rho sigma", 130),
+                _indented("Tau upsilon phi", 145),
+            ),
         ),
-        notes=(),
-        removals=(),
-        word_changes=(),
-        page_numbers=(),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _texts(blocks.blocks) == (
+        "Alpha beta gamma delta epsilon zeta eta theta iota kappa.",
+        "Lambda mu nu xi omicron pi rho sigma Tau upsilon phi",
+    )
+    assert tuple(block.id for block in blocks.blocks) == ("b-p0000-001", "b-p0000-002")
+
+
+def test_centred_line_is_a_paragraph_of_its_own() -> None:
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _full("Alpha beta gamma delta", 70),
+                _full("epsilon zeta eta theta", 85),
+                _spread("CHAPTER II", 150, 200, 100),
+                _full("iota kappa lambda mu", 115),
+                _full("nu xi omicron pi", 130),
+            ),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _texts(blocks.blocks) == (
+        "Alpha beta gamma delta epsilon zeta eta theta",
+        "CHAPTER II",
+        "iota kappa lambda mu nu xi omicron pi",
+    )
+
+
+def test_indented_line_after_a_hyphen_does_not_start_a_paragraph() -> None:
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _full("Alpha beta gamma delta", 70),
+                _full("epsilon zeta eta theta", 85),
+                _short("the work of neces-", 100),
+                _indented("sary things here", 115),
+                _full("omicron pi rho sigma", 130),
+            ),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), frozenset({"necessary"}), workers=1)
+    assert _texts(blocks.blocks) == (
+        (
+            "Alpha beta gamma delta epsilon zeta eta theta the work of necessary "
+            "things here omicron pi rho sigma"
+        ),
+    )
+
+
+def _body_page(index: int, *lines: Line) -> PageLayout:
+    return PageLayout(index, (_region(*lines),), ())
+
+
+def _five_full_lines(top: float, word: str) -> tuple[Line, ...]:
+    return tuple(
+        _full(f"{word} {n} of the page", top + _PITCH_PT * n) for n in range(5)
+    )
+
+
+def test_page_not_indented_continues_the_paragraph_across_a_blank_page() -> None:
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first"), _full("and a hyphen-", 145)),
+        PageLayout(1, (), ()),
+        _body_page(
+            2,
+            _full("ated word goes on", 70),
+            *_five_full_lines(85, "third")[:3],
+            _short("the end.", 130),
+            _indented("A new one", 145),
+        ),
+    )
+    lines = _lines_of(*pages)
+    blocks = make_blocks(lines, frozenset({"hyphenated"}), workers=1)
+    first, second = blocks.blocks
+    assert first.id == "b-p0000-001"
+    assert tuple(origin.page_index for origin in first.origin) == (0, 2)
+    assert first.origin[1].box == _box(
+        tuple(line.box for line in pages[2].regions[0].lines[:5])
+    )
+    assert "and a hyphenated word goes on" in block_text(first)
+    assert block_text(first).endswith("the end.")
+    assert (second.id, block_text(second)) == ("b-p0002-001", "A new one")
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=0,
+            before=("hyphen-", "ated"),
+            after=("hyphenated",),
+            reason=ChangeReason.HYPHEN_JOIN,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_words_of_a_plate_are_a_paragraph_of_their_own() -> None:
+    plate = PageLayout(
+        1,
+        (_region(_spread(", ' ..", 60, 90, 300)),),
+        (Figure(Box(40, 40, 300, 500), "images/p0001.png", 150),),
+    )
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first")),
+        plate,
+        _body_page(2, *_five_full_lines(70, "third")),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(block.id for block in blocks.blocks) == (
+        "b-p0000-001",
+        "b-p0001-001",
+        "b-p0002-001",
+    )
+    assert block_text(blocks.blocks[1]) == ", ' .."
+
+
+def _side_text_pages() -> tuple[PageLayout, ...]:
+    """Page 0: a body whose last paragraph runs on to page 1, a margin note
+    right of the body, and a band of small type below it; page 1: the
+    paragraph's end and a new paragraph."""
+    margin = _region(_spread("Margin", 310, 340, 85), _spread("note", 310, 330, 97))
+    band = _region(
+        _spread("1 A note in small", 50, 300, 300, height=7.0),
+        _spread("type.", 50, 80, 309, height=7.0),
+    )
+    page_0 = PageLayout(
+        0,
+        (
+            _region(*_five_full_lines(70, "first"), _full("runs on to", 145)),
+            margin,
+            band,
+        ),
+        (),
+    )
+    page_1 = _body_page(
+        1,
+        _full("the next page", 70),
+        *_five_full_lines(85, "second")[:3],
+        _short("its end.", 130),
+        _indented("Another paragraph", 145),
+    )
+    return page_0, page_1
+
+
+def test_margin_and_band_follow_the_paragraph_in_which_the_page_ends() -> None:
+    lines = _lines_of(*_side_text_pages())
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert tuple((block.id, block.kind) for block in blocks.blocks) == (
+        ("b-p0000-001", BlockKind.PARAGRAPH),
+        ("b-p0000-002", BlockKind.MARGIN_NOTE),
+        ("b-p0001-001", BlockKind.PARAGRAPH),
+    )
+    assert tuple(origin.page_index for origin in blocks.blocks[0].origin) == (0, 1)
+    assert block_text(blocks.blocks[1]) == "Margin note"
+    assert block_text(blocks.blocks[2]) == "Another paragraph"
+    (note,) = blocks.notes
+    assert (note.id, note.marker, note.referenced) == ("n-p0000-001", "", False)
+    # Markdown writes the note after the margin note, the last block whose
+    # origin includes page 0, so its block is the third to start there.
+    assert tuple((block.id, block.kind) for block in note.blocks) == (
+        ("b-p0000-003", BlockKind.PARAGRAPH),
+    )
+    assert block_text(note.blocks[0]) == "1 A note in small type."
+    assert note.origin == note.blocks[0].origin
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_margin_note_of_a_page_whose_body_is_empty_follows_the_last_block() -> None:
+    # Page 1's one body line is its page number, removed; a mark 2 pt wide
+    # right of it is a margin region.
+    page_number = _region(_spread("83", 142, 182, 600))
+    mark = _region(_spread("x", 300, 302, 300))
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first")),
+        PageLayout(1, (page_number, mark), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple((block.id, block.kind) for block in blocks.blocks) == (
+        ("b-p0000-001", BlockKind.PARAGRAPH),
+        ("b-p0001-001", BlockKind.MARGIN_NOTE),
+    )
+    assert blocks.page_numbers == (PageNumber(1, "83", PageNumberPosition.FOOT),)
+
+
+def test_two_index_columns_of_equal_width_give_no_margin_note() -> None:
+    left = _region(*(_spread(f"Entry {n}, 12", 50, 170, 70 + 15 * n) for n in range(6)))
+    right = _region(
+        *(_spread(f"Other {n}, 40", 180, 300, 70 + 15 * n) for n in range(6))
+    )
+    blocks = make_blocks(
+        _lines_of(PageLayout(0, (left, right), ())), _NO_WORDS, workers=1
+    )
+    assert all(block.kind is BlockKind.PARAGRAPH for block in blocks.blocks)
+    assert blocks.notes == ()
+
+
+def test_make_blocks_with_1_worker_and_with_3_gives_the_same_value() -> None:
+    pages = (
+        *_side_text_pages(),
+        *(
+            replace(page, index=page.index + 2 * n)
+            for n in range(1, 4)
+            for page in _side_text_pages()
+        ),
+        *_numbered_heads(),
+    )
+    lines = _lines_of(*pages)
+    assert make_blocks(lines, _NO_WORDS, workers=1) == make_blocks(
+        lines, _NO_WORDS, workers=3
     )
 
 
@@ -755,7 +1007,7 @@ def _replace_hash(path: Path) -> None:
 
 @pytest.mark.thread_unsafe
 @pytest.mark.tesseract
-def test_run_writes_the_blocks_of_every_region(tmp_path: Path) -> None:
+def test_run_writes_a_paragraph_that_runs_over_a_blank_page(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     structure.run(folder, config, workers=1)
     assert read_blocks(folder.blocks_json) == BlocksFile(
@@ -765,17 +1017,14 @@ def test_run_writes_the_blocks_of_every_region(tmp_path: Path) -> None:
                 id="b-p0000-001",
                 kind=BlockKind.PARAGRAPH,
                 level=None,
-                spans=(Span("Alpha beta, gamma delta.", Emphasis.NONE, None),),
+                spans=(
+                    Span("Alpha beta, gamma delta. gamma delta.", Emphasis.NONE, None),
+                ),
                 figure=None,
-                origin=(Origin(0, Box(40, 100, 130, 132)),),
-            ),
-            Block(
-                id="b-p0002-001",
-                kind=BlockKind.PARAGRAPH,
-                level=None,
-                spans=(Span("gamma delta.", Emphasis.NONE, None),),
-                figure=None,
-                origin=(Origin(2, Box(40, 120, 130, 132)),),
+                origin=(
+                    Origin(0, Box(40, 100, 130, 132)),
+                    Origin(2, Box(40, 120, 130, 132)),
+                ),
             ),
         ),
         notes=(),

@@ -346,7 +346,9 @@ signature marks, the line heights of body and notes. Then, per page, it
 removes those, decides what each region is, groups lines into
 paragraphs, headings, quotes, margin notes and notes (a margin note goes
 just before the paragraph whose line it sits beside), joins hyphenated
-words where the word list or the book's own words allow it, and splits
+words (dropping the hyphen where the word list or the book's own words
+allow it, keeping it in a compound the book prints, and dropping it as a
+recorded guess where neither decides; `docs/specs/structure.md` §5), and splits
 note markers off the words they are glued to. Last, it joins paragraphs
 and notes that run over a page break and matches each note reference to
 its note.
