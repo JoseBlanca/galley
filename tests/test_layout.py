@@ -5,6 +5,7 @@ The excerpt tests of layout are in work package 4.
 """
 
 import hashlib
+import json
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
@@ -1263,11 +1264,12 @@ def _layout_of_pdf(pdf: Path, root: Path) -> tuple[WordsFile, LinesFile]:
     galley2epub on a book folder at `root`."""
     excluded = ", ".join(str(page) for page in _EXCLUDED_PAGES.get(pdf.stem, ()))
     folder = BookFolder(root)
+    # TOML basic strings take JSON's escapes, so json.dumps quotes any path.
     folder.book_toml.write_text(
-        f"pdf = '{pdf}'\n"
-        f'title = "{pdf.stem}"\n'
+        f"pdf = {json.dumps(str(pdf))}\n"
+        f"title = {json.dumps(pdf.stem)}\n"
         'authors = ["An Author"]\n'
-        f'language = "{_LANGUAGES.get(pdf.stem, "en")}"\n'
+        f"language = {json.dumps(_LANGUAGES.get(pdf.stem, 'en'))}\n"
         f"exclude_pages = [{excluded}]\n",
         encoding="utf-8",
     )

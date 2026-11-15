@@ -157,11 +157,13 @@ def test_kadesh_page_0_reads_its_two_footnote_columns_one_after_the_other(
 def test_gierke_page_2_has_a_margin_region_right_of_the_body(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    # Layout spec section 8: book page 88 has margin notes outside the
-    # column, on the right of an even page index.
+    # Layout spec section 8: book page 88 has a running head and margin
+    # notes outside the column, on the right of an even page index. The
+    # spec's order puts the running-head region first and the body next.
     regions = read_lines(excerpt_books[GIERKE].lines_json).pages[2].regions
-    body = max(regions, key=lambda region: len(region.lines))
-    assert any(region.box.x0 >= body.box.x1 for region in regions)
+    head, body = regions[0], regions[1]
+    assert head.box.bottom <= body.box.top
+    assert any(region.box.x0 >= body.box.x1 for region in regions[2:])
 
 
 # blocks.json
