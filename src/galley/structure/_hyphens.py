@@ -8,7 +8,12 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from galley.model import ChangeReason, WordChange
-from galley.structure._measures import APOSTROPHES, is_hyphen_first_part, word_key
+from galley.structure._measures import (
+    APOSTROPHES,
+    is_hyphen_first_part,
+    is_number_before_word,
+    word_key,
+)
 
 # Spec section 5: a join of two numbers, "1830-" "40", keeps the hyphen.
 _NUMBER_KEY = re.compile(r"[0-9]+")
@@ -36,9 +41,10 @@ def join_hyphen(
     """The word made of `first`, the last word of a line, and `second`, the
     first word of the next, or None when they are not joined (spec section
     5): `first` must end with "-" after a letter or digit and `second`
-    start with a letter or digit. After a lower-case letter, a `second`
-    that starts with a capital is joined only when the book prints the
-    hyphenated word (`hyphen_kept`), and else not at all.
+    start with a letter or digit, and with a digit after a digit. After a
+    lower-case letter, a `second` that starts with a capital is joined
+    only when the book prints the hyphenated word (`hyphen_kept`), and
+    else not at all.
 
     The hyphen is kept (`hyphen_kept`) when the hyphenated word is among
     `book_words`, the keys of the words the book prints whole, and the
@@ -50,6 +56,8 @@ def join_hyphen(
     the joined word's part after its last apostrophe is looked up too.
     """
     if not (is_hyphen_first_part(first) and second[:1].isalnum()):
+        return None
+    if is_number_before_word(first, second):
         return None
     hyphenated = first + second
     joined = first[:-1] + second

@@ -175,3 +175,16 @@ def is_hyphen_first_part(text: str) -> bool:
     """Whether a word can be the first part of a hyphen join: it ends with
     the ASCII hyphen-minus after a letter or digit (spec section 5)."""
     return text.endswith("-") and text[:-1][-1:].isalnum()
+
+
+def is_number_before_word(first: str, second: str) -> bool:
+    """Whether `first`, the last word of a line, ends with a hyphen after a
+    digit and `second`, the first word of the next, starts with a letter:
+    "136-39-" "Bryce,", which are not joined (spec section 5), unlike a
+    range, "1830-" "40"."""
+    return (
+        first.endswith("-")
+        and first[:-1][-1:].isdigit()
+        and second[:1].isalnum()
+        and not second[:1].isdigit()
+    )

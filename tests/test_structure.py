@@ -236,6 +236,15 @@ def test_survey_book_words_leave_out_the_parts_of_a_hyphenated_word() -> None:
     )
 
 
+def test_survey_book_words_keep_a_number_before_a_word_and_leave_out_a_range() -> None:
+    page = PageLayout(
+        0, (_body(70, "Britain, 136-39-", "Bryce, 1066-", "1087 here"),), ()
+    )
+    assert survey_book(_lines_of(page), workers=1).book_words == frozenset(
+        {"britain", "136-39-", "bryce", "here"}
+    )
+
+
 def test_survey_body_word_height_is_the_median_of_the_rows_medians() -> None:
     small = _region(
         *(_line("a small note", 50, 300 + 10 * n, height=7.0) for n in range(3))
@@ -616,11 +625,25 @@ def test_note_line_starting_with_its_marker_on_two_pages_is_no_signature_line() 
             HyphenJoin("Normandy.", ChangeReason.HYPHEN_JOIN),
         ),
         (
+            "12th-",
+            "century",
+            frozenset(),
+            frozenset({"12thcentury"}),
+            HyphenJoin("12thcentury", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
             "1830-",
             "40,",
             frozenset(),
             frozenset(),
             HyphenJoin("1830-40,", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "1066-",
+            "1087",
+            frozenset({"10661087"}),
+            frozenset({"10661087"}),
+            HyphenJoin("1066-1087", ChangeReason.HYPHEN_KEPT),
         ),
         (
             "d'in-",
@@ -650,7 +673,9 @@ def test_note_line_starting_with_its_marker_on_two_pages_is_no_signature_line() 
         "guessed",
         "punctuation after",
         "word list in lower case",
+        "letter after a digit",
         "two numbers",
+        "a range of years",
         "after the apostrophe",
         "apostrophe in the second part",
         "printed both ways",
@@ -668,11 +693,26 @@ def test_join_hyphen_gives_the_word_and_its_reason(
 
 @pytest.mark.parametrize(
     ("first", "second"),
-    [("—", "and"), ("rep-", "(1)"), ("-", "and"), ("word", "and")],
-    ids=["dash", "bracket after", "hyphen alone", "no hyphen"],
+    [
+        ("—", "and"),
+        ("rep-", "(1)"),
+        ("-", "and"),
+        ("word", "and"),
+        ("136-39-", "Bryce,"),
+        ("37-", "Abacus"),
+    ],
+    ids=[
+        "dash",
+        "bracket after",
+        "hyphen alone",
+        "no hyphen",
+        "digit before, index",
+        "digit before, capital",
+    ],
 )
 def test_join_hyphen_does_not_join(first: str, second: str) -> None:
-    assert join_hyphen(first, second, frozenset(), frozenset({"and"})) is None
+    known = frozenset({"and", "136-39bryce", "37abacus"})
+    assert join_hyphen(first, second, known, known) is None
 
 
 @pytest.mark.parametrize(
@@ -1199,6 +1239,27 @@ def test_indented_line_after_a_hyphen_does_not_start_a_paragraph() -> None:
             "Alpha beta gamma delta epsilon zeta eta theta the work of necessary "
             "things here omicron pi rho sigma"
         ),
+    )
+
+
+def test_indented_line_after_a_number_and_hyphen_starts_a_paragraph() -> None:
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _full("Alpha beta gamma delta", 70),
+                _short("Britain, 136-39-", 85),
+                _indented("Bryce, James, 12", 100),
+                _short("Bari, 1066-", 115),
+                _indented("1087 and later", 130),
+            ),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _texts(blocks.blocks) == (
+        "Alpha beta gamma delta Britain, 136-39-",
+        "Bryce, James, 12 Bari, 1066-1087 and later",
     )
 
 

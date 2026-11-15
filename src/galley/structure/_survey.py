@@ -22,6 +22,7 @@ from galley.structure._heads import (
 )
 from galley.structure._measures import (
     is_hyphen_first_part,
+    is_number_before_word,
     letters,
     word_height,
     word_key,
@@ -114,10 +115,16 @@ def _words_printed_whole(page: PageLayout) -> frozenset[str]:
     same region (spec section 5)."""
     keys: set[str] = set()
     for region in page.regions:
+        lines = tuple(tuple(word.text for word in line.words) for line in region.lines)
         split_after = False
-        for line in region.lines:
-            texts = tuple(word.text for word in line.words)
-            split_here = bool(texts) and is_hyphen_first_part(texts[-1])
+        for texts, next_texts in zip(lines, (*lines[1:], ()), strict=True):
+            split_here = (
+                bool(texts)
+                and is_hyphen_first_part(texts[-1])
+                and not (
+                    bool(next_texts) and is_number_before_word(texts[-1], next_texts[0])
+                )
+            )
             start = 1 if split_after else 0
             end = len(texts) - 1 if split_here else len(texts)
             keys.update(word_key(text) for text in texts[start:end])

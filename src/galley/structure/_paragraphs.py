@@ -36,6 +36,7 @@ from galley.structure._measures import (
     Edges,
     box_of,
     is_hyphen_first_part,
+    is_number_before_word,
     is_short,
     region_edges,
 )
@@ -106,8 +107,15 @@ def _is_centred(line: PlacedLine) -> bool:
     )
 
 
-def _ends_with_hyphen(line: PlacedLine) -> bool:
-    return bool(line.line.words) and is_hyphen_first_part(line.line.words[-1].text)
+def _hyphen_between(before: PlacedLine, line: PlacedLine) -> bool:
+    """Whether `before` ends with a hyphen that may join it to `line`: the
+    first part of a join, unless a number before a word (spec section 6)."""
+    if not before.line.words:
+        return False
+    last = before.line.words[-1].text
+    return is_hyphen_first_part(last) and not (
+        bool(line.line.words) and is_number_before_word(last, line.line.words[0].text)
+    )
 
 
 def _starts_paragraph(line: PlacedLine, before: PlacedLine | None) -> bool:
@@ -116,7 +124,7 @@ def _starts_paragraph(line: PlacedLine, before: PlacedLine | None) -> bool:
     a short line, or it or the line before is centred."""
     if before is None:
         return True
-    if _ends_with_hyphen(before):
+    if _hyphen_between(before, line):
         return False
     return _is_indented(line, before) or _is_centred(line) or _is_centred(before)
 
@@ -230,7 +238,7 @@ def _body_entries(pages: Sequence[PageParts]) -> tuple[_Entry, ...]:
             plate_break = (
                 number == 0
                 and (page.has_figure or page_before_has_figure)
-                and not (before is not None and _ends_with_hyphen(before))
+                and not (before is not None and _hyphen_between(before, line))
             )
             if plate_break or _starts_paragraph(line, before):
                 if current:
