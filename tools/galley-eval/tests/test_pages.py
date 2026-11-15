@@ -214,3 +214,83 @@ def test_unaligned_token_before_the_first_anchor_takes_the_page_before_it() -> N
     galley = _galley((2, "Title"), (4, "Preface"), (9, "alpha"))
     pages, _ = _pages(reference, galley)
     assert pages == (2, 2, 4, 9)
+
+
+def test_unaligned_note_token_takes_the_nearest_aligned_token_after_it() -> None:
+    # "here" is nearer "Malaterra", read at the top of page 7, than "Amatus".
+    reference = _reference(
+        _block("the duke"),
+        notes=(
+            ReferenceNote("Footnote_1", (_block("Amatus lost words here Malaterra"),)),
+        ),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 2)),),
+    )
+    galley = _galley((6, "the duke")) + tuple(
+        GalleyToken(
+            text=text,
+            page_index=page_index,
+            stream=GalleyStream.NOTES,
+            edge_of_page=False,
+            block_id=None,
+        )
+        for page_index, text in ((6, "Amatus"), (7, "Malaterra"))
+    )
+    pages, _ = _pages(reference, galley)
+    assert pages == (6, 6, 6, 6, 6, 7, 7)
+
+
+def test_split_takes_the_page_of_its_first_galley_token() -> None:
+    reference = _reference(_block("alpha replicate"))
+    galley = _galley((39, "alpha"), (40, "repli-"), (41, "cate"))
+    pages, _ = _pages(reference, galley)
+    assert pages == (39, 40)
+
+
+def test_glued_tokens_take_the_page_of_their_galley_token() -> None:
+    reference = _reference(_block("alpha pamphlets published"))
+    galley = _galley((39, "alpha"), (40, "pamphletspublished"))
+    pages, _ = _pages(reference, galley)
+    assert pages == (39, 40, 40)
+
+
+def test_anchor_offset_is_the_lower_median() -> None:
+    # Page index minus printed page 11 is 4 for "beta" and 5 for "gamma".
+    reference = _reference(_block("beta gamma"), anchors=(("11", 0),))
+    _, anchors = _pages(reference, _galley((15, "beta"), (16, "gamma")))
+    assert anchors[0].offset == 4
+
+
+def test_excluded_page_equal_to_an_anchor_page_is_not_between() -> None:
+    reference = _reference(
+        _block("alpha beta Map of Anjou gamma delta"), anchors=(("34", 0), ("35", 5))
+    )
+    galley = _galley((51, "alpha beta"), (56, "gamma delta"))
+    for excluded in (frozenset((51,)), frozenset((56,))):
+        pages, _ = _pages(reference, galley, excluded)
+        assert pages[2:5] == (51, 51, 51)
+
+
+def test_unread_note_takes_the_page_of_the_token_before_its_reference() -> None:
+    def note_pages(reference_at: int) -> tuple[int | None, ...]:
+        reference = _reference(
+            _block("alpha beta"),
+            notes=(ReferenceNote("Footnote_1", (_block("lost"),)),),
+            note_references=(
+                NoteReference("Footnote_1", Gap(Stream.BODY, reference_at)),
+            ),
+        )
+        pages, _ = _pages(reference, _galley((3, "alpha"), (4, "beta")))
+        return pages[2:]
+
+    # Before the first token, the first token's page; at the end, the last's.
+    assert note_pages(0) == (3,)
+    assert note_pages(1) == (3,)
+    assert note_pages(2) == (4,)
+
+
+def test_note_with_no_aligned_token_and_no_reference_is_unplaced() -> None:
+    reference = _reference(
+        _block("alpha beta"), notes=(ReferenceNote("Footnote_1", (_block("lost"),)),)
+    )
+    pages, _ = _pages(reference, _galley((3, "alpha beta")))
+    assert pages == (3, 3, None)

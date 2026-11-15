@@ -501,10 +501,16 @@ def test_empty_key_is_never_an_anchor() -> None:
 
 
 def test_anchored_pass_turns_off_difflib_automatic_junk() -> None:
-    # With automatic junk, a key above 1% of a stretch of 200 tokens or
-    # more is junk and never matched.
-    keys = ("the",) * 300
-    assert anchored_pass(keys, keys) == (Stretch(Operation.EQUAL, 0, 300, 0, 300),)
+    # 200 tokens with no anchor, "the" every other one: with automatic junk,
+    # a key above 1% of a stretch of 200 tokens or more is never matched.
+    reference = tuple(key for number in range(100) for key in ("the", f"r{number}"))
+    galley = tuple(key for number in range(100) for key in ("the", f"g{number}"))
+    equal = tuple(
+        stretch
+        for stretch in anchored_pass(reference, galley)
+        if stretch.operation is Operation.EQUAL
+    )
+    assert len(equal) == 100
 
 
 # Walking a replaced stretch
@@ -700,6 +706,15 @@ def test_leftovers_are_taken_in_book_order() -> None:
         _galley("the duke", page_index=4)
         + _galley("Amatus", page_index=5)
         + _galley("Amatus", page_index=4, stream=GalleyStream.NOTES)
+    )
+    alignment, _ = _align(reference, galley)
+    assert _pairing_of_reference(alignment, 2).galley_indices == (3,)
+    # On the same page, the body comes before the notes, whatever galley's
+    # order.
+    galley = (
+        _galley("the duke", page_index=4)
+        + _galley("Amatus", page_index=4, stream=GalleyStream.NOTES)
+        + _galley("Amatus", page_index=4)
     )
     alignment, _ = _align(reference, galley)
     assert _pairing_of_reference(alignment, 2).galley_indices == (3,)
