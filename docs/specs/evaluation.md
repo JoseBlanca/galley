@@ -398,9 +398,13 @@ of the nearest aligned token before it. A reference token is aligned
 only with galley tokens within one page of its provisional page, in book
 order, and those on its provisional page first: the pages either side
 are offered only the tokens still unaligned after that. Without the
-preference, on Haskins' printed page 119 the reference's "VII," was
-paired with "ii8", the page number of the page before, and galley's
-"VH," on the right page was left extra. Without the window, the leftovers of the whole book form one sequence,
+preference, the reference's "History," in Haskins' note 42 (printed page
+121) was paired with the running head "HISTORY" of printed page 120,
+not with galley's "ConstitutionalHistory," on its own page. The
+preference does not help where the word on the right page is not alike
+enough: "VII," against galley's "VH," (similarity 0.4) on printed page
+119 still pairs with "ii8" (0.67) of the page before. Without the
+window, the leftovers of the whole book form one sequence,
 and a word missing on page 9 was paired with stray marks on page 1: 247
 such pairs in Haskins, 537 in Mariéjol, in the first build. A note or
 margin note that runs over a page break has its tokens on the page of
@@ -475,7 +479,18 @@ position, relative to its side's stretch, is `missing` or `extra`. Two
 tokens are alike when the similarity of their keys, as
 `difflib.SequenceMatcher` measures it over characters, is at least 0.5,
 or when both keys are empty. A token with an empty key is never alike
-one with a non-empty key. What is left over at the end is `missing` or
+one with a non-empty key; when one of the two current tokens has an
+empty key and the other not, the one with the empty key is left
+unpaired first, so that a stray "*" does not stop a word from being
+joined or paired.
+
+The walk looks no further than the current position: a word behind a
+run of extras, as "Giraldus" behind the running head "NORMANDY AND
+FRANCE 117" that galley leaves before note 40, is given up before the
+walk reaches its glued form "GiraldusCambrensis". Such words are
+reported `missing` where they are `glued`. Once structure removes
+running heads these stretches are short; looking ahead is left until
+the baseline after that shows it matters. What is left over at the end is `missing` or
 `extra`. Pairing every token of a stretch in order, as the first build
 did, paired 10,175 of Mariéjol's 21,769 changed pairs with a word of
 nothing alike, such as "son" with "'", where the truth is a missing
