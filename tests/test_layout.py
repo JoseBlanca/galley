@@ -12,6 +12,7 @@ import pytest
 
 from galley import layout
 from galley.book_folder import BookFolder
+from galley.cli import main
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
 from galley.fidelity import check_stage
@@ -30,6 +31,7 @@ from galley.model import (
     Word,
     WordsFile,
     read_lines,
+    read_words,
     write_lines,
     write_pages,
     write_words,
@@ -690,6 +692,32 @@ def test_drop_capital_with_no_line_beside_it_is_laid_out_as_a_body_word() -> Non
     assert len(body.lines) == 21
 
 
+def test_regions_are_head_body_columns_body_margins_by_top_then_band() -> None:
+    # A head; 10 two-column rows, then 10 full rows; a right margin note at
+    # the top, a left and a right one level with each other lower down; 3
+    # band rows.
+    words = (
+        _word("Head", 120, 82, 180, 90),
+        *_two_column_rows(10),
+        *_rows(10, top=220),
+        _word("Early", 256, 100, 290, 108),
+        _word("Left", 20, 232, 44, 240),
+        _word("Right", 256, 232, 290, 240),
+        *_small_rows(3, 220 + 9 * _PITCH + 1.5 * _PITCH),
+    )
+    result = layout_page(_page(0, words), _MEASURES)
+    assert _region_texts(result) == (
+        (("Head",),),
+        tuple((f"L{row}",) for row in range(10)),
+        tuple((f"R{row}",) for row in range(10)),
+        tuple((f"a{row}", f"b{row}", f"c{row}") for row in range(10)),
+        (("Early",),),
+        (("Left",),),
+        (("Right",),),
+        (("n0",), ("n1",), ("n2",)),
+    )
+
+
 # The fidelity check at the layout boundary
 
 
@@ -728,10 +756,28 @@ _PDF_BYTES = b"%PDF-1.4 a stand-in: layout reads only its hash"
 _PAGE_COUNT = 8
 
 
+def _regions_page(index: int) -> PageWords:
+    """A page with a running head, 16 body rows, a margin note beside row 3
+    (on the right on even pages, on the left on odd ones) and a band of 3
+    small rows, its words in an order that differs from page to page."""
+    note = (
+        _word("Note", 256, 136, 290, 144)
+        if index % 2 == 0
+        else _word("Note", 20, 136, 44, 144)
+    )
+    words = (
+        _word("Head", 120, 82, 180, 90),
+        *_rows(16),
+        note,
+        *_small_rows(3, 100 + 15 * _PITCH + 1.5 * _PITCH),
+    )
+    shift = index * 7 % len(words)
+    return _page(index, words[shift:] + words[:shift])
+
+
 def _book(root: Path) -> tuple[BookFolder, BookConfig]:
     """A book folder with pages.json and words.json of 8 pages written by
-    hand, every page's words a different shuffle of two rows, page 4
-    without words."""
+    hand, each page as `_regions_page` makes it, page 4 without words."""
     pdf = root / "book.pdf"
     pdf.write_bytes(_PDF_BYTES)
     pdf_hash = hashlib.sha256(_PDF_BYTES).hexdigest()
@@ -754,10 +800,7 @@ def _book(root: Path) -> tuple[BookFolder, BookConfig]:
         ocr_audit=None,
     )
     word_pages = tuple(
-        _page(
-            index,
-            () if index == 4 else _PAGE_WORDS[index % 4 :] + _PAGE_WORDS[: index % 4],
-        )
+        _page(4, ()) if index == 4 else _regions_page(index)
         for index in range(_PAGE_COUNT)
     )
     write_pages(folder.pages_json, pages)
@@ -778,10 +821,10 @@ def test_run_writes_the_layout_of_every_page(tmp_path: Path) -> None:
     assert written.source_pdf_sha256 == hashlib.sha256(_PDF_BYTES).hexdigest()
     assert tuple(page.index for page in written.pages) == tuple(range(_PAGE_COUNT))
     assert written.pages[4] == PageLayout(4, (), ())
-    expected_lines = (("Alpha", "beta"), ("gamma", "delta"))
+    body = tuple((f"a{row}", f"b{row}", f"c{row}") for row in range(16))
+    band = (("n0",), ("n1",), ("n2",))
     for page in written.pages[:4] + written.pages[5:]:
-        (region,) = page.regions
-        assert _texts(region.lines) == expected_lines
+        assert _region_texts(page) == ((("Head",),), body, (("Note",),), band)
 
 
 @pytest.mark.thread_unsafe
@@ -847,3 +890,88 @@ def test_run_that_loses_a_word_raises_and_writes_no_lines_json(
     with pytest.raises(FidelityError):
         layout.run(folder, config, workers=1)
     assert not folder.lines_json.exists()
+
+
+# The fidelity check on the excerpts and the whole books (layout spec
+# section 7)
+
+_EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
+
+# The pages without a text layer of each excerpt and book, which analyze
+# refuses unless excluded: the excerpts' as in tests/conftest.py and
+# tests/fixtures/evaluation/haskins_eval.toml; the evaluation books' as in
+# evaluation/books.toml; Kadesh's and Gierke's as analyze listed them on 15
+# November 2026.
+_EXCLUDED_PAGES = frozendict(
+    {
+        "kadesh_8-17": (9,),
+        "haskins_eval": (8,),
+        "normansineuropea00hask": (0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279),
+        "earlyplantagenet01stub": (
+            *(0, 2, 3, 4, 5, 8, 9, 10, 11, 52, 53, 54, 55),
+            *(338, 339, 340, 341, 342, 343),
+        ),
+        "domesdaybook00maituoft": (0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557),
+        "catherinedemedic00mariuoft": (0, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456),
+        "battleofkadeshst00breauoft": (
+            *(1, 2, 3, 17, 23, 35, 43, 57, 69, 70, 71, 72, 73, 75),
+        ),
+        "politicaltheorie00gieruoft": (0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 289),
+    }
+)
+_LANGUAGES = frozendict({"catherinedemedic00mariuoft": "fr"})
+
+
+def _layout_of_pdf(pdf: Path, root: Path) -> tuple[WordsFile, LinesFile]:
+    """The words and lines of `pdf`, from analyze, extract and layout run by
+    galley2epub on a book folder at `root`."""
+    excluded = ", ".join(str(page) for page in _EXCLUDED_PAGES.get(pdf.stem, ()))
+    folder = BookFolder(root)
+    folder.book_toml.write_text(
+        f"pdf = '{pdf}'\n"
+        f'title = "{pdf.stem}"\n'
+        'authors = ["An Author"]\n'
+        f'language = "{_LANGUAGES.get(pdf.stem, "en")}"\n'
+        f"exclude_pages = [{excluded}]\n",
+        encoding="utf-8",
+    )
+    for stage in ("analyze", "extract", "layout"):
+        main([stage, str(root)])
+    return read_words(folder.words_json), read_lines(folder.lines_json)
+
+
+def _assert_laid_out_in_regions(words: WordsFile, lines: LinesFile) -> None:
+    """The fidelity check passes, and some page has more than one region:
+    the book was measured and its pages cut."""
+    check_stage(FidelityBoundary.LAYOUT, words, lines)
+    assert any(len(page.regions) > 1 for page in lines.pages)
+
+
+@pytest.mark.thread_unsafe
+@pytest.mark.parametrize(
+    "excerpt", sorted(path.stem for path in _EXCERPTS_DIR.glob("*.pdf"))
+)
+def test_layout_of_an_excerpt_keeps_every_word(excerpt: str, tmp_path: Path) -> None:
+    words, lines = _layout_of_pdf(_EXCERPTS_DIR / f"{excerpt}.pdf", tmp_path)
+    _assert_laid_out_in_regions(words, lines)
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.parametrize(
+    "book",
+    [
+        "battleofkadeshst00breauoft",
+        "catherinedemedic00mariuoft",
+        "domesdaybook00maituoft",
+        "earlyplantagenet01stub",
+        "normansineuropea00hask",
+        "politicaltheorie00gieruoft",
+    ],
+)
+def test_layout_of_a_whole_book_keeps_every_word(
+    book: str, books_dir: Path, tmp_path: Path
+) -> None:
+    words, lines = _layout_of_pdf(books_dir / f"{book}.pdf", tmp_path)
+    _assert_laid_out_in_regions(words, lines)

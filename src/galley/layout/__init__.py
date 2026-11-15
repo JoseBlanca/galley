@@ -10,8 +10,8 @@ bottom. `layout_page` places the body column on the page, takes the
 words outside it as margin regions, the first row set apart at the top as
 the running-head region and the small rows at the foot as the footnote
 band, cuts the body and the band into two columns where a gutter runs
-down them, and puts a drop capital first in the line beside it. run does
-not give it the measures yet.
+down them, and puts a drop capital first in the line beside it. `run`
+measures the book, then lays out its pages in parallel.
 """
 
 import logging
@@ -643,8 +643,8 @@ def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout:
 def run(
     folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS
 ) -> None:
-    """Reads pages.json and words.json from `folder`, lays out every page in
-    `workers` threads, and writes lines.json.
+    """Reads pages.json and words.json from `folder`, measures the book and
+    lays out every page in `workers` threads, and writes lines.json.
 
     lines.json and every later stage's file (blocks.json, book.md,
     book.epub) are deleted first. pages.json must have been made from
@@ -656,15 +656,22 @@ def run(
     _, words = read_checked_input(
         folder.pages_json, config.pdf, folder.words_json, read_words
     )
+    measures = measure_book(words, workers=workers)
+    _logger.info("layout: the book's measures, in points: %s", measures)
+
+    def lay_out(page: PageWords) -> PageLayout:
+        return layout_page(page, measures)
+
     lines = LinesFile(
         source_pdf_sha256=words.source_pdf_sha256,
-        pages=map_pages(lambda page: layout_page(page, None), words.pages, workers),
+        pages=map_pages(lay_out, words.pages, workers),
     )
     check_stage(FidelityBoundary.LAYOUT, words, lines)
     write_lines(folder.lines_json, lines)
     _logger.info(
-        "layout: %d pages, %d lines written to %s",
+        "layout: %d pages, %d regions, %d lines written to %s",
         len(lines.pages),
+        sum(len(page.regions) for page in lines.pages),
         sum(len(region.lines) for page in lines.pages for region in page.regions),
         folder.lines_json,
     )
