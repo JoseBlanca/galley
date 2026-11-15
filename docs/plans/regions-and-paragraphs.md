@@ -199,7 +199,7 @@ Work package 6 shows it.
 - [x] 3.5 Paragraphs, side text, the order of blocks and notes, ids and
   origins; `make_blocks` and `run`; the Tesseract check in the CLI.
   Spec: structure §6, §8 and §9. Needs 3.1 to 3.4. Deliverables 2 to 5.
-- [ ] 3.6 No hyphen join when the character before the line-end hyphen
+- [x] 3.6 No hyphen join when the character before the line-end hyphen
   is a digit ("136-39-" "Bryce," on Haskins 266, "37-" in its index;
   found by the owner's check). Spec: structure §5, changed first.
   Deliverable 2.
