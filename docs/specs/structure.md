@@ -624,6 +624,11 @@ budget of the `coding` skill in the plan.
   under a full-size title, band regions); entries become paragraphs by
   rules 1 and 2, which do not fit an index's hanging indents. The second
   plan makes them index entries.
+- **A chapter summary with a hanging indent** (Stubbs page 51): its
+  indented continuation lines start blocks, so the summary comes out in
+  two, and its second half runs into the chapter's first paragraph,
+  whose first line is not indented. The second plan's chapter summaries
+  (section 11) change it.
 - **Plates**: their text-layer words become a paragraph, as now.
 - **Known misses at the foot** (15 November 2026, with layout's
   regions): Kadesh's page 38 prints "105" at the foot, but its body

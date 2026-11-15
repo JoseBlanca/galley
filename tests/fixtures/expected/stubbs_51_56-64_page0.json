@@ -174,5 +174,6 @@
       "text": "34",
       "position": "head"
     }
-  ]
+  ],
+  "known": "The chapter summary in small type (\"Terms of Henry's accession — ... Summary of nine years' work.\"), one hanging-indent paragraph on the page, comes out as two blocks, and its second half runs into the chapter's first body paragraph: the paragraph rules do not fit a hanging indent. Stubbs' chapter summaries are for the second plan (structure spec, section 11); a fix there changes this file."
 }
