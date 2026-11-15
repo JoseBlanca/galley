@@ -17,6 +17,11 @@ stages write, and the edits.
 `edits/` and applied by the markdown stage. Made by the correct stage, the
 owner or an agent. Not a "correction" unless the correct stage made it.
 
+**evaluation book**: a book of the evaluation set of
+`evaluation/books.toml`: an Internet Archive PDF, the Project Gutenberg
+edition made from that scan, and its settings. See
+`docs/specs/evaluation.md`.
+
 **excerpt**: a PDF of about ten pages cut from a public-domain book and
 committed under `tests/fixtures/pdf/`. The fixture of the excerpt tests.
 
@@ -47,6 +52,11 @@ block where the marker was printed.
 **page index**: the position of a page in the PDF, from 0. **page
 number**: what is printed on the page, a string ("47", "xiv"), which may
 be missing or come in two sequences.
+
+**reference text**: the Project Gutenberg edition of an evaluation book,
+read into galley's kinds of blocks and notes, against which the
+evaluation tool compares galley's output. Not the same as a reference
+page.
 
 **reference page**: a page of an excerpt whose expected output the owner
 has checked by eye, used as the literal of a test.
