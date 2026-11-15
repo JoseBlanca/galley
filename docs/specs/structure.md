@@ -74,7 +74,11 @@ says what a region's edges are); its middle is halfway between.
    number. The body word height is the median, over all lines of the
    book pooled, of the median height of a line's words; the body line
    pitch is the median distance from the top of a line to the top of the
-   next line of the same region, over the regions of 5 lines or more.
+   next line of the same region, over the regions of 5 lines or more (over
+   every region when none has 5 lines; 0 when no region has two lines,
+   and the body word height is 0 in a book without words). The survey
+   also finds the pages whose lowest line is a signature line (section
+   4), which takes the other pages' lowest lines.
 2. **Per page**: decide what each region is (below); remove the running
    head, page numbers, signature marks and stray marks (sections 3 and
    4); group the body stream into paragraphs, and each side region into
@@ -93,7 +97,8 @@ says what a region's edges are); its middle is halfway between.
   number of lines of marks above it). When section 3 does not make it a
   running head, it is the first body region;
 - a **margin region** is narrower than a quarter of the page's widest
-  region (the first, on a tie) and lies wholly left or wholly right of
+  region other than the head line (the first, on a tie) and lies wholly
+  left or wholly right of
   it, or overlaps vertically a region wider than itself (a cut-in note,
   once layout finds them, in the second plan, layout §9). Margin notes are about 30
   pt wide against columns of 266 to 317 pt; each column of an index is
@@ -148,9 +153,11 @@ by one space, with the smallest box that holds them; a
 marks stay in the text. When both end words are page-number forms, the
 page number is the one whose value plus the **offset** gives the page
 index, where the offset is the commonest page index minus printed number
-of the book's arabic head numbers (Haskins 15; Stubbs 17 on pages 19 to
-51 and 21 from page 56, so 21; Domesday 25; a tie takes the smaller),
-or the first word when no offset is known. A roman numeral counts as a
+of the book's arabic head numbers (each arabic page-number form at the
+first or last word of a running head, both when both are; Haskins 15;
+Stubbs 17 on pages 19 to 51 and 21 from page 56, so 21; Domesday 25; a
+tie takes the smaller), or the first word when no offset is known or
+neither gives the page index. A roman numeral counts as a
 page number only on pages before the first page whose head has an arabic
 one, so that Stubbs' "The Early Plantagenets. ch. i." gives no page
 number "i.". A page number the OCR misread ("ii8" for 118) is not a
@@ -225,7 +232,8 @@ The signature lines measured were 0.54 to 0.73 alike to one another
 
 **A printer's signature mark** of the Cambridge kind, "M. 4" and "4—2"
 in Domesday, "I — 2", "M. 2" in Gierke, is the lowest line, or the line
-above it when the lowest was a page number, when it has at most 3 words
+above it (the lowest of the lines left) when the lowest was a page
+number, when it has at most 3 words
 and at most 6 letters and digits in all, at least one of them a digit;
 is not a page number by the rules above, nor a number alone ("1900."),
 but letters and digits ("M. 4", "d2") or digits around a dash or a
@@ -239,7 +247,9 @@ by the research lie from 0.42 to 0.83 of the page width. The research found 53 i
 such as "1G-2", and about 19 in Gierke ("£ 2", "d2"), none in Haskins,
 Stubbs and Kadesh.
 
-A word of a lowest line that is none of these stays in the text.
+A word of a lowest line that is none of these stays in the text. A page
+with no body region has no body column, and nothing is removed at its
+foot.
 
 ## 5. Hyphens at line ends
 
@@ -265,9 +275,13 @@ not letters, digits, hyphens or apostrophes stripped from both ends):
    word list of the book's language (`wordlist.word_list`, a list of
    words drawn from Tesseract's language data, compared lower-cased: it
    holds "Normandy" and "Gloucester" capitalised) or among the book's own
-   words. "neces-" "sary" becomes "necessary". In French, the
-   part after the last apostrophe is looked up too, in both: "d'in-"
-   "signes" becomes "d'insignes" when "insignes" is known.
+   words. "neces-" "sary" becomes "necessary". When the first part holds
+   an apostrophe ("'" or "’"), as French elision does, the part of the
+   joined word after the last apostrophe is looked up too, in both:
+   "d'in-" "signes" becomes "d'insignes" when "insignes" is known. The
+   rule asks for the apostrophe in the first part, not for the book's
+   language, which `join_hyphen` is not given; an English possessive,
+   "Wil-" "liam's", has it in the second.
 3. **Guessed** (`hyphen_join_guessed`, new): neither. The hyphen is
    dropped, as in 2 (owner, 15 November 2026), and the change is
    recorded as guessed, so that the correct stage, a pass by a local
@@ -299,7 +313,11 @@ hyphens are lines the skeleton mixed with a margin note or a note
 column, misreadings, or hyphens the reference does not show; Kadesh (110
 hyphens, 71 with evidence) and Gierke (714, 483) have no reference. A
 hyphen whose next word is not in the same block, or does not start with
-a letter or digit, is left as it is, with no record.
+a letter or digit, is left as it is, with no record. A line of one word
+between two line-end hyphens is joined twice: the second change has the
+first join's word as its first word ("pre-" "Anglo-" then "preAnglo-"
+"Saxon"), and the fidelity check, which undoes every change, still
+balances.
 
 ## 6. Paragraphs, side text and the order of the blocks
 
@@ -311,12 +329,14 @@ a letter or digit, is left as it is, with no record.
 2. **it is centred**, or the line before it is: both of its insets from
    the region's edges are at least 15 pt and differ by at most 10 pt.
 
-A line after a line that ends with a hyphen never starts a paragraph,
-at a page break too, so the hyphen is joined. The first line of a body
+A line after a line that ends with a hyphen (its last word ends as
+section 5 asks of a first part, "-" after a letter or digit) never
+starts a paragraph, at a page break too, so the hyphen is joined. The first line of a body
 region after the first on a page is judged like any line, with the last
 line of the region before as "the line before"; the book's first line
 starts a paragraph. A region's **left and right edges** are the commonest left and right sides
-of its lines, to 2 pt, or, with fewer than 5 lines, the sides of its box.
+of its lines, to 2 pt, or, with fewer than 5 lines, the sides of its box,
+taken on the region as layout gives it, before any line is removed.
 A heading is a centred line, and so a paragraph of its own; a title of
 two lines makes two.
 
@@ -392,6 +412,13 @@ and a joined word in place of its two parts.
 | `word_changes` | the hyphen joins, of the three reasons of section 5 |
 | `page_numbers` | the head and foot page numbers removed |
 
+The lists are in a fixed order, so that the file does not depend on the
+number of workers: `removals` by page, and on a page from the top line
+down and, on one line, from left to right; `word_changes` by the page of
+their first word, and on a page the body's in reading order before
+those of the side text, region by region; `page_numbers` by page, the
+head's before the foot's.
+
 Three values are added to shared enums, as architecture §8 allows ("a
 spec adds a reason when it needs one"); `model.py`, `fidelity.py`, the
 lists of architecture §8 and the glossary change with them:
@@ -423,6 +450,7 @@ class BookSurvey:
     body_word_height: float
     body_line_pitch: float
     book_words: frozenset[str]             # keys of the words printed whole
+    signature_lines: frozenset[int]        # pages whose lowest line is a signature line
 
 class HyphenJoin(NamedTuple):
     word: str
@@ -430,7 +458,7 @@ class HyphenJoin(NamedTuple):
 
 def run(folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS) -> None: ...
 
-def survey_book(lines: LinesFile) -> BookSurvey: ...
+def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurvey: ...
 def join_hyphen(first: str, second: str, book_words: frozenset[str],
                 word_list: frozenset[str]) -> HyphenJoin | None: ...
 def make_blocks(lines: LinesFile, word_list: frozenset[str], *,
@@ -438,7 +466,8 @@ def make_blocks(lines: LinesFile, word_list: frozenset[str], *,
 ```
 
 `join_hyphen` gives `None` when the two words are not joined (section
-5). `make_blocks` is the whole stage on values: it calls `survey_book`,
+5); it takes the word list in lower case, which `make_blocks` makes once
+from the list `wordlist.word_list` gives. `make_blocks` is the whole stage on values: it calls `survey_book`,
 does the per-page work with `map_pages`, then the work across pages.
 `run` reads `pages.json` and `lines.json` with `read_checked_input` as
 now, takes the word list with `wordlist.word_list(config.language)`,
@@ -496,7 +525,8 @@ budget of the `coding` skill in the plan.
 
 - `survey_book` on 6 pages (page indices 10 to 15, heads at top 36 pt,
   pitch 15 pt) whose head lines read "25 THE BOOK", "THE BOOK 26"…: every
-  page is a running head and the offset is 15; on 6 pages whose heads
+  page is a running head and the offset is −15 (page index minus printed
+  number); on 6 pages whose heads
   carry no number ("THE BOOK", "THE BOKO"), the alike rule alone makes
   them running heads; a page whose first region holds the same title 70
   pt lower is not;
