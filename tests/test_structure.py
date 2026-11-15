@@ -670,6 +670,66 @@ def test_join_hyphen_does_not_join(first: str, second: str) -> None:
     assert join_hyphen(first, second, frozenset(), frozenset({"and"})) is None
 
 
+@pytest.mark.parametrize(
+    ("first", "second", "book_words", "word_list", "expected"),
+    [
+        ("half-", "Danish", frozenset(), frozenset({"halfdanish"}), None),
+        ("be-", "The", frozenset({"bethe"}), frozenset({"bethe"}), None),
+        (
+            "half-",
+            "Danish",
+            frozenset({"half-danish"}),
+            frozenset(),
+            HyphenJoin("half-Danish", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "ANGLO-",
+            "SAXON",
+            frozenset(),
+            frozenset({"anglosaxon"}),
+            HyphenJoin("ANGLOSAXON", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "tro-",
+            "d",
+            frozenset(),
+            frozenset({"trod"}),
+            HyphenJoin("trod", ChangeReason.HYPHEN_JOIN_GUESSED),
+        ),
+        (
+            "tro-",
+            "d.",
+            frozenset({"trod"}),
+            frozenset(),
+            HyphenJoin("trod.", ChangeReason.HYPHEN_JOIN),
+        ),
+    ],
+    ids=[
+        "capital without evidence",
+        "capital with a word-list key",
+        "capital with the book's compound",
+        "capitals on both sides",
+        "one letter, word list",
+        "one letter, book's words",
+    ],
+)
+def test_join_hyphen_before_a_capital_or_a_single_letter(
+    first: str,
+    second: str,
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    expected: HyphenJoin | None,
+) -> None:
+    assert join_hyphen(first, second, book_words, word_list) == expected
+
+
+def test_hyphen_before_a_capital_without_evidence_leaves_both_words() -> None:
+    page = PageLayout(0, (_body(70, "who was half-", "Danish in blood"),), ())
+    blocks = make_blocks(_lines_of(page), frozenset({"halfdanish"}), workers=1)
+    assert block_text(blocks.blocks[0]) == "who was half- Danish in blood"
+    assert blocks.word_changes == ()
+
+
 # Hyphens in the blocks
 
 
@@ -718,13 +778,13 @@ def test_hyphen_at_a_line_end_is_joined_inside_a_block_and_recorded() -> None:
 
 
 def test_line_of_one_word_between_two_hyphens_is_joined_twice() -> None:
-    page = PageLayout(0, (_body(70, "the pre-", "Anglo-", "Saxon age"),), ())
+    page = PageLayout(0, (_body(70, "the pre-", "anglo-", "saxon age"),), ())
     lines = _lines_of(page)
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
-    assert block_text(blocks.blocks[0]) == "the preAngloSaxon age"
+    assert block_text(blocks.blocks[0]) == "the preanglosaxon age"
     assert tuple(change.before for change in blocks.word_changes) == (
-        ("pre-", "Anglo-"),
-        ("preAnglo-", "Saxon"),
+        ("pre-", "anglo-"),
+        ("preanglo-", "saxon"),
     )
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 

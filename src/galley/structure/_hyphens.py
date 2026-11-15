@@ -13,6 +13,9 @@ from galley.structure._measures import is_hyphen_first_part, word_key
 # Spec section 5: a join of two numbers, "1830-" "40", keeps the hyphen.
 _NUMBER_KEY = re.compile(r"[0-9]+")
 _APOSTROPHES = ("'", "’")
+# Spec section 5: the word list is no evidence for a second part of fewer
+# than 2 letters ("Con-" "1", "na-" "R": junk keys it happens to hold).
+_WORD_LIST_MIN_LETTERS = 2
 
 
 class HyphenJoin(NamedTuple):
@@ -34,13 +37,16 @@ def join_hyphen(
     """The word made of `first`, the last word of a line, and `second`, the
     first word of the next, or None when they are not joined (spec section
     5): `first` must end with "-" after a letter or digit and `second`
-    start with a letter or digit.
+    start with a letter or digit. After a lower-case letter, a `second`
+    that starts with a capital is joined only when the book prints the
+    hyphenated word (`hyphen_kept`), and else not at all.
 
     The hyphen is kept (`hyphen_kept`) when the hyphenated word is among
     `book_words`, the keys of the words the book prints whole, and the
     joined word is not, and always between two numbers; it is dropped
     (`hyphen_join`) when the joined word is in `word_list`, which is in
-    lower case, or among `book_words`, and dropped as a guess
+    lower case (unless `second` has fewer than 2 letters), or among
+    `book_words`, and dropped as a guess
     (`hyphen_join_guessed`) otherwise. When `first` holds an apostrophe,
     the joined word's part after its last apostrophe is looked up too.
     """
@@ -48,6 +54,10 @@ def join_hyphen(
         return None
     hyphenated = first + second
     joined = first[:-1] + second
+    if first[-2].islower() and second[0].isupper():
+        if word_key(hyphenated) in book_words:
+            return HyphenJoin(hyphenated, ChangeReason.HYPHEN_KEPT)
+        return None
     if _NUMBER_KEY.fullmatch(word_key(first[:-1])) and _NUMBER_KEY.fullmatch(
         word_key(second)
     ):
@@ -58,7 +68,12 @@ def join_hyphen(
     keys = (joined_key,)
     if any(apostrophe in first for apostrophe in _APOSTROPHES):
         keys = (joined_key, _after_last_apostrophe(joined_key))
-    if any(key in word_list or key in book_words for key in keys):
+    word_list_counts = (
+        sum(character.isalpha() for character in second) >= _WORD_LIST_MIN_LETTERS
+    )
+    if any(
+        key in book_words or (word_list_counts and key in word_list) for key in keys
+    ):
         return HyphenJoin(joined, ChangeReason.HYPHEN_JOIN)
     return HyphenJoin(joined, ChangeReason.HYPHEN_JOIN_GUESSED)
 
