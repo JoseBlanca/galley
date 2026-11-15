@@ -16,11 +16,9 @@ How the spec is read here, where it leaves a choice:
   of kind margin_note inside a note is part of its note and is aligned
   by the notes pass.
 - Pairs found in a replaced stretch, `changed` ones included, are aligned
-  and are not offered to a later pass; only the tokens left over are.
+  and are not offered to a later pass; the tokens left unpaired are.
 - The last pass takes the reference's leftover tokens in the reference's
   order: the body, margin notes in place, then the notes.
-- A `split` or `glued` joins only tokens whose key is not empty, so that
-  a dash or a lone quote is never part of one.
 - `reference_correction` is the subkind of any pairing other than
   matched whose reference tokens include a marked correction, missing,
   split and glued ones too, so that all of them are counted apart from
@@ -28,6 +26,14 @@ How the spec is read here, where it leaves a choice:
 - The tests of `case` and `punctuation` compare the two texts after
   quotes, dashes and ligatures are written one way, so that "’Tis" and
   "'TIS" differ only in case.
+- For `diacritic`, the letters æ œ ð þ count as accents, as the
+  alignment key spells them out: "Æthelred" and "AEthelred" differ by a
+  diacritic. Equal keys with no accent differing, such as the long s
+  "ſerfs" and "serfs", are `letters`.
+- In a replaced stretch, when neither current token can be paired, the
+  one further behind is the one whose middle, (position + 1/2) divided
+  by its side's length, is lower; on a tie, the one of the side with more
+  tokens left, the reference's when both have as many.
 """
 
 import bisect
@@ -56,6 +62,7 @@ __all__ = [
     "Subkind",
     "align",
     "alignment_key",
+    "anchor_pairs",
     "anchored_pass",
     "changed_subkind",
     "equal_key_share",
@@ -220,10 +227,10 @@ def anchored_pass(
 ) -> tuple[Stretch, ...]:
     """The stretches that align two sequences of alignment keys, in order,
     covering both. The anchors are the keys found exactly once on each
-    side, the longest run of them in the same order on both sides; each
-    anchor is an equal stretch of one, and the stretches between anchors
+    side, other than empty keys, the longest run of them in the same order
+    on both sides; each anchor is an equal stretch of one, and the stretches between anchors
     are difflib's, with no automatic junk."""
-    anchors = _anchors(reference_keys, galley_keys)
+    anchors = anchor_pairs(reference_keys, galley_keys)
     stretches: list[Stretch] = []
     reference_from, galley_from = 0, 0
     ends = (*anchors, (len(reference_keys), len(galley_keys)))
@@ -250,17 +257,19 @@ def anchored_pass(
     return tuple(stretches)
 
 
-def _anchors(
+def anchor_pairs(
     reference_keys: Sequence[str], galley_keys: Sequence[str]
 ) -> tuple[tuple[int, int], ...]:
-    """The positions of the unique keys shared by both sides that form the
-    longest subsequence increasing on both sides."""
+    """The anchors of an anchored pass, as (reference position, galley
+    position) pairs in order: the tokens whose key is not empty and is
+    found exactly once on each side, the longest run of them in the same
+    order on both sides."""
     reference_counts = Counter(reference_keys)
     galley_counts = Counter(galley_keys)
     galley_position = {
         key: position
         for position, key in enumerate(galley_keys)
-        if galley_counts[key] == 1 and reference_counts[key] == 1
+        if key and galley_counts[key] == 1 and reference_counts[key] == 1
     }
     pairs = tuple(
         (position, galley_position[key])
@@ -367,15 +376,34 @@ def changed_subkind(reference: ReferenceToken, galley_text: str) -> Subkind:
         return Subkind.CONVENTION
     if reference_text.lower() == galley_conventional.lower():
         return Subkind.CASE
-    if _letters_and_digits(reference_text) == _letters_and_digits(galley_conventional):
+    if (
+        _letters_and_digits(reference_text).lower()
+        == _letters_and_digits(galley_conventional).lower()
+    ):
         return Subkind.PUNCTUATION
-    if alignment_key(reference.text) == alignment_key(galley_text):
+    if alignment_key(reference.text) == alignment_key(galley_text) and _accents(
+        reference.text
+    ) != _accents(galley_text):
         return Subkind.DIACRITIC
     return Subkind.LETTERS
 
 
 def _letters_and_digits(text: str) -> str:
     return "".join(char for char in text if char.isalnum())
+
+
+_ACCENTED_LETTERS = frozenset("æœðþ")
+
+
+def _accents(text: str) -> tuple[str, ...]:
+    """The accents of `text` in order, once decomposed, and the letters æ œ
+    ð þ, which the alignment key spells out as it drops accents."""
+    decomposed = unicodedata.normalize("NFKD", text.lower())
+    return tuple(
+        char
+        for char in decomposed
+        if unicodedata.combining(char) or char in _ACCENTED_LETTERS
+    )
 
 
 # The three passes
@@ -618,16 +646,10 @@ def _pair(
 # (spec section 5).
 _MOST_JOINED = 4
 
-
-@dataclass(frozen=True, slots=True)
-class _Join:
-    """A split or glued found in a replaced stretch, by positions in it."""
-
-    state: State
-    reference_start: int
-    reference_end: int
-    galley_start: int
-    galley_end: int
+# Two tokens are alike, and may be paired as changed, when difflib's ratio
+# of their keys' characters is at least this: a guess, to be checked on the
+# baseline (spec section 5).
+_ALIKE = 0.5
 
 
 def _replaced(
@@ -636,120 +658,102 @@ def _replaced(
     reference_stretch: tuple[int, ...],
     galley_stretch: tuple[int, ...],
 ) -> tuple[Pairing, ...]:
-    """The pairings of a replaced stretch: splits and glueds first, in
-    order; the tokens between them paired in order as changed; the tokens
-    left over unpaired."""
-    joins = _joins(
-        tuple(sides.reference_keys[index] for index in reference_stretch),
-        tuple(sides.galley_keys[index] for index in galley_stretch),
-    )
+    """The pairings of a replaced stretch, walked in order on both sides at
+    once. At each step: a split or glued at the current positions; else a
+    changed pair when the two current tokens are alike; else the token
+    further behind on its side, as _reference_behind measures it, is left
+    unpaired. The tokens
+    left unpaired are offered to the next pass."""
+    reference_keys = tuple(sides.reference_keys[index] for index in reference_stretch)
+    galley_keys = tuple(sides.galley_keys[index] for index in galley_stretch)
+    reference_count, galley_count = len(reference_stretch), len(galley_stretch)
     pairings: list[Pairing] = []
-    reference_from, galley_from = 0, 0
-    for join in (*joins, None):
-        reference_to = len(reference_stretch) if join is None else join.reference_start
-        galley_to = len(galley_stretch) if join is None else join.galley_start
-        pairings.extend(
-            _pair(found_in, sides, reference_index, galley_index)
-            for reference_index, galley_index in zip(
-                reference_stretch[reference_from:reference_to],
-                galley_stretch[galley_from:galley_to],
-                strict=False,
+    reference_at, galley_at = 0, 0
+    while reference_at < reference_count and galley_at < galley_count:
+        join = _join_at(reference_keys, reference_at, galley_keys, galley_at)
+        if join is not None:
+            state, reference_end, galley_end = join
+            reference_joined = reference_stretch[reference_at:reference_end]
+            pairings.append(
+                Pairing(
+                    state=state,
+                    subkind=_correction_subkind(sides.places, reference_joined),
+                    reference_indices=reference_joined,
+                    galley_indices=galley_stretch[galley_at:galley_end],
+                    found_in=found_in,
+                )
             )
-        )
-        if join is None:
-            break
-        reference_joined = reference_stretch[join.reference_start : join.reference_end]
-        pairings.append(
-            Pairing(
-                state=join.state,
-                subkind=_correction_subkind(sides.places, reference_joined),
-                reference_indices=reference_joined,
-                galley_indices=galley_stretch[join.galley_start : join.galley_end],
-                found_in=found_in,
+            reference_at, galley_at = reference_end, galley_end
+        elif _alike(reference_keys[reference_at], galley_keys[galley_at]):
+            pairings.append(
+                _pair(
+                    found_in,
+                    sides,
+                    reference_stretch[reference_at],
+                    galley_stretch[galley_at],
+                )
             )
-        )
-        reference_from, galley_from = join.reference_end, join.galley_end
+            reference_at, galley_at = reference_at + 1, galley_at + 1
+        elif _reference_behind(reference_at, reference_count, galley_at, galley_count):
+            reference_at += 1
+        else:
+            galley_at += 1
     return tuple(pairings)
 
 
-def _joins(
-    reference_keys: tuple[str, ...], galley_keys: tuple[str, ...]
-) -> tuple[_Join, ...]:
-    """The splits and glueds of a replaced stretch, found in the order of
-    the reference: for each reference token, the first galley position not
-    yet passed where up to four galley tokens join into its key (a split),
-    or where its key joined with the next ones, up to four, is one galley
-    token's key (a glued); the nearer of the two when both are found."""
-    split_spans = _joined_spans(galley_keys)
-    single_at = _positions(galley_keys)
-    joins: list[_Join] = []
-    reference_at, galley_from = 0, 0
-    while reference_at < len(reference_keys):
-        join = _join_at(
-            reference_keys, reference_at, galley_from, split_spans, single_at
-        )
-        if join is None:
-            reference_at += 1
-            continue
-        joins.append(join)
-        reference_at, galley_from = join.reference_end, join.galley_end
-    return tuple(joins)
-
-
-def _joined_spans(
-    keys: tuple[str, ...],
-) -> frozendict[str, tuple[tuple[int, int], ...]]:
-    """For each key made by joining 2 to 4 consecutive non-empty keys, the
-    (start, end) of each place where it is made, in order."""
-    joined: dict[str, list[tuple[int, int]]] = {}
-    for start in range(len(keys)):
-        for end in range(start + 2, min(start + _MOST_JOINED, len(keys)) + 1):
-            parts = keys[start:end]
-            if all(parts):
-                joined.setdefault("".join(parts), []).append((start, end))
-    return frozendict({key: tuple(spans) for key, spans in joined.items()})
-
-
-def _positions(keys: tuple[str, ...]) -> frozendict[str, tuple[int, ...]]:
-    """For each non-empty key, the positions where it is, in order."""
-    found: dict[str, list[int]] = {}
-    for position, key in enumerate(keys):
-        if key:
-            found.setdefault(key, []).append(position)
-    return frozendict({key: tuple(positions) for key, positions in found.items()})
+def _reference_behind(
+    reference_at: int, reference_count: int, galley_at: int, galley_count: int
+) -> bool:
+    """Whether the current reference token is further behind in its
+    stretch than the current galley token: its middle, (position + 1/2)
+    over the side's length, is lower; on a tie, whether the reference has
+    at least as many tokens left."""
+    reference_middle = (2 * reference_at + 1) * galley_count
+    galley_middle = (2 * galley_at + 1) * reference_count
+    if reference_middle != galley_middle:
+        return reference_middle < galley_middle
+    return reference_count - reference_at >= galley_count - galley_at
 
 
 def _join_at(
     reference_keys: tuple[str, ...],
     reference_at: int,
-    galley_from: int,
-    split_spans: frozendict[str, tuple[tuple[int, int], ...]],
-    single_at: frozendict[str, tuple[int, ...]],
-) -> _Join | None:
-    candidates: list[_Join] = []
+    galley_keys: tuple[str, ...],
+    galley_at: int,
+) -> tuple[State, int, int] | None:
+    """A split or glued starting at the current positions, with its state
+    and the ends it reaches on each side; None when there is neither. Only
+    tokens with a non-empty key are joined, 2 to 4 of them."""
     key = reference_keys[reference_at]
     if key:
-        spans = split_spans.get(key, ())
-        found = bisect.bisect_left(spans, (galley_from, 0))
-        if found < len(spans):
-            start, end = spans[found]
-            candidates.append(
-                _Join(State.SPLIT, reference_at, reference_at + 1, start, end)
-            )
-    for end in range(
-        reference_at + 2, min(reference_at + _MOST_JOINED, len(reference_keys)) + 1
-    ):
-        parts = reference_keys[reference_at:end]
-        if not all(parts):
-            break
-        positions = single_at.get("".join(parts), ())
-        found = bisect.bisect_left(positions, galley_from)
-        if found < len(positions):
-            start = positions[found]
-            candidates.append(_Join(State.GLUED, reference_at, end, start, start + 1))
-    if not candidates:
-        return None
-    return min(candidates, key=lambda join: join.galley_start)
+        for end in range(
+            galley_at + 2, min(galley_at + _MOST_JOINED, len(galley_keys)) + 1
+        ):
+            parts = galley_keys[galley_at:end]
+            if not all(parts):
+                break
+            if "".join(parts) == key:
+                return State.SPLIT, reference_at + 1, end
+    key = galley_keys[galley_at]
+    if key:
+        for end in range(
+            reference_at + 2, min(reference_at + _MOST_JOINED, len(reference_keys)) + 1
+        ):
+            parts = reference_keys[reference_at:end]
+            if not all(parts):
+                break
+            if "".join(parts) == key:
+                return State.GLUED, end, galley_at + 1
+    return None
+
+
+def _alike(reference_key: str, galley_key: str) -> bool:
+    """Whether two tokens may be paired as changed: both keys empty, or
+    both non-empty with a character similarity of at least 0.5."""
+    if not reference_key or not galley_key:
+        return reference_key == galley_key
+    matcher = SequenceMatcher(None, reference_key, galley_key, autojunk=False)
+    return matcher.ratio() >= _ALIKE
 
 
 def _correction_subkind(

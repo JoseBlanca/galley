@@ -16,6 +16,7 @@ from galley_eval.align import (
     Subkind,
     align,
     alignment_key,
+    anchor_pairs,
     anchored_pass,
     changed_subkind,
     equal_key_share,
@@ -484,3 +485,132 @@ def test_every_token_is_in_exactly_one_pairing_whatever_the_input() -> None:
             i for pairing in pairings for i in pairing.galley_indices
         ) == list(range(len(galley)))
         assert len(alignment.reference_pairing) == reference_count
+
+
+# The anchors
+
+
+def test_anchor_pairs_are_keys_unique_on_both_sides() -> None:
+    # "a" is twice in the reference, "b" twice in galley's words.
+    assert anchor_pairs(("a", "b", "a", "c"), ("a", "c", "b")) == ((3, 1),)
+    assert anchor_pairs(("b", "c"), ("b", "c", "b")) == ((1, 1),)
+
+
+def test_empty_key_is_never_an_anchor() -> None:
+    assert anchor_pairs(("", "alpha"), ("", "alpha")) == ((1, 1),)
+
+
+def test_anchored_pass_turns_off_difflib_automatic_junk() -> None:
+    # With automatic junk, a key above 1% of a stretch of 200 tokens or
+    # more is junk and never matched.
+    keys = ("the",) * 300
+    assert anchored_pass(keys, keys) == (Stretch(Operation.EQUAL, 0, 300, 0, 300),)
+
+
+# Walking a replaced stretch
+
+
+def test_word_unlike_the_one_across_is_missing_and_extra() -> None:
+    alignment, _ = _align(
+        _reference(_paragraph("il dit son nom")), _galley("il dit ' nom")
+    )
+    assert _pairing_of_reference(alignment, 2).state is State.MISSING
+    assert _pairing_of_galley(alignment, 2).state is State.EXTRA
+
+
+def test_running_head_before_a_misread_word_stays_extra() -> None:
+    alignment, _ = _align(
+        _reference(_paragraph("one alpha two")), _galley("one HISTORY 199 alqha two")
+    )
+    assert tuple(
+        _pairing_of_galley(alignment, index).state for index in range(1, 4)
+    ) == (
+        State.EXTRA,
+        State.EXTRA,
+        State.CHANGED,
+    )
+
+
+def test_empty_keys_pair_only_with_empty_keys() -> None:
+    alignment, _ = _align(_reference(_paragraph("one — two")), _galley("one x two"))
+    assert _pairing_of_reference(alignment, 1).state is State.MISSING
+    alignment, _ = _align(_reference(_paragraph("one — two")), _galley("one * two"))
+    assert _pairing_of_reference(alignment, 1).state is State.CHANGED
+
+
+def test_split_is_looked_for_only_at_the_current_position() -> None:
+    # By the time the walk reaches "p" "our" in galley, it has passed "pour"
+    # in the reference: no split.
+    alignment, _ = _align(
+        _reference(_paragraph("one pour xx yy two")), _galley("one zzzz qqqq p our two")
+    )
+    assert _pairing_of_reference(alignment, 1).state is State.MISSING
+
+
+def test_split_joins_up_to_four_tokens() -> None:
+    alignment, _ = _align(
+        _reference(_paragraph("one interesting two")), _galley("one in ter est ing two")
+    )
+    assert _pairing_of_reference(alignment, 1).state is State.SPLIT
+    assert _pairing_of_reference(alignment, 1).galley_indices == (1, 2, 3, 4)
+    alignment, _ = _align(
+        _reference(_paragraph("one interestingly two")),
+        _galley("one in ter est ing ly two"),
+    )
+    assert _pairing_of_reference(alignment, 1).state is not State.SPLIT
+
+
+def test_glued_joins_up_to_four_tokens() -> None:
+    alignment, _ = _align(
+        _reference(_paragraph("one a b c d two")), _galley("one abcd two")
+    )
+    assert _pairing_of_reference(alignment, 1).state is State.GLUED
+    alignment, _ = _align(
+        _reference(_paragraph("one a b c d e two")), _galley("one abcde two")
+    )
+    assert _pairing_of_reference(alignment, 1).state is not State.GLUED
+
+
+def test_split_never_joins_a_token_with_an_empty_key() -> None:
+    alignment, _ = _align(
+        _reference(_paragraph("one replicate two")), _galley("one repli- — cate two")
+    )
+    assert _pairing_of_reference(alignment, 1).state is State.CHANGED
+
+
+def test_split_of_a_marked_correction_is_reference_correction() -> None:
+    reference = _reference(
+        ReferenceBlock(
+            ReferenceKind.PARAGRAPH,
+            _words("to") + _words("replicate", marked=True) + _words("the"),
+        )
+    )
+    alignment, _ = _align(reference, _galley("to repli- cate the"))
+    pairing = _pairing_of_reference(alignment, 1)
+    assert pairing.state is State.SPLIT
+    assert pairing.subkind is Subkind.REFERENCE_CORRECTION
+
+
+def test_glued_with_a_marked_correction_is_reference_correction() -> None:
+    reference = _reference(
+        ReferenceBlock(
+            ReferenceKind.PARAGRAPH,
+            _words("to") + _words("re", marked=True) + _words("plicate the"),
+        )
+    )
+    alignment, _ = _align(reference, _galley("to replicate the"))
+    pairing = _pairing_of_reference(alignment, 1)
+    assert pairing.state is State.GLUED
+    assert pairing.subkind is Subkind.REFERENCE_CORRECTION
+
+
+def test_case_and_punctuation_together_are_punctuation() -> None:
+    reference = ReferenceToken("Serfs.", marked_correction=False)
+    assert changed_subkind(reference, "serfs") is Subkind.PUNCTUATION
+
+
+def test_equal_keys_without_different_accents_are_letters() -> None:
+    # The long s decomposes to s, so the keys are equal, but no accent
+    # differs.
+    reference = ReferenceToken("ſerfs", marked_correction=False)
+    assert changed_subkind(reference, "serfs") is Subkind.LETTERS
