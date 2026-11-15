@@ -269,3 +269,63 @@ input of the stage before met three faults the first time it ran on the
 real input (the body height, the margin rule, Gierke's edges), each
 found within an hour of the trial merge. Running the two stages together
 before the review, as was done here, should be a task of the plan.
+
+## 6. Measurement
+
+Done, on the plan's branch at ec2edc4. `uv run galley-eval run` on the
+four evaluation books took 81 s; the run is in
+`runs/evaluation/` of the worktree `regions-and-paragraphs-eval`
+(git-ignored), the baseline (galley at cc481d1) in `runs/evaluation/` of
+the main checkout. `galley-eval compare` cannot read two runs, so the
+scorecards were compared directly.
+
+Targets of structure §9, body, at blocks (paragraph scores are the same
+at markdown); baseline / target / now:
+
+| score | Haskins | Stubbs | Domesday | Mariéjol |
+|---|---|---|---|---|
+| extra tokens | 1,893 / ≤1,000 / 684 | 5,593 / ≤4,300 / 3,665 | 11,178 / ≤9,900 / 9,698 | 28,921 / ≤28,400 / 27,203 |
+| hyphen splits left | 1,005 / ≤150 / 1 | 1,235 / ≤300 / 10 | 781 / ≤150 / 16 | 1,450 / ≤400 / 25 |
+| paragraph precision / recall | .11/.11 / .75/.75 / .84/.86 | .13/.07 / .55/.60 / .72/.72 | .12/.08 / .70/.70 / .75/**.62** | .09/.04 / .55/.60 / .69/.74 |
+| notes found as notes | 0 / 55 of 72 / 65 | (none) | 0 / 1,300 of 1,729 / 1,659 | 0 / 900 of 1,432 / 1,008 |
+| margin notes as margin notes | (none) | 0 / 0 of 467 / 0 | 0 / 400 of 593 / 462 | (none) |
+
+Every target is met but one, Domesday's paragraph recall (0.62 against
+0.70). Of its 286 missed breaks, 135 have a margin-note word at the
+start of the paragraph's first line: its text-layer box crosses into the
+column, so layout keeps it in the body line (the case layout §6 names),
+the line starts left of the column and the indent rule cannot fire
+(pages 65, 211, 375). A layout rule that sends such a word to the
+margin note beside it would bring recall to about 0.80. The rest: 36
+not indented after a full line, 20 across a page break, about 50 beside
+tables, quotes and headings, about 25 where the alignment does not line
+up.
+
+Error rates of the body, words / lines / blocks / markdown: Haskins
+.123/.124/.089/.089 (baseline .124 at blocks), Stubbs .179/.174/.142/.142
+(.174), Domesday .114/.113/.101/.101 (.112), Mariéjol .342/.343/.327/.327
+(.343). The rate at words is the OCR's, which this plan does not touch.
+
+Worse than the baseline: Stubbs' index, in small type, is read as a band
+and gives 106 notes (its index error rate at blocks went from 2.22 to
+3.13); notes counted missing went from 4 to 39 in Mariéjol, margin notes
+missing from 6 to 51 in Domesday.
+
+Guessed joins: Haskins 142, Stubbs 256, Domesday 201, Mariéjol 738,
+Kadesh 28, Gierke 185.
+
+`uv run pytest -m whole_book`: 14 passed in 47.1 s. The six EPUBs pass
+epubcheck with no error or warning; they are in
+`runs/regions-and-paragraphs/epubs/` of the main checkout. Kadesh and
+Gierke have no committed whole-book config; the run excluded the pages
+analyze reported without a text layer.
+
+## 5. The reference pages (under way)
+
+The sheet of the 15 reference pages and 2 page-break pairs is built and
+published privately for the owner. On 4 of the 17 sections galley's
+output differs from the spec: Gierke 270 and Mariéjol 210 because the
+excerpt lacks the other pages the running-head and signature rules
+compare with; Domesday 76, where an OCR box puts "autrui." on the line
+above so notes 3 and 4 are one note; Haskins 266, whose index columns
+are body regions, not band regions (reading order unchanged).

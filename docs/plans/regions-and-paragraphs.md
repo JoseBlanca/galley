@@ -247,7 +247,7 @@ This is the plan's one pause for the owner. While waiting, work package
 owner that changes code goes back to the stream's code with a test that
 fails first, and work package 6 is run again.
 
-- [ ] 5.1 Build the sheet from the six excerpts' outputs, and check each
+- [x] 5.1 Build the sheet from the six excerpts' outputs, and check each
   page against the spec before it goes to the owner. Spec: layout §8 and
   structure §9, "Excerpt tests". Deliverable 1.
 - [ ] 5.2 Turn the owner's answer into the expected outputs and the
@@ -277,7 +277,7 @@ and what fixing it would take goes to the owner as a proposal.
 
 **Stands on:** work packages 1 to 4, merged and reviewed.
 
-- [ ] 6.1 Run the evaluation, the whole-book tests and the six EPUBs;
+- [x] 6.1 Run the evaluation, the whole-book tests and the six EPUBs;
   write the results into the report. Spec: structure §9, "Targets", and
   `docs/specs/evaluation.md` §9. Deliverables 1 to 4.
 
