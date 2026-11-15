@@ -1,0 +1,179 @@
+{
+  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
+  "excerpt": "stubbs_51_56-64",
+  "page": 0,
+  "book_page_index": 51,
+  "shows": "a cut-in note at the left; specks above the head",
+  "layout": [
+    [
+      "—",
+      "34 The Early Plantagenets. a.d. 1154."
+    ],
+    [
+      "more honest man he would certainly have been far",
+      "more successful.",
+      "CHAPTER III.",
+      "THE EARLY YEARS OF HENRY II.",
+      "Terms ofHenryJs accession — His character — H is early reforms",
+      "His relations with France—War ofToulouse — Summaryofnine",
+      "years' work.",
+      "Very few epochs of history are more clearly marked",
+      "than the accession of Henry II. Most great eras are",
+      "Importance determined, and their real importance as-",
+      "attachedby certained, long after the event the famous",
+      ";",
+      "contempora-",
+      "ries toHenry's Parliament of Si. mon de Montfort, in 1265,",
+      "accession. .",
+      "f or instance, i . s scarcel,y named, ,by t,,he con-",
+      "temporary historians, and only rises into importance as",
+      "later history unfolds its real bearings. But the succes-",
+      "sion of Henry is hailed by the writers of his time as a",
+      "dawn of hope, a certain omen of restoration and re-",
+      "freshing. Often and often, it is true, such omens are",
+      "discerned on the accession of a new king; men hasten",
+      "to salute the rising sun ; good wishes to the new sove-",
+      "reign take the form of prophecy, and, where they are",
+      "fulfilled, partly help on their own fulfilment. Here,",
+      "however, we have omens that were amply fulfilled, and",
+      "an epoch which those who lived in it were the first to",
+      "recognise. The fact proves how weary England was of",
+      "Stephen'sincompetency,howthoroughly shehad learned",
+      "the miserable consequences ofa feudal system ofsociety",
+      "unchecked by strong government, how readily she wel-",
+      "comed the young and inexperienced but strong and, in",
+      "the main, honest rule of Henry."
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "more honest man he would certainly have been far more successful.",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "CHAPTER III.",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "THE EARLY YEARS OF HENRY II.",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "Terms ofHenryJs accession — His character — H is early reforms",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "His relations with France—War ofToulouse — Summaryofnine years' work. Very few epochs of history are more clearly marked than the accession of Henry II. Most great eras are Importance determined, and their real importance asattachedby certained, long after the event the famous ; contemporaries toHenry's Parliament of Si. mon de Montfort, in 1265, accession. . f or instance, i . s scarcel,y named, ,by t,,he contemporary historians, and only rises into importance as later history unfolds its real bearings. But the succession of Henry is hailed by the writers of his time as a dawn of hope, a certain omen of restoration and refreshing. Often and often, it is true, such omens are discerned on the accession of a new king; men hasten to salute the rising sun ; good wishes to the new sovereign take the form of prophecy, and, where they are fulfilled, partly help on their own fulfilment. Here, however, we have omens that were amply fulfilled, and an epoch which those who lived in it were the first to recognise. The fact proves how weary England was of Stephen'sincompetency,howthoroughly shehad learned the miserable consequences ofa feudal system ofsociety unchecked by strong government, how readily she welcomed the young and inexperienced but strong and, in the main, honest rule of Henry.",
+      "pages": [
+        0
+      ]
+    }
+  ],
+  "notes": [],
+  "removals": [
+    {
+      "reason": "stray_mark",
+      "text": "—"
+    },
+    {
+      "reason": "page_number",
+      "text": "34"
+    },
+    {
+      "reason": "running_head",
+      "text": "The Early Plantagenets. a.d. 1154."
+    }
+  ],
+  "word_changes": [
+    {
+      "before": [
+        "as-",
+        "attachedby"
+      ],
+      "after": [
+        "asattachedby"
+      ],
+      "reason": "hyphen_join_guessed"
+    },
+    {
+      "before": [
+        "contempora-",
+        "ries"
+      ],
+      "after": [
+        "contemporaries"
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "con-",
+        "temporary"
+      ],
+      "after": [
+        "contemporary"
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "succes-",
+        "sion"
+      ],
+      "after": [
+        "succession"
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "re-",
+        "freshing."
+      ],
+      "after": [
+        "refreshing."
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "sove-",
+        "reign"
+      ],
+      "after": [
+        "sovereign"
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "wel-",
+        "comed"
+      ],
+      "after": [
+        "welcomed"
+      ],
+      "reason": "hyphen_join"
+    }
+  ],
+  "page_numbers": [
+    {
+      "text": "34",
+      "position": "head"
+    }
+  ],
+  "known": "The chapter summary in small type (\"Terms of Henry's accession — ... Summary of nine years' work.\"), one hanging-indent paragraph on the page, comes out as two blocks, and its second half runs into the chapter's first body paragraph: the paragraph rules do not fit a hanging indent. Stubbs' chapter summaries are for the second plan (structure spec, section 11); a fix there changes this file."
+}

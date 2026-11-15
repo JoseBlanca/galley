@@ -124,6 +124,45 @@ EVALUATION_EXCERPTS = frozendict(
                 ),
             ),
         ),
+        "earlyplantagenet01stub": (
+            Excerpt(
+                name="stubbs_51_56-64",
+                # Page indices 52 to 55 are maps and blank pages without a text layer.
+                page_indices=(51, *range(56, 65)),
+                covers=(
+                    "the excerpt of layout's reference pages "
+                    "(docs/specs/layout.md, section 8): a chapter opening with "
+                    "a summary in small type, margin notes cut into the text "
+                    "column on both sides, running heads with dates, specks "
+                    "above the head, and a hyphen across a page break"
+                ),
+            ),
+        ),
+        "domesdaybook00maituoft": (
+            Excerpt(
+                name="domesday_74-83",
+                page_indices=tuple(range(74, 84)),
+                covers=(
+                    "the excerpt of layout's reference pages "
+                    "(docs/specs/layout.md, section 8): outer margin notes on "
+                    "both sides, footnotes, short notes side by side, and the "
+                    'signature marks "M. 4" (page index 74) and "4—2" (76)'
+                ),
+            ),
+        ),
+        "catherinedemedic00mariuoft": (
+            Excerpt(
+                name="mariejol_210-219",
+                page_indices=tuple(range(210, 220)),
+                covers=(
+                    "the excerpt of layout's reference pages "
+                    "(docs/specs/layout.md, section 8): page numbers at the "
+                    "foot in parentheses, a foot line holding the signature "
+                    "and the page number (page index 210), and footnotes in "
+                    "poor OCR"
+                ),
+            ),
+        ),
     }
 )
 

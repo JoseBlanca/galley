@@ -1,0 +1,95 @@
+{
+  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
+  "excerpt": "haskins_eval",
+  "page": 0,
+  "book_page_index": 131,
+  "shows": "a chapter's first page: chapter number, title, drop capital (\"IN\")",
+  "layout": [
+    [
+      "V",
+      "NORMANDY AND FRANCE",
+      "IN July, 1189, Henry II lay dying In his castle at",
+      "Chinon. Abandoned and attacked by his sons,",
+      "driven from LeMans and Tours by Philip of",
+      "France and forced to a hurailiating peace, sick In",
+      "body and broken in spirit, the aged king made his way",
+      "to the old stronghold of the Angevin counts in the val-",
+      "ley of the VIenne. Cursing the faithless Richard as he",
+      "gave him the enforced kiss of peace at Colombieres, he",
+      "had fixed his hopes on his youngest son John till the",
+      "schedule was brought him of those who had thrown off",
+      "their allegiance. \"Sire,\" said the clerk who read the",
+      "document to the fever-tossed king, \"may Christ help",
+      "me, the first here written is Count John, your son.\"",
+      "\"What,\" cried the king, starting up from his bed,",
+      "\"John, my very heart, my best beloved, for whose ad-",
+      "vancement I have brought upon me all this misery?",
+      "Now let all things go as they will; I care no more for",
+      "myself nor for anything in this world.\" Two days later",
+      "he died, cursing his sons, cursing the day he had been",
+      "born, repeating constantly, \"Shame on a conquered",
+      "king.\" Deserted by all save his illegitimate son Geof-",
+      "frey, who received his father's blessing and his signet",
+      "ring marked with the leopard of England, Henry was"
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "V",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "NORMANDY AND FRANCE",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "IN July, 1189, Henry II lay dying In his castle at Chinon. Abandoned and attacked by his sons, driven from LeMans and Tours by Philip of France and forced to a hurailiating peace, sick In body and broken in spirit, the aged king made his way to the old stronghold of the Angevin counts in the valley of the VIenne. Cursing the faithless Richard as he gave him the enforced kiss of peace at Colombieres, he had fixed his hopes on his youngest son John till the schedule was brought him of those who had thrown off their allegiance. \"Sire,\" said the clerk who read the document to the fever-tossed king, \"may Christ help me, the first here written is Count John, your son.\" \"What,\" cried the king, starting up from his bed, \"John, my very heart, my best beloved, for whose advancement I have brought upon me all this misery? Now let all things go as they will; I care no more for myself nor for anything in this world.\" Two days later he died, cursing his sons, cursing the day he had been born, repeating constantly, \"Shame on a conquered king.\" Deserted by all save his illegitimate son Geoffrey, who received his father's blessing and his signet ring marked with the leopard of England, Henry was plundered by his attendants of gold and furnishings and apparel, just as William the Conqueror had been despoiled in the hour of his death at Rouen, till some one in pity threw over the royal corpse the short cloak, or 'curt mantle,' by which men called him. Two days later he was laid away quietly in the nunnery of Fontevrault, where a later age was to rob his tomb of all save the noble recumbent figure by which it is still marked. Thus passed away the greatest ruler of his age; thus began the collapse of the Norman empire.",
+      "pages": [
+        0,
+        1
+      ]
+    }
+  ],
+  "notes": [],
+  "removals": [],
+  "word_changes": [
+    {
+      "before": [
+        "val-",
+        "ley"
+      ],
+      "after": [
+        "valley"
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "ad-",
+        "vancement"
+      ],
+      "after": [
+        "advancement"
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "Geof-",
+        "frey,"
+      ],
+      "after": [
+        "Geoffrey,"
+      ],
+      "reason": "hyphen_join"
+    }
+  ],
+  "page_numbers": []
+}

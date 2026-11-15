@@ -1,15 +1,16 @@
 # Handoff: where galley stands and how the work is run
 
 Written on 14 November 2026 at the end of the session that set the project
-up and carried out the walking-skeleton plan, for the session that takes
-over. It says what exists, what is being decided, and how the owner wants
+up and carried out the walking-skeleton plan, and updated on 15 November
+2026 after the evaluation plan, for the session that takes over. It says what exists, what is being decided, and how the owner wants
 the work run, including the practical lessons that no skill records yet.
 Read it after CLAUDE.md; replace it when it stops being true.
 
 ## What exists
 
-- `main` at bcec31e, pushed to https://github.com/JoseBlanca/galley
-  (public). The walking skeleton is merged: the `galley2epub` command runs
+- `main` at b6dcaa3 (local; pushed only to bcec31e,
+  https://github.com/JoseBlanca/galley, public). The walking skeleton is
+  merged: the `galley2epub` command runs
   six stages (analyze, extract, layout, structure, markdown, epub; correct
   is not built), each in its simplest form, on a book folder holding a
   `book.toml`. 461 tests pass in about 14.5 s (18.5 s with 8 threads).
@@ -27,38 +28,26 @@ Read it after CLAUDE.md; replace it when it stops being true.
 - Skills in `.claude/skills/`: writing, writing-specs, writing-plans,
   following-plans, coding, reviewing-code; subagents in `.claude/agents/`:
   code-reviewer, first-reader, spec-reviewer.
+- The evaluation tool, merged on 15 November 2026 (`docs/specs/evaluation.md`,
+  `docs/plans/evaluation.md`, `docs/reports/evaluation.md`): `uv run
+  galley-eval run` runs galley on four public-domain books
+  (`evaluation/books.toml`) and compares each stage's output with the
+  Project Gutenberg edition made from the same scan, giving per book a
+  scorecard, the differences with their page and stage, and a table of
+  pages for choosing a detector of bad OCR. The baseline of the walking
+  skeleton is in the report and in `runs/evaluation/` (ignored by git).
+  galley's word list, `wordlist.py`, exists. 781 tests in about 16 s.
 
-## The question on the table
+## What is under way
 
-The owner asked how to check the correctness of the whole process, and
-proposed books that exist both as PDF and EPUB. The answer given, which
-the owner has not yet accepted or changed:
-
-- Yes, with pairs of the same edition: Project Gutenberg EPUBs made by
-  Distributed Proofreaders from Internet Archive scans (their credits say
-  "produced from images generously made available by The Internet
-  Archive"), so that the reference is a human-proofread text of the very
-  scan galley reads. A different edition makes every editorial difference
-  look like a galley error.
-- Compare text and structure, never layout: align galley's words with the
-  reference's and count separately the words missing (a stage dropped
-  them, or the text layer lacks them), the extra words (running heads,
-  page numbers, signature marks left in: structure), the changed words
-  (OCR errors, wrong hyphen joins: the correct stage's target), and
-  structure (paragraph breaks, headings, notes; italics later). Normalise
-  the reference first (Gutenberg's licence, transcriber's notes, quote and
-  dash conventions).
-- A complement for later: synthetic books, a known text typeset into a PDF
-  with running heads, notes, hyphens and margin notes, where every
-  structure error is galley's and the expected result is exact.
-- It is an evaluation tool beside galley, slow, run at the end of a plan
-  (the `whole_book` tier), giving a scorecard per book that stage specs
-  can set targets against. `scripts/fetch_samples.py` can fetch the pairs.
-- Proposed next step, awaiting the owner's go: a subagent searches for 4-6
-  pairs that match on edition and look like the owner's books (non-fiction
-  prose with footnotes, running heads, a few figures, an index; one with
-  margin notes like Gierke's), with the evidence that each pair is one
-  edition. Then the evaluation tool's spec, written with the owner.
+The structure stage is next (owner, 15 November 2026), as the baseline
+suggests: running heads and page numbers (1,243–1,841 extra words per
+book), hyphens left split (985–3,600), paragraphs (about 1 in 10 of
+galley's breaks is real), notes and margin notes (none found). Layout
+probably comes with it, since margin notes and footnote columns need
+regions. Its spec is being written in `.claude/worktrees/spec-structure`,
+branch `spec/structure`. A plan is measured by `galley-eval run` before
+and after; its report quotes both.
 
 ## What comes after
 
@@ -123,3 +112,12 @@ that shape the session most:
 - A library's module-level table is shared state under free threading:
   pdfminer.six's keyword table raced (`PdfminerException: /b'trailer'`,
   about 1 run in 100), fixed by `text_layer.open_pdf` opening under a lock.
+- (Evaluation plan.) Reviewers mutating code must clear `__pycache__` or
+  set `PYTHONDONTWRITEBYTECODE=1`: a stale bytecode cache hid mutations
+  twice. Reviewer worktrees made with `isolation: "worktree"` start from
+  `main`; the prompt has them check out the commit under review.
+- (Evaluation plan.) For a tool that reads or aligns text, the most
+  useful review was the fidelity category adapted to "is any word lost,
+  invented or counted twice", done by an independent parse diffed word
+  by word. Specs of pairing rules must say how near and how alike two
+  things must be: every review round found a rule without that limit.

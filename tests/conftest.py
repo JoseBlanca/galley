@@ -40,6 +40,28 @@ EXCERPT_CONFIGS = frozendict(
             'authors = ["O. Gierke", "F. W. Maitland"]\n'
             'language = "en"\n'
         ),
+        # Haskins page 8, the blank page before the index, has no text layer.
+        "haskins_eval": (
+            'title = "The Normans in European History"\n'
+            'authors = ["Charles Homer Haskins"]\n'
+            'language = "en"\n'
+            "exclude_pages = [8]\n"
+        ),
+        "stubbs_51_56-64": (
+            'title = "The Early Plantagenets"\n'
+            'authors = ["William Stubbs"]\n'
+            'language = "en"\n'
+        ),
+        "domesday_74-83": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+        ),
+        "mariejol_210-219": (
+            'title = "Catherine de Médicis"\n'
+            'authors = ["Jean H. Mariéjol"]\n'
+            'language = "fr"\n'
+        ),
     }
 )
 

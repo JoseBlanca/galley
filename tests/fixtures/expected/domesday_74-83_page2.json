@@ -1,0 +1,145 @@
+{
+  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
+  "changed": "Changed since that check by task 2.5: on book page 77 \"villein\" leaves two body lines for the margin notes \"The villein ...\", so the paragraph of page 76 ends on 77 at \"thegn-right1.'\" Checked against the page image by the orchestrator on 15 November 2026.",
+  "excerpt": "domesday_74-83",
+  "page": 2,
+  "book_page_index": 76,
+  "shows": "an outer margin note on the right, short notes side by side, signature \"4—2\"",
+  "layout": [
+    [
+      "The Villeins. 5 1"
+    ],
+    [
+      "and captured ? No one word can be obtained in answer to this",
+      "question. We can only say that in Henry II.'s day the ordinary",
+      "peasant was regarded by the royal officials as ascriptitius ; the",
+      "land that he occupied was said to be part of his lord's demesne ;",
+      "his chattels were his lord's1. But then this was conceived to be,",
+      "at least in some degree, the result of the Norman Conquest and",
+      "subsequent rebellions of the peasantry2. To this we may add",
+      "that in one of our sets of Leges, the French Leis of William the",
+      "Conqueror, there are certain clauses which would be of great im-",
+      "portance could we suppose that they had an authoritative origin,",
+      "and which in any case are remarkable enough. The nativus",
+      "who flies from the land on which he is born, let none retain him",
+      "or his chattels ; if the lords will not send back these men to",
+      "their land the king's officers are to do it3. On the other hand,",
+      "the tillers of the soil are not to be worked beyond their proper",
+      "rent ; their lord may not remove them from their land so long",
+      "as they perform their right services4. Whether or no we",
+      "suppose that in the writer's opinion the ordinary peasant was a",
+      "nativus (of nativi Domesday Book has nothing to say) we still",
+      "have law more favourable to the peasant than was the common",
+      "law of Bracton's age :— a tiller who does his accustomed service",
+      "is not to be ejected ; h e is no tenant at will.",
+      "Hereafter we shall show that the English peasants did suffer",
+      "by the substitution of French for English lords. But the question",
+      "that we have asked, so urgent, so fundamental, as it may seem",
+      "to us, is really one which, as the history of the Roman coloni",
+      "might prove, can long remain unanswered. Men may become",
+      "economically so dependent on their lords, on wealthy masters",
+      "and creditors, that the legal question whether they can quit",
+      "their service has no interest. Who wishes to leave his all and",
+      "go forth a beggar into the world ? On the whole we can",
+      "find no evidence whatever that the men of the Confessor's",
+      "day who were retrospectively called villani were tied to the",
+      "soil. Certainly in Norman times the tradition was held that"
+    ],
+    [
+      "Earity of",
+      "fllght'"
+    ],
+    [
+      "1 Dialogus, i. c. 11 ; i i. c. 14. 2 Dialogus, i. c. 10.",
+      "z Will. Conq. i. 30, 31 : 'Si lea seignurages ne facent altri gainurs venir a",
+      "lour terre, la justise le facet.' The Latin version is ridiculous : ' S i domini",
+      "terrarum non procurent idoneos cultores ad terras suas colendas, iustitiarii hoc",
+      "uutrui. faciant.' The translator seems to have been puzzled by the word altri or",
+      "4 Ibid. 29.",
+      "4—2"
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "^ ^e free to (lu*fc k\"8 loi%d and his land, or can he be pursued and captured ? No one word can be obtained in answer to this question. We can only say that in Henry II.'s day the ordinary peasant was regarded by the royal officials as ascriptitius ; the land that he occupied was said to be part of his lord's demesne ; his chattels were his lord's1. But then this was conceived to be, at least in some degree, the result of the Norman Conquest and subsequent rebellions of the peasantry2. To this we may add that in one of our sets of Leges, the French Leis of William the Conqueror, there are certain clauses which would be of great importance could we suppose that they had an authoritative origin, and which in any case are remarkable enough. The nativus who flies from the land on which he is born, let none retain him or his chattels ; if the lords will not send back these men to their land the king's officers are to do it3. On the other hand, the tillers of the soil are not to be worked beyond their proper rent ; their lord may not remove them from their land so long as they perform their right services4. Whether or no we suppose that in the writer's opinion the ordinary peasant was a nativus (of nativi Domesday Book has nothing to say) we still have law more favourable to the peasant than was the common law of Bracton's age :— a tiller who does his accustomed service is not to be ejected ; h e is no tenant at will.",
+      "pages": [
+        1,
+        2
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "Hereafter we shall show that the English peasants did suffer by the substitution of French for English lords. But the question that we have asked, so urgent, so fundamental, as it may seem to us, is really one which, as the history of the Roman coloni might prove, can long remain unanswered. Men may become economically so dependent on their lords, on wealthy masters and creditors, that the legal question whether they can quit their service has no interest. Who wishes to leave his all and go forth a beggar into the world ? On the whole we can find no evidence whatever that the men of the Confessor's day who were retrospectively called villani were tied to the soil. Certainly in Norman times the tradition was held that according to the old law the villanus might acquire five hides of land and so 'thrive to thegn-right1.'",
+      "pages": [
+        2,
+        3
+      ]
+    },
+    {
+      "kind": "margin_note",
+      "text": "Earity of fllght'",
+      "pages": [
+        2
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "1 Dialogus, i. c. 11 ; i i. c. 14. 2 Dialogus, i. c. 10."
+        }
+      ],
+      "pages": [
+        2
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "z Will. Conq. i. 30, 31 : 'Si lea seignurages ne facent altri gainurs venir a lour terre, la justise le facet.' The Latin version is ridiculous : ' S i domini terrarum non procurent idoneos cultores ad terras suas colendas, iustitiarii hoc uutrui. faciant.' The translator seems to have been puzzled by the word altri or 4 Ibid. 29."
+        }
+      ],
+      "pages": [
+        2
+      ]
+    }
+  ],
+  "removals": [
+    {
+      "reason": "running_head",
+      "text": "The Villeins."
+    },
+    {
+      "reason": "page_number",
+      "text": "5 1"
+    },
+    {
+      "reason": "signature_mark",
+      "text": "4—2"
+    }
+  ],
+  "word_changes": [
+    {
+      "before": [
+        "im-",
+        "portance"
+      ],
+      "after": [
+        "importance"
+      ],
+      "reason": "hyphen_join"
+    }
+  ],
+  "page_numbers": [
+    {
+      "text": "51",
+      "position": "head"
+    }
+  ]
+}

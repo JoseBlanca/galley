@@ -281,9 +281,13 @@ page_numbers)`:
 - `WordChange`: `page_index`, `before: tuple[str, ...]`, `after:
   tuple[str, ...]`, `reason: ChangeReason`: a word that structure changed
   without losing any letter. `hyphen_join`: ("repli-", "cate") becomes
-  ("replicate",). `note_marker`: ("Greece,1",) becomes ("Greece,", "1"),
-  the "1" going to the note reference. A spec adds a reason when it needs
-  one.
+  ("replicate",), because the word list or the book's own words hold the
+  joined word. `hyphen_join_guessed`: the same, when neither holds it
+  (structure §5), recorded so that the guessed joins can be reviewed.
+  `hyphen_kept`: ("Anglo-", "Saxon") becomes ("Anglo-Saxon",), a
+  compound the book prints with its hyphen. `note_marker`: ("Greece,1",)
+  becomes ("Greece,", "1"), the "1" going to the note reference. A spec
+  adds a reason when it needs one.
 - `PageNumber`: `page_index`, `text`, `position: head | foot`.
   `page_numbers: tuple[PageNumber, ...]`, taken from the removals; the
   index stage uses it (section 11).
@@ -291,7 +295,9 @@ page_numbers)`:
 **Removal**, in words.json (excluded pages and regions) and blocks.json
 (the rest): `page_index`, `box`, `text`,
 `reason: RemovalReason`: `excluded_page`, `excluded_region`,
-`running_head`, `page_number`, `signature_mark`. A stage spec adds a
+`running_head`, `page_number`, `signature_mark`, `plate_text`,
+`stray_mark` (a line with no letter or digit above a running head, a
+speck of the scan). A stage spec adds a
 reason when it removes a new kind of text, and the reason names what the
 text is, never "noise": a plate's stray text-layer characters are removed
 as `plate_text` by structure, which the owner can review.
@@ -340,7 +346,9 @@ signature marks, the line heights of body and notes. Then, per page, it
 removes those, decides what each region is, groups lines into
 paragraphs, headings, quotes, margin notes and notes (a margin note goes
 just before the paragraph whose line it sits beside), joins hyphenated
-words where the word list or the book's own words allow it, and splits
+words (dropping the hyphen where the word list or the book's own words
+allow it, keeping it in a compound the book prints, and dropping it as a
+recorded guess where neither decides; `docs/specs/structure.md` §5), and splits
 note markers off the words they are glued to. Last, it joins paragraphs
 and notes that run over a page break and matches each note reference to
 its note.
@@ -430,7 +438,7 @@ A stage imports these and nothing else of galley.
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage` |
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file |
-| `wordlist.py` | `word_list(language) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/` |
+| `wordlist.py` | `word_list(language, cache_dir) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before structure |
 | `fidelity.py` | the fidelity check, section 13 |
 | `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract) and stops naming any that is missing |
 
@@ -535,8 +543,6 @@ with `brew install epubcheck` (5.4.0) before the epub stage is built.
 - How each stage does its work: the page score threshold, column
   detection, running heads, paragraphs, notes, OCR settings, figure
   cutting. That is in the stage specs.
-- What happens to a hyphen that structure cannot join safely ("neces-" and
-  "sary" with no evidence): structure's spec, as an open point.
 - The `correct` stage, with its log and how it calls the vision model; the
   `index` stage; and `edits-from`. Each is specified later, and section 8
   gains their formats then.

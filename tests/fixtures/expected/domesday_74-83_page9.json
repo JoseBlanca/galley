@@ -1,0 +1,175 @@
+{
+  "checked": "Checked by the orchestrator against the page image on 15 November 2026 (galley at ec2edc4); the owner did not check this page.",
+  "changed": "Changed since that check by task 2.5: \"Eng-\" leaves the body line for the margin note \"The Eng-\", and \"As a last question\" starts a paragraph. Checked against the page image by the orchestrator on 15 November 2026.",
+  "excerpt": "domesday_74-83",
+  "page": 9,
+  "book_page_index": 83,
+  "shows": "short notes side by side in three rows, read row by row",
+  "layout": [
+    [
+      "58 Domesday Book."
+    ],
+    [
+      "the theoretically free gifts of the tenants, are sums of money.",
+      "But often enough the villanus is paying a substantial money",
+      "rent. We have seen how at Leominster villeins plough and",
+      "sow 140 acres for their lord and pay a rent of more than £11 1.",
+      "At Lewisham in Kent the Abbot of Gand has a manor valued",
+      "at £30 ; of this £2 is due to the profits of the port while two",
+      "mills with 'the gafol of the rustics' bring in £8. 12s.2 Such",
+      "entries as the following are not uncommon — there is one villein",
+      "rendering 30d8 — there is one villein rendering 10s.4 — 46 cotarii",
+      "with one hide render 30 shillings a year6 — the villeins give",
+      "13s. 4>d. by way of consuetude6. No doubt it would be somewhat",
+      "rare to find a villein discharging all his dues in money — this is",
+      "suggested when we are told how on the land of Sl. Augustin one",
+      "Wadard holds a large piece 'de terra villanorum' and yet",
+      "renders no service to the abbot save 30s. a year7. At least",
+      "in one instance the villeins seem to be holding the manor",
+      "in farm, that is to say, they are farming the demesne land and",
+      "paying a rent in money or in provender8. We dare not represent",
+      "the stream of economic history as flowing uninterruptedly from",
+      "a system of labour services to a system of rents. We must",
+      "remember that in the Conqueror's reign the lord very often had",
+      "numerous serfs whose whole time was given to the cultivation",
+      "of his demesne. In the south-western counties he will often",
+      "have two, three or more serfs for every team that he has on his",
+      "demesne, and, while this is so, we can not safely say that his",
+      "husbandry requires that the villeins should be labouring on his",
+      "land for three or four days in every week.",
+      "As a last question we may ask : What was the English for",
+      "villanus ? It is a foreign word, one of those words which came",
+      "in with the Conqueror. Surely, we may argue, there must have",
+      "been some English equivalent for it. Yet we have the greatest",
+      "difficulty in finding the proper term. True that in the Quadri-",
+      "partitus and the Leges villanus generally represents ceorl ; ceorl",
+      "when it is not rendered by villanus is left untranslated in some",
+      "such form as cyrliscus homo. But then ceorl must be a wider"
+    ],
+    [
+      "The Eng-"
+    ],
+    [
+      "1 See above p. 56. 2 D. B. i. 12 b.",
+      "8 D. B. i. 11 b, Hamestede. * D. B. i. 117 b, Colun.",
+      "8 D. B. i. 127, Stibenhede. e D. B. i. 179 b, Leno.",
+      "7 D. B. i. 12 b, Norborne.",
+      "8 D. B. i. 127 b: ' W ellesdone tenent canonici S. Pauli....Hoc manerium",
+      "tenent villani ad firmam canonicorum. In dominio nil habetur.'"
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "With our thirteenth century cartularies before us, we might T easily underrate the amount or money that was already being paid as the rent of land at the date of the Conquest. In several counties we come across small groups of censarii, censores, gablatores who pay for their land in money, of cervisarii and mellitarii who bring beer and honey. Renders in kind, in herrings, eels, salmon are not uncommon, and sometimes they are ' a ppreciated,' valued in terms of money. The pannage pig or the grass swine, which the villeins give in return for mast and herbage, is often mentioned. Throughout Sussex it seems to be the custom that the lord should have ' f or herbage ' o ne pig from every villein who has seven pigs8. But money will be taken instead of swine, oxen or fish9. The gersuma, the tailla, the theoretically free gifts of the tenants, are sums of money. But often enough the villanus is paying a substantial money rent. We have seen how at Leominster villeins plough and sow 140 acres for their lord and pay a rent of more than £11 1. At Lewisham in Kent the Abbot of Gand has a manor valued at £30 ; of this £2 is due to the profits of the port while two mills with 'the gafol of the rustics' bring in £8. 12s.2 Such entries as the following are not uncommon — there is one villein rendering 30d8 — there is one villein rendering 10s.4 — 46 cotarii with one hide render 30 shillings a year6 — the villeins give 13s. 4>d. by way of consuetude6. No doubt it would be somewhat rare to find a villein discharging all his dues in money — this is suggested when we are told how on the land of Sl. Augustin one Wadard holds a large piece 'de terra villanorum' and yet renders no service to the abbot save 30s. a year7. At least in one instance the villeins seem to be holding the manor in farm, that is to say, they are farming the demesne land and paying a rent in money or in provender8. We dare not represent the stream of economic history as flowing uninterruptedly from a system of labour services to a system of rents. We must remember that in the Conqueror's reign the lord very often had numerous serfs whose whole time was given to the cultivation of his demesne. In the south-western counties he will often have two, three or more serfs for every team that he has on his demesne, and, while this is so, we can not safely say that his husbandry requires that the villeins should be labouring on his land for three or four days in every week.",
+      "pages": [
+        8,
+        9
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "As a last question we may ask : What was the English for villanus ? It is a foreign word, one of those words which came in with the Conqueror. Surely, we may argue, there must have been some English equivalent for it. Yet we have the greatest difficulty in finding the proper term. True that in the Quadripartitus and the Leges villanus generally represents ceorl ; ceorl when it is not rendered by villanus is left untranslated in some such form as cyrliscus homo. But then ceorl must be a wider",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "margin_note",
+      "text": "The Eng-",
+      "pages": [
+        9
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "1 See above p. 56. 2 D. B. i. 12 b."
+        }
+      ],
+      "pages": [
+        9
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "8 D. B. i. 11 b, Hamestede. * D. B. i. 117 b, Colun."
+        }
+      ],
+      "pages": [
+        9
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "8 D. B. i. 127, Stibenhede. e D. B. i. 179 b, Leno."
+        }
+      ],
+      "pages": [
+        9
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "7 D. B. i. 12 b, Norborne."
+        }
+      ],
+      "pages": [
+        9
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "8 D. B. i. 127 b: ' W ellesdone tenent canonici S. Pauli....Hoc manerium tenent villani ad firmam canonicorum. In dominio nil habetur.'"
+        }
+      ],
+      "pages": [
+        9
+      ]
+    }
+  ],
+  "removals": [
+    {
+      "reason": "page_number",
+      "text": "58"
+    },
+    {
+      "reason": "running_head",
+      "text": "Domesday Book."
+    }
+  ],
+  "word_changes": [
+    {
+      "before": [
+        "Quadri-",
+        "partitus"
+      ],
+      "after": [
+        "Quadripartitus"
+      ],
+      "reason": "hyphen_join_guessed"
+    }
+  ],
+  "page_numbers": [
+    {
+      "text": "58",
+      "position": "head"
+    }
+  ]
+}

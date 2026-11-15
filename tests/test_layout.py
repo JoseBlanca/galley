@@ -1,10 +1,16 @@
-"""Tests of galley.layout (spec section 7, "layout" and "Their tests").
+"""Tests of galley.layout (docs/specs/layout.md, section 8).
 
-Every value is written by hand: layout's tests need no output of extract.
-The excerpt tests of layout are in work package 4.
+The unit tests lay out pages written by hand, with the book's measures
+given in the test, and need no output of extract. The excerpt tests read
+the session's run of each committed excerpt (tests/conftest.py), and the
+whole_book tests run analyze, extract and layout on the six whole books;
+both check that no word is lost, duplicated or moved to another page. The
+exact regions of the reference pages are tested in tests/test_excerpts.py.
 """
 
 import hashlib
+import json
+from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
@@ -12,10 +18,11 @@ import pytest
 
 from galley import layout
 from galley.book_folder import BookFolder
+from galley.cli import main
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
 from galley.fidelity import check_stage
-from galley.layout import group_lines, layout_page
+from galley.layout import BookMeasures, group_lines, layout_page, measure_book
 from galley.model import (
     Box,
     Figure,
@@ -30,6 +37,7 @@ from galley.model import (
     Word,
     WordsFile,
     read_lines,
+    read_words,
     write_lines,
     write_pages,
     write_words,
@@ -158,8 +166,8 @@ _PAGE_WORDS = (
 )
 
 
-def test_layout_page_puts_every_line_in_one_region_whose_box_holds_them() -> None:
-    result = layout_page(_page(3, _PAGE_WORDS))
+def test_layout_page_without_measures_puts_every_line_in_one_region() -> None:
+    result = layout_page(_page(3, _PAGE_WORDS), None)
     assert result.index == 3
     assert len(result.regions) == 1
     region = result.regions[0]
@@ -173,13 +181,1027 @@ def test_layout_page_puts_every_line_in_one_region_whose_box_holds_them() -> Non
 
 
 def test_page_with_no_words_has_no_region() -> None:
-    assert layout_page(_page(5, ())) == PageLayout(5, (), ())
+    assert layout_page(_page(5, ()), None) == PageLayout(5, (), ())
+    assert layout_page(_page(5, ()), _MEASURES) == PageLayout(5, (), ())
 
 
 def test_layout_page_copies_the_figures() -> None:
     figures = (Figure(Box(10, 20, 300, 400), "images/p0002-01.png", 300),)
     page = replace(_page(2, _PAGE_WORDS[:1]), figures=figures)
-    assert layout_page(page).figures == figures
+    assert layout_page(page, None).figures == figures
+    assert layout_page(page, _MEASURES).figures == figures
+
+
+# measure_book and the body column (layout spec section 3, "The book's
+# measures" and step 1)
+
+_ROW_HEIGHT = 8.0
+_PITCH = 12.0
+
+
+def _full_row(row: int, left: float, width: float, top: float) -> tuple[Word, ...]:
+    """Three words of height 8 that fill `width` from `left`, 4 pt apart as
+    word spaces are, too close for a gutter."""
+    bottom = top + _ROW_HEIGHT
+    return (
+        _word(f"a{row}", left, top, left + 65, bottom),
+        _word(f"b{row}", left + 69, top, left + 135, bottom),
+        _word(f"c{row}", left + 139, top, left + width, bottom),
+    )
+
+
+def _column_page(
+    index: int, left: float, width: float, rows: int, top: float = 100.0
+) -> PageWords:
+    """A page of `rows` full rows of the column at `left`, `width` wide,
+    12 pt apart."""
+    return _page(
+        index,
+        tuple(
+            word
+            for row in range(rows)
+            for word in _full_row(row, left, width, top + row * _PITCH)
+        ),
+    )
+
+
+def test_measure_book_on_20_pages_gives_the_medians() -> None:
+    # Widths 200 to 219: the median is 209.5. Even pages start at 50, odd at
+    # 60. Each page has one more row whose last word hangs 15 pt past the
+    # others, so its right side is not the commonest. A page of 5 rows,
+    # 400 pt wide at 10, is not measured: the others have 15 rows or more.
+    def ragged_page(index: int) -> PageWords:
+        left = 50 if index % 2 == 0 else 60
+        page = _column_page(index, left, 200 + index, 16)
+        hanging = _full_row(16, left, 200 + index + 15, 100 + 16 * _PITCH)
+        return replace(page, words=page.words + hanging)
+
+    pages = (*(ragged_page(i) for i in range(20)), _column_page(20, 10, 400, 5))
+    measures = measure_book(_words_file(pages))
+    assert measures == BookMeasures(
+        column_width=209.5,
+        body_word_height=_ROW_HEIGHT,
+        body_line_pitch=_PITCH,
+        usual_left_edge=frozendict({0: 50.0, 1: 60.0}),
+    )
+
+
+def test_measure_book_pools_the_heights_and_pitches_of_every_row() -> None:
+    # Page 0: 16 rows of height 8, 12 pt apart. Page 1: 16 rows of height
+    # 10, 14 pt apart. Pooled, 32 heights and 30 pitches: the medians fall
+    # between the two pages' values.
+    tall = tuple(
+        Word(word.text, replace(word.box, bottom=word.box.top + 10), None)
+        for row in range(16)
+        for word in _full_row(row, 50, 200, 100 + row * 14)
+    )
+    pages = (_column_page(0, 50, 200, 16), _page(1, tall))
+    measures = measure_book(_words_file(pages))
+    assert measures is not None
+    assert measures.body_word_height == 9.0
+    assert measures.body_line_pitch == 13.0
+
+
+def test_measure_book_on_pages_of_2_rows_gives_none() -> None:
+    pages = tuple(_column_page(i, 50, 200, 2) for i in range(20))
+    assert measure_book(_words_file(pages)) is None
+
+
+def test_measure_book_with_no_page_of_15_rows_measures_pages_of_3() -> None:
+    pages = (_column_page(0, 50, 200, 3), _column_page(1, 50, 200, 2))
+    assert measure_book(_words_file(pages)) == BookMeasures(
+        column_width=200.0,
+        body_word_height=_ROW_HEIGHT,
+        body_line_pitch=_PITCH,
+        usual_left_edge=frozendict({0: 50.0, 1: 50.0}),
+    )
+
+
+def test_column_left_edge_is_the_commonest_left_side_of_the_wide_rows() -> None:
+    # 8 full rows start at 50; 9 short rows (100 pt, under 0.8 of the
+    # column) start at 80; 2 rows with a margin note start at 20 and are
+    # wider than the column. The commonest left side of all rows is 80, of
+    # the wide rows 50.
+    full = tuple(w for row in range(8) for w in _full_row(row, 50, 200, row * 12))
+    short = tuple(
+        _word(f"s{row}", 80, 200 + row * 12, 180, 208 + row * 12) for row in range(9)
+    )
+    noted = tuple(
+        word
+        for row in range(2)
+        for word in (
+            _word(f"note{row}", 20, 320 + row * 12, 44, 328 + row * 12),
+            *_full_row(row + 20, 50, 200, 320 + row * 12),
+        )
+    )
+    measures = measure_book(
+        _words_file((_page(0, full + short + noted), _column_page(1, 50, 200, 16)))
+    )
+    assert measures is not None
+    assert measures.usual_left_edge[0] == 50.0
+
+
+def test_column_left_edge_counts_edges_within_2_pt_and_takes_the_smallest_on_a_tie() -> (
+    None
+):
+    # Two rows start at 50 and two at 54: each value has two edges within
+    # 2 pt of it, and the tie goes to the smaller.
+    rows = (
+        *_full_row(0, 50, 200, 100),
+        *_full_row(1, 50, 200, 112),
+        *_full_row(2, 54, 200, 124),
+        *_full_row(3, 54, 200, 136),
+    )
+    measures = measure_book(_words_file((_page(0, rows),)))
+    assert measures is not None
+    assert measures.usual_left_edge[0] == 50.0
+    # A fifth row at 51.6 rounds to 52, which has all five edges within 2
+    # pt. A fifth row at 55.6 rounds to 56: 54 and 56 have three edges
+    # each, 50 two, and the tie goes to 54.
+    for extra_left, expected in ((51.6, 52.0), (55.6, 54.0)):
+        page = _page(0, rows + _full_row(4, extra_left, 200, 148))
+        measures = measure_book(_words_file((page,)))
+        assert measures is not None
+        assert measures.usual_left_edge[0] == expected
+
+
+def test_usual_left_edge_of_a_parity_without_a_wide_row_is_the_other_paritys() -> None:
+    # Pages 1, 3 and 5 hold only short rows, 100 pt from 90, under 0.8 of
+    # the 150-pt column (the median of 200, 200, 200, 100, 100, 100). They
+    # take the even pages' 50, not the median of every measured page's
+    # commonest left edge, 70.
+    short = tuple(
+        _word(f"s{row}", 90, 100 + row * 12, 190, 108 + row * 12) for row in range(16)
+    )
+    pages = (
+        *(_column_page(i, 50, 200, 16) for i in (0, 2, 4)),
+        *(_page(i, short) for i in (1, 3, 5)),
+    )
+    measures = measure_book(_words_file(pages))
+    assert measures is not None
+    assert measures.usual_left_edge == frozendict({0: 50.0, 1: 50.0})
+
+
+def test_book_without_a_wide_row_takes_the_median_commonest_left_edge() -> None:
+    # On every page 8 rows start at its left edge and end 30 to 100 pt past
+    # it, 10 pt apart, and 8 rows end 200 pt past it and start 100 to 170
+    # pt past it: the column is 200 wide and no row is 160. Even pages
+    # start at 50, odd at 60: both parities take the median of the pages'
+    # commonest left edges, 55.
+    def page(index: int) -> PageWords:
+        left = 50 if index % 2 == 0 else 60
+        starting = tuple(
+            _word(
+                f"s{row}",
+                left,
+                100 + row * _PITCH,
+                left + 30 + 10 * row,
+                108 + row * _PITCH,
+            )
+            for row in range(8)
+        )
+        ending = tuple(
+            _word(
+                f"e{row}",
+                left + 100 + 10 * row,
+                196 + row * _PITCH,
+                left + 200,
+                204 + row * _PITCH,
+            )
+            for row in range(8)
+        )
+        return _page(index, starting + ending)
+
+    measures = measure_book(_words_file((page(0), page(1))))
+    assert measures is not None
+    assert measures.column_width == 200.0
+    assert measures.usual_left_edge == frozendict({0: 55.0, 1: 55.0})
+
+
+# layout_page: outer margin notes and the running-head line (layout spec
+# section 3, steps 1 to 3)
+
+# The measures of the pages below: a column 200 pt wide at 50 on every
+# page, rows 12 pt apart of words 8 pt high.
+_MEASURES = BookMeasures(
+    column_width=200.0,
+    body_word_height=_ROW_HEIGHT,
+    body_line_pitch=_PITCH,
+    usual_left_edge=frozendict({0: 50.0, 1: 50.0}),
+)
+
+
+def _rows(count: int, top: float = 100.0, left: float = 50.0) -> tuple[Word, ...]:
+    """`count` full rows of the column of `_MEASURES`, 12 pt apart from `top`."""
+    return tuple(
+        word
+        for row in range(count)
+        for word in _full_row(row, left, 200, top + row * _PITCH)
+    )
+
+
+def _region_texts(page: PageLayout) -> tuple[tuple[tuple[str, ...], ...], ...]:
+    return tuple(_texts(region.lines) for region in page.regions)
+
+
+def test_margin_word_6_pt_right_of_the_column_is_a_margin_region_of_its_own() -> None:
+    note = _word("Note", 256, 136, 290, 144)  # beside row 3, top 136
+    result = layout_page(_page(0, (*_rows(20), note)), _MEASURES)
+    body, margin = result.regions
+    assert len(body.lines) == 20
+    assert "Note" not in {word.text for line in body.lines for word in line.words}
+    assert _texts(margin.lines) == (("Note",),)
+    assert margin.box == note.box
+
+
+def test_word_1_pt_outside_the_column_stays_in_its_body_line() -> None:
+    hung = _word("”", 251, 136, 255, 144)  # 1 pt right of the right edge, 250
+    result = layout_page(_page(0, (*_rows(20), hung)), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[3] == ("a3", "b3", "c3", "”")
+
+
+def test_margin_word_2_pt_left_of_the_column_is_a_margin_word() -> None:
+    note = _word("Note", 20, 136, 48, 144)  # right side 2 pt left of 50
+    result = layout_page(_page(0, (*_rows(20), note)), _MEASURES)
+    assert _region_texts(result)[1:] == ((("Note",),),)
+
+
+def _page_with_row_3_reaching_left(
+    first: Word, second_x0: float, note: Word
+) -> PageLayout:
+    """A page of 20 full rows of the column at 50 whose row 3 (top 136) is
+    `first`, then words from `second_x0` to the right edge, with `note`
+    in the left margin."""
+    rows = tuple(word for word in _rows(20) if not word.text.endswith("3"))
+    row_3 = (
+        first,
+        _word("The", second_x0, 136, second_x0 + 40, 144),
+        _word("idea", second_x0 + 44, 136, 250, 144),
+    )
+    return layout_page(_page(0, (*rows, *row_3, note)), _MEASURES)
+
+
+def test_note_word_reaching_into_the_empty_indent_joins_its_margin_note() -> None:
+    # "land." runs from 20 pt left of the edge, 50, to 7 pt right of it;
+    # "The" starts 17 pt inside, more than the 12 pt pitch.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 67, _word("Free", 5, 136, 25, 144)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("The", "idea")
+    assert margin == (("Free", "land."),)
+
+
+def test_note_word_reaching_into_the_column_joins_a_note_a_pitch_above() -> None:
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 67, _word("Free", 5, 124, 25, 132)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("The", "idea")
+    assert margin == (("Free",), ("land.",))
+
+
+def test_word_reaching_left_stays_when_the_next_word_is_less_than_a_pitch_inside() -> (
+    None
+):
+    # "The" starts 6 pt inside the edge: the column is not empty there.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 56, _word("Free", 5, 136, 25, 144)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+    assert margin == (("Free",),)
+
+
+def test_word_reaching_left_stays_beside_a_margin_word_of_fewer_than_2_letters() -> (
+    None
+):
+    # A list number hung outside the column, as Gierke's "44" on page 62.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 67, _word("44", 5, 136, 25, 144)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+    assert margin == (("44",),)
+
+
+def test_word_reaching_left_stays_when_its_middle_is_1_pt_outside() -> None:
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 40, 136, 58, 144), 67, _word("Free", 5, 136, 25, 144)
+    )
+    body, _ = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+
+
+def test_word_reaching_left_with_its_middle_exactly_2_pt_outside_moves() -> None:
+    # Middle (30 + 66) / 2 = 48, 2 pt left of the edge at 50.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 66, 144), 67, _word("Free", 5, 136, 25, 144)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("The", "idea")
+    assert margin == (("Free", "land."),)
+
+
+def test_word_reaching_left_with_its_middle_1_9_pt_outside_stays() -> None:
+    # Middle (30 + 66.2) / 2 = 48.1, 1.9 pt left of the edge at 50.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 66.2, 144), 67, _word("Free", 5, 136, 25, 144)
+    )
+    body, _ = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+
+
+def test_word_reaching_left_alone_on_its_row_stays() -> None:
+    # Gierke's page 123: "Stfoarm.", a note word and a body word read as one.
+    rows = tuple(word for word in _rows(20) if not word.text.endswith("3"))
+    alone = _word("land.", 30, 136, 57, 144)
+    note = _word("Free", 5, 136, 25, 144)
+    body, margin = _region_texts(layout_page(_page(0, (*rows, alone, note)), _MEASURES))
+    assert body[3] == ("land.",)
+    assert margin == (("Free",),)
+
+
+@pytest.mark.parametrize(
+    ("top", "bottom"),
+    [(114.8, 122.8), (157.2, 165.2)],
+    ids=["1.1 pitches above", "1.1 pitches below"],
+)
+def test_word_reaching_left_stays_with_the_note_more_than_a_pitch_away(
+    top: float, bottom: float
+) -> None:
+    # "land." runs from 136 to 144; the note ends 13.2 pt above its top or
+    # starts 13.2 pt below its bottom, 1.1 pitches of 12 pt.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 67, _word("Free", 5, top, 25, bottom)
+    )
+    body, _ = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+
+
+def test_word_reaching_left_stays_beside_a_margin_word_of_one_letter() -> None:
+    # A margin word of one letter, as "U" on Kadesh's cover (page 0).
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 67, _word("U", 5, 136, 25, 144)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+    assert margin == (("U",),)
+
+
+def test_hung_semicolon_3_pt_outside_stays_in_its_body_line() -> None:
+    result = _page_with_row_3_reaching_left(
+        _word(";", 45.5, 136, 48.5, 144), 67, _word("Free", 5, 136, 25, 144)
+    )
+    body, _ = _region_texts(result)
+    assert body[3] == (";", "The", "idea")
+
+
+def test_note_word_reaching_into_the_right_margin_stays_in_its_body_line() -> None:
+    # The rule is applied at the left edge only.
+    rows = tuple(word for word in _rows(20) if not word.text.endswith("3"))
+    row_3 = (
+        _word("The", 50, 136, 150, 144),
+        _word("own", 243, 136, 270, 144),  # middle 6.5 pt right of 250
+    )
+    note = _word("Free", 275, 136, 295, 144)
+    result = layout_page(_page(0, (*rows, *row_3, note)), _MEASURES)
+    body, margin = _region_texts(result)
+    assert body[3] == ("The", "own")
+    assert margin == (("Free",),)
+
+
+def test_margin_lines_more_than_1_5_pitches_apart_are_two_margin_regions() -> None:
+    # Lines at 136 and 148 are one note; the next at 167 is 19 pt, more
+    # than 1.5 pitches (18 pt), below 148: a second note.
+    notes = (
+        _word("First", 256, 136, 290, 144),
+        _word("note", 256, 148, 290, 156),
+        _word("Second", 256, 167, 290, 175),
+    )
+    result = layout_page(_page(0, (*_rows(20), *notes)), _MEASURES)
+    assert _region_texts(result)[1:] == ((("First",), ("note",)), (("Second",),))
+
+
+def test_page_without_a_wide_row_places_the_column_at_its_paritys_usual_left_edge() -> (
+    None
+):
+    # Rows of 100 pt at 120: none is 0.8 of the column wide. Page 1 takes
+    # the usual left edge 50, so the word at 20 to 40 is a margin word; at
+    # parity 0's edge, 300, every word would be.
+    short = tuple(
+        _word(f"s{row}", 120, 100 + row * 12, 220, 108 + row * 12) for row in range(5)
+    )
+    note = _word("Note", 20, 200, 40, 208)  # below the rows, on a row of its own
+    measures = replace(_MEASURES, usual_left_edge=frozendict({0: 300.0, 1: 50.0}))
+    result = layout_page(_page(1, (*short, note)), measures)
+    assert _region_texts(result) == (
+        tuple((f"s{row}",) for row in range(5)),
+        (("Note",),),
+    )
+
+
+def test_rows_with_margin_notes_joined_outnumbering_the_body_rows_keep_the_column() -> (
+    None
+):
+    # 14 body rows from 50 to 250, then 16 rows whose note word at 12 to
+    # 44 the text layer joined to the row (Gierke's endnotes). The common
+    # left edges are 12 and 50; with the right edge 250, the pair 50-250
+    # is the column's width, so the notes are margin words.
+    joined = tuple(
+        word
+        for row in range(16)
+        for word in (
+            _word(f"note{row}", 12, 268 + row * _PITCH, 44, 276 + row * _PITCH),
+            *_full_row(row + 14, 50, 200, 268 + row * _PITCH),
+        )
+    )
+    result = layout_page(_page(0, (*_rows(14), *joined)), _MEASURES)
+    texts = _region_texts(result)
+    assert len(texts[0]) == 30
+    assert all(not line[0].startswith("note") for line in texts[0])
+    assert sum(len(region) for region in texts[1:]) == 16
+
+
+def test_page_set_wider_than_the_book_keeps_its_line_ends_in_the_body() -> None:
+    # Rows from 50 to 270 on a book whose column is 200 wide: the last
+    # word, from 254, would be 4 pt outside the column 50-250.
+    rows = tuple(
+        word
+        for row in range(16)
+        for word in (
+            *_full_row(row, 50, 200, 100 + row * _PITCH),
+            _word(f"d{row}", 254, 100 + row * _PITCH, 270, 108 + row * _PITCH),
+        )
+    )
+    result = layout_page(_page(0, rows), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 16
+
+
+def test_table_rows_outvoting_the_body_rows_do_not_move_the_column() -> None:
+    # 20 table rows from 63 to 240 and 15 body rows from 50 to 250 (Domesday
+    # page 28). The pair 50-250 is the column's width; "is" at 50 to 58
+    # stays in the body.
+    table = tuple(
+        _word(f"t{row}", 63, 100 + row * _PITCH, 240, 108 + row * _PITCH)
+        for row in range(20)
+    )
+    body = _rows(15, top=100 + 20 * _PITCH)
+    alone = _word("is", 50, 100 + 35 * _PITCH, 58, 108 + 35 * _PITCH)
+    result = layout_page(_page(0, (*table, *body, alone)), _MEASURES)
+    (region,) = result.regions
+    assert _texts(region.lines)[-1] == ("is",)
+
+
+def test_page_with_2_wide_rows_takes_the_usual_left_edge() -> None:
+    # Two wide rows start at 20; page 1's usual left edge is 50, so the
+    # word at 20 to 44 on the first row is a margin word.
+    rows = (
+        _word("Note", 20, 100, 44, 108),
+        *_full_row(0, 50, 200, 100),
+        *_full_row(1, 20, 230, 112),
+        _word("short", 50, 124, 120, 132),
+    )
+    result = layout_page(_page(1, rows), _MEASURES)
+    assert _region_texts(result)[-1] == (("Note",),)
+
+
+def test_word_with_an_inverted_box_is_in_one_region_only() -> None:
+    # The model accepts a box whose x0 is right of its x1: (400, 130, 10,
+    # 140) lies both 2 pt left of the column and 2 pt right of it.
+    inverted = _word("odd", 400, 130, 10, 140)
+    page = _page(0, (*_rows(20), inverted))
+    result = layout_page(page, _MEASURES)
+    texts = [
+        word.text
+        for region in result.regions
+        for line in region.lines
+        for word in line.words
+    ]
+    assert sorted(texts) == sorted(word.text for word in page.words)
+
+
+def test_head_row_1_4_pitches_above_the_body_is_a_running_head_region_first() -> None:
+    head = _word("HEAD", 120, 100 - 1.4 * _PITCH, 180, 100 - 1.4 * _PITCH + 8)
+    result = layout_page(_page(0, (head, *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("HEAD",),)
+    assert len(body.lines) == 20
+
+
+def test_head_row_1_2_pitches_above_the_body_gives_no_running_head_region() -> None:
+    head = _word("HEAD", 120, 100 - 1.2 * _PITCH, 180, 100 - 1.2 * _PITCH + 8)
+    result = layout_page(_page(0, (head, *_rows(20))), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[0] == ("HEAD",)
+    assert len(body.lines) == 21
+
+
+def test_row_of_specks_above_the_head_goes_into_the_running_head_region() -> None:
+    specks = _word(";", 140, 60, 144, 66)
+    head = _word("HEAD", 120, 80, 180, 88)
+    result = layout_page(_page(0, (specks, head, *_rows(20))), _MEASURES)
+    assert _region_texts(result)[0] == ((";",), ("HEAD",))
+    assert len(result.regions) == 2
+
+
+def test_specks_above_a_head_not_set_apart_stay_in_the_body() -> None:
+    specks = _word(";", 140, 60, 144, 66)
+    head = _word("HEAD", 120, 88, 180, 96)  # 12 pt above the body: 1 pitch
+    result = layout_page(_page(0, (specks, head, *_rows(20))), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[:2] == ((";",), ("HEAD",))
+
+
+def test_page_whose_only_row_holds_a_letter_has_no_running_head_region() -> None:
+    result = layout_page(_page(0, (_word("Alone", 120, 100, 180, 108),)), _MEASURES)
+    assert _region_texts(result) == ((("Alone",),),)
+
+
+def test_margin_note_level_with_the_head_never_joins_the_head() -> None:
+    head = _word("HEAD", 120, 80, 180, 88)
+    note = _word("Note", 256, 80, 290, 88)
+    result = layout_page(_page(0, (head, note, *_rows(20))), _MEASURES)
+    assert _region_texts(result)[0] == (("HEAD",),)
+    assert _region_texts(result)[2] == (("Note",),)
+
+
+# layout_page: the footnote band, columns and the drop capital (layout spec
+# section 3, steps 4 to 6)
+
+_SMALL_HEIGHT = 0.7 * _ROW_HEIGHT
+
+
+def _small_rows(count: int, top: float, pitch: float = 9.0) -> tuple[Word, ...]:
+    """`count` rows of words 0.7 of the body word height high, `pitch` apart."""
+    return tuple(
+        _word(f"n{row}", 50, top + row * pitch, 250, top + row * pitch + _SMALL_HEIGHT)
+        for row in range(count)
+    )
+
+
+# 20 body rows at tops 100 to 328.
+_LAST_BODY_TOP = 100 + 19 * _PITCH
+
+
+def test_small_rows_1_5_pitches_below_the_body_are_a_band_region() -> None:
+    band = _small_rows(5, _LAST_BODY_TOP + 1.5 * _PITCH)
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    body, band_region = result.regions
+    assert len(body.lines) == 20
+    assert _texts(band_region.lines) == tuple((f"n{row}",) for row in range(5))
+
+
+def test_small_rows_without_the_gap_are_no_band() -> None:
+    band = _small_rows(5, _LAST_BODY_TOP + _PITCH)
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 25
+
+
+def test_page_of_small_rows_only_has_no_band() -> None:
+    rows = (*_small_rows(10, 100), *_small_rows(10, 100 + 9 * 9 + 1.5 * _PITCH))
+    result = layout_page(_page(0, rows), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 20
+
+
+def test_small_row_set_apart_but_followed_by_body_rows_is_no_band() -> None:
+    # One small row in four from there down: under two thirds.
+    small = _small_rows(1, _LAST_BODY_TOP + 1.5 * _PITCH)
+    after = _rows(3, top=_LAST_BODY_TOP + 1.5 * _PITCH + _PITCH)
+    result = layout_page(_page(0, (*_rows(20), *small, *after)), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 24
+
+
+def _two_column_rows(
+    count: int, top: float = 100.0, height: float = _ROW_HEIGHT, pitch: float = _PITCH
+) -> tuple[Word, ...]:
+    """`count` rows of a left word from 50 to 146 and a right word from 154
+    to 250: an empty strip 8 pt wide at the middle of the column."""
+    return tuple(
+        word
+        for row in range(count)
+        for word in (
+            _word(f"L{row}", 50, top + row * pitch, 146, top + row * pitch + height),
+            _word(f"R{row}", 154, top + row * pitch, 250, top + row * pitch + height),
+        )
+    )
+
+
+def test_10_rows_with_an_empty_strip_at_the_middle_are_two_columns_left_first() -> None:
+    result = layout_page(_page(0, _two_column_rows(10)), _MEASURES)
+    assert _region_texts(result) == (
+        tuple((f"L{row}",) for row in range(10)),
+        tuple((f"R{row}",) for row in range(10)),
+    )
+
+
+def test_7_rows_with_an_empty_strip_at_the_middle_are_one_region() -> None:
+    result = layout_page(_page(0, _two_column_rows(7)), _MEASURES)
+    assert _region_texts(result) == (tuple((f"L{row}", f"R{row}") for row in range(7)),)
+
+
+def test_column_cut_keeps_the_rows_above_and_below_as_regions_of_their_own() -> None:
+    title = _word("INDEX", 120, 76, 180, 84)  # spans the strip
+    columns = _two_column_rows(10)
+    footer = _word("END", 120, 100 + 10 * _PITCH, 180, 108 + 10 * _PITCH)
+    result = layout_page(_page(0, (title, *columns, footer)), _MEASURES)
+    assert _region_texts(result) == (
+        (("INDEX",),),
+        tuple((f"L{row}",) for row in range(10)),
+        tuple((f"R{row}",) for row in range(10)),
+        (("END",),),
+    )
+
+
+def test_blank_left_cell_and_a_word_over_the_gutter_keep_the_columns_one_run() -> None:
+    # Rows 0 to 4 and 7 to 11 are open. Row 5 has a word on the right only;
+    # row 6 a word from 100 to 152, across the strip but with its middle,
+    # 126, more than 6 pt from the strip's. Both are compatible.
+    rows = tuple(
+        word for word in _two_column_rows(12) if word.text not in {"L5", "L6", "R5"}
+    )
+    rows += (
+        _word("R5", 200, 100 + 5 * _PITCH, 250, 108 + 5 * _PITCH),
+        _word("X6", 100, 100 + 6 * _PITCH, 152, 108 + 6 * _PITCH),
+    )
+    result = layout_page(_page(0, rows), _MEASURES)
+    left, right = result.regions
+    assert _texts(left.lines) == (
+        *((f"L{row}",) for row in range(5)),
+        ("X6",),
+        *((f"L{row}",) for row in range(7, 12)),
+    )
+    assert _texts(right.lines) == tuple((f"R{row}",) for row in range(12))
+
+
+def test_prose_row_with_a_word_across_the_strip_above_the_columns_stays_one_line() -> (
+    None
+):
+    # The prose row's word "across" runs from 104 to 170 over the strip
+    # (146.7 to 152.7); its middle, 137, is more than 6 pt from the strip's,
+    # so the row is compatible, but it is not between two open rows. A row
+    # with a word on the left only, below the columns, stays a row too.
+    prose = (
+        _word("prose", 50, 88, 100, 96),
+        _word("across", 104, 88, 170, 96),
+        _word("end", 174, 88, 250, 96),
+    )
+    after = _word("alone", 50, 100 + 10 * _PITCH, 120, 108 + 10 * _PITCH)
+    result = layout_page(_page(0, (*prose, *_two_column_rows(10), after)), _MEASURES)
+    assert _region_texts(result) == (
+        (("prose", "across", "end"),),
+        tuple((f"L{row}",) for row in range(10)),
+        tuple((f"R{row}",) for row in range(10)),
+        (("alone",),),
+    )
+
+
+def test_band_row_with_a_word_over_the_gutter_at_the_runs_edge_joins_the_run() -> None:
+    # The band's first row has "Ori-" from 120 to 152 over the strip, its
+    # middle 136 more than 6 pt from the strip's (Kadesh page 8); it
+    # starts the run in the band, so its words go to the two columns.
+    top = _LAST_BODY_TOP + 1.5 * _PITCH
+    first = (
+        _word("L0", 50, top, 110, top + 5.6),
+        _word("Ori-", 120, top, 152, top + 5.6),
+        _word("R0", 160, top, 250, top + 5.6),
+    )
+    band = _two_column_rows(3, top=top + 9, height=_SMALL_HEIGHT, pitch=9.0)
+    result = layout_page(_page(0, (*_rows(20), *first, *band)), _MEASURES)
+    assert _region_texts(result)[1:] == (
+        (("L0", "Ori-"), *((f"L{row}",) for row in range(3))),
+        (("R0",), *((f"R{row}",) for row in range(3))),
+    )
+
+
+def test_word_across_the_middle_of_the_gutter_ends_the_run() -> None:
+    # Row 5 holds one word from 140 to 160: its middle is the strip's. Two
+    # runs of 5 open rows are too short to cut.
+    rows = tuple(
+        word for word in _two_column_rows(11) if word.text not in {"L5", "R5"}
+    ) + (_word("X5", 140, 100 + 5 * _PITCH, 160, 108 + 5 * _PITCH),)
+    result = layout_page(_page(0, rows), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 11
+
+
+def test_3_band_rows_with_the_gutter_at_the_middle_are_two_band_columns() -> None:
+    band = _two_column_rows(
+        3, top=_LAST_BODY_TOP + 1.5 * _PITCH, height=_SMALL_HEIGHT, pitch=9.0
+    )
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    assert _region_texts(result)[1:] == (
+        tuple((f"L{row}",) for row in range(3)),
+        tuple((f"R{row}",) for row in range(3)),
+    )
+
+
+def test_3_band_rows_of_short_notes_side_by_side_stay_three_rows() -> None:
+    # The left notes end at 90: the leftmost strip open on every row is at
+    # the start of the middle third, its middle at 116.7, 33 pt from the
+    # column's middle, 150.
+    top = _LAST_BODY_TOP + 1.5 * _PITCH
+    band = tuple(
+        word
+        for row in range(3)
+        for word in (
+            _word(f"{2 * row + 1}", 50, top + row * 9, 90, top + row * 9 + 5.6),
+            _word(f"{2 * row + 2}", 154, top + row * 9, 200, top + row * 9 + 5.6),
+        )
+    )
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    assert _region_texts(result)[1:] == ((("1", "2"), ("3", "4"), ("5", "6")),)
+
+
+def test_band_rows_with_a_gutter_11_pt_off_the_middle_stay_rows() -> None:
+    # Left notes end at 157.5 and right notes start at 166: the strips'
+    # middles step by 1 pt from 116.7, so the gutter's middle is at 160.7
+    # (strip 157.7 to 163.7), 10.7 pt right of the column's middle, though
+    # every left part ends within 3 pt of the strip. With the left notes
+    # ending at 156.5, the gutter is at 159.7, 9.7 pt off the middle, and
+    # the band is cut.
+    top = _LAST_BODY_TOP + 1.5 * _PITCH
+
+    def band(left_end: float) -> tuple[Word, ...]:
+        return tuple(
+            word
+            for row in range(3)
+            for word in (
+                _word(f"L{row}", 50, top + row * 9, left_end, top + row * 9 + 5.6),
+                _word(f"R{row}", 166, top + row * 9, 250, top + row * 9 + 5.6),
+            )
+        )
+
+    off = layout_page(_page(0, (*_rows(20), *band(157.5))), _MEASURES)
+    assert _region_texts(off)[1:] == (
+        tuple((f"L{row}", f"R{row}") for row in range(3)),
+    )
+    centred = layout_page(_page(0, (*_rows(20), *band(156.5))), _MEASURES)
+    assert _region_texts(centred)[1:] == (
+        tuple((f"L{row}",) for row in range(3)),
+        tuple((f"R{row}",) for row in range(3)),
+    )
+
+
+def _drop_capital_page(capital_top: float) -> tuple[Word, ...]:
+    """A drop capital 3 body word heights tall at the left edge, beside rows
+    0 and 1, which start at 75; 18 full rows below them."""
+    beside = tuple(
+        word
+        for row in range(2)
+        for word in (
+            _word(f"a{row}", 75, 100 + row * _PITCH, 130, 108 + row * _PITCH),
+            _word(f"b{row}", 140, 100 + row * _PITCH, 250, 108 + row * _PITCH),
+        )
+    )
+    capital = _word("IN", 50, capital_top, 70, capital_top + 3 * _ROW_HEIGHT)
+    return (capital, *beside, *_rows(18, top=100 + 2 * _PITCH))
+
+
+def test_drop_capital_is_the_first_word_of_the_upper_line_it_spans() -> None:
+    result = layout_page(_page(0, _drop_capital_page(100)), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[:3] == (
+        ("IN", "a0", "b0"),
+        ("a1", "b1"),
+        ("a0", "b0", "c0"),
+    )
+    assert len(body.lines) == 20
+    assert body.lines[0].box == Box(50, 100, 250, 124)
+
+
+def test_drop_capital_whose_top_is_below_the_upper_lines_centre_joins_that_line() -> (
+    None
+):
+    # The upper line is 100 to 108; the capital's top, 104.5, is 0.5 pt
+    # below its centre.
+    result = layout_page(_page(0, _drop_capital_page(104.5)), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[:2] == (("IN", "a0", "b0"), ("a1", "b1"))
+
+
+def test_drop_capital_beside_two_columns_goes_to_the_left_column() -> None:
+    # Rows 0 and 1 of the left column start at 75, beside a capital from
+    # 50 to 70 and 100.5 to 124.5; the right column's first line, from 98,
+    # is higher than the left's, from 100, and overlaps the capital too.
+    words = tuple(
+        replace(word, box=replace(word.box, x0=75))
+        if word.text in {"L0", "L1"}
+        else replace(word, box=replace(word.box, top=98, bottom=106))
+        if word.text == "R0"
+        else word
+        for word in _two_column_rows(10)
+    )
+    capital = _word("T", 50, 100.5, 70, 124.5)
+    result = layout_page(_page(0, (capital, *words)), _MEASURES)
+    left, right = result.regions
+    assert _texts(left.lines)[:2] == (("T", "L0"), ("L1",))
+    assert _texts(right.lines)[0] == ("R0",)
+
+
+def test_tall_word_away_from_the_left_edge_is_no_drop_capital() -> None:
+    # 4 pt right of the left edge: its rows are grouped as the skeleton did.
+    words = tuple(
+        replace(word, box=replace(word.box, x0=54, x1=74))
+        if word.text == "IN"
+        else word
+        for word in _drop_capital_page(100)
+    )
+    result = layout_page(_page(0, words), _MEASURES)
+    # The tall word's row holds both rows beside it; the next row, 24 pt
+    # below its top, sets it apart as a running-head region.
+    assert _region_texts(result)[0] == (("IN", "a0", "a1", "b0", "b1"),)
+
+
+def test_drop_capital_with_no_line_beside_it_is_laid_out_as_a_body_word() -> None:
+    # A word 3 body word heights tall at the left edge, alone between rows
+    # 9 and 10 of the body: no line overlaps it to its right.
+    tall = _word("A", 50, 220, 70, 244)
+    words = (*_rows(10), tall, *_rows(10, top=256))
+    result = layout_page(_page(0, words), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[10] == ("A",)
+    assert len(body.lines) == 21
+
+
+def test_regions_are_head_body_columns_body_margins_by_top_then_band() -> None:
+    # A head; 10 two-column rows, then 10 full rows; a right margin note at
+    # the top, a left and a right one level with each other lower down; 3
+    # band rows.
+    words = (
+        _word("Head", 120, 82, 180, 90),
+        *_two_column_rows(10),
+        *_rows(10, top=220),
+        _word("Early", 256, 100, 290, 108),
+        _word("Left", 20, 232, 44, 240),
+        _word("Right", 256, 232, 290, 240),
+        *_small_rows(3, 220 + 9 * _PITCH + 1.5 * _PITCH),
+    )
+    result = layout_page(_page(0, words), _MEASURES)
+    assert _region_texts(result) == (
+        (("Head",),),
+        tuple((f"L{row}",) for row in range(10)),
+        tuple((f"R{row}",) for row in range(10)),
+        tuple((f"a{row}", f"b{row}", f"c{row}") for row in range(10)),
+        (("Early",),),
+        (("Left",),),
+        (("Right",),),
+        (("n0",), ("n1",), ("n2",)),
+    )
+
+
+# Boundary cases of the band, the columns and the drop capital
+
+
+def _rows_of_height(count: int, top: float, height: float) -> tuple[Word, ...]:
+    return tuple(
+        _word(f"n{row}", 50, top + row * 9, 250, top + row * 9 + height)
+        for row in range(count)
+    )
+
+
+@pytest.mark.parametrize(("share", "regions"), [(0.8, 2), (0.9, 1)])
+def test_band_rows_are_small_at_0_8_of_the_body_height_and_not_at_0_9(
+    share: float, regions: int
+) -> None:
+    band = _rows_of_height(5, _LAST_BODY_TOP + 1.5 * _PITCH, share * _ROW_HEIGHT)
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    assert len(result.regions) == regions
+
+
+@pytest.mark.parametrize(("gap", "regions"), [(1.05, 1), (1.15, 2)])
+def test_band_needs_a_gap_of_1_1_pitches_above_it(gap: float, regions: int) -> None:
+    band = _small_rows(5, _LAST_BODY_TOP + gap * _PITCH)
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    assert len(result.regions) == regions
+
+
+def test_2_band_rows_with_a_gutter_at_the_middle_stay_rows() -> None:
+    band = _two_column_rows(
+        2, top=_LAST_BODY_TOP + 1.5 * _PITCH, height=_SMALL_HEIGHT, pitch=9.0
+    )
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    assert _region_texts(result)[1:] == ((("L0", "R0"), ("L1", "R1")),)
+
+
+def test_8_rows_with_an_empty_strip_at_the_middle_are_two_columns() -> None:
+    result = layout_page(_page(0, _two_column_rows(8)), _MEASURES)
+    assert len(result.regions) == 2
+
+
+def test_body_gutter_20_pt_off_the_middle_is_still_cut() -> None:
+    # Left words end at 126 and right words start at 134: the gutter's
+    # middle is at 129.7, 20.3 pt left of the column's middle. The test of
+    # the gutter's place is the band's only.
+    rows = tuple(
+        word
+        for row in range(10)
+        for word in (
+            _word(f"L{row}", 50, 100 + row * _PITCH, 126, 108 + row * _PITCH),
+            _word(f"R{row}", 134, 100 + row * _PITCH, 250, 108 + row * _PITCH),
+        )
+    )
+    result = layout_page(_page(0, rows), _MEASURES)
+    assert len(result.regions) == 2
+
+
+def test_strip_open_only_in_the_outer_third_is_no_gutter() -> None:
+    # Words end at 58 and start at 72: the only empty strip lies in the
+    # left third of the column, 50 to 116.7.
+    rows = tuple(
+        word
+        for row in range(10)
+        for word in (
+            _word(f"L{row}", 50, 100 + row * _PITCH, 58, 108 + row * _PITCH),
+            _word(f"R{row}", 72, 100 + row * _PITCH, 250, 108 + row * _PITCH),
+        )
+    )
+    result = layout_page(_page(0, rows), _MEASURES)
+    assert len(result.regions) == 1
+
+
+def test_rows_on_one_side_of_the_gutter_only_are_not_cut() -> None:
+    # 10 open rows, a full row that blocks the strip, then 10 rows with a
+    # word on the left only: the first run is cut, the second has no open
+    # row and stays rows.
+    one_side = tuple(
+        _word(f"S{row}", 50, 232 + row * _PITCH, 140, 240 + row * _PITCH)
+        for row in range(10)
+    )
+    words = (*_two_column_rows(10), *_full_row(10, 50, 200, 220), *one_side)
+    result = layout_page(_page(0, words), _MEASURES)
+    assert _region_texts(result)[2] == (
+        ("a10", "b10", "c10"),
+        *((f"S{row}",) for row in range(10)),
+    )
+    assert len(result.regions) == 3
+
+
+def test_two_words_across_the_strip_block_the_row() -> None:
+    # Row 5 has words from 130 to 148 and 151 to 175, both across the strip
+    # 146.7 to 152.7, each with its middle more than 6 pt from 149.7. The
+    # row blocks; two runs of 5 open rows are too short to cut.
+    rows = tuple(
+        word for word in _two_column_rows(11) if word.text not in {"L5", "R5"}
+    ) + (
+        _word("x", 130, 100 + 5 * _PITCH, 148, 108 + 5 * _PITCH),
+        _word("y", 151, 100 + 5 * _PITCH, 175, 108 + 5 * _PITCH),
+    )
+    result = layout_page(_page(0, rows), _MEASURES)
+    assert len(result.regions) == 1
+
+
+def test_word_over_the_gutter_goes_to_the_column_of_its_middle() -> None:
+    # "over", from 140 to 175, has its middle at 157.5, right of the
+    # gutter's 149.7 and more than 6 pt from it: the row stays in the run
+    # and the word goes to the right column.
+    rows = tuple(
+        word for word in _two_column_rows(11) if word.text not in {"L5", "R5"}
+    ) + (_word("over", 140, 100 + 5 * _PITCH, 175, 108 + 5 * _PITCH),)
+    result = layout_page(_page(0, rows), _MEASURES)
+    left, right = result.regions
+    assert ("over",) in _texts(right.lines)
+    assert ("over",) not in _texts(left.lines)
+
+
+def test_word_twice_the_body_height_at_the_left_edge_is_no_drop_capital() -> None:
+    # 16 pt tall, beside rows 2 and 3 at 100 and 112: it is grouped with
+    # them as the skeleton groups words, into one line.
+    above = _rows(2, top=76)
+    beside = tuple(
+        word
+        for row in (2, 3)
+        for word in (
+            _word(f"a{row}", 75, 76 + row * _PITCH, 130, 84 + row * _PITCH),
+            _word(f"b{row}", 140, 76 + row * _PITCH, 250, 84 + row * _PITCH),
+        )
+    )
+    tall = _word("T", 50, 100, 70, 116)
+    result = layout_page(
+        _page(0, (*above, tall, *beside, *_rows(16, top=124))), _MEASURES
+    )
+    (body,) = result.regions
+    assert _texts(body.lines)[2] == ("T", "a2", "a3", "b2", "b3")
+
+
+def test_line_starting_left_of_the_capitals_middle_does_not_receive_it() -> None:
+    # The capital runs from 50 to 70 (middle 60), 100 to 124. Row 0 starts
+    # at 55 and row 1 at 75: only row 1 is beside it.
+    rows = (
+        _word("x0", 55, 100, 130, 108),
+        _word("y0", 140, 100, 250, 108),
+        _word("x1", 75, 112, 130, 120),
+        _word("y1", 140, 112, 250, 120),
+    )
+    capital = _word("T", 50, 100, 70, 124)
+    result = layout_page(_page(0, (capital, *rows, *_rows(16, top=124))), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[:2] == (("x0", "y0"), ("T", "x1", "y1"))
 
 
 # The fidelity check at the layout boundary
@@ -192,13 +1214,14 @@ def _words_file(pages: tuple[PageWords, ...]) -> WordsFile:
 def test_fidelity_check_passes_on_layout_pages() -> None:
     pages = (_page(0, _PAGE_WORDS), _page(1, ()))
     lines = LinesFile(
-        source_pdf_sha256="0" * 64, pages=tuple(layout_page(p) for p in pages)
+        source_pdf_sha256="0" * 64,
+        pages=tuple(layout_page(p, _MEASURES) for p in pages),
     )
     check_stage(FidelityBoundary.LAYOUT, _words_file(pages), lines)
 
 
 def test_fidelity_check_fails_when_a_word_is_dropped_from_a_line() -> None:
-    page = layout_page(_page(0, _PAGE_WORDS))
+    page = layout_page(_page(0, _PAGE_WORDS), None)
     region = page.regions[0]
     first_line = region.lines[0]
     dropped = replace(first_line, words=first_line.words[:1])
@@ -219,10 +1242,28 @@ _PDF_BYTES = b"%PDF-1.4 a stand-in: layout reads only its hash"
 _PAGE_COUNT = 8
 
 
+def _regions_page(index: int) -> PageWords:
+    """A page with a running head, 16 body rows, a margin note beside row 3
+    (on the right on even pages, on the left on odd ones) and a band of 3
+    small rows, its words in an order that differs from page to page."""
+    note = (
+        _word("Note", 256, 136, 290, 144)
+        if index % 2 == 0
+        else _word("Note", 20, 136, 44, 144)
+    )
+    words = (
+        _word("Head", 120, 82, 180, 90),
+        *_rows(16),
+        note,
+        *_small_rows(3, 100 + 15 * _PITCH + 1.5 * _PITCH),
+    )
+    shift = index * 7 % len(words)
+    return _page(index, words[shift:] + words[:shift])
+
+
 def _book(root: Path) -> tuple[BookFolder, BookConfig]:
     """A book folder with pages.json and words.json of 8 pages written by
-    hand, every page's words a different shuffle of two rows, page 4
-    without words."""
+    hand, each page as `_regions_page` makes it, page 4 without words."""
     pdf = root / "book.pdf"
     pdf.write_bytes(_PDF_BYTES)
     pdf_hash = hashlib.sha256(_PDF_BYTES).hexdigest()
@@ -245,10 +1286,7 @@ def _book(root: Path) -> tuple[BookFolder, BookConfig]:
         ocr_audit=None,
     )
     word_pages = tuple(
-        _page(
-            index,
-            () if index == 4 else _PAGE_WORDS[index % 4 :] + _PAGE_WORDS[: index % 4],
-        )
+        _page(4, ()) if index == 4 else _regions_page(index)
         for index in range(_PAGE_COUNT)
     )
     write_pages(folder.pages_json, pages)
@@ -269,10 +1307,10 @@ def test_run_writes_the_layout_of_every_page(tmp_path: Path) -> None:
     assert written.source_pdf_sha256 == hashlib.sha256(_PDF_BYTES).hexdigest()
     assert tuple(page.index for page in written.pages) == tuple(range(_PAGE_COUNT))
     assert written.pages[4] == PageLayout(4, (), ())
-    expected_lines = (("Alpha", "beta"), ("gamma", "delta"))
+    body = tuple((f"a{row}", f"b{row}", f"c{row}") for row in range(16))
+    band = (("n0",), ("n1",), ("n2",))
     for page in written.pages[:4] + written.pages[5:]:
-        (region,) = page.regions
-        assert _texts(region.lines) == expected_lines
+        assert _region_texts(page) == ((("Head",),), body, (("Note",),), band)
 
 
 @pytest.mark.thread_unsafe
@@ -329,10 +1367,110 @@ def test_run_that_loses_a_word_raises_and_writes_no_lines_json(
 ) -> None:
     folder, config = _book(tmp_path)
 
-    def layout_page_losing_a_word(page: PageWords) -> PageLayout:
-        return layout_page(replace(page, words=page.words[1:]))
+    def layout_page_losing_a_word(
+        page: PageWords, measures: BookMeasures | None
+    ) -> PageLayout:
+        return layout_page(replace(page, words=page.words[1:]), measures)
 
     monkeypatch.setattr(layout, "layout_page", layout_page_losing_a_word)
     with pytest.raises(FidelityError):
         layout.run(folder, config, workers=1)
     assert not folder.lines_json.exists()
+
+
+# The fidelity check on the excerpts and the whole books (layout spec
+# section 7)
+
+_EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
+
+# The pages without a text layer of each whole book, which analyze refuses
+# unless excluded: the evaluation books' as in evaluation/books.toml;
+# Kadesh's and Gierke's as analyze listed them on 15 November 2026. The
+# whole_book test of tests/test_structure.py uses the same configs.
+_EXCLUDED_PAGES = frozendict(
+    {
+        "normansineuropea00hask": (0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279),
+        "earlyplantagenet01stub": (
+            *(0, 2, 3, 4, 5, 8, 9, 10, 11, 52, 53, 54, 55),
+            *(338, 339, 340, 341, 342, 343),
+        ),
+        "domesdaybook00maituoft": (0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557),
+        "catherinedemedic00mariuoft": (0, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456),
+        "battleofkadeshst00breauoft": (
+            *(1, 2, 3, 17, 23, 35, 43, 57, 69, 70, 71, 72, 73, 75),
+        ),
+        "politicaltheorie00gieruoft": (0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 289),
+    }
+)
+_LANGUAGES = frozendict({"catherinedemedic00mariuoft": "fr"})
+
+
+def _layout_of_pdf(pdf: Path, root: Path) -> tuple[WordsFile, LinesFile]:
+    """The words and lines of `pdf`, from analyze, extract and layout run by
+    galley2epub on a book folder at `root`."""
+    excluded = ", ".join(str(page) for page in _EXCLUDED_PAGES.get(pdf.stem, ()))
+    folder = BookFolder(root)
+    # TOML basic strings take JSON's escapes, so json.dumps quotes any path.
+    folder.book_toml.write_text(
+        f"pdf = {json.dumps(str(pdf))}\n"
+        f"title = {json.dumps(pdf.stem)}\n"
+        'authors = ["An Author"]\n'
+        f"language = {json.dumps(_LANGUAGES.get(pdf.stem, 'en'))}\n"
+        f"exclude_pages = [{excluded}]\n",
+        encoding="utf-8",
+    )
+    for stage in ("analyze", "extract", "layout"):
+        main([stage, str(root)])
+    return read_words(folder.words_json), read_lines(folder.lines_json)
+
+
+def _assert_laid_out_in_regions(words: WordsFile, lines: LinesFile) -> None:
+    """The fidelity check passes; each page's words, with their boxes, are
+    those of the same page in words.json, since layout never moves a word
+    to another page; and some page has more than one region: the book was
+    measured and its pages cut."""
+    check_stage(FidelityBoundary.LAYOUT, words, lines)
+    assert tuple(page.index for page in lines.pages) == tuple(
+        page.index for page in words.pages
+    )
+    for page_lines, page_words in zip(lines.pages, words.pages, strict=True):
+        assert Counter(
+            (word.text, word.box)
+            for region in page_lines.regions
+            for line in region.lines
+            for word in line.words
+        ) == Counter((word.text, word.box) for word in page_words.words)
+    assert any(len(page.regions) > 1 for page in lines.pages)
+
+
+@pytest.mark.parametrize(
+    "excerpt", sorted(path.stem for path in _EXCERPTS_DIR.glob("*.pdf"))
+)
+def test_layout_of_an_excerpt_keeps_every_word(
+    excerpt: str, excerpt_books: frozendict[str, BookFolder]
+) -> None:
+    # The session's one run of each excerpt (tests/conftest.py).
+    folder = excerpt_books[excerpt]
+    words, lines = read_words(folder.words_json), read_lines(folder.lines_json)
+    _assert_laid_out_in_regions(words, lines)
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.parametrize(
+    "book",
+    [
+        "battleofkadeshst00breauoft",
+        "catherinedemedic00mariuoft",
+        "domesdaybook00maituoft",
+        "earlyplantagenet01stub",
+        "normansineuropea00hask",
+        "politicaltheorie00gieruoft",
+    ],
+)
+def test_layout_of_a_whole_book_keeps_every_word(
+    book: str, books_dir: Path, tmp_path: Path
+) -> None:
+    words, lines = _layout_of_pdf(books_dir / f"{book}.pdf", tmp_path)
+    _assert_laid_out_in_regions(words, lines)
