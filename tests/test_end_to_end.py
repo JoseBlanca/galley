@@ -196,19 +196,16 @@ def test_blocks_json_with_its_records_holds_every_word_of_words_json(
         assert _structure_words(blocks).total() == sum(word_counts)
 
 
-def test_the_last_kadesh_blocks_are_the_stray_words_of_the_plate(
+def test_the_stray_words_of_the_kadesh_plate_are_in_the_last_block(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    blocks = read_blocks(excerpt_books[KADESH].blocks_json)
-    plate_words = [
-        word
-        for block in blocks.blocks
-        if block.id.startswith("b-p0008-")
-        for word in block_text(block).split()
-    ]
-
-    assert blocks.blocks[-1].id.startswith("b-p0008-")
-    assert sorted(plate_words) == sorted([",", "'", "..", "^U;L"])
+    # analyze finds page 8 a text page (4 words, no figure), so structure
+    # cannot tell it is a plate: its words are body words, and as the
+    # first is not indented they run on the paragraph of page 7 (structure
+    # spec, section 6). They are kept, in the last block, on page 8.
+    last = read_blocks(excerpt_books[KADESH].blocks_json).blocks[-1]
+    assert 8 in {origin.page_index for origin in last.origin}
+    assert sorted(block_text(last).split()[-4:]) == sorted([",", "'", "..", "^U;L"])
 
 
 def test_every_page_number_of_blocks_json_is_a_page_number_removed_on_its_page(

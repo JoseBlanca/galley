@@ -9,7 +9,7 @@ from collections import Counter
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
-from galley.model import Line, LinesFile, PageLayout
+from galley.model import Line, LinesFile, PageLayout, Word
 from galley.parallel import DEFAULT_WORKERS, map_pages
 from galley.structure._foot import signature_candidate
 from galley.structure._measures import (
@@ -23,8 +23,11 @@ from galley.structure._measures import (
 )
 from galley.structure._regions import head_line, region_kinds
 
-# Spec section 2: the pitch is measured on the regions of 5 lines or more.
-_LINES_FOR_PITCH = 5
+# Spec section 2, from layout section 3: the body word height and pitch are
+# measured on the rows of the pages of at least 15 rows, or of 3 rows when
+# no page has 15 (layout's measure_book; structure imports no stage).
+_MEASURED_PAGE_ROWS = 15
+_MEASURED_PAGE_ROWS_FALLBACK = 3
 # Spec section 3: a running head lies at most 2 pitches below the median top
 # of the head lines (Haskins' title page 16 is 2.85 below; Kadesh's article
 # title on page 8 about 2.7).
@@ -67,20 +70,32 @@ class BookSurvey:
 @dataclass(frozen=True, slots=True)
 class _PageMeasures:
     """What the survey takes from one page: its head line's text line, the
-    median word height of each line, the pitches of its regions (those of
-    5 lines or more, and all), and the keys of its words printed whole."""
+    median word height of each line, the median word height of each row and
+    the distances from one row's top to the next's, and the keys of its
+    words printed whole."""
 
     head: Line | None
     line_heights: tuple[float, ...]
-    long_region_pitches: tuple[float, ...]
-    pitches: tuple[float, ...]
+    row_heights: tuple[float, ...]
+    row_pitches: tuple[float, ...]
     words: frozenset[str]
 
 
-def _pitches(lines: tuple[Line, ...]) -> tuple[float, ...]:
-    return tuple(
-        after.box.top - before.box.top for before, after in itertools.pairwise(lines)
-    )
+def _rows(words: tuple[Word, ...]) -> tuple[tuple[Word, ...], ...]:
+    """The rows of `words` by layout's row rule (layout section 1): taken
+    by top, then left side; the first word starts a row and is its anchor,
+    and a later word joins the row when its vertical centre lies within the
+    anchor's top and bottom, edges included."""
+    rows: list[list[Word]] = []
+    anchor: Word | None = None
+    for word in sorted(words, key=lambda word: (word.box.top, word.box.x0)):
+        centre = (word.box.top + word.box.bottom) / 2
+        if anchor is not None and anchor.box.top <= centre <= anchor.box.bottom:
+            rows[-1].append(word)
+        else:
+            rows.append([word])
+            anchor = word
+    return tuple(tuple(row) for row in rows)
 
 
 def _words_printed_whole(page: PageLayout) -> frozenset[str]:
@@ -103,6 +118,14 @@ def _words_printed_whole(page: PageLayout) -> frozenset[str]:
 
 def _page_measures(page: PageLayout) -> _PageMeasures:
     head = head_line(page)
+    rows = _rows(
+        tuple(
+            word
+            for region in page.regions
+            for line in region.lines
+            for word in line.words
+        )
+    )
     return _PageMeasures(
         head=head.lines[-1] if head is not None else None,
         line_heights=tuple(
@@ -111,14 +134,12 @@ def _page_measures(page: PageLayout) -> _PageMeasures:
             for line in region.lines
             if line.words
         ),
-        long_region_pitches=tuple(
-            pitch
-            for region in page.regions
-            if len(region.lines) >= _LINES_FOR_PITCH
-            for pitch in _pitches(region.lines)
+        row_heights=tuple(
+            statistics.median(word_height(word) for word in row) for row in rows
         ),
-        pitches=tuple(
-            pitch for region in page.regions for pitch in _pitches(region.lines)
+        row_pitches=tuple(
+            below[0].box.top - above[0].box.top
+            for above, below in itertools.pairwise(rows)
         ),
         words=_words_printed_whole(page),
     )
@@ -253,19 +274,34 @@ def _commonest_offset(numbers: tuple[tuple[int, int], ...]) -> int | None:
     return min(counts, key=lambda offset: (-counts[offset], offset))
 
 
+def _body_measures(measures: tuple[_PageMeasures, ...]) -> tuple[float, float]:
+    """The body word height and body line pitch, in points (spec section 2):
+    over the rows of the pages of at least 15 rows, or 3, as layout takes
+    them; else the median height of all lines, and a pitch of 0."""
+    measured = tuple(
+        page for page in measures if len(page.row_heights) >= _MEASURED_PAGE_ROWS
+    ) or tuple(
+        page
+        for page in measures
+        if len(page.row_heights) >= _MEASURED_PAGE_ROWS_FALLBACK
+    )
+    if not measured:
+        line_heights = tuple(
+            height for page in measures for height in page.line_heights
+        )
+        return (statistics.median(line_heights) if line_heights else 0.0), 0.0
+    return (
+        statistics.median(height for page in measured for height in page.row_heights),
+        statistics.median(pitch for page in measured for pitch in page.row_pitches),
+    )
+
+
 def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurvey:
     """What structure learns from the whole book before the per-page work
     (spec sections 2 and 3), the pages measured in a pool of `workers`
     threads. The result does not depend on `workers`."""
     measures = map_pages(_page_measures, lines.pages, workers)
-    line_heights = tuple(height for page in measures for height in page.line_heights)
-    long_pitches = tuple(
-        pitch for page in measures for pitch in page.long_region_pitches
-    )
-    pitches = long_pitches or tuple(
-        pitch for page in measures for pitch in page.pitches
-    )
-    pitch = statistics.median(pitches) if pitches else 0.0
+    body_word_height, pitch = _body_measures(measures)
     heads = tuple(
         (page.index, measured.head)
         for page, measured in zip(lines.pages, measures, strict=True)
@@ -273,7 +309,6 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
     )
     running_heads = _running_heads(heads, pitch, workers)
     arabic_numbers = _arabic_head_numbers(heads, running_heads)
-    body_word_height = statistics.median(line_heights) if line_heights else 0.0
     candidates = map_pages(
         lambda page: signature_candidate(
             page, region_kinds(page, body_word_height, running_heads)

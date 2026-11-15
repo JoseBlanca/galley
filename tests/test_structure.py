@@ -931,6 +931,31 @@ def test_note_follows_the_blocks_that_start_on_its_page_or_earlier() -> None:
     assert blocks.notes[0].blocks[0].id == "b-p0001-002"
 
 
+def test_band_of_two_columns_is_found_when_its_lines_outnumber_the_body() -> None:
+    # 9 body lines and 16 note lines in two columns: the note lines are most
+    # of the lines, but the body's are most of the rows, so the body word
+    # height is the body's (structure spec, section 2, from layout §3).
+    body = _region(*_five_full_lines(70, "first"), *_five_full_lines(145, "more")[:4])
+    left = _region(
+        *(
+            _spread(f"{n} A note on the left", 50, 170, 220 + 9 * n, height=7.0)
+            for n in range(8)
+        )
+    )
+    right = _region(
+        *(
+            _spread(f"{n} A note on the right", 180, 300, 220 + 9 * n, height=7.0)
+            for n in range(8)
+        )
+    )
+    lines = _lines_of(PageLayout(0, (body, left, right), ()))
+    assert survey_book(lines, workers=1).body_word_height == _WORD_HEIGHT_PT
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert len(blocks.notes) == 2
+    assert all(block.kind is BlockKind.PARAGRAPH for block in blocks.blocks)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
 def test_two_index_columns_of_equal_width_give_no_margin_note() -> None:
     left = _region(*(_spread(f"Entry {n}, 12", 50, 170, 70 + 15 * n) for n in range(6)))
     right = _region(
