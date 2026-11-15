@@ -196,10 +196,10 @@ package 4 runs these on books.
 
 **Tasks.**
 
-- [ ] 3.1 The alignment key, the anchored pass and the three passes;
+- [x] 3.1 The alignment key, the anchored pass and the three passes;
   the states, `split` and `glued`, and the subkinds. Spec §1 "Alignment
   key", §5 "Alignment" and "Differences". Deliverable 1.
-- [ ] 3.2 Pages, unplaced tokens, anchor mismatches, and the stage of a
+- [x] 3.2 Pages, unplaced tokens, anchor mismatches, and the stage of a
   difference, repaired tokens and extra tokens. Spec §5 "Pages" and "The
   stage a difference belongs to". Deliverables 2–4. Needs 3.1.
 
