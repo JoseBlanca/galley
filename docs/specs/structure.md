@@ -134,6 +134,15 @@ pitches below the median top of the head lines of the book, and either:
   number. A roman form counts only on pages before the first arabic head
   number, here too.
 
+**A speck as the head line.** When the head line has fewer than 4
+letters and is not a running head, the line below it, the topmost line of
+the page's other regions, is tested: it is a running head when its top
+lies within the 2 pitches of the median head top and its letters are at
+least 4 and 0.75 alike to those of a running head of another page. It is
+then removed as a running head is, with its page number, and the speck
+above stays as it is (in the text, or as a `stray_mark` when it has no
+letter or digit).
+
 A number alone does not make a running head: a top line that ends with
 a word that is also a roman form ("vi", "mix", "dix", "d", "c.", "i.")
 or with a number of the text stays in the text. On Stubbs' page 267 a
@@ -526,10 +535,14 @@ budget of the `coding` skill in the plan.
   are paragraphs of their own; the drop capital (layout §3, step 6) is
   the first word of the first paragraph. A page number at its foot is
   removed.
-- **A digit speck above the head**: on about 12 of Stubbs' pages a speck
-  read as "6" or "1 —" is the first row with a digit, so it becomes the
-  head line, is not a running head, and the real head stays in the text
-  (page 33).
+- **A speck above the head**: on Stubbs' pages 28, 32, 33, 35, 36, 94,
+  97, 232, 237 and 267 and Kadesh's 38 a speck read as "6", ". 5", "1 —"
+  or "d" is the first row with a letter or digit, so layout makes it the
+  head line, and the real head is the first line of the body. The speck
+  is no running head; the line below it is, by the rule for a head line
+  of fewer than 4 letters (section 3), and is removed as one, so that no
+  hyphen at the page break joins into it ("Geof-" with "1", "cer-" with
+  "Simon").
 - **A title page**: its year, "1907", is neither a page number nor a
   signature mark, and stays.
 - **Two page-number sequences** (Kadesh): one removal and one
