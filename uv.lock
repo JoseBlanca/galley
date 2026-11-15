@@ -2,6 +2,12 @@ version = 1
 revision = 5
 requires-python = ">=3.15"
 
+[manifest]
+members = [
+    "galley",
+    "galley-eval",
+]
+
 [[package]]
 name = "cffi"
 version = "2.1.1"
@@ -166,6 +172,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "galley-eval" },
     { name = "pytest" },
     { name = "pytest-run-parallel" },
     { name = "pytest-timeout" },
@@ -183,11 +190,27 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "galley-eval", editable = "tools/galley-eval" },
     { name = "pytest", specifier = "==9.2.0" },
     { name = "pytest-run-parallel", specifier = "==0.10.0" },
     { name = "pytest-timeout", specifier = "==2.4.0" },
     { name = "ruff", specifier = "==0.17.5" },
     { name = "ty", specifier = "==0.0.104" },
+]
+
+[[package]]
+name = "galley-eval"
+version = "0.1.0"
+source = { editable = "tools/galley-eval" }
+dependencies = [
+    { name = "galley" },
+    { name = "gilguard" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "galley", editable = "." },
+    { name = "gilguard", specifier = "==0.2.0" },
 ]
 
 [[package]]
