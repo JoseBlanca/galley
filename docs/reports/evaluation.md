@@ -174,3 +174,76 @@ real prose is far from that.
 The fixes were checked by the orchestrator, not reviewed again; the
 review of work package 4 also covers them, since it runs them on whole
 books.
+
+## Work package 4: scores, output files and the command
+
+Tasks 4.1–4.3 in a64378a, c6dec6d, ce315ec; review fixes in 608d52d,
+1971691, ec1b4e3, after the spec was settled in b47dd68.
+
+Deliverables, checked on the branch: the unit tests of galley's token
+streams, the scores and the page table pass (`pytest`: 767 passed, 8
+deselected, 15.4 s; with 8 threads 767 passed; `-m whole_book` 8
+passed). `uv run galley-eval run` from the worktree root ran galley on
+the four books and wrote every book's `scorecard.json`,
+`differences.jsonl`, `pages.tsv` and `summary.md`, and
+`runs/evaluation/summary.md` with four rows. A failing book is reported
+and the others go on, with exit status 1 (tested).
+
+The scores of galley as it is (the walking skeleton), after the fixes,
+body unless named:
+
+| book | error rate: words / lines / blocks / markdown | extras on the page edge | notes error rate | glued / missing at markdown | comparison |
+|---|---|---|---|---|---|
+| Haskins | 0.123 / 0.124 / 0.124 / 0.124 | 1,250 | 0.412 | 3,424 / 347 | 2.9 s |
+| Stubbs | 0.180 / 0.176 / 0.176 / 0.176 | 1,594 | (none) | 4,974 / 1,264 | 5.0 s |
+| Domesday | 0.115 / 0.114 / 0.114 / 0.114 | 1,833 | 0.104 | 18 / 1,088 | 11.2 s |
+| Mariéjol | 0.355 / 0.356 / 0.356 / 0.356 | 1,706 | 0.705 | 515 / 11,520 | 12.7 s |
+
+These are not the baseline yet; work package 5 gives it, after the
+owner's check.
+
+### What the review found
+
+The tool reads every word of galley's four outputs exactly once, each
+with a page, and the scorecard, the differences and the page table add
+up on the four books. What mattered:
+
+- Words the text layer runs together, as "Thelandisnotthewholeofnature's
+  gifttoNormandy;" (eleven words), were reported as missing, because the
+  spec joined at most 4 tokens: a third of Haskins' missing words. Now up
+  to 12; Haskins' missing at markdown fell from 902 to 347 and its glued
+  rose. This is the extract stage's spacing, and the summary now sends it
+  there.
+- A speck on the scan, a "!" or ";" above the running head, hid the
+  running head from the page-edge flag on 93 of Stubbs' 324 pages.
+- Each difference mixed its state in the final text with the stage it is
+  blamed on; both are now written. The summary sends hyphen splits to
+  structure, glued words to extract.
+- Errors: a missing `book.md` stopped every book; a failed galley run was
+  reported without the stage; a failed book kept stale numbers in the
+  summary; a bug in the alignment read like a fault of the book. All
+  fixed.
+- About 40 of 115 mutations survived the tests; each has a test now.
+
+Not taken, or open:
+
+- Haskins' notes error rate stays 0.412. Its notes sit in the body at
+  the foot of their pages, as the walking skeleton leaves them; aligned
+  against Gutenberg's notes, a long leftover stretch drops a glued word
+  ("Mont-Saint-Micheland") before reaching it. Once structure finds
+  notes, galley's notes come in a stream of their own and this stretch
+  no longer forms; the case is left until then, and the notes rate of a
+  book whose notes galley leaves in the body is overstated.
+- The comparison takes 2.9–12.7 s per book, most of it reading galley's
+  JSON (about 4 s for Domesday, in `galley.model`), not the 1.5 s the
+  spec first estimated. Acceptable for a run at the end of a plan.
+- `compare` refuses a book folder that `run` did not make, since the
+  commit of galley that made the files is unknown.
+
+### For whoever next revises a skill or writes a plan
+
+- Reviews of the tool kept finding the same thing in different places:
+  a rule that pairs or joins without a limit of distance or similarity
+  (leftovers across the book, any two tokens of a stretch, joins far
+  apart, joins of at most 4). A spec of an alignment should say, for
+  each pairing rule, how near and how alike two things must be.

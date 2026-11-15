@@ -463,7 +463,7 @@ step, a `split` or a `glued` is tried at the current position of each
 side, joining consecutive tokens with non-empty keys for as long as
 their joined keys are a beginning of the other side's key, up to 12
 tokens. The text layer glues long runs: Haskins page index 28 has
-"Thelandisnotthewholeofnature'sgifttoNormandy;", ten words, and with a
+"Thelandisnotthewholeofnature'sgifttoNormandy;", eleven words, and with a
 limit of 4 such runs were reported as `missing` words, 576 of Haskins'
 1,606 (a third), although the words are in galley's output; else the two current tokens are
 paired as `changed` when they are alike; else the one with the lower
