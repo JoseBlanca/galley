@@ -123,10 +123,14 @@ def test_note_label_that_holds_the_pairing_id_is_dropped_and_pairs_the_note() ->
     # Haskins: one div.footnote per note; the id is on the dropped a.label.
     reference = _read(
         '<p>So wrote Michelet<a class="fnanchor" href="#Footnote_1" id="FNanchor_1">1</a>.</p>'
+        # As in pg72514: Gutenberg's heading inside div.chapter.footnotes,
+        # after a p holding only a page anchor.
+        '<div class="chapter footnotes">'
+        '<p><span class="pagenum" id="Page_250">250</span></p>'
         '<h2 class="nobreak" id="FOOTNOTES">FOOTNOTES</h2>'
         '<div class="footnote"><p class="fn1"><a class="label" href="#FNanchor_1"'
-        ' id="Footnote_1">1</a> <i>La France</i>, p. 161.</p></div>',
-        change_rules(HASKINS_RULES, RuleChange.ADD, "drop_text", ("FOOTNOTES",)),
+        ' id="Footnote_1">1</a> <i>La France</i>, p. 161.</p></div></div>',
+        HASKINS_RULES,
     )
     assert reference.blocks == (_paragraph("So wrote Michelet."),)
     assert reference.notes == (
@@ -371,3 +375,28 @@ def test_text_outside_every_block_is_an_error() -> None:
 def test_end_tag_that_closes_nothing_is_an_error() -> None:
     with pytest.raises(ReferenceReadError, match="closes no open element"):
         _read("<p>Text</p></div>")
+
+
+def test_section_break_asterisks_and_map_links_are_dropped() -> None:
+    reference = _read(
+        '<p>several periods</p><div class="tb">* * * * *</div><p>The interest</p>'
+        '<div class="larger-version">[<a href="images/map1_large.jpg">Larger map</a>]'
+        "</div>"
+    )
+    assert reference.blocks == (
+        _paragraph("several periods"),
+        _paragraph("The interest"),
+    )
+
+
+def test_separate_rule_makes_an_inline_element_separate_words() -> None:
+    # Stubbs' table of contents, pg70828 line 453.
+    html = (
+        '<p>years\u2019 work<span class="float-right"><i>Page</i> '
+        '<a href="#Page_34">34</a></span></p>'
+    )
+    assert _read(html).blocks == (_paragraph("years\u2019 workPage 34"),)
+    rules = change_rules(
+        DEFAULT_RULES, RuleChange.ADD, "separate", ("span.float-right",)
+    )
+    assert _read(html, rules).blocks == (_paragraph("years\u2019 work Page 34"),)

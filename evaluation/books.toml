@@ -22,8 +22,6 @@ expected_counts = { notes = 72, margin_notes = 0, note_references = 72, page_anc
 [book.rules.add]
 # Each note is a div.footnote whose label a.label holds the pairing id.
 note = ["div.footnote"]
-# Gutenberg's heading over the notes it gathered, an h2 of its own.
-drop_text = ["FOOTNOTES"]
 
 [[book]]
 name = "stubbs"
@@ -38,6 +36,8 @@ expected_counts = { notes = 0, margin_notes = 467, note_references = 0, page_anc
 [book.rules.add]
 # The chapter titles are p.ph3, not h1-h6.
 heading = ["p.ph3"]
+# The page column of the table of contents follows the title with no space.
+separate = ["span.float-right"]
 
 [[book]]
 name = "domesday"

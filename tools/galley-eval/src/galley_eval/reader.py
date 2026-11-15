@@ -612,7 +612,9 @@ def _pieces(element: _Element, context: _Context, *, lift: bool) -> tuple[_Piece
                 else context
             )
             inner = _pieces(child, inner_context, lift=lift)
-            if child.tag in _INLINE_TAGS:
+            if child.tag in _INLINE_TAGS and not _matches(
+                rules.separate, child, element
+            ):
                 pieces.extend(inner)
             else:
                 pieces.extend((_SPACE, *inner, _SPACE))
