@@ -438,7 +438,14 @@ page; verse and dialogue (Haskins) give false starts.
 
 **Side text.** Each margin region becomes one block of its own; each
 band region is grouped into blocks by rules 1 and 2, as the body is,
-without the page-break rule; hyphens are joined inside each. What kind
+without the page-break rule, with the sides of the band's box as its
+edges whatever its number of lines; hyphens are joined inside each. On a
+band of 5 to 9 lines the commonest right side is often that of its
+short last lines, and rule 1 then never fired: Domesday's page 83 gave
+its six notes as one note, Mariéjol's page 214 its three as one. A note
+whose first line is indented from the band's left side after a short
+line starts a block; Domesday prints two short notes side by side on one
+line (page 83, notes 1 and 2), which stay one block. What kind
 of block they become was decided by the owner (section 10): a margin
 region is a `margin_note` block, and each
 block of a band region is a `Note` of one block, with `referenced`
