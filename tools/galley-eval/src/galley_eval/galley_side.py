@@ -10,8 +10,9 @@ block's id:
   by line;
 - blocks: the tokens of each block of `blocks.json`, split as the
   fidelity check splits them at the markdown boundary: a note reference
-  span is a space, not a token, and a note's marker is not a token. The
-  body blocks come in order, with the margin notes in their place, then
+  span is a space, not a token, and so is the marker of a referenced
+  note; the marker of an unreferenced note is a word of the book, the
+  first tokens of the note's first block. The body blocks come in order, with the margin notes in their place, then
   the notes' blocks;
 - markdown: the words of `book.md` as `galley.fidelity.read_markdown`
   reads them, each in the block its id names.
@@ -20,10 +21,11 @@ A word's text is split on white space, as the fidelity check splits it.
 
 How the spec is read here, where it leaves a choice:
 
-- `edge_of_page` flags the words of the first and the last line of a page
-  in `lines.json`'s order, the first line of its first region with one
-  and the last line of its last region with one. In words.json, a word
-  is flagged when the same word, text and box, is on such a line.
+- `edge_of_page` flags, in `lines.json`'s order of a page's lines, the
+  first and the last line that hold a token with a non-empty alignment
+  key, and the lines of marks only before the first and after the last
+  (spec section 5). In words.json, a word is flagged when the same word,
+  text and box, is on such a line.
 - A block token's page is found by aligning the block's tokens with the
   words of the pages in its `origin`, in `lines.json`'s order, with
   `difflib.SequenceMatcher(autojunk=False)` over their texts. In a
@@ -51,14 +53,17 @@ from galley.model import (
     Block,
     BlockKind,
     BlocksFile,
+    Line,
     LinesFile,
+    Note,
+    PageLayout,
     Word,
     WordsFile,
     read_blocks,
     read_lines,
     read_words,
 )
-from galley_eval.align import GalleyStream, GalleyToken
+from galley_eval.align import GalleyStream, GalleyToken, alignment_key
 from galley_eval.errors import GalleyFilesError
 
 __all__ = [
@@ -118,7 +123,14 @@ def read_galley_side(folder: BookFolder) -> GalleySide:
     words = read_words(folder.words_json)
     lines = read_lines(folder.lines_json)
     blocks = read_blocks(folder.blocks_json)
-    markdown = read_markdown(folder.book_md.read_text(encoding="utf-8"))
+    try:
+        markdown_text = folder.book_md.read_text(encoding="utf-8")
+    except FileNotFoundError as err:
+        message = (
+            f"{folder.book_md} does not exist; run `galley2epub markdown` to write it"
+        )
+        raise GalleyFilesError(message) from err
+    markdown = read_markdown(markdown_text)
     blocks_side = blocks_tokens(blocks, lines)
     return GalleySide(
         words=words_tokens(words, lines),
@@ -134,23 +146,46 @@ def read_galley_side(folder: BookFolder) -> GalleySide:
 # words and lines
 
 
+def _edge_flags(page_lines: tuple[Line, ...]) -> tuple[bool, ...]:
+    """For each line of a page, whether it is on the edge: the first and
+    the last line that hold a token with a non-empty alignment key, and
+    the lines of marks only before the first and after the last. A page
+    of marks only is all on the edge."""
+    keyed = tuple(
+        position
+        for position, line in enumerate(page_lines)
+        if any(alignment_key(word.text) for word in line.words)
+    )
+    if not keyed:
+        return tuple(True for _ in page_lines)
+    first, last = keyed[0], keyed[-1]
+    return tuple(
+        position <= first or position >= last for position in range(len(page_lines))
+    )
+
+
+def _page_lines(page: PageLayout) -> tuple[Line, ...]:
+    return tuple(line for region in page.regions for line in region.lines)
+
+
 def _edge_lines(lines: LinesFile) -> frozendict[int, tuple[Word, ...]]:
-    """For each page, the words of its first and last line in the file's
-    order (once when the page has one line)."""
+    """For each page, the words of its lines on the edge."""
     edges: dict[int, tuple[Word, ...]] = {}
     for page in lines.pages:
-        page_lines = tuple(line for region in page.regions for line in region.lines)
-        if not page_lines:
-            continue  # a page without lines has no edge, and no word to flag
-        first, last = page_lines[0], page_lines[-1]
-        edges[page.index] = first.words + (last.words if last is not first else ())
+        page_lines = _page_lines(page)
+        edges[page.index] = tuple(
+            word
+            for line, edge in zip(page_lines, _edge_flags(page_lines), strict=True)
+            if edge
+            for word in line.words
+        )
     return frozendict(edges)
 
 
 def words_tokens(words: WordsFile, lines: LinesFile) -> tuple[GalleyToken, ...]:
     """The tokens of `words.json`, page by page in the file's order, each
-    flagged `edge_of_page` when the same word, text and box, is on the
-    first or last line of its page in `lines`."""
+    flagged `edge_of_page` when the same word, text and box, is on a line
+    of its page on the edge in `lines` (_edge_flags)."""
     edges = _edge_lines(lines)
     tokens: list[GalleyToken] = []
     for page in words.pages:
@@ -165,12 +200,12 @@ def words_tokens(words: WordsFile, lines: LinesFile) -> tuple[GalleyToken, ...]:
 
 def lines_tokens(lines: LinesFile) -> tuple[GalleyToken, ...]:
     """The tokens of `lines.json`, page by page, region by region, line by
-    line, those of a page's first and last line flagged `edge_of_page`."""
+    line, those of a page's lines on the edge (_edge_flags) flagged
+    `edge_of_page`."""
     tokens: list[GalleyToken] = []
     for page in lines.pages:
-        page_lines = tuple(line for region in page.regions for line in region.lines)
-        for position, line in enumerate(page_lines):
-            edge = position in {0, len(page_lines) - 1}
+        page_lines = _page_lines(page)
+        for line, edge in zip(page_lines, _edge_flags(page_lines), strict=True):
             for word in line.words:
                 tokens.extend(_split(word.text, page.index, edge_of_page=edge))
     return tuple(tokens)
@@ -222,23 +257,45 @@ def galley_blocks(blocks: BlocksFile) -> frozendict[str, GalleyBlock]:
     return frozendict(body | notes)
 
 
-def _block_texts(block: Block) -> tuple[str, ...]:
+def _block_texts(block: Block, marker: str) -> tuple[str, ...]:
     """The tokens of a block as the fidelity check splits them at the
-    markdown boundary: a note reference span is a space."""
+    markdown boundary: a note reference span is a space; `marker`, the
+    marker of an unreferenced note before its first block, else "", comes
+    first."""
     text = "".join(
         " " if span.note_ref is not None else span.text for span in block.spans
     )
-    return tuple(text.split())
+    return tuple(marker.split()) + tuple(text.split())
+
+
+def _blocks_with_markers(blocks: BlocksFile) -> tuple[tuple[Block, str, bool], ...]:
+    """Every block, the body's then the notes', with the marker its text
+    starts with and whether it is in a note. Raises GalleyFilesError for
+    an unreferenced note with no block to hold its marker."""
+    found: list[tuple[Block, str, bool]] = [
+        (block, "", False) for block in blocks.blocks
+    ]
+    for note in blocks.notes:
+        if not note.blocks:
+            message = f"note {note.id} of blocks.json has no block"
+            raise GalleyFilesError(message)
+        found.extend(
+            (block, _marker(note) if position == 0 else "", True)
+            for position, block in enumerate(note.blocks)
+        )
+    return tuple(found)
+
+
+def _marker(note: Note) -> str:
+    return "" if note.referenced else note.marker
 
 
 def note_references(blocks: BlocksFile) -> tuple[GalleyNoteReference, ...]:
     """The note references of every block, the body's then the notes', in
     order, each with the number of its block's tokens before it."""
     found: list[GalleyNoteReference] = []
-    for block in blocks.blocks + tuple(
-        block for note in blocks.notes for block in note.blocks
-    ):
-        before = ""
+    for block, marker, _ in _blocks_with_markers(blocks):
+        before = marker + " "
         for span in block.spans:
             if span.note_ref is not None:
                 found.append(
@@ -270,22 +327,15 @@ def blocks_tokens(blocks: BlocksFile, lines: LinesFile) -> tuple[GalleyToken, ..
         )
         for page in lines.pages
     }
-    body = tuple(
+    return tuple(
         token
-        for block in blocks.blocks
-        for token in _tokens_of_block(block, page_words, in_note=False)
+        for block, marker, in_note in _blocks_with_markers(blocks)
+        for token in _tokens_of_block(block, marker, page_words, in_note=in_note)
     )
-    notes = tuple(
-        token
-        for note in blocks.notes
-        for block in note.blocks
-        for token in _tokens_of_block(block, page_words, in_note=True)
-    )
-    return body + notes
 
 
 def _tokens_of_block(
-    block: Block, page_words: dict[int, tuple[str, ...]], *, in_note: bool
+    block: Block, marker: str, page_words: dict[int, tuple[str, ...]], *, in_note: bool
 ) -> tuple[GalleyToken, ...]:
     pages = tuple(dict.fromkeys(origin.page_index for origin in block.origin))
     if not pages:
@@ -299,7 +349,7 @@ def _tokens_of_block(
         )
         raise GalleyFilesError(message)
     source = tuple((word, page) for page in pages for word in page_words[page])
-    texts = _block_texts(block)
+    texts = _block_texts(block, marker)
     stream = _block_stream(block, in_note=in_note)
     return tuple(
         GalleyToken(

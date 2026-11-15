@@ -360,3 +360,116 @@ def test_read_galley_side_reads_the_four_files_of_a_folder(tmp_path: Path) -> No
         ("here.", 1),
     )
     assert side.galley_blocks["b-p0001-002"].note_id == "n-p0001-001"
+
+
+# The page edge skips lines of marks
+
+
+def test_a_line_of_marks_above_the_running_head_does_not_take_its_flag() -> None:
+    # Haskins page index 28: a "!" from a speck above "NORMANDY IN HISTORY 13".
+    lines = LinesFile(
+        source_pdf_sha256=_SHA,
+        pages=(
+            _page_lines(0, "!", "NORMANDY IN HISTORY 13", "the text", "more text", ";"),
+        ),
+    )
+    flagged = tuple(token.text for token in lines_tokens(lines) if token.edge_of_page)
+    assert flagged == ("!", "NORMANDY", "IN", "HISTORY", "13", "more", "text", ";")
+    words_flagged = tuple(
+        token.text
+        for token in words_tokens(_words_file(lines), lines)
+        if token.edge_of_page
+    )
+    assert sorted(words_flagged) == sorted(flagged)
+
+
+def test_a_page_of_marks_only_is_all_on_the_edge() -> None:
+    lines = LinesFile(source_pdf_sha256=_SHA, pages=(_page_lines(0, "!", "* ;"),))
+    assert all(token.edge_of_page for token in lines_tokens(lines))
+
+
+# Note markers and note references
+
+
+def _note_blocks(*, referenced: bool) -> BlocksFile:
+    return BlocksFile(
+        source_pdf_sha256=_SHA,
+        blocks=(),
+        notes=(
+            Note(
+                id="n-p0001-001",
+                marker="*",
+                blocks=(
+                    _block(
+                        "b-p0001-002",
+                        BlockKind.PARAGRAPH,
+                        (_span("cate"), _span("2", "n-p0001-002"), _span("it")),
+                        _origin(1),
+                    ),
+                ),
+                origin=_origin(1),
+                referenced=referenced,
+            ),
+        ),
+        removals=(),
+        word_changes=(),
+        page_numbers=(),
+    )
+
+
+def test_marker_of_an_unreferenced_note_is_its_first_token() -> None:
+    tokens = blocks_tokens(_note_blocks(referenced=False), _LINES)
+    assert tuple(token.text for token in tokens) == ("*", "cate", "it")
+    assert tokens[0].block_id == "b-p0001-002"
+    assert tokens[0].stream is GalleyStream.NOTES
+    assert note_references(_note_blocks(referenced=False)) == (
+        GalleyNoteReference(
+            note_id="n-p0001-002", block_id="b-p0001-002", tokens_before=2
+        ),
+    )
+
+
+def test_marker_of_a_referenced_note_is_not_a_token() -> None:
+    tokens = blocks_tokens(_note_blocks(referenced=True), _LINES)
+    assert tuple(token.text for token in tokens) == ("cate", "it")
+
+
+def test_note_reference_span_separates_the_words_around_it() -> None:
+    # "cate" + reference + "it" would be "cateit" if the span gave no space.
+    blocks = _note_blocks(referenced=True)
+    assert "cateit" not in {token.text for token in blocks_tokens(blocks, _LINES)}
+
+
+def test_token_with_no_word_in_lines_takes_the_page_of_the_word_before() -> None:
+    lines = LinesFile(
+        source_pdf_sha256=_SHA,
+        pages=(_page_lines(0, "alpha beta"), _page_lines(1, "gamma delta")),
+    )
+    blocks = BlocksFile(
+        source_pdf_sha256=_SHA,
+        blocks=(
+            _block(
+                "b-p0000-001",
+                BlockKind.PARAGRAPH,
+                (_span("inserted alpha beta between gamma delta"),),
+                _origin(0, 1),
+            ),
+        ),
+        notes=(),
+        removals=(),
+        word_changes=(),
+        page_numbers=(),
+    )
+    pages = tuple(token.page_index for token in blocks_tokens(blocks, lines))
+    # "between" is in no line: the page of "beta" before it, not of "gamma";
+    # "inserted" has no word before it, and takes the page of the one after.
+    assert pages == (0, 0, 0, 0, 1, 1)
+
+
+def test_folder_without_book_md_is_an_error_naming_the_stage(tmp_path: Path) -> None:
+    folder = BookFolder(tmp_path)
+    write_words(folder.words_json, _words_file(_LINES))
+    write_lines(folder.lines_json, _LINES)
+    write_blocks(folder.blocks_json, _BLOCKS)
+    with pytest.raises(GalleyFilesError, match=r"book\.md(.|\n)*galley2epub markdown"):
+        read_galley_side(folder)
