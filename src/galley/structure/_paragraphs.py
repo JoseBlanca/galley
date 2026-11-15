@@ -227,7 +227,12 @@ def _body_entries(pages: Sequence[PageParts]) -> tuple[_Entry, ...]:
     page_before_has_figure = False
     for page in pages:
         for number, line in enumerate(page.body):
-            plate_break = number == 0 and (page.has_figure or page_before_has_figure)
+            # The hyphen rule comes before the plate break (spec section 6).
+            plate_break = (
+                number == 0
+                and (page.has_figure or page_before_has_figure)
+                and not (before is not None and _ends_with_hyphen(before))
+            )
             if plate_break or _starts_paragraph(line, before):
                 if current:
                     entries.append(_Paragraph(_Piece(tuple(current))))

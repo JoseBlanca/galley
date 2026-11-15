@@ -996,6 +996,21 @@ def test_words_of_a_plate_are_a_paragraph_of_their_own() -> None:
     assert block_text(blocks.blocks[1]) == ", ' .."
 
 
+def test_hyphen_before_a_plate_page_is_joined_across_it() -> None:
+    plate = PageLayout(
+        1,
+        (_region(_spread("cate the plate", 60, 160, 300)),),
+        (Figure(Box(40, 40, 300, 500), "images/p0001.png", 150),),
+    )
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first"), _full("we repli-", 145)),
+        plate,
+    )
+    blocks = make_blocks(_lines_of(*pages), frozenset({"replicate"}), workers=1)
+    assert len(blocks.blocks) == 1
+    assert block_text(blocks.blocks[0]).endswith("we replicate the plate")
+
+
 def _side_text_pages() -> tuple[PageLayout, ...]:
     """Page 0: a body whose last paragraph runs on to page 1, a margin note
     right of the body, and a band of small type below it; page 1: the
