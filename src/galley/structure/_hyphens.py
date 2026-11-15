@@ -2,7 +2,6 @@
 hyphen are joined, with the hyphen dropped or kept, and the joins of a
 block's lines."""
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import NamedTuple
@@ -10,13 +9,12 @@ from typing import NamedTuple
 from galley.model import ChangeReason, WordChange
 from galley.structure._measures import (
     APOSTROPHES,
+    ASCII_DIGITS,
+    is_digit_before_hyphen,
     is_hyphen_first_part,
-    is_number_before_word,
     word_key,
 )
 
-# Spec section 5: a join of two numbers, "1830-" "40", keeps the hyphen.
-_NUMBER_KEY = re.compile(r"[0-9]+")
 # Spec section 5: the word list is no evidence for a second part of fewer
 # than 2 letters ("Con-" "1", "na-" "R": junk keys it happens to hold).
 _WORD_LIST_MIN_LETTERS = 2
@@ -41,14 +39,16 @@ def join_hyphen(
     """The word made of `first`, the last word of a line, and `second`, the
     first word of the next, or None when they are not joined (spec section
     5): `first` must end with "-" after a letter or digit and `second`
-    start with a letter or digit, and with a digit after a digit. After a
+    start with a letter or digit, and with an ASCII digit after an ASCII
+    digit, in which case the hyphen is always kept (`hyphen_kept`): "235-"
+    "37-" gives "235-37-". After a
     lower-case letter, a `second` that starts with a capital is joined
     only when the book prints the hyphenated word (`hyphen_kept`), and
     else not at all.
 
     The hyphen is kept (`hyphen_kept`) when the hyphenated word is among
     `book_words`, the keys of the words the book prints whole, and the
-    joined word is not, and always between two numbers; it is dropped
+    joined word is not; it is dropped
     (`hyphen_join`) when the joined word is in `word_list`, which is in
     lower case (unless `second` has fewer than 2 letters), or among
     `book_words`, and dropped as a guess
@@ -57,18 +57,16 @@ def join_hyphen(
     """
     if not (is_hyphen_first_part(first) and second[:1].isalnum()):
         return None
-    if is_number_before_word(first, second):
-        return None
+    if is_digit_before_hyphen(first):
+        if second[0] not in ASCII_DIGITS:
+            return None
+        return HyphenJoin(first + second, ChangeReason.HYPHEN_KEPT)
     hyphenated = first + second
     joined = first[:-1] + second
     if first[-2].islower() and second[0].isupper():
         if word_key(hyphenated) in book_words:
             return HyphenJoin(hyphenated, ChangeReason.HYPHEN_KEPT)
         return None
-    if _NUMBER_KEY.fullmatch(word_key(first[:-1])) and _NUMBER_KEY.fullmatch(
-        word_key(second)
-    ):
-        return HyphenJoin(hyphenated, ChangeReason.HYPHEN_KEPT)
     joined_key = word_key(joined)
     if word_key(hyphenated) in book_words and joined_key not in book_words:
         return HyphenJoin(hyphenated, ChangeReason.HYPHEN_KEPT)

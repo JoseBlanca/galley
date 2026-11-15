@@ -177,14 +177,18 @@ def is_hyphen_first_part(text: str) -> bool:
     return text.endswith("-") and text[:-1][-1:].isalnum()
 
 
+# Spec section 5: a digit of the hyphen rule is an ASCII digit.
+ASCII_DIGITS = frozenset("0123456789")
+
+
+def is_digit_before_hyphen(text: str) -> bool:
+    """Whether `text` ends with a hyphen after an ASCII digit, "1830-"."""
+    return text.endswith("-") and text[:-1][-1:] in ASCII_DIGITS
+
+
 def is_number_before_word(first: str, second: str) -> bool:
-    """Whether `first`, the last word of a line, ends with a hyphen after a
-    digit and `second`, the first word of the next, starts with a letter:
-    "136-39-" "Bryce,", which are not joined (spec section 5), unlike a
-    range, "1830-" "40"."""
-    return (
-        first.endswith("-")
-        and first[:-1][-1:].isdigit()
-        and second[:1].isalnum()
-        and not second[:1].isdigit()
-    )
+    """Whether `first`, the last word of a line, ends with a hyphen after an
+    ASCII digit and `second`, the first word of the next, starts with a
+    letter (`str.isalpha`): "136-39-" "Bryce,", which are not joined (spec
+    section 5), unlike a range, "1830-" "40"."""
+    return is_digit_before_hyphen(first) and second[:1].isalpha()

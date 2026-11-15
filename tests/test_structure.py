@@ -700,6 +700,7 @@ def test_join_hyphen_gives_the_word_and_its_reason(
         ("word", "and"),
         ("136-39-", "Bryce,"),
         ("37-", "Abacus"),
+        ("37-", "abacus"),
     ],
     ids=[
         "dash",
@@ -708,11 +709,34 @@ def test_join_hyphen_gives_the_word_and_its_reason(
         "no hyphen",
         "digit before, index",
         "digit before, capital",
+        "digit before, lower case",
     ],
 )
 def test_join_hyphen_does_not_join(first: str, second: str) -> None:
     known = frozenset({"and", "136-39bryce", "37abacus"})
     assert join_hyphen(first, second, known, known) is None
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "known", "expected"),
+    [
+        ("235-", "37-", frozenset(), "235-37-"),
+        ("235-", "37-", frozenset({"23537-", "23537"}), "235-37-"),
+        ("149-", "57;insouthernItaly,", frozenset(), "149-57;insouthernItaly,"),
+    ],
+    ids=["range in an index", "joined form known", "digits then letters"],
+)
+def test_join_after_a_digit_with_a_digit_always_keeps_the_hyphen(
+    first: str, second: str, known: frozenset[str], expected: str
+) -> None:
+    # Haskins' index, pages 270 and 268.
+    assert join_hyphen(first, second, known, known) == HyphenJoin(
+        expected, ChangeReason.HYPHEN_KEPT
+    )
+
+
+def test_join_after_a_digit_with_a_non_ascii_digit_does_not_join() -> None:
+    assert join_hyphen("37-", "²", frozenset(), frozenset()) is None
 
 
 @pytest.mark.parametrize(
@@ -1340,6 +1364,25 @@ def test_hyphen_before_a_plate_page_is_joined_across_it() -> None:
     blocks = make_blocks(_lines_of(*pages), frozenset({"replicate"}), workers=1)
     assert len(blocks.blocks) == 1
     assert block_text(blocks.blocks[0]).endswith("we replicate the plate")
+
+
+def test_page_with_a_figure_after_a_number_and_hyphen_starts_a_paragraph() -> None:
+    # "136-39-" is a number before a word, not a hyphen to join: the plate's
+    # first line starts a paragraph, and so does the indented "Bryce," after.
+    plate = PageLayout(
+        1,
+        (_region(_spread("Plate one", 60, 160, 300)),),
+        (Figure(Box(40, 40, 300, 500), "images/p0001.png", 150),),
+    )
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first"), _short("Britain, 136-39-", 145)),
+        plate,
+        _body_page(2, _indented("Bryce, James, 12", 70), _full("and so on", 85)),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert _texts(blocks.blocks)[1:] == ("Plate one", "Bryce, James, 12 and so on")
+    assert block_text(blocks.blocks[0]).endswith("Britain, 136-39-")
+    assert blocks.word_changes == ()
 
 
 def _side_text_pages() -> tuple[PageLayout, ...]:
