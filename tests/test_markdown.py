@@ -2,7 +2,9 @@
 
 import hashlib
 import re
+import shutil
 import string
+import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
 from collections import defaultdict
@@ -14,8 +16,13 @@ import pytest
 from galley import epub, markdown
 from galley.book_folder import BookFolder
 from galley.config import BookConfig, Language
-from galley.errors import EditError, FidelityError, InputFileError
-from galley.fidelity import read_markdown
+from galley.errors import (
+    EditError,
+    FidelityBoundary,
+    FidelityError,
+    InputFileError,
+)
+from galley.fidelity import check_stage, read_markdown
 from galley.markdown import escape_markdown, render_markdown
 from galley.model import (
     Block,
@@ -260,20 +267,23 @@ NOTE = Note(
     origin=(Origin(0, Box(10.0, 500.0, 300.0, 520.0)),),
     referenced=True,
 )
-HEADING = Block(
-    id="b-p0000-001",
-    kind=BlockKind.HEADING,
-    level=1,
-    spans=(Span("Chapter one", Emphasis.NONE, None),),
-    figure=None,
-    origin=(Origin(0, Box(10.0, 20.0, 300.0, 40.0)),),
-)
+
+
+def _block_of_kind(block_id: str, kind: BlockKind) -> Block:
+    return replace(_paragraph(block_id, "Chapter one"), kind=kind)
+
+
+HEADING = replace(_block_of_kind("b-p0000-001", BlockKind.HEADING), level=1)
 
 
 @pytest.mark.parametrize(
     ("blocks", "named"),
     [
         (_blocks_file((HEADING,)), "b-p0000-001"),
+        *(
+            (_blocks_file((_block_of_kind("b-p0000-004", kind),)), "b-p0000-004")
+            for kind in (BlockKind.QUOTE, BlockKind.FIGURE, BlockKind.INDEX_ENTRY)
+        ),
         (_blocks_file((_paragraph("b-p0000-001", "Text."),), (NOTE,)), "n-p0000-001"),
         (
             _blocks_file(
@@ -281,14 +291,278 @@ HEADING = Block(
             ),
             "b-p0000-003",
         ),
+        (
+            _blocks_file(
+                (),
+                (
+                    replace(
+                        NOTE,
+                        referenced=False,
+                        blocks=(_block_of_kind("b-p0000-005", BlockKind.HEADING),),
+                    ),
+                ),
+            ),
+            "b-p0000-005",
+        ),
+        (
+            _blocks_file((), (replace(NOTE, referenced=False, blocks=()),)),
+            "n-p0000-001",
+        ),
+        (
+            _blocks_file((), (replace(NOTE, referenced=False, origin=()),)),
+            "n-p0000-001",
+        ),
     ],
-    ids=["heading", "note", "note reference"],
+    ids=[
+        "heading",
+        "quote",
+        "figure",
+        "index entry",
+        "referenced note",
+        "note reference",
+        "heading in a note",
+        "note without blocks",
+        "note without origin",
+    ],
 )
-def test_render_markdown_refuses_what_the_skeleton_does_not_write(
+def test_render_markdown_refuses_what_it_does_not_write_yet(
     blocks: BlocksFile, named: str
 ) -> None:
     with pytest.raises(InputFileError, match=f"blocks.json.*{named}"):
         render_markdown(blocks, CONFIG)
+
+
+# Structure spec section 10, option (b): margin notes and notes with
+# `referenced` false.
+
+
+def _block(block_id: str, kind: BlockKind, text: str, *page_indices: int) -> Block:
+    """A block of one span on the pages given, one origin each."""
+    return Block(
+        id=block_id,
+        kind=kind,
+        level=None,
+        spans=(Span(text, Emphasis.NONE, None),),
+        figure=None,
+        origin=tuple(
+            Origin(page_index, Box(10.0, 20.0, 300.0, 400.0))
+            for page_index in page_indices
+        ),
+    )
+
+
+def _unreferenced_note(
+    note_id: str, page_index: int, *blocks: Block, marker: str = ""
+) -> Note:
+    return Note(
+        id=note_id,
+        marker=marker,
+        blocks=blocks,
+        origin=(Origin(page_index, Box(10.0, 500.0, 300.0, 520.0)),),
+        referenced=False,
+    )
+
+
+HEADER = """\
+---
+title: "Political Theories of the Middle Age"
+author:
+- "O\\\\. Gierke"
+- "F\\\\. W\\\\. Maitland"
+lang: en
+---
+"""
+
+# Page 3 holds a paragraph and the start of one that runs on to page 4,
+# where the body ends; page 4 has a margin note; each page has a note.
+SIDE_TEXT = _blocks_file(
+    (
+        _block("b-p0003-001", BlockKind.PARAGRAPH, "First paragraph.", 3),
+        _block("b-p0003-002", BlockKind.PARAGRAPH, "runs over the page.", 3, 4),
+        _block("b-p0004-001", BlockKind.MARGIN_NOTE, "Of kings.", 4),
+        _block("b-p0005-001", BlockKind.PARAGRAPH, "Last.", 5),
+    ),
+    (
+        _unreferenced_note(
+            "n-p0003-001",
+            3,
+            _block("b-p0003-003", BlockKind.PARAGRAPH, "A note of page three.", 3),
+            marker="*",
+        ),
+        _unreferenced_note(
+            "n-p0004-001",
+            4,
+            _block("b-p0004-002", BlockKind.PARAGRAPH, "A note,", 4),
+            _block("b-p0004-003", BlockKind.PARAGRAPH, "in two paragraphs.", 4),
+        ),
+    ),
+)
+
+SIDE_TEXT_MARKDOWN = (
+    HEADER
+    + """
+::: {#b-p0003-001}
+First paragraph\\.
+:::
+
+::: {#b-p0003-002}
+runs over the page\\.
+:::
+
+:::: {#n-p0003-001 .note}
+::: {#b-p0003-003}
+\\* A note of page three\\.
+:::
+::::
+
+::: {#b-p0004-001 .margin-note}
+Of kings\\.
+:::
+
+:::: {#n-p0004-001 .note}
+::: {#b-p0004-002}
+A note\\,
+:::
+
+::: {#b-p0004-003}
+in two paragraphs\\.
+:::
+::::
+
+::: {#b-p0005-001}
+Last\\.
+:::
+"""
+)
+
+
+def test_render_markdown_writes_margin_notes_where_they_are_and_notes_after_their_page() -> (
+    None
+):
+    assert render_markdown(SIDE_TEXT, CONFIG) == SIDE_TEXT_MARKDOWN
+
+
+def _ids_in_order(markdown_text: str) -> tuple[str, ...]:
+    """The ids of the divs, in the order their fences open."""
+    return tuple(
+        line.split("{#", 1)[1].split()[0].rstrip("}")
+        for line in markdown_text.splitlines()
+        if line.startswith(":::") and "{#" in line
+    )
+
+
+def test_a_note_whose_page_no_block_covers_follows_the_last_block_of_an_earlier_page() -> (
+    None
+):
+    blocks = _blocks_file(
+        (
+            _block("b-p0002-001", BlockKind.PARAGRAPH, "Page two.", 2),
+            _block("b-p0006-001", BlockKind.PARAGRAPH, "Page six.", 6),
+            # Its first origin is on page 3, though it comes after page 6.
+            _block("b-p0003-001", BlockKind.MARGIN_NOTE, "Out of order.", 3),
+        ),
+        (
+            _unreferenced_note(
+                "n-p0004-001",
+                4,
+                _block("b-p0004-001", BlockKind.PARAGRAPH, "Page four.", 4),
+            ),
+        ),
+    )
+
+    assert _ids_in_order(render_markdown(blocks, CONFIG)) == (
+        "b-p0002-001",
+        "b-p0006-001",
+        "b-p0003-001",
+        "n-p0004-001",
+        "b-p0004-001",
+    )
+
+
+def test_a_note_before_every_page_of_the_blocks_comes_first_of_all() -> None:
+    blocks = _blocks_file(
+        (_block("b-p0002-001", BlockKind.PARAGRAPH, "Page two.", 2),),
+        (
+            _unreferenced_note(
+                "n-p0001-001",
+                1,
+                _block("b-p0001-001", BlockKind.PARAGRAPH, "Page one.", 1),
+            ),
+        ),
+    )
+
+    assert _ids_in_order(render_markdown(blocks, CONFIG)) == (
+        "n-p0001-001",
+        "b-p0001-001",
+        "b-p0002-001",
+    )
+
+
+def test_notes_after_the_same_block_keep_their_order() -> None:
+    blocks = _blocks_file(
+        (
+            _block("b-p0001-001", BlockKind.PARAGRAPH, "Page one.", 1),
+            _block("b-p0002-001", BlockKind.PARAGRAPH, "Page two.", 2),
+        ),
+        tuple(
+            _unreferenced_note(
+                f"n-p0001-00{position}",
+                1,
+                _block(f"b-p0001-00{position + 1}", BlockKind.PARAGRAPH, "A note.", 1),
+            )
+            for position in (1, 2, 3)
+        ),
+    )
+
+    assert _ids_in_order(render_markdown(blocks, CONFIG)) == (
+        "b-p0001-001",
+        "n-p0001-001",
+        "b-p0001-002",
+        "n-p0001-002",
+        "b-p0001-003",
+        "n-p0001-003",
+        "b-p0001-004",
+        "b-p0002-001",
+    )
+
+
+@pytest.mark.pandoc
+def test_pandoc_reads_margin_notes_and_notes_in_their_divs() -> None:
+    assert _words_by_block(SIDE_TEXT_MARKDOWN) == {
+        "b-p0003-001": ["First", "paragraph."],
+        "b-p0003-002": ["runs", "over", "the", "page."],
+        "b-p0003-003": ["*", "A", "note", "of", "page", "three."],
+        "b-p0004-001": ["Of", "kings."],
+        "b-p0004-002": ["A", "note,"],
+        "b-p0004-003": ["in", "two", "paragraphs."],
+        "b-p0005-001": ["Last."],
+    }
+
+
+@pytest.mark.pandoc
+def test_fidelity_check_passes_on_margin_notes_and_notes() -> None:
+    check_stage(FidelityBoundary.MARKDOWN, SIDE_TEXT, read_markdown(SIDE_TEXT_MARKDOWN))
+
+
+@pytest.mark.pandoc
+@pytest.mark.parametrize(
+    ("written", "damaged", "lost"),
+    [
+        ("\\* A note", "A note", "*"),
+        ("page three", "page", "three."),
+        ("Of kings", "Of", "kings."),
+    ],
+    ids=["marker", "note word", "margin note word"],
+)
+def test_fidelity_check_finds_a_word_lost_from_a_note_or_margin_note(
+    written: str, damaged: str, lost: str
+) -> None:
+    markdown_text = SIDE_TEXT_MARKDOWN.replace(written, damaged, 1)
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.MARKDOWN, SIDE_TEXT, read_markdown(markdown_text))
+
+    assert lost in raised.value.missing
 
 
 # Spec section 8: XML 1.0 does not allow these, and Pandoc copies them into
@@ -502,3 +776,48 @@ def test_run_without_blocks_json_raises_naming_structure(tmp_path: Path) -> None
 
     with pytest.raises(InputFileError, match="galley2epub structure"):
         markdown.run(folder, config)
+
+
+# Pages 0 and 1, which _book's pages.json has.
+SIDE_TEXT_ON_TWO_PAGES = _blocks_file(
+    (
+        _block("b-p0000-001", BlockKind.PARAGRAPH, "Of the three estates.", 0),
+        _block("b-p0000-002", BlockKind.MARGIN_NOTE, "The estates.", 0),
+        _block("b-p0001-001", BlockKind.PARAGRAPH, "Of the clergy.", 1),
+    ),
+    (
+        _unreferenced_note(
+            "n-p0000-001",
+            0,
+            _block("b-p0000-003", BlockKind.PARAGRAPH, "See the rolls.", 0),
+            marker="1",
+        ),
+    ),
+)
+
+
+def test_render_markdown_refuses_a_marker_with_a_character_xml_does_not_allow() -> None:
+    note = replace(SIDE_TEXT.notes[0], marker="\ufffe")
+    blocks = replace(SIDE_TEXT, notes=(note,))
+
+    with pytest.raises(
+        InputFileError, match=r"blocks.json.*marker of note n-p0003-001.*U\+FFFE"
+    ):
+        render_markdown(blocks, CONFIG)
+
+
+# Java starts in about a second; the 8-thread run would start it 8 times.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
+@pytest.mark.epubcheck
+def test_the_epub_of_margin_notes_and_notes_passes_epubcheck(tmp_path: Path) -> None:
+    folder, config = _book(tmp_path, SIDE_TEXT_ON_TWO_PAGES)
+
+    markdown.run(folder, config)
+    epub.run(folder, config)
+
+    epubcheck = shutil.which("epubcheck")
+    assert epubcheck is not None
+    # Not captured here, so that pytest shows epubcheck's report on failure;
+    # check=True makes any error a CalledProcessError.
+    subprocess.run([epubcheck, str(folder.book_epub)], check=True, timeout=60)
