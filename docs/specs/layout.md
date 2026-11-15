@@ -153,7 +153,7 @@ applied to all the page's words):
   Domesday 12.1, Mariéjol 11.5.
 - **usual left edge** for odd and for even page indices: the median of
   the left edge found by step 1 below on the pages of that parity that
-  have one; it serves pages with no row wide enough to place the column.
+  place their column themselves; it serves pages with no row wide enough to place the column.
   A parity with no such page takes the other parity's; when no page of
   the book has one, both take the median of the measured pages'
   commonest left edges.
@@ -165,13 +165,30 @@ is laid out as one region, as the skeleton did.
 ### Per page
 
 1. **Body column.** The page's rows are made from all its words,
-   margin notes included. The left edge is the commonest left side of
-   the rows whose width (from the left side of their first word to the
-   right side of their last) is at least 0.8 of the column width; a row
-   with a margin note is then wider than the column and starts outside
-   it, but such rows are a minority (Domesday: 1,000 of about 16,600).
-   The right edge is the left edge plus the column width. A page with no
-   such row takes the usual left edge of its parity.
+   margin notes included. Its **wide rows** are those whose width (from
+   the left side of their first word to the right side of their last) is
+   at least 0.8 of the column width. A page with at least 3 wide rows
+   places its column itself. The **common edges** of a set of sides are
+   found as peaks: the commonest value (as defined in section 1), then
+   the commonest of the values more than 4 pt from every peak found, and
+   so on, keeping each peak that has at least a third as many sides
+   within 2 pt of it as the first. Of the common edges of the wide rows'
+   left sides and those of their right sides, the left and right edges
+   are the pair whose distance is nearest the column width; a tie takes
+   the smaller left edge, then the smaller right. A page with fewer than
+   3 wide rows takes the usual left edge of its parity, and that plus the
+   column width as its right edge.
+
+   Why the page's own edges, and the pair: a row with a margin note is
+   wider than the column and starts, or ends, outside it. Such rows are a
+   minority in most books (Domesday: 1,000 of about 16,600), but not on
+   every page: on Gierke's endnote pages (216 to 280) the notes are
+   joined to as many rows as the body alone makes, and on Domesday's page
+   28 a table's rows start 13 pt right of the body's. And some pages are
+   set wider than the book's column: Gierke's introduction (page 13, 296
+   pt against 273). With the left edge alone and the book's width, the
+   column's right edge fell 40 pt inside Gierke's text, and about 470
+   body words became margin words.
 2. **Outer margin notes.** A word whose right side is at least 2 pt left
    of the left edge, or whose left side is at least 2 pt right of the
    right edge, is a margin word. A word that crosses an edge stays in the
@@ -258,6 +275,8 @@ Where the thresholds come from:
 | threshold | value | from |
 |---|---|---|
 | a row wide enough to place the column | 0.8 of the column width | guessed; a full line is the column width |
+| wide rows for a page to place its column | 3 | guessed |
+| a common edge | a third of the commonest edge's rows, peaks more than 4 pt apart | guessed; measured below |
 | rows that measure a book | 15 rows a page | guessed: enough rows for a commonest edge |
 | commonest edge | within 2 pt | measured: body lines start within 2.2 pt of the edge on 99% of Haskins' lines |
 | margin word | 2 pt outside the column edge | measured, above |
@@ -311,6 +330,32 @@ four of Domesday's (354, two columns of notes; 418, a table; 547 and 552,
 the index) and four of Mariéjol's (14, the bibliography; 71, two columns
 of notes; 169 and 261, pages whose OCR is garbled), and on no page of
 Haskins or Gierke.
+
+The column's edges of step 1 were changed on 15 November 2026, from
+the commonest left side of the wide rows plus the book's column width
+to the pair of common edges. Run on the six whole books with every
+other rule as before, the words in each kind of region:
+
+| book | rule | head | body | left margin | right margin | band |
+|---|---|---|---|---|---|---|
+| Haskins | before | 1,218 | 63,186 | 14 | 4 | 1,925 |
+| | after | 1,218 | 63,173 | 11 | 20 | 1,925 |
+| Stubbs | before | 1,879 | 95,326 | 9 | 9 | 11,909 |
+| | after | 1,880 | 95,328 | 8 | 6 | 11,910 |
+| Domesday | before | 1,890 | 198,212 | 793 | 1,065 | 54,379 |
+| | after | 1,890 | 198,209 | 763 | 1,079 | 54,398 |
+| Mariéjol | before | 1,630 | 208,149 | 10 | 34 | 31,193 |
+| | after | 1,632 | 208,153 | 10 | 26 | 31,195 |
+| Kadesh | before | 212 | 18,075 | 3 | 13 | 7,164 |
+| | after | 212 | 18,076 | 3 | 12 | 7,164 |
+| Gierke | before | 1,439 | 109,014 | 940 | 2,547 | 56 |
+| | after | 1,444 | 110,261 | 1,163 | 1,072 | 56 |
+
+Gierke's margin words fall from 32 to 1 on page 13 (the introduction),
+and on page 235 from 69 body-line ends ("est", "the popu-",
+"similis;") to the 21 words of its margin notes ("Convey- / ance",
+"Nullity"). On Domesday's page 28, "is" and "a" return to their lines.
+The new margin words of Haskins are on two pages of specks (2, 278).
 
 ### What the rules give, measured
 
