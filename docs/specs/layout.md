@@ -153,8 +153,10 @@ applied to all the page's words):
   Domesday 12.1, Mariéjol 11.5.
 - **usual left edge** for odd and for even page indices: the median of
   the left edge found by step 1 below on the pages of that parity that
-  have one; it serves pages with no row wide enough to place the column.
-  A parity with no such page takes the other parity's.
+  place their column themselves; it serves pages with no row wide enough to place the column.
+  A parity with no such page takes the other parity's; when no page of
+  the book has one, both take the median of the measured pages'
+  commonest left edges.
 
 A book with no page of 15 rows is measured on its pages of at least 3
 rows; a book with none of those has no measures, and each of its pages
@@ -163,13 +165,30 @@ is laid out as one region, as the skeleton did.
 ### Per page
 
 1. **Body column.** The page's rows are made from all its words,
-   margin notes included. The left edge is the commonest left side of
-   the rows whose width (from the left side of their first word to the
-   right side of their last) is at least 0.8 of the column width; a row
-   with a margin note is then wider than the column and starts outside
-   it, but such rows are a minority (Domesday: 1,000 of about 16,600).
-   The right edge is the left edge plus the column width. A page with no
-   such row takes the usual left edge of its parity.
+   margin notes included. Its **wide rows** are those whose width (from
+   the left side of their first word to the right side of their last) is
+   at least 0.8 of the column width. A page with at least 3 wide rows
+   places its column itself. The **common edges** of a set of sides are
+   found as peaks: the commonest value (as defined in section 1), then
+   the commonest of the values more than 4 pt from every peak found, and
+   so on, keeping each peak that has at least a third as many sides
+   within 2 pt of it as the first. Of the common edges of the wide rows'
+   left sides and those of their right sides, the left and right edges
+   are the pair whose distance is nearest the column width; a tie takes
+   the smaller left edge, then the smaller right. A page with fewer than
+   3 wide rows takes the usual left edge of its parity, and that plus the
+   column width as its right edge.
+
+   Why the page's own edges, and the pair: a row with a margin note is
+   wider than the column and starts, or ends, outside it. Such rows are a
+   minority in most books (Domesday: 1,000 of about 16,600), but not on
+   every page: on Gierke's endnote pages (216 to 280) the notes are
+   joined to as many rows as the body alone makes, and on Domesday's page
+   28 a table's rows start 13 pt right of the body's. And some pages are
+   set wider than the book's column: Gierke's introduction (page 13, 296
+   pt against 273). With the left edge alone and the book's width, the
+   column's right edge fell 40 pt inside Gierke's text, and about 470
+   body words became margin words.
 2. **Outer margin notes.** A word whose right side is at least 2 pt left
    of the left edge, or whose left side is at least 2 pt right of the
    right edge, is a margin word. A word that crosses an edge stays in the
@@ -212,12 +231,25 @@ is laid out as one region, as the skeleton did.
    "ancient"). The gutter is the strip of 6 pt, moved in steps of 1 pt
    across the middle third, at which the most rows are open; a tie takes
    the leftmost. A **run** is a longest stretch of consecutive compatible
-   rows; it is cut when it holds at least 8 open rows in the body, or 3
-   in the band, and in the band only when at least half of its open rows
-   have their left part ending within 3 pt of the strip's left side (the
-   left column is justified to the gutter; Domesday's short notes printed
-   side by side in a row are not, and must be read row by row, 1, 2, 3,
-   4, not 1, 3, 2, 4). A cut run becomes two regions: each word goes
+   rows that, in the body, starts and ends at an open row: there a row
+   with words on one side only, or with a word across the strip, belongs
+   to a run only between two of its open rows. (A justified line of prose
+   has one word across the strip; counted at the edge of a run, it joined
+   the run, and on Kadesh's page 28 and Domesday's 43, 388 and 477 lines
+   of prose above or below a table or figure were read as their left
+   halves, then their right halves.) In the band a run may start or end
+   at any compatible row: the first row of Kadesh's two columns of notes
+   on page 8 has an OCR word that runs over the gutter ("Ori-", 227 to
+   252 pt, the strip 245.5 to 251.5), and as the edge of the run it would
+   be read across both columns. Word spaces do not tell the two apart:
+   Kadesh's prose has gaps of 6 pt or more within 12 pt of the gutter on
+   19 of the 26 rows of page 28 with a word across it. A run is cut
+   when it holds at least 8 open rows in the body, or 3
+   in the band, and in the band only when the gutter's middle lies within
+   10 pt of the middle of the body column (two columns of notes are set
+   on either side of the middle; Domesday's short notes printed side by
+   side in a row are not, and must be read row by row, 1, 2, 3, 4, not 1,
+   3, 2, 4). A cut run becomes two regions: each word goes
    left or right of the strip's middle by its own middle. The rows
    before and after it stay regions of their own: an index page whose
    title spans the column gives the title, then the left column, then
@@ -225,11 +257,17 @@ is laid out as one region, as the skeleton did.
 6. **Drop capital.** A word of the body taller than 2.2 times the body
    word height, whose left side is within 3 pt of the left edge, is set
    aside before the rows of steps 3 to 5 and the lines of step 7 are
-   made. Once its region's lines are made, it is placed first in the
-   topmost line whose box overlaps the word's box vertically and lies to
-   its right. (Haskins' "IN" on page 163 has its top 0.5 pt below the
+   made. Once the regions' lines are made, the lines beside it are those,
+   of any region but a margin region, whose box overlaps the word's box
+   vertically and lies to its right, that is whose left side is at or
+   right of the word's middle. Its region is the one holding the line
+   beside it whose left side is nearest it (the smallest left side), so
+   that beside a column cut the left column's lines win over the right's;
+   it is placed first in the topmost line beside it in that region, and
+   the line's box then holds the word. (Haskins' "IN" on page 163 has its top 0.5 pt below the
    first line's centre, so a rule on the line's centre would put it on
-   the second line.)
+   the second line.) A word with no such line is not set aside: the
+   page is laid out again with it as a word of the body.
 7. **Lines.** Inside each region, words are grouped into lines by the
    skeleton's rule, the lines ordered by their top and the words of each
    line by their left side.
@@ -247,6 +285,8 @@ Where the thresholds come from:
 | threshold | value | from |
 |---|---|---|
 | a row wide enough to place the column | 0.8 of the column width | guessed; a full line is the column width |
+| wide rows for a page to place its column | 3 | guessed |
+| a common edge | a third of the commonest edge's rows, peaks more than 4 pt apart | guessed; measured below |
 | rows that measure a book | 15 rows a page | guessed: enough rows for a commonest edge |
 | commonest edge | within 2 pt | measured: body lines start within 2.2 pt of the edge on 99% of Haskins' lines |
 | margin word | 2 pt outside the column edge | measured, above |
@@ -256,7 +296,7 @@ Where the thresholds come from:
 | band rows small | two thirds | guessed: Mariéjol's note lines are small on 769 of 911 |
 | gap above the band | 1.1 body line pitches | measured: the 10th percentile of the gap from the last body line to the first note line is 1.16 pitches in Haskins, 1.24 in Domesday, 1.39 in Mariéjol |
 | gutter | 6 pt wide, middle third, 8 open rows in the body, 3 in the band | measured, below |
-| left column justified | 3 pt | guessed |
+| band gutter off the column's middle | 10 pt | measured, below |
 | drop capital | 2.2 times the body word height, within 3 pt of the edge | measured: Haskins' are 2.67 ("IN", page 163) to 4 times |
 
 An earlier form of the column rule, which asked every row of a run to
@@ -279,8 +319,53 @@ Stubbs' index pages a full-size catchword row under the head ("BUR
 CON") makes the small-type columns below it a band, so the band's
 3-row rule applies there. The band needs only 3 rows because two
 columns of notes are often short, as in Kadesh; with 3 rows and no
-justification test, the band rule cut Domesday's side-by-side notes
+further test, the band rule cut Domesday's side-by-side notes
 into columns on 19 pages (83 and 139 among them) and Mariéjol's on 10.
+
+The further test was first that at least half of the open rows have
+their left part ending within 3 pt of the strip's left side (the left
+column justified to the gutter). Run on the six whole books on 15
+November 2026, it failed on two reference pages. On Domesday's page 83,
+notes 3 and 5 end within 2 pt of the strip, being of the same length, so
+two of its three open rows passed and the notes were cut into columns.
+On Kadesh's page 10, the text layer's word boxes end 4 to 12 pt short of
+the gutter, so three of its seven open rows passed and its two columns
+of notes were read across. The gutter's position tells them apart: in
+the band runs of 3 open rows or more, its middle lies within 8 pt of the
+column's middle on all 30 of Kadesh's, and 13 to 46 pt from it in the
+nine of Domesday's short notes side by side (pages 83, 111, 122, 139,
+236, 240, 404, 504, 506). With the 10 pt test, the band is cut into
+columns on 30 of Kadesh's pages, Stubbs' 10 index pages (312 to 321),
+four of Domesday's (354, two columns of notes; 418, a table; 547 and 552,
+the index) and four of Mariéjol's (14, the bibliography; 71, two columns
+of notes; 169 and 261, pages whose OCR is garbled), and on no page of
+Haskins or Gierke.
+
+The column's edges of step 1 were changed on 15 November 2026, from
+the commonest left side of the wide rows plus the book's column width
+to the pair of common edges. Run on the six whole books with every
+other rule as before, the words in each kind of region:
+
+| book | rule | head | body | left margin | right margin | band |
+|---|---|---|---|---|---|---|
+| Haskins | before | 1,218 | 63,186 | 14 | 4 | 1,925 |
+| | after | 1,218 | 63,173 | 11 | 20 | 1,925 |
+| Stubbs | before | 1,879 | 95,326 | 9 | 9 | 11,909 |
+| | after | 1,880 | 95,328 | 8 | 6 | 11,910 |
+| Domesday | before | 1,890 | 198,212 | 793 | 1,065 | 54,379 |
+| | after | 1,890 | 198,209 | 763 | 1,079 | 54,398 |
+| Mariéjol | before | 1,630 | 208,149 | 10 | 34 | 31,193 |
+| | after | 1,632 | 208,153 | 10 | 26 | 31,195 |
+| Kadesh | before | 212 | 18,075 | 3 | 13 | 7,164 |
+| | after | 212 | 18,076 | 3 | 12 | 7,164 |
+| Gierke | before | 1,439 | 109,014 | 940 | 2,547 | 56 |
+| | after | 1,444 | 110,261 | 1,163 | 1,072 | 56 |
+
+Gierke's margin words fall from 32 to 1 on page 13 (the introduction),
+and on page 235 from 65 words, mostly body-line ends ("est", "the popu-",
+"similis;") to the 21 words of its margin notes ("Convey- / ance",
+"Nullity"). On Domesday's page 28, "is" and "a" return to their lines.
+The new margin words of Haskins are on two pages of specks (2, 278).
 
 ### What the rules give, measured
 
@@ -324,7 +409,7 @@ class BookMeasures:
 
 def run(folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS) -> None: ...
 
-def measure_book(words: WordsFile) -> BookMeasures | None: ...
+def measure_book(words: WordsFile, *, workers: int = DEFAULT_WORKERS) -> BookMeasures | None: ...
 def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout: ...
 def group_lines(words: tuple[Word, ...]) -> tuple[Line, ...]: ...
 ```
@@ -344,12 +429,16 @@ runs the fidelity check before writing, and writes nothing on a
 ## 5. How it runs in parallel
 
 `measure_book` computes each page's rows and its numbers with
-`map_pages`, then takes the medians over the pages in page order. Then
+`map_pages`, in `workers` threads, then takes the medians over the pages
+in page order. Then
 `layout_page` runs on every page with `map_pages`. A page needs nothing
 from the others but the book's measures, so the output does not depend
 on the number of workers. The measures pass adds one grouping of rows
-per page; on Domesday, 558 pages, it is expected to cost less than the
-layout itself (not measured).
+per page. Measured on 15 November 2026 on Domesday's 558 pages, on an
+Apple M5 Pro with 6 workers (1 worker in brackets): the measures pass
+takes 0.07 s (0.17 s) and the layout of the pages 0.19 s (0.62 s);
+reading words.json takes 1.1 s, and `galley2epub layout`, which also
+runs the fidelity check and writes lines.json, 2.5 s in all.
 
 ## 6. The cases
 
@@ -360,15 +449,17 @@ layout itself (not measured).
   the head line. Structure removes them (structure §4).
 - **A page number alone at the foot** (Mariéjol's "(49)"; Kadesh's
   second sequence, the page numbers of the journal it was printed in) and **signature marks**
-  ("M. 4", "4—2"): layout gives them no region of their own. The gap
+  ("M. 4", "4—2"): layout looks for no region of their own. The gap
   above a page's last line does not tell them from the last line of
   text: it is below 0.9 body line pitches for a tenth of the page numbers
   and signature marks of the four books. They end as the last line of
-  the body or the band, and structure finds them there.
+  the body or the band, and structure finds them there; below a column
+  cut, as on Kadesh's page 10 ("83"), they are the row after the run and
+  so a region of their own, which structure reads the same way.
 - **A margin note level with the running head**: its words are margin
   words (step 2) and never join the head.
 - **Domesday's short notes side by side**: one line per row, read left
-  to right, which is their order; the justification test of step 5 keeps
+  to right, which is their order; the gutter test of step 5 keeps
   three or more such rows from being cut into columns (page 83, a
   reference page).
 - **Index pages**: two columns, each read top to bottom (step 5). An
@@ -392,6 +483,21 @@ layout itself (not measured).
   until the first plan's evaluation shows how much it matters.
 - **A margin region beside a column cut**: it is placed by its own top,
   after all the body regions, whatever columns it lies beside.
+- **A margin word whose box reaches into the column**: the text layer
+  sometimes gives a margin note's word a box that runs on into the body
+  column, past its edge (Domesday's page 75, "land." from 52.6 to 80.0 pt
+  against the edge at 53; page 83, "Eng-" from 46.3 to 73.4 pt against
+  69). Such a word crosses the edge, so it stays in the body line beside
+  it, as a hung quotation mark does; the rest of its note is a margin
+  region.
+- **A margin note cut in two**: where the OCR lost a line of a note, the
+  gap between its lines passes 1.5 pitches and the note becomes two
+  margin regions (Gierke's page 270). Structure reads them one after the
+  other.
+- **A table of contents** (Mariéjol's page 450): titles on the left and
+  page numbers on the right, with an empty strip between them over 8
+  rows, are cut into a column of titles and a column of numbers. Reading
+  them as entries is left to structure's second plan.
 
 ## 7. Fidelity
 
@@ -423,8 +529,8 @@ with their boxes, with a `BookMeasures` given in the test:
   is a drop capital whose top lies 0.5 pt below the upper line's centre;
 - in the body, 10 open rows, a blank row in the left column and one word
   crossing the gutter keep one run and give two regions; in a band,
-  three rows of two short notes whose left parts end 20 pt and more
-  before the strip stay three rows;
+  three rows of two short notes whose gutter lies more than 10 pt from
+  the column's middle stay three rows;
 - `measure_book` on 20 hand-made pages gives the medians, and `None` on
   pages of 2 rows;
 - `run` on a hand-made `words.json` of 8 pages with 1 worker and with 3
@@ -449,7 +555,8 @@ differ slightly from the whole book's.
 | `stubbs_51_56-64` (new) | 0 (51) | a cut-in note at the left; specks above the head |
 | `stubbs_51_56-64` | 9 (64) | a cut-in note at the right |
 | `domesday_74-83` (new) | 2 (76) | an outer margin note on the right, short notes side by side, signature "4—2" |
-| `domesday_74-83` | 0 (74) | an outer margin note on the left, signature "M. 4" |
+| `domesday_74-83` | 0 (74) | an outer margin note on the right, signature "M. 4" |
+| `domesday_74-83` | 1 (75) | outer margin notes on the left; one word of a note, "land.", whose box reaches into the column, stays in its body line |
 | `domesday_74-83` | 9 (83) | short notes side by side in three rows, read row by row |
 | `mariejol_210-219` (new) | 0 (210) | footnotes of 9-pt OCR lines; a foot line holding the signature and the page number "(l93)" |
 | `mariejol_210-219` | 4 (214) | a foot line the OCR garbled |

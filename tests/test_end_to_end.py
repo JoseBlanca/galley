@@ -23,15 +23,6 @@ from galley.model import block_text, read_blocks, read_lines, read_words
 KADESH = "kadesh_8-17"
 GIERKE = "gierke_86-93_270-271"
 
-# Spec section 2: the lines of each page under the skeleton's layout rule.
-# Kadesh page 0 keeps 41 lines without the page number 81, which shared a
-# line with other words.
-LINE_COUNTS = frozendict(
-    {
-        KADESH: (41, 45, 45, 52, 51, 50, 52, 49, 2, 0),
-        GIERKE: (24, 37, 37, 36, 36, 36, 34, 30, 43, 53),
-    }
-)
 # Spec sections 2 and 6: the words of each page in words.json. Kadesh page 0
 # loses 81 to its excluded region, and page 9 is excluded.
 WORD_COUNTS = frozendict(
@@ -43,7 +34,8 @@ WORD_COUNTS = frozendict(
 TITLES = frozendict(
     {KADESH: "The Battle of Kadesh", GIERKE: "Political Theories of the Middle Age"}
 )
-# The block ids of spec section 9: one paragraph per page that has a region.
+# The block ids of spec section 9 that still hold with layout's regions: the
+# first block of each page that has a region.
 BLOCK_IDS = frozendict(
     {
         KADESH: tuple(f"b-p{page:04d}-001" for page in range(9)),
@@ -84,69 +76,135 @@ def test_every_file_of_the_book_folder_but_edits_is_written(
 # lines.json
 
 
-def test_lines_json_has_the_line_counts_of_spec_section_2(
+def test_every_word_of_a_page_is_in_one_line_of_that_page(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    for name, line_counts in LINE_COUNTS.items():
+    # Layout spec section 7: layout regroups words and removes none.
+    for name, word_counts in WORD_COUNTS.items():
         lines = read_lines(excerpt_books[name].lines_json)
+        words = read_words(excerpt_books[name].words_json)
+        assert tuple(page.index for page in lines.pages) == tuple(
+            page.index for page in words.pages
+        )
+        for page_lines, page_words in zip(lines.pages, words.pages, strict=True):
+            assert Counter(
+                word.text
+                for region in page_lines.regions
+                for line in region.lines
+                for word in line.words
+            ) == Counter(word.text for word in page_words.words)
         assert (
             tuple(
-                sum(len(region.lines) for region in page.regions)
+                sum(len(line.words) for region in page.regions for line in region.lines)
                 for page in lines.pages
             )
-            == line_counts
+            == word_counts
         )
 
 
-def test_lines_json_has_one_region_per_page_but_on_the_excluded_kadesh_page_9(
+def test_every_page_has_regions_but_the_excluded_kadesh_page_9(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     kadesh = read_lines(excerpt_books[KADESH].lines_json)
     gierke = read_lines(excerpt_books[GIERKE].lines_json)
 
-    assert tuple(len(page.regions) for page in kadesh.pages) == (1,) * 9 + (0,)
-    assert tuple(len(page.regions) for page in gierke.pages) == (1,) * 10
+    assert tuple(len(page.regions) > 0 for page in kadesh.pages) == (True,) * 9 + (
+        False,
+    )
+    assert all(page.regions for page in gierke.pages)
 
 
-def test_kadesh_page_0_has_the_line_across_both_footnote_columns(
+def test_kadesh_page_2_has_a_running_head_region_first_and_a_band_of_two_columns(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    (region,) = read_lines(excerpt_books[KADESH].lines_json).pages[0].regions
-    texts = tuple(" ".join(word.text for word in line.words) for line in region.lines)
+    # Layout spec section 8: book page 10 has a running head and two
+    # footnote columns. The head region is first and above every other; two
+    # regions below the body sit side by side, the left one first.
+    regions = read_lines(excerpt_books[KADESH].lines_json).pages[2].regions
+    head, body = regions[0], regions[1]
+    assert len(head.lines) == 1
+    assert all(head.box.bottom <= region.box.top for region in regions[1:])
+    below = tuple(region for region in regions[2:] if region.box.top >= body.box.bottom)
+    assert any(
+        left.box.x1 <= right.box.x0 + 2
+        and left.box.top < right.box.bottom
+        and right.box.top < left.box.bottom
+        for index, left in enumerate(below)
+        for right in below[index + 1 :]
+    )
 
-    assert (
-        "•Pa per read before the International Congress of Ori- 'There is, "
-        "however, much material for studying the"
-    ) in texts
+
+def test_kadesh_page_0_reads_its_two_footnote_columns_one_after_the_other(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # The skeleton read one line across both columns, from "•Pa" in the
+    # left to "'There" in the right; layout puts them in two regions, the
+    # left first (layout spec section 3, step 5).
+    regions = read_lines(excerpt_books[KADESH].lines_json).pages[0].regions
+
+    def region_of(text: str) -> int:
+        (index,) = (
+            index
+            for index, region in enumerate(regions)
+            for line in region.lines
+            if text in (word.text for word in line.words)
+        )
+        return index
+
+    assert region_of("•Pa") < region_of("'There")
+
+
+def test_gierke_page_2_has_a_margin_region_right_of_the_body(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Layout spec section 8: book page 88 has a running head and margin
+    # notes outside the column, on the right of an even page index. The
+    # spec's order puts the running-head region first and the body next.
+    regions = read_lines(excerpt_books[GIERKE].lines_json).pages[2].regions
+    head, body = regions[0], regions[1]
+    assert head.box.bottom <= body.box.top
+    assert any(region.box.x0 >= body.box.x1 for region in regions[2:])
 
 
 # blocks.json
 
 
-def test_blocks_json_has_one_paragraph_per_page_with_every_word_of_it(
+def test_blocks_json_has_one_paragraph_per_region_with_every_word_of_it(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
+    # The walking skeleton's structure, which work package 3 replaces: each
+    # region becomes one paragraph, numbered from 1 on its page.
     for name, block_ids in BLOCK_IDS.items():
         blocks = read_blocks(excerpt_books[name].blocks_json)
-        words = read_words(excerpt_books[name].words_json)
-        assert tuple(block.id for block in blocks.blocks) == block_ids
-        block_word_counts = tuple(
-            len(block_text(block).split()) for block in blocks.blocks
+        lines = read_lines(excerpt_books[name].lines_json)
+        regions = tuple(
+            (page.index, number, region)
+            for page in lines.pages
+            for number, region in enumerate(page.regions, start=1)
         )
-        assert block_word_counts == tuple(
-            len(page.words) for page in words.pages if page.words
+        assert tuple(block.id for block in blocks.blocks) == tuple(
+            f"b-p{index:04d}-{number:03d}" for index, number, _ in regions
         )
-        assert block_word_counts == tuple(
-            count for count in WORD_COUNTS[name] if count > 0
+        assert set(block_ids) <= {block.id for block in blocks.blocks}
+        assert tuple(block_text(block).split() for block in blocks.blocks) == tuple(
+            [word.text for line in region.lines for word in line.words]
+            for _, _, region in regions
         )
 
 
-def test_the_last_kadesh_block_is_the_stray_words_of_the_plate(
+def test_the_last_kadesh_blocks_are_the_stray_words_of_the_plate(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     blocks = read_blocks(excerpt_books[KADESH].blocks_json)
+    plate_words = [
+        word
+        for block in blocks.blocks
+        if block.id.startswith("b-p0008-")
+        for word in block_text(block).split()
+    ]
 
-    assert block_text(blocks.blocks[-1]) == ", ' .. ^U;L"
+    assert blocks.blocks[-1].id.startswith("b-p0008-")
+    assert sorted(plate_words) == sorted([",", "'", "..", "^U;L"])
 
 
 def test_blocks_json_has_no_notes_removals_word_changes_or_page_numbers(
