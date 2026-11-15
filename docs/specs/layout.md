@@ -474,7 +474,8 @@ differ slightly from the whole book's.
 | `stubbs_51_56-64` (new) | 0 (51) | a cut-in note at the left; specks above the head |
 | `stubbs_51_56-64` | 9 (64) | a cut-in note at the right |
 | `domesday_74-83` (new) | 2 (76) | an outer margin note on the right, short notes side by side, signature "4—2" |
-| `domesday_74-83` | 0 (74) | an outer margin note on the left, signature "M. 4" |
+| `domesday_74-83` | 0 (74) | an outer margin note on the right, signature "M. 4" |
+| `domesday_74-83` | 1 (75) | outer margin notes on the left |
 | `domesday_74-83` | 9 (83) | short notes side by side in three rows, read row by row |
 | `mariejol_210-219` (new) | 0 (210) | footnotes of 9-pt OCR lines; a foot line holding the signature and the page number "(l93)" |
 | `mariejol_210-219` | 4 (214) | a foot line the OCR garbled |
