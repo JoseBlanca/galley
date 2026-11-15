@@ -154,7 +154,9 @@ applied to all the page's words):
 - **usual left edge** for odd and for even page indices: the median of
   the left edge found by step 1 below on the pages of that parity that
   have one; it serves pages with no row wide enough to place the column.
-  A parity with no such page takes the other parity's.
+  A parity with no such page takes the other parity's; when no page of
+  the book has one, both take the median of the measured pages'
+  commonest left edges.
 
 A book with no page of 15 rows is measured on its pages of at least 3
 rows; a book with none of those has no measures, and each of its pages
@@ -324,7 +326,7 @@ class BookMeasures:
 
 def run(folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS) -> None: ...
 
-def measure_book(words: WordsFile) -> BookMeasures | None: ...
+def measure_book(words: WordsFile, *, workers: int = DEFAULT_WORKERS) -> BookMeasures | None: ...
 def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout: ...
 def group_lines(words: tuple[Word, ...]) -> tuple[Line, ...]: ...
 ```
@@ -344,7 +346,8 @@ runs the fidelity check before writing, and writes nothing on a
 ## 5. How it runs in parallel
 
 `measure_book` computes each page's rows and its numbers with
-`map_pages`, then takes the medians over the pages in page order. Then
+`map_pages`, in `workers` threads, then takes the medians over the pages
+in page order. Then
 `layout_page` runs on every page with `map_pages`. A page needs nothing
 from the others but the book's measures, so the output does not depend
 on the number of workers. The measures pass adds one grouping of rows
