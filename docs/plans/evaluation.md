@@ -7,7 +7,7 @@ galley's word list, `wordlist.py` (architecture §12), which the tool and
 later the analyze stage need. It ends with the tool's first run on the
 four books of the evaluation set, whose scores are the baseline that
 every later plan is measured against. Dated 15 November 2026. State:
-under way, approved by the owner on 15 November 2026.
+done, 15 November 2026 (approved by the owner the same day).
 
 The five work packages are the breakdown the owner approved in chat on
 15 November 2026. "Spec §5" below is section 5 of
@@ -289,7 +289,7 @@ books.
 - [x] 5.1 The excerpt, its HTML and galley's outputs; a subagent chooses
   the 5 to 8 differences from what the tool reports on it and from the
   page images, and writes them down. Spec §10. Deliverables 1 and 2.
-- [ ] 5.2 After the owner's check: the excerpt test; then `galley-eval
+- [x] 5.2 After the owner's check: the excerpt test; then `galley-eval
   run` on the four books and the baseline in the report. Spec §10, §8.
   Deliverables 3 and 4. Needs 5.1 and the owner.
 

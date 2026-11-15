@@ -5,6 +5,67 @@ tool of `docs/specs/evaluation.md` and galley's word list, and ends with
 the baseline scores of galley on four books. Written as the work goes,
 for the owner. Started on 15 November 2026.
 
+## Summary
+
+The plan is done, on branch `plan/evaluation`, not merged. Finished on
+15 November 2026.
+
+**What exists now.**
+
+- `galley-eval`, a development tool beside galley. `uv run galley-eval
+  run` runs galley on the four books of `evaluation/books.toml` and
+  compares its words, lines, blocks and `book.md` with the Project
+  Gutenberg edition made from the same scan, in 74 s for the four. Each
+  book gets a scorecard, a file of differences (each with its PDF page
+  and the stage to blame), a table of pages and a summary;
+  `runs/evaluation/summary.md` puts the books side by side.
+- galley's word list, `wordlist.py`, which analyze will use.
+- An excerpt test on ten pages of Haskins, with the eight differences
+  the owner checked, in 0.22 s.
+- The baseline of galley as it is (the walking skeleton), below. The
+  whole suite, galley's and the tool's, is 781 tests in 15.8 s.
+
+**What the baseline says**, in the order of what it would gain:
+
+- The error rate is the share of the book's words (66,000 in Haskins to
+  241,000 in Domesday, by Gutenberg's text) that galley loses, adds or
+  gets wrong: 11% to 17% in the English books, 34% in Mariéjol. It is
+  the same after every stage, because no stage after extract changes
+  the words yet: all of it is in the words read from the page, or is
+  text that structure should have removed.
+- Structure has the most to gain: 1,243–1,841 running-head and
+  page-number words per book that galley keeps and the book does not
+  have (up to 2.5% of Haskins' words), 985–3,600 hyphens left split, and
+  no paragraph, note or margin note found: about 1 in 10 of galley's
+  paragraph breaks is one the book has.
+- Extract's spacing: text run together is the commonest error of
+  Haskins (1,328 runs) and common in Stubbs (2,315).
+- Mariéjol's text layer misreads a third of its words (error rate
+  0.343): the case for galley's own OCR.
+- For detecting bad OCR without a reference, the share of dictionary
+  words follows the real error (Spearman +0.59 to +0.84) and the share of
+  stray single letters catches scrambled pages (−0.67 to −0.73 in three
+  books).
+
+**What is left open**, each written where the next person will look:
+
+- Three kinds of word are counted as galley's errors when they are not,
+  or not of that kind: a word run together with the next, when a running
+  head sits just before it, is counted lost rather than run together;
+  the notes of a book whose notes galley leaves in the body score worse
+  than they are (Haskins' notes, 0.409); and Gutenberg's unmarked
+  corrections (about 25 in Stubbs) count as galley's errors. Each is a
+  few hundred words at most, and the first two go away once structure
+  removes running heads and finds notes. Spec §5 and below.
+- The comparison takes 3–13 s per book, mostly reading galley's JSON.
+
+**What is asked of the owner:** to read the baseline, to decide whether
+to merge `plan/evaluation` into `main`, and then which stage to work on
+first. The next step, with the owner, is to go through the commonest
+differences of each book and turn them into the work of a stage spec.
+The baseline suggests structure (running heads, hyphens, paragraphs,
+notes) first.
+
 ## Before the first task
 
 Checked on 15 November 2026 in `.claude/worktrees/evaluation`, branch
@@ -247,3 +308,94 @@ Not taken, or open:
   (leftovers across the book, any two tokens of a stretch, joins far
   apart, joins of at most 4). A spec of an alignment should say, for
   each pairing rule, how near and how alike two things must be.
+
+## Work package 5: the excerpt test and the baseline
+
+Task 5.1 in 861d2bf, task 5.2 in 0b8c758 and cc481d1.
+
+1. The excerpt `haskins_eval`: 10 PDF pages of Haskins, page indices
+   131–138 (printed 116–123: the start of chapter V, footnotes 40–42,
+   line-end hyphens, running heads, a section break), 265 (a blank page,
+   kept so that the index follows the right page) and 266 (printed 251,
+   the first page of the index). With it, under
+   `tests/fixtures/evaluation/`: the matching part of Gutenberg's HTML,
+   25 KB, with no licence (`grep -ci gutenberg`: 0), and galley's output
+   files, 957 KB in all.
+2. The owner checked the eight chosen differences by eye against the
+   page images on 15 November 2026; all eight hold. One of them is not
+   galley's error: chapter V opens "IN" in capitals, galley read "IN",
+   and Gutenberg wrote "In". It stays in the test, counted as `case`,
+   with a comment.
+3. `tools/galley-eval/tests/test_excerpt.py`: 8 tests, 0.22 s. With the
+   stage attribution broken, all 8 failed.
+4. The baseline, below.
+
+A last defect of the tool, found while choosing the differences, was
+fixed in 0b8c758: the leftover passes now offer a word the galley tokens
+of its own page first. It lowered the error rates by up to 1.3 points
+(Mariéjol, 0.356 to 0.343). Two limits remain and are written in spec §5:
+a word on the right page that is not alike enough still pairs with one
+on the page before ("VII," with "ii8"), and a glued word behind a run of
+extras, such as a running head, is reported missing ("Giraldus" before
+"GiraldusCambrensis").
+
+### The baseline
+
+galley at commit cc481d1 (the walking skeleton), the four books run by
+`uv run galley-eval run` from a clean `runs/evaluation/`: 74 s in all,
+on the M5 Pro. Rerun after the last commit, the scores were the same.
+Error rates are the share of the reference's tokens that are wrong, in
+the body unless named; lower is better.
+
+| book | error rate: words / lines / blocks / markdown | notes error rate | extras on the page edge | paragraph breaks right / found | notes as notes / in body / missing | margin notes as margin notes / in body / missing |
+|---|---|---|---|---|---|---|
+| Haskins | 0.123 / 0.124 / 0.124 / 0.124 | 0.409 | 1,243 | 0.113 / 0.110 | 0 / 71 / 1 | (none) |
+| Stubbs | 0.179 / 0.174 / 0.174 / 0.174 | (none) | 1,598 | 0.131 / 0.074 | (none) | 0 / 448 / 19 |
+| Domesday | 0.114 / 0.112 / 0.112 / 0.112 | 0.104 | 1,841 | 0.120 / 0.082 | 0 / 1,729 / 0 | 0 / 587 / 6 |
+| Mariéjol | 0.342 / 0.343 / 0.343 / 0.343 | 0.700 | 1,538 | 0.092 / 0.037 | 0 / 1,428 / 4 | (none) |
+
+What the baseline says about galley:
+
+- The error rate is the same at every stage, because the walking
+  skeleton removes nothing and joins nothing: every error comes from
+  the words read from the page, or is something structure should remove.
+- Running heads and page numbers: 1,243 to 1,841 extra tokens per book
+  on the page edge, all to be removed by structure.
+- Words run together by the text layer ("ThekingsofFrance,"): the
+  commonest error of Haskins, 1,328, and 2,315 in Stubbs; extract's
+  spacing.
+- Hyphens at line ends left split: 985 in Haskins, 1,918 in Stubbs,
+  3,600 in Domesday; structure's hyphen join.
+- Scrambled text: Stubbs' two-column index gives most of its 10,903
+  extra tokens; Domesday's tables most of its 11,077.
+- Mariéjol's text layer is poor: 26,257 misread words and 21,526 missing
+  ones. It is the case for galley's own OCR.
+- Paragraphs: one per page, so about 10% of galley's breaks are real.
+  Notes and margin notes are all left in the body, as the skeleton does.
+
+The ten commonest kinds of difference per book, with an example of each,
+are in the run's `summary.md` files; the counts above are from them.
+
+### The candidates for detecting bad OCR
+
+Spearman correlation over pages (scored pages with 50 tokens or more)
+of each statistic galley can compute alone with the two measures of real
+OCR error of spec §8. Each cell gives the correlation with `ocr_recall`
+(words misread or lost), then with `ocr_precision` (pages scrambled).
+
+| book | pages | share of dictionary words | share of stray single letters | share of words with a symbol inside |
+|---|---|---|---|---|
+| Haskins | 260 | +0.81 / +0.80 | −0.24 / −0.29 | −0.36 / −0.34 |
+| Stubbs | 320 | +0.78 / +0.84 | −0.41 / −0.71 | −0.19 / −0.22 |
+| Domesday | 538 | +0.59 / +0.68 | −0.49 / −0.67 | −0.50 / −0.46 |
+| Mariéjol | 438 | +0.76 / +0.84 | −0.67 / −0.73 | −0.24 / −0.22 |
+
+On the tool's own definitions the share of dictionary words follows
+the real error better than the first look of spec §8 found in the three
+English books (Domesday 0.59–0.68 against 0.40, Stubbs 0.78–0.84 against
+0.46) and a little less in Mariéjol (0.76–0.84 against 0.87); the cause
+was not measured (the definitions, the word list and the page edges all
+changed). The share of stray single letters is the
+best second statistic for scrambled pages (−0.67 to −0.73 with
+`ocr_precision` in three books). These are the numbers analyze's spec
+starts from.
