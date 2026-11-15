@@ -11,6 +11,7 @@ from difflib import SequenceMatcher
 
 from galley.model import Line, LinesFile, PageLayout
 from galley.parallel import DEFAULT_WORKERS, map_pages
+from galley.structure._foot import signature_candidate
 from galley.structure._measures import (
     arabic_value,
     is_hyphen_first_part,
@@ -20,7 +21,7 @@ from galley.structure._measures import (
     word_key,
     words_text,
 )
-from galley.structure._regions import head_line
+from galley.structure._regions import head_line, region_kinds
 
 # Spec section 2: the pitch is measured on the regions of 5 lines or more.
 _LINES_FOR_PITCH = 5
@@ -34,6 +35,11 @@ _HEAD_PITCHES = 2.0
 _HEAD_ALIKE_RATIO = 0.75
 _HEAD_MIN_LETTERS = 4
 _HEAD_LENGTH_DIFFERENCE = 8
+# Spec section 4: a signature line's words left of its page number hold at
+# least 4 letters, at least 0.5 alike to another page's (Mariéjol's were
+# 0.54 to 0.73 alike).
+_SIGNATURE_ALIKE_RATIO = 0.5
+_SIGNATURE_MIN_LETTERS = 4
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -124,31 +130,78 @@ def _end_words(line: Line) -> tuple[str, ...]:
     return texts[:1] if len(texts) == 1 else (texts[0], texts[-1])
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Alike:
+    """When the letters of a line are alike to another page's: they are at
+    least `min_letters`, and their difflib ratio is at least `ratio` to
+    letters whose length differs by at most `max_length_difference`."""
+
+    min_letters: int
+    ratio: float
+    max_length_difference: int | None
+
+
+_HEADS_ALIKE = _Alike(
+    min_letters=_HEAD_MIN_LETTERS,
+    ratio=_HEAD_ALIKE_RATIO,
+    max_length_difference=_HEAD_LENGTH_DIFFERENCE,
+)
+_SIGNATURES_ALIKE = _Alike(
+    min_letters=_SIGNATURE_MIN_LETTERS,
+    ratio=_SIGNATURE_ALIKE_RATIO,
+    max_length_difference=None,
+)
+
+
 def _alike_to_another(
-    head_letters: str, counts: Counter[str], distinct: tuple[str, ...]
+    line_letters: str, counts: Counter[str], distinct: tuple[str, ...], alike: _Alike
 ) -> bool:
-    """Whether a head's letters are at least 4 and at least 0.75 alike to
-    those of another page's head line (spec section 3)."""
-    if len(head_letters) < _HEAD_MIN_LETTERS:
+    """Whether `line_letters`, the letters of one page's line, are alike to
+    those of another page's line; `counts` counts the pages of each letters
+    and `distinct` lists them."""
+    if len(line_letters) < alike.min_letters:
         return False
-    if counts[head_letters] > 1:
+    if counts[line_letters] > 1:
         return True
     matcher = SequenceMatcher(None, autojunk=False)
-    matcher.set_seq2(head_letters)
+    matcher.set_seq2(line_letters)
     for other in distinct:
-        if (
-            other == head_letters
-            or abs(len(other) - len(head_letters)) > _HEAD_LENGTH_DIFFERENCE
+        if other == line_letters or (
+            alike.max_length_difference is not None
+            and abs(len(other) - len(line_letters)) > alike.max_length_difference
         ):
             continue
         matcher.set_seq1(other)
         if (
-            matcher.real_quick_ratio() >= _HEAD_ALIKE_RATIO
-            and matcher.quick_ratio() >= _HEAD_ALIKE_RATIO
-            and matcher.ratio() >= _HEAD_ALIKE_RATIO
+            matcher.real_quick_ratio() >= alike.ratio
+            and matcher.quick_ratio() >= alike.ratio
+            and matcher.ratio() >= alike.ratio
         ):
             return True
     return False
+
+
+def _alike_pages(
+    page_letters: tuple[tuple[int, str], ...], alike: _Alike, workers: int
+) -> frozenset[int]:
+    """The pages of `page_letters`, (page index, letters of a line), whose
+    letters are alike to another page's, compared in `workers` threads."""
+    counts = Counter(text for _, text in page_letters)
+    distinct = tuple(sorted(counts))
+    alike_letters = dict(
+        zip(
+            distinct,
+            map_pages(
+                lambda text: _alike_to_another(text, counts, distinct, alike),
+                distinct,
+                workers,
+            ),
+            strict=True,
+        )
+    )
+    return frozenset(
+        page_index for page_index, text in page_letters if alike_letters[text]
+    )
 
 
 def _running_heads(
@@ -163,24 +216,18 @@ def _running_heads(
         for page_index, line in heads
         if line.box.top - median_top <= _HEAD_PITCHES * pitch
     )
-    head_letters = tuple(letters(words_text(line.words)) for _, line in near)
-    counts = Counter(head_letters)
-    distinct = tuple(sorted(counts))
-    alike = dict(
-        zip(
-            distinct,
-            map_pages(
-                lambda text: _alike_to_another(text, counts, distinct),
-                distinct,
-                workers,
-            ),
-            strict=True,
-        )
+    alike = _alike_pages(
+        tuple(
+            (page_index, letters(words_text(line.words))) for page_index, line in near
+        ),
+        _HEADS_ALIKE,
+        workers,
     )
     return frozenset(
         page_index
-        for (page_index, line), text in zip(near, head_letters, strict=True)
-        if alike[text] or any(is_page_number_form(end) for end in _end_words(line))
+        for page_index, line in near
+        if page_index in alike
+        or any(is_page_number_form(end) for end in _end_words(line))
     )
 
 
@@ -226,14 +273,30 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
     )
     running_heads = _running_heads(heads, pitch, workers)
     arabic_numbers = _arabic_head_numbers(heads, running_heads)
+    body_word_height = statistics.median(line_heights) if line_heights else 0.0
+    candidates = map_pages(
+        lambda page: signature_candidate(
+            page, region_kinds(page, body_word_height, running_heads)
+        ),
+        lines.pages,
+        workers,
+    )
     return BookSurvey(
         running_heads=running_heads,
         head_page_offset=_commonest_offset(arabic_numbers),
         first_arabic_page=min(
             (page_index for page_index, _ in arabic_numbers), default=None
         ),
-        body_word_height=statistics.median(line_heights) if line_heights else 0.0,
+        body_word_height=body_word_height,
         body_line_pitch=pitch,
         book_words=frozenset().union(*(page.words for page in measures)),
-        signature_lines=frozenset(),
+        signature_lines=_alike_pages(
+            tuple(
+                (page.index, candidate)
+                for page, candidate in zip(lines.pages, candidates, strict=True)
+                if candidate is not None
+            ),
+            _SIGNATURES_ALIKE,
+            workers,
+        ),
     )

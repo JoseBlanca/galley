@@ -341,6 +341,156 @@ def test_of_two_head_numbers_the_one_the_offset_gives_is_the_page_number() -> No
     )
 
 
+# Page numbers at the foot and signature marks, on a column from x 25 to
+# 299 pt (its middle at 162 pt)
+
+_COLUMN_LEFT_PT = 25.0
+_COLUMN_RIGHT_PT = 299.0
+_FOOT_TOP_PT = 400.0
+
+
+def _column_line(top: float) -> Line:
+    words = (
+        Word("Body", Box(_COLUMN_LEFT_PT, top, 60, top + _WORD_HEIGHT_PT), None),
+        Word("text.", Box(264, top, _COLUMN_RIGHT_PT, top + _WORD_HEIGHT_PT), None),
+    )
+    return Line(_box(tuple(word.box for word in words)), words)
+
+
+def _foot_line(top: float, *words: tuple[str, float]) -> Line:
+    """A line of the words (text, left side), each 5 pt wide a character."""
+    placed = tuple(
+        Word(
+            text,
+            Box(x0, top, x0 + _CHAR_PT * len(text), top + _WORD_HEIGHT_PT),
+            None,
+        )
+        for text, x0 in words
+    )
+    return Line(_box(tuple(word.box for word in placed)), placed)
+
+
+def _page_with_foot(index: int, *foot_lines: Line) -> PageLayout:
+    """A page of six body lines across the column, then the foot lines in a
+    region of their own, as layout gives a foot set apart."""
+    body = _region(*(_column_line(70 + _PITCH_PT * number) for number in range(6)))
+    return PageLayout(index, (body, _region(*foot_lines)), ())
+
+
+def _centred(text: str) -> tuple[str, float]:
+    return text, 162 - _CHAR_PT * len(text) / 2
+
+
+@pytest.mark.parametrize("number", ["(49)", "U9)", "83"])
+def test_centred_page_number_at_the_foot_is_removed(number: str) -> None:
+    foot = _foot_line(_FOOT_TOP_PT, _centred(number))
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), workers=1)
+    assert blocks.removals == (
+        Removal(
+            page_index=4, box=foot.box, text=number, reason=RemovalReason.PAGE_NUMBER
+        ),
+    )
+    assert blocks.page_numbers == (PageNumber(4, number, PageNumberPosition.FOOT),)
+
+
+@pytest.mark.parametrize(
+    "words",
+    [(("M.", 37), ("4", 266)), (("4—2", 252),)],
+    ids=["M. 4", "4—2"],
+)
+def test_signature_mark_at_the_foot_is_removed(
+    words: tuple[tuple[str, float], ...],
+) -> None:
+    foot = _foot_line(_FOOT_TOP_PT, *words)
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), workers=1)
+    assert blocks.removals == (
+        Removal(
+            page_index=4,
+            box=foot.box,
+            text=" ".join(text for text, _ in words),
+            reason=RemovalReason.SIGNATURE_MARK,
+        ),
+    )
+    assert blocks.page_numbers == ()
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        (("4", 28), ("Ibid.", 38), ("29.", 68)),
+        (("(5)", 28), ("Ibid.,", 48), ("p.", 83), ("3.", 98)),
+        (("p.", 28), ("83.", 43)),
+        (_centred("1907"),),
+    ],
+    ids=["note line", "note line with a marker", "short note line", "year"],
+)
+def test_foot_line_that_is_no_page_number_or_mark_stays(
+    words: tuple[tuple[str, float], ...],
+) -> None:
+    foot = _foot_line(_FOOT_TOP_PT, *words)
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), workers=1)
+    assert blocks.removals == ()
+    assert blocks.page_numbers == ()
+
+
+def test_signature_mark_above_a_page_number_is_removed_with_it() -> None:
+    mark = _foot_line(_FOOT_TOP_PT - _PITCH_PT, ("4—2", 252))
+    number = _foot_line(_FOOT_TOP_PT, _centred("83"))
+    blocks = make_blocks(_lines_of(_page_with_foot(4, mark, number)), workers=1)
+    assert tuple((removal.text, removal.reason) for removal in blocks.removals) == (
+        ("4—2", RemovalReason.SIGNATURE_MARK),
+        ("83", RemovalReason.PAGE_NUMBER),
+    )
+
+
+def _signature_line(*words: str) -> Line:
+    """Mariéjol's signature line: the words, its page number in brackets
+    centred, and the signature's number."""
+    *signature, number, sheet = words
+    left = 30.0
+    placed = []
+    for text in signature:
+        placed.append((text, left))
+        left += _CHAR_PT * (len(text) + 1)
+    return _foot_line(_FOOT_TOP_PT, *placed, _centred(number), (sheet, 280))
+
+
+def test_signature_line_on_two_pages_gives_a_page_number_and_a_mark_each() -> None:
+    lines = (
+        _signature_line("MARIÉJOL.", "Cath.", "de", "Médicis.", "(49)", "4"),
+        _signature_line("UAMiàjoL.", "CmOl", "da", "Médidib", "(l93)", "13"),
+    )
+    pages = tuple(_page_with_foot(index, line) for index, line in enumerate(lines))
+    blocks = make_blocks(_lines_of(*pages), workers=1)
+    assert tuple(
+        (removal.page_index, removal.text, removal.reason)
+        for removal in blocks.removals
+    ) == (
+        (0, "MARIÉJOL. Cath. de Médicis. 4", RemovalReason.SIGNATURE_MARK),
+        (0, "(49)", RemovalReason.PAGE_NUMBER),
+        (1, "UAMiàjoL. CmOl da Médidib 13", RemovalReason.SIGNATURE_MARK),
+        (1, "(l93)", RemovalReason.PAGE_NUMBER),
+    )
+    assert blocks.page_numbers == (
+        PageNumber(0, "(49)", PageNumberPosition.FOOT),
+        PageNumber(1, "(l93)", PageNumberPosition.FOOT),
+    )
+
+
+def test_note_line_starting_with_its_marker_on_two_pages_is_no_signature_line() -> None:
+    lines = (
+        _foot_line(
+            _FOOT_TOP_PT, _centred("(5)"), ("Ibid.,", 200), ("p.", 240), ("3.", 255)
+        ),
+        _foot_line(
+            _FOOT_TOP_PT, _centred("(5)"), ("Ibid.,", 200), ("p.", 240), ("3.", 255)
+        ),
+    )
+    pages = tuple(_page_with_foot(index, line) for index, line in enumerate(lines))
+    blocks = make_blocks(_lines_of(*pages), workers=1)
+    assert blocks.removals == ()
+
+
 # make_blocks
 
 _HASH = "a" * 64

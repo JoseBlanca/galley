@@ -19,10 +19,10 @@ _SMALL_WORD_SHARE = 0.85
 
 
 class RegionKind(StrEnum):
-    """What a region of a page is. The head line is a running head or the
-    first body region, as section 3 decides."""
+    """What a region of a page is. A head line is a running head, or else
+    the first body region (section 3)."""
 
-    HEAD_LINE = "head_line"
+    RUNNING_HEAD = "running_head"
     BODY = "body"
     MARGIN = "margin"
     BAND = "band"
@@ -66,13 +66,23 @@ def _is_margin(region: Region, widest: Region, others: tuple[Region, ...]) -> bo
     )
 
 
-def region_kinds(page: PageLayout, body_word_height: float) -> tuple[RegionKind, ...]:
+def region_kinds(
+    page: PageLayout, body_word_height: float, running_heads: frozenset[int]
+) -> tuple[RegionKind, ...]:
     """The kind of each region of `page`, in the order of its regions
-    (spec section 2). `body_word_height` is the book's, in points."""
+    (spec section 2). `body_word_height` is the book's, in points;
+    `running_heads` the pages whose head line is a running head."""
     has_head_line = head_line(page) is not None
+    head_kinds = (
+        ()
+        if not has_head_line
+        else (RegionKind.RUNNING_HEAD,)
+        if page.index in running_heads
+        else (RegionKind.BODY,)
+    )
     others = page.regions[1:] if has_head_line else page.regions
     if not others:
-        return (RegionKind.HEAD_LINE,) if has_head_line else ()
+        return head_kinds
     widest = max(others, key=_width)
     margins = tuple(_is_margin(region, widest, others) for region in others)
     small_limit = _SMALL_WORD_SHARE * body_word_height
@@ -91,4 +101,4 @@ def region_kinds(page: PageLayout, body_word_height: float) -> tuple[RegionKind,
         else RegionKind.BODY
         for region, margin, height in zip(others, margins, heights, strict=True)
     )
-    return ((RegionKind.HEAD_LINE,) if has_head_line else ()) + kinds
+    return head_kinds + kinds

@@ -2,7 +2,8 @@
 
 structure surveys the whole book (`survey_book`), then removes from each
 page its running head, with the page number and the stray marks above it,
-each kept as a removal with its reason (`docs/specs/structure.md`). Each
+and the page number, signature line or printer's signature mark at its
+foot, each kept as a removal with its reason (`docs/specs/structure.md`). Each
 region's remaining lines become one paragraph, as in the walking skeleton.
 """
 
@@ -30,7 +31,8 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
 from galley.structure._measures import box_of, words_text
-from galley.structure._removals import head_removals
+from galley.structure._regions import region_kinds
+from galley.structure._removals import foot_removals, head_removals
 from galley.structure._survey import BookSurvey, survey_book
 
 __all__ = ["BookSurvey", "make_blocks", "run", "survey_book"]
@@ -46,7 +48,10 @@ class _PageResult:
 
 
 def _page_result(page: PageLayout, survey: BookSurvey) -> _PageResult:
-    removed = head_removals(page, survey)
+    kinds = region_kinds(page, survey.body_word_height, survey.running_heads)
+    head = head_removals(page, kinds, survey)
+    foot = foot_removals(page, kinds, survey)
+    removed_lines = head.lines | foot.lines
     kept_regions = tuple(
         lines
         for region_number, region in enumerate(page.regions)
@@ -54,7 +59,7 @@ def _page_result(page: PageLayout, survey: BookSurvey) -> _PageResult:
             lines := tuple(
                 line
                 for line_number, line in enumerate(region.lines)
-                if (region_number, line_number) not in removed.lines
+                if (region_number, line_number) not in removed_lines
             )
         )
     )
@@ -75,7 +80,11 @@ def _page_result(page: PageLayout, survey: BookSurvey) -> _PageResult:
         )
         for number, lines in enumerate(kept_regions, start=1)
     )
-    return _PageResult(blocks, removed.removals, removed.page_numbers)
+    return _PageResult(
+        blocks,
+        head.removals + foot.removals,
+        head.page_numbers + foot.page_numbers,
+    )
 
 
 def make_blocks(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BlocksFile:

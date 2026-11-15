@@ -18,7 +18,14 @@ import pytest
 
 from galley.book_folder import BookFolder
 from galley.fidelity import read_markdown
-from galley.model import block_text, read_blocks, read_lines, read_words
+from galley.model import (
+    BlocksFile,
+    RemovalReason,
+    block_text,
+    read_blocks,
+    read_lines,
+    read_words,
+)
 
 KADESH = "kadesh_8-17"
 GIERKE = "gierke_86-93_270-271"
@@ -42,13 +49,6 @@ WORD_COUNTS = frozendict(
 )
 TITLES = frozendict(
     {KADESH: "The Battle of Kadesh", GIERKE: "Political Theories of the Middle Age"}
-)
-# The block ids of spec section 9: one paragraph per page that has a region.
-BLOCK_IDS = frozendict(
-    {
-        KADESH: tuple(f"b-p{page:04d}-001" for page in range(9)),
-        GIERKE: tuple(f"b-p{page:04d}-001" for page in range(10)),
-    }
 )
 
 _XHTML = "http://www.w3.org/1999/xhtml"
@@ -123,22 +123,34 @@ def test_kadesh_page_0_has_the_line_across_both_footnote_columns(
 # blocks.json
 
 
-def test_blocks_json_has_one_paragraph_per_page_with_every_word_of_it(
+def _structure_words(blocks: BlocksFile) -> Counter[str]:
+    """The words of blocks.json's blocks and notes, with structure's word
+    changes undone and its removals added back: the words of words.json
+    (the structure spec, section 7, and architecture section 13)."""
+    words = Counter(
+        word
+        for block in (
+            *blocks.blocks,
+            *(b for note in blocks.notes for b in note.blocks),
+        )
+        for word in block_text(block).split()
+    )
+    words.update(word for removal in blocks.removals for word in removal.text.split())
+    words.update(word for change in blocks.word_changes for word in change.before)
+    words.subtract(word for change in blocks.word_changes for word in change.after)
+    return +words
+
+
+def test_blocks_json_with_its_records_holds_every_word_of_words_json(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    for name, block_ids in BLOCK_IDS.items():
+    for name, word_counts in WORD_COUNTS.items():
         blocks = read_blocks(excerpt_books[name].blocks_json)
         words = read_words(excerpt_books[name].words_json)
-        assert tuple(block.id for block in blocks.blocks) == block_ids
-        block_word_counts = tuple(
-            len(block_text(block).split()) for block in blocks.blocks
+        assert _structure_words(blocks) == Counter(
+            word.text for page in words.pages for word in page.words
         )
-        assert block_word_counts == tuple(
-            len(page.words) for page in words.pages if page.words
-        )
-        assert block_word_counts == tuple(
-            count for count in WORD_COUNTS[name] if count > 0
-        )
+        assert _structure_words(blocks).total() == sum(word_counts)
 
 
 def test_the_last_kadesh_block_is_the_stray_words_of_the_plate(
@@ -149,32 +161,42 @@ def test_the_last_kadesh_block_is_the_stray_words_of_the_plate(
     assert block_text(blocks.blocks[-1]) == ", ' .. ^U;L"
 
 
-def test_blocks_json_has_no_notes_removals_word_changes_or_page_numbers(
+def test_every_page_number_of_blocks_json_is_a_page_number_removed_on_its_page(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     for folder in excerpt_books.values():
         blocks = read_blocks(folder.blocks_json)
-        assert blocks.notes == ()
-        assert blocks.removals == ()
-        assert blocks.word_changes == ()
-        assert blocks.page_numbers == ()
+        removed = {
+            (removal.page_index, removal.text.replace(" ", ""))
+            for removal in blocks.removals
+            if removal.reason is RemovalReason.PAGE_NUMBER
+        }
+        assert {
+            (number.page_index, number.text) for number in blocks.page_numbers
+        } == removed
 
 
 # book.md
 
 
 @pytest.mark.pandoc
-def test_book_md_holds_every_word_of_words_json_and_no_note(
+def test_book_md_holds_the_words_of_words_json_less_structures_records_and_no_note(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    for name, word_count in ((KADESH, 6120), (GIERKE, 3406)):
-        folder = excerpt_books[name]
+    for folder in excerpt_books.values():
         markdown = read_markdown(folder.book_md.read_text(encoding="utf-8"))
-        words = read_words(folder.words_json)
-        assert len(markdown.words) == word_count
-        assert Counter(word.text for word in markdown.words) == Counter(
-            word.text for page in words.pages for word in page.words
+        blocks = read_blocks(folder.blocks_json)
+        words = Counter(
+            word.text
+            for page in read_words(folder.words_json).pages
+            for word in page.words
         )
+        words.subtract(
+            word for removal in blocks.removals for word in removal.text.split()
+        )
+        words.subtract(word for change in blocks.word_changes for word in change.before)
+        words.update(word for change in blocks.word_changes for word in change.after)
+        assert Counter(word.text for word in markdown.words) == +words
         assert markdown.note_count == 0
 
 
@@ -188,7 +210,10 @@ def _opf(epub: zipfile.ZipFile) -> ElementTree.Element:
 def test_book_epub_is_an_epub_with_the_title_language_and_every_block(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    for name, block_ids in BLOCK_IDS.items():
+    for name in TITLES:
+        block_ids = tuple(
+            block.id for block in read_blocks(excerpt_books[name].blocks_json).blocks
+        )
         with zipfile.ZipFile(excerpt_books[name].book_epub) as epub:
             first = epub.infolist()[0]
             assert first.filename == "mimetype"
