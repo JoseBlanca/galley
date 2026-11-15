@@ -243,13 +243,13 @@ puts the books side by side.
 
 **Tasks.**
 
-- [ ] 4.1 galley's side: the token streams of the four outputs, from
+- [x] 4.1 galley's side: the token streams of the four outputs, from
   `galley.model`, `galley.book_folder` and `galley.fidelity.read_markdown`.
   Spec §5 "galley's tokens". Deliverable 1.
-- [ ] 4.2 The scores of spec §6 and the page table of spec §8, as the
+- [x] 4.2 The scores of spec §6 and the page table of spec §8, as the
   frozen `Evaluation` of spec §9's `evaluate`. Deliverables 2 and 3.
   Needs 4.1.
-- [ ] 4.3 Writing the files of spec §7, and the `run`, `compare` and
+- [x] 4.3 Writing the files of spec §7, and the `run`, `compare` and
   `summary` subcommands of spec §9. Deliverable 4. Needs 4.2.
 
 ## 5. The excerpt test and the baseline
