@@ -22,14 +22,15 @@ How the rules apply, beyond the spec's words:
 - Text outside every block, such as text directly in `body`, and content
   of a notes section before its first note, are a ReferenceReadError, so
   that no word is lost unseen. Text that a misplaced end tag leaves
-  between two elements of a notes section is a paragraph of the note
-  before it.
+  between two elements of a notes section runs on into the last block of
+  the note before it.
 - A page anchor or note reference inside a dropped element is dropped
   with it.
 - Elements other than inline ones separate words, as `<br>` does.
 """
 
 import re
+import unicodedata
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from html.parser import HTMLParser
@@ -128,12 +129,16 @@ class PageAnchor:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ReferenceText:
-    """A book's reference text (spec section 4)."""
+    """A book's reference text (spec section 4). `page_anchors` are those
+    of the body, in order. `anchors_in_notes` are page anchors that
+    Gutenberg left among the notes it gathered, out of their place, so
+    that they are not used to find pages but listed apart."""
 
     blocks: tuple[ReferenceBlock, ...]
     notes: tuple[ReferenceNote, ...]
     note_references: tuple[NoteReference, ...]
     page_anchors: tuple[PageAnchor, ...]
+    anchors_in_notes: tuple[PageAnchor, ...]
 
 
 def read_reference_file(path: Path, rules: ReadingRules) -> ReferenceText:
@@ -713,23 +718,32 @@ def _grouped_note(
     section: _Element, group: tuple[_Element | str, ...], context: _Context
 ) -> _RawNote:
     """The note made of `group`, consecutive children of a notes section,
-    the first an element with the note's id. A text among them is a
-    paragraph of the note."""
+    the first an element with the note's id. A text among them runs on
+    into the note's last block, with no space when it starts with
+    punctuation."""
     first = group[0]
     note_id = None if isinstance(first, str) else _note_id(first, context.targets)
     if note_id is None:
         raise AssertionError(first)  # a group starts at an element with one
     note_context = replace(context, in_note=True)
-    items = tuple(
-        item
-        for child in group
-        for item in (
-            (_raw_block(ReferenceKind.PARAGRAPH, (_Text(child, correction=False),)),)
-            if isinstance(child, str)
-            else _container((child,), section, note_context)
-        )
-    )
-    return _raw_note(note_id, items)
+    items: list[_Item] = []
+    for child in group:
+        if isinstance(child, _Element):
+            items.extend(_container((child,), section, note_context))
+        else:
+            items.append(_run_on(items, child.strip()))
+    return _raw_note(note_id, tuple(items))
+
+
+def _run_on(items: list[_Item], text: str) -> _Item:
+    """The last block of `items`, taken out of it, with `text` after its
+    text; a paragraph of `text` alone when `items` ends with no block."""
+    last = items[-1] if len(items) > 0 else None
+    if not isinstance(last, _RawBlock) or last.kind is None:
+        return _raw_block(ReferenceKind.PARAGRAPH, (_Text(text, correction=False),))
+    items.pop()
+    joint = "" if unicodedata.category(text[0]).startswith("P") else " "
+    return replace(last, text=last.text.rstrip() + joint + text)
 
 
 def _raw_note(note_id: str, items: tuple[_Item, ...]) -> _RawNote:
@@ -786,6 +800,7 @@ def _assemble(items: tuple[_Item, ...]) -> ReferenceText:
     notes: list[ReferenceNote] = []
     references: list[NoteReference] = []
     anchors: list[PageAnchor] = []
+    anchors_in_notes: list[PageAnchor] = []
     counts = {Stream.BODY: 0, Stream.NOTES: 0}
 
     def place(raw: _RawBlock, stream: Stream) -> ReferenceBlock | None:
@@ -793,8 +808,10 @@ def _assemble(items: tuple[_Item, ...]) -> ReferenceText:
         for index, marker in markers:
             gap = Gap(stream, counts[stream] + index)
             match marker:
-                case _Anchor(printed_page=printed_page):
+                case _Anchor(printed_page=printed_page) if stream is Stream.BODY:
                     anchors.append(PageAnchor(printed_page, gap))
+                case _Anchor(printed_page=printed_page):
+                    anchors_in_notes.append(PageAnchor(printed_page, gap))
                 case _Reference(note_id=note_id):
                     references.append(NoteReference(note_id, gap))
         counts[stream] += len(tokens)
@@ -820,4 +837,5 @@ def _assemble(items: tuple[_Item, ...]) -> ReferenceText:
         notes=tuple(notes),
         note_references=tuple(references),
         page_anchors=tuple(anchors),
+        anchors_in_notes=tuple(anchors_in_notes),
     )

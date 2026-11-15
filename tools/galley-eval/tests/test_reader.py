@@ -166,30 +166,36 @@ def test_note_continued_by_an_element_without_an_id_is_one_note() -> None:
     )
 
 
-def test_text_left_between_notes_by_a_misplaced_end_tag_continues_the_note() -> None:
-    # Domesday's note 101 ends `interlined</em></p>.’]`.
+def test_text_left_between_notes_runs_on_into_the_note_before() -> None:
+    # Domesday's note 101 ends `interlined</em></p>.’]`: no space before
+    # punctuation, a space before a word.
     reference = _read(
-        '<p>one<a href="#Footnote_101">[101]</a></p><div class="footnote">'
+        '<p>one<a href="#Footnote_101">[101]</a> two<a href="#Footnote_102">[102]</a></p>'
+        '<div class="footnote">'
         '<p><a id="Footnote_101"><span class="label">[101]</span></a>'
-        " [vel bures <em>interlined</em></p>.’]\n</div>",
+        " [vel bures <em>interlined</em></p>.\u2019]\n"
+        '<p><a id="Footnote_102"><span class="label">[102]</span></a> Hist.</p>Eng. Law'
+        "\n</div>",
         DOMESDAY_RULES,
     )
     assert reference.notes == (
-        ReferenceNote(
-            "Footnote_101", (_paragraph("[vel bures interlined"), _paragraph(".’]"))
-        ),
+        ReferenceNote("Footnote_101", (_paragraph("[vel bures interlined.\u2019]"),)),
+        ReferenceNote("Footnote_102", (_paragraph("Hist. Eng. Law"),)),
     )
 
 
-def test_page_anchor_between_notes_is_placed_in_the_notes_stream() -> None:
+def test_page_anchor_between_notes_is_kept_apart_from_the_body_anchors() -> None:
+    # Domesday's anchor of printed page 357, between notes 1198 and 1199.
     reference = _read(
         '<p>one<a href="#Footnote_1">1</a> two<a href="#Footnote_2">2</a></p>'
-        '<div class="footnote"><p><a id="Footnote_1"><span class="label">[1]</span></a> mark-men.</p>'
+        '<div class="footnote"><p><a id="Footnote_1"><span class="label">[1]</span></a>'
+        " mark-men.</p>"
         '<a class="pagenum" title="357" id="Page_357"></a>'
         '<p><a id="Footnote_2"><span class="label">[2]</span></a> D. B. ii.</p></div>',
         DOMESDAY_RULES,
     )
-    assert reference.page_anchors == (PageAnchor("357", Gap(Stream.NOTES, 1)),)
+    assert reference.page_anchors == ()
+    assert reference.anchors_in_notes == (PageAnchor("357", Gap(Stream.NOTES, 1)),)
 
 
 def test_link_from_one_note_to_another_is_text_not_a_note_reference() -> None:

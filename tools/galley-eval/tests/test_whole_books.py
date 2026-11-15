@@ -28,6 +28,7 @@ def test_reader_finds_the_expected_counts_in_the_html(
             1 for block in reference.blocks if block.kind is ReferenceKind.MARGIN_NOTE
         ),
         note_references=len(reference.note_references),
-        page_anchors=len(reference.page_anchors),
+        # The count in the HTML holds the anchors left among the notes.
+        page_anchors=len(reference.page_anchors) + len(reference.anchors_in_notes),
     )
     assert found == book.expected_counts
