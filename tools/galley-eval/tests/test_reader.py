@@ -311,7 +311,8 @@ def test_poetry_holding_verse_lines_is_one_quote() -> None:
 def test_marked_correction_keeps_the_corrected_text_and_tags_its_tokens() -> None:
     reference = _read(
         '<p>on the <ins class="correction" title="original: roial">royal</ins>'
-        " demesne</p>"
+        ' demesne, <ins class="correction" title="original: Demesne">demesne</ins>,'
+        " held</p>"
     )
     assert reference.blocks == (
         ReferenceBlock(
@@ -320,10 +321,32 @@ def test_marked_correction_keeps_the_corrected_text_and_tags_its_tokens() -> Non
                 ReferenceToken("on", marked_correction=False),
                 ReferenceToken("the", marked_correction=False),
                 ReferenceToken("royal", marked_correction=True),
-                ReferenceToken("demesne", marked_correction=False),
+                ReferenceToken("demesne,", marked_correction=False),
+                # The correction covers part of the token.
+                ReferenceToken("demesne,", marked_correction=True),
+                ReferenceToken("held", marked_correction=False),
             ),
         ),
     )
+
+
+@pytest.mark.parametrize(
+    ("html", "text"),
+    [
+        ("54<sup>1</sup>\u2044<sub>2</sub> teams", "54\u00bd teams"),
+        ("2<sup>1</sup>\u2044<sub>7</sub> hides", "2\u2150 hides"),
+        ("2<sup>5</sup>\u2044<sub>7</sub> hides", "2 5\u20447 hides"),
+        ("<sup>2</sup>\u2044<sub>3</sub>", "\u2154"),
+        ("M<sup>r</sup> Round", "Mr Round"),
+    ],
+)
+def test_fraction_is_written_as_printed(html: str, text: str) -> None:
+    assert _read(f"<p>{html}</p>").blocks == (_paragraph(text),)
+
+
+def test_soft_hyphen_is_removed_and_zero_width_space_separates_words() -> None:
+    reference = _read("<p>house\u00adholders and\u200btheir</p>")
+    assert reference.blocks == (_paragraph("householders and their"),)
 
 
 def test_typographic_markup_gives_its_text_only() -> None:

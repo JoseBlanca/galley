@@ -26,7 +26,8 @@ How the rules apply, beyond the spec's words:
   the note before it.
 - A page anchor or note reference inside a dropped element is dropped
   with it.
-- Elements other than inline ones separate words, as `<br>` does.
+- Elements other than inline ones separate words, as `<br>` does, and so
+  do the inline ones of the `separate` rule.
 """
 
 import re
@@ -619,7 +620,7 @@ def _pieces(element: _Element, context: _Context, *, lift: bool) -> tuple[_Piece
     """The text, markers and lifted elements inside `element`, in order."""
     rules = context.rules
     pieces: list[_Piece] = []
-    for child in element.children:
+    for child in _with_fractions(element.children):
         if isinstance(child, str):
             if not any(pattern.fullmatch(child.strip()) for pattern in rules.drop_text):
                 pieces.append(_Text(child, context.correction))
@@ -651,6 +652,78 @@ def _pieces(element: _Element, context: _Context, *, lift: bool) -> tuple[_Piece
     return tuple(pieces)
 
 
+_FRACTION_SLASH = "\u2044"
+# Unicode's vulgar fraction characters, by (numerator, denominator).
+_VULGAR_FRACTIONS = frozendict(
+    {
+        (1, 2): "½",
+        (1, 3): "⅓",
+        (2, 3): "⅔",
+        (1, 4): "¼",
+        (3, 4): "¾",
+        (1, 5): "⅕",
+        (2, 5): "⅖",
+        (3, 5): "⅗",
+        (4, 5): "⅘",
+        (1, 6): "⅙",
+        (5, 6): "⅚",
+        (1, 7): "⅐",
+        (1, 8): "⅛",
+        (3, 8): "⅜",
+        (5, 8): "⅝",
+        (7, 8): "⅞",
+        (1, 9): "⅑",
+        (1, 10): "⅒",
+        (0, 3): "↉",
+    }
+)
+
+
+def _digits(node: _Element | str, tag: str) -> str | None:
+    """The digits that `node` holds when it is a `tag` holding only digits."""
+    if isinstance(node, str) or node.tag != tag or len(node.children) != 1:
+        return None
+    text = node.children[0]
+    return text if isinstance(text, str) and text.isdigit() else None
+
+
+def _with_fractions(
+    children: tuple[_Element | str, ...],
+) -> tuple[_Element | str, ...]:
+    """`children` with each fraction written with a superscript, the
+    fraction slash and a subscript, `<sup>1</sup>⁄<sub>2</sub>`, made into
+    its text as printed: the vulgar fraction character when Unicode has
+    one, "½", else " 1⁄2" with a space, so that "2" before it does not
+    become another number."""
+    result: list[_Element | str] = []
+    position = 0
+    while position < len(children):
+        numerator = _digits(children[position], "sup")
+        middle = children[position + 1] if position + 1 < len(children) else None
+        denominator = (
+            _digits(children[position + 2], "sub")
+            if position + 2 < len(children)
+            else None
+        )
+        if (
+            numerator is not None
+            and middle == _FRACTION_SLASH
+            and denominator is not None
+        ):
+            vulgar = _VULGAR_FRACTIONS.get((int(numerator), int(denominator)))
+            fraction = f" {numerator}{_FRACTION_SLASH}{denominator}"
+            result.append(fraction if vulgar is None else vulgar)
+            position += 3
+        else:
+            result.append(children[position])
+            position += 1
+    return tuple(result)
+
+
+# A soft hyphen is removed; a zero-width space separates words.
+_INVISIBLE = str.maketrans({"\u00ad": None, "\u200b": " "})
+
+
 def _raw_block(kind: ReferenceKind, pieces: tuple[_Piece, ...]) -> _RawBlock:
     text_parts: list[str] = []
     corrections: list[tuple[int, int]] = []
@@ -658,7 +731,8 @@ def _raw_block(kind: ReferenceKind, pieces: tuple[_Piece, ...]) -> _RawBlock:
     length = 0
     for piece in pieces:
         match piece:
-            case _Text(text=text, correction=correction):
+            case _Text(text=raw_text, correction=correction):
+                text = raw_text.translate(_INVISIBLE)
                 if correction:
                     corrections.append((length, length + len(text)))
                 text_parts.append(text)
