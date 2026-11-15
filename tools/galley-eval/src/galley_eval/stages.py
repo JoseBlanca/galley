@@ -108,8 +108,8 @@ def trace_extras(extras: PerOutput[tuple[GalleyToken, ...]]) -> tuple[TracedExtr
 
 def _copies(
     tokens: tuple[GalleyToken, ...],
-) -> dict[tuple[int, str], tuple[GalleyToken, ...]]:
+) -> frozendict[tuple[int, str], tuple[GalleyToken, ...]]:
     grouped: dict[tuple[int, str], list[GalleyToken]] = {}
     for token in tokens:
         grouped.setdefault((token.page_index, token.text), []).append(token)
-    return {item: tuple(found) for item, found in grouped.items()}
+    return frozendict({item: tuple(found) for item, found in grouped.items()})

@@ -8,7 +8,6 @@ from galley_eval.align import (
     State,
     align,
     extra_tokens,
-    reference_places,
     reference_states,
 )
 from galley_eval.reader import (
@@ -85,11 +84,11 @@ def test_token_matched_again_at_markdown_is_repaired_where_the_last_match_starts
 def test_hyphenated_word_joined_by_structure_is_repaired_by_blocks() -> None:
     # Spec section 5: "repli-" "cate" at words and lines, which structure
     # joins into "replicate".
-    places = reference_places(_reference("to replicate the text"))
+    reference = _reference("to replicate the text")
     hyphenated = _tokens(40, "to repli- cate the text")
     joined = _tokens(40, "to replicate the text", block_id="b-p0040-001")
     states = tuple(
-        reference_states(align(places, output))[1]
+        reference_states(align(reference, output))[1]
         for output in (hyphenated, hyphenated, joined, joined)
     )
     assert states == (State.SPLIT, State.SPLIT, State.MATCHED, State.MATCHED)
@@ -111,7 +110,7 @@ def test_hyphenated_word_broken_again_by_markdown_is_a_markdown_difference() -> 
 def test_running_head_never_removed_is_extra_from_words() -> None:
     # Spec section 5: the first line of Haskins' page index 214, through a
     # galley that does not yet remove running heads.
-    places = reference_places(_reference("Robert Guiscard had been conquered"))
+    reference = _reference("Robert Guiscard had been conquered")
     page_213 = _tokens(213, "Robert Guiscard")
     head = "THE NORMANS IN THE SOUTH 199"
     words = (
@@ -127,7 +126,7 @@ def test_running_head_never_removed_is_extra_from_words() -> None:
     )
     markdown = blocks
     extras = tuple(
-        extra_tokens(align(places, output), output)
+        extra_tokens(align(reference, output), output)
         for output in (words, lines, blocks, markdown)
     )
     traced = trace_extras((extras[0], extras[1], extras[2], extras[3]))

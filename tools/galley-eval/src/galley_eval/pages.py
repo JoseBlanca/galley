@@ -33,7 +33,13 @@ import re
 import statistics
 from dataclasses import dataclass
 
-from galley_eval.align import Alignment, GalleyToken, ReferencePlace, State
+from galley_eval.align import (
+    Alignment,
+    GalleyToken,
+    ReferencePlace,
+    State,
+    reference_places,
+)
 from galley_eval.reader import PageAnchor, ReferenceKind, ReferenceText, Stream
 
 __all__ = ["AnchorPage", "ReferencePages", "printed_page_number", "reference_pages"]
@@ -46,14 +52,14 @@ class AnchorPage:
     `offset` is the lower median of page index minus printed number over
     the aligned tokens between it and the next anchor, None when there is
     none; `page_index` is the printed number plus that offset, or plus the
-    offset it borrows; `mismatch` is true when its offset differs from
+    offset it borrows; `anchor_mismatch` is true when its offset differs from
     both its neighbours'."""
 
     anchor: PageAnchor
     printed_number: int | None
     offset: int | None
     page_index: int | None
-    mismatch: bool
+    anchor_mismatch: bool
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -68,7 +74,9 @@ class ReferencePages:
 
 _ARABIC = re.compile(r"\d+")
 _ROMAN = re.compile(r"m{0,3}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})")
-_ROMAN_VALUES = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
+_ROMAN_VALUES = frozendict(
+    {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
+)
 
 
 def printed_page_number(printed_page: str) -> int | None:
@@ -91,16 +99,16 @@ _ALIGNED = frozenset((State.MATCHED, State.CHANGED, State.SPLIT, State.GLUED))
 
 def reference_pages(
     reference: ReferenceText,
-    places: tuple[ReferencePlace, ...],
     alignment: Alignment,
     galley: tuple[GalleyToken, ...],
     exclude_pages: frozenset[int],
 ) -> ReferencePages:
-    """The page of each token of `reference`, whose places are `places`,
-    from its alignment with galley's words `galley`. `exclude_pages` are
+    """The page of each token of `reference`, in the order of
+    reference_places, from its alignment with galley's words `galley`. `exclude_pages` are
     the book's page indices without a text layer; a body token placed by
     the anchors between two anchors whose pages have one of them between
     is unplaced. The page anchors among the notes are not used."""
+    places = reference_places(reference)
     aligned = tuple(
         _aligned_page(alignment, galley, index) for index in range(len(places))
     )
@@ -165,7 +173,7 @@ def _aligned_page(
     pairing = alignment.pairings[alignment.reference_pairing[index]]
     if pairing.state not in _ALIGNED:
         return None
-    return galley[pairing.galley[0]].page_index
+    return galley[pairing.galley_indices[0]].page_index
 
 
 def _anchor_pages(
@@ -209,7 +217,7 @@ def _anchor_pages(
             printed_number=number,
             offset=own_offsets[rank],
             page_index=None if offset is None else number + offset,
-            mismatch=mismatch,
+            anchor_mismatch=mismatch,
         )
     return tuple(
         found.get(
@@ -219,7 +227,7 @@ def _anchor_pages(
                 printed_number=None,
                 offset=None,
                 page_index=None,
-                mismatch=False,
+                anchor_mismatch=False,
             ),
         )
         for position, anchor in enumerate(anchors)
@@ -259,7 +267,7 @@ def _running_after(pages: tuple[int | None, ...]) -> tuple[int | None, ...]:
 
 def _nearest_in_groups(
     aligned: tuple[int | None, ...], members: tuple[tuple[int | None, int], ...]
-) -> dict[int, int | None]:
+) -> frozendict[int, int | None]:
     """For each token index of `members`, (group, index) pairs in order, the
     page of the nearest aligned token of its group, before it on a tie;
     None when no token of its group is aligned."""
@@ -277,12 +285,12 @@ def _nearest_in_groups(
             options = positions[max(found - 1, 0) : found + 1]
             closest = min(options, key=lambda position: abs(position - index))
             nearest[index] = aligned[closest]
-    return nearest
+    return frozendict(nearest)
 
 
 def _note_reference_pages(
     reference: ReferenceText, body_pages: tuple[int | None, ...]
-) -> dict[str, int | None]:
+) -> frozendict[str, int | None]:
     """For each note id, the page of the body token just before its first
     reference (the first token when the reference comes before all)."""
     pages: dict[str, int | None] = {}
@@ -297,7 +305,7 @@ def _note_reference_pages(
             continue
         before = min(max(note_reference.gap.token_index - 1, 0), len(body_pages) - 1)
         pages[note_reference.note_id] = body_pages[before]
-    return pages
+    return frozendict(pages)
 
 
 def _note_id(reference: ReferenceText, place: ReferencePlace) -> str:

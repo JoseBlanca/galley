@@ -16,3 +16,8 @@ class ReferenceReadError(EvaluationError):
     """A Gutenberg HTML edition cannot be read by its book's reading rules:
     the `start` element is missing, text lies outside every block, or a note
     has no `id` that a note reference points to."""
+
+
+class AlignmentError(EvaluationError):
+    """A stage output cannot be aligned with the reference: a token ended
+    in no pairing or in two, which is a fault of the alignment's code."""

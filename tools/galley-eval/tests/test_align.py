@@ -2,6 +2,8 @@
 three passes, and the states and subkinds of the tokens (spec section 1,
 "Alignment key", and section 5, "Alignment" and "Differences")."""
 
+import random
+
 from galley_eval.align import (
     Alignment,
     AlignmentPass,
@@ -74,7 +76,7 @@ def _galley(
 def _align(
     reference: ReferenceText, galley: tuple[GalleyToken, ...]
 ) -> tuple[Alignment, tuple[Pairing, ...]]:
-    alignment = align(reference_places(reference), galley)
+    alignment = align(reference, galley)
     return alignment, alignment.pairings
 
 
@@ -156,7 +158,7 @@ def test_same_key_other_text_is_changed() -> None:
     pairing = _pairing_of_reference(alignment, 1)
     assert pairing.state is State.CHANGED
     assert pairing.subkind is Subkind.PUNCTUATION
-    assert pairing.galley == (1,)
+    assert pairing.galley_indices == (1,)
 
 
 def test_replaced_token_is_paired_as_changed() -> None:
@@ -167,8 +169,8 @@ def test_replaced_token_is_paired_as_changed() -> None:
     pairing = _pairing_of_reference(alignment, 1)
     assert pairing.state is State.CHANGED
     assert pairing.subkind is Subkind.LETTERS
-    assert pairing.reference == (1,)
-    assert pairing.galley == (1,)
+    assert pairing.reference_indices == (1,)
+    assert pairing.galley_indices == (1,)
 
 
 def test_hyphenated_word_is_a_split_of_two() -> None:
@@ -178,8 +180,8 @@ def test_hyphenated_word_is_a_split_of_two() -> None:
     )
     pairing = _pairing_of_reference(alignment, 1)
     assert pairing.state is State.SPLIT
-    assert pairing.reference == (1,)
-    assert pairing.galley == (1, 2)
+    assert pairing.reference_indices == (1,)
+    assert pairing.galley_indices == (1, 2)
     assert _pairing_of_galley(alignment, 2) == pairing
 
 
@@ -190,8 +192,8 @@ def test_words_without_spaces_are_glued_of_three() -> None:
     )
     pairing = _pairing_of_reference(alignment, 2)
     assert pairing.state is State.GLUED
-    assert pairing.reference == (1, 2, 3)
-    assert pairing.galley == (1,)
+    assert pairing.reference_indices == (1, 2, 3)
+    assert pairing.galley_indices == (1,)
     assert reference_states(alignment) == (
         State.MATCHED,
         State.GLUED,
@@ -220,7 +222,7 @@ def test_reference_token_with_no_galley_token_is_missing() -> None:
     )
     pairing = _pairing_of_reference(alignment, 2)
     assert pairing.state is State.MISSING
-    assert pairing.galley == ()
+    assert pairing.galley_indices == ()
     assert pairing.found_in is None
 
 
@@ -338,7 +340,7 @@ def test_note_moved_to_the_end_is_found_by_the_notes_pass() -> None:
         == (AlignmentPass.NOTES,) * 3
     )
     assert tuple(
-        _pairing_of_reference(alignment, index).galley for index in note_tokens
+        _pairing_of_reference(alignment, index).galley_indices for index in note_tokens
     ) == (
         (5,),
         (6,),
@@ -354,7 +356,7 @@ def test_margin_note_is_left_to_the_margin_notes_pass() -> None:
     )
     alignment, _ = _align(reference, _galley("the tax Danegeld was levied"))
     assert _pairing_of_reference(alignment, 0).found_in is AlignmentPass.MARGIN_NOTES
-    assert _pairing_of_reference(alignment, 0).galley == (2,)
+    assert _pairing_of_reference(alignment, 0).galley_indices == (2,)
 
 
 def test_margin_note_out_of_order_among_galley_notes_is_found_by_the_last_pass() -> (
@@ -371,9 +373,9 @@ def test_margin_note_out_of_order_among_galley_notes_is_found_by_the_last_pass()
     )
     galley = (
         _galley("the tax", page_index=1)
-        + _galley("Hidage assessed", page_index=2, stream=GalleyStream.MARGIN_NOTE)
+        + _galley("Hidage assessed", page_index=2, stream=GalleyStream.MARGIN_NOTES)
         + _galley("the hide", page_index=2)
-        + _galley("Danegeld levied", page_index=3, stream=GalleyStream.NOTE)
+        + _galley("Danegeld levied", page_index=3, stream=GalleyStream.NOTES)
     )
     alignment, _ = _align(reference, galley)
     passes = {
@@ -388,7 +390,7 @@ def test_galley_tokens_of_other_streams_wait_for_the_later_passes() -> None:
     # A note galley found is not offered to the body pass, even where its
     # words would fit the body.
     reference = _reference(_paragraph("the duke landed"))
-    galley = _galley("the duke") + _galley("landed", stream=GalleyStream.NOTE)
+    galley = _galley("the duke") + _galley("landed", stream=GalleyStream.NOTES)
     alignment, _ = _align(reference, galley)
     assert _pairing_of_reference(alignment, 2).found_in is AlignmentPass.REMAINDER
 
@@ -397,8 +399,88 @@ def test_galley_tokens_of_other_streams_wait_for_the_later_passes() -> None:
 
 
 def test_equal_key_share_counts_matched_and_changed_with_equal_keys() -> None:
-    places = reference_places(_reference(_paragraph("the Normans, in Sicilv")))
+    reference = _reference(_paragraph("the Normans, in Sicilv"))
+    places = reference_places(reference)
     galley = _galley("the Normans in Sicily")
-    alignment = align(places, galley)
+    alignment = align(reference, galley)
     # "the", "Normans," and "in" have equal keys; "Sicilv" does not.
     assert equal_key_share(alignment, places, galley) == 0.75
+
+
+# Every token in exactly one pairing
+
+
+def test_margin_note_block_inside_a_note_is_aligned_once() -> None:
+    # The reader gives a note block of kind margin_note when an element
+    # inside a note matches the margin_note rule; it belongs to the notes.
+    reference = _reference(
+        _paragraph("the duke landed"),
+        notes=(
+            ReferenceNote(
+                "Footnote_1",
+                (ReferenceBlock(ReferenceKind.MARGIN_NOTE, _words("Amatus ii")),),
+            ),
+        ),
+    )
+    # galley read the note twice; the second copy must stay extra.
+    alignment, pairings = _align(
+        reference, _galley("the duke landed Amatus ii Amatus ii")
+    )
+    assert sorted(
+        index for pairing in pairings for index in pairing.reference_indices
+    ) == list(range(5))
+    assert sorted(
+        index for pairing in pairings for index in pairing.galley_indices
+    ) == list(range(7))
+    assert _pairing_of_reference(alignment, 3).found_in is AlignmentPass.NOTES
+
+
+_VOCABULARY = ("the", "duke", "Normans,", "—", "*", "repli-", "cate", "replicate", "of")
+
+
+def test_every_token_is_in_exactly_one_pairing_whatever_the_input() -> None:
+    generator = random.Random(1915)
+    for _ in range(300):
+
+        def text(length: int) -> str:
+            return " ".join(generator.choice(_VOCABULARY) for _ in range(length))
+
+        kinds = (ReferenceKind.PARAGRAPH, ReferenceKind.MARGIN_NOTE)
+        reference = _reference(
+            *(
+                ReferenceBlock(
+                    generator.choice(kinds), _words(text(generator.randint(1, 8)))
+                )
+                for _ in range(generator.randint(0, 4))
+            ),
+            notes=tuple(
+                ReferenceNote(
+                    f"Footnote_{number}",
+                    (
+                        ReferenceBlock(
+                            generator.choice(kinds),
+                            _words(text(generator.randint(1, 5))),
+                        ),
+                    ),
+                )
+                for number in range(generator.randint(0, 2))
+            ),
+        )
+        galley = tuple(
+            token
+            for _ in range(generator.randint(0, 5))
+            for token in _galley(
+                text(generator.randint(1, 8)),
+                page_index=generator.randint(0, 3),
+                stream=generator.choice(tuple(GalleyStream)),
+            )
+        )
+        alignment, pairings = _align(reference, galley)
+        reference_count = len(reference_places(reference))
+        assert sorted(
+            i for pairing in pairings for i in pairing.reference_indices
+        ) == list(range(reference_count))
+        assert sorted(
+            i for pairing in pairings for i in pairing.galley_indices
+        ) == list(range(len(galley)))
+        assert len(alignment.reference_pairing) == reference_count

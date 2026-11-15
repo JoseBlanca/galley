@@ -12,9 +12,9 @@ missing or extra.
 
 How the spec is read here, where it leaves a choice:
 
-- The body pass aligns the reference's body without its margin notes,
-  which wait for the margin notes pass, as the spec's second pass names
-  them as a stream of their own.
+- The margin notes pass takes the margin notes of the body only. A block
+  of kind margin_note inside a note is part of its note and is aligned
+  by the notes pass.
 - Pairs found in a replaced stretch, `changed` ones included, are aligned
   and are not offered to a later pass; only the tokens left over are.
 - The last pass takes the reference's leftover tokens in the reference's
@@ -34,12 +34,13 @@ import bisect
 import re
 import unicodedata
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from enum import StrEnum
 from typing import assert_never
 
+from galley_eval.errors import AlignmentError
 from galley_eval.reader import ReferenceKind, ReferenceText, ReferenceToken, Stream
 
 __all__ = [
@@ -69,12 +70,14 @@ class GalleyStream(StrEnum):
     in the body."""
 
     BODY = "body"
-    MARGIN_NOTE = "margin_note"
-    NOTE = "note"
+    MARGIN_NOTES = "margin_notes"
+    NOTES = "notes"
 
 
 # Book order: within a page, the body first, then margin notes, then notes.
-_BOOK_ORDER = {GalleyStream.BODY: 0, GalleyStream.MARGIN_NOTE: 1, GalleyStream.NOTE: 2}
+_BOOK_ORDER = frozendict(
+    {GalleyStream.BODY: 0, GalleyStream.MARGIN_NOTES: 1, GalleyStream.NOTES: 2}
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -156,8 +159,8 @@ class Pairing:
 
     state: State
     subkind: Subkind | None
-    reference: tuple[int, ...]
-    galley: tuple[int, ...]
+    reference_indices: tuple[int, ...]
+    galley_indices: tuple[int, ...]
     found_in: AlignmentPass | None
 
 
@@ -407,16 +410,21 @@ def reference_places(reference: ReferenceText) -> tuple[ReferencePlace, ...]:
     return body + notes
 
 
-def align(
-    places: tuple[ReferencePlace, ...], galley: tuple[GalleyToken, ...]
-) -> Alignment:
-    """A stage output aligned with the reference by the three passes of
-    spec section 5. The tokens of each galley stream must come in `galley`
-    in the stream's order; the streams may be interleaved or one after
-    another. Each galley token is in exactly one pairing, and so is each
-    reference token."""
-    reference_keys = tuple(alignment_key(place.token.text) for place in places)
-    galley_keys = tuple(alignment_key(token.text) for token in galley)
+def align(reference: ReferenceText, galley: tuple[GalleyToken, ...]) -> Alignment:
+    """A stage output aligned with `reference` by the three passes of spec
+    section 5. The tokens of each galley stream must come in `galley` in
+    the stream's order; the streams may be interleaved or one after
+    another. The reference's tokens are counted as reference_places gives
+    them. Each galley token is in exactly one pairing, and so is each
+    reference token; AlignmentError says which one is not, should the
+    passes ever break that."""
+    places = reference_places(reference)
+    sides = _Sides(
+        places=places,
+        galley=galley,
+        reference_keys=tuple(alignment_key(place.token.text) for place in places),
+        galley_keys=tuple(alignment_key(token.text) for token in galley),
+    )
     book_order = tuple(
         sorted(
             range(len(galley)),
@@ -426,36 +434,9 @@ def align(
             ),
         )
     )
-    reference_aligned = [False] * len(places)
-    galley_aligned = [False] * len(galley)
-    pairings: list[Pairing] = []
-
-    def run(
-        found_in: AlignmentPass,
-        reference_indices: tuple[int, ...],
-        galley_indices: tuple[int, ...],
-    ) -> None:
-        found = _pass(
-            found_in,
-            places,
-            galley,
-            reference_keys,
-            galley_keys,
-            reference_indices,
-            galley_indices,
-        )
-        for pairing in found:
-            for index in pairing.reference:
-                reference_aligned[index] = True
-            for index in pairing.galley:
-                galley_aligned[index] = True
-        pairings.extend(found)
-
-    def galley_left() -> tuple[int, ...]:
-        return tuple(index for index in book_order if not galley_aligned[index])
-
-    run(
+    body = _pass(
         AlignmentPass.BODY,
+        sides,
         tuple(
             index
             for index, place in enumerate(places)
@@ -468,69 +449,119 @@ def align(
             if token.stream is GalleyStream.BODY
         ),
     )
-    run(
+    notes = _pass(
         AlignmentPass.NOTES,
+        sides,
         tuple(
             index for index, place in enumerate(places) if place.stream is Stream.NOTES
         ),
-        galley_left(),
+        _left(book_order, body, _galley_side),
     )
-    run(
+    margin_notes = _pass(
         AlignmentPass.MARGIN_NOTES,
+        sides,
         tuple(
             index
             for index, place in enumerate(places)
-            if place.kind is ReferenceKind.MARGIN_NOTE
+            if place.stream is Stream.BODY and place.kind is ReferenceKind.MARGIN_NOTE
         ),
-        galley_left(),
+        _left(book_order, body + notes, _galley_side),
     )
-    run(
+    found = body + notes + margin_notes
+    remainder = _pass(
         AlignmentPass.REMAINDER,
-        tuple(index for index in range(len(places)) if not reference_aligned[index]),
-        galley_left(),
+        sides,
+        _left(tuple(range(len(places))), found, _reference_side),
+        _left(book_order, found, _galley_side),
     )
-    pairings.extend(
+    found += remainder
+    missing = tuple(
         Pairing(
             state=State.MISSING,
             subkind=_correction_subkind(places, (index,)),
-            reference=(index,),
-            galley=(),
+            reference_indices=(index,),
+            galley_indices=(),
             found_in=None,
         )
-        for index in range(len(places))
-        if not reference_aligned[index]
+        for index in _left(tuple(range(len(places))), found, _reference_side)
     )
-    pairings.extend(
+    extra = tuple(
         Pairing(
             state=State.EXTRA,
             subkind=None,
-            reference=(),
-            galley=(index,),
+            reference_indices=(),
+            galley_indices=(index,),
             found_in=None,
         )
-        for index in range(len(galley))
-        if not galley_aligned[index]
+        for index in _left(tuple(range(len(galley))), found, _galley_side)
     )
-    reference_pairing = [0] * len(places)
-    galley_pairing = [0] * len(galley)
-    for pairing_index, pairing in enumerate(pairings):
-        for index in pairing.reference:
-            reference_pairing[index] = pairing_index
-        for index in pairing.galley:
-            galley_pairing[index] = pairing_index
+    pairings = found + missing + extra
     return Alignment(
-        pairings=tuple(pairings),
-        reference_pairing=tuple(reference_pairing),
-        galley_pairing=tuple(galley_pairing),
+        pairings=pairings,
+        reference_pairing=_pairing_of_each(
+            pairings, len(places), _reference_side, "reference"
+        ),
+        galley_pairing=_pairing_of_each(pairings, len(galley), _galley_side, "galley"),
     )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Sides:
+    """The two sides being aligned and their alignment keys."""
+
+    places: tuple[ReferencePlace, ...]
+    galley: tuple[GalleyToken, ...]
+    reference_keys: tuple[str, ...]
+    galley_keys: tuple[str, ...]
+
+
+def _reference_side(pairing: Pairing) -> tuple[int, ...]:
+    return pairing.reference_indices
+
+
+def _galley_side(pairing: Pairing) -> tuple[int, ...]:
+    return pairing.galley_indices
+
+
+def _left(
+    indices: tuple[int, ...],
+    pairings: tuple[Pairing, ...],
+    side: Callable[[Pairing], tuple[int, ...]],
+) -> tuple[int, ...]:
+    """The indices, in their order, that no pairing holds on its `side`."""
+    taken = frozenset(index for pairing in pairings for index in side(pairing))
+    return tuple(index for index in indices if index not in taken)
+
+
+def _pairing_of_each(
+    pairings: tuple[Pairing, ...],
+    count: int,
+    side: Callable[[Pairing], tuple[int, ...]],
+    side_name: str,
+) -> tuple[int, ...]:
+    """For each of the `count` tokens of a side, the index of the one
+    pairing that holds it. Raises AlignmentError when a token is in no
+    pairing or in two."""
+    found: dict[int, int] = {}
+    for pairing_index, pairing in enumerate(pairings):
+        for index in side(pairing):
+            if index in found:
+                message = (
+                    f"{side_name} token {index} is in pairings {found[index]} "
+                    f"and {pairing_index}"
+                )
+                raise AlignmentError(message)
+            found[index] = pairing_index
+    lost = tuple(index for index in range(count) if index not in found)
+    if lost or len(found) != count:
+        message = f"{side_name} tokens in no pairing: {lost[:10]}"
+        raise AlignmentError(message)
+    return tuple(found[index] for index in range(count))
 
 
 def _pass(
     found_in: AlignmentPass,
-    places: tuple[ReferencePlace, ...],
-    galley: tuple[GalleyToken, ...],
-    reference_keys: tuple[str, ...],
-    galley_keys: tuple[str, ...],
+    sides: _Sides,
     reference_indices: tuple[int, ...],
     galley_indices: tuple[int, ...],
 ) -> tuple[Pairing, ...]:
@@ -538,8 +569,8 @@ def _pass(
     and galley tokens at the given indices; tokens left out of every
     pairing are left for the next pass."""
     stretches = anchored_pass(
-        tuple(reference_keys[index] for index in reference_indices),
-        tuple(galley_keys[index] for index in galley_indices),
+        tuple(sides.reference_keys[index] for index in reference_indices),
+        tuple(sides.galley_keys[index] for index in galley_indices),
     )
     pairings: list[Pairing] = []
     for stretch in stretches:
@@ -550,22 +581,14 @@ def _pass(
         match stretch.operation:
             case Operation.EQUAL:
                 pairings.extend(
-                    _pair(found_in, places, galley, reference_index, galley_index)
+                    _pair(found_in, sides, reference_index, galley_index)
                     for reference_index, galley_index in zip(
                         reference_stretch, galley_stretch, strict=True
                     )
                 )
             case Operation.REPLACE:
                 pairings.extend(
-                    _replaced(
-                        found_in,
-                        places,
-                        galley,
-                        reference_keys,
-                        galley_keys,
-                        reference_stretch,
-                        galley_stretch,
-                    )
+                    _replaced(found_in, sides, reference_stretch, galley_stretch)
                 )
             case Operation.DELETE | Operation.INSERT:
                 pass  # no partner in this pass; the next pass may find one
@@ -575,29 +598,18 @@ def _pass(
 
 
 def _pair(
-    found_in: AlignmentPass,
-    places: tuple[ReferencePlace, ...],
-    galley: tuple[GalleyToken, ...],
-    reference_index: int,
-    galley_index: int,
+    found_in: AlignmentPass, sides: _Sides, reference_index: int, galley_index: int
 ) -> Pairing:
     """One reference token aligned to one galley token: matched when the
     texts are equal, else changed."""
-    reference_token = places[reference_index].token
-    galley_text = galley[galley_index].text
-    if reference_token.text == galley_text:
-        return Pairing(
-            state=State.MATCHED,
-            subkind=None,
-            reference=(reference_index,),
-            galley=(galley_index,),
-            found_in=found_in,
-        )
+    reference_token = sides.places[reference_index].token
+    galley_text = sides.galley[galley_index].text
+    same = reference_token.text == galley_text
     return Pairing(
-        state=State.CHANGED,
-        subkind=changed_subkind(reference_token, galley_text),
-        reference=(reference_index,),
-        galley=(galley_index,),
+        state=State.MATCHED if same else State.CHANGED,
+        subkind=None if same else changed_subkind(reference_token, galley_text),
+        reference_indices=(reference_index,),
+        galley_indices=(galley_index,),
         found_in=found_in,
     )
 
@@ -620,10 +632,7 @@ class _Join:
 
 def _replaced(
     found_in: AlignmentPass,
-    places: tuple[ReferencePlace, ...],
-    galley: tuple[GalleyToken, ...],
-    reference_keys: tuple[str, ...],
-    galley_keys: tuple[str, ...],
+    sides: _Sides,
     reference_stretch: tuple[int, ...],
     galley_stretch: tuple[int, ...],
 ) -> tuple[Pairing, ...]:
@@ -631,8 +640,8 @@ def _replaced(
     order; the tokens between them paired in order as changed; the tokens
     left over unpaired."""
     joins = _joins(
-        tuple(reference_keys[index] for index in reference_stretch),
-        tuple(galley_keys[index] for index in galley_stretch),
+        tuple(sides.reference_keys[index] for index in reference_stretch),
+        tuple(sides.galley_keys[index] for index in galley_stretch),
     )
     pairings: list[Pairing] = []
     reference_from, galley_from = 0, 0
@@ -640,7 +649,7 @@ def _replaced(
         reference_to = len(reference_stretch) if join is None else join.reference_start
         galley_to = len(galley_stretch) if join is None else join.galley_start
         pairings.extend(
-            _pair(found_in, places, galley, reference_index, galley_index)
+            _pair(found_in, sides, reference_index, galley_index)
             for reference_index, galley_index in zip(
                 reference_stretch[reference_from:reference_to],
                 galley_stretch[galley_from:galley_to],
@@ -653,9 +662,9 @@ def _replaced(
         pairings.append(
             Pairing(
                 state=join.state,
-                subkind=_correction_subkind(places, reference_joined),
-                reference=reference_joined,
-                galley=galley_stretch[join.galley_start : join.galley_end],
+                subkind=_correction_subkind(sides.places, reference_joined),
+                reference_indices=reference_joined,
+                galley_indices=galley_stretch[join.galley_start : join.galley_end],
                 found_in=found_in,
             )
         )
@@ -671,15 +680,14 @@ def _joins(
     yet passed where up to four galley tokens join into its key (a split),
     or where its key joined with the next ones, up to four, is one galley
     token's key (a glued); the nearer of the two when both are found."""
-    split_at = _joined_positions(galley_keys)
-    single_at: dict[str, list[int]] = {}
-    for position, key in enumerate(galley_keys):
-        if key:
-            single_at.setdefault(key, []).append(position)
+    split_spans = _joined_spans(galley_keys)
+    single_at = _positions(galley_keys)
     joins: list[_Join] = []
     reference_at, galley_from = 0, 0
     while reference_at < len(reference_keys):
-        join = _join_at(reference_keys, reference_at, galley_from, split_at, single_at)
+        join = _join_at(
+            reference_keys, reference_at, galley_from, split_spans, single_at
+        )
         if join is None:
             reference_at += 1
             continue
@@ -688,7 +696,9 @@ def _joins(
     return tuple(joins)
 
 
-def _joined_positions(keys: tuple[str, ...]) -> dict[str, list[tuple[int, int]]]:
+def _joined_spans(
+    keys: tuple[str, ...],
+) -> frozendict[str, tuple[tuple[int, int], ...]]:
     """For each key made by joining 2 to 4 consecutive non-empty keys, the
     (start, end) of each place where it is made, in order."""
     joined: dict[str, list[tuple[int, int]]] = {}
@@ -697,23 +707,32 @@ def _joined_positions(keys: tuple[str, ...]) -> dict[str, list[tuple[int, int]]]
             parts = keys[start:end]
             if all(parts):
                 joined.setdefault("".join(parts), []).append((start, end))
-    return joined
+    return frozendict({key: tuple(spans) for key, spans in joined.items()})
+
+
+def _positions(keys: tuple[str, ...]) -> frozendict[str, tuple[int, ...]]:
+    """For each non-empty key, the positions where it is, in order."""
+    found: dict[str, list[int]] = {}
+    for position, key in enumerate(keys):
+        if key:
+            found.setdefault(key, []).append(position)
+    return frozendict({key: tuple(positions) for key, positions in found.items()})
 
 
 def _join_at(
     reference_keys: tuple[str, ...],
     reference_at: int,
     galley_from: int,
-    split_at: dict[str, list[tuple[int, int]]],
-    single_at: dict[str, list[int]],
+    split_spans: frozendict[str, tuple[tuple[int, int], ...]],
+    single_at: frozendict[str, tuple[int, ...]],
 ) -> _Join | None:
     candidates: list[_Join] = []
     key = reference_keys[reference_at]
     if key:
-        places = split_at.get(key, [])
-        found = bisect.bisect_left(places, (galley_from, 0))
-        if found < len(places):
-            start, end = places[found]
+        spans = split_spans.get(key, ())
+        found = bisect.bisect_left(spans, (galley_from, 0))
+        if found < len(spans):
+            start, end = spans[found]
             candidates.append(
                 _Join(State.SPLIT, reference_at, reference_at + 1, start, end)
             )
@@ -723,7 +742,7 @@ def _join_at(
         parts = reference_keys[reference_at:end]
         if not all(parts):
             break
-        positions = single_at.get("".join(parts), [])
+        positions = single_at.get("".join(parts), ())
         found = bisect.bisect_left(positions, galley_from)
         if found < len(positions):
             start = positions[found]
@@ -776,7 +795,7 @@ def equal_key_share(
         1
         for pairing in alignment.pairings
         if pairing.state in {State.MATCHED, State.CHANGED}
-        and alignment_key(places[pairing.reference[0]].token.text)
-        == alignment_key(galley[pairing.galley[0]].text)
+        and alignment_key(places[pairing.reference_indices[0]].token.text)
+        == alignment_key(galley[pairing.galley_indices[0]].text)
     )
     return equal / len(places)

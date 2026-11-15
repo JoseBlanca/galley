@@ -5,7 +5,6 @@ from galley_eval.align import (
     GalleyStream,
     GalleyToken,
     align,
-    reference_places,
 )
 from galley_eval.pages import AnchorPage, printed_page_number, reference_pages
 from galley_eval.reader import (
@@ -66,10 +65,7 @@ def _pages(
     galley: tuple[GalleyToken, ...],
     exclude_pages: frozenset[int] = NO_EXCLUDED_PAGES,
 ) -> tuple[tuple[int | None, ...], tuple[AnchorPage, ...]]:
-    places = reference_places(reference)
-    found = reference_pages(
-        reference, places, align(places, galley), galley, exclude_pages
-    )
+    found = reference_pages(reference, align(reference, galley), galley, exclude_pages)
     return found.page_indices, found.anchors
 
 
@@ -189,7 +185,7 @@ def test_anchor_whose_offset_differs_from_both_neighbours_is_a_mismatch() -> Non
     )
     _, anchors = _pages(reference, galley)
     assert tuple(anchor.offset for anchor in anchors) == (20, 20, 22, 24, 24)
-    assert tuple(anchor.mismatch for anchor in anchors) == (
+    assert tuple(anchor.anchor_mismatch for anchor in anchors) == (
         False,
         False,
         True,
