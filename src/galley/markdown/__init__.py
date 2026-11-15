@@ -6,8 +6,10 @@ whose text has every ASCII punctuation character escaped (walking-skeleton
 spec, section 8). A paragraph's div has no class; a margin note's has the
 class `margin-note` and stands where the block is in blocks.json; a note
 with `referenced` false is a div with its id and the class `note` around
-its blocks' divs, its marker first, after the last block of its page
-(structure spec, section 10, option b). Headings, quotes, figures, index
+its blocks' divs, its marker first, after the last block, in the order
+of blocks.json, whose first origin is on the note's first page or an
+earlier one, or first of all (structure spec, sections 6 and 10, option
+b). Headings, quotes, figures, index
 entries, note references and referenced notes are refused, and so are
 edits, since none can exist before `galley2epub edits-from` is built.
 """
@@ -194,32 +196,24 @@ def _note_positions(
     blocks: tuple[Block, ...], notes: tuple[Note, ...]
 ) -> tuple[int, ...]:
     """For each note, how many blocks of `blocks` are written before it: all
-    up to the last block whose origin includes the note's first page; when
-    no block does, all up to the last block whose first origin is on an
-    earlier page; when none is, none (structure spec, section 10)."""
-    covering = {
-        part.page_index: position
-        for position, block in enumerate(blocks, start=1)
-        for part in block.origin
-    }
-    # Each block's first page, in page order, with the most blocks written
-    # up to any block of that page or an earlier one.
+    up to the last block, in the order of `blocks`, whose first origin is on
+    the note's first page or an earlier one; none when there is no such
+    block (structure spec, sections 6 and 10)."""
+    # Each block's first page and its position from 1, in page order, and
+    # for each the highest position of a block on that page or before.
     by_first_page = sorted(
         (block.origin[0].page_index, position)
         for position, block in enumerate(blocks, start=1)
         if block.origin
     )
     first_pages = tuple(page_index for page_index, _ in by_first_page)
-    most_written = tuple(
+    last_positions = tuple(
         itertools.accumulate((position for _, position in by_first_page), max)
     )
 
     def position_of(note: Note) -> int:
-        page_index = note.origin[0].page_index
-        if page_index in covering:
-            return covering[page_index]
-        earlier = bisect.bisect_left(first_pages, page_index)
-        return most_written[earlier - 1] if earlier else 0
+        on_or_before = bisect.bisect_right(first_pages, note.origin[0].page_index)
+        return last_positions[on_or_before - 1] if on_or_before else 0
 
     return tuple(position_of(note) for note in notes)
 
@@ -231,9 +225,9 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     a blank line between each. A margin note's div also has the class
     `margin-note`. Each note, all with `referenced` false, is a div with its
     id and the class `note` around its blocks' divs, the marker first in the
-    first one's text; it follows the last block whose origin includes the
-    note's first page or, when no block does, the last block whose first
-    origin is on an earlier page, or comes first of all. Notes written at
+    first one's text; it follows the last block, in the order of
+    blocks.json, whose first origin is on the note's first page or an
+    earlier one, or comes first of all when there is none. Notes written at
     the same place keep the order of blocks.json.
 
     The title and each author are escaped by escape_markdown too. Raises

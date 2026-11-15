@@ -451,15 +451,49 @@ def _ids_in_order(markdown_text: str) -> tuple[str, ...]:
     )
 
 
-def test_a_note_whose_page_no_block_covers_follows_the_last_block_of_an_earlier_page() -> (
+def test_notes_of_a_page_follow_the_side_text_of_the_page_before() -> None:
+    # A paragraph runs from page 3 to page 4; page 3's margin note follows it.
+    blocks = _blocks_file(
+        (
+            _block("b-p0003-001", BlockKind.PARAGRAPH, "Runs over.", 3, 4),
+            _block("b-p0003-002", BlockKind.MARGIN_NOTE, "Of page three.", 3),
+            _block("b-p0005-001", BlockKind.PARAGRAPH, "Page five.", 5),
+        ),
+        (
+            _unreferenced_note(
+                "n-p0003-001",
+                3,
+                _block("b-p0003-003", BlockKind.PARAGRAPH, "Note three.", 3),
+            ),
+            _unreferenced_note(
+                "n-p0004-001",
+                4,
+                _block("b-p0004-001", BlockKind.PARAGRAPH, "Note four.", 4),
+            ),
+        ),
+    )
+
+    assert _ids_in_order(render_markdown(blocks, CONFIG)) == (
+        "b-p0003-001",
+        "b-p0003-002",
+        "n-p0003-001",
+        "b-p0003-003",
+        "n-p0004-001",
+        "b-p0004-001",
+        "b-p0005-001",
+    )
+
+
+def test_a_note_follows_the_last_block_in_blocks_order_that_starts_on_its_page_or_before() -> (
     None
 ):
     blocks = _blocks_file(
         (
             _block("b-p0002-001", BlockKind.PARAGRAPH, "Page two.", 2),
+            _block("b-p0003-001", BlockKind.PARAGRAPH, "Page three.", 3),
             _block("b-p0006-001", BlockKind.PARAGRAPH, "Page six.", 6),
-            # Its first origin is on page 3, though it comes after page 6.
-            _block("b-p0003-001", BlockKind.MARGIN_NOTE, "Out of order.", 3),
+            # Its first origin is on page 2, though it comes after page 6.
+            _block("b-p0002-002", BlockKind.MARGIN_NOTE, "Out of order.", 2),
         ),
         (
             _unreferenced_note(
@@ -472,8 +506,9 @@ def test_a_note_whose_page_no_block_covers_follows_the_last_block_of_an_earlier_
 
     assert _ids_in_order(render_markdown(blocks, CONFIG)) == (
         "b-p0002-001",
-        "b-p0006-001",
         "b-p0003-001",
+        "b-p0006-001",
+        "b-p0002-002",
         "n-p0004-001",
         "b-p0004-001",
     )
