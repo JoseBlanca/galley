@@ -8,6 +8,8 @@ authors = [
 requires-python = ">=3.15"
 dependencies = [
     "galley",
+    # Imported first by galley_eval, as by galley (src/galley/__init__.py).
+    "gilguard==0.2.0",
 ]
 
 [project.scripts]

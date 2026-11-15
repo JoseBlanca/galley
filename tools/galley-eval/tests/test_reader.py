@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from galley.model import BlockKind
 from galley_eval.errors import ReferenceReadError
 from galley_eval.reader import (
     Gap,
@@ -442,9 +443,22 @@ def test_added_heading_rule_makes_a_heading_of_a_p() -> None:
     )
 
 
-def test_text_outside_every_block_is_an_error() -> None:
-    with pytest.raises(ReferenceReadError, match="text outside every block"):
-        _read("<p>Text</p>stray words<p>More</p>")
+def test_text_outside_every_block_is_an_error_naming_its_line() -> None:
+    with pytest.raises(ReferenceReadError, match="text outside every block") as raised:
+        read_reference(
+            f"<html><body>{HEADER}\n<p>Text</p>\n\n  stray words<p>More</p></body></html>",
+            DEFAULT_RULES,
+        )
+    assert "line 4" in str(raised.value)
+    assert "stray words" in str(raised.value)
+
+
+def test_text_that_drop_text_matches_is_no_error_outside_every_block() -> None:
+    rules = change_rules(DEFAULT_RULES, RuleChange.ADD, "drop_text", (r"Note \d+:",))
+    assert _read("<p>Text</p>Note 1:<p>More</p>", rules).blocks == (
+        _paragraph("Text"),
+        _paragraph("More"),
+    )
 
 
 def test_end_tag_that_closes_nothing_is_an_error() -> None:
@@ -513,3 +527,62 @@ def test_reference_file_that_is_not_utf8_is_an_error(tmp_path: Path) -> None:
     path.write_bytes(data)
     with pytest.raises(ReferenceReadError, match="not UTF-8"):
         read_reference_file(path, DEFAULT_RULES, _sha256(data))
+
+
+def test_reference_kinds_are_galleys_block_kinds_and_table() -> None:
+    assert {kind.value for kind in ReferenceKind} == {
+        kind.value for kind in BlockKind
+    } | {"table"}
+
+
+@pytest.mark.parametrize(
+    ("rule", "html", "kind"),
+    [
+        ("heading", '<p class="sidenote">Kent.</p>', ReferenceKind.MARGIN_NOTE),
+        ("table", '<p class="sidenote">Kent.</p>', ReferenceKind.MARGIN_NOTE),
+        ("figure", "<table><tr><td>Hides</td></tr></table>", ReferenceKind.TABLE),
+        ("quote", '<div class="figcenter">MAP</div>', ReferenceKind.FIGURE),
+        ("heading", '<div class="blockquot">Verse</div>', ReferenceKind.QUOTE),
+    ],
+)
+def test_element_two_rules_match_takes_the_kind_of_the_first_in_order(
+    rule: str, html: str, kind: ReferenceKind
+) -> None:
+    # The order: margin note, table, figure, quote, heading.
+    element = html[1 : html.index(">")].replace(' class="', ".").rstrip('"')
+    rules = change_rules(DEFAULT_RULES, RuleChange.ADD, rule, (element,))
+    assert [block.kind for block in _read(html, rules).blocks] == [kind]
+
+
+def test_content_before_the_first_note_of_a_notes_section_is_an_error() -> None:
+    with pytest.raises(ReferenceReadError, match="before its first note"):
+        _read(
+            '<p>one<a href="#Footnote_1">1</a></p><div class="footnote">'
+            "<p>Gathered notes</p>"
+            '<p><a id="Footnote_1"><span class="label">[1]</span></a> Text.</p></div>',
+            DOMESDAY_RULES,
+        )
+
+
+def test_note_with_text_of_its_own_is_one_paragraph() -> None:
+    reference = _read(
+        '<p>one<a href="#Footnote_1">1</a></p>'
+        '<div class="footnote"><a class="label" id="Footnote_1">1</a> <i>La France</i>,'
+        " p. 161.<br>Ibid.</div>",
+        HASKINS_RULES,
+    )
+    assert reference.notes == (
+        ReferenceNote("Footnote_1", (_paragraph("La France, p. 161. Ibid."),)),
+    )
+
+
+def test_note_inside_a_note_is_text_of_the_outer_note() -> None:
+    reference = _read(
+        '<p>one<a href="#Footnote_1">1</a></p>'
+        '<div class="footnote"><p><a class="label" id="Footnote_1">1</a> Outer.</p>'
+        '<div class="footnote"><p>Inner.</p></div></div>',
+        HASKINS_RULES,
+    )
+    assert reference.notes == (
+        ReferenceNote("Footnote_1", (_paragraph("Outer."), _paragraph("Inner."))),
+    )

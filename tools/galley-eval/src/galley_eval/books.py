@@ -114,10 +114,10 @@ def read_books(path: Path) -> tuple[EvaluationBook, ...]:
     except tomllib.TOMLDecodeError as err:
         message = f"{path} is not valid TOML: {err}"
         raise BooksFileError(message) from err
-    return books_from_toml(content, path)
+    return _books_from_toml(content, path)
 
 
-def books_from_toml(
+def _books_from_toml(
     content: dict[str, object], path: Path
 ) -> tuple[EvaluationBook, ...]:
     """The books in the parsed TOML `content`; `path` names the file in a
