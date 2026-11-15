@@ -11,6 +11,9 @@ How the spec is read here, where it leaves a choice:
 - A pairing with several reference tokens, a glued one, is attributed to
   the latest of their stages: the output from which none of them is
   matched again.
+- `state` and `subkind` are those of the pairing at markdown;
+  `state_at_stage` and `subkind_at_stage` those of the first reference
+  token's pairing at the attributed output, `extra` for an extra token.
 - A difference's `edge_of_page` is that of its extra token at the output
   it is attributed to, or, for a reference token, whether a galley token
   of its pairing at that output is flagged.
@@ -19,20 +22,21 @@ How the spec is read here, where it leaves a choice:
   page is that page.
 - `context` holds up to 8 reference tokens before and after the
   difference, within its stream (the body or the notes). For an extra
-  token, the place is after the reference token aligned to the nearest
-  aligned galley token before it at markdown.
+  token, it holds up to 8 galley tokens at markdown before and after it
+  on its page.
 - A difference that is unplaced, or on a page of `exclude_pages` or
   `not_in_reference`, is written with `apart` saying which, and is not
   scored.
 """
 
+import dataclasses
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from galley import wordlist
 from galley.book_folder import BookFolder
-from galley.wordlist import word_list
 from galley_eval.align import (
     Alignment,
     GalleyToken,
@@ -41,6 +45,7 @@ from galley_eval.align import (
     Subkind,
     align,
     equal_key_share,
+    extra_tokens,
     reference_side,
     reference_states,
 )
@@ -100,11 +105,15 @@ class Apart(StrEnum):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Difference:
-    """One line of `differences.jsonl` (spec section 7)."""
+    """One line of `differences.jsonl` (spec section 7): its state and
+    subkind at markdown, the error of the book, and at `stage`, the output
+    it is attributed to."""
 
     stage: StageOutput
     state: State
     subkind: Subkind | None
+    state_at_stage: State
+    subkind_at_stage: Subkind | None
     part: Part
     page_index: int | None
     printed_page: str | None
@@ -174,22 +183,22 @@ def evaluate(
     folder: BookFolder,
     reference_html: Path,
     *,
-    dictionary: frozenset[str] | None = None,
+    word_list: frozenset[str] | None = None,
 ) -> Evaluation:
     """Compare galley's files in `folder` with the reference; write nothing.
 
-    `dictionary` is the set of lowered words of the book's language, by
+    `word_list` is the set of lowered words of the book's language, by
     default galley's word list. Raises ReferenceReadError when the HTML
     cannot be read, galley's InputFileError or ExternalProgramError when
     its files or Pandoc fail, GalleyFilesError when its files do not fit
     together, and AlignmentError when galley's words align less than half
     of the reference."""
-    reference = read_reference_file(reference_html, book.rules, book.html_sha256)
     side = read_galley_side(folder)
+    reference = read_reference_file(reference_html, book.rules, book.html_sha256)
     words = (
-        dictionary
-        if dictionary is not None
-        else frozenset(word.lower() for word in word_list(book.language))
+        word_list
+        if word_list is not None
+        else frozenset(word.lower() for word in wordlist.word_list(book.language))
     )
     return evaluation_of(book, reference, side, words)
 
@@ -198,10 +207,10 @@ def evaluation_of(
     book: EvaluationBook,
     reference: ReferenceText,
     side: GalleySide,
-    dictionary: frozenset[str],
+    word_list: frozenset[str],
 ) -> Evaluation:
     """The comparison of galley's side `side` with `reference`, for
-    `book`; `dictionary` holds the lowered words of its language."""
+    `book`; `word_list` holds the lowered words of its language."""
     prepared = reference_side(reference)
     places = prepared.places
     outputs = (side.words, side.lines, side.blocks, side.markdown)
@@ -272,7 +281,6 @@ def evaluation_of(
     ) + _extra_differences(
         alignments,
         outputs,
-        places,
         parts_of_pages=parts_of_pages,
         printed_pages=printed_pages,
         side=side,
@@ -298,7 +306,7 @@ def evaluation_of(
             page_indices=pages.page_indices,
             parts_of_pages=parts_of_pages,
             printed_pages=printed_pages,
-            dictionary=dictionary,
+            word_list=word_list,
             language=book.language,
         ),
         anchor_mismatches=mismatches,
@@ -368,10 +376,16 @@ def _output_scores(
             side.galley_blocks,
             side.note_references,
         ),
-        margin_notes=margin_note_scores(
-            alignment, places, galley, margin_notes_moved=book.margin_notes_moved
-        ),
+        margin_notes=_margin_notes(book, margin_note_scores(alignment, places, galley)),
     )
+
+
+def _margin_notes(book: EvaluationBook, scores: MarginNoteScores) -> MarginNoteScores:
+    """The margin note scores, without their position when Gutenberg moved
+    the book's margin notes."""
+    if book.margin_notes_moved:
+        return dataclasses.replace(scores, position_right=None)
+    return scores
 
 
 def _context(
@@ -435,6 +449,9 @@ def _reference_differences(
         stage = _stage_of(fates, indices)
         at_stage = stage_position[stage]
         stage_alignment = alignments[at_stage]
+        pairing_at_stage = stage_alignment.pairings[
+            stage_alignment.reference_pairing[indices[0]]
+        ]
         edge = any(
             outputs[at_stage][galley_index].edge_of_page
             for index in indices
@@ -454,6 +471,8 @@ def _reference_differences(
                 stage=stage,
                 state=pairing.state,
                 subkind=pairing.subkind,
+                state_at_stage=pairing_at_stage.state,
+                subkind_at_stage=pairing_at_stage.subkind,
                 part=parts[indices[0]],
                 page_index=page,
                 printed_page=None if page is None else printed_pages.get(page),
@@ -479,7 +498,6 @@ def _note_id(side: GalleySide, block_id: str | None) -> str | None:
 def _extra_differences(
     alignments: tuple[Alignment, ...],
     outputs: tuple[tuple[GalleyToken, ...], ...],
-    places: tuple[ReferencePlace, ...],
     *,
     parts_of_pages: frozendict[int, Part],
     printed_pages: frozendict[int, str],
@@ -487,24 +505,14 @@ def _extra_differences(
     apart_pages: frozendict[int, Apart],
 ) -> tuple[Difference, ...]:
     extras = tuple(
-        tuple(
-            token
-            for token, pairing in zip(galley, alignment.galley_pairing, strict=True)
-            if alignment.pairings[pairing].state is State.EXTRA
-        )
+        extra_tokens(alignment, galley)
         for alignment, galley in zip(alignments, outputs, strict=True)
     )
     traced = trace_extras((extras[0], extras[1], extras[2], extras[3]))
-    markdown_alignment = alignments[-1]
-    # The reference token after which each markdown token sits: that of the
-    # nearest aligned galley token at or before it.
-    after_reference: list[int | None] = []
-    last: int | None = None
-    for pairing_index in markdown_alignment.galley_pairing:
-        pairing = markdown_alignment.pairings[pairing_index]
-        if pairing.reference_indices:
-            last = pairing.reference_indices[-1]
-        after_reference.append(last)
+    markdown_alignment, markdown = alignments[-1], outputs[-1]
+    on_page: dict[int, list[int]] = {}
+    for index, token in enumerate(markdown):
+        on_page.setdefault(token.page_index, []).append(index)
     extra_positions = tuple(
         index
         for index, pairing_index in enumerate(markdown_alignment.galley_pairing)
@@ -513,8 +521,7 @@ def _extra_differences(
     return tuple(
         _extra_difference(
             extra,
-            after_reference[position],
-            places,
+            _page_context(markdown, on_page[markdown[position].page_index], position),
             parts_of_pages=parts_of_pages,
             printed_pages=printed_pages,
             side=side,
@@ -524,34 +531,43 @@ def _extra_differences(
     )
 
 
+def _page_context(
+    markdown: tuple[GalleyToken, ...], page_positions: list[int], position: int
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The galley tokens at markdown on the same page before and after the
+    one at `position`, up to _CONTEXT_TOKENS each."""
+    at = page_positions.index(position)
+    before = page_positions[max(at - _CONTEXT_TOKENS, 0) : at]
+    after = page_positions[at + 1 : at + 1 + _CONTEXT_TOKENS]
+    return (
+        tuple(markdown[index].text for index in before),
+        tuple(markdown[index].text for index in after),
+    )
+
+
 def _extra_difference(
     extra: TracedExtra,
-    after: int | None,
-    places: tuple[ReferencePlace, ...],
+    context: tuple[tuple[str, ...], tuple[str, ...]],
     *,
     parts_of_pages: frozendict[int, Part],
     printed_pages: frozendict[int, str],
     side: GalleySide,
     apart_pages: frozendict[int, Apart],
 ) -> Difference:
-    if after is None:
-        before: tuple[str, ...] = ()
-        following = tuple(place.token.text for place in places[:_CONTEXT_TOKENS])
-    else:
-        earlier, following = _context(places, after, after)
-        before = (*earlier, places[after].token.text)[-_CONTEXT_TOKENS:]
     page = extra.token.page_index
     return Difference(
         stage=extra.stage,
         state=State.EXTRA,
         subkind=None,
+        state_at_stage=State.EXTRA,
+        subkind_at_stage=None,
         part=parts_of_pages.get(page, Part.BODY),
         page_index=page,
         printed_page=printed_pages.get(page),
         reference=(),
         galley=(extra.token.text,),
-        context_before=before,
-        context_after=following,
+        context_before=context[0],
+        context_after=context[1],
         block_id=extra.token.block_id,
         note_id=_note_id(side, extra.token.block_id),
         edge_of_page=extra.origin.edge_of_page,

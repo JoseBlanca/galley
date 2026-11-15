@@ -42,6 +42,7 @@ from galley_eval.scores import Part, TextScores
 from galley_eval.stages import StageOutput
 
 __all__ = [
+    "BookResult",
     "RunInfo",
     "Work",
     "book_summary",
@@ -49,10 +50,13 @@ __all__ = [
     "differences_jsonl",
     "evaluation_dir",
     "pages_tsv",
+    "read_galley_commit",
     "scorecard_json",
     "work_of",
     "write_books_summary",
     "write_evaluation",
+    "write_failure",
+    "write_galley_commit",
 ]
 
 # The kinds of difference summary.md gives for each work, and the examples
@@ -63,10 +67,12 @@ _EXAMPLES = 3
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class RunInfo:
-    """What a scorecard says of the run that made it: galley's commit, the
-    date, and the tool's version."""
+    """What a scorecard says of the run that made it: the commit of galley
+    that made the book's files, the commit of the comparison, the date,
+    and the tool's version."""
 
     galley_commit: str
+    comparison_commit: str
     date: str
     tool_version: str
 
@@ -75,9 +81,14 @@ class Work(StrEnum):
     """The work a difference calls for: the stage of galley to change."""
 
     ANALYZE_EXTRACT = "analyze and extract"
+    EXTRACT = "extract"
     LAYOUT = "layout"
     STRUCTURE = "structure"
     MARKDOWN = "markdown"
+
+
+_GALLEY_COMMIT_FILE = "galley-commit.txt"
+_FAILED_FILE = "failed.txt"
 
 
 def evaluation_dir(folder: BookFolder) -> Path:
@@ -86,12 +97,24 @@ def evaluation_dir(folder: BookFolder) -> Path:
 
 
 def work_of(difference: Difference) -> Work:
-    """The work `difference` calls for: its stage's, but structure's for an
-    extra token on the edge of a page."""
+    """The work `difference` calls for (spec section 5): structure's for an
+    extra token on the edge of a page, and for a split of words or lines
+    whose first galley token ends with "-"; extract's for a glued of
+    words; analyze's and extract's for the other differences of words;
+    each later stage's own for its differences."""
     if difference.state is State.EXTRA and difference.edge_of_page:
+        return Work.STRUCTURE
+    if (
+        difference.state is State.SPLIT
+        and difference.stage in {StageOutput.WORDS, StageOutput.LINES}
+        and difference.galley
+        and difference.galley[0].endswith("-")
+    ):
         return Work.STRUCTURE
     match difference.stage:
         case StageOutput.WORDS:
+            if difference.state is State.GLUED:
+                return Work.EXTRACT
             return Work.ANALYZE_EXTRACT
         case StageOutput.LINES:
             return Work.LAYOUT
@@ -134,6 +157,7 @@ def scorecard_json(scorecard: Scorecard, run: RunInfo) -> str:
         "book": scorecard.book,
         "gutenberg_number": scorecard.gutenberg_number,
         "galley_commit": run.galley_commit,
+        "comparison_commit": run.comparison_commit,
         "date": run.date,
         "tool_version": run.tool_version,
         "equal_key_share": scorecard.equal_key_share,
@@ -170,6 +194,8 @@ def differences_jsonl(differences: tuple[Difference, ...]) -> str:
                 "stage",
                 "state",
                 "subkind",
+                "state_at_stage",
+                "subkind_at_stage",
                 "part",
                 "page_index",
                 "printed_page",
@@ -223,13 +249,14 @@ def _text_rows(scorecard: Scorecard) -> list[str]:
         (
             "| output | part | reference tokens | token error rate | matched "
             "| changed | convention | split | glued | missing | extra "
-            "| extra on page edge | repaired | unplaced |"
+            "| extra on page edge | repaired | unplaced | not scored "
+            "| galley tokens |"
         ),
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for scores in scorecard.outputs:
         for part, text in scores.text.items():
-            if text.reference_tokens == 0 and text.extra == 0 and text.unplaced == 0:
+            if text.reference_tokens == text.galley_tokens == text.unplaced == 0:
                 continue  # a part the book does not have
             rows.append(
                 f"| {scores.output.value} | {part.value} | {text.reference_tokens} "
@@ -238,7 +265,7 @@ def _text_rows(scorecard: Scorecard) -> list[str]:
                 f"| {text.glued} | {text.missing} | {text.extra} "
                 f"| {text.edge_of_page_extra} "
                 f"| {'' if text.repaired is None else text.repaired} "
-                f"| {text.unplaced} |"
+                f"| {text.unplaced} | {text.not_scored} | {text.galley_tokens} |"
             )
     return rows
 
@@ -396,8 +423,9 @@ def book_summary(evaluation: Evaluation, run: RunInfo) -> str:
         f"# {scorecard.book}",
         "",
         (
-            f"Gutenberg ebook {scorecard.gutenberg_number}; galley at "
-            f"{run.galley_commit}; galley-eval {run.tool_version}; {run.date}. "
+            f"Gutenberg ebook {scorecard.gutenberg_number}; galley's files made "
+            f"at {run.galley_commit}, compared at {run.comparison_commit}; "
+            f"galley-eval {run.tool_version}; {run.date}. "
             f"galley's words align {scorecard.equal_key_share:.1%} of the "
             "reference's tokens to a token with the same key."
         ),
@@ -414,7 +442,9 @@ def book_summary(evaluation: Evaluation, run: RunInfo) -> str:
         (
             "Tokens not matched at markdown, by the stage of galley to change. "
             "An extra token on the edge of a page, a running head or page "
-            "number, is structure's to remove."
+            "number, is structure's to remove, and so is a word split by a "
+            "hyphen at a line end to join; words glued together are "
+            "extract's, which reads the spaces between words."
         ),
         "",
         *_work_rows(evaluation.differences),
@@ -425,20 +455,60 @@ def book_summary(evaluation: Evaluation, run: RunInfo) -> str:
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
+def _write_atomically(files: tuple[tuple[Path, str], ...]) -> None:
+    """Write each text to a temporary file beside its path, then move each
+    into place, so that a run cut short leaves the earlier files whole."""
+    for path, text in files:
+        path.with_name(path.name + ".tmp").write_text(text, encoding="utf-8")
+    for path, _ in files:
+        path.with_name(path.name + ".tmp").replace(path)
+
+
 def write_evaluation(evaluation: Evaluation, folder: BookFolder, run: RunInfo) -> None:
-    """Write the four files of a book under `<folder>/evaluation/`."""
+    """Write the four files of a book under `<folder>/evaluation/`, and
+    remove the record of an earlier failure."""
     directory = evaluation_dir(folder)
     directory.mkdir(exist_ok=True)
-    (directory / "scorecard.json").write_text(
-        scorecard_json(evaluation.scorecard, run), encoding="utf-8"
+    _write_atomically(
+        (
+            (directory / "scorecard.json", scorecard_json(evaluation.scorecard, run)),
+            (
+                directory / "differences.jsonl",
+                differences_jsonl(evaluation.differences),
+            ),
+            (directory / "pages.tsv", pages_tsv(evaluation.pages)),
+            (directory / "summary.md", book_summary(evaluation, run)),
+        )
     )
-    (directory / "differences.jsonl").write_text(
-        differences_jsonl(evaluation.differences), encoding="utf-8"
-    )
-    (directory / "pages.tsv").write_text(pages_tsv(evaluation.pages), encoding="utf-8")
-    (directory / "summary.md").write_text(
-        book_summary(evaluation, run), encoding="utf-8"
-    )
+    (directory / _FAILED_FILE).unlink(missing_ok=True)
+
+
+def write_failure(folder: BookFolder, error: str) -> None:
+    """Record in `<folder>/evaluation/` that the book's last run or
+    comparison failed, with its error, so that the books' summary shows
+    it failed and not its earlier scores."""
+    directory = evaluation_dir(folder)
+    directory.mkdir(parents=True, exist_ok=True)
+    _write_atomically(((directory / _FAILED_FILE, error + "\n"),))
+
+
+def write_galley_commit(folder: BookFolder, commit: str) -> None:
+    """Record in the book folder the commit of galley that made its files."""
+    _write_atomically(((folder.root / _GALLEY_COMMIT_FILE, commit + "\n"),))
+
+
+def read_galley_commit(folder: BookFolder) -> str:
+    """The commit of galley that made the book's files, as `run` recorded
+    it. Raises EvaluationError when it was not recorded."""
+    path = folder.root / _GALLEY_COMMIT_FILE
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError as err:
+        message = (
+            f"{path} does not exist, so the commit of galley that made the "
+            f"files of {folder.root} is not known; run `galley-eval run` on it"
+        )
+        raise EvaluationError(message) from err
 
 
 # runs/evaluation/summary.md
@@ -477,6 +547,8 @@ _SUMMARY_COLUMNS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "margin notes as margin notes",
         ("outputs", "markdown", "margin_notes", "as_margin_note"),
     ),
+    ("margin notes in body", ("outputs", "markdown", "margin_notes", "in_body")),
+    ("margin notes missing", ("outputs", "markdown", "margin_notes", "missing")),
     ("unplaced", ("unplaced",)),
     ("anchor mismatches", ("anchor_mismatches",)),
 )
@@ -504,9 +576,47 @@ def _summary_cell(value: object) -> str:
             return str(value)
 
 
-def books_summary(scorecards: tuple[tuple[str, str], ...]) -> str:
-    """The text of runs/evaluation/summary.md: one row per book, from each
-    book's name and the text of its scorecard.json."""
+@dataclass(frozen=True, slots=True, kw_only=True)
+class BookResult:
+    """What the books' summary shows of a book: the text of its
+    scorecard.json, or the error of its last failed run or comparison;
+    neither when it was never compared."""
+
+    name: str
+    scorecard: str | None
+    failure: str | None
+
+
+def _book_row(result: BookResult, columns: int) -> str | None:
+    if result.failure is not None:
+        first_line = (
+            result.failure.strip().splitlines()[0] if result.failure.strip() else ""
+        )
+        cells = (result.name, f"failed: {first_line}", *([""] * (columns - 2)))
+        return "| " + " | ".join(cells) + " |"
+    if result.scorecard is None:
+        return None
+    source = f"the scorecard of {result.name}"
+    try:
+        content = json.loads(result.scorecard)
+    except json.JSONDecodeError as err:
+        message = f"{source} is not valid JSON: {err}"
+        raise EvaluationError(message) from err
+    cells = (
+        result.name,
+        _summary_cell(_value_at(content, ("galley_commit",), source)),
+        _summary_cell(_value_at(content, ("date",), source)),
+        *(
+            _summary_cell(_value_at(content, path, source))
+            for _, path in _SUMMARY_COLUMNS
+        ),
+    )
+    return "| " + " | ".join(cells) + " |"
+
+
+def books_summary(results: tuple[BookResult, ...]) -> str:
+    """The text of runs/evaluation/summary.md: one row per book that was
+    compared or failed, a failed one with its error and no score."""
     header = ("book", "commit", "date", *(heading for heading, _ in _SUMMARY_COLUMNS))
     lines = [
         "# galley on the evaluation set",
@@ -520,34 +630,29 @@ def books_summary(scorecards: tuple[tuple[str, str], ...]) -> str:
         "| " + " | ".join(header) + " |",
         "|" + "---|" * len(header),
     ]
-    for name, text in scorecards:
-        source = f"the scorecard of {name}"
-        try:
-            content = json.loads(text)
-        except json.JSONDecodeError as err:
-            message = f"{source} is not valid JSON: {err}"
-            raise EvaluationError(message) from err
-        cells = (
-            name,
-            _summary_cell(_value_at(content, ("galley_commit",), source)),
-            _summary_cell(_value_at(content, ("date",), source)),
-            *(
-                _summary_cell(_value_at(content, path, source))
-                for _, path in _SUMMARY_COLUMNS
-            ),
-        )
-        lines.append("| " + " | ".join(cells) + " |")
+    lines.extend(
+        row for result in results if (row := _book_row(result, len(header))) is not None
+    )
     return "\n".join(lines) + "\n"
 
 
+def _read_if_there(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8")
+
+
 def write_books_summary(runs_dir: Path, names: tuple[str, ...]) -> Path:
-    """Rewrite `runs_dir/summary.md` from the scorecards of the books
-    `names` that have one, in that order; return its path."""
-    scorecards = tuple(
-        (name, path.read_text(encoding="utf-8"))
+    """Rewrite `runs_dir/summary.md` from the books `names`, in that order:
+    the scorecard of each, or its failure; return its path."""
+    results = tuple(
+        BookResult(
+            name=name,
+            scorecard=_read_if_there(runs_dir / name / "evaluation" / "scorecard.json"),
+            failure=_read_if_there(runs_dir / name / "evaluation" / _FAILED_FILE),
+        )
         for name in names
-        if (path := runs_dir / name / "evaluation" / "scorecard.json").exists()
     )
     summary = runs_dir / "summary.md"
-    summary.write_text(books_summary(scorecards), encoding="utf-8")
+    _write_atomically(((summary, books_summary(results)),))
     return summary

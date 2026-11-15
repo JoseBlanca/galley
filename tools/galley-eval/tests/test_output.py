@@ -1,6 +1,7 @@
 """Tests of galley_eval.output: the files the tool writes for a book and
 the summary of the books (spec section 7)."""
 
+import dataclasses
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -11,8 +12,9 @@ from galley.book_folder import BookFolder
 from galley_eval.align import State, Subkind
 from galley_eval.books import EvaluationBook
 from galley_eval.errors import EvaluationError
-from galley_eval.evaluate import Difference, Evaluation
+from galley_eval.evaluate import Apart, Difference, Evaluation
 from galley_eval.output import (
+    BookResult,
     RunInfo,
     Work,
     book_summary,
@@ -23,27 +25,39 @@ from galley_eval.output import (
     work_of,
     write_books_summary,
     write_evaluation,
+    write_failure,
 )
 from galley_eval.scores import Part
 from galley_eval.stages import StageOutput
 
 type SmallEvaluation = Callable[[EvaluationBook | None], Evaluation]
 
-_RUN = RunInfo(galley_commit="abc123", date="2026-11-15", tool_version="0.1.0")
+_RUN = RunInfo(
+    galley_commit="abc123",
+    comparison_commit="def456",
+    date="2026-11-15",
+    tool_version="0.1.0",
+)
 
 
 def _difference(
-    stage: StageOutput, state: State, *, edge_of_page: bool = False
+    stage: StageOutput,
+    state: State,
+    *,
+    edge_of_page: bool = False,
+    galley: tuple[str, ...] = ("HEAD",),
 ) -> Difference:
     return Difference(
         stage=stage,
         state=state,
         subkind=None,
+        state_at_stage=state,
+        subkind_at_stage=None,
         part=Part.BODY,
         page_index=4,
         printed_page=None,
         reference=(),
-        galley=("HEAD",),
+        galley=galley,
         context_before=(),
         context_after=(),
         block_id=None,
@@ -54,20 +68,37 @@ def _difference(
 
 
 @pytest.mark.parametrize(
-    ("stage", "state", "edge_of_page", "work"),
+    ("stage", "state", "edge_of_page", "galley", "work"),
     [
-        (StageOutput.WORDS, State.EXTRA, True, Work.STRUCTURE),
-        (StageOutput.WORDS, State.EXTRA, False, Work.ANALYZE_EXTRACT),
-        (StageOutput.WORDS, State.CHANGED, True, Work.ANALYZE_EXTRACT),
-        (StageOutput.LINES, State.MISSING, False, Work.LAYOUT),
-        (StageOutput.BLOCKS, State.SPLIT, False, Work.STRUCTURE),
-        (StageOutput.MARKDOWN, State.GLUED, False, Work.MARKDOWN),
+        (StageOutput.WORDS, State.EXTRA, True, ("HEAD",), Work.STRUCTURE),
+        (StageOutput.LINES, State.EXTRA, True, ("HEAD",), Work.STRUCTURE),
+        (StageOutput.WORDS, State.EXTRA, False, ("HEAD",), Work.ANALYZE_EXTRACT),
+        (StageOutput.WORDS, State.CHANGED, True, ("HEAD",), Work.ANALYZE_EXTRACT),
+        (StageOutput.WORDS, State.SPLIT, False, ("repli-", "cate"), Work.STRUCTURE),
+        (StageOutput.LINES, State.SPLIT, False, ("repli-", "cate"), Work.STRUCTURE),
+        (
+            StageOutput.WORDS,
+            State.SPLIT,
+            False,
+            ("rep", "licate"),
+            Work.ANALYZE_EXTRACT,
+        ),
+        (StageOutput.WORDS, State.GLUED, False, ("ofthese",), Work.EXTRACT),
+        (StageOutput.LINES, State.MISSING, False, ("HEAD",), Work.LAYOUT),
+        (StageOutput.BLOCKS, State.SPLIT, False, ("rep", "licate"), Work.STRUCTURE),
+        (StageOutput.MARKDOWN, State.SPLIT, False, ("repli-", "cate"), Work.MARKDOWN),
+        (StageOutput.MARKDOWN, State.GLUED, False, ("ofthese",), Work.MARKDOWN),
     ],
 )
-def test_work_of_a_difference_is_its_stage_but_structure_for_page_edges(
-    stage: StageOutput, state: State, edge_of_page: bool, work: Work
+def test_work_of_a_difference_follows_the_spec_routing(
+    stage: StageOutput,
+    state: State,
+    edge_of_page: bool,
+    galley: tuple[str, ...],
+    work: Work,
 ) -> None:
-    assert work_of(_difference(stage, state, edge_of_page=edge_of_page)) is work
+    difference = _difference(stage, state, edge_of_page=edge_of_page, galley=galley)
+    assert work_of(difference) is work
 
 
 def test_differences_jsonl_has_one_line_per_difference_in_the_spec_order(
@@ -79,6 +110,8 @@ def test_differences_jsonl_has_one_line_per_difference_in_the_spec_order(
         "stage",
         "state",
         "subkind",
+        "state_at_stage",
+        "subkind_at_stage",
         "part",
         "page_index",
         "printed_page",
@@ -94,6 +127,8 @@ def test_differences_jsonl_has_one_line_per_difference_in_the_spec_order(
         "stage": "words",
         "state": "changed",
         "subkind": Subkind.LETTERS.value,
+        "state_at_stage": "changed",
+        "subkind_at_stage": Subkind.LETTERS.value,
         "part": "body",
         "page_index": 1,
         "printed_page": None,
@@ -120,9 +155,10 @@ def test_scorecard_json_has_the_run_and_every_output(
         content["book"],
         content["gutenberg_number"],
         content["galley_commit"],
+        content["comparison_commit"],
         content["date"],
         content["tool_version"],
-    ) == ("small", 42, "abc123", "2026-11-15", "0.1.0")
+    ) == ("small", 42, "abc123", "def456", "2026-11-15", "0.1.0")
     assert list(content["outputs"]) == ["words", "lines", "blocks", "markdown"]
     body = content["outputs"]["markdown"]["text"]["body"]
     # werk, RUNNING and HEAD in ten reference tokens.
@@ -199,6 +235,57 @@ def test_books_summary_has_one_row_per_book_with_a_scorecard(
 
 def test_books_summary_of_a_scorecard_without_a_score_is_an_error() -> None:
     with pytest.raises(EvaluationError, match="scorecard of broken has no"):
-        books_summary((("broken", '{"galley_commit": "x", "date": "y"}'),))
+        books_summary(
+            (
+                BookResult(
+                    name="broken",
+                    scorecard='{"galley_commit": "x", "date": "y"}',
+                    failure=None,
+                ),
+            )
+        )
     with pytest.raises(EvaluationError, match="not valid JSON"):
-        books_summary((("broken", "{"),))
+        books_summary((BookResult(name="broken", scorecard="{", failure=None),))
+
+
+def test_book_that_failed_is_shown_failed_not_with_its_earlier_scores(
+    tmp_path: Path,
+    small_book: Callable[[str], EvaluationBook],
+    small_evaluation: SmallEvaluation,
+) -> None:
+    folder = BookFolder(tmp_path / "first")
+    folder.root.mkdir()
+    write_evaluation(small_evaluation(small_book("first")), folder, _RUN)
+    write_failure(folder, "galley2epub run exited with 1: ERROR bad page\nmore")
+    summary = write_books_summary(tmp_path, ("first",)).read_text(encoding="utf-8")
+    (row,) = (line for line in summary.splitlines() if line.startswith("| first"))
+    assert row.startswith("| first | failed: galley2epub run exited with 1: ERROR")
+    assert "abc123" not in row
+    # A later success removes the failure.
+    write_evaluation(small_evaluation(small_book("first")), folder, _RUN)
+    summary = write_books_summary(tmp_path, ("first",)).read_text(encoding="utf-8")
+    assert "| first | abc123 |" in summary
+
+
+def test_write_evaluation_leaves_no_temporary_file(
+    tmp_path: Path, small_evaluation: SmallEvaluation
+) -> None:
+    write_evaluation(small_evaluation(None), BookFolder(tmp_path), _RUN)
+    assert not tuple((tmp_path / "evaluation").glob("*.tmp"))
+
+
+def test_differences_listed_apart_are_not_grouped_by_work(
+    small_evaluation: SmallEvaluation,
+) -> None:
+    evaluation = small_evaluation(None)
+    apart = dataclasses.replace(
+        _difference(StageOutput.WORDS, State.EXTRA, galley=("APARTWORD",)),
+        apart=Apart.EXCLUDED_PAGE,
+    )
+    summary = book_summary(
+        dataclasses.replace(evaluation, differences=(*evaluation.differences, apart)),
+        _RUN,
+    )
+    works = summary.split("## Differences by the work")[1].split("## Listed apart")[0]
+    assert "APARTWORD" not in works
+    assert "1 excluded_page" in summary

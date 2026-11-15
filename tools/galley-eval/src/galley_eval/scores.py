@@ -64,6 +64,7 @@ from galley_eval.reader import ReferenceKind, ReferenceText, Stream
 
 __all__ = [
     "BoundaryScores",
+    "GalleyKind",
     "KindCount",
     "MarginNoteScores",
     "NoteScores",
@@ -77,6 +78,7 @@ __all__ = [
     "page_parts",
     "paragraph_boundaries",
     "reference_part",
+    "share",
     "text_scores",
 ]
 
@@ -103,6 +105,10 @@ class Placement(StrEnum):
 @dataclass(frozen=True, slots=True, kw_only=True)
 class TextScores:
     """The text scores of one part at one output (spec section 6, "Text").
+    `reference_tokens` counts the scored ones; with `unplaced` and
+    `not_scored` they add up to the reference's tokens of the part.
+    `galley_tokens` counts the galley tokens aligned to a reference token
+    of the part and the extra ones on its pages, scored or not.
     `repaired` is None at words; `token_error_rate` is None when the part
     has no scored reference token."""
 
@@ -119,6 +125,8 @@ class TextScores:
     extra: int
     reference_correction: int
     unplaced: int
+    not_scored: int
+    galley_tokens: int
     edge_of_page_extra: int
     repaired: int | None
     token_error_rate: float | None
@@ -137,13 +145,27 @@ class BoundaryScores:
     recall: float | None
 
 
+class GalleyKind(StrEnum):
+    """The kind of the galley block that holds a reference block: galley's
+    block kinds, and `none` when no token of the reference block is
+    aligned."""
+
+    HEADING = "heading"
+    PARAGRAPH = "paragraph"
+    QUOTE = "quote"
+    FIGURE = "figure"
+    MARGIN_NOTE = "margin_note"
+    INDEX_ENTRY = "index_entry"
+    NONE = "none"
+
+
 @dataclass(frozen=True, slots=True)
 class KindCount:
     """How many reference blocks of `reference` kind are held mostly by a
-    galley block of `galley` kind, `none` when no token is aligned."""
+    galley block of `galley` kind."""
 
-    reference: str
-    galley: str
+    reference: ReferenceKind
+    galley: GalleyKind
     count: int
 
 
@@ -161,8 +183,8 @@ class NoteScores:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class MarginNoteScores:
     """The reference's margin notes found as a galley margin note, in the
-    body, or not at all; `position_right` is None when the book's margin
-    notes were moved by Gutenberg."""
+    body, or not at all, and those found in their place; `position_right`
+    is None when Gutenberg moved the book's margin notes."""
 
     as_margin_note: int
     in_body: int
@@ -243,6 +265,7 @@ def text_scores(
                 counter["unplaced"] += 1
                 continue
             case Placement.NOT_SCORED:
+                counter["not_scored"] += 1
                 continue
             case Placement.SCORED:
                 pass
@@ -255,8 +278,12 @@ def text_scores(
             counter["repaired"] += 1
     for index, token in enumerate(galley):
         pairing = alignment.pairings[alignment.galley_pairing[index]]
-        if pairing.state is State.EXTRA and galley_scored[index]:
-            counter = counts[galley_part[index]]
+        if pairing.state is not State.EXTRA:
+            counts[parts[pairing.reference_indices[0]]]["galley_tokens"] += 1
+            continue  # counted with its reference token
+        counter = counts[galley_part[index]]
+        counter["galley_tokens"] += 1
+        if galley_scored[index]:
             counter["extra"] += 1
             counter["edge_of_page_extra"] += token.edge_of_page
     return frozendict(
@@ -306,6 +333,8 @@ def _text_scores(counter: Counter[str], *, with_repaired: bool) -> TextScores:
         extra=counter["extra"],
         reference_correction=counter["reference_correction"],
         unplaced=counter["unplaced"],
+        not_scored=counter["not_scored"],
+        galley_tokens=counter["galley_tokens"],
         edge_of_page_extra=counter["edge_of_page_extra"],
         repaired=counter["repaired"] if with_repaired else None,
         token_error_rate=errors / reference_tokens if reference_tokens else None,
@@ -407,8 +436,8 @@ def paragraph_boundaries(
                 right=right_counts[part],
                 reference_boundaries=reference_counts[part],
                 found=found_counts[part],
-                precision=_share(right_counts[part], galley_counts[part]),
-                recall=_share(found_counts[part], reference_counts[part]),
+                precision=share(right_counts[part], galley_counts[part]),
+                recall=share(found_counts[part], reference_counts[part]),
             )
             for part in Part
             if part is not Part.NOTES
@@ -416,7 +445,8 @@ def paragraph_boundaries(
     )
 
 
-def _share(count: int, total: int) -> float | None:
+def share(count: int, total: int) -> float | None:
+    """`count` divided by `total`; None when `total` is 0."""
     return count / total if total else None
 
 
@@ -441,7 +471,9 @@ def block_kinds(
 ) -> frozendict[Part, tuple[KindCount, ...]]:
     """For every part, how many reference blocks of each kind are held
     mostly by a galley block of each kind, in the order first seen."""
-    counts: dict[Part, Counter[tuple[str, str]]] = {part: Counter() for part in Part}
+    counts: dict[Part, Counter[tuple[ReferenceKind, GalleyKind]]] = {
+        part: Counter() for part in Part
+    }
     for indices in _groups(places):
         holders = Counter(
             block_id
@@ -450,12 +482,12 @@ def block_kinds(
             and (block_id := galley[galley_index].block_id) is not None
         )
         galley_kind = (
-            galley_blocks[holders.most_common(1)[0][0]].kind.value
+            GalleyKind(galley_blocks[holders.most_common(1)[0][0]].kind.value)
             if holders
-            else "none"
+            else GalleyKind.NONE
         )
         place = places[indices[0]]
-        counts[parts[indices[0]]][place.kind.value, galley_kind] += 1
+        counts[parts[indices[0]]][place.kind, galley_kind] += 1
     return frozendict(
         {
             part: tuple(
@@ -584,13 +616,12 @@ def margin_note_scores(
     alignment: Alignment,
     places: tuple[ReferencePlace, ...],
     galley: tuple[GalleyToken, ...],
-    *,
-    margin_notes_moved: bool,
 ) -> MarginNoteScores:
     """Each reference margin note of the body found as a galley margin
-    note, in the body or not at all, and, unless `margin_notes_moved`,
-    whether galley put it just before the block that holds the paragraph
-    it precedes in the reference."""
+    note, in the body or not at all, and how many galley put just before
+    the block that holds the paragraph it precedes in the reference. The
+    caller leaves the position out for a book whose margin notes
+    Gutenberg moved."""
 
     def margin_note_of(token: GalleyToken) -> str | None:
         if token.stream is not GalleyStream.MARGIN_NOTES:
@@ -612,8 +643,8 @@ def margin_note_scores(
             continue  # only margin notes are scored here
         where, galley_block = _found_where(alignment, indices, galley, margin_note_of)
         found[where] += 1
-        if margin_notes_moved or galley_block is None:
-            continue  # position not scored, or no margin note to place
+        if galley_block is None:
+            continue  # no margin note to place
         paragraph = next(
             (
                 blocks[later]
@@ -638,7 +669,7 @@ def margin_note_scores(
         as_margin_note=found[_Found.AS_ITSELF],
         in_body=found[_Found.IN_BODY],
         missing=found[_Found.MISSING],
-        position_right=None if margin_notes_moved else right,
+        position_right=right,
     )
 
 

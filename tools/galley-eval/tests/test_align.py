@@ -744,3 +744,31 @@ def test_leftovers_are_taken_in_book_order() -> None:
     )
     alignment, _ = _align(reference, galley)
     assert _pairing_of_reference(alignment, 2).galley_indices == (3,)
+
+
+def test_tokens_with_half_their_letters_alike_are_paired_as_changed() -> None:
+    # "abcd" and "abxy": a ratio of 2 * 2 / 8 = 0.5, the least that pairs.
+    alignment, _ = _align(
+        _reference(_paragraph("one abcd two")), _galley("one abxy two")
+    )
+    assert _pairing_of_reference(alignment, 1).state is State.CHANGED
+
+
+def test_tokens_with_less_than_half_their_letters_alike_are_not_paired() -> None:
+    # "abcde" and "abxyz": 2 * 2 / 10 = 0.4.
+    alignment, _ = _align(
+        _reference(_paragraph("one abcde two")), _galley("one abxyz two")
+    )
+    assert _pairing_of_reference(alignment, 1).state is State.MISSING
+
+
+def test_on_a_tie_the_reference_token_is_left_first() -> None:
+    # Two tokens on each side, crossed: at the first step neither is
+    # behind, and the reference has as many tokens left, so the body pass
+    # leaves "pppp" and pairs "qqqq" with "qqqz"; the last pass pairs
+    # "pppp" with "pppz".
+    alignment, _ = _align(
+        _reference(_paragraph("one pppp qqqq two")), _galley("one qqqz pppz two")
+    )
+    assert _pairing_of_reference(alignment, 2).found_in is AlignmentPass.BODY
+    assert _pairing_of_reference(alignment, 1).found_in is AlignmentPass.REMAINDER

@@ -16,6 +16,7 @@ from galley_eval.reader import (
 )
 from galley_eval.scores import (
     BoundaryScores,
+    GalleyKind,
     KindCount,
     MarginNoteScores,
     NoteScores,
@@ -251,8 +252,8 @@ def test_block_kind_is_that_of_the_galley_block_holding_most_tokens() -> None:
     )
     # The heading has one token in h1 and one in p1: the first wins a tie.
     assert kinds[Part.BODY] == (
-        KindCount("heading", "heading", 1),
-        KindCount("paragraph", "paragraph", 1),
+        KindCount(ReferenceKind.HEADING, GalleyKind.HEADING, 1),
+        KindCount(ReferenceKind.PARAGRAPH, GalleyKind.PARAGRAPH, 1),
     )
 
 
@@ -270,7 +271,7 @@ def test_block_with_no_aligned_token_has_kind_none() -> None:
     kinds = block_kinds(
         align(reference, galley), places, galley, galley_blocks, (Part.BODY,) * 4
     )
-    assert KindCount("paragraph", "none", 1) in kinds[Part.BODY]
+    assert KindCount(ReferenceKind.PARAGRAPH, GalleyKind.NONE, 1) in kinds[Part.BODY]
 
 
 # Notes
@@ -378,14 +379,9 @@ _MARGIN_REFERENCE = _reference(
 )
 
 
-def _margin_scores(
-    galley: tuple[GalleyToken, ...], *, margin_notes_moved: bool
-) -> MarginNoteScores:
+def _margin_scores(galley: tuple[GalleyToken, ...]) -> MarginNoteScores:
     return margin_note_scores(
-        align(_MARGIN_REFERENCE, galley),
-        reference_places(_MARGIN_REFERENCE),
-        galley,
-        margin_notes_moved=margin_notes_moved,
+        align(_MARGIN_REFERENCE, galley), reference_places(_MARGIN_REFERENCE), galley
     )
 
 
@@ -401,14 +397,8 @@ _MARGIN_GALLEY = (
 
 
 def test_margin_notes_found_and_their_position_scored() -> None:
-    assert _margin_scores(_MARGIN_GALLEY, margin_notes_moved=False) == (
+    assert _margin_scores(_MARGIN_GALLEY) == (
         MarginNoteScores(as_margin_note=2, in_body=0, missing=1, position_right=1)
-    )
-
-
-def test_margin_notes_moved_by_gutenberg_have_no_position_score() -> None:
-    assert _margin_scores(_MARGIN_GALLEY, margin_notes_moved=True) == (
-        MarginNoteScores(as_margin_note=2, in_body=0, missing=1, position_right=None)
     )
 
 
@@ -419,7 +409,7 @@ def test_margin_note_in_a_paragraph_is_in_the_body() -> None:
         + _tokens("Henry returns", "m2", stream=GalleyStream.MARGIN_NOTES)
         + _tokens("the king came back", "p3")
     )
-    assert _margin_scores(galley, margin_notes_moved=False) == MarginNoteScores(
+    assert _margin_scores(galley) == MarginNoteScores(
         as_margin_note=1, in_body=1, missing=1, position_right=1
     )
 
@@ -451,6 +441,311 @@ def test_margin_notes_one_after_another_both_precede_their_paragraph() -> None:
         align(reference, galley),
         reference_places(reference),
         galley,
-        margin_notes_moved=False,
     )
     assert scores.position_right == 2
+
+
+# Every term of the error rate, on one literal stretch
+
+
+def test_every_state_and_subkind_is_counted_once_and_corrections_apart() -> None:
+    reference = _reference(
+        ReferenceBlock(
+            ReferenceKind.PARAGRAPH,
+            tuple(
+                ReferenceToken(word, marked_correction=False)
+                for word in [
+                    "aaa",
+                    "one",
+                    "bbb",
+                    "“two”",
+                    "ccc",
+                    "Three",
+                    "ddd",
+                    "four,",
+                    "eee",
+                    "Léon",
+                    "fff",
+                    "house",
+                    "ggg",
+                    "replicate",
+                    "hhh",
+                    "of",
+                    "these",
+                    "iii",
+                    "lost",
+                    "jjj",
+                ]
+            )
+            + (ReferenceToken("Corrected", marked_correction=True),)
+            + (ReferenceToken("kkk", marked_correction=False),),
+        )
+    )
+    galley = _tokens(
+        'aaa one bbb "two" ccc THREE ddd four eee Leon fff honse ggg repli- cate '
+        "hhh ofthese iii jjj Corected stray kkk"
+    )
+    count = len(reference_places(reference))
+    scores = text_scores(
+        align(reference, galley),
+        galley,
+        parts=(Part.BODY,) * count,
+        placements=(Placement.SCORED,) * count,
+        galley_part=(Part.BODY,) * len(galley),
+        galley_scored=(True,) * len(galley),
+        repaired=None,
+    )[Part.BODY]
+    assert (
+        scores.reference_tokens,
+        scores.matched,
+        scores.changed_convention,
+        scores.changed_case,
+        scores.changed_punctuation,
+        scores.changed_diacritic,
+        scores.changed_letters,
+        scores.split,
+        scores.glued,
+        scores.missing,
+        scores.extra,
+        scores.reference_correction,
+        scores.galley_tokens,
+    ) == (22, 12, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, len(galley))
+    # case, punctuation, diacritic, letters, split, 2 glued, missing,
+    # extra; not the convention nor the correction.
+    assert scores.token_error_rate == 9 / 22
+
+
+def test_not_scored_and_unplaced_add_up_with_the_scored_tokens() -> None:
+    reference = _reference(_paragraph("one two three four"))
+    galley = _tokens("one two three four") + _tokens("plate", page_index=9)
+    scores = text_scores(
+        align(reference, galley),
+        galley,
+        parts=(Part.BODY,) * 4,
+        placements=(
+            Placement.SCORED,
+            Placement.NOT_SCORED,
+            Placement.UNPLACED,
+            Placement.SCORED,
+        ),
+        galley_part=(Part.BODY,) * 5,
+        galley_scored=(True, True, True, True, False),
+        repaired=None,
+    )[Part.BODY]
+    assert (
+        scores.reference_tokens,
+        scores.not_scored,
+        scores.unplaced,
+        scores.extra,
+        scores.galley_tokens,
+    ) == (2, 1, 1, 0, 5)
+
+
+# Parts
+
+
+def test_reference_part_of_notes_tables_figures_and_headings() -> None:
+    reference = _reference(
+        _block(ReferenceKind.HEADING, "Title"),
+        _block(ReferenceKind.TABLE, "cell"),
+        _block(ReferenceKind.FIGURE, "caption"),
+        _block(ReferenceKind.QUOTE, "verse"),
+        notes=(_note("Footnote_1", "Ibid."),),
+    )
+    assert tuple(reference_part(place) for place in reference_places(reference)) == (
+        Part.BODY,
+        Part.TABLES,
+        Part.FIGURES,
+        Part.BODY,
+        Part.NOTES,
+    )
+
+
+def test_page_part_on_a_tie_is_the_first_in_part_order() -> None:
+    reference = _reference(
+        _block(ReferenceKind.INDEX_ENTRY, "Rollo"),
+        _block(ReferenceKind.TABLE, "cell"),
+        _paragraph("text"),
+        notes=(_note("Footnote_1", "Ibid."),),
+    )
+    places = reference_places(reference)
+    # Page 0: an index token and a table token; page 1: body and notes.
+    assert page_parts(places, (0, 0, 1, 1)) == {0: Part.INDEX, 1: Part.BODY}
+
+
+def test_galley_token_on_a_page_with_no_reference_token_is_in_the_body() -> None:
+    galley = _tokens("one", page_index=0) + _tokens("two", page_index=7)
+    assert galley_parts(galley, frozendict({0: Part.INDEX})) == (
+        Part.INDEX,
+        Part.BODY,
+    )
+
+
+def test_boundaries_and_kinds_are_counted_in_the_part_of_the_block() -> None:
+    reference = _reference(
+        _paragraph("alpha beta"),
+        _block(ReferenceKind.INDEX_ENTRY, "Rollo, 12"),
+        _block(ReferenceKind.INDEX_ENTRY, "Rouen, 14"),
+    )
+    galley = _tokens("alpha beta", "b1") + _tokens("Rollo, 12 Rouen, 14", "b2")
+    places = reference_places(reference)
+    parts = tuple(reference_part(place) for place in places)
+    alignment = align(reference, galley)
+    boundaries = paragraph_boundaries(alignment, places, galley, parts)
+    assert (
+        boundaries[Part.INDEX].reference_boundaries,
+        boundaries[Part.INDEX].right,
+    ) == (
+        2,
+        1,
+    )
+    assert boundaries[Part.BODY].reference_boundaries == 0
+    galley_blocks = frozendict(
+        {
+            "b1": GalleyBlock(
+                kind=BlockKind.PARAGRAPH, stream=GalleyStream.BODY, note_id=None
+            ),
+            "b2": GalleyBlock(
+                kind=BlockKind.INDEX_ENTRY, stream=GalleyStream.BODY, note_id=None
+            ),
+        }
+    )
+    kinds = block_kinds(alignment, places, galley, galley_blocks, parts)
+    assert kinds[Part.INDEX] == (
+        KindCount(ReferenceKind.INDEX_ENTRY, GalleyKind.INDEX_ENTRY, 2),
+    )
+    assert kinds[Part.BODY] == (
+        KindCount(ReferenceKind.PARAGRAPH, GalleyKind.PARAGRAPH, 1),
+    )
+
+
+# Boundaries: claimed gaps, no token after, glued
+
+
+def test_two_galley_boundaries_on_one_gap_are_one_right_and_one_wrong() -> None:
+    reference = _reference(_paragraph("alpha beta"), _paragraph("gamma delta"))
+    # An extra-only block "HEAD" between: both its boundaries map before
+    # "gamma".
+    galley = (
+        _tokens("alpha beta", "b1")
+        + _tokens("HEAD", "b2")
+        + _tokens("gamma delta", "b3")
+    )
+    places = reference_places(reference)
+    scores = paragraph_boundaries(
+        align(reference, galley), places, galley, (Part.BODY,) * 4
+    )[Part.BODY]
+    assert (scores.galley_boundaries, scores.right, scores.found) == (2, 1, 1)
+
+
+def test_boundary_with_no_aligned_token_after_maps_after_the_last() -> None:
+    reference = _reference(_paragraph("alpha beta"), _paragraph("gamma"))
+    # galley ends with a block of extra tokens, whose boundary maps after
+    # "gamma", the end of the reference: no boundary there.
+    galley = (
+        _tokens("alpha beta", "b1") + _tokens("gamma", "b2") + _tokens("12 HEAD", "b3")
+    )
+    places = reference_places(reference)
+    scores = paragraph_boundaries(
+        align(reference, galley), places, galley, (Part.BODY,) * 3
+    )[Part.BODY]
+    assert (scores.galley_boundaries, scores.right) == (2, 1)
+
+
+def test_boundary_before_a_glued_token_maps_before_its_first_word() -> None:
+    reference = _reference(_paragraph("alpha beta"), _paragraph("of these words"))
+    galley = _tokens("alpha beta", "b1") + _tokens("ofthese words", "b2")
+    places = reference_places(reference)
+    scores = paragraph_boundaries(
+        align(reference, galley), places, galley, (Part.BODY,) * 5
+    )[Part.BODY]
+    assert scores.right == 1
+
+
+# Notes and margin notes at exactly half
+
+
+def test_note_with_half_its_tokens_in_a_galley_note_is_found_as_a_note() -> None:
+    reference = _reference(
+        _paragraph("first second third fourth"),
+        notes=(_note("Footnote_1", "Ibid. page forty two"),),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 4)),),
+    )
+    galley = _tokens("first second third fourth page forty", "p1") + _tokens(
+        "Ibid. two", "n1", stream=GalleyStream.NOTES
+    )
+    scores = note_scores(
+        reference,
+        align(reference, galley),
+        reference_places(reference),
+        galley,
+        _NOTE_BLOCKS,
+        (
+            # At the end of its block, after "forty".
+            GalleyNoteReference(note_id="n-p0000-001", block_id="p1", tokens_before=6),
+        ),
+    )
+    assert (scores.as_note, scores.in_body, scores.missing) == (1, 0, 0)
+    # The reference after the last token of p1 maps after "fourth": gap 4.
+    assert scores.reference_right == 1
+
+
+def test_note_with_half_in_the_body_and_the_rest_lost_is_in_the_body() -> None:
+    reference = _reference(
+        _paragraph("first second third fourth"),
+        notes=(_note("Footnote_1", "Ibid. page forty two"),),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 4)),),
+    )
+    galley = _tokens("first second third fourth page forty", "p1")
+    scores = note_scores(
+        reference,
+        align(reference, galley),
+        reference_places(reference),
+        galley,
+        _NOTE_BLOCKS,
+        (),
+    )
+    # Two of its four tokens are aligned, both in the body: all its
+    # aligned tokens, so more than half.
+    assert (scores.as_note, scores.in_body, scores.missing) == (0, 1, 0)
+
+
+def test_margin_note_with_half_its_tokens_in_a_margin_note_is_found() -> None:
+    reference = _reference(
+        _paragraph("opening words here"),
+        _block(ReferenceKind.MARGIN_NOTE, "Becket exiled abroad again"),
+        _paragraph("the archbishop left England"),
+    )
+    galley = (
+        _tokens("opening words here", "p1")
+        + _tokens("Becket exiled", "m1", stream=GalleyStream.MARGIN_NOTES)
+        + _tokens("abroad again the archbishop left England", "p2")
+    )
+    scores = margin_note_scores(
+        align(reference, galley), reference_places(reference), galley
+    )
+    assert (scores.as_margin_note, scores.in_body) == (1, 0)
+
+
+def test_note_reference_at_the_end_of_its_block_is_after_its_last_token() -> None:
+    reference = _reference(
+        _paragraph("first second third fourth fifth sixth seventh eighth"),
+        notes=(_note("Footnote_1", "Ibid. page forty"),),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 7)),),
+    )
+    galley = (
+        _tokens("first second third fourth", "p1")
+        + _tokens("fifth sixth seventh eighth", "p2")
+        + _tokens("Ibid. page forty", "n1", stream=GalleyStream.NOTES)
+    )
+    scores = note_scores(
+        reference,
+        align(reference, galley),
+        reference_places(reference),
+        galley,
+        _NOTE_BLOCKS,
+        (GalleyNoteReference(note_id="n-p0000-001", block_id="p1", tokens_before=4),),
+    )
+    # After "fourth" is gap 4, three tokens from Gutenberg's 7; before
+    # "fourth" would be 3, four tokens away.
+    assert scores.reference_right == 1

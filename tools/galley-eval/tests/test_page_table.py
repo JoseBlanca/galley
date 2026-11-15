@@ -96,7 +96,7 @@ def _rows(
         page_indices=tuple(0 for _ in places),
         parts_of_pages=frozendict({0: Part.BODY}),
         printed_pages=frozendict({0: "7"}),
-        dictionary=frozenset(("the", "king", "went")),
+        word_list=frozenset(("the", "king", "went")),
         language=Language.EN,
     )
 
@@ -112,10 +112,19 @@ def test_ocr_recall_counts_a_split_and_a_case_change_as_read() -> None:
 
 def test_ocr_precision_is_low_on_a_page_scrambled_into_letters() -> None:
     reference = _reference("Rollo Rouen Richard Robert")
-    galley = _tokens("R o l l o Rouen R i c h a r d")
+    # Letters out of their order, so that no run of them joins into a word.
+    galley = _tokens("l R o o l Rouen h c i R a r d")
     (row,) = _rows(reference, galley)
     # One galley token of thirteen is a word of the reference.
     assert row.ocr_precision == 1 / 13
+
+
+def test_ocr_precision_counts_the_parts_of_a_split_as_precise() -> None:
+    reference = _reference("the king went")
+    galley = _tokens("the ki- ng wemt")
+    (row,) = _rows(reference, galley)
+    # "ki-" and "ng" are a split; "wemt" has another key than "went".
+    assert row.ocr_precision == 3 / 4
 
 
 def test_ocr_precision_leaves_out_tokens_on_the_edge_of_the_page() -> None:
@@ -171,3 +180,29 @@ def test_inner_symbol_share_counts_symbols_inside_a_word() -> None:
     # Anglo-Saxon is between letters; "a-" is stripped to "a".
     assert inner_symbol_share(texts) == pytest.approx(3 / 7)
     assert inner_symbol_share(()) is None
+
+
+def test_ocr_recall_counts_convention_case_punctuation_but_not_letters() -> None:
+    # convention, case, punctuation are read; diacritic and letters not.
+    reference = _reference("aaa “two” bbb Three ccc four, ddd Léon eee house fff")
+    galley = _tokens('aaa "two" bbb THREE ccc four ddd Leon eee honse fff')
+    (row,) = _rows(reference, galley)
+    assert row.ocr_recall == 9 / 11
+
+
+def test_part_column_is_that_of_the_page() -> None:
+    reference = _reference("Rollo")
+    galley = _tokens("Rollo")
+    places = reference_places(reference)
+    (row,) = page_rows(
+        _words_file(galley),
+        galley,
+        align(reference, galley),
+        places,
+        page_indices=(0,),
+        parts_of_pages=frozendict({0: Part.INDEX}),
+        printed_pages=frozendict(),
+        word_list=frozenset(),
+        language=Language.EN,
+    )
+    assert (row.part, row.printed_page) == (Part.INDEX, None)

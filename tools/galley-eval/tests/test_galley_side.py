@@ -1,6 +1,7 @@
 """Tests of galley_eval.galley_side: the tokens of galley's four stage
 outputs (spec section 5, "galley's tokens")."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -31,7 +32,9 @@ from galley.model import (
     write_words,
 )
 from galley_eval.align import GalleyStream, GalleyToken
+from galley_eval.books import EvaluationBook
 from galley_eval.errors import GalleyFilesError
+from galley_eval.evaluate import evaluate
 from galley_eval.galley_side import (
     GalleyNoteReference,
     blocks_tokens,
@@ -473,3 +476,19 @@ def test_folder_without_book_md_is_an_error_naming_the_stage(tmp_path: Path) -> 
     write_blocks(folder.blocks_json, _BLOCKS)
     with pytest.raises(GalleyFilesError, match=r"book\.md(.|\n)*galley2epub markdown"):
         read_galley_side(folder)
+
+
+def test_evaluate_of_a_folder_without_book_md_is_a_book_error(
+    tmp_path: Path, small_book: Callable[[str], EvaluationBook]
+) -> None:
+    folder = BookFolder(tmp_path)
+    write_words(folder.words_json, _words_file(_LINES))
+    write_lines(folder.lines_json, _LINES)
+    write_blocks(folder.blocks_json, _BLOCKS)
+    with pytest.raises(GalleyFilesError, match="galley2epub markdown"):
+        evaluate(
+            small_book("small"),
+            folder,
+            tmp_path / "never-read.html",
+            word_list=frozenset(),
+        )

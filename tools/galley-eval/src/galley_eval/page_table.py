@@ -23,6 +23,8 @@ How the spec is read here, where it leaves a choice:
   with a symbol. Any other character inside the stripped token that is
   neither a letter nor a hyphen between two letters makes it one, an
   apostrophe included.
+- `ocr_precision` counts the galley tokens of a split as precise, as the
+  spec now says: "repli-" and "cate" are read right.
 - A share is empty (None) when it has nothing to divide by: a page with
   no reference token has no `ocr_recall`.
 """
@@ -41,7 +43,7 @@ from galley_eval.align import (
     Subkind,
     alignment_key,
 )
-from galley_eval.scores import Part
+from galley_eval.scores import Part, share
 
 __all__ = [
     "PageRow",
@@ -97,13 +99,13 @@ def stripped(text: str) -> str:
     return text[start:end].lower()
 
 
-def wordlist_share(texts: tuple[str, ...], dictionary: frozenset[str]) -> float | None:
+def wordlist_share(texts: tuple[str, ...], word_list: frozenset[str]) -> float | None:
     """The share of the alphabetic tokens of `texts`, letters only once
-    stripped, that are in `dictionary`, a set of lowered words."""
+    stripped, that are in `word_list`, a set of lowered words."""
     alphabetic = tuple(word for text in texts if (word := stripped(text)).isalpha())
     if not alphabetic:
         return None
-    return sum(1 for word in alphabetic if word in dictionary) / len(alphabetic)
+    return sum(1 for word in alphabetic if word in word_list) / len(alphabetic)
 
 
 def single_letter_share(texts: tuple[str, ...], language: Language) -> float | None:
@@ -152,12 +154,12 @@ def page_rows(
     page_indices: tuple[int | None, ...],
     parts_of_pages: frozendict[int, Part],
     printed_pages: frozendict[int, str],
-    dictionary: frozenset[str],
+    word_list: frozenset[str],
     language: Language,
 ) -> tuple[PageRow, ...]:
     """One row for each page of `words_file`, from galley's words `galley`
     aligned with the reference by `alignment`. `page_indices` is the page
-    of each reference token, None when unplaced; `dictionary` holds the
+    of each reference token, None when unplaced; `word_list` holds the
     lowered words of the book's language."""
     read: Counter[int] = Counter()
     reference_counts: Counter[int] = Counter()
@@ -179,9 +181,11 @@ def page_rows(
             continue  # left out of ocr_precision
         inside[token.page_index] += 1
         pairing = alignment.pairings[alignment.galley_pairing[index]]
-        if pairing.state in {State.MATCHED, State.CHANGED} and alignment_key(
-            token.text
-        ) == alignment_key(places[pairing.reference_indices[0]].token.text):
+        if pairing.state is State.SPLIT or (
+            pairing.state in {State.MATCHED, State.CHANGED}
+            and alignment_key(token.text)
+            == alignment_key(places[pairing.reference_indices[0]].token.text)
+        ):
             precise[token.page_index] += 1
     rows: list[PageRow] = []
     for page in words_file.pages:
@@ -198,9 +202,9 @@ def page_rows(
                 text_source=page.text_source,
                 part=parts_of_pages.get(page.index, Part.BODY),
                 tokens=len(page_texts),
-                ocr_recall=_share(read[page.index], reference_counts[page.index]),
-                ocr_precision=_share(precise[page.index], inside[page.index]),
-                wordlist_share=wordlist_share(page_texts, dictionary),
+                ocr_recall=share(read[page.index], reference_counts[page.index]),
+                ocr_precision=share(precise[page.index], inside[page.index]),
+                wordlist_share=wordlist_share(page_texts, word_list),
                 single_letter_share=single_letter_share(page_texts, language),
                 inner_symbol_share=inner_symbol_share(page_texts),
                 ocr_confidence_mean=fmean(confidences)
@@ -209,7 +213,3 @@ def page_rows(
             )
         )
     return tuple(rows)
-
-
-def _share(count: int, total: int) -> float | None:
-    return count / total if total else None
