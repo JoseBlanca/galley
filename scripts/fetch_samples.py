@@ -127,7 +127,7 @@ EVALUATION_EXCERPTS = frozendict(
         "earlyplantagenet01stub": (
             Excerpt(
                 name="stubbs_51_56-64",
-                # Pages 52 to 55 are maps and blank pages without a text layer.
+                # Page indices 52 to 55 are maps and blank pages without a text layer.
                 page_indices=(51, *range(56, 65)),
                 covers=(
                     "the excerpt of layout's reference pages "

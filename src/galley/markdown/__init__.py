@@ -203,9 +203,12 @@ def _div_attributes(block: Block) -> str:
             assert_never(block.kind)
 
 
-def _div(block: Block, before_text: str = "") -> str:
-    """A block's fenced div, `before_text` and its text on one line."""
-    text = escape_markdown(f"{before_text} {block_text(block)}")
+def _div(block: Block, marker: str = "") -> str:
+    """A block's fenced div, with its text on one line, escaped by
+    escape_markdown; a note's `marker`, when given, is joined before the
+    text with one space and escaped with it. An empty marker adds
+    nothing."""
+    text = escape_markdown(f"{marker} {block_text(block)}")
     return f"::: {{{_div_attributes(block)}}}\n{text}\n:::\n"
 
 
