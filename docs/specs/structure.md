@@ -413,7 +413,10 @@ with no body stream (a plate, a blank page) does not end the paragraph.
 A plate whose text layer has words has a body stream; so that those
 words are a paragraph of their own (section 9, "Plates"), the first line
 of a page that has a figure (lines.json copies the figures) starts a
-paragraph, and so does the first line of the page after it.
+paragraph, and so does the first line of the page after it. The hyphen
+rule above comes first: a line after a line that ends with a hyphen
+does not start a paragraph, on a plate's page or after it either, so
+that a word split before a plate and finished on it is joined.
 
 Measured on the lines of words the reference puts in the body, as if
 layout had separated the regions without fault, against the
