@@ -71,10 +71,22 @@ says what a region's edges are); its middle is halfway between.
 1. **Survey the book** (one pass over every page): the head lines, the
    book's own words for the hyphen rule, the body word height and body
    line pitch, and the offset between page index and printed page
-   number. The body word height is the median, over all lines of the
-   book pooled, of the median height of a line's words; the body line
-   pitch is the median distance from the top of a line to the top of the
-   next line of the same region, over the regions of 5 lines or more.
+   number. The body word height and body line pitch are measured as
+   layout measures them (layout §3, "The book's measures"), on the same
+   words: each page's words, from every region, are grouped into rows by
+   the row rule of layout §1; on the pages of at least 15 rows (of 3 rows
+   when no page has 15), the body word height is the median, over all
+   their rows pooled, of the median height of a row's words, and the
+   pitch the median distance from the top of a row to the top of the
+   next. A book with no page of 3 rows takes the median over all its
+   lines for the height, 0 without words, and 0 for the pitch. (Owner,
+   15 November 2026: the median over all lines, the first rule, found
+   8.1 pt on the Kadesh excerpt, whose note lines outnumber its body
+   lines, against 11.0 pt for the whole book, and so no band; layout's
+   rule gives 11.0 pt on both. structure imports no stage, so it repeats
+   the rule.) The survey
+   also finds the pages whose lowest line is a signature line (section
+   4), which takes the other pages' lowest lines.
 2. **Per page**: decide what each region is (below); remove the running
    head, page numbers, signature marks and stray marks (sections 3 and
    4); group the body stream into paragraphs, and each side region into
@@ -93,7 +105,8 @@ says what a region's edges are); its middle is halfway between.
   number of lines of marks above it). When section 3 does not make it a
   running head, it is the first body region;
 - a **margin region** is narrower than a quarter of the page's widest
-  region (the first, on a tie) and lies wholly left or wholly right of
+  region other than the head line (the first, on a tie) and lies wholly
+  left or wholly right of
   it, or overlaps vertically a region wider than itself (a cut-in note,
   once layout finds them, in the second plan, layout §9). Margin notes are about 30
   pt wide against columns of 266 to 317 pt; each column of an index is
@@ -114,8 +127,30 @@ pitches below the median top of the head lines of the book, and either:
   letters and at least 0.75 alike (`difflib.SequenceMatcher` ratio) to
   those of the head line of at least one other page within the same 2
   pitches; or
-- its first or last word is a page-number form; or
-- it is a page-number form alone.
+- its first or last word is a page-number form that the book's head
+  numbers confirm: an arabic one whose value plus the offset (below)
+  gives the page index within 2, or one whose line without it is alike,
+  by the rule above, to the line of another such head without its
+  number. A roman form counts only on pages before the first arabic head
+  number, here too.
+
+**A speck as the head line.** When the head line has fewer than 4
+letters and is not a running head, the line below it, the topmost line of
+the page's other regions, is tested: it is a running head when its top
+lies within the 2 pitches of the median head top and its letters are at
+least 4 and 0.75 alike to those of a running head of another page. It is
+then removed as a running head is, with its page number, and the speck
+above stays as it is (in the text, or as a `stray_mark` when it has no
+letter or digit).
+
+A number alone does not make a running head: a top line that ends with
+a word that is also a roman form ("vi", "mix", "dix", "d", "c.", "i.")
+or with a number of the text stays in the text. On Stubbs' page 267 a
+speck read as "d" is the head line; under the first form of this rule
+it was a running head and its page number "d", and the real head below
+stayed in the body. The offset is taken first, from every head line
+within the 2 pitches that has an arabic page-number form at an end, so
+that it does not depend on which heads are running heads.
 
 The first condition keeps a chapter's title from being taken for a
 running head on the chapter's first page, where Haskins prints it as its
@@ -148,14 +183,25 @@ by one space, with the smallest box that holds them; a
 marks stay in the text. When both end words are page-number forms, the
 page number is the one whose value plus the **offset** gives the page
 index, where the offset is the commonest page index minus printed number
-of the book's arabic head numbers (Haskins 15; Stubbs 17 on pages 19 to
-51 and 21 from page 56, so 21; Domesday 25; a tie takes the smaller),
-or the first word when no offset is known. A roman numeral counts as a
+of the book's arabic head numbers (each arabic page-number form at the
+first or last word of a head line within the 2 pitches, both when both
+are; Haskins 15;
+Stubbs 17 on pages 19 to 51 and 21 from page 56, so 21; Domesday 25; a
+tie takes the smaller), or the first word when no offset is known or
+neither gives the page index. A roman numeral counts as a
 page number only on pages before the first page whose head has an arabic
-one, so that Stubbs' "The Early Plantagenets. ch. i." gives no page
-number "i.". A page number the OCR misread ("ii8" for 118) is not a
+one that the offset confirms, so that Stubbs' "The Early Plantagenets.
+ch. i." gives no page number "i.". A page number the OCR misread ("ii8" for 118) is not a
 page-number form: it is removed with the running head, and the page has
 no `page_numbers` entry.
+
+The OCR splits some head numbers into two words ("The Villeins. 5 1" for
+51, Gierke's "1 82"; 23 heads in Gierke, 4 in Stubbs, 1 in Domesday). A
+run of words of digits at the start or the end of a head line (the last
+of them may end with "." or ","), is joined without spaces and tested as
+one word, as a page number at the foot is (section 4): its removal holds
+the words joined by a space, and its `PageNumber.text` the run joined
+without, "51".
 
 **What was measured.** With a prototype of layout's head line and this
 rule, the words
@@ -225,7 +271,8 @@ The signature lines measured were 0.54 to 0.73 alike to one another
 
 **A printer's signature mark** of the Cambridge kind, "M. 4" and "4—2"
 in Domesday, "I — 2", "M. 2" in Gierke, is the lowest line, or the line
-above it when the lowest was a page number, when it has at most 3 words
+above it (the lowest of the lines left) when the lowest was a page
+number, when it has at most 3 words
 and at most 6 letters and digits in all, at least one of them a digit;
 is not a page number by the rules above, nor a number alone ("1900."),
 but letters and digits ("M. 4", "d2") or digits around a dash or a
@@ -239,7 +286,9 @@ by the research lie from 0.42 to 0.83 of the page width. The research found 53 i
 such as "1G-2", and about 19 in Gierke ("£ 2", "d2"), none in Haskins,
 Stubbs and Kadesh.
 
-A word of a lowest line that is none of these stays in the text.
+A word of a lowest line that is none of these stays in the text. A page
+with no body region has no body column, and nothing is removed at its
+foot.
 
 ## 5. Hyphens at line ends
 
@@ -256,18 +305,41 @@ on the page of the first; it is one of three kinds, tried in this order
 on the **key** of each form (lower case, with the characters that are
 not letters, digits, hyphens or apostrophes stripped from both ends):
 
+**A lower-case end and a capital start.** When the letter before the
+hyphen is in lower case and the second part starts with a capital
+("half-" "Danish", "Con-" "NORMANDY", "exhaus-" "The"), the two are
+joined only when the book prints the hyphenated form whole: the change
+is then `hyphen_kept`. Otherwise they are not joined at all, and no
+change is recorded. Measured on the six books on 15 November 2026, such
+pairs were 157 of the joins, most of them a word and the first word of
+another line (a head, a note, the next entry) or a compound with a
+proper name ("Vice-Regent"), and 41 of them were recorded as
+`hyphen_join` on keys the word list happens to hold ("beThe", "naR",
+"dLa"). Decided by the coordinator on 15 November 2026. Further, the
+word list is never evidence when the second part has fewer than 2
+letters ("Con-" "1"): only the book's own words count then.
+
+The other joins are of three kinds:
+
 1. **The hyphen is kept** (`hyphen_kept`, new): the hyphenated form's key
    is among the book's own words and the joined form's key is not.
-   "proto-" "journalist" becomes "proto-journalist"; "Mont-Saint-" and
-   "Michel" "Mont-Saint-Michel"; "peut-" "être" "peut-être". A join of
+   In a book that prints "proto-journalist" whole and never
+   "protojournalist", "proto-" "journalist" becomes "proto-journalist"
+   (an example made up for the tests: Haskins prints it only at a line
+   end, so there the join is guessed); Haskins prints "Anglo-Saxon"
+   whole, so "Anglo-" "Saxon" becomes "Anglo-Saxon". A join of
    two numbers, "1830-" "40", always keeps the hyphen.
 2. **The hyphen is dropped** (`hyphen_join`): the joined key is in the
    word list of the book's language (`wordlist.word_list`, a list of
    words drawn from Tesseract's language data, compared lower-cased: it
    holds "Normandy" and "Gloucester" capitalised) or among the book's own
-   words. "neces-" "sary" becomes "necessary". In French, the
-   part after the last apostrophe is looked up too, in both: "d'in-"
-   "signes" becomes "d'insignes" when "insignes" is known.
+   words. "neces-" "sary" becomes "necessary". When the first part holds
+   an apostrophe ("'" or "’"), as French elision does, the part of the
+   joined word after the last apostrophe is looked up too, in both:
+   "d'in-" "signes" becomes "d'insignes" when "insignes" is known. The
+   rule asks for the apostrophe in the first part, not for the book's
+   language, which `join_hyphen` is not given; an English possessive,
+   "Wil-" "liam's", has it in the second.
 3. **Guessed** (`hyphen_join_guessed`, new): neither. The hyphen is
    dropped, as in 2 (owner, 15 November 2026), and the change is
    recorded as guessed, so that the correct stage, a pass by a local
@@ -299,7 +371,11 @@ hyphens are lines the skeleton mixed with a margin note or a note
 column, misreadings, or hyphens the reference does not show; Kadesh (110
 hyphens, 71 with evidence) and Gierke (714, 483) have no reference. A
 hyphen whose next word is not in the same block, or does not start with
-a letter or digit, is left as it is, with no record.
+a letter or digit, is left as it is, with no record. A line of one word
+between two line-end hyphens is joined twice: the second change has the
+first join's word as its first word ("pre-" "Anglo-" then "preAnglo-"
+"Saxon"), and the fidelity check, which undoes every change, still
+balances.
 
 ## 6. Paragraphs, side text and the order of the blocks
 
@@ -309,14 +385,23 @@ a letter or digit, is left as it is, with no record.
    left edge, and the line before it in the stream ends more than 3 pt
    short of that line's region's right edge; or
 2. **it is centred**, or the line before it is: both of its insets from
-   the region's edges are at least 15 pt and differ by at most 10 pt.
+   the region's edges are at least 15 pt and differ by at most 10 pt. A
+   line of a region of fewer than 5 lines is measured against the page's
+   body column (section 1) instead, since the box of such a region is
+   the box of its lines and its one line would never be centred in it:
+   Mariéjol's "CHAPITRE II" to "XI", Domesday's "ESSAY I." to "III.",
+   Haskins' "INDEX" and Gierke's "NOTES." ran on from the page before.
+   Such a title starts a paragraph also at a page break, as rule 2 says,
+   which is the chapter's first page of section 9.
 
-A line after a line that ends with a hyphen never starts a paragraph,
-at a page break too, so the hyphen is joined. The first line of a body
+A line after a line that ends with a hyphen (its last word ends as
+section 5 asks of a first part, "-" after a letter or digit) never
+starts a paragraph, at a page break too, so the hyphen is joined. The first line of a body
 region after the first on a page is judged like any line, with the last
 line of the region before as "the line before"; the book's first line
 starts a paragraph. A region's **left and right edges** are the commonest left and right sides
-of its lines, to 2 pt, or, with fewer than 5 lines, the sides of its box.
+of its lines, to 2 pt, or, with fewer than 5 lines, the sides of its box,
+taken on the region as layout gives it, before any line is removed.
 A heading is a centred line, and so a paragraph of its own; a title of
 two lines makes two.
 
@@ -325,6 +410,13 @@ last paragraph of the page before that has a body stream, unless rule 1
 or rule 2 makes it a start; for rule 1, "the line before" is the last
 line of that page, measured against its own region's right edge. A page
 with no body stream (a plate, a blank page) does not end the paragraph.
+A plate whose text layer has words has a body stream; so that those
+words are a paragraph of their own (section 9, "Plates"), the first line
+of a page that has a figure (lines.json copies the figures) starts a
+paragraph, and so does the first line of the page after it. The hyphen
+rule above comes first: a line after a line that ends with a hyphen
+does not start a paragraph, on a plate's page or after it either, so
+that a word split before a plate and finished on it is joined.
 
 Measured on the lines of words the reference puts in the body, as if
 layout had separated the regions without fault, against the
@@ -349,7 +441,14 @@ page; verse and dialogue (Haskins) give false starts.
 
 **Side text.** Each margin region becomes one block of its own; each
 band region is grouped into blocks by rules 1 and 2, as the body is,
-without the page-break rule; hyphens are joined inside each. What kind
+without the page-break rule, with the sides of the band's box as its
+edges whatever its number of lines; hyphens are joined inside each. On a
+band of 5 to 9 lines the commonest right side is often that of its
+short last lines, and rule 1 then never fired: Domesday's page 83 gave
+its six notes as one note, Mariéjol's page 214 its three as one. A note
+whose first line is indented from the band's left side after a short
+line starts a block; Domesday prints two short notes side by side on one
+line (page 83, notes 1 and 2), which stay one block. What kind
 of block they become was decided by the owner (section 10): a margin
 region is a `margin_note` block, and each
 block of a band region is a `Note` of one block, with `referenced`
@@ -396,6 +495,13 @@ and a joined word in place of its two parts.
 | `word_changes` | the hyphen joins, of the three reasons of section 5 |
 | `page_numbers` | the head and foot page numbers removed |
 
+The lists are in a fixed order, so that the file does not depend on the
+number of workers: `removals` by page, and on a page from the top line
+down and, on one line, from left to right; `word_changes` by the page of
+their first word, and on a page the body's in reading order before
+those of the side text, region by region; `page_numbers` by page, the
+head's before the foot's.
+
 Three values are added to shared enums, as architecture §8 allows ("a
 spec adds a reason when it needs one"); `model.py`, `fidelity.py`, the
 lists of architecture §8 and the glossary change with them:
@@ -427,6 +533,7 @@ class BookSurvey:
     body_word_height: float
     body_line_pitch: float
     book_words: frozenset[str]             # keys of the words printed whole
+    signature_lines: frozenset[int]        # pages whose lowest line is a signature line
 
 class HyphenJoin(NamedTuple):
     word: str
@@ -434,7 +541,7 @@ class HyphenJoin(NamedTuple):
 
 def run(folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS) -> None: ...
 
-def survey_book(lines: LinesFile) -> BookSurvey: ...
+def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurvey: ...
 def join_hyphen(first: str, second: str, book_words: frozenset[str],
                 word_list: frozenset[str]) -> HyphenJoin | None: ...
 def make_blocks(lines: LinesFile, word_list: frozenset[str], *,
@@ -442,7 +549,8 @@ def make_blocks(lines: LinesFile, word_list: frozenset[str], *,
 ```
 
 `join_hyphen` gives `None` when the two words are not joined (section
-5). `make_blocks` is the whole stage on values: it calls `survey_book`,
+5); it takes the word list in lower case, which `make_blocks` makes once
+from the list `wordlist.word_list` gives. `make_blocks` is the whole stage on values: it calls `survey_book`,
 does the per-page work with `map_pages`, then the work across pages.
 `run` reads `pages.json` and `lines.json` with `read_checked_input` as
 now, takes the word list with `wordlist.word_list(config.language)`,
@@ -471,10 +579,14 @@ budget of the `coding` skill in the plan.
   are paragraphs of their own; the drop capital (layout §3, step 6) is
   the first word of the first paragraph. A page number at its foot is
   removed.
-- **A digit speck above the head**: on about 12 of Stubbs' pages a speck
-  read as "6" or "1 —" is the first row with a digit, so it becomes the
-  head line, is not a running head, and the real head stays in the text
-  (page 33).
+- **A speck above the head**: on Stubbs' pages 28, 32, 33, 35, 36, 94,
+  97, 232, 237 and 267 and Kadesh's 38 a speck read as "6", ". 5", "1 —"
+  or "d" is the first row with a letter or digit, so layout makes it the
+  head line, and the real head is the first line of the body. The speck
+  is no running head; the line below it is, by the rule for a head line
+  of fewer than 4 letters (section 3), and is removed as one, so that no
+  hyphen at the page break joins into it ("Geof-" with "1", "cer-" with
+  "Simon").
 - **A title page**: its year, "1907", is neither a page number nor a
   signature mark, and stays.
 - **Two page-number sequences** (Kadesh): one removal and one
@@ -495,12 +607,20 @@ budget of the `coding` skill in the plan.
   rules 1 and 2, which do not fit an index's hanging indents. The second
   plan makes them index entries.
 - **Plates**: their text-layer words become a paragraph, as now.
+- **Known misses at the foot** (15 November 2026, with layout's
+  regions): Kadesh's page 38 prints "105" at the foot, but its body
+  column there runs from 191 to 452 pt, so the number is not centred on
+  it and stays; Gierke's page 66 ends with a lone "302" and Domesday's
+  page 428 with "[0", both centred, which are removed as page numbers
+  although they are not the page's. No rule that is plain fixes them
+  without losing others; the reference pages show whether they matter.
 
 **Unit tests**, on `LinesFile` values written in the test:
 
 - `survey_book` on 6 pages (page indices 10 to 15, heads at top 36 pt,
   pitch 15 pt) whose head lines read "25 THE BOOK", "THE BOOK 26"…: every
-  page is a running head and the offset is 15; on 6 pages whose heads
+  page is a running head and the offset is −15 (page index minus printed
+  number); on 6 pages whose heads
   carry no number ("THE BOOK", "THE BOKO"), the alike rule alone makes
   them running heads; a page whose first region holds the same title 70
   pt lower is not;
@@ -563,8 +683,18 @@ counts them under structure. Scores are for the body, at blocks, unless named.
 | margin notes found as margin notes (baseline 0) | (none) | 0 of 467 (cut-in notes, layout §9) | 400 of 593 | (none) |
 
 Stubbs' paragraph and hyphen targets allow for the cut-in notes
-that stay in its body lines meanwhile. The number of guessed joins is
-expected near the research's: 35, 33, 78 and 192.
+that stay in its body lines meanwhile. The research's guessed joins, 35,
+33, 78 and 192 for the four books, counted only the line-end hyphens
+whose right form the reference shows. On the whole books, with layout's
+regions (15 November 2026), the stage guesses 142 joins in Haskins, 256
+in Stubbs, 201 in Domesday and 738 in Mariéjol (28 in Kadesh, 185 in
+Gierke). A sample of 40 guessed joins of Haskins and 40 of Mariéjol
+showed 57 of the 80 to be words the OCR damaged (Haskins' text layer
+runs words together, "dations" with "which"; Mariéjol's misreads
+letters) and 14 right joins of words missing from Tesseract's lists
+(its French list, 74,068 words, lacks most inflections: "reproduisit",
+"courageusement"; the English one lacks "deposing"); 7 were compounds
+whose hyphen should have stayed and 2 not one word.
 
 ## 10. Decided: margin notes and unreferenced notes, with a change to markdown
 

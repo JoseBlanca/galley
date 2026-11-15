@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from galley import cli
+from galley import cli, wordlist
 from galley.book_folder import BookFolder
 from galley.cli import main
 from galley.config import BookConfig
@@ -437,3 +437,77 @@ def test_a_command_that_needs_pandoc_stops_before_any_stage_without_it(
     )
     # No stage ran: each would have deleted its own file first.
     assert _names(folder) == _files_up_to("epub")
+
+
+def _path_with_pandoc_only(tmp_path: Path) -> str:
+    """A PATH whose one folder holds a link to pandoc, so that Tesseract and
+    its tools are missing."""
+    pandoc = shutil.which("pandoc")
+    assert pandoc is not None
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "pandoc").symlink_to(pandoc)
+    return str(bin_dir)
+
+
+# Changes PATH and the word list's cache folder for the whole process.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
+@pytest.mark.parametrize("command", ["run", "structure"])
+def test_a_command_running_structure_stops_without_tesseract_or_a_cached_word_list(
+    command: str,
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
+    monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", tmp_path / "no-cache")
+
+    with pytest.raises(ExternalProgramError) as raised:
+        main([command, str(folder.root)])
+
+    assert str(raised.value) == (
+        "tesseract, combine_tessdata and dawg2wordlist are not installed; "
+        "structure needs them once to extract the word list of eng from "
+        "Tesseract's data: install them with `brew install tesseract`"
+    )
+    # No stage ran: each would have deleted its own file first.
+    assert _names(folder) == _files_up_to("epub")
+
+
+# Changes PATH and the word list's cache folder for the whole process.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
+def test_a_command_without_structure_runs_without_tesseract(
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
+    monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", tmp_path / "no-cache")
+
+    main(["markdown", str(folder.root)])
+
+    assert _names(folder) == _files_up_to("markdown")
+
+
+# Changes PATH and the word list's cache folder for the whole process.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
+def test_structure_runs_without_tesseract_when_the_word_list_is_cached(
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "eng.txt").write_text("the\nbattle\n", encoding="utf-8")
+    monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", cache_dir)
+
+    main(["structure", str(folder.root)])
+
+    assert _names(folder) == _files_up_to("structure")

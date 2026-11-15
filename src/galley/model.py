@@ -166,6 +166,7 @@ class RemovalReason(StrEnum):
     PAGE_NUMBER = "page_number"
     SIGNATURE_MARK = "signature_mark"
     PLATE_TEXT = "plate_text"  # stray text-layer characters on a plate
+    STRAY_MARK = "stray_mark"  # a line with no letter or digit above a running head
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -299,10 +300,13 @@ class Note:
 
 class ChangeReason(StrEnum):
     """Why structure changed words without losing a letter: a hyphen join,
-    or a note marker split off the word it was glued to."""
+    with the hyphen dropped on evidence, dropped without it (guessed), or
+    kept in a compound; or a note marker split off the word it was glued to."""
 
     HYPHEN_JOIN = "hyphen_join"
     NOTE_MARKER = "note_marker"
+    HYPHEN_JOIN_GUESSED = "hyphen_join_guessed"  # dropped without evidence
+    HYPHEN_KEPT = "hyphen_kept"  # "Anglo-" "Saxon" to "Anglo-Saxon"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
