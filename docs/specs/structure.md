@@ -195,6 +195,14 @@ ch. i." gives no page number "i.". A page number the OCR misread ("ii8" for 118)
 page-number form: it is removed with the running head, and the page has
 no `page_numbers` entry.
 
+The OCR splits some head numbers into two words ("The Villeins. 5 1" for
+51, Gierke's "1 82"; 23 heads in Gierke, 4 in Stubbs, 1 in Domesday). A
+run of words of digits at the start or the end of a head line (the last
+of them may end with "." or ","), is joined without spaces and tested as
+one word, as a page number at the foot is (section 4): its removal holds
+the words joined by a space, and its `PageNumber.text` the run joined
+without, "51".
+
 **What was measured.** With a prototype of layout's head line and this
 rule, the words
 removed as running heads and page numbers, by what the reference makes
