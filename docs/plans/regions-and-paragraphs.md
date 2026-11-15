@@ -144,7 +144,7 @@ expected and not fixed here.
   order of regions, and the fidelity check on the excerpts and whole
   books. Spec: layout §4, §5 and §7. Needs 2.1 to 2.3. Deliverables 2,
   3, 4.
-- [ ] 2.5 A margin word whose box crosses the column's edge, at the
+- [x] 2.5 A margin word whose box crosses the column's edge, at the
   start of a body line beside a margin note, goes to that margin note
   (added 15 November 2026 after the measurement: 135 of Domesday's 286
   missed paragraph starts, pages 65, 75, 83, 211, 375). Spec: layout §3
