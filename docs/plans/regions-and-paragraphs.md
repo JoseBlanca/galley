@@ -217,7 +217,7 @@ includes the note's first page.
 
 **Stands on:** nothing of this plan.
 
-- [ ] 4.1 The two kinds in `src/galley/markdown/`. Spec: structure §10,
+- [x] 4.1 The two kinds in `src/galley/markdown/`. Spec: structure §10,
   option (b), and architecture §9 and §17 for the div's form. Deliverables
   1 to 3.
 
