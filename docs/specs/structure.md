@@ -298,16 +298,22 @@ and none with another hyphen), with a letter or digit before the
 hyphen, is joined with the first word of the next line of the same
 block, when that word starts with a letter or digit, and with a digit
 when a digit is before the hyphen. A line of one word is no exception.
-A **number before a word**, a digit before the hyphen and a next word
-that starts with a letter, is not joined: both words stay as they are,
-and no change is recorded. In Haskins' index "136-39-" ends a line and
+A digit here is one of the ASCII digits 0 to 9, and a letter a
+character for which Python's `str.isalpha` is true. A **number before a
+word**, a digit before the hyphen and a next word that starts with a
+letter, is not joined: both words stay as they are, and no change is
+recorded. In Haskins' index "136-39-" ends a line and
 "Bryce," starts the next, and the page prints "136-39." (the OCR read
 the full stop as a hyphen), so the join "136-39Bryce," was wrong; "37-"
-in the same index is another. A range, "1066-" "1087" or "289-" "303",
-is joined with the hyphen kept, as kind 1 says. "12th-" "century" has a
-letter before the hyphen and is joined as any other word. Decided by
-the coordinator on 15 November 2026, after the owner's check of
-Haskins' index. A hyphen at the end
+in the same index is another. A digit before the hyphen and a next
+word that starts with a digit are always joined with the hyphen kept,
+whatever follows the digits: a range, "1066-" "1087" or "289-" "303",
+and also "235-" "37-", which gives "235-37-", and "149-"
+"57;insouthernItaly,", which gives "149-57;insouthernItaly,"
+(Haskins' index, pages 268 and 270). "12th-" "century" has a letter
+before the hyphen and is joined as any other word. This rule was set
+on 15 November 2026, after the owner's check of Haskins' index. A
+hyphen at the end
 of a page's last body line joins with the first word of the next page's
 body stream, when the paragraph runs on (section 6). Every join is a
 `WordChange` whose `before` is the two words and `after` the one word,
@@ -325,7 +331,7 @@ pairs were 157 of the joins, most of them a word and the first word of
 another line (a head, a note, the next entry) or a compound with a
 proper name ("Vice-Regent"), and 41 of them were recorded as
 `hyphen_join` on keys the word list happens to hold ("beThe", "naR",
-"dLa"). Decided by the coordinator on 15 November 2026. Further, the
+"dLa"). This rule was set on 15 November 2026. Further, the
 word list is never evidence when the second part has fewer than 2
 letters ("Con-" "1"): only the book's own words count then.
 
@@ -337,8 +343,8 @@ The other joins are of three kinds:
    "protojournalist", "proto-" "journalist" becomes "proto-journalist"
    (an example made up for the tests: Haskins prints it only at a line
    end, so there the join is guessed); Haskins prints "Anglo-Saxon"
-   whole, so "Anglo-" "Saxon" becomes "Anglo-Saxon". A join of
-   two numbers, "1830-" "40", always keeps the hyphen.
+   whole, so "Anglo-" "Saxon" becomes "Anglo-Saxon". A join after a
+   digit, "1830-" "40" or "235-" "37-", always keeps the hyphen.
 2. **The hyphen is dropped** (`hyphen_join`): the joined key is in the
    word list of the book's language (`wordlist.word_list`, a list of
    words drawn from Tesseract's language data, compared lower-cased: it
@@ -649,12 +655,16 @@ budget of the `coding` skill in the plan.
   "anglo-saxon" among the book's words gives ("Anglo-Saxon",
   `hyphen_kept`); ("Bal-", "hazar") with neither gives ("Balhazar",
   `hyphen_join_guessed`); ("1066-", "1087") gives ("1066-1087",
-  `hyphen_kept`); ("—", "and"), ("rep-", "(1)"), ("136-39-", "Bryce,")
-  and ("37-", "Abacus") give `None`; ("12th-", "century") is joined;
+  `hyphen_kept`), and ("235-", "37-") gives ("235-37-", `hyphen_kept`)
+  whatever the book's words and the word list hold; ("—", "and"),
+  ("rep-", "(1)"), ("136-39-", "Bryce,"), ("37-", "Abacus") and ("37-",
+  "abacus") give `None`; ("12th-", "century") is joined;
 - paragraphs: an indented line after a short one starts a paragraph; an
   indented line after a full one does not; a centred line is a
   paragraph of its own; an indented line after a hyphen does not start
-  one, but one after a number before a word ("136-39-" "Bryce,") does; a page whose first line is not indented continues the last
+  one, but one after a number before a word ("136-39-" "Bryce,") does,
+  and so does the first line of a page with a figure after such a
+  line; a page whose first line is not indented continues the last
   paragraph of the page before, across a blank page;
 - side text: a page with a margin region and a band region gives a
   margin note and a note after the paragraph that ends the page, that
