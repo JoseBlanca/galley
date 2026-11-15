@@ -10,7 +10,11 @@ books of the evaluation set (docs/specs/evaluation.md, section 3) to
 
 `samples/` is that of the main checkout, also when the script runs in a
 worktree, or the folder that GALLEY_SAMPLES names, as the tests find it.
-A book or an HTML file already there is not downloaded again.
+The evaluation books, with their Internet Archive identifier and Gutenberg
+number, are read from evaluation/books.toml. A book, an HTML file or an
+excerpt already there is not downloaded or cut again; delete an excerpt
+to cut it again. A download is written to `<file>.part` and renamed when
+whole.
 
     uv run python scripts/fetch_samples.py            # download and cut
     uv run python scripts/fetch_samples.py --cut-only # cut from books on disk
@@ -24,10 +28,13 @@ import os
 import subprocess
 import time
 import urllib.request
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 import pypdfium2
+
+from galley_eval.books import read_books
 
 logger = logging.getLogger("fetch_samples")
 
@@ -37,6 +44,7 @@ EXCERPTS_DIR = REPO / "tests" / "fixtures" / "pdf"
 # The Internet Archive and Project Gutenberg ask automated clients to go slowly.
 SECONDS_BETWEEN_DOWNLOADS = 5
 DOWNLOAD_TIMEOUT_S = 300
+CHUNK_BYTES = 1 << 20
 USER_AGENT = "galley-dev/0.1"
 
 
@@ -91,32 +99,25 @@ BOOKS = (
             ),
         ),
     ),
-    # The evaluation set of docs/specs/evaluation.md, section 3.
-    Book(
-        archive_id="normansineuropea00hask",
-        title="C. H. Haskins, The Normans in European History (1915)",
-        gutenberg_number=72514,
-        excerpts=(),
-    ),
-    Book(
-        archive_id="earlyplantagenet01stub",
-        title="W. Stubbs, The Early Plantagenets (1900)",
-        gutenberg_number=70828,
-        excerpts=(),
-    ),
-    Book(
-        archive_id="domesdaybook00maituoft",
-        title="F. W. Maitland, Domesday Book and Beyond (1897)",
-        gutenberg_number=43255,
-        excerpts=(),
-    ),
-    Book(
-        archive_id="catherinedemedic00mariuoft",
-        title="J. H. Mariéjol, Catherine de Médicis (1920)",
-        gutenberg_number=36315,
-        excerpts=(),
-    ),
 )
+
+EVALUATION_BOOKS_TOML = REPO / "evaluation" / "books.toml"
+
+
+def all_books() -> tuple[Book, ...]:
+    """The books with excerpts, then the evaluation set of
+    evaluation/books.toml (docs/specs/evaluation.md, section 3), whose
+    Gutenberg HTML is downloaded too."""
+    evaluation = tuple(
+        Book(
+            archive_id=book.archive_id,
+            title=f"{', '.join(book.authors)}, {book.title}",
+            gutenberg_number=book.gutenberg_number,
+            excerpts=(),
+        )
+        for book in read_books(EVALUATION_BOOKS_TOML)
+    )
+    return (*BOOKS, *evaluation)
 
 
 def _samples_dir() -> Path:
@@ -140,7 +141,7 @@ def _book_path(books_dir: Path, book: Book) -> Path:
     return books_dir / f"{book.archive_id}.pdf"
 
 
-def _downloads(books_dir: Path, book: Book) -> tuple[tuple[str, Path], ...]:
+def downloads(books_dir: Path, book: Book) -> tuple[tuple[str, Path], ...]:
     """The (url, path) of each file of `book` to download: its PDF and, for
     a book of the evaluation set, its Gutenberg HTML edition."""
     pdf = (
@@ -160,19 +161,39 @@ def _downloads(books_dir: Path, book: Book) -> tuple[tuple[str, Path], ...]:
 def _download(url: str, path: Path) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=DOWNLOAD_TIMEOUT_S) as response:
-        content = response.read()
+        size = save(path, iter(lambda: response.read(CHUNK_BYTES), b""))
+    logger.info("downloaded %s (%d bytes)", path.name, size)
+
+
+def save(path: Path, chunks: Iterator[bytes]) -> int:
+    """Write `chunks` to `path` and return the bytes written. They go first
+    to `<path>.part`, renamed to `path` only once the last chunk is
+    written, so that an interrupted download is never taken for a whole
+    file. A partial file left by a failure is overwritten by the next try."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(content)
-    logger.info("downloaded %s (%d bytes)", path.name, len(content))
+    partial = path.with_name(path.name + ".part")
+    size = 0
+    with partial.open("wb") as out:
+        for chunk in chunks:
+            out.write(chunk)
+            size += len(chunk)
+    partial.replace(path)
+    return size
 
 
-def _cut(books_dir: Path, book: Book, excerpt: Excerpt) -> Path:
+def cut(books_dir: Path, excerpts_dir: Path, book: Book, excerpt: Excerpt) -> Path:
+    """Cut `excerpt` from `book` into `excerpts_dir`, unless it is there:
+    pypdfium2 does not save the same pages to the same bytes twice, and a
+    committed excerpt must not change. Delete it to cut it again."""
+    out_path = excerpts_dir / f"{excerpt.name}.pdf"
+    if out_path.exists():
+        logger.info("already there: %s", out_path)
+        return out_path
     source = pypdfium2.PdfDocument(_book_path(books_dir, book))
     target = pypdfium2.PdfDocument.new()
     try:
         target.import_pages(source, list(excerpt.page_indices))
-        EXCERPTS_DIR.mkdir(parents=True, exist_ok=True)
-        out_path = EXCERPTS_DIR / f"{excerpt.name}.pdf"
+        excerpts_dir.mkdir(parents=True, exist_ok=True)
         with out_path.open("wb") as out:
             target.save(out)
     finally:
@@ -190,9 +211,9 @@ def main() -> None:
 
     books_dir = _samples_dir() / "public_domain"
     downloaded = 0
-    for book in BOOKS:
+    for book in all_books():
         if not args.cut_only:
-            for url, path in _downloads(books_dir, book):
+            for url, path in downloads(books_dir, book):
                 if path.exists():
                     logger.info("already there: %s", path)
                     continue
@@ -201,7 +222,7 @@ def main() -> None:
                 _download(url, path)
                 downloaded += 1
         for excerpt in book.excerpts:
-            _cut(books_dir, book, excerpt)
+            cut(books_dir, EXCERPTS_DIR, book, excerpt)
     logger.info("downloaded %d files into %s", downloaded, books_dir)
 
 
