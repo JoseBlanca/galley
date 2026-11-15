@@ -132,15 +132,15 @@ the excerpt and the book differently. The footnote band's 0.85 ratio
 leaves a fifth of Mariéjol's notes in the body (layout §6); that is
 expected and not fixed here.
 
-- [ ] 2.1 The book's measures, `measure_book`, and the body column's
+- [x] 2.1 The book's measures, `measure_book`, and the body column's
   position. Spec: layout §3, "The book's measures" and step 1.
   Deliverables 1, 5.
-- [ ] 2.2 Outer margin notes and the running-head line. Spec: layout §3,
+- [x] 2.2 Outer margin notes and the running-head line. Spec: layout §3,
   steps 2 and 3. Deliverable 1.
-- [ ] 2.3 The footnote band, columns in the body and in the band, and the
+- [x] 2.3 The footnote band, columns in the body and in the band, and the
   drop capital. Spec: layout §3, steps 4 to 6, and layout §6. Deliverable
   1.
-- [ ] 2.4 `run` with the measures pass before the per-page work, the
+- [x] 2.4 `run` with the measures pass before the per-page work, the
   order of regions, and the fidelity check on the excerpts and whole
   books. Spec: layout §4, §5 and §7. Needs 2.1 to 2.3. Deliverables 2,
   3, 4.
@@ -223,7 +223,7 @@ includes the note's first page.
 
 ## 5. The reference pages, checked by the owner
 
-**What it gives.** The reference pages of layout §8 (14 pages) and of
+**What it gives.** The reference pages of layout §8 (15 pages) and of
 structure §9 (the same pages, and the two page-break pairs) become exact
 tests, after the owner has checked them against the page images.
 

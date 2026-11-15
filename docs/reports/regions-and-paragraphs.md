@@ -91,3 +91,80 @@ that reads every page costs 14 s in the 8-thread run (27 s to 41 s),
 because pdfplumber reads 60 pages in each of 8 threads; the default run
 is unaffected (20 s, under the 30 s budget). The coding skill's budget
 names only the default run.
+
+## 2. Layout cuts pages into regions
+
+Done, commits 647d5f4 to c990d84 on `plan/regions-and-paragraphs-layout`,
+merged into the plan's branch. Layout measures the book (column width,
+body word height, line pitch), then on each page takes out the outer
+margin notes, the running-head line and the footnote band, cuts columns
+in the body and the band, and puts drop capitals in their line.
+
+Deliverables:
+
+1. The unit tests of layout §8: `uv run pytest tests/test_layout.py -k
+   "measure_book or margin or band or head or column or drop_capital"
+   --collect-only -q` lists 35 or more, at least 8 required; all pass.
+2. 1 worker and 3 give the same bytes on 8 hand-made pages.
+3. `uv run pytest -m whole_book -k layout`: 6 passed in 46.6 s, the
+   fidelity check and a new per-page check of every word's text and box
+   on the six whole books.
+4. The reference pages look as the spec says, apart from the cases the
+   spec now lists (below); the owner checks them in work package 5.
+5. Default `uv run pytest` on the layout branch: 843 passed in 17.2 s;
+   on the plan's branch after the merge, 873 passed in 22.6 s.
+
+Changes to the plan: the reference pages of layout §8 are 15, not 14
+(Domesday page 75 added for a left margin note; page 74's is on the
+right). The stream changed `tests/test_end_to_end.py`, outside its
+files, by the orchestrator's leave: five assertions of the walking
+skeleton's one region per page were replaced by checks that follow from
+the layout spec.
+
+Spec changes made during the work and the review, each in its own
+commit: the band is cut into columns only when the gutter lies within
+10 pt of the column's middle (f126f0b; on Kadesh the gutter is within 8
+pt, on Domesday's short notes side by side 13 to 46 pt away); in the
+body a column run starts and ends at a row open at the gutter (cf560fd,
+f00b675); each page's column edges come from its own wide rows (f3ccf0d);
+cases for margin words that reach into the column and for the page
+number below a column cut (e04467b).
+
+**Review** (four reviewers). No word lost or invented on the six books.
+Two findings changed the reading order of body text and were fixed by
+changing the spec, on the orchestrator's decision, which the owner was
+told:
+
+- Full prose lines beside a column cut were read as left halves, then
+  right halves (Kadesh page 28; Domesday 43, 388, 477), because a
+  justified line with one word across the gutter joined the run. Now a
+  body run starts and ends at an open row.
+- Column edges measured once per book put about 470 of Gierke's body
+  words into margin regions (its introduction is set 296 pt wide; on its
+  endnote pages the margin notes join the rows). Now each page with 3 or
+  more wide rows takes its own edges. Gierke's margin words went from
+  3,487 to 2,235, its body words from 109,014 to 110,261; page 13 has 1
+  margin word, down from 32.
+
+Also fixed: a word with an inverted box could be counted twice; a drop
+capital could go to the other column; a per-page check of words and
+boxes in the tests; boundary tests for thresholds that could move with
+no test failing (small type 0.85, band gap 1.1 pitches, 2 band rows, 8
+body rows, the gutter search, the drop capital's height); names,
+docstrings, enums, the sources of constants.
+
+Not taken or not fully fixed:
+
+- The run rule of the body is not applied in the band: there the first
+  note row of Kadesh page 8 has "Ori-" across the gutter and would be
+  read across both columns.
+- Domesday 43 and 388: two prose rows with a wide space at the gutter
+  still count as open and are cut in halves. No rule tried tells them
+  from real columns. The owner's page check or the evaluation will show
+  whether it matters.
+- The band's 10 pt threshold has little room (Kadesh at most 7.5 pt, a
+  Domesday table 10.8 pt): left to the reference-page tests.
+
+**What the owner should know.** Layout of Domesday's 558 pages takes
+3.2 s. Mariéjol's 9-pt OCR notes stay in the body (layout §6), and its
+table of contents (page 450) is cut into titles and page numbers.
