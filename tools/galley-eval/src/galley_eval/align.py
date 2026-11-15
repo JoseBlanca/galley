@@ -17,8 +17,12 @@ How the spec is read here, where it leaves a choice:
   by the notes pass.
 - Pairs found in a replaced stretch, `changed` ones included, are aligned
   and are not offered to a later pass; the tokens left unpaired are.
-- The last pass takes the reference's leftover tokens in the reference's
-  order: the body, margin notes in place, then the notes.
+- In passes 2 and 3, a token whose rule for its provisional page finds
+  nothing (a margin note before a paragraph with no aligned token, a
+  token before every aligned one) takes the page of the nearest aligned
+  body token before it, else after it; the tokens of each provisional
+  page are aligned in the reference's order, the pages in increasing
+  order, so that galley tokens a page took are not offered to the next.
 - `reference_correction` is the subkind of any pairing other than
   matched whose reference tokens include a marked correction, missing,
   split and glued ones too, so that all of them are counted apart from
@@ -477,17 +481,21 @@ def align(reference: ReferenceText, galley: tuple[GalleyToken, ...]) -> Alignmen
             if token.stream is GalleyStream.BODY
         ),
     )
-    notes = _pass(
+    notes = _near_page_pass(
         AlignmentPass.NOTES,
         sides,
+        reference,
+        body,
         tuple(
             index for index, place in enumerate(places) if place.stream is Stream.NOTES
         ),
         _left(book_order, body, _galley_side),
     )
-    margin_notes = _pass(
+    margin_notes = _near_page_pass(
         AlignmentPass.MARGIN_NOTES,
         sides,
+        reference,
+        body + notes,
         tuple(
             index
             for index, place in enumerate(places)
@@ -496,9 +504,11 @@ def align(reference: ReferenceText, galley: tuple[GalleyToken, ...]) -> Alignmen
         _left(book_order, body + notes, _galley_side),
     )
     found = body + notes + margin_notes
-    remainder = _pass(
+    remainder = _near_page_pass(
         AlignmentPass.REMAINDER,
         sides,
+        reference,
+        found,
         _left(tuple(range(len(places))), found, _reference_side),
         _left(book_order, found, _galley_side),
     )
@@ -585,6 +595,138 @@ def _pairing_of_each(
         message = f"{side_name} tokens in no pairing: {lost[:10]}"
         raise AlignmentError(message)
     return tuple(found[index] for index in range(count))
+
+
+def _near_page_pass(
+    found_in: AlignmentPass,
+    sides: _Sides,
+    reference: ReferenceText,
+    found: tuple[Pairing, ...],
+    reference_indices: tuple[int, ...],
+    galley_indices: tuple[int, ...],
+) -> tuple[Pairing, ...]:
+    """The pairings of a pass that works near the page (passes 2 and 3):
+    the reference tokens are taken page by page of their provisional page,
+    from the pairings `found` before, and each page's are aligned by an
+    anchored pass with the galley tokens still unpaired on that page, the
+    page before or the page after, in book order (`galley_indices` is in
+    book order). A reference token with no provisional page is left
+    unpaired."""
+    provisional = _provisional_pages(sides, reference, found)
+    by_page: dict[int, list[int]] = {}
+    for index in reference_indices:
+        page = provisional[index]
+        if page is not None:
+            by_page.setdefault(page, []).append(index)
+    galley_by_page: dict[int, list[int]] = {}
+    for index in galley_indices:
+        galley_by_page.setdefault(sides.galley[index].page_index, []).append(index)
+    taken: set[int] = set()
+    pairings: list[Pairing] = []
+    for page in sorted(by_page):
+        candidates = tuple(
+            index
+            for near in range(page - _NEAR_PAGES, page + _NEAR_PAGES + 1)
+            for index in galley_by_page.get(near, ())
+            if index not in taken
+        )
+        page_pairings = _pass(found_in, sides, tuple(by_page[page]), candidates)
+        taken.update(
+            index for pairing in page_pairings for index in pairing.galley_indices
+        )
+        pairings.extend(page_pairings)
+    return tuple(pairings)
+
+
+# Passes 2 and 3 pair a reference token only with galley tokens within this
+# many pages of its provisional page (spec section 5).
+_NEAR_PAGES = 1
+
+
+def _provisional_pages(
+    sides: _Sides, reference: ReferenceText, found: tuple[Pairing, ...]
+) -> tuple[int | None, ...]:
+    """The provisional page of each reference token from the pairings
+    `found` so far (spec section 5): a note token's, the page of its note
+    reference, that is of the body token before it; a margin note token's,
+    the page of the first aligned token of the paragraph it precedes; any
+    other body token's, the page of the nearest aligned token before it.
+    Where these find nothing, the page of the nearest aligned body token
+    before, else after; None when there is none, or for a note with no
+    reference."""
+    places = sides.places
+    aligned: list[int | None] = [None] * len(places)
+    for pairing in found:
+        page = sides.galley[pairing.galley_indices[0]].page_index
+        for index in pairing.reference_indices:
+            aligned[index] = page
+    body_count = sum(1 for place in places if place.stream is Stream.BODY)
+    before = _running(tuple(aligned[:body_count]))
+    after = tuple(reversed(_running(tuple(reversed(aligned[:body_count])))))
+    nearest = tuple(
+        found_before if found_before is not None else after[index]
+        for index, found_before in enumerate(before)
+    )
+    first_of_block: dict[int, int] = {}
+    for index in range(body_count):
+        page = aligned[index]
+        if page is not None:
+            first_of_block.setdefault(places[index].block_index, page)
+    following = _following_paragraphs(reference)
+
+    def body_page(index: int) -> int | None:
+        place = places[index]
+        if place.kind is ReferenceKind.MARGIN_NOTE:
+            paragraph = following[place.block_index]
+            if paragraph is not None and paragraph in first_of_block:
+                return first_of_block[paragraph]
+        return nearest[index]
+
+    body_pages = tuple(body_page(index) for index in range(body_count))
+    reference_before: dict[str, int] = {}
+    for note_reference in reference.note_references:
+        if note_reference.gap.stream is Stream.BODY and body_count > 0:
+            reference_before.setdefault(
+                note_reference.note_id,
+                min(max(note_reference.gap.token_index - 1, 0), body_count - 1),
+            )
+
+    def note_page(place: ReferencePlace) -> int | None:
+        before_reference = reference_before.get(
+            reference.notes[_note_index(place)].note_id
+        )
+        return None if before_reference is None else body_pages[before_reference]
+
+    return body_pages + tuple(note_page(place) for place in places[body_count:])
+
+
+def _note_index(place: ReferencePlace) -> int:
+    if place.note_index is None:
+        message = "a token of the notes stream has no note"
+        raise AlignmentError(message)
+    return place.note_index
+
+
+def _running(pages: tuple[int | None, ...]) -> tuple[int | None, ...]:
+    """For each position, the last page given at or before it."""
+    found: list[int | None] = []
+    last: int | None = None
+    for page in pages:
+        last = page if page is not None else last
+        found.append(last)
+    return tuple(found)
+
+
+def _following_paragraphs(reference: ReferenceText) -> tuple[int | None, ...]:
+    """For each body block, the index of the first block after it that is
+    not a margin note, None when there is none."""
+    following: list[int | None] = []
+    next_block: int | None = None
+    for block_index in range(len(reference.blocks) - 1, -1, -1):
+        following.append(next_block)
+        if reference.blocks[block_index].kind is not ReferenceKind.MARGIN_NOTE:
+            next_block = block_index
+    return tuple(reversed(following))
 
 
 def _pass(

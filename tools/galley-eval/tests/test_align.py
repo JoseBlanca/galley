@@ -363,7 +363,7 @@ def test_margin_note_is_left_to_the_margin_notes_pass() -> None:
 def test_margin_note_out_of_order_among_galley_notes_is_found_by_the_last_pass() -> (
     None
 ):
-    # galley put the first margin note among the notes of a later page, so
+    # galley put the first margin note of a page among the page's notes, so
     # that in book order it comes after the second; the margin notes pass
     # can align only one of them in order, the last pass finds the other.
     reference = _reference(
@@ -373,10 +373,10 @@ def test_margin_note_out_of_order_among_galley_notes_is_found_by_the_last_pass()
         _paragraph("the hide"),
     )
     galley = (
-        _galley("the tax", page_index=1)
+        _galley("the tax", page_index=2)
         + _galley("Hidage assessed", page_index=2, stream=GalleyStream.MARGIN_NOTES)
         + _galley("the hide", page_index=2)
-        + _galley("Danegeld levied", page_index=3, stream=GalleyStream.NOTES)
+        + _galley("Danegeld levied", page_index=2, stream=GalleyStream.NOTES)
     )
     alignment, _ = _align(reference, galley)
     passes = {
@@ -614,3 +614,92 @@ def test_equal_keys_without_different_accents_are_letters() -> None:
     # differs.
     reference = ReferenceToken("ſerfs", marked_correction=False)
     assert changed_subkind(reference, "serfs") is Subkind.LETTERS
+
+
+def test_margin_note_whose_words_fit_the_body_waits_for_its_pass() -> None:
+    reference = _reference(
+        ReferenceBlock(ReferenceKind.MARGIN_NOTE, _words("Danegeld")),
+        _paragraph("the tax"),
+    )
+    alignment, _ = _align(reference, _galley("Danegeld the tax"))
+    assert _pairing_of_reference(alignment, 0).found_in is AlignmentPass.MARGIN_NOTES
+
+
+# Passes 2 and 3 near the page
+
+
+def test_leftover_is_not_paired_with_a_token_pages_away() -> None:
+    # "including" was lost on page 9; a stray "includinq" on page 1 is not
+    # its partner.
+    reference = _reference(_paragraph("one two three including four"))
+    galley = _galley("one includinq two", page_index=1) + _galley(
+        "three four", page_index=9
+    )
+    alignment, _ = _align(reference, galley)
+    assert _pairing_of_reference(alignment, 3).state is State.MISSING
+    assert _pairing_of_galley(alignment, 1).state is State.EXTRA
+
+
+def test_leftover_is_paired_with_a_token_on_the_next_page() -> None:
+    reference = _reference(_paragraph("one two three including four"))
+    galley = (
+        _galley("one two three", page_index=8)
+        + _galley("four", page_index=9)
+        + _galley("including", page_index=9, stream=GalleyStream.NOTES)
+    )
+    alignment, _ = _align(reference, galley)
+    assert _pairing_of_reference(alignment, 3).galley_indices == (4,)
+
+
+def test_note_is_looked_for_near_the_page_of_its_reference() -> None:
+    reference = ReferenceText(
+        blocks=(_paragraph("the duke landed"), _paragraph("and took Palermo")),
+        notes=(ReferenceNote("Footnote_1", (_paragraph("Amatus"),)),),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 3)),),
+        page_anchors=(),
+        anchors_in_notes=(),
+    )
+    near = _galley("the duke landed Amatus", page_index=5) + _galley(
+        "and took Palermo", page_index=9
+    )
+    alignment, _ = _align(reference, near)
+    assert _pairing_of_reference(alignment, 6).state is State.MATCHED
+    far = (
+        _galley("the duke landed", page_index=5)
+        + _galley("and took Palermo", page_index=9)
+        + _galley("Amatus", page_index=9, stream=GalleyStream.NOTES)
+    )
+    alignment, _ = _align(reference, far)
+    assert _pairing_of_reference(alignment, 6).state is State.MISSING
+
+
+def test_margin_note_is_looked_for_near_the_paragraph_it_precedes() -> None:
+    reference = _reference(
+        _paragraph("alpha beta"),
+        ReferenceBlock(ReferenceKind.MARGIN_NOTE, _words("Danegeld")),
+        _paragraph("the tax"),
+    )
+    galley = _galley("alpha beta", page_index=1) + _galley(
+        "Danegeld the tax", page_index=5
+    )
+    alignment, _ = _align(reference, galley)
+    assert _pairing_of_reference(alignment, 2).state is State.MATCHED
+
+
+def test_leftovers_are_taken_in_book_order() -> None:
+    # galley lists its body before its notes, but its note "Amatus" is on
+    # page 4, before the body's stray "Amatus" on page 5.
+    reference = ReferenceText(
+        blocks=(_paragraph("the duke"),),
+        notes=(ReferenceNote("Footnote_1", (_paragraph("Amatus"),)),),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 2)),),
+        page_anchors=(),
+        anchors_in_notes=(),
+    )
+    galley = (
+        _galley("the duke", page_index=4)
+        + _galley("Amatus", page_index=5)
+        + _galley("Amatus", page_index=4, stream=GalleyStream.NOTES)
+    )
+    alignment, _ = _align(reference, galley)
+    assert _pairing_of_reference(alignment, 2).galley_indices == (3,)
