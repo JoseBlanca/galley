@@ -35,7 +35,7 @@ The plan is done, on branch `plan/evaluation`, not merged. Finished on
   text that structure should have removed.
 - Structure has the most to gain: 1,243–1,841 running-head and
   page-number words per book that galley keeps and the book does not
-  have (up to 2.5% of Haskins' words), 985–3,600 hyphens left split, and
+  have (1.9% of Haskins' words, 0.8% of Domesday's), 985–3,600 hyphens left split, and
   no paragraph, note or margin note found: about 1 in 10 of galley's
   paragraph breaks is one the book has.
 - Extract's spacing: text run together is the commonest error of
