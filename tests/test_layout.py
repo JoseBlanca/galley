@@ -427,6 +427,95 @@ def test_margin_word_2_pt_left_of_the_column_is_a_margin_word() -> None:
     assert _region_texts(result)[1:] == ((("Note",),),)
 
 
+def _page_with_row_3_reaching_left(
+    first: Word, second_x0: float, note: Word
+) -> PageLayout:
+    """A page of 20 full rows of the column at 50 whose row 3 (top 136) is
+    `first`, then words from `second_x0` to the right edge, with `note`
+    in the left margin."""
+    rows = tuple(word for word in _rows(20) if not word.text.endswith("3"))
+    row_3 = (
+        first,
+        _word("The", second_x0, 136, second_x0 + 40, 144),
+        _word("idea", second_x0 + 44, 136, 250, 144),
+    )
+    return layout_page(_page(0, (*rows, *row_3, note)), _MEASURES)
+
+
+def test_note_word_reaching_into_the_empty_indent_joins_its_margin_note() -> None:
+    # "land." runs from 20 pt left of the edge, 50, to 7 pt right of it;
+    # "The" starts 17 pt inside, more than the 12 pt pitch.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 67, _word("Free", 5, 136, 25, 144)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("The", "idea")
+    assert margin == (("Free", "land."),)
+
+
+def test_note_word_reaching_into_the_column_joins_a_note_a_pitch_above() -> None:
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 67, _word("Free", 5, 124, 25, 132)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("The", "idea")
+    assert margin == (("Free",), ("land.",))
+
+
+def test_word_reaching_left_stays_when_the_next_word_is_less_than_a_pitch_inside() -> (
+    None
+):
+    # "The" starts 6 pt inside the edge: the column is not empty there.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 56, _word("Free", 5, 136, 25, 144)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+    assert margin == (("Free",),)
+
+
+def test_word_reaching_left_stays_beside_a_margin_word_of_fewer_than_2_letters() -> (
+    None
+):
+    # A list number hung outside the column, as Gierke's "44" on page 62.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 67, _word("44", 5, 136, 25, 144)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+    assert margin == (("44",),)
+
+
+def test_word_reaching_left_stays_when_its_middle_is_1_pt_outside() -> None:
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 40, 136, 58, 144), 67, _word("Free", 5, 136, 25, 144)
+    )
+    body, _ = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+
+
+def test_hung_semicolon_3_pt_outside_stays_in_its_body_line() -> None:
+    result = _page_with_row_3_reaching_left(
+        _word(";", 45.5, 136, 48.5, 144), 67, _word("Free", 5, 136, 25, 144)
+    )
+    body, _ = _region_texts(result)
+    assert body[3] == (";", "The", "idea")
+
+
+def test_note_word_reaching_into_the_right_margin_stays_in_its_body_line() -> None:
+    # The rule is applied at the left edge only.
+    rows = tuple(word for word in _rows(20) if not word.text.endswith("3"))
+    row_3 = (
+        _word("The", 50, 136, 150, 144),
+        _word("own", 243, 136, 270, 144),  # middle 6.5 pt right of 250
+    )
+    note = _word("Free", 275, 136, 295, 144)
+    result = layout_page(_page(0, (*rows, *row_3, note)), _MEASURES)
+    body, margin = _region_texts(result)
+    assert body[3] == ("The", "own")
+    assert margin == (("Free",),)
+
+
 def test_margin_lines_more_than_1_5_pitches_apart_are_two_margin_regions() -> None:
     # Lines at 136 and 148 are one note; the next at 167 is 19 pt, more
     # than 1.5 pitches (18 pt), below 148: a second note.
