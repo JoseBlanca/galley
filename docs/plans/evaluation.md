@@ -7,7 +7,7 @@ galley's word list, `wordlist.py` (architecture §12), which the tool and
 later the analyze stage need. It ends with the tool's first run on the
 four books of the evaluation set, whose scores are the baseline that
 every later plan is measured against. Dated 15 November 2026. State:
-draft.
+under way, approved by the owner on 15 November 2026.
 
 The five work packages are the breakdown the owner approved in chat on
 15 November 2026. "Spec §5" below is section 5 of
