@@ -277,30 +277,21 @@ def _first_page(unnumbered: _Unnumbered) -> int:
 def _note_places(
     blocks: tuple[_Unnumbered, ...], notes: tuple[_Unnumbered, ...]
 ) -> tuple[int, ...]:
-    """For each note, the position in `blocks` of the block it follows, -1
-    for first of all (spec sections 6 and 10): the last block whose origin
-    includes the note's page, else the last block whose first origin is
-    on an earlier page."""
-    last_with_page: dict[int, int] = {}
-    for position, block in enumerate(blocks):
-        for origin in block.origin:
-            last_with_page[origin.page_index] = position
-    last_starting_on: dict[int, int] = {}
-    for position, block in enumerate(blocks):
-        last_starting_on[_first_page(block)] = position
-    first_pages = sorted(last_starting_on)
-    last_starting_by_page = tuple(
-        itertools.accumulate(
-            (last_starting_on[page_index] for page_index in first_pages), max
-        )
+    """For each note, the position in `blocks` of the block markdown writes
+    it after, -1 for first of all (spec section 6, "Order"): the last block
+    whose first origin is on the note's first page or an earlier one."""
+    first_pages = tuple(_first_page(block) for block in blocks)
+    last_by_page: dict[int, int] = {}
+    for position, page_index in enumerate(first_pages):
+        last_by_page[page_index] = position
+    pages = sorted(last_by_page)
+    last_up_to = tuple(
+        itertools.accumulate((last_by_page[page] for page in pages), max)
     )
 
     def place(note: _Unnumbered) -> int:
-        page_index = _first_page(note)
-        if page_index in last_with_page:
-            return last_with_page[page_index]
-        earlier = bisect.bisect_left(first_pages, page_index)
-        return last_starting_by_page[earlier - 1] if earlier > 0 else -1
+        up_to = bisect.bisect_right(pages, _first_page(note))
+        return last_up_to[up_to - 1] if up_to > 0 else -1
 
     return tuple(place(note) for note in notes)
 

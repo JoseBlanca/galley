@@ -907,6 +907,30 @@ def test_margin_note_of_a_page_whose_body_is_empty_follows_the_last_block() -> N
     assert blocks.page_numbers == (PageNumber(1, "83", PageNumberPosition.FOOT),)
 
 
+def test_note_follows_the_blocks_that_start_on_its_page_or_earlier() -> None:
+    # A paragraph runs from page 0 to page 1; page 1 has a margin note and a
+    # band, and no paragraph of its own. Markdown writes page 1's note after
+    # the last block whose first origin is on page 1 or earlier, the margin
+    # note of page 1, not after the paragraph that has a line on page 1
+    # (structure spec, section 6, "Order").
+    page_0 = _body_page(0, *_five_full_lines(70, "first"), _full("runs on to", 145))
+    page_1 = PageLayout(
+        1,
+        (
+            _region(*_five_full_lines(70, "second"), _short("its end.", 145)),
+            _region(_spread("Margin", 310, 340, 85)),
+            _region(_spread("1 A note in small type.", 50, 300, 300, height=7.0)),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page_0, page_1), _NO_WORDS, workers=1)
+    assert tuple((block.id, block.kind) for block in blocks.blocks) == (
+        ("b-p0000-001", BlockKind.PARAGRAPH),
+        ("b-p0001-001", BlockKind.MARGIN_NOTE),
+    )
+    assert blocks.notes[0].blocks[0].id == "b-p0001-002"
+
+
 def test_two_index_columns_of_equal_width_give_no_margin_note() -> None:
     left = _region(*(_spread(f"Entry {n}, 12", 50, 170, 70 + 15 * n) for n in range(6)))
     right = _region(
