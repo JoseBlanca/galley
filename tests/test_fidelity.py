@@ -268,6 +268,41 @@ def test_structure_hyphen_join_with_its_word_change_passes() -> None:
     check_stage(FidelityBoundary.STRUCTURE, _HYPHEN_LINES, blocks)
 
 
+_COMPOUND_LINES = _lines_file((("an Anglo-",), ("Saxon king",)))
+
+
+def test_structure_hyphen_kept_with_its_word_change_passes() -> None:
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0, 1), (_span("an Anglo-Saxon king"),)),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=("Anglo-", "Saxon"),
+                after=("Anglo-Saxon",),
+                reason=ChangeReason.HYPHEN_KEPT,
+            ),
+        ),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, _COMPOUND_LINES, blocks)
+
+
+def test_structure_hyphen_join_guessed_with_its_word_change_passes() -> None:
+    blocks = _blocks_file(
+        (_HYPHEN_BLOCK,),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=("repli-", "cate"),
+                after=("replicate",),
+                reason=ChangeReason.HYPHEN_JOIN_GUESSED,
+            ),
+        ),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, _HYPHEN_LINES, blocks)
+
+
 def test_structure_hyphen_join_without_its_word_change_fails() -> None:
     blocks = _blocks_file((_HYPHEN_BLOCK,))
 
@@ -415,6 +450,50 @@ def test_structure_note_reference_to_no_note_fails() -> None:
                 reason=ChangeReason.HYPHEN_JOIN,
             ),
         ),
+        # A kept hyphen whose word drops the hyphen.
+        (
+            ("an Anglo-", "Saxon king"),
+            "an AngloSaxon king",
+            WordChange(
+                page_index=0,
+                before=("Anglo-", "Saxon"),
+                after=("AngloSaxon",),
+                reason=ChangeReason.HYPHEN_KEPT,
+            ),
+        ),
+        # A kept hyphen whose first part has no hyphen.
+        (
+            ("an Anglo", "Saxon king"),
+            "an AngloSaxon king",
+            WordChange(
+                page_index=0,
+                before=("Anglo", "Saxon"),
+                after=("AngloSaxon",),
+                reason=ChangeReason.HYPHEN_KEPT,
+            ),
+        ),
+        # A guessed join that changes a letter.
+        (
+            ("Bal-", "hazar"),
+            "Balthazar",
+            WordChange(
+                page_index=0,
+                before=("Bal-", "hazar"),
+                after=("Balthazar",),
+                reason=ChangeReason.HYPHEN_JOIN_GUESSED,
+            ),
+        ),
+        # A guessed join that keeps the hyphen.
+        (
+            ("Bal-", "hazar"),
+            "Bal-hazar",
+            WordChange(
+                page_index=0,
+                before=("Bal-", "hazar"),
+                after=("Bal-hazar",),
+                reason=ChangeReason.HYPHEN_JOIN_GUESSED,
+            ),
+        ),
     ],
     ids=[
         "changed-letter",
@@ -423,6 +502,10 @@ def test_structure_note_reference_to_no_note_fails() -> None:
         "no-hyphen",
         "tomatoda",
         "three-words",
+        "kept-hyphen-dropped",
+        "kept-without-hyphen",
+        "guessed-changed-letter",
+        "guessed-hyphen-kept",
     ],
 )
 def test_structure_word_change_that_breaks_its_rules_fails(

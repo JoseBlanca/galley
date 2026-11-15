@@ -1118,6 +1118,7 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "page_number",
             "signature_mark",
             "plate_text",
+            "stray_mark",
         ],
         "BlockKind": [
             "heading",
@@ -1128,7 +1129,12 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "index_entry",
         ],
         "Emphasis": ["none"],
-        "ChangeReason": ["hyphen_join", "note_marker"],
+        "ChangeReason": [
+            "hyphen_join",
+            "note_marker",
+            "hyphen_join_guessed",
+            "hyphen_kept",
+        ],
         "PageNumberPosition": ["head", "foot"],
         "Language": ["en", "es", "fr", "de", "it"],
         "OcrMode": ["verify", "trust", "redo"],

@@ -45,10 +45,10 @@ invented.
 
 **hyphen join**: two parts of a word split at a line end, "repli-" and
 "cate", made into one, "replicate". A kind of word change. When the
-book's words show a compound, the hyphen is kept ("Anglo-Saxon"). A
-**guessed join** is one that neither the word list nor the book's own
-words support; the hyphen is dropped and the change recorded as guessed,
-for review.
+book's words show a compound, the hyphen is kept ("Anglo-Saxon"),
+recorded as a kept hyphen. A **guessed join** is one that neither the
+word list nor the book's own words support; the hyphen is dropped and the
+change recorded as guessed, for review.
 
 **line**: a line of one region of a page, as layout groups the words, left
 to right. Not what pdfplumber calls a line, which runs across columns.
@@ -83,8 +83,8 @@ body column, a margin, a column of footnotes, the running head. Found by
 layout; what each region is, structure decides.
 
 **removal**: text a stage took out of the book on purpose, with its page,
-box and reason: a running head, a page number, a signature mark, an
-excluded page or region.
+box and reason: a running head, a page number, a signature mark, a stray
+mark, an excluded page or region.
 
 **running head**: the line printed at the top of most pages, the book's,
 chapter's or author's name, often with the page number. Not a "header".
