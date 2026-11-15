@@ -150,3 +150,16 @@ def signature_candidate(page: PageLayout, kinds: tuple[RegionKind, ...]) -> str 
     if position is None:
         return None
     return signature_letters(line.words, position)
+
+
+def line_below_head(page: PageLayout) -> LinePlace | None:
+    """The topmost line of the page's regions after the first, the first
+    in their order on a tie: the line below a head line (spec section 3);
+    None when there is none."""
+    below: LinePlace | None = None
+    below_top = 0.0
+    for region_number, region in enumerate(page.regions[1:], start=1):
+        for line_number, line in enumerate(region.lines):
+            if below is None or line.box.top < below_top:
+                below, below_top = (region_number, line_number), line.box.top
+    return below

@@ -11,11 +11,17 @@ from difflib import SequenceMatcher
 
 from galley.model import Line, LinesFile, PageLayout, Word
 from galley.parallel import DEFAULT_WORKERS, map_pages
-from galley.structure._foot import signature_candidate
+from galley.structure._foot import line_at, line_below_head, signature_candidate
+from galley.structure._heads import (
+    EndNumber,
+    arabic_number,
+    end_numbers,
+    is_confirmed,
+    is_roman_number,
+    without,
+)
 from galley.structure._measures import (
-    arabic_value,
     is_hyphen_first_part,
-    is_page_number_form,
     letters,
     word_height,
     word_key,
@@ -55,7 +61,9 @@ class BookSurvey:
     `first_arabic_page` the first page index whose running head has one;
     `body_word_height` and `body_line_pitch` in points; `book_words` the
     keys of the words printed whole (spec section 5); `signature_lines`
-    the page indices whose lowest line is a signature line (section 4).
+    the page indices whose lowest line is a signature line (section 4);
+    `heads_below_specks` the page indices whose head line is a speck and
+    the line below it a running head (section 3).
     """
 
     running_heads: frozenset[int]
@@ -65,6 +73,7 @@ class BookSurvey:
     body_line_pitch: float
     book_words: frozenset[str]
     signature_lines: frozenset[int]
+    heads_below_specks: frozenset[int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +84,7 @@ class _PageMeasures:
     words printed whole."""
 
     head: Line | None
+    below_head: Line | None
     line_heights: tuple[float, ...]
     row_heights: tuple[float, ...]
     row_pitches: tuple[float, ...]
@@ -128,6 +138,9 @@ def _page_measures(page: PageLayout) -> _PageMeasures:
     )
     return _PageMeasures(
         head=head.lines[-1] if head is not None else None,
+        below_head=line_at(page, below)
+        if head is not None and (below := line_below_head(page)) is not None
+        else None,
         line_heights=tuple(
             statistics.median(word_height(word) for word in line.words)
             for region in page.regions
@@ -143,12 +156,6 @@ def _page_measures(page: PageLayout) -> _PageMeasures:
         ),
         words=_words_printed_whole(page),
     )
-
-
-def _end_words(line: Line) -> tuple[str, ...]:
-    """The first and last word of a line, once when it has one word."""
-    texts = tuple(word.text for word in line.words)
-    return texts[:1] if len(texts) == 1 else (texts[0], texts[-1])
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -174,20 +181,15 @@ _SIGNATURES_ALIKE = _Alike(
 )
 
 
-def _alike_to_another(
-    line_letters: str, counts: Counter[str], distinct: tuple[str, ...], alike: _Alike
-) -> bool:
-    """Whether `line_letters`, the letters of one page's line, are alike to
-    those of another page's line; `counts` counts the pages of each letters
-    and `distinct` lists them."""
+def _alike_to_any(line_letters: str, others: tuple[str, ...], alike: _Alike) -> bool:
+    """Whether `line_letters`, the letters of one line, are alike to any of
+    `others`, the letters of lines of other pages."""
     if len(line_letters) < alike.min_letters:
         return False
-    if counts[line_letters] > 1:
-        return True
     matcher = SequenceMatcher(None, autojunk=False)
     matcher.set_seq2(line_letters)
-    for other in distinct:
-        if other == line_letters or (
+    for other in others:
+        if (
             alike.max_length_difference is not None
             and abs(len(other) - len(line_letters)) > alike.max_length_difference
         ):
@@ -206,64 +208,120 @@ def _alike_pages(
     page_letters: tuple[tuple[int, str], ...], alike: _Alike, workers: int
 ) -> frozenset[int]:
     """The pages of `page_letters`, (page index, letters of a line), whose
-    letters are alike to another page's, compared in `workers` threads."""
-    counts = Counter(text for _, text in page_letters)
+    letters are alike to another page's, compared in `workers` threads.
+    Letters found on two pages are alike without being compared."""
+    counts = frozendict(Counter(text for _, text in page_letters))
     distinct = tuple(sorted(counts))
+
+    def alike_to_another(text: str) -> bool:
+        if len(text) < alike.min_letters:
+            return False
+        others = tuple(other for other in distinct if other != text)
+        return counts[text] > 1 or _alike_to_any(text, others, alike)
+
     alike_letters = dict(
-        zip(
-            distinct,
-            map_pages(
-                lambda text: _alike_to_another(text, counts, distinct, alike),
-                distinct,
-                workers,
-            ),
-            strict=True,
-        )
+        zip(distinct, map_pages(alike_to_another, distinct, workers), strict=True)
     )
     return frozenset(
         page_index for page_index, text in page_letters if alike_letters[text]
     )
 
 
-def _running_heads(
-    heads: tuple[tuple[int, Line], ...], pitch: float, workers: int
-) -> frozenset[int]:
-    """The pages whose head line is a running head (spec section 3)."""
+@dataclass(frozen=True, slots=True)
+class _HeadSurvey:
+    """What the survey finds of the head lines (spec section 3)."""
+
+    running_heads: frozenset[int]
+    offset: int | None
+    first_arabic_page: int | None
+    heads_below_specks: frozenset[int]
+
+
+def _texts(line: Line) -> tuple[str, ...]:
+    return tuple(word.text for word in line.words)
+
+
+def _line_letters(line: Line) -> str:
+    return letters(words_text(line.words))
+
+
+def number_candidates(
+    page_index: int, line: Line, first_arabic_page: int | None
+) -> tuple[EndNumber, ...]:
+    """The page-number forms at the ends of a head line, a roman one only
+    before the first confirmed arabic head number (spec section 3)."""
+    roman_allowed = first_arabic_page is None or page_index < first_arabic_page
+    return tuple(
+        candidate
+        for candidate in end_numbers(_texts(line))
+        if arabic_number(candidate) is not None
+        or (roman_allowed and is_roman_number(candidate))
+    )
+
+
+def _head_survey(
+    heads: tuple[tuple[int, Line, Line | None], ...], pitch: float, workers: int
+) -> _HeadSurvey:
+    """Running heads, the offset and the first arabic head number from the
+    head lines, (page index, head line, line below it) (spec section 3)."""
     if not heads:
-        return frozenset()
-    median_top = statistics.median(line.box.top for _, line in heads)
+        return _HeadSurvey(frozenset(), None, None, frozenset())
+    median_top = statistics.median(line.box.top for _, line, _ in heads)
+    limit = _HEAD_PITCHES * pitch
     near = tuple(
         (page_index, line)
-        for page_index, line in heads
-        if line.box.top - median_top <= _HEAD_PITCHES * pitch
+        for page_index, line, _ in heads
+        if line.box.top - median_top <= limit
     )
-    alike = _alike_pages(
+    offset = _commonest_offset(
         tuple(
-            (page_index, letters(words_text(line.words))) for page_index, line in near
+            (page_index, value)
+            for page_index, line in near
+            for candidate in end_numbers(_texts(line))
+            if (value := arabic_number(candidate)) is not None
+        )
+    )
+    confirmed = frozenset(
+        page_index
+        for page_index, line in near
+        if any(
+            is_confirmed(page_index, arabic_number(candidate), offset)
+            for candidate in end_numbers(_texts(line))
+        )
+    )
+    first_arabic_page = min(confirmed, default=None)
+    numbered = tuple(
+        (page_index, line, candidates)
+        for page_index, line in near
+        if (candidates := number_candidates(page_index, line, first_arabic_page))
+    )
+    alike_whole = _alike_pages(
+        tuple((page_index, _line_letters(line)) for page_index, line in near),
+        _HEADS_ALIKE,
+        workers,
+    )
+    alike_without_number = _alike_pages(
+        tuple(
+            (page_index, letters("".join(without(candidates[0], _texts(line)))))
+            for page_index, line, candidates in numbered
         ),
         _HEADS_ALIKE,
         workers,
     )
-    return frozenset(
+    running = alike_whole | confirmed | alike_without_number
+    running_letters = tuple(
+        sorted({_line_letters(line) for page, line in near if page in running})
+    )
+    below_specks = frozenset(
         page_index
-        for page_index, line in near
-        if page_index in alike
-        or any(is_page_number_form(end) for end in _end_words(line))
+        for page_index, line, below in heads
+        if page_index not in running
+        and below is not None
+        and len(_line_letters(line)) < _HEAD_MIN_LETTERS
+        and below.box.top - median_top <= limit
+        and _alike_to_any(_line_letters(below), running_letters, _HEADS_ALIKE)
     )
-
-
-def _arabic_head_numbers(
-    heads: tuple[tuple[int, Line], ...], running_heads: frozenset[int]
-) -> tuple[tuple[int, int], ...]:
-    """(page index, printed number) of each arabic page-number form at the
-    first or last word of a running head."""
-    return tuple(
-        (page_index, value)
-        for page_index, line in heads
-        if page_index in running_heads
-        for end in _end_words(line)
-        if (value := arabic_value(end)) is not None
-    )
+    return _HeadSurvey(running, offset, first_arabic_page, below_specks)
 
 
 def _commonest_offset(numbers: tuple[tuple[int, int], ...]) -> int | None:
@@ -303,12 +361,12 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
     measures = map_pages(_page_measures, lines.pages, workers)
     body_word_height, pitch = _body_measures(measures)
     heads = tuple(
-        (page.index, measured.head)
+        (page.index, measured.head, measured.below_head)
         for page, measured in zip(lines.pages, measures, strict=True)
         if measured.head is not None
     )
-    running_heads = _running_heads(heads, pitch, workers)
-    arabic_numbers = _arabic_head_numbers(heads, running_heads)
+    head_survey = _head_survey(heads, pitch, workers)
+    running_heads = head_survey.running_heads
     candidates = map_pages(
         lambda page: signature_candidate(
             page, region_kinds(page, body_word_height, running_heads)
@@ -318,10 +376,8 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
     )
     return BookSurvey(
         running_heads=running_heads,
-        head_page_offset=_commonest_offset(arabic_numbers),
-        first_arabic_page=min(
-            (page_index for page_index, _ in arabic_numbers), default=None
-        ),
+        head_page_offset=head_survey.offset,
+        first_arabic_page=head_survey.first_arabic_page,
         body_word_height=body_word_height,
         body_line_pitch=pitch,
         book_words=frozenset().union(*(page.words for page in measures)),
@@ -334,4 +390,5 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
             _SIGNATURES_ALIKE,
             workers,
         ),
+        heads_below_specks=head_survey.heads_below_specks,
     )

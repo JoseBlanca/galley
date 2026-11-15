@@ -345,6 +345,78 @@ def test_of_two_head_numbers_the_one_the_offset_gives_is_the_page_number() -> No
     )
 
 
+def test_top_line_ending_with_a_roman_form_that_is_a_word_stays() -> None:
+    pages = (
+        _page_with_head(5, "The war ended in the year of 1066 at last, in vi"),
+        *_numbered_heads(),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert 5 not in survey.running_heads
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert _removals_of(5, blocks) == ()
+
+
+def test_number_alone_is_a_running_head_only_where_the_offset_puts_it() -> None:
+    # Pages 10 to 15 print 25 to 30: the offset is -15.
+    pages = (
+        *_numbered_heads(),
+        _page_with_head(16, "31"),
+        _page_with_head(17, "47"),
+        _page_with_head(18, "35"),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert {16, 18} <= survey.running_heads
+    assert 17 not in survey.running_heads
+
+
+def test_roman_number_whose_line_is_alike_to_another_without_it_is_a_head() -> None:
+    # "PREF vii" and "PREF xxxviii" are not alike with their numbers' letters
+    # (0.56), but are without them; the roman numbers come before the first
+    # arabic head, on page 10.
+    pages = (
+        _page_with_head(3, "PREF vii"),
+        _page_with_head(4, "PREF xxxviii"),
+        _page_with_head(5, "INTRODUCTION 99"),
+        *_numbered_heads(),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert {3, 4} <= survey.running_heads
+    assert 5 not in survey.running_heads
+    assert survey.head_page_offset == -15
+
+
+def test_roman_number_alone_after_the_first_arabic_head_is_no_running_head() -> None:
+    pages = (*_numbered_heads(), _page_with_head(16, "d"))
+    assert 16 not in survey_book(_lines_of(*pages), workers=1).running_heads
+
+
+def test_head_number_split_by_the_ocr_is_joined() -> None:
+    pages = (*_numbered_heads(), _page_with_head(16, "THE BOOK 3 1"))
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert blocks.page_numbers[-1] == PageNumber(16, "31", PageNumberPosition.HEAD)
+    assert tuple(
+        (removal.text, removal.reason) for removal in _removals_of(16, blocks)
+    ) == (("THE BOOK", RemovalReason.RUNNING_HEAD), ("3 1", RemovalReason.PAGE_NUMBER))
+
+
+def test_running_head_below_a_speck_is_removed_and_the_speck_stays() -> None:
+    speck_page = PageLayout(
+        16,
+        (
+            _region(_line("d", 120, 20)),
+            _body(36, "THE BOOK 31", *_BODY_TEXTS),
+        ),
+        (),
+    )
+    pages = (*_numbered_heads(), speck_page)
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(
+        (removal.text, removal.reason) for removal in _removals_of(16, blocks)
+    ) == (("THE BOOK", RemovalReason.RUNNING_HEAD), ("31", RemovalReason.PAGE_NUMBER))
+    assert blocks.page_numbers[-1] == PageNumber(16, "31", PageNumberPosition.HEAD)
+    assert "d the first line of the body" in block_text(blocks.blocks[-1])
+
+
 # Page numbers at the foot and signature marks, on a column from x 25 to
 # 299 pt (its middle at 162 pt)
 

@@ -19,20 +19,21 @@ from galley.structure._foot import (
     body_column,
     is_foot_page_number,
     line_at,
+    line_below_head,
     lowest_line,
     running_head_lines,
     signature_page_number,
 )
+from galley.structure._heads import EndNumber, arabic_number, is_confirmed
 from galley.structure._measures import (
     Edges,
-    arabic_value,
-    is_roman_form,
+    line_has_letter_or_digit,
     middle,
     words_box,
     words_text,
 )
 from galley.structure._regions import RegionKind
-from galley.structure._survey import BookSurvey
+from galley.structure._survey import BookSurvey, number_candidates
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,31 +73,50 @@ def _removal(
 
 
 def _head_page_number(
-    words: tuple[Word, ...], page_index: int, survey: BookSurvey
-) -> int | None:
-    """The position in `words` of the running head's page number, or None
-    (spec section 3): its first or last word, when a page-number form, a
-    roman one only before the first page with an arabic head number; of
-    two, the one the offset gives, else the first."""
-    roman_allowed = (
-        survey.first_arabic_page is None or page_index < survey.first_arabic_page
-    )
-    ends = (0,) if len(words) == 1 else (0, len(words) - 1)
-    numbers = tuple(
-        position
-        for position in ends
-        if arabic_value(words[position].text) is not None
-        or (roman_allowed and is_roman_form(words[position].text))
-    )
-    if not numbers:
+    line: Line, page_index: int, survey: BookSurvey
+) -> EndNumber | None:
+    """The running head's page number, or None (spec section 3): a
+    page-number form at its start or end, a run of digit words joined, a
+    roman one only before the first arabic head number; of two, the one
+    the offset puts within 2 of the page index, else the first."""
+    candidates = number_candidates(page_index, line, survey.first_arabic_page)
+    if not candidates:
         return None
-    offset = survey.head_page_offset
-    if offset is not None:
-        for position in numbers:
-            value = arabic_value(words[position].text)
-            if value is not None and value + offset == page_index:
-                return position
-    return numbers[0]
+    return next(
+        (
+            candidate
+            for candidate in candidates
+            if is_confirmed(
+                page_index, arabic_number(candidate), survey.head_page_offset
+            )
+        ),
+        candidates[0],
+    )
+
+
+def _running_head_removals(
+    page_index: int, line: Line, survey: BookSurvey
+) -> tuple[tuple[Removal, ...], tuple[PageNumber, ...]]:
+    """A running head's line removed: its page number as `page_number`, the
+    rest as `running_head`, in the order of the line."""
+    words = line.words
+    number = _head_page_number(line, page_index, survey)
+    if number is None:
+        return (_removal(page_index, words, RemovalReason.RUNNING_HEAD),), ()
+    number_words = words[number.first : number.last + 1]
+    rest = words[: number.first] + words[number.last + 1 :]
+    number_removal = _removal(page_index, number_words, RemovalReason.PAGE_NUMBER)
+    rest_removals = (
+        (_removal(page_index, rest, RemovalReason.RUNNING_HEAD),) if rest else ()
+    )
+    in_line_order = (
+        (number_removal, *rest_removals)
+        if number.first == 0
+        else (*rest_removals, number_removal)
+    )
+    return in_line_order, (
+        PageNumber(page_index, number.text, PageNumberPosition.HEAD),
+    )
 
 
 def head_removals(
@@ -104,44 +124,35 @@ def head_removals(
 ) -> LineRemovals:
     """The removals of a running head (spec section 3): a line of marks
     above it as `stray_mark`, its page number as `page_number` with a
-    `head` page number, and the rest of its line as `running_head`. A page
-    whose head line is not a running head loses nothing. `kinds` are those
-    of the page's regions, in their order."""
-    if RegionKind.RUNNING_HEAD not in kinds:
+    `head` page number, and the rest of its line as `running_head`. When
+    the head line is a speck and the line below it the running head, that
+    line is removed so, and the speck stays. A page with no running head
+    loses nothing. `kinds` are those of the page's regions, in their order."""
+    if RegionKind.RUNNING_HEAD in kinds:
+        head = page.regions[0]
+        *marks, text_line = head.lines
+        head_place = (0, len(marks))
+    elif page.index in survey.heads_below_specks:
+        below = line_below_head(page)
+        assert below is not None, "the survey found a line below the speck"
+        marks = [
+            line for line in page.regions[0].lines if not line_has_letter_or_digit(line)
+        ]
+        text_line = line_at(page, below)
+        head_place = below
+    else:
         return _NOTHING_REMOVED
-    head = page.regions[0]
-    *marks, text_line = head.lines
+    mark_places = tuple(
+        (0, number)
+        for number, line in enumerate(page.regions[0].lines)
+        if not line_has_letter_or_digit(line)
+    )
     strays = tuple(
         _removal(page.index, mark.words, RemovalReason.STRAY_MARK) for mark in marks
     )
     removals, page_numbers = _running_head_removals(page.index, text_line, survey)
     return LineRemovals(
-        strays + removals,
-        page_numbers,
-        frozenset((0, number) for number in range(len(head.lines))),
-    )
-
-
-def _running_head_removals(
-    page_index: int, line: Line, survey: BookSurvey
-) -> tuple[tuple[Removal, ...], tuple[PageNumber, ...]]:
-    words = line.words
-    position = _head_page_number(words, page_index, survey)
-    if position is None:
-        return (_removal(page_index, words, RemovalReason.RUNNING_HEAD),), ()
-    number = words[position]
-    rest = words[:position] + words[position + 1 :]
-    number_removal = _removal(page_index, (number,), RemovalReason.PAGE_NUMBER)
-    rest_removals = (
-        (_removal(page_index, rest, RemovalReason.RUNNING_HEAD),) if rest else ()
-    )
-    in_line_order = (
-        (number_removal, *rest_removals)
-        if position == 0
-        else (*rest_removals, number_removal)
-    )
-    return in_line_order, (
-        PageNumber(page_index, number.text, PageNumberPosition.HEAD),
+        strays + removals, page_numbers, frozenset((*mark_places, head_place))
     )
 
 
