@@ -1113,6 +1113,26 @@ def test_band_of_two_columns_is_found_when_its_lines_outnumber_the_body() -> Non
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+def test_band_of_five_lines_with_short_last_lines_gives_a_note_each() -> None:
+    # The band's commonest edges would be 60 and 140 pt, those of its
+    # indented first lines and short last lines; its box, 50 to 300 pt,
+    # gives each note its start (structure spec, section 6, "Side text").
+    band = _region(
+        _spread("1 A note in small", 60, 300, 300, height=7.0),
+        _spread("type that ends.", 50, 140, 309, height=7.0),
+        _spread("2 Another note here", 60, 300, 318, height=7.0),
+        _spread("ends.", 50, 80, 327, height=7.0),
+        _spread("3 A third one.", 60, 140, 336, height=7.0),
+    )
+    page = PageLayout(0, (_region(*_five_full_lines(70, "first")), band), ())
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert tuple(block_text(note.blocks[0]) for note in blocks.notes) == (
+        "1 A note in small type that ends.",
+        "2 Another note here ends.",
+        "3 A third one.",
+    )
+
+
 def test_two_index_columns_of_equal_width_give_no_margin_note() -> None:
     left = _region(*(_spread(f"Entry {n}, 12", 50, 170, 70 + 15 * n) for n in range(6)))
     right = _region(

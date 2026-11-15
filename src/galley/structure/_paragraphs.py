@@ -132,6 +132,15 @@ def _pieces(lines: tuple[_PlacedLine, ...]) -> tuple[_Piece, ...]:
     return tuple(_Piece(tuple(piece)) for piece in pieces)
 
 
+def _edges(region: Region, kind: RegionKind) -> Edges:
+    """A region's edges for rules 1 and 2: a band's are its box's sides, so
+    that its short last lines do not set its right edge (spec section 6,
+    "Side text"); any other region's are `region_edges`."""
+    if kind is RegionKind.BAND:
+        return Edges(region.box.x0, region.box.x1)
+    return region_edges(region)
+
+
 def page_parts(page: PageLayout, survey: BookSurvey) -> PageParts:
     """The per-page work on `page` (spec section 2, step 2)."""
     kinds = region_kinds(page, survey.body_word_height, survey.running_heads)
@@ -160,7 +169,10 @@ def page_parts(page: PageLayout, survey: BookSurvey) -> PageParts:
             zip(
                 page.regions,
                 kinds,
-                (region_edges(region) for region in page.regions),
+                (
+                    _edges(region, kind)
+                    for region, kind in zip(page.regions, kinds, strict=True)
+                ),
                 strict=True,
             )
         )
