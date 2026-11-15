@@ -1,7 +1,11 @@
-"""Tests of galley.layout (spec section 7, "layout" and "Their tests").
+"""Tests of galley.layout (docs/specs/layout.md, section 8).
 
-Every value is written by hand: layout's tests need no output of extract.
-The excerpt tests of layout are in work package 4.
+The unit tests lay out pages written by hand, with the book's measures
+given in the test, and need no output of extract. The excerpt tests run
+analyze, extract and layout on each committed excerpt, and the whole_book
+tests on the six whole books, and check that no word is lost, duplicated
+or moved to another page. The exact regions of the reference pages are
+work package 5's, once the owner has checked them.
 """
 
 import hashlib
@@ -741,7 +745,7 @@ def test_word_across_the_middle_of_the_gutter_ends_the_run() -> None:
     assert len(body.lines) == 11
 
 
-def test_3_band_rows_justified_to_the_gutter_are_two_band_columns() -> None:
+def test_3_band_rows_with_the_gutter_at_the_middle_are_two_band_columns() -> None:
     band = _two_column_rows(
         3, top=_LAST_BODY_TOP + 1.5 * _PITCH, height=_SMALL_HEIGHT, pitch=9.0
     )

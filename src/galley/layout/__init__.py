@@ -19,7 +19,7 @@ import math
 from bisect import bisect_left, bisect_right
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from itertools import groupby, pairwise
 from statistics import median
 from typing import Final, assert_never
@@ -90,7 +90,9 @@ def group_lines(words: tuple[Word, ...]) -> tuple[Line, ...]:
 
 # Guessed: enough rows on a page for a commonest edge.
 _MEASURED_PAGE_ROWS: Final[int] = 15
-# A book with no page of 15 rows is measured on its pages of 3 rows.
+# Guessed, not measured: a book with no page of 15 rows is measured on its
+# pages of 3 rows, the fewest that give a pitch between two rows and a
+# commonest edge of more than one.
 _MEASURED_PAGE_ROWS_FALLBACK: Final[int] = 3
 # Measured: body lines start within 2.2 pt of the edge on 99% of Haskins'
 # lines.
@@ -126,8 +128,8 @@ class BookMeasures:
 
 def _commonest(edges: Iterable[float]) -> float | None:
     """The commonest value of `edges`, in points: each edge rounded to the
-    point, the value with the most edges within 2 pt of it, the smallest on
-    a tie. None for no edges."""
+    point, the value with the most edges within `_COMMONEST_EDGE_PT` of it,
+    the smallest on a tie. None for no edges."""
     rounded = sorted(float(round(edge)) for edge in edges)
     if not rounded:
         return None
@@ -328,9 +330,10 @@ def _column_edges(
 
 
 def _margin_regions(words: tuple[Word, ...], pitch: float) -> tuple[Region, ...]:
-    """The margin regions of the margin words of one side of a page: their
-    lines, cut where a line's top is more than 1.5 `pitch` below the top of
-    the line before."""
+    """The margin regions of the margin words of one side of a page (step
+    2): their lines, cut where a line's top is more than
+    `_MARGIN_REGION_GAP_PITCHES` times `pitch` below the top of the line
+    before."""
     groups: list[list[Line]] = []
     for line in group_lines(words):
         if (
@@ -351,8 +354,9 @@ def _has_letter_or_digit(row: Line) -> bool:
 def _running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
     """How many of the column's `rows`, from the top, form the running-head
     region (step 3): the first row with a letter or a digit and the rows
-    above it, when the next row's top is at least 1.3 `pitch` below that
-    row's top. 0 when there is no such region."""
+    above it, when the next row's top is at least
+    `_RUNNING_HEAD_GAP_PITCHES` times `pitch` below that row's top. 0 when
+    there is no such region."""
     first = next(
         (index for index, row in enumerate(rows) if _has_letter_or_digit(row)), None
     )
@@ -374,9 +378,11 @@ _BAND_SMALL_ROWS_SHARE: Final[float] = 2 / 3
 _BAND_GAP_PITCHES: Final[float] = 1.1
 # Measured on the six books (layout spec section 3, "Where the thresholds
 # come from"): a gutter is a strip 6 pt wide in the middle third of the
-# column, moved in steps of 1 pt; a word across it whose middle is more
-# than 6 pt from the strip's is an OCR word that ran over the gutter.
+# column; a word across it whose middle is more than 6 pt from the strip's
+# is an OCR word that ran over the gutter.
 _GUTTER_WIDTH_PT: Final[float] = 6.0
+# Guessed, not measured: a step of 1 pt, the precision of the commonest
+# edge.
 _GUTTER_STEP_PT: Final[float] = 1.0
 _GUTTER_CROSSING_WORD_PT: Final[float] = 6.0
 # Measured: with 8 open rows the cut fires on the index pages and tables of
@@ -391,10 +397,12 @@ _BAND_GUTTER_OFF_CENTRE_PT: Final[float] = 10.0
 # Measured: Haskins' drop capitals are 2.67 ("IN", page 163) to 4 times the
 # body word height.
 _DROP_CAPITAL_HEIGHTS: Final[float] = 2.2
+# Guessed, not measured: the drop capital's left side lies within 3 pt of the
+# left edge, a little more than the commonest edge's 2 pt.
 _DROP_CAPITAL_EDGE_PT: Final[float] = 3.0
 
 
-class _Part(Enum):
+class _Part(StrEnum):
     """The part of the column that is cut into columns: the body or the
     footnote band, which need different numbers of open rows."""
 
@@ -413,7 +421,7 @@ def _open_rows_to_cut(part: _Part) -> int:
             assert_never(part)
 
 
-class _AtGutter(Enum):
+class _AtGutter(StrEnum):
     """How a row lies at a gutter: open (words on both sides, none across),
     on one side only, with one word across it far from its middle, or
     blocked. All but the last are compatible with a column cut."""
@@ -459,8 +467,8 @@ def _row_gaps(row: Line) -> tuple[tuple[float, float], ...]:
 
 
 def _gutter_middle(rows: tuple[Line, ...], left: float, width: float) -> float | None:
-    """The middle of the gutter of `rows`, in points: of the strips 6 pt
-    wide whose middles step by 1 pt across the middle third of the column
+    """The middle of the gutter of `rows`, in points (step 5): of the strips
+    whose middles step across the middle third of the column
     from `left`, `width` wide, the leftmost at which most rows are open.
     None when no row is open at any."""
     start = left + width / 3
@@ -485,7 +493,7 @@ def _gutter_middle(rows: tuple[Line, ...], left: float, width: float) -> float |
 
 
 def _at_gutter(row: Line, middle: float) -> _AtGutter:
-    """How `row` lies at the strip 6 pt wide around `middle`."""
+    """How `row` lies at the gutter's strip around `middle` (step 5)."""
     half = _GUTTER_WIDTH_PT / 2
     across = tuple(
         word
@@ -493,8 +501,8 @@ def _at_gutter(row: Line, middle: float) -> _AtGutter:
         if word.box.x0 < middle + half and word.box.x1 > middle - half
     )
     if not across:
-        both_sides = any(w.box.x1 <= middle - half for w in row.words) and any(
-            w.box.x0 >= middle + half for w in row.words
+        both_sides = any(word.box.x1 <= middle - half for word in row.words) and any(
+            word.box.x0 >= middle + half for word in row.words
         )
         return _AtGutter.OPEN if both_sides else _AtGutter.ONE_SIDE
     if (
@@ -506,10 +514,10 @@ def _at_gutter(row: Line, middle: float) -> _AtGutter:
     return _AtGutter.BLOCKED
 
 
-def _run_is_cut(run: tuple[tuple[Line, _AtGutter], ...], part: _Part) -> bool:
+def _run_is_cut(column_run: tuple[tuple[Line, _AtGutter], ...], part: _Part) -> bool:
     """Whether a run of compatible rows has the open rows to be cut into two
     columns (step 5)."""
-    open_rows = sum(at is _AtGutter.OPEN for _, at in run)
+    open_rows = sum(at is _AtGutter.OPEN for _, at in column_run)
     return open_rows >= _open_rows_to_cut(part)
 
 
@@ -519,10 +527,18 @@ def _cut_run(rows: tuple[Line, ...], middle: float) -> tuple[Region, Region]:
     words = _words_of(rows)
     return (
         _region(
-            group_lines(tuple(w for w in words if (w.box.x0 + w.box.x1) / 2 < middle))
+            group_lines(
+                tuple(
+                    word for word in words if (word.box.x0 + word.box.x1) / 2 < middle
+                )
+            )
         ),
         _region(
-            group_lines(tuple(w for w in words if (w.box.x0 + w.box.x1) / 2 >= middle))
+            group_lines(
+                tuple(
+                    word for word in words if (word.box.x0 + word.box.x1) / 2 >= middle
+                )
+            )
         ),
     )
 
@@ -738,7 +754,13 @@ def run(
         folder.pages_json, config.pdf, folder.words_json, read_words
     )
     measures = measure_book(words, workers=workers)
-    _logger.info("layout: the book's measures, in points: %s", measures)
+    if measures is None:
+        _logger.info(
+            "layout: no page has %d rows; every page is laid out as one region",
+            _MEASURED_PAGE_ROWS_FALLBACK,
+        )
+    else:
+        _logger.info("layout: the book's measures, in points: %s", measures)
 
     def lay_out(page: PageWords) -> PageLayout:
         return layout_page(page, measures)
