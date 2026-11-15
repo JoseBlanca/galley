@@ -17,7 +17,10 @@ epubcheck.
 
 **Measured** by the evaluation tool on the four evaluation books, body
 text at blocks, against the baseline (galley at cc481d1) and the
-targets of structure §9. Every target is met:
+targets of structure §9. "Extra words" are words of galley's output
+that the Gutenberg text does not have (running heads, page numbers,
+stray OCR); a note or margin note is "found" when galley gives it that
+kind and the reference has it. Every target is met:
 
 | score | Haskins | Stubbs | Domesday | Mariéjol |
 |---|---|---|---|---|
@@ -25,13 +28,13 @@ targets of structure §9. Every target is met:
 | hyphens left split | 1,005 → 1 (≤150) | 1,235 → 10 (≤300) | 781 → 17 (≤150) | 1,450 → 25 (≤400) |
 | paragraph precision / recall | .11/.11 → .84/.86 (.75/.75) | .13/.07 → .72/.72 (.55/.60) | .12/.08 → .80/.83 (.70/.70) | .09/.04 → .69/.74 (.55/.60) |
 | notes found as notes | 0 → 65 of 72 (55) | (none) | 0 → 1,659 of 1,729 (1,300) | 0 → 1,008 of 1,432 (900) |
-| margin notes as margin notes | (none) | 0 of 467 (0, left to the second plan) | 0 → 514 of 593 (400) | (none) |
+| margin notes as margin notes | (none) | 0 of 467 (no target: these notes are cut into the text column and wait for the second plan) | 0 → 514 of 593 (400) | (none) |
 
 **What exists now:** layout and structure as their specs give them;
 markdown writing margin notes and unreferenced notes; three new
-excerpts (Stubbs, Domesday, Mariéjol); 17 reference pages as exact
-tests, 13 checked by the owner and 4 by the orchestrator against the
-page images; 1,049 tests in about 24 s (budget 30 s), 16 whole-book
+excerpts (Stubbs, Domesday, Mariéjol); 15 reference pages and 2
+page-break pairs as exact tests, 13 of the 17 checked by the owner and 4
+by the orchestrator against the page images; 1,049 tests in about 24 s (budget 30 s), 16 whole-book
 tests.
 
 **Decided by the orchestrator, which the owner may reverse:** spec
@@ -41,7 +44,11 @@ lines checked against the head offset, capital-start hyphen pairs left
 unjoined without evidence, chapter titles, short bands, split page
 numbers); task 2.5 (margin words at a line's start go to their note) and
 the handling of the two pages an excerpt cannot get right (Gierke 270,
-Mariéjol 210), both taken while the owner was away.
+Mariéjol 210), both taken while the owner was away. Each spec
+correction is a commit of its own that names its reason, followed by the
+code that applies it; reversing one is reverting those two commits and
+the tests that came with them, and the evaluation would show what it
+costs.
 
 **Left open:**
 
@@ -277,7 +284,9 @@ text layer):
 | Gierke | 249 / 195 / 22 / 0 | 580 / 185 / 7 | 65 | 639 | 818 | 11 |
 
 The fidelity check passes on all six at every boundary, and every EPUB
-passes epubcheck.
+passes epubcheck. These are galley's own counts of what it made; the
+evaluation's counts (section 6) are of those that match the reference,
+so Domesday's 633 margin notes here give 514 found there.
 
 **Guessed joins.** Many more than the research's 35, 33, 78 and 192,
 which counted only hyphens whose form the reference shows. A sample of
