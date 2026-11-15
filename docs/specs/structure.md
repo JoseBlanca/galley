@@ -676,8 +676,18 @@ counts them under structure. Scores are for the body, at blocks, unless named.
 | margin notes found as margin notes (baseline 0) | (none) | 0 of 467 (cut-in notes, layout §9) | 400 of 593 | (none) |
 
 Stubbs' paragraph and hyphen targets allow for the cut-in notes
-that stay in its body lines meanwhile. The number of guessed joins is
-expected near the research's: 35, 33, 78 and 192.
+that stay in its body lines meanwhile. The research's guessed joins, 35,
+33, 78 and 192 for the four books, counted only the line-end hyphens
+whose right form the reference shows. On the whole books, with layout's
+regions (15 November 2026), the stage guesses 142 joins in Haskins, 256
+in Stubbs, 201 in Domesday and 738 in Mariéjol (28 in Kadesh, 185 in
+Gierke). A sample of 40 guessed joins of Haskins and 40 of Mariéjol
+showed 57 of the 80 to be words the OCR damaged (Haskins' text layer
+runs words together, "dations" with "which"; Mariéjol's misreads
+letters) and 14 right joins of words missing from Tesseract's lists
+(its French list, 74,068 words, lacks most inflections: "reproduisit",
+"courageusement"; the English one lacks "deposing"); 7 were compounds
+whose hyphen should have stayed and 2 not one word.
 
 ## 10. Decided: margin notes and unreferenced notes, with a change to markdown
 
