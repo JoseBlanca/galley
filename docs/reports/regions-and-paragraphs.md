@@ -361,3 +361,35 @@ be reversed:
    excerpt lacks): the exact tests record what the excerpt gives, with
    the reason, and a `whole_book` test checks those two pages on the
    whole books.
+
+## Tasks 2.5 and 3.6, added after the measurement
+
+Done, merged, reviewed together and fixed (commits up to 0696e45).
+
+- **2.5, layout:** the first word of a body row whose middle lies at
+  least 2 pt left of the column's edge, followed by a word at least a
+  pitch inside, beside a margin word of 2 or more letters within a pitch,
+  goes to that margin note. It moves 176 words in Domesday and 95 in
+  Gierke, none in the other four books. The review checked all 272 words
+  it first moved against the page images: 271 were margin-note words;
+  the one body word, Gierke 123's "Stfoarm." (the OCR fused the note's
+  "State." with the body's "form."), came from a clause for rows of one
+  word, now removed. The rule is not applied at the right edge, where it
+  would move 7 body words for 1 note word. Domesday 75 now reads "Free
+  land." as the note and "The idea of freedom…" as the body line.
+- **3.6, structure:** a line-end hyphen after a digit joins only a next
+  word that starts with a digit, keeping the hyphen ("235-37-",
+  "1830-40"); before a word that starts with a letter nothing is joined
+  ("136-39-" "Bryce,"). On the six books this removes 23 guessed joins,
+  two of which were real words the OCR broke ("ch4- teau", "00- blier"),
+  and turns two of Haskins' index ranges that had lost their hyphen
+  ("23537-") into kept ones. All joins after a digit are now kept ones.
+
+Review findings fixed: the fused-word case; four parts of the 2.5 rule
+that could change with no test failing; the stated reason for the
+two-letter threshold, which was wrong; ranges whose second part is not
+digits only; the plate-break use of the 3.6 rule without a test; two
+slips in the spec. Not taken: none.
+
+Checks after the fixes: `uv run pytest` 1,010 passed in 25.2 s; with 8
+threads 40.9 s; `-m whole_book` 14 passed in 49.7 s.
