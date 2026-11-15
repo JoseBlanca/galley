@@ -1,0 +1,41 @@
+# The entry of the excerpt haskins_eval, as in evaluation/books.toml, for
+# the excerpt test of the evaluation tool (docs/specs/evaluation.md,
+# section 10).
+#
+# The excerpt is tests/fixtures/pdf/haskins_eval.pdf, cut by
+# scripts/fetch_samples.py from Haskins' scan: PDF pages 131 to 138, 265
+# and 266, printed pages 116 to 123, 250 and 251. Page indices 0 to 7 here
+# are printed pages 116 to 123; page index 8 is the blank page 250 before
+# the index, without a text layer, excluded as in Haskins' entry; page
+# index 9 is printed page 251, the first page of the index. The reference
+# is haskins_eval.html beside this file, the transcription cut to the same
+# pages, with notes 40 to 42.
+#
+# `html_sha256` is that of haskins_eval.html as committed on 15 November
+# 2026. `expected_counts` were counted by hand in that file on the same
+# day, with a search for each class and href: 3 div.footnote, 3 links to
+# #Footnote_N, 9 span.pagenum (116 to 123 and 251), 3 h2 of which the
+# FOOTNOTES heading is dropped; `first_tokens` are read in the HTML.
+#
+# The rules are Haskins' of evaluation/books.toml, with one change: the
+# file has no header of the transcription to start after, so reading
+# starts at the first div.chapter, that of chapter V.
+
+[[book]]
+name = "haskins_eval"
+gutenberg_number = 72514
+archive_id = "normansineuropea00hask"
+title = "The Normans in European History"
+authors = ["Charles Homer Haskins"]
+language = "en"
+exclude_pages = [8]
+html_sha256 = "d9c32547bf2741c4ef412a90499d16edb6c5012c0b921d1af121d31153a6611b"
+expected_counts = { notes = 3, margin_notes = 0, note_references = 3, page_anchors = 9, headings = 2, first_tokens = ["V", "NORMANDY", "AND", "FRANCE", "In"] }
+
+[book.rules.replace]
+# The cut file starts at chapter V.
+start = ["div.chapter"]
+
+[book.rules.add]
+# Each note is a div.footnote whose label a.label holds the pairing id.
+note = ["div.footnote"]

@@ -103,17 +103,42 @@ BOOKS = (
 
 EVALUATION_BOOKS_TOML = REPO / "evaluation" / "books.toml"
 
+# The excerpts cut from books of the evaluation set, by Internet Archive
+# identifier.
+EVALUATION_EXCERPTS = frozendict(
+    {
+        "normansineuropea00hask": (
+            Excerpt(
+                name="haskins_eval",
+                # Printed pages 116 to 123, 250 and 251: page index = printed
+                # page + 15. Page 250 is the blank page before the index, as in
+                # the book; it keeps the index more than a page from the body.
+                page_indices=(*range(131, 139), 265, 266),
+                covers=(
+                    "the excerpt of the evaluation tool's test "
+                    "(docs/specs/evaluation.md, section 10): a chapter start "
+                    "with a drop capital, running heads with page numbers, "
+                    "footnotes on three pages, hyphens at line ends and one "
+                    "across a page break, a section break, a blank page without "
+                    "a text layer, and the first page of the two-column index"
+                ),
+            ),
+        ),
+    }
+)
+
 
 def all_books() -> tuple[Book, ...]:
     """The books with excerpts, then the evaluation set of
     evaluation/books.toml (docs/specs/evaluation.md, section 3), whose
-    Gutenberg HTML is downloaded too."""
+    Gutenberg HTML is downloaded too, with the excerpts of
+    EVALUATION_EXCERPTS."""
     evaluation = tuple(
         Book(
             archive_id=book.archive_id,
             title=f"{', '.join(book.authors)}, {book.title}",
             gutenberg_number=book.gutenberg_number,
-            excerpts=(),
+            excerpts=EVALUATION_EXCERPTS.get(book.archive_id, ()),
         )
         for book in read_books(EVALUATION_BOOKS_TOML)
     )

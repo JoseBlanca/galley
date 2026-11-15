@@ -1,0 +1,127 @@
+# Differences on the excerpt haskins_eval for its excerpt test
+# (docs/specs/evaluation.md, section 10), chosen on 15 November 2026 from
+# what `evaluate` reports on the committed files of this folder and from
+# the page images. They are for the owner to check by eye against the
+# pages of tests/fixtures/pdf/haskins_eval.pdf before the test asserts
+# them.
+#
+# Each difference gives the page index in the excerpt PDF (from 0), the
+# printed page, the reference's tokens, galley's tokens at markdown, the
+# state at markdown, the stage it is attributed to and the state there,
+# the part, whether it is on the edge of the page, and what is on the
+# page. A running head is one difference per token in differences.jsonl;
+# it is listed here once, with all its tokens.
+#
+# The stage is words for all of them: galley as it is (the walking
+# skeleton) leaves running heads, hyphens and footnotes where the text
+# layer has them, so every difference starts at words and lasts to
+# markdown.
+
+[[difference]]
+what = "running head of a right-hand page"
+page_index = 1
+printed_page = "117"
+reference = []
+galley = ["NORMANDY", "AND", "FRANCE", "117"]
+state = "extra"
+stage = "words"
+state_at_stage = "extra"
+part = "body"
+edge_of_page = true
+on_the_page = "The first line of the page is the running head NORMANDY AND FRANCE with the page number 117, which galley keeps as the first words of the page's paragraph."
+
+[[difference]]
+what = "running head of a left-hand page"
+page_index = 6
+printed_page = "122"
+reference = []
+galley = ["122", "NORMANS", "IN", "EUROPEAN", "HISTORY"]
+state = "extra"
+stage = "words"
+state_at_stage = "extra"
+part = "body"
+edge_of_page = true
+on_the_page = "The first line of the page is the page number 122 and the running head NORMANS IN EUROPEAN HISTORY, kept by galley as words of the text."
+
+[[difference]]
+what = "a hyphen at a line end, left split"
+page_index = 0
+printed_page = "116"
+reference = ["valley"]
+galley = ["val-", "ley"]
+state = "split"
+stage = "words"
+state_at_stage = "split"
+part = "body"
+edge_of_page = false
+on_the_page = "In the first paragraph of chapter V, line 6 ends with 'val-' and line 7 starts with 'ley of the Vienne'; galley keeps the two halves."
+
+[[difference]]
+what = "a hyphenated word broken at its hyphen at a line end, with a note reference after it"
+page_index = 2
+printed_page = "118"
+reference = ["proto-journalist,"]
+galley = ["proto-", "journalist,^"]
+state = "split"
+stage = "words"
+state_at_stage = "split"
+part = "body"
+edge_of_page = false
+on_the_page = "Line 6 ends with 'proto-' and line 7 starts with 'journalist,' followed by the superscript note reference 1, which the text layer reads as '^' glued to the word."
+
+[[difference]]
+what = "a footnote left in the body"
+page_index = 1
+printed_page = "117"
+reference = ["VIII,"]
+galley = ["viii,"]
+state = "changed"
+subkind = "case"
+stage = "words"
+state_at_stage = "changed"
+part = "notes"
+edge_of_page = true
+block_id = "b-p0001-001"
+on_the_page = "The footnote at the foot of the page, '1 Giraldus Cambrensis (Rolls Series), viii, p. 283.', is in galley's body paragraph b-p0001-001, and its volume number is printed in small capitals, which the reference writes as capitals."
+
+[[difference]]
+what = "a misread ligature"
+page_index = 1
+printed_page = "117"
+reference = ["Æschylus"]
+galley = ["yEschylus"]
+state = "changed"
+subkind = "letters"
+stage = "words"
+state_at_stage = "changed"
+part = "body"
+edge_of_page = false
+on_the_page = "In the second paragraph, line 3 ends with 'imagine an' and line 4 starts with 'Æschylus or a Sophocles', with the ligature Æ, which the text layer reads as 'yE'."
+
+[[difference]]
+what = "the drop capital of the chapter start"
+page_index = 0
+printed_page = "116"
+reference = ["In"]
+galley = ["IN"]
+state = "changed"
+subkind = "case"
+stage = "words"
+state_at_stage = "changed"
+part = "body"
+edge_of_page = false
+on_the_page = "Chapter V opens with a drop capital I three lines high followed by a small capital N, 'IN July, 1189'; the reference writes 'In'."
+
+[[difference]]
+what = "an index entry with an italic f. read as '/.'"
+page_index = 9
+printed_page = "251"
+reference = ["106"]
+galley = ["106/."]
+state = "changed"
+subkind = "punctuation"
+stage = "words"
+state_at_stage = "changed"
+part = "index"
+edge_of_page = false
+on_the_page = "The first entry of the index, left column, is 'Abacus, 106 f.' with an italic f.; the text layer reads '106/.', so the reference's 'f.' after it is a missing token, a difference of its own."
