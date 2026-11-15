@@ -323,8 +323,11 @@ The other joins are of three kinds:
 
 1. **The hyphen is kept** (`hyphen_kept`, new): the hyphenated form's key
    is among the book's own words and the joined form's key is not.
-   "proto-" "journalist" becomes "proto-journalist"; "Mont-Saint-" and
-   "Michel" "Mont-Saint-Michel"; "peut-" "être" "peut-être". A join of
+   In a book that prints "proto-journalist" whole and never
+   "protojournalist", "proto-" "journalist" becomes "proto-journalist"
+   (an example made up for the tests: Haskins prints it only at a line
+   end, so there the join is guessed); Haskins prints "Anglo-Saxon"
+   whole, so "Anglo-" "Saxon" becomes "Anglo-Saxon". A join of
    two numbers, "1830-" "40", always keeps the hyphen.
 2. **The hyphen is dropped** (`hyphen_join`): the joined key is in the
    word list of the book's language (`wordlist.word_list`, a list of
