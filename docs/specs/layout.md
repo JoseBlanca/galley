@@ -194,9 +194,54 @@ is laid out as one region, as the skeleton did.
    right edge, is a margin word. A word that crosses an edge stays in the
    column, so a quotation mark hung outside the edge stays with its line
    (in the measurement, 64 of Domesday's 181,400 body words and 11 of
-   Haskins' 60,900 fell outside by this rule). Each side's margin words
-   are grouped into lines, and the lines into regions: a region ends
-   where the next line's top is more than 1.5 body line pitches below
+   Haskins' 60,900 fell outside by this rule).
+
+   One exception, at the left edge only: the text layer sometimes gives
+   a word of an outer margin note a box that runs on into the empty
+   indent of the body line beside it (Domesday's page 75, "land." from
+   52.6 to 80.0 pt against the edge at 73, beside "Free"; page 83,
+   "Eng-" from 46.3 to 73.4 pt against 69). Kept in the body line, it
+   makes the line start left of the column, and structure, which finds
+   a paragraph's first line by its indent from the column's edge, does
+   not see the indent: in the evaluation of 15 November 2026, 135 of the
+   286 paragraph starts of Domesday that structure missed had such a
+   word at the start of their first line. The rows here are those of
+   the words the 2 pt test leaves in the column, grouped by the rule of
+   section 1. The first word of such a row (the one with the smallest
+   left side) is a margin word too when all four of these hold:
+
+   - it holds a letter or a digit, so that a quotation mark or a
+     semicolon hung outside the edge stays in its line;
+   - its middle lies at least 2 pt left of the left edge: more of it
+     lies in the margin than in the column;
+   - the second word of the row starts at least one body line pitch right
+     of the left edge, or the row has no second word: the box ran into
+     an empty stretch of the column. This keeps the words of a list
+     whose numbers hang outside the column ("13. Ivo Carnotensis",
+     Gierke's page 69), and boxes that join a note's text to the
+     body's ("TheFrank-ha", Domesday's page 303);
+   - a margin word of the left side with at least two letters lies
+     within one body line pitch of the first word, above or below: the
+     margin word's top lies above the first word's bottom plus a pitch,
+     and its bottom below the first word's top minus a pitch.
+     The margin then holds a note, not numbers: on Gierke's page 62, a
+     table of contents, "The Celestial Head gives" is set wide beside
+     its number "44".
+
+   Run on the six whole books on 15 November 2026, the rule moves 176
+   of Domesday's words and 96 of Gierke's, and none of Haskins',
+   Stubbs', Mariéjol's or Kadesh's. Of 23 of them compared with the
+   page image (one each on Domesday's pages 65, 75, 83, 91, 167, 193,
+   211, 281, 363, 375 and 503, and Gierke's 87, 101, 115, 123, 153,
+   171, 173, 195, 217, 233, 239 and 255), each is a word of a margin
+   note. The same rule at
+   the right edge moved 8 words: one a note's ("Bonds", Domesday's page
+   92), six a body word and a note word read as one ("ofdemesne-",
+   Domesday's page 90), and one a body word ("the", Domesday's page
+   270), so it is not applied there.
+
+   Each side's margin words are grouped into lines, and the lines into
+   regions: a region ends where the next line's top is more than 1.5 body line pitches below
    the top of the line before (a guess, so that each printed note is a
    region of its own).
 3. **Running-head line.** Of the remaining words, grouped into rows,
@@ -290,6 +335,7 @@ Where the thresholds come from:
 | rows that measure a book | 15 rows a page | guessed: enough rows for a commonest edge |
 | commonest edge | within 2 pt | measured: body lines start within 2.2 pt of the edge on 99% of Haskins' lines |
 | margin word | 2 pt outside the column edge | measured, above |
+| a word reaching into the column from the left margin | middle 2 pt outside, next word a pitch inside, a margin word of two letters within a pitch | measured on the six books, step 2 |
 | margin region split | 1.5 body line pitches | guessed |
 | running-head gap | 1.3 body line pitches | measured: the 5th percentile of the head's gap is 1.42 or more in the four evaluation books |
 | small row | 0.85 of the body word height | measured, section 2 |
@@ -486,10 +532,13 @@ runs the fidelity check and writes lines.json, 2.5 s in all.
 - **A margin word whose box reaches into the column**: the text layer
   sometimes gives a margin note's word a box that runs on into the body
   column, past its edge (Domesday's page 75, "land." from 52.6 to 80.0 pt
-  against the edge at 53; page 83, "Eng-" from 46.3 to 73.4 pt against
-  69). Such a word crosses the edge, so it stays in the body line beside
-  it, as a hung quotation mark does; the rest of its note is a margin
-  region.
+  against the edge at 73; page 83, "Eng-" from 46.3 to 73.4 pt against
+  69). At the left edge, such a word goes to the margin note beside it
+  when most of it lies in the margin and the body line beside it leaves
+  the column empty for a pitch (step 2): page 75's body line reads "The
+  idea of freedom…" and its note "Free land.". At the right edge it
+  stays in the body line beside it, as a hung quotation mark does: there
+  such boxes were mostly a body word and a note word read as one.
 - **A margin note cut in two**: where the OCR lost a line of a note, the
   gap between its lines passes 1.5 pitches and the note becomes two
   margin regions (Gierke's page 270). Structure reads them one after the
@@ -515,6 +564,15 @@ with their boxes, with a `BookMeasures` given in the test:
 - a body of 20 rows and a margin word 6 pt right of the right edge on
   row 3 give a body region of 20 lines and a margin region of 1 line;
   the word 1 pt outside stays in the body line;
+- a left margin note "Free" beside a body row that starts with "land.",
+  whose box runs from 20 pt left of the left edge to 7 pt right of it,
+  and whose next word starts 17 pt inside the edge, with a pitch of 12
+  pt: "land." joins
+  "Free" in the margin region's line. The same row with its next word 6
+  pt inside the edge, or with the margin word "44" instead of "Free",
+  or with the middle of "land." only 1 pt left of the edge, keeps
+  "land." in the body line; so does a ";" whose middle lies 3 pt left of
+  the edge;
 - a head row 1.4 pitches above the body gives a running-head region
   first; at 1.2 pitches, no such region; a row of ";" above it goes into
   the head region;
@@ -556,7 +614,7 @@ differ slightly from the whole book's.
 | `stubbs_51_56-64` | 9 (64) | a cut-in note at the right |
 | `domesday_74-83` (new) | 2 (76) | an outer margin note on the right, short notes side by side, signature "4—2" |
 | `domesday_74-83` | 0 (74) | an outer margin note on the right, signature "M. 4" |
-| `domesday_74-83` | 1 (75) | outer margin notes on the left; one word of a note, "land.", whose box reaches into the column, stays in its body line |
+| `domesday_74-83` | 1 (75) | outer margin notes on the left; one word of a note, "land.", whose box reaches into the column, goes to its note, "Free land." |
 | `domesday_74-83` | 9 (83) | short notes side by side in three rows, read row by row |
 | `mariejol_210-219` (new) | 0 (210) | footnotes of 9-pt OCR lines; a foot line holding the signature and the page number "(l93)" |
 | `mariejol_210-219` | 4 (214) | a foot line the OCR garbled |
