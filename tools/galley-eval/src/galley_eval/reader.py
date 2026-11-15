@@ -30,6 +30,7 @@ How the rules apply, beyond the spec's words:
   do the inline ones of the `separate` rule.
 """
 
+import hashlib
 import re
 import unicodedata
 from dataclasses import dataclass, replace
@@ -142,11 +143,36 @@ class ReferenceText:
     anchors_in_notes: tuple[PageAnchor, ...]
 
 
-def read_reference_file(path: Path, rules: ReadingRules) -> ReferenceText:
+def read_reference_file(
+    path: Path, rules: ReadingRules, html_sha256: str
+) -> ReferenceText:
     """The reference text of the Gutenberg HTML file at `path`, read by
-    `rules`. Raises ReferenceReadError as read_reference does, with the
-    file's path in the message."""
-    html = path.read_text(encoding="utf-8")
+    `rules`, which were written for the file whose SHA-256 is
+    `html_sha256` (64 hexadecimal digits). Raises ReferenceReadError, with
+    the file's path in the message, when the file is missing, is not
+    UTF-8, has another SHA-256 (Gutenberg published a new version), or
+    cannot be read as read_reference says."""
+    try:
+        data = path.read_bytes()
+    except FileNotFoundError as err:
+        message = (
+            f"{path} does not exist; download it with "
+            "`uv run python scripts/fetch_samples.py`"
+        )
+        raise ReferenceReadError(message) from err
+    found = hashlib.sha256(data).hexdigest()
+    if found != html_sha256:
+        message = (
+            f"{path} has the SHA-256 {found}, not {html_sha256}, that of the "
+            "file its reading rules and expected counts were written for; "
+            "check them against the new file before changing html_sha256"
+        )
+        raise ReferenceReadError(message)
+    try:
+        html = data.decode("utf-8")
+    except UnicodeDecodeError as err:
+        message = f"{path} is not UTF-8 text: {err}"
+        raise ReferenceReadError(message) from err
     try:
         return read_reference(html, rules)
     except ReferenceReadError as err:

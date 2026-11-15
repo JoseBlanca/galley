@@ -3,7 +3,9 @@ section 4), on small pieces of HTML written after the four books' HTML,
 one per rule and per case the reviews of the spec found (spec section 10,
 plan work package 1)."""
 
+import hashlib
 import re
+from pathlib import Path
 
 import pytest
 
@@ -19,6 +21,7 @@ from galley_eval.reader import (
     ReferenceToken,
     Stream,
     read_reference,
+    read_reference_file,
 )
 from galley_eval.rules import DEFAULT_RULES, ReadingRules, RuleChange, change_rules
 
@@ -472,3 +475,41 @@ def test_separate_rule_makes_an_inline_element_separate_words() -> None:
         DEFAULT_RULES, RuleChange.ADD, "separate", ("span.float-right",)
     )
     assert _read(html, rules).blocks == (_paragraph("years\u2019 work Page 34"),)
+
+
+def _sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def test_reference_file_is_read_when_its_sha256_is_the_expected_one(
+    tmp_path: Path,
+) -> None:
+    html = f"<html><body>{HEADER}<p>Text</p></body></html>".encode()
+    path = tmp_path / "pg1-images.html"
+    path.write_bytes(html)
+    reference = read_reference_file(path, DEFAULT_RULES, _sha256(html))
+    assert reference.blocks == (_paragraph("Text"),)
+
+
+def test_reference_file_of_another_sha256_is_an_error(tmp_path: Path) -> None:
+    path = tmp_path / "pg1-images.html"
+    path.write_bytes(f"<html><body>{HEADER}<p>Text</p></body></html>".encode())
+    with pytest.raises(ReferenceReadError, match=f"{re.escape(str(path))}.*SHA-256"):
+        read_reference_file(path, DEFAULT_RULES, _sha256(b"another version"))
+
+
+def test_missing_reference_file_is_an_error_naming_the_fetch_command(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "pg1-images.html"
+    with pytest.raises(ReferenceReadError, match="fetch_samples.py") as raised:
+        read_reference_file(path, DEFAULT_RULES, _sha256(b""))
+    assert str(path) in str(raised.value)
+
+
+def test_reference_file_that_is_not_utf8_is_an_error(tmp_path: Path) -> None:
+    data = "<p>Médicis</p>".encode("latin-1")
+    path = tmp_path / "pg1-images.html"
+    path.write_bytes(data)
+    with pytest.raises(ReferenceReadError, match="not UTF-8"):
+        read_reference_file(path, DEFAULT_RULES, _sha256(data))
