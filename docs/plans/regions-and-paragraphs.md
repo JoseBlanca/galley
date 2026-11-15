@@ -13,7 +13,8 @@ This plan builds the first part of the book's structure:
 It is built from `docs/specs/layout.md` and `docs/specs/structure.md`,
 both settled by the owner on 15 November 2026. It ends with the
 evaluation tool's scores on the four evaluation books against the
-targets of structure §9. Dated 15 November 2026. State: draft.
+targets of structure §9. Dated 15 November 2026. State: under way
+(approved by the owner on 15 November 2026).
 
 The six work packages are the breakdown the owner approved in chat on
 15 November 2026. "Layout §3" below is section 3 of `docs/specs/layout.md`,
