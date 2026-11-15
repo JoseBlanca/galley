@@ -27,10 +27,10 @@ the same PDF), `lines.json` (each page's regions, lines and words, from
 layout) and the book config (for the language of the word list), and
 writes `blocks.json` (the book as blocks and notes, with what was removed
 and every word changed) in the format of architecture §8, with three values
-added to its enums (section 7). One point is open for the owner: what
-kind of block the margin and footnote text becomes in the first plan,
-which decides a small change to the markdown stage (**Open 1**, section
-10).
+added to its enums (section 7). The margin and footnote text becomes
+`margin_note` blocks and unreferenced notes, which needs a small change
+to the markdown stage, as the owner decided on 15 November 2026
+(section 10).
 
 ## 1. Terms
 
@@ -95,7 +95,7 @@ says what a region's edges are); its middle is halfway between.
 - a **margin region** is narrower than a quarter of the page's widest
   region (the first, on a tie) and lies wholly left or wholly right of
   it, or overlaps vertically a region wider than itself (a cut-in note,
-  once layout finds them, layout **Open 1**). Margin notes are about 30
+  once layout finds them, in the second plan, layout §9). Margin notes are about 30
   pt wide against columns of 266 to 317 pt; each column of an index is
   about half the width, so it is not a margin region;
 - a **band region** is any other region, not the head line, whose
@@ -342,7 +342,7 @@ body line pitches below the line before. It added 0 to 4 points of
 recall and cost up to 7 points of precision (Mariéjol, where the OCR
 cuts lines). Stubbs' cut-in notes start the body lines beside them 60 pt
 in, outside rule 1's 40, so they do not make false starts; they do mix
-their words into those lines until layout **Open 1** is answered. The
+their words into those lines until the second plan (layout §9). The
 starts missed are chapter openings, where the first line is not
 indented and follows a centred title only when the title is on the same
 page; verse and dialogue (Haskins) give false starts.
@@ -350,8 +350,8 @@ page; verse and dialogue (Haskins) give false starts.
 **Side text.** Each margin region becomes one block of its own; each
 band region is grouped into blocks by rules 1 and 2, as the body is,
 without the page-break rule; hyphens are joined inside each. What kind
-of block they become is **Open 1**; meanwhile this spec is written for
-its recommendation: a margin region is a `margin_note` block, and each
+of block they become was decided by the owner (section 10): a margin
+region is a `margin_note` block, and each
 block of a band region is a `Note` of one block, with `referenced`
 false and `marker` empty (the printed marker stays as the first word of
 its text, until the second plan splits it off). No word of side text is
@@ -365,7 +365,7 @@ follow in `notes`, in the order of their regions and lines; markdown
 writes the notes of a page after the last block of `blocks` whose
 origin includes that page, which is that paragraph or the page's last
 margin note, or, when no block does, after the last block whose first
-origin is on an earlier page, or first of all (**Open 1**). So the side
+origin is on an earlier page, or first of all (section 10). So the side
 text of a page is read after the paragraph in which the page's body
 ends, never inside it. A page whose body stream is
 empty puts its side text after the last block so far.
@@ -386,8 +386,8 @@ and a joined word in place of its two parts.
 
 | field | in the first plan |
 |---|---|
-| `blocks` | `paragraph` blocks, and `margin_note` blocks (**Open 1**); `level` and `figure` `None` |
-| `notes` | one note per block of a band region, `referenced` false, `marker` empty (**Open 1**) |
+| `blocks` | `paragraph` blocks, and `margin_note` blocks (section 10); `level` and `figure` `None` |
+| `notes` | one note per block of a band region, `referenced` false, `marker` empty (section 10) |
 | `removals` | the running heads, page numbers, signature marks and stray marks |
 | `word_changes` | the hyphen joins, of the three reasons of section 5 |
 | `page_numbers` | the head and foot page numbers removed |
@@ -556,17 +556,20 @@ counts them under structure. Scores are for the body, at blocks, unless named.
 | paragraph boundaries, precision / recall (baseline) | 0.11 / 0.11 | 0.13 / 0.07 | 0.12 / 0.08 | 0.09 / 0.04 |
 | paragraph boundaries, target | at least 0.75 / 0.75 | 0.55 / 0.60 | 0.70 / 0.70 | 0.55 / 0.60 |
 | notes found as notes (baseline 0) | 55 of 72 | (no notes) | 1,300 of 1,729 | 900 of 1,432 |
-| margin notes found as margin notes (baseline 0) | (none) | 0 of 467 (layout **Open 1**) | 400 of 593 | (none) |
+| margin notes found as margin notes (baseline 0) | (none) | 0 of 467 (cut-in notes, layout §9) | 400 of 593 | (none) |
 
-The last two rows hold for the recommendation of **Open 1**; with
-option (a) they stay at 0, and the paragraph targets do not hold (see
-there). Stubbs' paragraph and hyphen targets allow for the cut-in notes
+Stubbs' paragraph and hyphen targets allow for the cut-in notes
 that stay in its body lines meanwhile. The number of guessed joins is
 expected near the research's: 35, 33, 78 and 192.
 
-## 10. Open points
+## 10. Decided: margin notes and unreferenced notes, with a change to markdown
 
-**Open 1: what the margin and footnote text becomes in the first plan.**
+There are no open points. The one this spec had was decided by the
+owner on 15 November 2026: option (b) below. So the first plan also
+changes the markdown stage, as (b) describes, and that description is
+the spec of that change. What was weighed:
+
+**What the margin and footnote text becomes in the first plan.**
 The first plan keeps it out of the body's paragraphs; the question is
 what kind of block holds it, because the markdown stage, as the walking
 skeleton built it, refuses every block that is not a paragraph and every
@@ -595,10 +598,9 @@ note, and because the evaluation tool reads a block's kind.
   shows the same text in the same place as (a); the evaluation tool
   scores notes and margin notes from the first plan on.
 
-Recommendation: (b). It costs one small change outside the two stages,
-and without it the first plan's work on notes and margins cannot be
-measured and its paragraph scores are wrong. Meanwhile: this spec is
-written for (b).
+Chosen: (b). It costs one small change outside the two stages, and
+without it the first plan's work on notes and margins cannot be
+measured and its paragraph scores are wrong.
 
 ## 11. Later: what the second plan adds
 

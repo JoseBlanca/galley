@@ -31,9 +31,9 @@ its text and its box in points, as extract read them from the text
 layer), and writes `lines.json` (each page's regions, each a list of
 lines, each a list of words), in the format of architecture §8,
 unchanged. The **walking skeleton** is galley's first build, every stage
-in its simplest form; its code is what exists now. One point is open for the
-owner: how Stubbs' notes cut into the text column are found (**Open 1**,
-section 9).
+in its simplest form; its code is what exists now. Stubbs' notes cut into
+the text column are left to the second plan, as the owner decided on 15
+November 2026 (section 9).
 
 ## 1. Terms
 
@@ -291,7 +291,7 @@ kind went (quotes counted with paragraphs):
 | book | note words in the band | body words in the band | margin-note words in a margin region | body words in a margin region |
 |---|---|---|---|---|
 | Haskins | 485 of 523 | 1,945 of 60,900 | (none) | 11 |
-| Stubbs | (none) | 141 of 90,100 | 0 of 1,521 (cut-in notes, **Open 1**) | 7 |
+| Stubbs | (none) | 141 of 90,100 | 0 of 1,521 (cut-in notes, section 9) | 7 |
 | Domesday | 48,085 of 49,650 | 521 of 181,400 | 1,190 of 1,890 | 64 |
 | Mariéjol | 20,049 of 25,784 | 593 of 184,100 | (none) | 1 |
 
@@ -382,8 +382,8 @@ layout itself (not measured).
   of a page they are read as a band. Their words keep their place in the
   reading order either way (structure §6).
 - **Plate pages, blank pages**: no words, no region, as now.
-- **Stubbs' cut-in notes**: until **Open 1** is answered, they stay in
-  the body rows beside them, as now.
+- **Stubbs' cut-in notes**: they stay in the body rows beside them, as
+  now, until the second plan (section 9).
 - **Mariéjol's notes in 9-pt OCR lines**: a fifth of its note words
   (5,735 of 25,784) stay in the body, at the foot of
   their page, because their lines are not small by step 4. A reader of
@@ -480,9 +480,16 @@ targets (structure §9): paragraph breaks that margin and note text no
 longer cause, notes and margin notes found as such. The table of section
 3 is what layout's rules gave on a prototype; it is not a target.
 
-## 9. Open points
+## 9. Decided: Stubbs' cut-in notes wait for the second plan
 
-**Open 1: how layout finds Stubbs' cut-in notes.** The text layer does
+There are no open points. The one this spec had, how layout finds
+Stubbs' notes cut into the text column, was decided by the owner on 15
+November 2026: option (c) below, so they stay in the body lines beside
+them in the first plan. Option (a) is the one to try in the second
+plan, which places margin notes and may render pages for other uses
+too. What was measured and weighed:
+
+**How layout finds Stubbs' cut-in notes.** The text layer does
 not show them reliably. Five rules were tried on Stubbs' words, each
 against the reference's labels; the best one that takes few body words
 looks for an empty strip at least 6 pt wide, 20 to 100 pt inside the
@@ -507,10 +514,11 @@ words are glued to body words ("toHenry's").
   they stay in the body lines beside them, as now, and keep breaking
   Stubbs' paragraphs.
 
-Recommendation: (a), as a task of the plan that measures before it
-builds, with (c) as the outcome if it fails the bar. A body word moved
-into a margin note breaks the text a reader reads, so the bar is on
-precision. Meanwhile: (c).
+The spec recommended (a), with (c) if it failed the bar; the owner
+chose (c), because the cut-in notes are in one of the six books and (a)
+changes what layout reads. Whatever the second plan tries, the bar is
+on precision: a body word moved into a margin note breaks the text a
+reader reads.
 
 ## 10. Not in this spec
 
