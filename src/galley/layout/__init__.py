@@ -292,6 +292,13 @@ def measure_book(
 # pt outside it took 64 of Domesday's 181,400 body words and 11 of Haskins'
 # 60,900 into a margin.
 _MARGIN_WORD_PT: Final[float] = 2.0
+# Measured on the six whole books on 15 November 2026: a word whose middle
+# lies 2 pt left of the left edge, whose row's next word starts a pitch
+# inside the edge, beside a margin word of 2 letters, is a margin note's
+# word in 23 of 23 checked (176 such words in Domesday, 96 in Gierke, none
+# in the other four). With 1 letter, a list number hung outside the column
+# counted as a note (Gierke page 62).
+_MARGIN_NOTE_LETTERS: Final[int] = 2
 # Guessed, so that each printed margin note is a region of its own.
 _MARGIN_REGION_GAP_PITCHES: Final[float] = 1.5
 # Measured: the 5th percentile of the gap below the running head is 1.42
@@ -327,6 +334,29 @@ def _column_edges(
         left = measures.usual_left_edge[page_index % 2]
         return left, left + measures.column_width
     return edges
+
+
+def _reaches_from_left_margin(
+    row: Line, left: float, left_margin: tuple[Word, ...], pitch: float
+) -> bool:
+    """Whether the first word of `row`, a row of the column's words, is a
+    margin note's word whose box runs on into the column (step 2): it
+    holds a letter or a digit, its middle lies `_MARGIN_WORD_PT` or more
+    left of `left`, the row's second word starts `pitch` or more right of
+    `left` (or there is none), and a word of `left_margin` with
+    `_MARGIN_NOTE_LETTERS` letters lies within `pitch` above or below it."""
+    first, *rest = sorted(row.words, key=lambda word: word.box.x0)
+    return (
+        any(char.isalnum() for char in first.text)
+        and (first.box.x0 + first.box.x1) / 2 <= left - _MARGIN_WORD_PT
+        and (not rest or rest[0].box.x0 - left >= pitch)
+        and any(
+            sum(char.isalpha() for char in word.text) >= _MARGIN_NOTE_LETTERS
+            and word.box.top < first.box.bottom + pitch
+            and word.box.bottom > first.box.top - pitch
+            for word in left_margin
+        )
+    )
 
 
 def _margin_regions(words: tuple[Word, ...], pitch: float) -> tuple[Region, ...]:
@@ -688,19 +718,33 @@ def _page_regions(
     left, right = _column_edges(group_lines(words), page_index, measures)
     # Each word goes to one group, also one whose box is inverted (x0 right
     # of x1), which would otherwise lie in both margins.
-    left_margin = tuple(word for word in words if word.box.x1 <= left - _MARGIN_WORD_PT)
+    outside_left = tuple(
+        word for word in words if word.box.x1 <= left - _MARGIN_WORD_PT
+    )
     right_margin = tuple(
         word
         for word in words
         if word.box.x1 > left - _MARGIN_WORD_PT
         and word.box.x0 >= right + _MARGIN_WORD_PT
     )
-    column = tuple(
+    in_column = tuple(
         word
         for word in words
         if word.box.x1 > left - _MARGIN_WORD_PT
         and word.box.x0 < right + _MARGIN_WORD_PT
     )
+    # A note's word whose box runs on into the column goes to the left
+    # margin; compared by identity, since two words may be equal.
+    reaching = {
+        id(min(row.words, key=lambda word: word.box.x0))
+        for row in group_lines(in_column)
+        if _reaches_from_left_margin(row, left, outside_left, pitch)
+    }
+    left_margin = (
+        *outside_left,
+        *(word for word in in_column if id(word) in reaching),
+    )
+    column = tuple(word for word in in_column if id(word) not in reaching)
     upper, band = _column_regions_with_drop_capitals(
         column,
         frozenset(
