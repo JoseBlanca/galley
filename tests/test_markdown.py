@@ -305,6 +305,36 @@ HEADING = replace(_block_of_kind("b-p0000-001", BlockKind.HEADING), level=1)
             "b-p0000-005",
         ),
         (
+            _blocks_file(
+                (),
+                (
+                    replace(
+                        NOTE,
+                        referenced=False,
+                        blocks=(_block_of_kind("b-p0000-006", BlockKind.MARGIN_NOTE),),
+                    ),
+                ),
+            ),
+            "b-p0000-006",
+        ),
+        (
+            _blocks_file(
+                (),
+                (
+                    replace(
+                        NOTE,
+                        referenced=False,
+                        blocks=(
+                            _paragraph(
+                                "b-p0000-007", "Ibid.", "2", note_ref="n-p0000-009"
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            "b-p0000-007",
+        ),
+        (
             _blocks_file((), (replace(NOTE, referenced=False, blocks=()),)),
             "n-p0000-001",
         ),
@@ -321,6 +351,8 @@ HEADING = replace(_block_of_kind("b-p0000-001", BlockKind.HEADING), level=1)
         "referenced note",
         "note reference",
         "heading in a note",
+        "margin note in a note",
+        "note reference in a note",
         "note without blocks",
         "note without origin",
     ],
