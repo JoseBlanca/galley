@@ -116,21 +116,21 @@ version of the rules gave 1,730 notes for 1,729 and 590 margin notes for
 
 **Tasks.**
 
-- [ ] 1.1 The workspace and the package skeleton: `tools/galley-eval/`
+- [x] 1.1 The workspace and the package skeleton: `tools/galley-eval/`
   with its `pyproject.toml`, the empty `galley_eval` package, the
   `galley-eval` command with its three subcommands as stubs, the root
   `pyproject.toml` changes of spec §9, the tests' `conftest.py`. Spec
   §9. Deliverable 1.
-- [ ] 1.2 `scripts/fetch_samples.py` downloads the four PDFs and the
+- [x] 1.2 `scripts/fetch_samples.py` downloads the four PDFs and the
   Gutenberg HTML (from `https://www.gutenberg.org/cache/epub/<n>/pg<n>-images.html`),
   slowly, as it does now. The excerpt comes in task 5.1. Spec §3.
   Deliverable 2.
-- [ ] 1.3 `evaluation/books.toml` and the code that reads it into
+- [x] 1.3 `evaluation/books.toml` and the code that reads it into
   `EvaluationBook`, with its malformed-input tests (the `coding` skill).
   The reading rules of each entry are written while doing 1.4, and the
   expected counts before it. Spec §3, §4 "The rules". Deliverable 3.
   Needs 1.1.
-- [ ] 1.4 The reader of spec §4: the rules, which rule wins, notes,
+- [x] 1.4 The reader of spec §4: the rules, which rule wins, notes,
   paragraphs, tokens, marked corrections, page anchors. Deliverables 4
   and 5. Needs 1.3.
 
