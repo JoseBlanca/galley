@@ -230,8 +230,9 @@ is laid out as one region, as the skeleton did.
      The margin then holds a note, not numbers: on Gierke's page 62, a
      table of contents, "The Celestial Head gives" is set wide beside
      its number "44", which has no letter. One letter instead of two
-     would move one more word in the six books, "31" beside "U" on
-     Kadesh's cover (page 0).
+     moves the same words in the six books; with no test of letters,
+     3 more move: that "The", Gierke's "Monarchy" beside "''" (page
+     119) and Domesday's "^X.^" beside "--,." (page 39).
 
    Run on the six whole books on 15 November 2026, the rule moves 176
    of Domesday's words and 95 of Gierke's, and none of Haskins',
@@ -339,7 +340,7 @@ Where the thresholds come from:
 | rows that measure a book | 15 rows a page | guessed: enough rows for a commonest edge |
 | commonest edge | within 2 pt | measured: body lines start within 2.2 pt of the edge on 99% of Haskins' lines |
 | margin word | 2 pt outside the column edge | measured, above |
-| a word reaching into the column from the left margin | middle 2 pt outside, next word a pitch inside, a margin word of two letters within a pitch | measured on the six books, step 2: with one letter, Kadesh's cover also moves "31" beside "U" |
+| a word reaching into the column from the left margin | middle 2 pt outside, next word a pitch inside, a margin word of two letters within a pitch | measured on the six books, step 2: one letter moves the same words, none 3 more |
 | margin region split | 1.5 body line pitches | guessed |
 | running-head gap | 1.3 body line pitches | measured: the 5th percentile of the head's gap is 1.42 or more in the four evaluation books |
 | small row | 0.85 of the body word height | measured, section 2 |
