@@ -222,12 +222,16 @@ def _column_page(
 
 def test_measure_book_on_20_pages_gives_the_medians() -> None:
     # Widths 200 to 219: the median is 209.5. Even pages start at 50, odd at
-    # 60. A page of 5 rows, 400 pt wide at 10, is not measured: the others
-    # have 15 rows or more.
-    pages = (
-        *(_column_page(i, 50 if i % 2 == 0 else 60, 200 + i, 16) for i in range(20)),
-        _column_page(20, 10, 400, 5),
-    )
+    # 60. Each page has one more row whose last word hangs 15 pt past the
+    # others, so its right side is not the commonest. A page of 5 rows,
+    # 400 pt wide at 10, is not measured: the others have 15 rows or more.
+    def ragged_page(index: int) -> PageWords:
+        left = 50 if index % 2 == 0 else 60
+        page = _column_page(index, left, 200 + index, 16)
+        hanging = _full_row(16, left, 200 + index + 15, 100 + 16 * _PITCH)
+        return replace(page, words=page.words + hanging)
+
+    pages = (*(ragged_page(i) for i in range(20)), _column_page(20, 10, 400, 5))
     measures = measure_book(_words_file(pages))
     assert measures == BookMeasures(
         column_width=209.5,
@@ -317,14 +321,56 @@ def test_column_left_edge_counts_edges_within_2_pt_and_takes_the_smallest_on_a_t
 
 
 def test_usual_left_edge_of_a_parity_without_a_wide_row_is_the_other_paritys() -> None:
-    # Page 1 holds only short rows (100 pt of a 200-pt column).
+    # Pages 1, 3 and 5 hold only short rows, 100 pt from 90, under 0.8 of
+    # the 150-pt column (the median of 200, 200, 200, 100, 100, 100). They
+    # take the even pages' 50, not the median of every measured page's
+    # commonest left edge, 70.
     short = tuple(
         _word(f"s{row}", 90, 100 + row * 12, 190, 108 + row * 12) for row in range(16)
     )
-    pages = (*(_column_page(i, 50, 200, 16) for i in (0, 2, 4)), _page(1, short))
+    pages = (
+        *(_column_page(i, 50, 200, 16) for i in (0, 2, 4)),
+        *(_page(i, short) for i in (1, 3, 5)),
+    )
     measures = measure_book(_words_file(pages))
     assert measures is not None
     assert measures.usual_left_edge == frozendict({0: 50.0, 1: 50.0})
+
+
+def test_book_without_a_wide_row_takes_the_median_commonest_left_edge() -> None:
+    # On every page 8 rows start at its left edge and end 30 to 100 pt past
+    # it, 10 pt apart, and 8 rows end 200 pt past it and start 100 to 170
+    # pt past it: the column is 200 wide and no row is 160. Even pages
+    # start at 50, odd at 60: both parities take the median of the pages'
+    # commonest left edges, 55.
+    def page(index: int) -> PageWords:
+        left = 50 if index % 2 == 0 else 60
+        starting = tuple(
+            _word(
+                f"s{row}",
+                left,
+                100 + row * _PITCH,
+                left + 30 + 10 * row,
+                108 + row * _PITCH,
+            )
+            for row in range(8)
+        )
+        ending = tuple(
+            _word(
+                f"e{row}",
+                left + 100 + 10 * row,
+                196 + row * _PITCH,
+                left + 200,
+                204 + row * _PITCH,
+            )
+            for row in range(8)
+        )
+        return _page(index, starting + ending)
+
+    measures = measure_book(_words_file((page(0), page(1))))
+    assert measures is not None
+    assert measures.column_width == 200.0
+    assert measures.usual_left_edge == frozendict({0: 55.0, 1: 55.0})
 
 
 # layout_page: outer margin notes and the running-head line (layout spec
@@ -857,6 +903,155 @@ def test_regions_are_head_body_columns_body_margins_by_top_then_band() -> None:
         (("Right",),),
         (("n0",), ("n1",), ("n2",)),
     )
+
+
+# Boundary cases of the band, the columns and the drop capital
+
+
+def _rows_of_height(count: int, top: float, height: float) -> tuple[Word, ...]:
+    return tuple(
+        _word(f"n{row}", 50, top + row * 9, 250, top + row * 9 + height)
+        for row in range(count)
+    )
+
+
+@pytest.mark.parametrize(("share", "regions"), [(0.8, 2), (0.9, 1)])
+def test_band_rows_are_small_at_0_8_of_the_body_height_and_not_at_0_9(
+    share: float, regions: int
+) -> None:
+    band = _rows_of_height(5, _LAST_BODY_TOP + 1.5 * _PITCH, share * _ROW_HEIGHT)
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    assert len(result.regions) == regions
+
+
+@pytest.mark.parametrize(("gap", "regions"), [(1.05, 1), (1.15, 2)])
+def test_band_needs_a_gap_of_1_1_pitches_above_it(gap: float, regions: int) -> None:
+    band = _small_rows(5, _LAST_BODY_TOP + gap * _PITCH)
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    assert len(result.regions) == regions
+
+
+def test_2_band_rows_with_a_gutter_at_the_middle_stay_rows() -> None:
+    band = _two_column_rows(
+        2, top=_LAST_BODY_TOP + 1.5 * _PITCH, height=_SMALL_HEIGHT, pitch=9.0
+    )
+    result = layout_page(_page(0, (*_rows(20), *band)), _MEASURES)
+    assert _region_texts(result)[1:] == ((("L0", "R0"), ("L1", "R1")),)
+
+
+def test_8_rows_with_an_empty_strip_at_the_middle_are_two_columns() -> None:
+    result = layout_page(_page(0, _two_column_rows(8)), _MEASURES)
+    assert len(result.regions) == 2
+
+
+def test_body_gutter_20_pt_off_the_middle_is_still_cut() -> None:
+    # Left words end at 126 and right words start at 134: the gutter's
+    # middle is at 129.7, 20.3 pt left of the column's middle. The test of
+    # the gutter's place is the band's only.
+    rows = tuple(
+        word
+        for row in range(10)
+        for word in (
+            _word(f"L{row}", 50, 100 + row * _PITCH, 126, 108 + row * _PITCH),
+            _word(f"R{row}", 134, 100 + row * _PITCH, 250, 108 + row * _PITCH),
+        )
+    )
+    result = layout_page(_page(0, rows), _MEASURES)
+    assert len(result.regions) == 2
+
+
+def test_strip_open_only_in_the_outer_third_is_no_gutter() -> None:
+    # Words end at 58 and start at 72: the only empty strip lies in the
+    # left third of the column, 50 to 116.7.
+    rows = tuple(
+        word
+        for row in range(10)
+        for word in (
+            _word(f"L{row}", 50, 100 + row * _PITCH, 58, 108 + row * _PITCH),
+            _word(f"R{row}", 72, 100 + row * _PITCH, 250, 108 + row * _PITCH),
+        )
+    )
+    result = layout_page(_page(0, rows), _MEASURES)
+    assert len(result.regions) == 1
+
+
+def test_rows_on_one_side_of_the_gutter_only_are_not_cut() -> None:
+    # 10 open rows, a full row that blocks the strip, then 10 rows with a
+    # word on the left only: the first run is cut, the second has no open
+    # row and stays rows.
+    one_side = tuple(
+        _word(f"S{row}", 50, 232 + row * _PITCH, 140, 240 + row * _PITCH)
+        for row in range(10)
+    )
+    words = (*_two_column_rows(10), *_full_row(10, 50, 200, 220), *one_side)
+    result = layout_page(_page(0, words), _MEASURES)
+    assert _region_texts(result)[2] == (
+        ("a10", "b10", "c10"),
+        *((f"S{row}",) for row in range(10)),
+    )
+    assert len(result.regions) == 3
+
+
+def test_two_words_across_the_strip_block_the_row() -> None:
+    # Row 5 has words from 130 to 148 and 151 to 175, both across the strip
+    # 146.7 to 152.7, each with its middle more than 6 pt from 149.7. The
+    # row blocks; two runs of 5 open rows are too short to cut.
+    rows = tuple(
+        word for word in _two_column_rows(11) if word.text not in {"L5", "R5"}
+    ) + (
+        _word("x", 130, 100 + 5 * _PITCH, 148, 108 + 5 * _PITCH),
+        _word("y", 151, 100 + 5 * _PITCH, 175, 108 + 5 * _PITCH),
+    )
+    result = layout_page(_page(0, rows), _MEASURES)
+    assert len(result.regions) == 1
+
+
+def test_word_over_the_gutter_goes_to_the_column_of_its_middle() -> None:
+    # "over", from 140 to 175, has its middle at 157.5, right of the
+    # gutter's 149.7 and more than 6 pt from it: the row stays in the run
+    # and the word goes to the right column.
+    rows = tuple(
+        word for word in _two_column_rows(11) if word.text not in {"L5", "R5"}
+    ) + (_word("over", 140, 100 + 5 * _PITCH, 175, 108 + 5 * _PITCH),)
+    result = layout_page(_page(0, rows), _MEASURES)
+    left, right = result.regions
+    assert ("over",) in _texts(right.lines)
+    assert ("over",) not in _texts(left.lines)
+
+
+def test_word_twice_the_body_height_at_the_left_edge_is_no_drop_capital() -> None:
+    # 16 pt tall, beside rows 2 and 3 at 100 and 112: it is grouped with
+    # them as the skeleton groups words, into one line.
+    above = _rows(2, top=76)
+    beside = tuple(
+        word
+        for row in (2, 3)
+        for word in (
+            _word(f"a{row}", 75, 76 + row * _PITCH, 130, 84 + row * _PITCH),
+            _word(f"b{row}", 140, 76 + row * _PITCH, 250, 84 + row * _PITCH),
+        )
+    )
+    tall = _word("T", 50, 100, 70, 116)
+    result = layout_page(
+        _page(0, (*above, tall, *beside, *_rows(16, top=124))), _MEASURES
+    )
+    (body,) = result.regions
+    assert _texts(body.lines)[2] == ("T", "a2", "a3", "b2", "b3")
+
+
+def test_line_starting_left_of_the_capitals_middle_does_not_receive_it() -> None:
+    # The capital runs from 50 to 70 (middle 60), 100 to 124. Row 0 starts
+    # at 55 and row 1 at 75: only row 1 is beside it.
+    rows = (
+        _word("x0", 55, 100, 130, 108),
+        _word("y0", 140, 100, 250, 108),
+        _word("x1", 75, 112, 130, 120),
+        _word("y1", 140, 112, 250, 120),
+    )
+    capital = _word("T", 50, 100, 70, 124)
+    result = layout_page(_page(0, (capital, *rows, *_rows(16, top=124))), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[:2] == (("x0", "y0"), ("T", "x1", "y1"))
 
 
 # The fidelity check at the layout boundary
