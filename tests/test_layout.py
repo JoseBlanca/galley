@@ -561,6 +561,46 @@ def test_blank_left_cell_and_a_word_over_the_gutter_keep_the_columns_one_run() -
     assert _texts(right.lines) == tuple((f"R{row}",) for row in range(12))
 
 
+def test_prose_row_with_a_word_across_the_strip_above_the_columns_stays_one_line() -> (
+    None
+):
+    # The prose row's word "across" runs from 104 to 170 over the strip
+    # (146.7 to 152.7); its middle, 137, is more than 6 pt from the strip's,
+    # so the row is compatible, but it is not between two open rows. A row
+    # with a word on the left only, below the columns, stays a row too.
+    prose = (
+        _word("prose", 50, 88, 100, 96),
+        _word("across", 104, 88, 170, 96),
+        _word("end", 174, 88, 250, 96),
+    )
+    after = _word("alone", 50, 100 + 10 * _PITCH, 120, 108 + 10 * _PITCH)
+    result = layout_page(_page(0, (*prose, *_two_column_rows(10), after)), _MEASURES)
+    assert _region_texts(result) == (
+        (("prose", "across", "end"),),
+        tuple((f"L{row}",) for row in range(10)),
+        tuple((f"R{row}",) for row in range(10)),
+        (("alone",),),
+    )
+
+
+def test_band_row_with_a_word_over_the_gutter_at_the_runs_edge_joins_the_run() -> None:
+    # The band's first row has "Ori-" from 120 to 152 over the strip, its
+    # middle 136 more than 6 pt from the strip's (Kadesh page 8); it
+    # starts the run in the band, so its words go to the two columns.
+    top = _LAST_BODY_TOP + 1.5 * _PITCH
+    first = (
+        _word("L0", 50, top, 110, top + 5.6),
+        _word("Ori-", 120, top, 152, top + 5.6),
+        _word("R0", 160, top, 250, top + 5.6),
+    )
+    band = _two_column_rows(3, top=top + 9, height=_SMALL_HEIGHT, pitch=9.0)
+    result = layout_page(_page(0, (*_rows(20), *first, *band)), _MEASURES)
+    assert _region_texts(result)[1:] == (
+        (("L0", "Ori-"), *((f"L{row}",) for row in range(3))),
+        (("R0",), *((f"R{row}",) for row in range(3))),
+    )
+
+
 def test_word_across_the_middle_of_the_gutter_ends_the_run() -> None:
     # Row 5 holds one word from 140 to 160: its middle is the strip's. Two
     # runs of 5 open rows are too short to cut.

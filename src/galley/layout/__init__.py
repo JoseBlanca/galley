@@ -477,7 +477,8 @@ def _column_cut_regions(
 ) -> tuple[Region, ...]:
     """The regions of the body or the band, top to bottom: each run of
     rows cut at the gutter gives its left and its right column, and the
-    rows between such runs a region each (step 5)."""
+    rows between such runs a region each (step 5). A run is a stretch of
+    compatible rows, in the body from an open row to an open row."""
     if not rows:
         return ()
     middle = _gutter_middle(rows, left, width)
@@ -492,14 +493,27 @@ def _column_cut_regions(
         ((row, _at_gutter(row, middle)) for row in rows),
         key=lambda row_at: row_at[1] is not _AtGutter.BLOCKED,
     ):
-        run = tuple(group)
-        if compatible and _run_is_cut(run, part):
+        stretch = tuple(group)
+        opened = tuple(
+            index for index, (_, at) in enumerate(stretch) if at is _AtGutter.OPEN
+        )
+        if not (compatible and opened):
+            pending.extend(row for row, _ in stretch)
+            continue
+        if part is _Part.BAND:
+            opened = (0, len(stretch) - 1)
+        # In the body a run starts and ends at an open row; the rows before
+        # and after it in the stretch stay rows.
+        pending.extend(row for row, _ in stretch[: opened[0]])
+        column_run = stretch[opened[0] : opened[-1] + 1]
+        if _run_is_cut(column_run, part):
             if pending:
                 regions.append(_region_of_rows(tuple(pending)))
                 pending = []
-            regions.extend(_cut_run(tuple(row for row, _ in run), middle))
+            regions.extend(_cut_run(tuple(row for row, _ in column_run), middle))
         else:
-            pending.extend(row for row, _ in run)
+            pending.extend(row for row, _ in column_run)
+        pending.extend(row for row, _ in stretch[opened[-1] + 1 :])
     if pending:
         regions.append(_region_of_rows(tuple(pending)))
     return tuple(regions)
