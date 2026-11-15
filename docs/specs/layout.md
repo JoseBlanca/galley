@@ -231,13 +231,20 @@ is laid out as one region, as the skeleton did.
    "ancient"). The gutter is the strip of 6 pt, moved in steps of 1 pt
    across the middle third, at which the most rows are open; a tie takes
    the leftmost. A **run** is a longest stretch of consecutive compatible
-   rows that starts and ends at an open row: a row with words on one side
-   only, or with a word across the strip, belongs to a run only between
-   two of its open rows. (A justified line of prose has one word across
-   the strip; counted at the edge of a run, it joined the run, and on
-   Kadesh's page 28 and Domesday's 43, 388 and 477 lines of prose above
-   or below a table or figure were read as their left halves, then their
-   right halves.) A run is cut when it holds at least 8 open rows in the body, or 3
+   rows that, in the body, starts and ends at an open row: there a row
+   with words on one side only, or with a word across the strip, belongs
+   to a run only between two of its open rows. (A justified line of prose
+   has one word across the strip; counted at the edge of a run, it joined
+   the run, and on Kadesh's page 28 and Domesday's 43, 388 and 477 lines
+   of prose above or below a table or figure were read as their left
+   halves, then their right halves.) In the band a run may start or end
+   at any compatible row: the first row of Kadesh's two columns of notes
+   on page 8 has an OCR word that runs over the gutter ("Ori-", 227 to
+   252 pt, the strip 245.5 to 251.5), and as the edge of the run it would
+   be read across both columns. Word spaces do not tell the two apart:
+   Kadesh's prose has gaps of 6 pt or more within 12 pt of the gutter on
+   19 of the 26 rows of page 28 with a word across it. A run is cut
+   when it holds at least 8 open rows in the body, or 3
    in the band, and in the band only when the gutter's middle lies within
    10 pt of the middle of the body column (two columns of notes are set
    on either side of the middle; Domesday's short notes printed side by
