@@ -4,8 +4,9 @@ every stage, and a stage's name runs that stage alone (spec section 9).
 The command reads `book.toml` from the folder and calls each stage's `run`.
 Before any stage, it refuses `correct = true` under `run` and checks that
 Pandoc is installed when a stage it runs needs it, and Tesseract when
-structure runs and the word list of the book's language is not cached. Errors propagate to
-`main`, which logs them and raises them again (architecture section 14).
+structure runs and the word list of the book's language is not cached.
+Errors propagate to `main`, which logs them and raises them again
+(architecture section 14).
 """
 
 import argparse
@@ -47,7 +48,7 @@ class _Stage:
     help: str
     run: _StageRun
     needs_pandoc: bool
-    needs_word_list: bool = False
+    needs_word_list: bool
 
 
 # The stages in the order `run` calls them. The correct stage and
@@ -59,18 +60,21 @@ _STAGES: tuple[_Stage, ...] = (
         help="what each page is: pages.json",
         run=analyze.run,
         needs_pandoc=False,
+        needs_word_list=False,
     ),
     _Stage(
         name="extract",
         help="the words of every page and the cover: words.json, images/",
         run=extract.run,
         needs_pandoc=False,
+        needs_word_list=False,
     ),
     _Stage(
         name="layout",
         help="the words grouped into regions and lines: lines.json",
         run=layout.run,
         needs_pandoc=False,
+        needs_word_list=False,
     ),
     _Stage(
         name="structure",
@@ -84,12 +88,14 @@ _STAGES: tuple[_Stage, ...] = (
         help="the Markdown to proofread: book.md",
         run=markdown.run,
         needs_pandoc=True,
+        needs_word_list=False,
     ),
     _Stage(
         name="epub",
         help="the EPUB, built by Pandoc: book.epub",
         run=epub.run,
         needs_pandoc=True,
+        needs_word_list=False,
     ),
 )
 

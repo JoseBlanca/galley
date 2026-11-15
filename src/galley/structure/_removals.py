@@ -166,7 +166,6 @@ def _is_signature_mark(line: Line, column: Edges) -> bool:
         len(line.words) <= _SIGNATURE_MARK_MAX_WORDS
         and len(characters) <= _SIGNATURE_MARK_MAX_CHARACTERS
         and has_digit
-        and not is_foot_page_number(line, column)
         # Letters and digits, or digits around a dash or a space: so not a
         # number alone, "1900.".
         and (has_letter or _DIGITS_AROUND_A_DASH_OR_SPACE.fullmatch(text) is not None)

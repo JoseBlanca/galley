@@ -1,11 +1,12 @@
 """Paragraphs, side text and the order of the blocks (spec section 6).
 
 The per-page part, `page_parts`, runs on one page: what each region is,
-what is removed, the body stream, and the side text's blocks with their
-hyphens joined. The part across pages, `assemble`, runs once in page
-order: it finds the paragraphs of the book's body stream, which run over
-page breaks, joins their hyphens, puts each page's side text after the
-paragraph in which its body ends, and numbers the blocks and notes.
+what is removed, the body stream, and the side text cut into blocks. The
+part across pages, `assemble`, runs once in page order: it finds the
+paragraphs of the book's body stream, which run over page breaks, joins
+the hyphens of every block, body and side text, puts each page's side
+text after the paragraph in which its body ends, and numbers the blocks
+and notes.
 """
 
 import bisect
@@ -55,7 +56,7 @@ _CENTRED_INSET_DIFFERENCE_PT = 10.0
 
 
 @dataclass(frozen=True, slots=True)
-class _PlacedLine:
+class PlacedLine:
     """A line of a page with its page index, its region's edges, and the
     edges its centring is measured against: the region's, or the page's
     body column for a line of a short body region (spec section 6)."""
@@ -67,10 +68,10 @@ class _PlacedLine:
 
 
 @dataclass(frozen=True, slots=True)
-class _Piece:
+class Piece:
     """A block's lines, all on one page or over several, in order."""
 
-    lines: tuple[_PlacedLine, ...]
+    lines: tuple[PlacedLine, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,13 +82,13 @@ class PageParts:
 
     removals: tuple[Removal, ...]
     page_numbers: tuple[PageNumber, ...]
-    body: tuple[_PlacedLine, ...]
-    margin_notes: tuple[_Piece, ...]
-    band_blocks: tuple[_Piece, ...]
+    body: tuple[PlacedLine, ...]
+    margin_notes: tuple[Piece, ...]
+    band_blocks: tuple[Piece, ...]
     has_figure: bool
 
 
-def _is_indented(line: _PlacedLine, before: _PlacedLine) -> bool:
+def _is_indented(line: PlacedLine, before: PlacedLine) -> bool:
     indent = line.line.box.x0 - line.edges.left
     return (
         _INDENT_MIN_PT <= indent <= _INDENT_MAX_PT
@@ -95,7 +96,7 @@ def _is_indented(line: _PlacedLine, before: _PlacedLine) -> bool:
     )
 
 
-def _is_centred(line: _PlacedLine) -> bool:
+def _is_centred(line: PlacedLine) -> bool:
     left_inset = line.line.box.x0 - line.centring_edges.left
     right_inset = line.centring_edges.right - line.line.box.x1
     return (
@@ -105,11 +106,11 @@ def _is_centred(line: _PlacedLine) -> bool:
     )
 
 
-def _ends_with_hyphen(line: _PlacedLine) -> bool:
+def _ends_with_hyphen(line: PlacedLine) -> bool:
     return bool(line.line.words) and is_hyphen_first_part(line.line.words[-1].text)
 
 
-def _starts_paragraph(line: _PlacedLine, before: _PlacedLine | None) -> bool:
+def _starts_paragraph(line: PlacedLine, before: PlacedLine | None) -> bool:
     """Whether `line` starts a paragraph after `before`, the line before it
     (spec section 6): never after a hyphen; else when it is indented after
     a short line, or it or the line before is centred."""
@@ -120,16 +121,16 @@ def _starts_paragraph(line: _PlacedLine, before: _PlacedLine | None) -> bool:
     return _is_indented(line, before) or _is_centred(line) or _is_centred(before)
 
 
-def _pieces(lines: tuple[_PlacedLine, ...]) -> tuple[_Piece, ...]:
+def _pieces(lines: tuple[PlacedLine, ...]) -> tuple[Piece, ...]:
     """The lines of one band region cut into blocks by rules 1 and 2."""
-    pieces: list[list[_PlacedLine]] = []
-    before: _PlacedLine | None = None
+    pieces: list[list[PlacedLine]] = []
+    before: PlacedLine | None = None
     for line in lines:
         if not pieces or _starts_paragraph(line, before):
             pieces.append([])
         pieces[-1].append(line)
         before = line
-    return tuple(_Piece(tuple(piece)) for piece in pieces)
+    return tuple(Piece(tuple(piece)) for piece in pieces)
 
 
 def _edges(region: Region, kind: RegionKind) -> Edges:
@@ -158,9 +159,7 @@ def page_parts(page: PageLayout, survey: BookSurvey) -> PageParts:
         (
             kind,
             tuple(
-                _PlacedLine(
-                    page.index, line, edges, centring_edges(region, kind, edges)
-                )
+                PlacedLine(page.index, line, edges, centring_edges(region, kind, edges))
                 for line_number, line in enumerate(region.lines)
                 if (region_number, line_number) not in removed
             ),
@@ -184,7 +183,7 @@ def page_parts(page: PageLayout, survey: BookSurvey) -> PageParts:
             line for kind, lines in regions if kind is RegionKind.BODY for line in lines
         ),
         margin_notes=tuple(
-            _Piece(lines)
+            Piece(lines)
             for kind, lines in regions
             if kind is RegionKind.MARGIN and lines
         ),
@@ -205,12 +204,12 @@ def page_parts(page: PageLayout, survey: BookSurvey) -> PageParts:
 class _Paragraph:
     """A paragraph of the body stream, as a piece."""
 
-    piece: _Piece
+    piece: Piece
 
 
 @dataclass(frozen=True, slots=True)
 class _MarginNote:
-    piece: _Piece
+    piece: Piece
 
 
 type _Entry = _Paragraph | _MarginNote
@@ -221,9 +220,9 @@ def _body_entries(pages: Sequence[PageParts]) -> tuple[_Entry, ...]:
     the margin notes of the pages whose body ends in it; the margin notes
     of a page with no body stream after the last block so far."""
     entries: list[_Entry] = []
-    current: list[_PlacedLine] = []
+    current: list[PlacedLine] = []
     pending: list[_MarginNote] = []
-    before: _PlacedLine | None = None
+    before: PlacedLine | None = None
     page_before_has_figure = False
     for page in pages:
         for number, line in enumerate(page.body):
@@ -235,7 +234,7 @@ def _body_entries(pages: Sequence[PageParts]) -> tuple[_Entry, ...]:
             )
             if plate_break or _starts_paragraph(line, before):
                 if current:
-                    entries.append(_Paragraph(_Piece(tuple(current))))
+                    entries.append(_Paragraph(Piece(tuple(current))))
                     entries.extend(pending)
                     pending = []
                 current = []
@@ -249,12 +248,12 @@ def _body_entries(pages: Sequence[PageParts]) -> tuple[_Entry, ...]:
         else:
             entries.extend(notes)
     if current:
-        entries.append(_Paragraph(_Piece(tuple(current))))
+        entries.append(_Paragraph(Piece(tuple(current))))
     entries.extend(pending)
     return tuple(entries)
 
 
-def _origin(piece: _Piece) -> tuple[Origin, ...]:
+def _origin(piece: Piece) -> tuple[Origin, ...]:
     """One origin per page the piece has lines on, with the box of those
     lines."""
     return tuple(
@@ -275,7 +274,7 @@ class _Unnumbered:
 
 
 def _joined(
-    piece: _Piece,
+    piece: Piece,
     kind: BlockKind,
     book_words: frozenset[str],
     word_list: frozenset[str],

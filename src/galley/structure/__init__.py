@@ -72,8 +72,9 @@ def run(
     deleted first. pages.json must have been made from `config.pdf` and
     lines.json from the same PDF, or InputFileError names the stage to run
     again. The word list of `config.language` is taken from Tesseract's
-    data, which needs Tesseract the first time a language is used. When the words of blocks.json are not those of lines.json less
-    the removals, FidelityError is raised and nothing is written. The pages
+    data, which needs Tesseract the first time a language is used. When
+    the words of blocks.json are not those of lines.json less the
+    removals, FidelityError is raised and nothing is written. The pages
     are worked on in a pool of `workers` threads.
     """
     delete_stage_outputs(folder, Stage.STRUCTURE)

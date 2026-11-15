@@ -438,7 +438,7 @@ A stage imports these and nothing else of galley.
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage` |
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file |
-| `wordlist.py` | `word_list(language) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/` |
+| `wordlist.py` | `word_list(language, cache_dir) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before structure |
 | `fidelity.py` | the fidelity check, section 13 |
 | `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract) and stops naming any that is missing |
 
@@ -543,8 +543,6 @@ with `brew install epubcheck` (5.4.0) before the epub stage is built.
 - How each stage does its work: the page score threshold, column
   detection, running heads, paragraphs, notes, OCR settings, figure
   cutting. That is in the stage specs.
-- What happens to a hyphen that structure cannot join safely ("neces-" and
-  "sary" with no evidence): structure's spec, as an open point.
 - The `correct` stage, with its log and how it calls the vision model; the
   `index` stage; and `edits-from`. Each is specified later, and section 8
   gains their formats then.

@@ -12,8 +12,9 @@ from dataclasses import dataclass
 
 from galley.model import Box, Line, Region, Word
 
-# layout section 1: the commonest edge counts the edges within 2 pt of it.
-_COMMONEST_WITHIN_PT = 2
+# layout section 3, measured: body lines start within 2.2 pt of the edge on
+# 99% of Haskins' lines, so the commonest edge counts the edges within 2 pt.
+_COMMONEST_EDGE_PT = 2
 # Spec section 6: a region of fewer lines takes its box's sides as edges.
 _LINES_FOR_COMMONEST_EDGES = 5
 
@@ -93,7 +94,7 @@ def is_page_number_form(text: str) -> bool:
 
 
 def commonest(edges: Iterable[float]) -> float:
-    """The commonest of `edges` (layout section 1): each edge rounded to the
+    """The commonest of `edges` (layout sections 1 and 3): each edge rounded to the
     point, the value with the most edges within 2 pt of it, the smallest
     on a tie. `edges` is not empty."""
     rounded = sorted(round(edge) for edge in edges)
@@ -101,8 +102,8 @@ def commonest(edges: Iterable[float]) -> float:
     best_count = 0
     for value in sorted(set(rounded)):
         count = bisect.bisect_right(
-            rounded, value + _COMMONEST_WITHIN_PT
-        ) - bisect.bisect_left(rounded, value - _COMMONEST_WITHIN_PT)
+            rounded, value + _COMMONEST_EDGE_PT
+        ) - bisect.bisect_left(rounded, value - _COMMONEST_EDGE_PT)
         if count > best_count:
             best_value, best_count = value, count
     return float(best_value)
@@ -147,11 +148,13 @@ def middle(box: Box) -> float:
     return (box.x0 + box.x1) / 2
 
 
-_APOSTROPHES = "'’"
+# Spec section 5: the apostrophes a key keeps, and after which a French
+# elision's word is looked up.
+APOSTROPHES = ("'", "’")
 
 
 def _kept_in_key(character: str) -> bool:
-    return character.isalnum() or character == "-" or character in _APOSTROPHES
+    return character.isalnum() or character == "-" or character in APOSTROPHES
 
 
 def word_key(text: str) -> str:
@@ -171,4 +174,4 @@ def word_key(text: str) -> str:
 def is_hyphen_first_part(text: str) -> bool:
     """Whether a word can be the first part of a hyphen join: it ends with
     the ASCII hyphen-minus after a letter or digit (spec section 5)."""
-    return len(text) >= 2 and text.endswith("-") and text[-2].isalnum()  # noqa: PLR2004
+    return text.endswith("-") and text[:-1][-1:].isalnum()

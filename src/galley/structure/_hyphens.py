@@ -8,11 +8,10 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 from galley.model import ChangeReason, WordChange
-from galley.structure._measures import is_hyphen_first_part, word_key
+from galley.structure._measures import APOSTROPHES, is_hyphen_first_part, word_key
 
 # Spec section 5: a join of two numbers, "1830-" "40", keeps the hyphen.
 _NUMBER_KEY = re.compile(r"[0-9]+")
-_APOSTROPHES = ("'", "’")
 # Spec section 5: the word list is no evidence for a second part of fewer
 # than 2 letters ("Con-" "1", "na-" "R": junk keys it happens to hold).
 _WORD_LIST_MIN_LETTERS = 2
@@ -27,7 +26,7 @@ class HyphenJoin(NamedTuple):
 
 
 def _after_last_apostrophe(key: str) -> str:
-    cut = max(key.rfind(apostrophe) for apostrophe in _APOSTROPHES)
+    cut = max(key.rfind(apostrophe) for apostrophe in APOSTROPHES)
     return key[cut + 1 :]
 
 
@@ -66,7 +65,7 @@ def join_hyphen(
     if word_key(hyphenated) in book_words and joined_key not in book_words:
         return HyphenJoin(hyphenated, ChangeReason.HYPHEN_KEPT)
     keys = (joined_key,)
-    if any(apostrophe in first for apostrophe in _APOSTROPHES):
+    if any(apostrophe in first for apostrophe in APOSTROPHES):
         keys = (joined_key, _after_last_apostrophe(joined_key))
     word_list_counts = (
         sum(character.isalpha() for character in second) >= _WORD_LIST_MIN_LETTERS
