@@ -75,8 +75,9 @@ expected_counts = { notes = 1432, margin_notes = 0, note_references = 1432, page
 [book.rules.add]
 # Each note is a blockquote.footnote after its paragraph.
 note = ["blockquote.footnote"]
-# Gutenberg's label of each note and its link back to the reference.
-drop_text = ['Note \d+:', '\(retour\)']
+# Gutenberg's label of each note and its link back to the reference. The
+# label of note 230 has no colon.
+drop_text = ['Note \d+:?', '\(retour\)']
 
 [book.rules.replace]
 # The references point to #footnoteN; the links back point to #footnotetagN.
