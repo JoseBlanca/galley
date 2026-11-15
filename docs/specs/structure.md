@@ -305,6 +305,22 @@ on the page of the first; it is one of three kinds, tried in this order
 on the **key** of each form (lower case, with the characters that are
 not letters, digits, hyphens or apostrophes stripped from both ends):
 
+**A lower-case end and a capital start.** When the letter before the
+hyphen is in lower case and the second part starts with a capital
+("half-" "Danish", "Con-" "NORMANDY", "exhaus-" "The"), the two are
+joined only when the book prints the hyphenated form whole: the change
+is then `hyphen_kept`. Otherwise they are not joined at all, and no
+change is recorded. Measured on the six books on 15 November 2026, such
+pairs were 157 of the joins, most of them a word and the first word of
+another line (a head, a note, the next entry) or a compound with a
+proper name ("Vice-Regent"), and 41 of them were recorded as
+`hyphen_join` on keys the word list happens to hold ("beThe", "naR",
+"dLa"). Decided by the coordinator on 15 November 2026. Further, the
+word list is never evidence when the second part has fewer than 2
+letters ("Con-" "1"): only the book's own words count then.
+
+The other joins are of three kinds:
+
 1. **The hyphen is kept** (`hyphen_kept`, new): the hyphenated form's key
    is among the book's own words and the joined form's key is not.
    "proto-" "journalist" becomes "proto-journalist"; "Mont-Saint-" and
