@@ -471,6 +471,21 @@ def test_page_with_2_wide_rows_takes_the_usual_left_edge() -> None:
     assert _region_texts(result)[-1] == (("Note",),)
 
 
+def test_word_with_an_inverted_box_is_in_one_region_only() -> None:
+    # The model accepts a box whose x0 is right of its x1: (400, 130, 10,
+    # 140) lies both 2 pt left of the column and 2 pt right of it.
+    inverted = _word("odd", 400, 130, 10, 140)
+    page = _page(0, (*_rows(20), inverted))
+    result = layout_page(page, _MEASURES)
+    texts = [
+        word.text
+        for region in result.regions
+        for line in region.lines
+        for word in line.words
+    ]
+    assert sorted(texts) == sorted(word.text for word in page.words)
+
+
 def test_head_row_1_4_pitches_above_the_body_is_a_running_head_region_first() -> None:
     head = _word("HEAD", 120, 100 - 1.4 * _PITCH, 180, 100 - 1.4 * _PITCH + 8)
     result = layout_page(_page(0, (head, *_rows(20))), _MEASURES)

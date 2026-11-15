@@ -665,12 +665,20 @@ def _page_regions(
     band's regions."""
     pitch = measures.body_line_pitch
     left, right = _column_edges(group_lines(words), page_index, measures)
-    left_margin = tuple(w for w in words if w.box.x1 <= left - _MARGIN_WORD_PT)
-    right_margin = tuple(w for w in words if w.box.x0 >= right + _MARGIN_WORD_PT)
+    # Each word goes to one group, also one whose box is inverted (x0 right
+    # of x1), which would otherwise lie in both margins.
+    left_margin = tuple(word for word in words if word.box.x1 <= left - _MARGIN_WORD_PT)
+    right_margin = tuple(
+        word
+        for word in words
+        if word.box.x1 > left - _MARGIN_WORD_PT
+        and word.box.x0 >= right + _MARGIN_WORD_PT
+    )
     column = tuple(
-        w
-        for w in words
-        if left - _MARGIN_WORD_PT < w.box.x1 and w.box.x0 < right + _MARGIN_WORD_PT
+        word
+        for word in words
+        if word.box.x1 > left - _MARGIN_WORD_PT
+        and word.box.x0 < right + _MARGIN_WORD_PT
     )
     upper, band = _column_regions_with_drop_capitals(
         column,
