@@ -1,12 +1,13 @@
 """structure: the book as ordered blocks and notes, and what was removed.
 
-The walking skeleton's rule (spec section 7): each region of a page becomes
-one paragraph, its words joined by single spaces, line after line. Nothing
-is removed, no note is found and no hyphen is joined, so running heads,
-page numbers and footnotes stay in the text.
+structure surveys the whole book (`survey_book`), then removes from each
+page its running head, with the page number and the stray marks above it,
+each kept as a removal with its reason (`docs/specs/structure.md`). Each
+region's remaining lines become one paragraph, as in the walking skeleton.
 """
 
 import logging
+from dataclasses import dataclass
 
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
@@ -20,54 +21,75 @@ from galley.model import (
     LinesFile,
     Origin,
     PageLayout,
-    Region,
+    PageNumber,
+    Removal,
     Span,
     read_checked_input,
     read_lines,
     write_blocks,
 )
-from galley.parallel import DEFAULT_WORKERS
+from galley.parallel import DEFAULT_WORKERS, map_pages
+from galley.structure._measures import box_of, words_text
+from galley.structure._removals import head_removals
+from galley.structure._survey import BookSurvey, survey_book
 
-__all__ = ["make_blocks", "page_blocks", "run"]
+__all__ = ["BookSurvey", "make_blocks", "run", "survey_book"]
 
 _logger = logging.getLogger(__name__)
 
 
-def _paragraph(page_index: int, number: int, region: Region) -> Block:
-    """The paragraph of `region`, the `number`-th (from 1) of its page."""
-    text = " ".join(word.text for line in region.lines for word in line.words)
-    return Block(
-        id=f"b-p{page_index:04d}-{number:03d}",
-        kind=BlockKind.PARAGRAPH,
-        level=None,
-        spans=(Span(text, Emphasis.NONE, None),),
-        figure=None,
-        origin=(Origin(page_index, region.box),),
+@dataclass(frozen=True, slots=True)
+class _PageResult:
+    blocks: tuple[Block, ...]
+    removals: tuple[Removal, ...]
+    page_numbers: tuple[PageNumber, ...]
+
+
+def _page_result(page: PageLayout, survey: BookSurvey) -> _PageResult:
+    removed = head_removals(page, survey)
+    kept_regions = tuple(
+        lines
+        for region_number, region in enumerate(page.regions)
+        if (
+            lines := tuple(
+                line
+                for line_number, line in enumerate(region.lines)
+                if (region_number, line_number) not in removed.lines
+            )
+        )
     )
-
-
-def page_blocks(page: PageLayout) -> tuple[Block, ...]:
-    """One paragraph block for each region of `page`, in the order of its
-    regions: the region's words, line after line, joined by single spaces,
-    in one span without emphasis or note reference. The n-th region gets
-    the id `b-p<page index, 4 digits>-<n, 3 digits>`, n from 1. A page
-    without regions gives no block."""
-    return tuple(
-        _paragraph(page.index, number, region)
-        for number, region in enumerate(page.regions, start=1)
+    blocks = tuple(
+        Block(
+            id=f"b-p{page.index:04d}-{number:03d}",
+            kind=BlockKind.PARAGRAPH,
+            level=None,
+            spans=(
+                Span(
+                    words_text(word for line in lines for word in line.words),
+                    Emphasis.NONE,
+                    None,
+                ),
+            ),
+            figure=None,
+            origin=(Origin(page.index, box_of(tuple(line.box for line in lines))),),
+        )
+        for number, lines in enumerate(kept_regions, start=1)
     )
+    return _PageResult(blocks, removed.removals, removed.page_numbers)
 
 
-def make_blocks(lines: LinesFile) -> BlocksFile:
-    """The blocks of every page of `lines`, in page order, with no note,
-    removal, word change or page number, and the PDF hash of `lines`."""
+def make_blocks(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BlocksFile:
+    """The blocks of the book, what was removed and the page numbers, in a
+    pool of `workers` threads; the result does not depend on `workers`."""
+    survey = survey_book(lines, workers=workers)
+    pages = map_pages(lambda page: _page_result(page, survey), lines.pages, workers)
     return BlocksFile(
         source_pdf_sha256=lines.source_pdf_sha256,
-        blocks=tuple(block for page in lines.pages for block in page_blocks(page)),
+        blocks=tuple(block for page in pages for block in page.blocks),
         notes=(),
-        removals=(),
+        removals=tuple(removal for page in pages for removal in page.removals),
         word_changes=(),
-        page_numbers=(),
+        page_numbers=tuple(number for page in pages for number in page.page_numbers),
     )
 
 
@@ -77,18 +99,17 @@ def run(
     """Reads pages.json and lines.json from `folder` and writes blocks.json.
 
     blocks.json and every later stage's file (book.md, book.epub) are
-    deleted first. pages.json must have been made from
-    `config.pdf` and lines.json from the same PDF, or InputFileError names
-    the stage to run again. When the words of blocks.json are not those of
-    lines.json, FidelityError is raised and nothing is written. structure
-    runs in one thread; `workers` is taken as every stage takes it.
+    deleted first. pages.json must have been made from `config.pdf` and
+    lines.json from the same PDF, or InputFileError names the stage to run
+    again. When the words of blocks.json are not those of lines.json less
+    the removals, FidelityError is raised and nothing is written. The pages
+    are worked on in a pool of `workers` threads.
     """
-    del workers  # one pass over the book, in this thread (spec section 10)
     delete_stage_outputs(folder, Stage.STRUCTURE)
     _, lines = read_checked_input(
         folder.pages_json, config.pdf, folder.lines_json, read_lines
     )
-    blocks = make_blocks(lines)
+    blocks = make_blocks(lines, workers=workers)
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
     write_blocks(folder.blocks_json, blocks)
     _logger.info(
