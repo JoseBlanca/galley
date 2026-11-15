@@ -15,7 +15,7 @@ from galley.book_folder import BookFolder
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
 from galley.fidelity import check_stage
-from galley.layout import group_lines, layout_page
+from galley.layout import BookMeasures, group_lines, layout_page, measure_book
 from galley.model import (
     Box,
     Figure,
@@ -180,6 +180,145 @@ def test_layout_page_copies_the_figures() -> None:
     figures = (Figure(Box(10, 20, 300, 400), "images/p0002-01.png", 300),)
     page = replace(_page(2, _PAGE_WORDS[:1]), figures=figures)
     assert layout_page(page).figures == figures
+
+
+# measure_book and the body column (layout spec section 3, "The book's
+# measures" and step 1)
+
+_ROW_HEIGHT = 8.0
+_PITCH = 12.0
+
+
+def _full_row(row: int, left: float, width: float, top: float) -> tuple[Word, ...]:
+    """Three words of height 8 that fill `width` from `left`."""
+    bottom = top + _ROW_HEIGHT
+    return (
+        _word(f"a{row}", left, top, left + 60, bottom),
+        _word(f"b{row}", left + 70, top, left + 130, bottom),
+        _word(f"c{row}", left + 140, top, left + width, bottom),
+    )
+
+
+def _column_page(
+    index: int, left: float, width: float, rows: int, top: float = 100.0
+) -> PageWords:
+    """A page of `rows` full rows of the column at `left`, `width` wide,
+    12 pt apart."""
+    return _page(
+        index,
+        tuple(
+            word
+            for row in range(rows)
+            for word in _full_row(row, left, width, top + row * _PITCH)
+        ),
+    )
+
+
+def test_measure_book_on_20_pages_gives_the_medians() -> None:
+    # Widths 200 to 219: the median is 209.5. Even pages start at 50, odd at
+    # 60. A page of 5 rows, 400 pt wide at 10, is not measured: the others
+    # have 15 rows or more.
+    pages = (
+        *(_column_page(i, 50 if i % 2 == 0 else 60, 200 + i, 16) for i in range(20)),
+        _column_page(20, 10, 400, 5),
+    )
+    measures = measure_book(_words_file(pages))
+    assert measures == BookMeasures(
+        column_width=209.5,
+        body_word_height=_ROW_HEIGHT,
+        body_line_pitch=_PITCH,
+        usual_left_edge=frozendict({0: 50.0, 1: 60.0}),
+    )
+
+
+def test_measure_book_pools_the_heights_and_pitches_of_every_row() -> None:
+    # Page 0: 16 rows of height 8, 12 pt apart. Page 1: 16 rows of height
+    # 10, 14 pt apart. Pooled, 32 heights and 30 pitches: the medians fall
+    # between the two pages' values.
+    tall = tuple(
+        Word(word.text, replace(word.box, bottom=word.box.top + 10), None)
+        for row in range(16)
+        for word in _full_row(row, 50, 200, 100 + row * 14)
+    )
+    pages = (_column_page(0, 50, 200, 16), _page(1, tall))
+    measures = measure_book(_words_file(pages))
+    assert measures is not None
+    assert measures.body_word_height == 9.0
+    assert measures.body_line_pitch == 13.0
+
+
+def test_measure_book_on_pages_of_2_rows_gives_none() -> None:
+    pages = tuple(_column_page(i, 50, 200, 2) for i in range(20))
+    assert measure_book(_words_file(pages)) is None
+
+
+def test_measure_book_with_no_page_of_15_rows_measures_pages_of_3() -> None:
+    pages = (_column_page(0, 50, 200, 3), _column_page(1, 50, 200, 2))
+    assert measure_book(_words_file(pages)) == BookMeasures(
+        column_width=200.0,
+        body_word_height=_ROW_HEIGHT,
+        body_line_pitch=_PITCH,
+        usual_left_edge=frozendict({0: 50.0, 1: 50.0}),
+    )
+
+
+def test_column_left_edge_is_the_commonest_left_side_of_the_wide_rows() -> None:
+    # 8 full rows start at 50; 9 short rows (100 pt, under 0.8 of the
+    # column) start at 80; 2 rows with a margin note start at 20 and are
+    # wider than the column. The commonest left side of all rows is 80, of
+    # the wide rows 50.
+    full = tuple(w for row in range(8) for w in _full_row(row, 50, 200, row * 12))
+    short = tuple(
+        _word(f"s{row}", 80, 200 + row * 12, 180, 208 + row * 12) for row in range(9)
+    )
+    noted = tuple(
+        word
+        for row in range(2)
+        for word in (
+            _word(f"note{row}", 20, 320 + row * 12, 44, 328 + row * 12),
+            *_full_row(row + 20, 50, 200, 320 + row * 12),
+        )
+    )
+    measures = measure_book(
+        _words_file((_page(0, full + short + noted), _column_page(1, 50, 200, 16)))
+    )
+    assert measures is not None
+    assert measures.usual_left_edge[0] == 50.0
+
+
+def test_column_left_edge_counts_edges_within_2_pt_and_takes_the_smallest_on_a_tie() -> (
+    None
+):
+    # Two rows start at 50 and two at 54: each value has two edges within
+    # 2 pt of it, and the tie goes to the smaller.
+    rows = (
+        *_full_row(0, 50, 200, 100),
+        *_full_row(1, 50, 200, 112),
+        *_full_row(2, 54, 200, 124),
+        *_full_row(3, 54, 200, 136),
+    )
+    measures = measure_book(_words_file((_page(0, rows),)))
+    assert measures is not None
+    assert measures.usual_left_edge[0] == 50.0
+    # A fifth row at 51.6 rounds to 52, which has all five edges within 2
+    # pt. A fifth row at 55.6 rounds to 56: 54 and 56 have three edges
+    # each, 50 two, and the tie goes to 54.
+    for extra_left, expected in ((51.6, 52.0), (55.6, 54.0)):
+        page = _page(0, rows + _full_row(4, extra_left, 200, 148))
+        measures = measure_book(_words_file((page,)))
+        assert measures is not None
+        assert measures.usual_left_edge[0] == expected
+
+
+def test_usual_left_edge_of_a_parity_without_a_wide_row_is_the_other_paritys() -> None:
+    # Page 1 holds only short rows (100 pt of a 200-pt column).
+    short = tuple(
+        _word(f"s{row}", 90, 100 + row * 12, 190, 108 + row * 12) for row in range(16)
+    )
+    pages = (*(_column_page(i, 50, 200, 16) for i in (0, 2, 4)), _page(1, short))
+    measures = measure_book(_words_file(pages))
+    assert measures is not None
+    assert measures.usual_left_edge == frozendict({0: 50.0, 1: 50.0})
 
 
 # The fidelity check at the layout boundary
