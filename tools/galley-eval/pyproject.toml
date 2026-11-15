@@ -1,0 +1,21 @@
+[project]
+name = "galley-eval"
+version = "0.1.0"
+description = "Compares galley's output for a book with the Project Gutenberg edition of the same scan"
+authors = [
+    { name = "Jose Blanca", email = "jblanca@upv.es" }
+]
+requires-python = ">=3.15"
+dependencies = [
+    "galley",
+]
+
+[project.scripts]
+galley-eval = "galley_eval.cli:main"
+
+[tool.uv.sources]
+galley = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
