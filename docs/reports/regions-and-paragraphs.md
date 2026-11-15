@@ -168,3 +168,104 @@ Not taken or not fully fixed:
 **What the owner should know.** Layout of Domesday's 558 pages takes
 3.2 s. Mariéjol's 9-pt OCR notes stay in the body (layout §6), and its
 table of contents (page 450) is cut into titles and page numbers.
+
+## 3. Structure: removals, hyphens, paragraphs and side text
+
+Done, merged into the plan's branch from `trial/regions-and-paragraphs`.
+Structure surveys the book, removes running heads, page numbers (head
+and foot), signature marks and stray marks, each recorded with its
+reason; joins line-end hyphens on evidence, kept, or as a recorded
+guess; builds paragraphs across page breaks; makes margin regions
+`margin_note` blocks and band regions notes with `referenced` false.
+
+Deliverables, on the plan's branch:
+
+1. The three enum values are in `model.py`, architecture §8 and the
+   glossary; the fidelity check verifies `hyphen_join_guessed` and
+   `hyphen_kept`, with the two failing cases as tests.
+2. The unit tests of structure §9: the plan's `-k` selection lists 42
+   or more (15 required, 11 before); all pass.
+3. `make_blocks` with 1 worker and 3 gives the same value (14 pages).
+4. `galley2epub` checks for Tesseract's tools before structure only
+   when the word list is not cached; tested both ways.
+5. On Domesday (546 text pages, M5 Pro), `survey_book` takes 0.05 s
+   with 6 workers, `make_blocks` 0.17 s, the structure command 1.9 s.
+
+Checks: ruff and ty pass; `uv run pytest` gives 985 passed, 14
+deselected in 25.6 s (the budget is 30 s); with 8 threads, 41 s.
+
+**How the work went, where it changes the plan.** Structure was built
+on hand-made lines, then run on layout's real regions on a trial branch,
+where it was reviewed; the trial branch is what was merged. Running on
+real regions showed that the body word height, as the spec measured it
+(the median over all lines), was the notes' height on the Kadesh
+excerpt, whose note lines outnumber its body lines: no note was found.
+Structure now measures as layout does, on rows of pages of at least 15
+rows (cb65466); the excerpt went from 0 to 53 notes.
+
+**The whole books after the review's fixes** (exclude_pages of
+`evaluation/books.toml`, and for Kadesh and Gierke the pages without a
+text layer):
+
+| book | running heads / page numbers / signature / stray | joins on evidence / guessed / kept | lower–capital pairs left unjoined | paragraphs | margin notes | notes |
+|---|---|---|---|---|---|---|
+| Haskins | 245 / 218 / 0 / 18 | 994 / 142 / 27 | 5 | 286 | 15 | 69 |
+| Stubbs | 305 / 275 / 1 / 71 | 1,241 / 256 / 11 | 96 | 557 | 12 | 106 |
+| Domesday | 523 / 508 / 59 / 0 | 686 / 201 / 56 | 55 | 849 | 633 | 1,513 |
+| Mariéjol | 352 / 348 / 19 / 0 | 1,257 / 738 / 58 | 82 | 1,206 | 29 | 942 |
+| Kadesh | 44 / 54 / 0 / 0 | 95 / 28 / 3 | 8 | 127 | 8 | 180 |
+| Gierke | 249 / 195 / 22 / 0 | 580 / 185 / 7 | 65 | 639 | 818 | 11 |
+
+The fidelity check passes on all six at every boundary, and every EPUB
+passes epubcheck.
+
+**Guessed joins.** Many more than the research's 35, 33, 78 and 192,
+which counted only hyphens whose form the reference shows. A sample of
+40 guessed joins of Haskins and 40 of Mariéjol: dropping the hyphen gave
+the right word in about 71 of the 80; 57 have a part damaged by the OCR
+("ingmidwinter", "diplouu-tique"), 14 are right joins of words Tesseract's
+lists lack (the French list has 74,068 words, without "reproduisit"), 7
+should have kept the hyphen, 2 join an index page number to the next
+entry. No bug: Mariéjol uses the French list, accents and elisions work.
+These are for the correct stage or a local model.
+
+**Review** (four reviewers, on the trial branch). Fixed, by spec changes
+the orchestrator decided and told the owner about, each a commit:
+
+- A top line was removed as a running head on one number alone,
+  including roman forms that are words ("vi", "d"): now the number must
+  fit the book's head offset, or the line be alike to other heads.
+- A speck above the head on 11 pages of Stubbs and Kadesh left the real
+  head in the text, and a page-break hyphen joined into it ("Geof1",
+  "cerSimon"): the line below a head line of under 4 letters is now
+  tested against the running heads.
+- 157 joins glued a lower-case end to a capital start ("halfDanish",
+  "exhausThe", "ConNORMANDY"), 41 of them backed by junk keys of the
+  word list: such pairs are now joined only when the book prints the
+  hyphenated form (kept), else left as two words.
+- Chapter titles alone on their line were glued onto the chapter before
+  (Mariéjol's ten "CHAPITRE", Domesday's "ESSAY", Haskins' "INDEX"):
+  a short region's line is now measured against the page's column.
+- Short bands merged their notes (Domesday page 83: 6 notes as 1, now 5;
+  Mariéjol 214: now 4); Domesday's notes went from 1,212 to 1,513.
+- Page numbers split by the OCR ("5 1") are read whole: Gierke's
+  one-digit head numbers went from 29 to 6.
+- Tests: about 20 rules and thresholds could be changed with no test
+  failing; each now has a test that fails. A test checks that
+  structure's measures equal layout's on every excerpt.
+
+Not taken:
+
+- Moving the measuring rule shared by layout and structure into a root
+  module: a change to architecture §12, proposed to the owner; the test
+  above guards it meanwhile.
+- Known cases listed in structure §9: Kadesh 38's foot number "105"
+  missed; Gierke 66's "302" and Domesday 428's "[0" removed as page
+  numbers; Stubbs 32's head gives page number "1" where "15" is printed
+  (the OCR split it across a speck).
+
+**For whoever next writes a plan.** A stage built only on hand-made
+input of the stage before met three faults the first time it ran on the
+real input (the body height, the margin rule, Gierke's edges), each
+found within an hour of the trial merge. Running the two stages together
+before the review, as was done here, should be a task of the plan.

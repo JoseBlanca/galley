@@ -182,16 +182,16 @@ research's own regions, not layout's; some rules were revised after the
 spec's review and not measured again (the spec's targets say so).
 Work package 6 shows it.
 
-- [ ] 3.1 The three enum values in `model.py`, architecture §8, the
+- [x] 3.1 The three enum values in `model.py`, architecture §8, the
   glossary and `fidelity.py`. Spec: structure §7. Deliverable 1. A
   commit of its own, first, because the other tasks stand on it.
-- [ ] 3.2 `survey_book`, running heads and page numbers in the head,
+- [x] 3.2 `survey_book`, running heads and page numbers in the head,
   stray marks. Spec: structure §1 to §3. Deliverable 2.
-- [ ] 3.3 Page numbers at the foot and signature marks. Spec: structure
+- [x] 3.3 Page numbers at the foot and signature marks. Spec: structure
   §4. Deliverable 2.
-- [ ] 3.4 `join_hyphen` and the hyphen joins, inside a page and across a
+- [x] 3.4 `join_hyphen` and the hyphen joins, inside a page and across a
   page break. Spec: structure §5. Deliverable 2.
-- [ ] 3.5 Paragraphs, side text, the order of blocks and notes, ids and
+- [x] 3.5 Paragraphs, side text, the order of blocks and notes, ids and
   origins; `make_blocks` and `run`; the Tesseract check in the CLI.
   Spec: structure §6, §8 and §9. Needs 3.1 to 3.4. Deliverables 2 to 5.
 
