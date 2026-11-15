@@ -166,20 +166,13 @@ def _check_before_any_stage(
         _check_word_list_tools(config)
 
 
-# The programs wordlist.word_list runs to extract a word list.
-_WORD_LIST_TOOLS = ("tesseract", "combine_tessdata", "dawg2wordlist")
-
-
 def _check_word_list_tools(config: BookConfig) -> None:
     """ExternalProgramError when the word list of the book's language is
     not in the word list's cache folder and Tesseract's tools are not on
     the PATH (structure spec, section 8)."""
-    # The cache folder is read here, not bound at import, so that a test
-    # can point it elsewhere.
-    if wordlist.is_cached(config.language, wordlist.DEFAULT_CACHE_DIR):
-        return
-    code = tesseract_language(config.language)
-    missing = tuple(tool for tool in _WORD_LIST_TOOLS if shutil.which(tool) is None)
+    # The cache folder is read here, as structure.run reads it, so that both
+    # look at the same folder and a test can point it elsewhere.
+    missing = wordlist.missing_tools(config.language, wordlist.DEFAULT_CACHE_DIR)
     if not missing:
         return
     names = (
@@ -188,6 +181,7 @@ def _check_word_list_tools(config: BookConfig) -> None:
         else ", ".join(missing[:-1]) + " and " + missing[-1]
     )
     verb, pronoun = ("is", "it") if len(missing) == 1 else ("are", "them")
+    code = tesseract_language(config.language)
     message = (
         f"{names} {verb} not installed; structure needs {pronoun} once to "
         f"extract the word list of {code} from Tesseract's data: install "

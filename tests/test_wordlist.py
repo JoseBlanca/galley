@@ -17,7 +17,9 @@ from galley import wordlist
 from galley.config import Language
 from galley.errors import ExternalProgramError, InputFileError
 from galley.wordlist import (
+    WORD_LIST_TOOLS,
     is_cached,
+    missing_tools,
     tessdata_dir_and_languages,
     word_list,
     words_of_list,
@@ -161,3 +163,15 @@ def test_is_cached_once_the_language_has_its_file_in_the_cache_folder(
     assert is_cached(Language.EN, cache_dir)
     assert not is_cached(Language.FR, cache_dir)
     assert word_list(Language.EN, cache_dir=cache_dir) == frozenset({"replicate"})
+
+
+# Empties PATH for the whole process.
+@pytest.mark.thread_unsafe
+def test_missing_tools_are_none_once_the_list_is_cached(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PATH", "")
+    cache_dir = _own_folder(tmp_path)
+    assert missing_tools(Language.EN, cache_dir) == WORD_LIST_TOOLS
+    (cache_dir / "eng.txt").write_text("replicate\n", encoding="utf-8")
+    assert missing_tools(Language.EN, cache_dir) == ()

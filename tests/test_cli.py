@@ -491,3 +491,23 @@ def test_a_command_without_structure_runs_without_tesseract(
     main(["markdown", str(folder.root)])
 
     assert _names(folder) == _files_up_to("markdown")
+
+
+# Changes PATH and the word list's cache folder for the whole process.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
+def test_structure_runs_without_tesseract_when_the_word_list_is_cached(
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "eng.txt").write_text("the\nbattle\n", encoding="utf-8")
+    monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", cache_dir)
+
+    main(["structure", str(folder.root)])
+
+    assert _names(folder) == _files_up_to("structure")

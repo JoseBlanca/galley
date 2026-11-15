@@ -53,6 +53,21 @@ def is_cached(language: Language, cache_dir: Path = DEFAULT_CACHE_DIR) -> bool:
     return _cache_file(language, cache_dir).exists()
 
 
+# The programs word_list runs to extract a word list that is not cached.
+WORD_LIST_TOOLS = ("tesseract", "combine_tessdata", "dawg2wordlist")
+
+
+def missing_tools(
+    language: Language, cache_dir: Path = DEFAULT_CACHE_DIR
+) -> tuple[str, ...]:
+    """The programs of WORD_LIST_TOOLS that are not on the PATH and that
+    `word_list` would need for `language`: none when its list is cached
+    in `cache_dir`."""
+    if is_cached(language, cache_dir):
+        return ()
+    return tuple(tool for tool in WORD_LIST_TOOLS if shutil.which(tool) is None)
+
+
 def _cache_file(language: Language, cache_dir: Path) -> Path:
     """The cached list of `language`, named by Tesseract's code for it."""
     return cache_dir / f"{tesseract_language(language)}.txt"

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from galley import structure
+from galley import structure, wordlist
 from galley.book_folder import BookFolder
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
@@ -1211,6 +1211,16 @@ _PDF_BYTES = b"%PDF-1.4 a stand-in: structure reads only its hash"
 _PDF_HASH = hashlib.sha256(_PDF_BYTES).hexdigest()
 
 
+@pytest.fixture
+def cached_word_list(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A word list of English cached in a folder of the test's own, so that
+    run neither runs Tesseract nor writes to ~/.cache."""
+    cache_dir = tmp_path / "word-list-cache"
+    cache_dir.mkdir()
+    (cache_dir / "eng.txt").write_text("alpha\nbeta\n", encoding="utf-8")
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", cache_dir)
+
+
 def _book(root: Path) -> tuple[BookFolder, BookConfig]:
     """A book folder with pages.json and lines.json of 3 pages written by hand."""
     pdf = root / "book.pdf"
@@ -1247,7 +1257,7 @@ def _replace_hash(path: Path) -> None:
 
 
 @pytest.mark.thread_unsafe
-@pytest.mark.tesseract
+@pytest.mark.usefixtures("cached_word_list")
 def test_run_writes_a_paragraph_that_runs_over_a_blank_page(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     structure.run(folder, config, workers=1)
@@ -1276,7 +1286,7 @@ def test_run_writes_a_paragraph_that_runs_over_a_blank_page(tmp_path: Path) -> N
 
 
 @pytest.mark.thread_unsafe
-@pytest.mark.tesseract
+@pytest.mark.usefixtures("cached_word_list")
 def test_run_with_a_config_of_another_pdf_names_analyze(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     other_pdf = tmp_path / "other.pdf"
@@ -1287,7 +1297,7 @@ def test_run_with_a_config_of_another_pdf_names_analyze(tmp_path: Path) -> None:
 
 
 @pytest.mark.thread_unsafe
-@pytest.mark.tesseract
+@pytest.mark.usefixtures("cached_word_list")
 def test_run_with_a_pages_json_of_another_pdf_names_analyze(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     write_blocks(folder.blocks_json, make_blocks(_LINES, _NO_WORDS, workers=1))
@@ -1298,7 +1308,7 @@ def test_run_with_a_pages_json_of_another_pdf_names_analyze(tmp_path: Path) -> N
 
 
 @pytest.mark.thread_unsafe
-@pytest.mark.tesseract
+@pytest.mark.usefixtures("cached_word_list")
 def test_run_with_a_lines_json_of_another_pdf_names_layout(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     _replace_hash(folder.lines_json)
@@ -1308,7 +1318,7 @@ def test_run_with_a_lines_json_of_another_pdf_names_layout(tmp_path: Path) -> No
 
 
 @pytest.mark.thread_unsafe
-@pytest.mark.tesseract
+@pytest.mark.usefixtures("cached_word_list")
 def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -13,6 +13,7 @@ notes, after the paragraph in which their page's body ends.
 
 import logging
 
+from galley import wordlist
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
 from galley.errors import FidelityBoundary
@@ -28,7 +29,6 @@ from galley.parallel import DEFAULT_WORKERS, map_pages
 from galley.structure._hyphens import HyphenJoin, join_hyphen
 from galley.structure._paragraphs import assemble, page_parts
 from galley.structure._survey import BookSurvey, survey_book
-from galley.wordlist import word_list
 
 __all__ = [
     "BookSurvey",
@@ -80,7 +80,9 @@ def run(
     _, lines = read_checked_input(
         folder.pages_json, config.pdf, folder.lines_json, read_lines
     )
-    blocks = make_blocks(lines, word_list(config.language), workers=workers)
+    # The cache folder is read here, as the command's check reads it.
+    words = wordlist.word_list(config.language, wordlist.DEFAULT_CACHE_DIR)
+    blocks = make_blocks(lines, words, workers=workers)
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
     write_blocks(folder.blocks_json, blocks)
     _logger.info(
