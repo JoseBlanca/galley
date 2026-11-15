@@ -607,6 +607,13 @@ budget of the `coding` skill in the plan.
   rules 1 and 2, which do not fit an index's hanging indents. The second
   plan makes them index entries.
 - **Plates**: their text-layer words become a paragraph, as now.
+- **Known misses at the foot** (15 November 2026, with layout's
+  regions): Kadesh's page 38 prints "105" at the foot, but its body
+  column there runs from 191 to 452 pt, so the number is not centred on
+  it and stays; Gierke's page 66 ends with a lone "302" and Domesday's
+  page 428 with "[0", both centred, which are removed as page numbers
+  although they are not the page's. No rule that is plain fixes them
+  without losing others; the reference pages show whether they matter.
 
 **Unit tests**, on `LinesFile` values written in the test:
 
