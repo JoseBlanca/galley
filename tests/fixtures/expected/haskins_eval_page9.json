@@ -1,0 +1,129 @@
+{
+  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
+  "changed": "Changed since that check by task 3.6 (no join after a digit before a letter): \"136-39-\" and \"Bryce,\" are no longer joined. Checked against the page image by the orchestrator on 15 November 2026.",
+  "excerpt": "haskins_eval",
+  "page": 9,
+  "book_page_index": 266,
+  "shows": "the first index page: title, two columns",
+  "layout": [
+    [
+      "INDEX"
+    ],
+    [
+      "Abacus, 106/.",
+      "Abruzzi, 196, 204, 222/.",
+      "Adams,Henry,quoted, 12,22, 188/.",
+      "Adelaide, countess, 210.",
+      "Adelardof Bath, 177, 179, 238.",
+      "Africa, 196/., 222, 232.",
+      "Aime of Monte Cassino, 13, 200/.",
+      "Alengon, 63, 178.",
+      "AlexanderII, Pope,74,79, 165, 175.",
+      "Alfred, king, 34.",
+      "Alphonso VIII, king, 90.",
+      "Amalfi, 197/., 204, 213, 232.",
+      "Amari, M., 216, 248; quoted, 234.",
+      "Anacletus II, Pope, 210.",
+      "Andeli, 134.",
+      "Angers, 61-63.",
+      "Angoulgme, 160.",
+      "Anjou, counts of, 61, 85; relations",
+      "with Normandy, 61-63, 85, 100,",
+      "112, 131, 136/.",
+      "Anna Comnena, quoted, 201.",
+      "Anselm, 175-78.",
+      "Antioch, 212; principality, 214-16.",
+      "Apulia, 186, 197-211, 222 /., 228,",
+      "238, 246.",
+      "Aquitaine, 87/.,90, 100, 120/., 136.",
+      "Arabic elements in Sicilian state,",
+      "226-30, 235, 238-44.",
+      "Architecture, Norman, 9-12, 102,",
+      "186-89; Sicilian, 189, 241-44.",
+      "Archives, Norman,9,66/., 105, 178.",
+      "Argentan, 10, 71, 133, 139, 153.",
+      "Arlette, mother of William the",
+      "Conqueror, 53, 166.",
+      "Arnulf of Chocques, patriarch, 212.",
+      "Arnulf, bishop of Lisieux, 167.",
+      "Arthur, duke of Brittany, 136-39.",
+      "Assizes, Anglo-Norman, 94, 100,",
+      "in/., 161; Sicilian, 230/., 234.",
+      "Aversa, 200, 204, 206.",
+      "Avranches, 172, 175, 178."
+    ],
+    [
+      "Avranchin, 28.",
+      "Avre, 7.",
+      "Bailli, 103, 145.",
+      "Barfleur, 132, 160.",
+      "Bari, 189, 197, 202, 232, 241.",
+      "Baudri of Bourgueil, 76.",
+      "Bayeux, 10, 46, 49, 67, 76, 150 /.,",
+      "162,166, 172,187;BlackBook, III.",
+      "See Odo, Turold, Richard, Philip",
+      "d'Harcourt.",
+      "BayeuxTapestry, 76/., 80, 84, 151,",
+      "167.",
+      "Bayonne, 161.",
+      "Bee, 171, 185; schools, 175 /.; li-",
+      "brary, 177-80.",
+      "Becket, 4, 100, 118, 168.",
+      "Bellgme, 154.",
+      "Benevento, 198, 203.",
+      "Benoit de Sainte-More, 184.",
+      "Bertaux, E., quoted, 197, 241.",
+      "Bessin, 10, 28.",
+      "Bibliographicalnotes,24/.,51,83/.,",
+      "114/., 147, 189-91,216/.,247-49.",
+      "Bisignano, 201.",
+      "Bocage, 10.",
+      "Boccaccio, 246.",
+      "Bocherville, Saint-Georges de, 169,",
+      "187.",
+      "Bohemond I,princeofAntioch,207,",
+      "213-16.",
+      "Bohmer, H., quoted, 165.",
+      "Bonneval, 154.",
+      "Bordeaux, 88.",
+      "Boutmy, E., quoted, loi.",
+      "Breteuil, 154, 160.",
+      "Brittany, 6-8, 10, 57, 61, 75, 88,",
+      "136-39-",
+      "Bryce, James, Viscount, quoted, 43.",
+      "Buchanan, James, 17/.",
+      "Bury St. Edmund's, 173."
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "INDEX",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "Abacus, 106/. Abruzzi, 196, 204, 222/. Adams,Henry,quoted, 12,22, 188/. Adelaide, countess, 210. Adelardof Bath, 177, 179, 238. Africa, 196/., 222, 232. Aime of Monte Cassino, 13, 200/. Alengon, 63, 178. AlexanderII, Pope,74,79, 165, 175. Alfred, king, 34. Alphonso VIII, king, 90. Amalfi, 197/., 204, 213, 232. Amari, M., 216, 248; quoted, 234. Anacletus II, Pope, 210. Andeli, 134. Angers, 61-63. Angoulgme, 160. Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100, 112, 131, 136/. Anna Comnena, quoted, 201. Anselm, 175-78. Antioch, 212; principality, 214-16. Apulia, 186, 197-211, 222 /., 228, 238, 246. Aquitaine, 87/.,90, 100, 120/., 136. Arabic elements in Sicilian state, 226-30, 235, 238-44. Architecture, Norman, 9-12, 102, 186-89; Sicilian, 189, 241-44. Archives, Norman,9,66/., 105, 178. Argentan, 10, 71, 133, 139, 153. Arlette, mother of William the Conqueror, 53, 166. Arnulf of Chocques, patriarch, 212. Arnulf, bishop of Lisieux, 167. Arthur, duke of Brittany, 136-39. Assizes, Anglo-Norman, 94, 100, in/., 161; Sicilian, 230/., 234. Aversa, 200, 204, 206. Avranches, 172, 175, 178. Avranchin, 28. Avre, 7. Bailli, 103, 145. Barfleur, 132, 160. Bari, 189, 197, 202, 232, 241. Baudri of Bourgueil, 76. Bayeux, 10, 46, 49, 67, 76, 150 /., 162,166, 172,187;BlackBook, III. See Odo, Turold, Richard, Philip d'Harcourt. BayeuxTapestry, 76/., 80, 84, 151, 167. Bayonne, 161. Bee, 171, 185; schools, 175 /.; library, 177-80. Becket, 4, 100, 118, 168. Bellgme, 154. Benevento, 198, 203. Benoit de Sainte-More, 184. Bertaux, E., quoted, 197, 241. Bessin, 10, 28. Bibliographicalnotes,24/.,51,83/., 114/., 147, 189-91,216/.,247-49. Bisignano, 201. Bocage, 10. Boccaccio, 246. Bocherville, Saint-Georges de, 169, 187. Bohemond I,princeofAntioch,207, 213-16. Bohmer, H., quoted, 165. Bonneval, 154. Bordeaux, 88. Boutmy, E., quoted, loi. Breteuil, 154, 160. Brittany, 6-8, 10, 57, 61, 75, 88, 136-39- Bryce, James, Viscount, quoted, 43. Buchanan, James, 17/. Bury St. Edmund's, 173.",
+      "pages": [
+        9
+      ]
+    }
+  ],
+  "notes": [],
+  "removals": [],
+  "word_changes": [
+    {
+      "before": [
+        "li-",
+        "brary,"
+      ],
+      "after": [
+        "library,"
+      ],
+      "reason": "hyphen_join"
+    }
+  ],
+  "page_numbers": []
+}

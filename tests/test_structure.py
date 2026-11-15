@@ -1,8 +1,9 @@
 """Tests of galley.structure (docs/specs/structure.md, section 9).
 
 Every value is written by hand: structure's tests need no output of layout.
-The excerpt tests of structure on the reference pages come later, once the
-owner has checked those pages.
+The excerpt tests of structure on the reference pages are in
+tests/test_excerpts.py; the whole_book tests here check the two reference
+pages an excerpt cannot get right.
 """
 
 import hashlib
@@ -1719,31 +1720,98 @@ def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
 # section 2: the same rule, written in both stages)
 
 _EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
-# The pages without a text layer, which analyze refuses unless excluded.
-_EXCLUDED_PAGES = frozendict({"kadesh_8-17": "9", "haskins_eval": "8"})
 
 
-@pytest.mark.thread_unsafe
 @pytest.mark.parametrize(
     "excerpt", sorted(path.stem for path in _EXCERPTS_DIR.glob("*.pdf"))
 )
 def test_structure_measures_the_body_as_layout_does(
-    excerpt: str, tmp_path: Path
+    excerpt: str, excerpt_books: frozendict[str, BookFolder]
 ) -> None:
-    folder = BookFolder(tmp_path)
-    pdf = _EXCERPTS_DIR / f"{excerpt}.pdf"
-    folder.book_toml.write_text(
-        f"pdf = {json.dumps(str(pdf))}\n"
-        f"title = {json.dumps(excerpt)}\n"
-        'authors = ["An Author"]\n'
-        'language = "en"\n'
-        f"exclude_pages = [{_EXCLUDED_PAGES.get(excerpt, '')}]\n",
-        encoding="utf-8",
-    )
-    for stage in ("analyze", "extract", "layout"):
-        main([stage, str(tmp_path)])
+    # The session's one run of each excerpt (tests/conftest.py).
+    folder = excerpt_books[excerpt]
     measures = measure_book(read_words(folder.words_json), workers=1)
     survey = survey_book(read_lines(folder.lines_json), workers=1)
     assert measures is not None
     assert survey.body_word_height == measures.body_word_height
     assert survey.body_line_pitch == measures.body_line_pitch
+
+
+# The two reference pages that an excerpt cannot get right (tests/
+# test_excerpts.py records what the excerpt gives): the running-head and
+# signature rules compare a page with others the excerpt lacks. On the
+# whole books, Gierke's page index 270 loses its head line "Notes. 185" as
+# a running head and a page number, and Mariéjol's page index 210 its foot
+# line as a signature mark and the page number "(l93)". The configs are
+# those of the whole_book test of tests/test_layout.py.
+_WHOLE_BOOK_TOML = frozendict(
+    {
+        "politicaltheorie00gieruoft": (
+            'language = "en"\n'
+            "exclude_pages = [0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 289]\n"
+        ),
+        "catherinedemedic00mariuoft": (
+            'language = "fr"\n'
+            "exclude_pages = [0, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456]\n"
+        ),
+    }
+)
+
+
+def _blocks_of_whole_book(books_dir: Path, book: str, root: Path) -> BlocksFile:
+    folder = BookFolder(root)
+    pdf = books_dir / f"{book}.pdf"
+    folder.book_toml.write_text(
+        f"pdf = {json.dumps(str(pdf))}\n"
+        f"title = {json.dumps(book)}\n"
+        'authors = ["An Author"]\n' + _WHOLE_BOOK_TOML[book],
+        encoding="utf-8",
+    )
+    for stage in ("analyze", "extract", "layout", "structure"):
+        main([stage, str(root)])
+    return read_blocks(folder.blocks_json)
+
+
+def _removed_on(blocks: BlocksFile, page: int) -> tuple[tuple[RemovalReason, str], ...]:
+    return tuple(
+        (removal.reason, removal.text)
+        for removal in blocks.removals
+        if removal.page_index == page
+    )
+
+
+def _numbers_on(blocks: BlocksFile, page: int) -> tuple[PageNumber, ...]:
+    return tuple(number for number in blocks.page_numbers if number.page_index == page)
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+def test_whole_book_gierke_270_loses_its_notes_head_and_page_number(
+    books_dir: Path, tmp_path: Path
+) -> None:
+    blocks = _blocks_of_whole_book(books_dir, "politicaltheorie00gieruoft", tmp_path)
+    assert _removed_on(blocks, 270) == (
+        (RemovalReason.RUNNING_HEAD, "Notes."),
+        (RemovalReason.PAGE_NUMBER, "185"),
+    )
+    assert _numbers_on(blocks, 270) == (
+        PageNumber(270, "185", PageNumberPosition.HEAD),
+    )
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+def test_whole_book_mariejol_210_foot_line_gives_page_number_and_signature_mark(
+    books_dir: Path, tmp_path: Path
+) -> None:
+    blocks = _blocks_of_whole_book(books_dir, "catherinedemedic00mariuoft", tmp_path)
+    assert _removed_on(blocks, 210) == (
+        (RemovalReason.RUNNING_HEAD, "L'EXTERMINATION DU PARTI PROTESTANT"),
+        (RemovalReason.SIGNATURE_MARK, "UAMiàjoL. CmOl da Médidib 13"),
+        (RemovalReason.PAGE_NUMBER, "(l93)"),
+    )
+    assert _numbers_on(blocks, 210) == (
+        PageNumber(210, "(l93)", PageNumberPosition.FOOT),
+    )

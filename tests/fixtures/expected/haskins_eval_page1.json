@@ -1,0 +1,113 @@
+{
+  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
+  "excerpt": "haskins_eval",
+  "page": 1,
+  "book_page_index": 132,
+  "shows": "footnotes in the band",
+  "layout": [
+    [
+      "NORMANDY AND FRANCE 117"
+    ],
+    [
+      "plundered by his attendants of gold and furnishings",
+      "and apparel, just as William the Conqueror had been",
+      "despoiled in the hour of his death at Rouen, till some",
+      "one in pity threw over the royal corpse the short cloak,",
+      "or 'curt mantle,' by which men called him. Two days",
+      "later he was laid away quietly in the nunnery of Fon-",
+      "tevrault, where a later age was to rob his tomb of all",
+      "save the noble recumbent figure by which it is still",
+      "marked. Thus passed away the greatest ruler of his",
+      "age; thus began the collapse of the Norman empire.",
+      "Strikingly dramatic both in its public and private",
+      "aspects, the end of Henry II offers material fit for a",
+      "Greek tragedy, and we may, if we choose, imagine an",
+      "yEschylus or a Sophocles painting the rapidity of his",
+      "rise, the hybris of his splendor, and the crushing nemesis",
+      "of his fall. Even the Promethean touch is not lacking in",
+      "the withdrawal of Henry's unconquered soul from God,",
+      "as he looked back in flight at the burning city of Le",
+      "Mans: \"My God, since to crown my confusion and in-",
+      "crease my disgrace, thou hast taken from me so vilely",
+      "the town which on earth I have loved best, where I was",
+      "born and bred, and where my father lies buried and the",
+      "body of St. Julian too, I will have my revenge on thee",
+      "also; I will of a surety withdraw from thee that thing",
+      "that thou lovest best in me.\" ^ Henry's life needs no",
+      "blasphemous closing in order to furnish inexhaustible"
+    ],
+    [
+      "* GiraldusCambrensis (RollsSeries), viii, p. 283."
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "IN July, 1189, Henry II lay dying In his castle at Chinon. Abandoned and attacked by his sons, driven from LeMans and Tours by Philip of France and forced to a hurailiating peace, sick In body and broken in spirit, the aged king made his way to the old stronghold of the Angevin counts in the valley of the VIenne. Cursing the faithless Richard as he gave him the enforced kiss of peace at Colombieres, he had fixed his hopes on his youngest son John till the schedule was brought him of those who had thrown off their allegiance. \"Sire,\" said the clerk who read the document to the fever-tossed king, \"may Christ help me, the first here written is Count John, your son.\" \"What,\" cried the king, starting up from his bed, \"John, my very heart, my best beloved, for whose advancement I have brought upon me all this misery? Now let all things go as they will; I care no more for myself nor for anything in this world.\" Two days later he died, cursing his sons, cursing the day he had been born, repeating constantly, \"Shame on a conquered king.\" Deserted by all save his illegitimate son Geoffrey, who received his father's blessing and his signet ring marked with the leopard of England, Henry was plundered by his attendants of gold and furnishings and apparel, just as William the Conqueror had been despoiled in the hour of his death at Rouen, till some one in pity threw over the royal corpse the short cloak, or 'curt mantle,' by which men called him. Two days later he was laid away quietly in the nunnery of Fontevrault, where a later age was to rob his tomb of all save the noble recumbent figure by which it is still marked. Thus passed away the greatest ruler of his age; thus began the collapse of the Norman empire.",
+      "pages": [
+        0,
+        1
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "Strikingly dramatic both in its public and private aspects, the end of Henry II offers material fit for a Greek tragedy, and we may, if we choose, imagine an yEschylus or a Sophocles painting the rapidity of his rise, the hybris of his splendor, and the crushing nemesis of his fall. Even the Promethean touch is not lacking in the withdrawal of Henry's unconquered soul from God, as he looked back in flight at the burning city of Le Mans: \"My God, since to crown my confusion and increase my disgrace, thou hast taken from me so vilely the town which on earth I have loved best, where I was born and bred, and where my father lies buried and the body of St. Julian too, I will have my revenge on thee also; I will of a surety withdraw from thee that thing that thou lovest best in me.\" ^ Henry's life needs no blasphemous closing in order to furnish inexhaustible material for moralizing, and in a period like the Middle Ages, given over as none other to moral lessons, it served to point many a tale of the crimes and fate of evil-doers. That vain and entertaining Welshman, Gerald de Barri, or Giraldus Cambrensis, in whom a recent writer thinks he has discovered the protojournalist,^ found in Henry's career the basis for a considerable book devoted to the Instruction of Princes. But whereas the ways of the gods are dark and unsearchable to the Greek tragedians, they have no mystery for Gerald. Henry's punishment was due to his violations of religion, first in his marriage with Eleanor, the divorced wife of his feudal lord Louis VII, second in his quarrel with Archbishop Becket and the oppression of the church which followed, and third and worst of all, in his failure to take part in a crusade. The hammer of the church, Henry was born for destruction. The modern world is more cautious in the matter of explaining the inexplicable, and morepronetoseek human causes when they can be found, yet the collapse of the Plantagenet empire is not the hardest of the historian's problems. Something he will ascribe to larger forces of development, something he can hardly fail to attribute to the character of Henry's sons and to his policy in dealing with them.",
+      "pages": [
+        1,
+        2
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "* GiraldusCambrensis (RollsSeries), viii, p. 283."
+        }
+      ],
+      "pages": [
+        1
+      ]
+    }
+  ],
+  "removals": [
+    {
+      "reason": "running_head",
+      "text": "NORMANDY AND FRANCE"
+    },
+    {
+      "reason": "page_number",
+      "text": "117"
+    }
+  ],
+  "word_changes": [
+    {
+      "before": [
+        "Fon-",
+        "tevrault,"
+      ],
+      "after": [
+        "Fontevrault,"
+      ],
+      "reason": "hyphen_join_guessed"
+    },
+    {
+      "before": [
+        "in-",
+        "crease"
+      ],
+      "after": [
+        "increase"
+      ],
+      "reason": "hyphen_join"
+    }
+  ],
+  "page_numbers": [
+    {
+      "text": "117",
+      "position": "head"
+    }
+  ]
+}

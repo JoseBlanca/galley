@@ -1,0 +1,46 @@
+{
+  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
+  "excerpt": "haskins_eval",
+  "pages": [
+    1,
+    2
+  ],
+  "book_page_indices": [
+    132,
+    133
+  ],
+  "shows": "a paragraph that runs over from book page 132 to 133",
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "Strikingly dramatic both in its public and private aspects, the end of Henry II offers material fit for a Greek tragedy, and we may, if we choose, imagine an yEschylus or a Sophocles painting the rapidity of his rise, the hybris of his splendor, and the crushing nemesis of his fall. Even the Promethean touch is not lacking in the withdrawal of Henry's unconquered soul from God, as he looked back in flight at the burning city of Le Mans: \"My God, since to crown my confusion and increase my disgrace, thou hast taken from me so vilely the town which on earth I have loved best, where I was born and bred, and where my father lies buried and the body of St. Julian too, I will have my revenge on thee also; I will of a surety withdraw from thee that thing that thou lovest best in me.\" ^ Henry's life needs no blasphemous closing in order to furnish inexhaustible material for moralizing, and in a period like the Middle Ages, given over as none other to moral lessons, it served to point many a tale of the crimes and fate of evil-doers. That vain and entertaining Welshman, Gerald de Barri, or Giraldus Cambrensis, in whom a recent writer thinks he has discovered the protojournalist,^ found in Henry's career the basis for a considerable book devoted to the Instruction of Princes. But whereas the ways of the gods are dark and unsearchable to the Greek tragedians, they have no mystery for Gerald. Henry's punishment was due to his violations of religion, first in his marriage with Eleanor, the divorced wife of his feudal lord Louis VII, second in his quarrel with Archbishop Becket and the oppression of the church which followed, and third and worst of all, in his failure to take part in a crusade. The hammer of the church, Henry was born for destruction. The modern world is more cautious in the matter of explaining the inexplicable, and morepronetoseek human causes when they can be found, yet the collapse of the Plantagenet empire is not the hardest of the historian's problems. Something he will ascribe to larger forces of development, something he can hardly fail to attribute to the character of Henry's sons and to his policy in dealing with them.",
+      "pages": [
+        1,
+        2
+      ]
+    }
+  ],
+  "notes": [],
+  "word_changes": [
+    {
+      "before": [
+        "Fon-",
+        "tevrault,"
+      ],
+      "after": [
+        "Fontevrault,"
+      ],
+      "reason": "hyphen_join_guessed"
+    },
+    {
+      "before": [
+        "in-",
+        "crease"
+      ],
+      "after": [
+        "increase"
+      ],
+      "reason": "hyphen_join"
+    }
+  ]
+}

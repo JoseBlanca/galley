@@ -1,11 +1,11 @@
 """Tests of galley.layout (docs/specs/layout.md, section 8).
 
 The unit tests lay out pages written by hand, with the book's measures
-given in the test, and need no output of extract. The excerpt tests run
-analyze, extract and layout on each committed excerpt, and the whole_book
-tests on the six whole books, and check that no word is lost, duplicated
-or moved to another page. The exact regions of the reference pages are
-work package 5's, once the owner has checked them.
+given in the test, and need no output of extract. The excerpt tests read
+the session's run of each committed excerpt (tests/conftest.py), and the
+whole_book tests run analyze, extract and layout on the six whole books;
+both check that no word is lost, duplicated or moved to another page. The
+exact regions of the reference pages are tested in tests/test_excerpts.py.
 """
 
 import hashlib
@@ -1383,15 +1383,12 @@ def test_run_that_loses_a_word_raises_and_writes_no_lines_json(
 
 _EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 
-# The pages without a text layer of each excerpt and book, which analyze
-# refuses unless excluded: the excerpts' as in tests/conftest.py and
-# tests/fixtures/evaluation/haskins_eval.toml; the evaluation books' as in
-# evaluation/books.toml; Kadesh's and Gierke's as analyze listed them on 15
-# November 2026.
+# The pages without a text layer of each whole book, which analyze refuses
+# unless excluded: the evaluation books' as in evaluation/books.toml;
+# Kadesh's and Gierke's as analyze listed them on 15 November 2026. The
+# whole_book test of tests/test_structure.py uses the same configs.
 _EXCLUDED_PAGES = frozendict(
     {
-        "kadesh_8-17": (9,),
-        "haskins_eval": (8,),
         "normansineuropea00hask": (0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279),
         "earlyplantagenet01stub": (
             *(0, 2, 3, 4, 5, 8, 9, 10, 11, 52, 53, 54, 55),
@@ -1446,12 +1443,15 @@ def _assert_laid_out_in_regions(words: WordsFile, lines: LinesFile) -> None:
     assert any(len(page.regions) > 1 for page in lines.pages)
 
 
-@pytest.mark.thread_unsafe
 @pytest.mark.parametrize(
     "excerpt", sorted(path.stem for path in _EXCERPTS_DIR.glob("*.pdf"))
 )
-def test_layout_of_an_excerpt_keeps_every_word(excerpt: str, tmp_path: Path) -> None:
-    words, lines = _layout_of_pdf(_EXCERPTS_DIR / f"{excerpt}.pdf", tmp_path)
+def test_layout_of_an_excerpt_keeps_every_word(
+    excerpt: str, excerpt_books: frozendict[str, BookFolder]
+) -> None:
+    # The session's one run of each excerpt (tests/conftest.py).
+    folder = excerpt_books[excerpt]
+    words, lines = read_words(folder.words_json), read_lines(folder.lines_json)
     _assert_laid_out_in_regions(words, lines)
 
 

@@ -1,0 +1,204 @@
+{
+  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
+  "changed": "Changed since that check by task 2.5: on book page 75 \"land.\" leaves the body line for the margin note \"Free land.\", so the last paragraph of page 74 ends at \"privilege.\" on 75. Checked against the page image by the orchestrator on 15 November 2026.",
+  "excerpt": "domesday_74-83",
+  "page": 0,
+  "book_page_index": 74,
+  "shows": "an outer margin note on the right, signature \"M. 4\"",
+  "layout": [
+    [
+      "The Villeins. 49"
+    ],
+    [
+      "where they pleased1/ and again, ' F our sokemen held this land,",
+      "of whom three were free, while the fourth held one hide but",
+      "could not give or sell it2.' Not that no one is called a liber",
+      "homo unless he has this power of ' r eceding ' f rom his lord ; far",
+      "from it ; all is a matter of degree ; b ut the free man is freer if",
+      "he can 'go to what lord he pleases,' and often enough the",
+      "phrases ' X tenuit et liber homo fuit,' ' X tenuit libere,' ' X",
+      "tenuit ut liber homo ' s eem to have no other meaning than this,",
+      "that the occupant of the land enjoyed the liberty of taking it",
+      "with him whithersoever he would. Therefore there is no",
+      "tautology in saying that the holder of the land was a thegn",
+      "and a free man, though of course there is a sense, there are",
+      "many senses, in which every thegn is free3. All this talk of",
+      "the freedom that consists in choosing a lord and subjecting land",
+      "to him may well puzzle us, for it puzzled the men of the",
+      "twelfth century. The chronicler of Abingdon abbey had to",
+      "explain that in the old days a free man could do strange",
+      "things4.",
+      "Comparisons may be instituted between the freedom of one",
+      "free man and that of another :— ' F ive thegns held this land of",
+      "Earl Edwin and could go with their land whither they would, and",
+      "below them they had four soldiers, who were as free as them-",
+      "selves5.' Ah igh degree of liberty is marked when we are told",
+      "that, ' T he said men were so free that they could sell their land",
+      "with soke and sake wherever they would6.' But there are yet",
+      "higher degrees of liberty. Of Worcestershire it is written,",
+      "' W hen the king goes upon a military expedition, if anyone who",
+      "is summoned stays at home, then if he is so free a man that he",
+      "has his sake and soke and can go whither he pleases with his",
+      "land, he with all his land shall be in the king's mercy7.' The"
+    ],
+    [
+      "The scale"
+    ],
+    [
+      "holding."
+    ],
+    [
+      "1 D. B. i. 35 b, Tornecrosta. 3 D. B. i. 212 b, Stanford.",
+      "3 D. B. i. 249 b: ' T res taini tenuerunt et liberi homines fuerunt'; 256,",
+      "' I psi taini liberi erant ' ; 259 b, ' Q uatuor taini tenuerunt ante eum et liberi",
+      "fuerunt.'",
+      "4 Chron. Abingd. i. 4 90: 'Nam quidam dives, Turkillus nomine, sub Haroldi",
+      "comitis testimonio et consultu, de ae cum sua terra quae Kingestun dicitur,",
+      "ecclesiae Abbendonensi et abbati Ordrico homagium fecit ; l icitum quippe libero",
+      "cuique, illo in tempore, sic agere erat.'",
+      "6 D. B. i. 180 b: 'et poterant ire curn terra quo volebant, et habebant sub se",
+      "4 milites, ita liberos ut ipsi erant.'",
+      "« D. B. ii. 59.",
+      "7 D. B. i. 172: 'si ita liber homo est ut habeat socam suam et sacarn et cum",
+      "terra sua possit ire quo voluerit.'",
+      "M. 4"
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "where they pleased1/ and again, ' F our sokemen held this land, of whom three were free, while the fourth held one hide but could not give or sell it2.' Not that no one is called a liber homo unless he has this power of ' r eceding ' f rom his lord ; far from it ; all is a matter of degree ; b ut the free man is freer if he can 'go to what lord he pleases,' and often enough the phrases ' X tenuit et liber homo fuit,' ' X tenuit libere,' ' X tenuit ut liber homo ' s eem to have no other meaning than this, that the occupant of the land enjoyed the liberty of taking it with him whithersoever he would. Therefore there is no tautology in saying that the holder of the land was a thegn and a free man, though of course there is a sense, there are many senses, in which every thegn is free3. All this talk of the freedom that consists in choosing a lord and subjecting land to him may well puzzle us, for it puzzled the men of the twelfth century. The chronicler of Abingdon abbey had to explain that in the old days a free man could do strange things4.",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "Comparisons may be instituted between the freedom of one free man and that of another :— ' F ive thegns held this land of Earl Edwin and could go with their land whither they would, and below them they had four soldiers, who were as free as themselves5.' Ah igh degree of liberty is marked when we are told that, ' T he said men were so free that they could sell their land with soke and sake wherever they would6.' But there are yet higher degrees of liberty. Of Worcestershire it is written, ' W hen the king goes upon a military expedition, if anyone who is summoned stays at home, then if he is so free a man that he has his sake and soke and can go whither he pleases with his land, he with all his land shall be in the king's mercy7.' The free man is the freer if he has soke and sake, if he has jurisdiction over other men. Exceptional privileges, immunities from common burdens, are already regarded as ' l iberties.' This is no new thing; often enough when the Anglo-Saxon land books speak of freedom they mean privilege.",
+      "pages": [
+        0,
+        1
+      ]
+    },
+    {
+      "kind": "margin_note",
+      "text": "The scale",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "margin_note",
+      "text": "holding.",
+      "pages": [
+        0
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "1 D. B. i. 35 b, Tornecrosta. 3 D. B. i. 212 b, Stanford."
+        }
+      ],
+      "pages": [
+        0
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "3 D. B. i. 249 b: ' T res taini tenuerunt et liberi homines fuerunt'; 256, ' I psi taini liberi erant ' ; 259 b, ' Q uatuor taini tenuerunt ante eum et liberi fuerunt.'"
+        }
+      ],
+      "pages": [
+        0
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "4 Chron. Abingd. i. 4 90: 'Nam quidam dives, Turkillus nomine, sub Haroldi comitis testimonio et consultu, de ae cum sua terra quae Kingestun dicitur, ecclesiae Abbendonensi et abbati Ordrico homagium fecit ; l icitum quippe libero cuique, illo in tempore, sic agere erat.'"
+        }
+      ],
+      "pages": [
+        0
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "6 D. B. i. 180 b: 'et poterant ire curn terra quo volebant, et habebant sub se 4 milites, ita liberos ut ipsi erant.'"
+        }
+      ],
+      "pages": [
+        0
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "« D. B. ii. 59."
+        }
+      ],
+      "pages": [
+        0
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "7 D. B. i. 172: 'si ita liber homo est ut habeat socam suam et sacarn et cum terra sua possit ire quo voluerit.'"
+        }
+      ],
+      "pages": [
+        0
+      ]
+    }
+  ],
+  "removals": [
+    {
+      "reason": "running_head",
+      "text": "The Villeins."
+    },
+    {
+      "reason": "page_number",
+      "text": "49"
+    },
+    {
+      "reason": "signature_mark",
+      "text": "M. 4"
+    }
+  ],
+  "word_changes": [
+    {
+      "before": [
+        "them-",
+        "selves5.'"
+      ],
+      "after": [
+        "themselves5.'"
+      ],
+      "reason": "hyphen_join_guessed"
+    }
+  ],
+  "page_numbers": [
+    {
+      "text": "49",
+      "position": "head"
+    }
+  ]
+}
