@@ -494,6 +494,62 @@ def test_word_reaching_left_stays_when_its_middle_is_1_pt_outside() -> None:
     assert body[3] == ("land.", "The", "idea")
 
 
+def test_word_reaching_left_with_its_middle_exactly_2_pt_outside_moves() -> None:
+    # Middle (30 + 66) / 2 = 48, 2 pt left of the edge at 50.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 66, 144), 67, _word("Free", 5, 136, 25, 144)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("The", "idea")
+    assert margin == (("Free", "land."),)
+
+
+def test_word_reaching_left_with_its_middle_1_9_pt_outside_stays() -> None:
+    # Middle (30 + 66.2) / 2 = 48.1, 1.9 pt left of the edge at 50.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 66.2, 144), 67, _word("Free", 5, 136, 25, 144)
+    )
+    body, _ = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+
+
+def test_word_reaching_left_alone_on_its_row_stays() -> None:
+    # Gierke's page 123: "Stfoarm.", a note word and a body word read as one.
+    rows = tuple(word for word in _rows(20) if not word.text.endswith("3"))
+    alone = _word("land.", 30, 136, 57, 144)
+    note = _word("Free", 5, 136, 25, 144)
+    body, margin = _region_texts(layout_page(_page(0, (*rows, alone, note)), _MEASURES))
+    assert body[3] == ("land.",)
+    assert margin == (("Free",),)
+
+
+@pytest.mark.parametrize(
+    ("top", "bottom"),
+    [(114.8, 122.8), (157.2, 165.2)],
+    ids=["1.1 pitches above", "1.1 pitches below"],
+)
+def test_word_reaching_left_stays_with_the_note_more_than_a_pitch_away(
+    top: float, bottom: float
+) -> None:
+    # "land." runs from 136 to 144; the note ends 13.2 pt above its top or
+    # starts 13.2 pt below its bottom, 1.1 pitches of 12 pt.
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 67, _word("Free", 5, top, 25, bottom)
+    )
+    body, _ = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+
+
+def test_word_reaching_left_stays_beside_a_margin_word_of_one_letter() -> None:
+    # A margin word of one letter, as "U" on Kadesh's cover (page 0).
+    result = _page_with_row_3_reaching_left(
+        _word("land.", 30, 136, 57, 144), 67, _word("U", 5, 136, 25, 144)
+    )
+    body, margin = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+    assert margin == (("U",),)
+
+
 def test_hung_semicolon_3_pt_outside_stays_in_its_body_line() -> None:
     result = _page_with_row_3_reaching_left(
         _word(";", 45.5, 136, 48.5, 144), 67, _word("Free", 5, 136, 25, 144)
