@@ -214,7 +214,13 @@ is laid out as one region, as the skeleton did.
    "ancient"). The gutter is the strip of 6 pt, moved in steps of 1 pt
    across the middle third, at which the most rows are open; a tie takes
    the leftmost. A **run** is a longest stretch of consecutive compatible
-   rows; it is cut when it holds at least 8 open rows in the body, or 3
+   rows that starts and ends at an open row: a row with words on one side
+   only, or with a word across the strip, belongs to a run only between
+   two of its open rows. (A justified line of prose has one word across
+   the strip; counted at the edge of a run, it joined the run, and on
+   Kadesh's page 28 and Domesday's 43, 388 and 477 lines of prose above
+   or below a table or figure were read as their left halves, then their
+   right halves.) A run is cut when it holds at least 8 open rows in the body, or 3
    in the band, and in the band only when the gutter's middle lies within
    10 pt of the middle of the body column (two columns of notes are set
    on either side of the middle; Domesday's short notes printed side by
