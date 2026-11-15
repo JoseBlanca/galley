@@ -64,7 +64,7 @@ reviewed.
 | 2 | `layout` | 2.1–2.4 | `src/galley/layout/`; `tests/test_layout.py` |
 | 3 | `structure` | 3.1–3.5 | `src/galley/structure/`; `tests/test_structure.py`; `src/galley/model.py`, `tests/test_model.py`; `src/galley/fidelity.py`, `tests/test_fidelity.py`; `src/galley/cli.py`, `tests/test_cli.py`; `docs/architecture.md`; `docs/glossary.md` |
 | 4 | `excerpts` | 4.1 | `src/galley/markdown/`; `tests/test_markdown.py` |
-| 5 | (plan branch) | 5.1–5.2 | `tests/test_excerpts.py`, `tests/test_layout.py`, `tests/test_structure.py`; `tests/fixtures/expected/` (new) |
+| 5 | (plan branch) | 5.1–5.2 | `tests/test_excerpts.py`, `tests/test_layout.py`, `tests/test_structure.py`; `tests/conftest.py` (the new excerpts' configs); `tests/fixtures/expected/` (new) |
 | 6 | (plan branch) | 6.1 | `docs/reports/regions-and-paragraphs.md`; `tests/` for `whole_book` tests only |
 
 The `structure` stream is the only one that changes the shared files.
@@ -95,7 +95,7 @@ with the pages and contents layout §8 lists.
 
 **Stands on:** the whole books in `samples/public_domain/`.
 
-- [ ] 1.1 Add the three excerpts to `scripts/fetch_samples.py`, with
+- [x] 1.1 Add the three excerpts to `scripts/fetch_samples.py`, with
   what each covers, cut and commit them. Spec: layout §8, the list of
   new excerpts. Deliverables 1, 2.
 
