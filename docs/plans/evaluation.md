@@ -160,7 +160,7 @@ cached under `~/.cache/galley/`.
 
 **Tasks.**
 
-- [ ] 2.1 `src/galley/wordlist.py` as architecture §12 gives it,
+- [x] 2.1 `src/galley/wordlist.py` as architecture §12 gives it,
   adapted from ocr_lab's `setup.sh` (the commit says from which file),
   with its tests. Architecture §12 and §6 (the language codes of
   `config.py`). Deliverable 1.
