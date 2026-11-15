@@ -1,0 +1,520 @@
+# The layout stage
+
+layout takes the words of each page, as extract read them, and groups
+them into the parts of the page that are read one after the other, the
+**regions**: the running-head line, the body column (or its two columns,
+on a page of the index), the notes printed in the margins, and the
+footnotes at the foot of the page (or their two columns). Inside each
+region it groups the words into lines, left to right, and it gives the
+regions in reading order. It removes nothing: every word of `words.json`
+ends in exactly one line of `lines.json`. What each region is, a running
+head or a footnote, is left to structure (`docs/specs/structure.md`),
+which reads the result.
+
+Dated 15 November 2026. This spec serves the first of the two plans of
+work on layout and structure that the owner set on 15 November 2026: the
+first finds the regions, removes running heads, page numbers and
+signature marks, joins hyphens and finds paragraphs; the second finds
+notes and their references, places margin notes, finds headings, quotes
+and index entries. It builds on `docs/architecture.md` (cited as
+"architecture §8") and `docs/glossary.md`. The code that exists is the
+walking skeleton's (`docs/specs/walking-skeleton.md` §7,
+`src/galley/layout/__init__.py`): one region per page, holding every
+word, grouped into lines by the vertical centre of each word. A row of
+the page then becomes one line across everything it crosses: a margin
+note goes into the body line beside it, and two footnote columns are
+read across. This spec replaces that.
+
+layout reads `pages.json` (what each page is: its size, whether it is
+text, a plate or blank) and `words.json` (each page's words, each with
+its text and its box in points, as extract read them from the text
+layer), and writes `lines.json` (each page's regions, each a list of
+lines, each a list of words), in the format of architecture §8,
+unchanged. The **walking skeleton** is galley's first build, every stage
+in its simplest form; its code is what exists now. One point is open for the
+owner: how Stubbs' notes cut into the text column are found (**Open 1**,
+section 9).
+
+## 1. Terms
+
+Besides those of the glossary, this spec uses these; the first four are
+added to the glossary.
+
+- **Body column**: the rectangle of the page that the main text fills,
+  from its **left edge** to its **right edge**. Its width is the same on
+  every page of a book (within 3 pt in Haskins, Stubbs, Domesday and
+  Mariéjol, between the 5th and 95th percentile of pages); its position
+  moves by 10 to 25 pt from page to page with the scan.
+- **Margin note**: (glossary) a short heading printed beside the body.
+  An **outer margin note** is printed outside the body column, as in
+  Domesday and Gierke; a **cut-in note** is printed inside it, at its
+  outer side, with the body lines beside it shortened, as in Stubbs.
+- **Footnote band**: the footnotes at the foot of a page, set in smaller
+  type below the body.
+- **Drop capital**: the large first letter of a chapter, two or three
+  lines tall, as in Haskins.
+- **Row**: the words that the walking skeleton's rule puts in one line.
+  The words are taken in order of their top, then their left side; the
+  first starts a row and is its anchor; each next word joins the current
+  row when its vertical centre lies within the anchor's top and bottom,
+  edges included, and otherwise starts a new row as its anchor. A row
+  may cross several regions; a **line** is the same grouping done inside
+  one region. The box of a row, a line or a region is the smallest box
+  that holds its words.
+- **Commonest** value of a set of edges: each edge rounded to the point;
+  the value with the most edges within 2 pt of it; on a tie, the
+  smallest such value.
+- **Body word height** and **body line pitch** of a book: the median
+  height of a line's words, and the median distance from the top of one
+  row to the top of the next, over the book (section 3). "Pitch" alone
+  means the body line pitch.
+- **The reference**: the Project Gutenberg edition of an evaluation
+  book, proofread by people from the same scan, against which the
+  evaluation tool (`docs/specs/evaluation.md`) compares galley's output.
+- **Letter or digit**: a character for which Python's `str.isalnum` is
+  true.
+
+The books named here are those of the evaluation set
+(`docs/specs/evaluation.md` §3: Haskins, Stubbs, Domesday, Mariéjol) and
+the two of the committed excerpts (Kadesh, Gierke). Unless it says
+otherwise, a number below was measured on 15 November 2026 by a
+research script on the whole book: on galley's output for the evaluation
+set in `runs/evaluation/` (the walking skeleton, commit cc481d1), with
+every word labelled by what the Gutenberg edition makes of it (body,
+note, margin note, or absent, such as a running head), and on galley's
+output for the whole Kadesh and Gierke books, which have no reference.
+A page is given by its page index, from 0, in the whole book.
+
+## 2. What the books show
+
+What a reader of words.json would not expect, and what the rules below
+are built on:
+
+- **Word heights tell type sizes apart, roughly.** The text layer gives
+  each word the height of its OCR line. The median height of a line's
+  words, over the book's median, is at most 0.85 for 57 of Haskins' 57
+  lines of notes and 8 of its 6,144 lines of body; for 4,007 of
+  Domesday's 4,020 lines of notes and 18 of its 15,986 of body; for 769
+  of Mariéjol's 911 lines of notes (its notes are 8 or 9 pt high against
+  10) and 3 of its 13,909 of body. Stubbs' word heights vary from 5 to
+  11 pt inside one line.
+- **The running head is apart.** On pages that have one, the top of the
+  next line is 1.43 body line pitches below the top of the head or more
+  on 95% of Haskins' pages (median 1.62), 1.59 in Stubbs, 1.90 in
+  Domesday, 1.42 in Mariéjol. Above the head, a line of specks read as
+  text (";", "^", "—") is on 24 of Haskins' 263 pages and 88 of Stubbs'
+  324.
+- **Margin notes share rows with the body.** In the skeleton's lines,
+  Domesday's margin notes sit on a row with body words in 1,000 of their
+  1,360 line pieces, Stubbs' in 585 of 968, and words outside Gierke's
+  body column share a row with body words in 1,417 of 1,488 lines.
+  Domesday's and Gierke's notes are about 6 pt outside the body column,
+  on the outer side (Gierke: right on even page indices 687 times, left
+  on odd 662). Stubbs' cut-in notes are about 31 pt wide, inside the
+  column on its outer side (left on odd page indices 480 times, right on
+  even 339), and the body lines beside them start, or end, 58 to 62 pt
+  inside the column's edge.
+- **Two columns where one is expected.** Kadesh prints its footnotes in
+  two columns on 22 of the 41 pages that have notes; Gierke on 9 pages.
+  The index is in two columns in Haskins, Stubbs and Domesday: in the
+  skeleton, 282 of Haskins' 352 index lines hold words of two entries.
+  Domesday prints short notes side by side in one row (page 76: notes 1
+  and 2), which reads correctly left to right.
+- **A drop capital spans lines.** Haskins opens its chapters with a drop
+  capital that the text layer reads together with the rest of the first
+  word: on page 41, "THE" is one word 33 pt tall (the body's are 8 pt),
+  from the drop capital "T" to "HE" on the first line. As the anchor of a
+  row, it pulls the first two lines into one.
+
+## 3. What layout does
+
+layout first measures three numbers over the whole book, then lays out
+each page on its own, in this order: the body column's position; the
+outer margin notes; the running-head line; the footnote band; columns;
+lines. Each step takes words out of what the later steps see, so a word
+goes to one region only.
+
+### The book's measures
+
+From the rows of every page with at least 15 rows (the skeleton's rule
+applied to all the page's words):
+
+- **column width**: the median, over those pages, of the page's
+  commonest right edge of a row minus its commonest left edge. An edge
+  is counted to the nearest point, and "commonest" means the value with
+  the most rows within 2 pt of it. Measured: Haskins 266 pt, Stubbs 267,
+  Domesday 274, Mariéjol 317.
+- **body word height**: the median, over all the rows of those pages
+  pooled, of the median height of the row's words. Haskins 8.3 pt, Stubbs 8.1, Domesday
+  10.0, Mariéjol 10.0.
+- **body line pitch**: the median, over all consecutive pairs of rows of
+  those pages pooled, of the distance from the top of a row to the top of
+  the next. Haskins 15.1 pt, Stubbs 12.8,
+  Domesday 12.1, Mariéjol 11.5.
+- **usual left edge** for odd and for even page indices: the median of
+  the left edge found by step 1 below on the pages of that parity that
+  have one; it serves pages with no row wide enough to place the column.
+  A parity with no such page takes the other parity's.
+
+A book with no page of 15 rows is measured on its pages of at least 3
+rows; a book with none of those has no measures, and each of its pages
+is laid out as one region, as the skeleton did.
+
+### Per page
+
+1. **Body column.** The page's rows are made from all its words,
+   margin notes included. The left edge is the commonest left side of
+   the rows whose width (from the left side of their first word to the
+   right side of their last) is at least 0.8 of the column width; a row
+   with a margin note is then wider than the column and starts outside
+   it, but such rows are a minority (Domesday: 1,000 of about 16,600).
+   The right edge is the left edge plus the column width. A page with no
+   such row takes the usual left edge of its parity.
+2. **Outer margin notes.** A word whose right side is at least 2 pt left
+   of the left edge, or whose left side is at least 2 pt right of the
+   right edge, is a margin word. A word that crosses an edge stays in the
+   column, so a quotation mark hung outside the edge stays with its line
+   (in the measurement, 64 of Domesday's 181,400 body words and 11 of
+   Haskins' 60,900 fell outside by this rule). Each side's margin words
+   are grouped into lines, and the lines into regions: a region ends
+   where the next line's top is more than 1.5 body line pitches below
+   the top of the line before (a guess, so that each printed note is a
+   region of its own).
+3. **Running-head line.** Of the remaining words, grouped into rows,
+   take the first row that holds a letter or a digit. It and every row
+   above it (specks) form the running-head region when the next row's
+   top is at least 1.3 body line pitches below its top. A page whose
+   first such row is not that far apart, or is its only row, has no such
+   region, and the specks above stay with the body. This region is a
+   candidate; structure decides whether it is a running head. On
+   Haskins' chapter pages (41, 67, 100, 131, 163, 233) the chapter number
+   is less than 1.3 pitches above the title (0.98 on page 41), so they
+   have no such region; Kadesh's article title on page 8 is set apart
+   and makes one, which structure keeps in the text (structure §3).
+4. **Footnote band.** Of the rows left after step 3, the band begins at
+   the first row, other than the first of them, that is small (the
+   median height of its words is at most 0.85 of the body word height),
+   whose top is at least 1.1 body line pitches below the top of the row
+   before, and from which on at least two thirds of the rows down to the
+   last, that row and the last included, are small. A page number or
+   signature mark at the foot counts as a row. The
+   band runs to the foot of the page; the rows above it are the body.
+   On a page whose every row is small, such as a page of the index, there
+   is no band: the rows are the body.
+5. **Columns.** The body, and the band apart from it, are each cut into
+   two columns at a **gutter**: a vertical strip at least 6 pt wide,
+   whose middle lies in the middle third of the body column. A row is
+   **open** at a strip when no word box of the row crosses it and the
+   row has words on both sides; a row is **compatible** when it is open,
+   or has words on one side only, or has one word crossing the strip
+   whose middle lies more than 6 pt from the strip's middle on either
+   side (an OCR word that ran over the gutter, Kadesh page 10's
+   "ancient"). The gutter is the strip of 6 pt, moved in steps of 1 pt
+   across the middle third, at which the most rows are open; a tie takes
+   the leftmost. A **run** is a longest stretch of consecutive compatible
+   rows; it is cut when it holds at least 8 open rows in the body, or 3
+   in the band, and in the band only when at least half of its open rows
+   have their left part ending within 3 pt of the strip's left side (the
+   left column is justified to the gutter; Domesday's short notes printed
+   side by side in a row are not, and must be read row by row, 1, 2, 3,
+   4, not 1, 3, 2, 4). A cut run becomes two regions: each word goes
+   left or right of the strip's middle by its own middle. The rows
+   before and after it stay regions of their own: an index page whose
+   title spans the column gives the title, then the left column, then
+   the right.
+6. **Drop capital.** A word of the body taller than 2.2 times the body
+   word height, whose left side is within 3 pt of the left edge, is set
+   aside before the rows of steps 3 to 5 and the lines of step 7 are
+   made. Once its region's lines are made, it is placed first in the
+   topmost line whose box overlaps the word's box vertically and lies to
+   its right. (Haskins' "IN" on page 163 has its top 0.5 pt below the
+   first line's centre, so a rule on the line's centre would put it on
+   the second line.)
+7. **Lines.** Inside each region, words are grouped into lines by the
+   skeleton's rule, the lines ordered by their top and the words of each
+   line by their left side.
+
+The regions of a page are given in this order, "top" meaning the top of
+the region's box: the running-head region;
+the body regions from top to bottom, and within a run of columns the
+left before the right; the margin regions by their top, the left side
+before the right at the same top; the band regions in the same order as
+the body's. A page with no word has no region; the figures are copied
+from `words.json`, as now.
+
+Where the thresholds come from:
+
+| threshold | value | from |
+|---|---|---|
+| a row wide enough to place the column | 0.8 of the column width | guessed; a full line is the column width |
+| rows that measure a book | 15 rows a page | guessed: enough rows for a commonest edge |
+| commonest edge | within 2 pt | measured: body lines start within 2.2 pt of the edge on 99% of Haskins' lines |
+| margin word | 2 pt outside the column edge | measured, above |
+| margin region split | 1.5 body line pitches | guessed |
+| running-head gap | 1.3 body line pitches | measured: the 5th percentile of the head's gap is 1.42 or more in the four evaluation books |
+| small row | 0.85 of the body word height | measured, section 2 |
+| band rows small | two thirds | guessed: Mariéjol's note lines are small on 769 of 911 |
+| gap above the band | 1.1 body line pitches | measured: the 10th percentile of the gap from the last body line to the first note line is 1.16 pitches in Haskins, 1.24 in Domesday, 1.39 in Mariéjol |
+| gutter | 6 pt wide, middle third, 8 open rows in the body, 3 in the band | measured, below |
+| left column justified | 3 pt | guessed |
+| drop capital | 2.2 times the body word height, within 3 pt of the edge | measured: Haskins' are 2.67 ("IN", page 163) to 4 times |
+
+An earlier form of the column rule, which asked every row of a run to
+be open, was run on the skeleton's rows of whole pages (not on the body
+left by steps 1 to 4) of the six books. It fires in
+the body on all 8 pages of Haskins' index, 9 of Stubbs' 10 (312 to
+321, and one page of advertisements after them),
+Domesday's index and its tables (24 pages), Gierke's two-column lists (9
+pages) and Mariéjol's two-column bibliography (2 pages), and on no page
+of running text. With 5 rows instead of 8 it fires on 14 pages of
+Mariéjol's running text, in runs of 5 to 11 rows, where the text layer
+leaves wide gaps; with 3 rows, on 230 of Domesday's pages. Asking every
+row to be open broke the columns: a blank line in one column or one
+word over the gutter ended a run, so Haskins' index page 269 was cut
+only on rows 9 to 19 of 55, Stubbs' page 312 into 8 runs, and only 198
+of Kadesh's 398 note rows on pages with a gutter fell in a run. The
+compatible rows above are the answer; the rule as written here was not
+measured, and its reference pages (section 8) test it. Run in order, on
+Stubbs' index pages a full-size catchword row under the head ("BUR
+CON") makes the small-type columns below it a band, so the band's
+3-row rule applies there. The band needs only 3 rows because two
+columns of notes are often short, as in Kadesh; with 3 rows and no
+justification test, the band rule cut Domesday's side-by-side notes
+into columns on 19 pages (83 and 139 among them) and Mariéjol's on 10.
+
+### What the rules give, measured
+
+The steps 1 to 4 were run by a research script on the four evaluation
+books, with the words labelled by the reference. Where the words of each
+kind went (quotes counted with paragraphs):
+
+| book | note words in the band | body words in the band | margin-note words in a margin region | body words in a margin region |
+|---|---|---|---|---|
+| Haskins | 485 of 523 | 1,945 of 60,900 | (none) | 11 |
+| Stubbs | (none) | 141 of 90,100 | 0 of 1,521 (cut-in notes, **Open 1**) | 7 |
+| Domesday | 48,085 of 49,650 | 521 of 181,400 | 1,190 of 1,890 | 64 |
+| Mariéjol | 20,049 of 25,784 | 593 of 184,100 | (none) | 1 |
+
+Haskins' body words in the band are its "Bibliographical note" sections,
+set in small type at the end of each chapter. Structure puts a band's
+text after the paragraph in which the page's body ends (structure §6),
+so they keep their order on the page; when such a section continues on
+the next page as body (Haskins 263 to 264), the next page's first
+paragraph may come before it. Of Domesday's margin-note words outside a margin region, 330 are
+running-head words that the reference labels as margin notes ("Domesday
+Book" is both), so the share is nearer 1,190 of 1,560. A fifth of
+Mariéjol's note words stay in the body: their OCR lines are 9 pt high
+against the body's 10.
+
+## 4. The public interface
+
+The pipeline calls `run`, as every stage (architecture §9). The other
+functions are public so that tests can call them on hand-made pages.
+
+```python
+# galley.layout
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class BookMeasures:
+    """The measures of section 3, in points."""
+    column_width: float
+    body_word_height: float
+    body_line_pitch: float
+    usual_left_edge: frozendict[int, float]   # by page index parity, 0 and 1
+
+def run(folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS) -> None: ...
+
+def measure_book(words: WordsFile) -> BookMeasures | None: ...
+def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout: ...
+def group_lines(words: tuple[Word, ...]) -> tuple[Line, ...]: ...
+```
+
+`measure_book` gives `None` for a book with no page of 3 rows, and
+`layout_page` with `None` lays the page out as the skeleton did.
+`group_lines` keeps its present rule and signature; `layout_page` takes
+a drop capital out of the words before it calls `group_lines`, and puts
+it into the line step 6 names afterwards.
+
+`run` is unchanged in what it reads, deletes, checks and writes
+(walking-skeleton spec §7): it reads both files with
+`read_checked_input`, deletes `lines.json` and every later file first,
+runs the fidelity check before writing, and writes nothing on a
+`FidelityError`.
+
+## 5. How it runs in parallel
+
+`measure_book` computes each page's rows and its numbers with
+`map_pages`, then takes the medians over the pages in page order. Then
+`layout_page` runs on every page with `map_pages`. A page needs nothing
+from the others but the book's measures, so the output does not depend
+on the number of workers. The measures pass adds one grouping of rows
+per page; on Domesday, 558 pages, it is expected to cost less than the
+layout itself (not measured).
+
+## 6. The cases
+
+- **A page with no running head**, a chapter's first page: its first row
+  is the chapter number or title. It is a running-head region only when
+  set apart by 1.3 pitches; structure returns it to the body.
+- **Specks above the running head**: in the running-head region, before
+  the head line. Structure removes them (structure §4).
+- **A page number alone at the foot** (Mariéjol's "(49)"; Kadesh's
+  second sequence, the page numbers of the journal it was printed in) and **signature marks**
+  ("M. 4", "4—2"): layout gives them no region of their own. The gap
+  above a page's last line does not tell them from the last line of
+  text: it is below 0.9 body line pitches for a tenth of the page numbers
+  and signature marks of the four books. They end as the last line of
+  the body or the band, and structure finds them there.
+- **A margin note level with the running head**: its words are margin
+  words (step 2) and never join the head.
+- **Domesday's short notes side by side**: one line per row, read left
+  to right, which is their order; the justification test of step 5 keeps
+  three or more such rows from being cut into columns (page 83, a
+  reference page).
+- **Index pages**: two columns, each read top to bottom (step 5). An
+  index set in small type under a full-size title has the title in the
+  body and the columns as the band, which keeps their order.
+- **Tables** (Domesday, 52 pages): a table with an empty strip in the
+  middle third over 8 rows is read as two columns; otherwise row by row,
+  as now. Tables are not otherwise handled.
+- **Small type in the body**: Stubbs' quotations (0.75 of the body word
+  height) are inside the body when body rows follow them; at the foot
+  of a page they are read as a band. Their words keep their place in the
+  reading order either way (structure §6).
+- **Plate pages, blank pages**: no words, no region, as now.
+- **Stubbs' cut-in notes**: until **Open 1** is answered, they stay in
+  the body rows beside them, as now.
+- **Mariéjol's notes in 9-pt OCR lines**: a fifth of its note words
+  (5,735 of 25,784) stay in the body, at the foot of
+  their page, because their lines are not small by step 4. A reader of
+  the EPUB sees them as body text there. A height measured per book for
+  the notes, rather than the 0.85 ratio, may catch them; that is left
+  until the first plan's evaluation shows how much it matters.
+- **A margin region beside a column cut**: it is placed by its own top,
+  after all the body regions, whatever columns it lies beside.
+
+## 7. Fidelity
+
+Every word of `words.json` is in exactly one line of `lines.json`
+(architecture §8 and §13); layout removes nothing. The check runs in
+`run`, as now. Each step of section 3 moves a word from what is left to
+one region; a test asserts, on every reference page, that the words of
+the regions are those of the page.
+
+## 8. How it is verified
+
+**Unit tests** on pages written in the test, each a few `Word` values
+with their boxes, with a `BookMeasures` given in the test:
+
+- a body of 20 rows and a margin word 6 pt right of the right edge on
+  row 3 give a body region of 20 lines and a margin region of 1 line;
+  the word 1 pt outside stays in the body line;
+- a head row 1.4 pitches above the body gives a running-head region
+  first; at 1.2 pitches, no such region; a row of ";" above it goes into
+  the head region;
+- 5 rows of words of height 0.7 under 20 rows of height 1.0, 1.5 pitches
+  apart, give a band region; the same rows without the gap give no band;
+  a page of small rows only gives no band;
+- 10 rows with an empty strip 8 pt wide at the middle give two regions,
+  left then right; 7 such rows give one region; in a band, 3 rows give
+  two regions;
+- a word 3 times the body height at the left edge spanning two rows is
+  the first word of the upper line, and the two rows stay two lines; so
+  is a drop capital whose top lies 0.5 pt below the upper line's centre;
+- in the body, 10 open rows, a blank row in the left column and one word
+  crossing the gutter keep one run and give two regions; in a band,
+  three rows of two short notes whose left parts end 20 pt and more
+  before the strip stay three rows;
+- `measure_book` on 20 hand-made pages gives the medians, and `None` on
+  pages of 2 rows;
+- `run` on a hand-made `words.json` of 8 pages with 1 worker and with 3
+  gives the same bytes.
+
+**Excerpt tests** on reference pages: the expected output of each is
+the list of its regions, each as the text of its lines (words joined by
+one space) in order, compared exactly; boxes are not compared. The owner
+checks each by eye against the page image before it becomes a test. The
+excerpt is measured on its own pages with `measure_book`, so its numbers
+differ slightly from the whole book's.
+
+| excerpt | page (excerpt page, book page index) | what it shows |
+|---|---|---|
+| `kadesh_8-17` (committed) | 2 (10) | running head, two footnote columns, the journal's page number alone at the foot |
+| `kadesh_8-17` | 0 (8) | the article's first page: its title set apart as a head-line region |
+| `gierke_86-93_270-271` (committed) | 2 (88) | margin notes outside the column; the signature mark "I — 2" as the last line |
+| `gierke_86-93_270-271` | 8 (270) | endnotes, with margin notes beside them |
+| `haskins_eval` (committed) | 0 (131) | a chapter's first page: chapter number, title, drop capital ("IN") |
+| `haskins_eval` | 1 (132) | footnotes in the band |
+| `haskins_eval` | 9 (266) | the first index page: title, two columns |
+| `stubbs_51_56-64` (new) | 0 (51) | a cut-in note at the left; specks above the head |
+| `stubbs_51_56-64` | 9 (64) | a cut-in note at the right |
+| `domesday_74-83` (new) | 2 (76) | an outer margin note on the right, short notes side by side, signature "4—2" |
+| `domesday_74-83` | 0 (74) | an outer margin note on the left, signature "M. 4" |
+| `domesday_74-83` | 9 (83) | short notes side by side in three rows, read row by row |
+| `mariejol_210-219` (new) | 0 (210) | footnotes of 9-pt OCR lines; a foot line holding the signature and the page number "(l93)" |
+| `mariejol_210-219` | 4 (214) | a foot line the OCR garbled |
+
+The three new excerpts are added to `scripts/fetch_samples.py` with
+what they cover, ten pages each, all with a text layer:
+
+- `stubbs_51_56-64`: Stubbs (`earlyplantagenet01stub`), page indices 51
+  and 56 to 64 (52 to 55 are maps and blank pages without a text layer):
+  a chapter opening with a summary in small type, cut-in margin notes on
+  both sides, running heads with dates, specks above the head, a hyphen
+  across a page break.
+- `domesday_74-83`: Domesday (`domesdaybook00maituoft`), page indices
+  74 to 83: outer margin notes on both sides, footnotes, short notes side
+  by side, the signature marks "M. 4" (74) and "4—2" (76).
+- `mariejol_210-219`: Mariéjol (`catherinedemedic00mariuoft`), page
+  indices 210 to 219: page numbers at the foot in parentheses, a
+  signature line with the page number (210), footnotes in poor OCR.
+
+The excerpt tests also run the fidelity check on each excerpt, and the
+`whole_book` tests on the whole books.
+
+**Measured by `galley-eval run`** (the evaluation tool of
+`docs/specs/evaluation.md`). The tool compares
+`lines.json` as one stream of words per page, so layout's regions do not
+show in its scores at lines. They show at blocks, through structure's
+targets (structure §9): paragraph breaks that margin and note text no
+longer cause, notes and margin notes found as such. The table of section
+3 is what layout's rules gave on a prototype; it is not a target.
+
+## 9. Open points
+
+**Open 1: how layout finds Stubbs' cut-in notes.** The text layer does
+not show them reliably. Five rules were tried on Stubbs' words, each
+against the reference's labels; the best one that takes few body words
+looks for an empty strip at least 6 pt wide, 20 to 100 pt inside the
+column edge, over at least 2 rows, with a line of only note words among
+them. It finds 139 of Stubbs' 1,521 cut-in note words and takes 75 body
+words; looser forms find up to 798 and take up to 2,166 body words. The
+text layer's boxes are the cause: 25% of the gaps between a cut-in note
+and the body word beside it are under 5.7 pt, where the word spaces of
+the body are 4.5 pt (median) and 8.1 pt (95th percentile), and some note
+words are glued to body words ("toHenry's").
+
+- (a) layout renders each page at 72 dpi with `pdfium.render` and looks
+  for the empty strip in the picture, at the offset the book's pages
+  share (58 to 62 pt in Stubbs). Layout then reads the PDF and the
+  config, which changes architecture §4 and §9, and costs a render per
+  page (about 6 s for Stubbs' 344 pages, a guess). Not measured: the
+  plan's first task would measure it on Stubbs and keep it only if at
+  least 95 of every 100 words it takes are note words.
+- (b) the best text-layer rule above: little gain (a tenth of the notes)
+  for 75 body words moved out of their paragraphs.
+- (c) leave cut-in notes to the second plan, with margin-note placement:
+  they stay in the body lines beside them, as now, and keep breaking
+  Stubbs' paragraphs.
+
+Recommendation: (a), as a task of the plan that measures before it
+builds, with (c) as the outcome if it fails the bar. A body word moved
+into a margin note breaks the text a reader reads, so the bar is on
+precision. Meanwhile: (c).
+
+## 10. Not in this spec
+
+- What each region is, and what is removed: structure's spec.
+- Figures inside text pages, tables as tables, the order of notes inside
+  a band: later.
+- OCR of pages without a text layer: analyze and extract.

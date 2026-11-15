@@ -10,8 +10,15 @@ paragraph, a quote, a figure or an index entry. It has an id,
 `b-p0012-003`, which is its anchor in the EPUB and what an edit names.
 Not a "chunk" or an "element".
 
+**body column**: the rectangle of a page that the main text fills, from
+its left edge to its right edge. Its width is the same on every page of a
+book; its position moves with the scan.
+
 **book folder**: the folder that holds a book's config, every file the
 stages write, and the edits.
+
+**drop capital**: the large first letter of a chapter, two or three
+lines tall. Placed by layout as the first word of the first line.
 
 **edit**: a change to the text of one block, kept in a file under
 `edits/` and applied by the markdown stage. Made by the correct stage, the
@@ -28,13 +35,20 @@ committed under `tests/fixtures/pdf/`. The fixture of the excerpt tests.
 **figure**: a picture in the book, cut from the page render into
 `images/`. A **plate** is a page that is mostly a figure.
 
+**footnote band**: the footnotes at the foot of a page, set in smaller
+type below the body, in one column or two. A region found by layout.
+
 **fidelity check**: the test, over the whole book, that the words of a
 stage's input are the words of its output plus the removals that stage
 made, once its word changes and edits are applied: nothing lost, nothing
 invented.
 
 **hyphen join**: two parts of a word split at a line end, "repli-" and
-"cate", made into one, "replicate". A kind of word change.
+"cate", made into one, "replicate". A kind of word change. When the
+book's words show a compound, the hyphen is kept ("Anglo-Saxon"). A
+**guessed join** is one that neither the word list nor the book's own
+words support; the hyphen is dropped and the change recorded as guessed,
+for review.
 
 **line**: a line of one region of a page, as layout groups the words, left
 to right. Not what pdfplumber calls a line, which runs across columns.
@@ -42,7 +56,10 @@ Once structure has joined hyphens and paragraphs, the book has no lines,
 only blocks.
 
 **margin note**: a short heading printed in the margin beside a paragraph,
-as Gierke has on most pages. A block kind.
+as Gierke has on most pages. A block kind. An **outer margin note** is
+printed outside the body column (Gierke, Domesday); a **cut-in note**
+inside it, at its outer side, with the body lines beside it shortened
+(Stubbs).
 
 **note**: a footnote or endnote of the book. Its **marker** is what is
 printed in the text and before the note ("8", "*"). A note holds blocks
@@ -77,6 +94,10 @@ chapter's or author's name, often with the page number. Not a "header".
 
 **span**: a run of a block's text with one emphasis and, optionally, a
 note reference.
+
+**stray mark**: a line with no letter or digit above the running head, a
+speck of the scan that the OCR read as text (";", "^"). Removed by
+structure, with a record.
 
 **stage**: one of analyze, extract, layout, structure, correct, markdown,
 epub. A subpackage of `src/galley/`.
