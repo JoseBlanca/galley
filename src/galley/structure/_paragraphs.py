@@ -24,15 +24,18 @@ from galley.model import (
     Origin,
     PageLayout,
     PageNumber,
+    Region,
     Removal,
     Span,
     WordChange,
 )
+from galley.structure._foot import body_column
 from galley.structure._hyphens import PageLine, join_lines
 from galley.structure._measures import (
     Edges,
     box_of,
     is_hyphen_first_part,
+    is_short,
     region_edges,
 )
 from galley.structure._regions import RegionKind, region_kinds
@@ -53,11 +56,14 @@ _CENTRED_INSET_DIFFERENCE_PT = 10.0
 
 @dataclass(frozen=True, slots=True)
 class _PlacedLine:
-    """A line of a page with its page index and its region's edges."""
+    """A line of a page with its page index, its region's edges, and the
+    edges its centring is measured against: the region's, or the page's
+    body column for a line of a short body region (spec section 6)."""
 
     page_index: int
     line: Line
     edges: Edges
+    centring_edges: Edges
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,8 +96,8 @@ def _is_indented(line: _PlacedLine, before: _PlacedLine) -> bool:
 
 
 def _is_centred(line: _PlacedLine) -> bool:
-    left_inset = line.line.box.x0 - line.edges.left
-    right_inset = line.edges.right - line.line.box.x1
+    left_inset = line.line.box.x0 - line.centring_edges.left
+    right_inset = line.centring_edges.right - line.line.box.x1
     return (
         left_inset >= _CENTRED_INSET_MIN_PT
         and right_inset >= _CENTRED_INSET_MIN_PT
@@ -132,11 +138,20 @@ def page_parts(page: PageLayout, survey: BookSurvey) -> PageParts:
     head = head_removals(page, kinds, survey)
     foot = foot_removals(page, kinds, survey)
     removed = head.lines | foot.lines
+    column = body_column(page, kinds)
+
+    def centring_edges(region: Region, kind: RegionKind, edges: Edges) -> Edges:
+        if kind is RegionKind.BODY and is_short(region) and column is not None:
+            return column
+        return edges
+
     regions = tuple(
         (
             kind,
             tuple(
-                _PlacedLine(page.index, line, edges)
+                _PlacedLine(
+                    page.index, line, edges, centring_edges(region, kind, edges)
+                )
                 for line_number, line in enumerate(region.lines)
                 if (region_number, line_number) not in removed
             ),

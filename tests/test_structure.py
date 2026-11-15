@@ -884,6 +884,31 @@ def test_centred_line_is_a_paragraph_of_its_own() -> None:
     )
 
 
+def test_centred_title_in_a_region_of_its_own_starts_a_paragraph_on_a_new_page() -> (
+    None
+):
+    # The title's region is its one line, so its own edges would make no
+    # line centred; it is measured against the body column, 50 to 300 pt.
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first"), _full("runs on to", 145)),
+        PageLayout(
+            1,
+            (
+                _region(_spread("CHAPTER II", 150, 200, 40)),
+                _region(*_five_full_lines(70, "second")),
+            ),
+            (),
+        ),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(block.id for block in blocks.blocks) == (
+        "b-p0000-001",
+        "b-p0001-001",
+        "b-p0001-002",
+    )
+    assert block_text(blocks.blocks[1]) == "CHAPTER II"
+
+
 def test_indented_line_after_a_hyphen_does_not_start_a_paragraph() -> None:
     page = PageLayout(
         0,

@@ -125,10 +125,16 @@ class Edges:
         return (self.left + self.right) / 2
 
 
+def is_short(region: Region) -> bool:
+    """Whether a region has too few lines for commonest edges, fewer than 5
+    (spec section 6): its edges are then its box's sides."""
+    return len(region.lines) < _LINES_FOR_COMMONEST_EDGES
+
+
 def region_edges(region: Region) -> Edges:
     """The commonest left and right sides of the region's lines, or, with
     fewer than 5 lines, the sides of its box (spec section 6)."""
-    if len(region.lines) < _LINES_FOR_COMMONEST_EDGES:
+    if is_short(region):
         return Edges(region.box.x0, region.box.x1)
     return Edges(
         commonest(line.box.x0 for line in region.lines),
