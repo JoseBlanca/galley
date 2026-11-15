@@ -144,6 +144,11 @@ expected and not fixed here.
   order of regions, and the fidelity check on the excerpts and whole
   books. Spec: layout §4, §5 and §7. Needs 2.1 to 2.3. Deliverables 2,
   3, 4.
+- [ ] 2.5 A margin word whose box crosses the column's edge, at the
+  start of a body line beside a margin note, goes to that margin note
+  (added 15 November 2026 after the measurement: 135 of Domesday's 286
+  missed paragraph starts, pages 65, 75, 83, 211, 375). Spec: layout §3
+  step 2 and §6, changed first. Deliverable 1.
 
 ## 3. Structure: removals, hyphens, paragraphs and side text
 
@@ -194,6 +199,10 @@ Work package 6 shows it.
 - [x] 3.5 Paragraphs, side text, the order of blocks and notes, ids and
   origins; `make_blocks` and `run`; the Tesseract check in the CLI.
   Spec: structure §6, §8 and §9. Needs 3.1 to 3.4. Deliverables 2 to 5.
+- [ ] 3.6 No hyphen join when the character before the line-end hyphen
+  is a digit ("136-39-" "Bryce," on Haskins 266, "37-" in its index;
+  found by the owner's check). Spec: structure §5, changed first.
+  Deliverable 2.
 
 ## 4. Markdown writes margin notes and unreferenced notes
 

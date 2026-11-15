@@ -329,3 +329,35 @@ excerpt lacks the other pages the running-head and signature rules
 compare with; Domesday 76, where an OCR box puts "autrui." on the line
 above so notes 3 and 4 are one note; Haskins 266, whose index columns
 are body regions, not band regions (reading order unchanged).
+
+### The owner's check (15 November 2026)
+
+The owner checked 13 of the 17 sections: the structure of each is right.
+Their remarks:
+
+- Text errors on every page (Kadesh 8 "ontalists" for "entalists",
+  Haskins 132 "GiraldusCambrensis"): the scan's OCR, not structure.
+  Gierke's margin notes are badly garbled in the text layer (page 88's
+  are "Diverse methods.", "Unity of the movement.", "Medieval and
+  Antique-Modern Thought", "Medieval Thought"). They are a case for the
+  re-OCR the owner asked for in the evaluation plan.
+- Haskins 266: "136-39-" "Bryce," must not be joined; the printed text
+  is "136-39." (task 3.6).
+
+The owner had to leave before the last four sections (Domesday 75 and
+83, Mariéjol 210 and 214). The orchestrator checked them against their
+page images: each is as the specs say, with the known cases the sheet
+lists. Their tests are marked as checked by the orchestrator, not the
+owner.
+
+The two decisions asked of the owner with the measurement were taken by
+the orchestrator as recommended, because the owner was away; both can
+be reversed:
+
+1. Domesday's paragraph recall: the margin-word rule is built in this
+   plan (task 2.5).
+2. Gierke 270 and Mariéjol 210, which an excerpt cannot get right (the
+   running-head and signature rules compare a page with others the
+   excerpt lacks): the exact tests record what the excerpt gives, with
+   the reason, and a `whole_book` test checks those two pages on the
+   whole books.
