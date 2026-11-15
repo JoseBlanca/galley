@@ -385,7 +385,14 @@ balances.
    left edge, and the line before it in the stream ends more than 3 pt
    short of that line's region's right edge; or
 2. **it is centred**, or the line before it is: both of its insets from
-   the region's edges are at least 15 pt and differ by at most 10 pt.
+   the region's edges are at least 15 pt and differ by at most 10 pt. A
+   line of a region of fewer than 5 lines is measured against the page's
+   body column (section 1) instead, since the box of such a region is
+   the box of its lines and its one line would never be centred in it:
+   Mariéjol's "CHAPITRE II" to "XI", Domesday's "ESSAY I." to "III.",
+   Haskins' "INDEX" and Gierke's "NOTES." ran on from the page before.
+   Such a title starts a paragraph also at a page break, as rule 2 says,
+   which is the chapter's first page of section 9.
 
 A line after a line that ends with a hyphen (its last word ends as
 section 5 asks of a first part, "-" after a letter or digit) never
