@@ -362,7 +362,8 @@ numbers and signature marks sit there.
 An **anchored pass** aligns two sequences of tokens:
 
 1. It finds the tokens whose alignment key occurs exactly once in each of
-   the two sequences.
+   the two sequences. A token whose key is empty, a mark of punctuation
+   only such as "—" or "*", is never an anchor.
 2. It keeps the longest subsequence of those that is in the same order on
    both sides.
 3. It aligns the stretches between consecutive anchors with
@@ -370,25 +371,37 @@ An **anchored pass** aligns two sequences of tokens:
 
 A galley token is aligned to at most one reference token. Three passes:
 
-1. galley's body stream against the reference's body tokens. At words and
-   lines, galley's whole text is the body stream.
-2. The galley tokens still unaligned, in book order, against the
-   reference's notes as one stream in order; then those still unaligned
-   against the reference's margin notes as one stream. This finds a note
-   wherever each side put it, at the end of a chapter or among the words
-   of its page.
-3. Whatever is still unaligned on each side, in book order, against each
-   other. This finds, for instance, a margin note that galley put among
-   the notes.
+1. galley's body stream against the reference's body tokens, without the
+   reference's margin notes. At words and lines, galley's whole text is
+   the body stream.
+2. The galley tokens still unaligned against the reference's notes; then
+   those still unaligned against the reference's margin notes of the
+   body. This finds a note wherever each side put it, at the end of a
+   chapter or among the words of its page.
+3. Whatever is still unaligned on each side, against each other. This
+   finds, for instance, a margin note that galley put among the notes.
+
+Passes 2 and 3 work **near the page**. Each reference token has a
+provisional page from what the passes before it aligned: a note's, the
+page of its note reference; a margin note's, the page of the first
+aligned token of the paragraph it precedes; any other token's, the page
+of the nearest aligned token before it. A reference token is aligned
+only with galley tokens within one page of its provisional page, in book
+order. Without this, the leftovers of the whole book form one sequence,
+and a word missing on page 9 was paired with stray marks on page 1: 247
+such pairs in Haskins, 537 in Mariéjol, in the first build. A note or
+margin note that runs over a page break has its tokens on the page of
+its start and the next, within the window.
 
 In difflib's result, an equal stretch gives aligned pairs. A replaced
 stretch is examined as "Differences" below says. A deleted or
 inserted stretch gives tokens with no partner.
 
 A book whose words output aligns less than 50% of its reference tokens
-stops with an error that gives the share, because a wrong scan or a
+to a galley token with the same alignment key (`matched`, or `changed`
+with an equal key) stops with an error that gives the share, because a wrong scan or a
 broken reading rule is likelier than galley being that far off. 50% is
-a guess, under Mariéjol's 73.7%.
+a guess, under Mariéjol's 76.0% in the first build.
 
 ### Pages
 
@@ -436,11 +449,23 @@ Each reference token, and each galley token, ends in one of these states:
 | `missing` | a reference token with no galley token |
 | `extra` | a galley token with no reference token |
 
-`split` and `glued` are looked for first in a replaced stretch, by
-joining up to 4 tokens (a choice: no case of more was seen); the tokens
-left in the stretch are paired in order as `changed`, and what is left
-over is `missing` or `extra`. The galley tokens of a split, "repli-"
-and "cate", and the reference tokens of a glued, have that state too.
+A replaced stretch is walked in order on both sides at once. At each
+step, a `split` or a `glued` is tried at the current position of each
+side, joining 2 to 4 consecutive tokens with non-empty keys (4 is a
+choice: no case of more was seen); else the two current tokens are
+paired as `changed` when they are alike; else the one with the lower
+position, relative to its side's stretch, is `missing` or `extra`. Two
+tokens are alike when the similarity of their keys, as
+`difflib.SequenceMatcher` measures it over characters, is at least 0.5,
+or when both keys are empty. A token with an empty key is never alike
+one with a non-empty key. What is left over at the end is `missing` or
+`extra`. Pairing every token of a stretch in order, as the first build
+did, paired 10,175 of Mariéjol's 21,769 changed pairs with a word of
+nothing alike, such as "son" with "'", where the truth is a missing
+word and an extra one; and it took the running heads out of the extras.
+The 0.5 is a guess, to be checked on the baseline. The galley tokens of
+a split, "repli-" and "cate", and the reference tokens of a glued, have
+that state too.
 
 A `changed` pair has a subkind, the first that applies:
 
@@ -448,8 +473,8 @@ A `changed` pair has a subkind, the first that applies:
 |---|---|---|
 | `convention` | equal once quotes, dashes and ligatures are written one way: `’` `‘` as `'`, `“ ”` as `"`, `–` `—` as `--` but `–` between digits as `-`, `ﬁ` as `fi` | no |
 | `case` | equal but for letter case | yes |
-| `punctuation` | equal once everything but letters and digits is dropped, case and accents kept | yes |
-| `diacritic` | equal alignment keys | yes |
+| `punctuation` | equal once everything but letters and digits is dropped and case is ignored, accents kept: "Serfs." and "serfs" | yes |
+| `diacritic` | equal alignment keys, and the accents differ | yes |
 | `letters` | anything else | yes |
 
 A difference on a token tagged as a marked correction has the subkind
