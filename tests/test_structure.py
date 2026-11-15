@@ -616,11 +616,11 @@ def test_note_line_starting_with_its_marker_on_two_pages_is_no_signature_line() 
             HyphenJoin("Normandy.", ChangeReason.HYPHEN_JOIN),
         ),
         (
-            "1830-",
-            "40,",
+            "12th-",
+            "century",
             frozenset(),
-            frozenset(),
-            HyphenJoin("1830-40,", ChangeReason.HYPHEN_KEPT),
+            frozenset({"12thcentury"}),
+            HyphenJoin("12thcentury", ChangeReason.HYPHEN_JOIN),
         ),
         (
             "d'in-",
@@ -650,7 +650,7 @@ def test_note_line_starting_with_its_marker_on_two_pages_is_no_signature_line() 
         "guessed",
         "punctuation after",
         "word list in lower case",
-        "two numbers",
+        "letter after a digit",
         "after the apostrophe",
         "apostrophe in the second part",
         "printed both ways",
@@ -668,11 +668,28 @@ def test_join_hyphen_gives_the_word_and_its_reason(
 
 @pytest.mark.parametrize(
     ("first", "second"),
-    [("—", "and"), ("rep-", "(1)"), ("-", "and"), ("word", "and")],
-    ids=["dash", "bracket after", "hyphen alone", "no hyphen"],
+    [
+        ("—", "and"),
+        ("rep-", "(1)"),
+        ("-", "and"),
+        ("word", "and"),
+        ("136-39-", "Bryce,"),
+        ("37-", "Abacus"),
+        ("1066-", "1087"),
+    ],
+    ids=[
+        "dash",
+        "bracket after",
+        "hyphen alone",
+        "no hyphen",
+        "digit before, index",
+        "digit before, capital",
+        "digit before, two numbers",
+    ],
 )
 def test_join_hyphen_does_not_join(first: str, second: str) -> None:
-    assert join_hyphen(first, second, frozenset(), frozenset({"and"})) is None
+    known = frozenset({"and", "136-39bryce", "37abacus", "10661087", "1066-1087"})
+    assert join_hyphen(first, second, known, known) is None
 
 
 @pytest.mark.parametrize(

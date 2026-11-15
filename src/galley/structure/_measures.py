@@ -173,5 +173,5 @@ def word_key(text: str) -> str:
 
 def is_hyphen_first_part(text: str) -> bool:
     """Whether a word can be the first part of a hyphen join: it ends with
-    the ASCII hyphen-minus after a letter or digit (spec section 5)."""
-    return text.endswith("-") and text[:-1][-1:].isalnum()
+    the ASCII hyphen-minus after a letter, not a digit (spec section 5)."""
+    return text.endswith("-") and text[:-1][-1:].isalpha()

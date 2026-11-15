@@ -2,7 +2,6 @@
 hyphen are joined, with the hyphen dropped or kept, and the joins of a
 block's lines."""
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import NamedTuple
@@ -10,8 +9,6 @@ from typing import NamedTuple
 from galley.model import ChangeReason, WordChange
 from galley.structure._measures import APOSTROPHES, is_hyphen_first_part, word_key
 
-# Spec section 5: a join of two numbers, "1830-" "40", keeps the hyphen.
-_NUMBER_KEY = re.compile(r"[0-9]+")
 # Spec section 5: the word list is no evidence for a second part of fewer
 # than 2 letters ("Con-" "1", "na-" "R": junk keys it happens to hold).
 _WORD_LIST_MIN_LETTERS = 2
@@ -35,17 +32,16 @@ def join_hyphen(
 ) -> HyphenJoin | None:
     """The word made of `first`, the last word of a line, and `second`, the
     first word of the next, or None when they are not joined (spec section
-    5): `first` must end with "-" after a letter or digit and `second`
-    start with a letter or digit. After a lower-case letter, a `second`
-    that starts with a capital is joined only when the book prints the
-    hyphenated word (`hyphen_kept`), and else not at all.
+    5): `first` must end with "-" after a letter, not a digit, and
+    `second` start with a letter or digit. After a lower-case letter, a
+    `second` that starts with a capital is joined only when the book
+    prints the hyphenated word (`hyphen_kept`), and else not at all.
 
     The hyphen is kept (`hyphen_kept`) when the hyphenated word is among
     `book_words`, the keys of the words the book prints whole, and the
-    joined word is not, and always between two numbers; it is dropped
-    (`hyphen_join`) when the joined word is in `word_list`, which is in
-    lower case (unless `second` has fewer than 2 letters), or among
-    `book_words`, and dropped as a guess
+    joined word is not; it is dropped (`hyphen_join`) when the joined word
+    is in `word_list`, which is in lower case (unless `second` has fewer
+    than 2 letters), or among `book_words`, and dropped as a guess
     (`hyphen_join_guessed`) otherwise. When `first` holds an apostrophe,
     the joined word's part after its last apostrophe is looked up too.
     """
@@ -57,10 +53,6 @@ def join_hyphen(
         if word_key(hyphenated) in book_words:
             return HyphenJoin(hyphenated, ChangeReason.HYPHEN_KEPT)
         return None
-    if _NUMBER_KEY.fullmatch(word_key(first[:-1])) and _NUMBER_KEY.fullmatch(
-        word_key(second)
-    ):
-        return HyphenJoin(hyphenated, ChangeReason.HYPHEN_KEPT)
     joined_key = word_key(joined)
     if word_key(hyphenated) in book_words and joined_key not in book_words:
         return HyphenJoin(hyphenated, ChangeReason.HYPHEN_KEPT)
