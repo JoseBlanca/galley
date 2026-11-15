@@ -286,7 +286,7 @@ books.
 
 **Tasks.**
 
-- [ ] 5.1 The excerpt, its HTML and galley's outputs; a subagent chooses
+- [x] 5.1 The excerpt, its HTML and galley's outputs; a subagent chooses
   the 5 to 8 differences from what the tool reports on it and from the
   page images, and writes them down. Spec §10. Deliverables 1 and 2.
 - [ ] 5.2 After the owner's check: the excerpt test; then `galley-eval

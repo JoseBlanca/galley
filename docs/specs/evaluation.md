@@ -396,7 +396,11 @@ page of its note reference; a margin note's, the page of the first
 aligned token of the paragraph it precedes; any other token's, the page
 of the nearest aligned token before it. A reference token is aligned
 only with galley tokens within one page of its provisional page, in book
-order. Without this, the leftovers of the whole book form one sequence,
+order, and those on its provisional page first: the pages either side
+are offered only the tokens still unaligned after that. Without the
+preference, on Haskins' printed page 119 the reference's "VII," was
+paired with "ii8", the page number of the page before, and galley's
+"VH," on the right page was left extra. Without the window, the leftovers of the whole book form one sequence,
 and a word missing on page 9 was paired with stray marks on page 1: 247
 such pairs in Haskins, 537 in Mariéjol, in the first build. A note or
 margin note that runs over a page break has its tokens on the page of
