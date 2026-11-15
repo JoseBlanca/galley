@@ -19,6 +19,7 @@ holds 338,080 words and the French one 74,068.
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -26,7 +27,7 @@ import threading
 from pathlib import Path
 
 from galley.config import Language, tesseract_language
-from galley.errors import ConfigError, ExternalProgramError, InputFileError
+from galley.errors import ExternalProgramError, InputFileError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,29 +42,35 @@ _TIMEOUT_S = 60
 # are kept apart by the rename in _extract, which is atomic.
 _EXTRACTION_LOCK = threading.Lock()
 
-_LIST_LANGS_HEADER = "List of available languages in "
+_LIST_LANGS_HEADER = re.compile(r'List of available languages in "(.+)" \(\d+\):')
+
+_DELETE_CACHE = "delete it to extract it again"
 
 
-def word_list(language: str, cache_dir: Path = DEFAULT_CACHE_DIR) -> frozenset[str]:
-    """The words of Tesseract's dictionary of `language`, an ISO 639-1 code
-    of architecture section 6 (`en`, `es`, `fr`, `de`, `it`).
+def word_list(
+    language: Language, cache_dir: Path = DEFAULT_CACHE_DIR
+) -> frozenset[str]:
+    """The words of Tesseract's dictionary of `language`.
 
     The first call for a language extracts the list with Tesseract's tools
     and writes it to `cache_dir`; later calls, also from other threads and
-    processes, read the file there. Raises ConfigError for a language galley
-    does not know, and ExternalProgramError when Tesseract or its tools are
-    missing, have no data for the language, or fail.
+    processes, read the file there. Raises ExternalProgramError when
+    Tesseract or its tools are missing, have no data for the language, or
+    fail, and InputFileError when the cached list is empty or not UTF-8.
     """
-    tesseract_code = tesseract_language(_known_language(language))
+    tesseract_code = tesseract_language(language)
     cache_file = cache_dir / f"{tesseract_code}.txt"
     with _EXTRACTION_LOCK:
         if not cache_file.exists():
             _extract(tesseract_code, cache_file)
-    words = words_of_list(cache_file.read_text(encoding="utf-8"))
+    try:
+        text = cache_file.read_text(encoding="utf-8")
+    except UnicodeDecodeError as err:
+        msg = f"the cached word list {cache_file} is not UTF-8; {_DELETE_CACHE}"
+        raise InputFileError(msg) from err
+    words = words_of_list(text)
     if not words:
-        msg = (
-            f"the cached word list {cache_file} is empty; delete it to extract it again"
-        )
+        msg = f"the cached word list {cache_file} is empty; {_DELETE_CACHE}"
         raise InputFileError(msg)
     return words
 
@@ -78,23 +85,14 @@ def tessdata_dir_and_languages(list_langs_output: str) -> tuple[Path, frozenset[
     from the output of `tesseract --list-langs`, whose first line is
     `List of available languages in "<folder>" (<count>):`."""
     header, *languages = list_langs_output.strip().split("\n")
-    if not header.startswith(_LIST_LANGS_HEADER):
+    match = _LIST_LANGS_HEADER.fullmatch(header.strip())
+    if match is None:
         msg = (
             "`tesseract --list-langs` printed an unexpected first line, "
             f"{header!r}, where galley expected the folder of the language data"
         )
         raise ExternalProgramError(msg)
-    folder = header.removeprefix(_LIST_LANGS_HEADER).split('"')[1]
-    return Path(folder), frozenset(language.strip() for language in languages)
-
-
-def _known_language(language: str) -> Language:
-    try:
-        return Language(language)
-    except ValueError as err:
-        known = ", ".join(member.value for member in Language)
-        msg = f"galley has no word list for the language {language!r}; it knows {known}"
-        raise ConfigError(msg) from err
+    return Path(match.group(1)), frozenset(language.strip() for language in languages)
 
 
 def _extract(tesseract_code: str, cache_file: Path) -> None:
@@ -137,12 +135,23 @@ def _extract(tesseract_code: str, cache_file: Path) -> None:
     if not words_of_list(text):
         msg = f"dawg2wordlist wrote no words for {tesseract_code!r}"
         raise ExternalProgramError(msg)
-    descriptor, partial = tempfile.mkstemp(
+    _write_atomically(text, cache_file)
+
+
+def _write_atomically(text: str, cache_file: Path) -> None:
+    """Writes `text` to a temporary file beside `cache_file` and renames it
+    into place; a failed write removes the temporary file."""
+    descriptor, partial_name = tempfile.mkstemp(
         dir=cache_file.parent, prefix=f".{cache_file.name}.", suffix=".partial"
     )
-    with os.fdopen(descriptor, "w", encoding="utf-8") as partial_file:
-        partial_file.write(text)
-    Path(partial).replace(cache_file)
+    partial = Path(partial_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as partial_file:
+            partial_file.write(text)
+        partial.replace(cache_file)
+    except BaseException:
+        partial.unlink(missing_ok=True)
+        raise
 
 
 def _run(program: str, *arguments: str) -> str:
