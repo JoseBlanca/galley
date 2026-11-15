@@ -26,3 +26,8 @@ class AlignmentError(EvaluationError):
 class GalleyFilesError(EvaluationError):
     """galley's files of a book do not fit together: a block with no page,
     a page that lines.json lacks, or a word of book.md in no known block."""
+
+
+class GalleyRunError(EvaluationError):
+    """`galley2epub run` on a book folder is not installed, failed, or did
+    not finish in time."""
