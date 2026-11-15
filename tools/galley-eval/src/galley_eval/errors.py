@@ -21,3 +21,8 @@ class ReferenceReadError(EvaluationError):
 class AlignmentError(EvaluationError):
     """A stage output cannot be aligned with the reference: a token ended
     in no pairing or in two, which is a fault of the alignment's code."""
+
+
+class GalleyFilesError(EvaluationError):
+    """galley's files of a book do not fit together: a block with no page,
+    a page that lines.json lacks, or a word of book.md in no known block."""
