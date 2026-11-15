@@ -345,6 +345,10 @@ last paragraph of the page before that has a body stream, unless rule 1
 or rule 2 makes it a start; for rule 1, "the line before" is the last
 line of that page, measured against its own region's right edge. A page
 with no body stream (a plate, a blank page) does not end the paragraph.
+A plate whose text layer has words has a body stream; so that those
+words are a paragraph of their own (section 9, "Plates"), the first line
+of a page that has a figure (lines.json copies the figures) starts a
+paragraph, and so does the first line of the page after it.
 
 Measured on the lines of words the reference puts in the body, as if
 layout had separated the regions without fault, against the
