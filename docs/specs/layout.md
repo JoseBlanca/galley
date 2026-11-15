@@ -214,35 +214,39 @@ is laid out as one region, as the skeleton did.
      semicolon hung outside the edge stays in its line;
    - its middle lies at least 2 pt left of the left edge: more of it
      lies in the margin than in the column;
-   - the second word of the row starts at least one body line pitch right
-     of the left edge, or the row has no second word: the box ran into
-     an empty stretch of the column. This keeps the words of a list
-     whose numbers hang outside the column ("13. Ivo Carnotensis",
-     Gierke's page 69), and boxes that join a note's text to the
-     body's ("TheFrank-ha", Domesday's page 303);
+   - the row has a second word, and it starts at least one body line
+     pitch right of the left edge: the box ran into an empty stretch of
+     the column. This keeps the words of a list whose numbers hang
+     outside the column ("13. Ivo Carnotensis", Gierke's page 69), and
+     boxes that join a note's text to the body's ("TheFrank-ha",
+     Domesday's page 303). A row of one word stays: on Gierke's page
+     123 the OCR read the note's "State." and the body's "form." as one
+     word, "Stfoarm." (27 to 93 pt against the edge at 66), and it is
+     the only such row the rule would move in the six books;
    - a margin word of the left side with at least two letters lies
      within one body line pitch of the first word, above or below: the
      margin word's top lies above the first word's bottom plus a pitch,
      and its bottom below the first word's top minus a pitch.
      The margin then holds a note, not numbers: on Gierke's page 62, a
      table of contents, "The Celestial Head gives" is set wide beside
-     its number "44".
+     its number "44", which has no letter. One letter instead of two
+     would move one more word in the six books, "31" beside "U" on
+     Kadesh's cover (page 0).
 
    Run on the six whole books on 15 November 2026, the rule moves 176
-   of Domesday's words and 96 of Gierke's, and none of Haskins',
+   of Domesday's words and 95 of Gierke's, and none of Haskins',
    Stubbs', Mariéjol's or Kadesh's. Of 23 of them compared with the
    page image (one each on Domesday's pages 65, 75, 83, 91, 167, 193,
    211, 281, 363, 375 and 503, and Gierke's 87, 101, 115, 123, 153,
    171, 173, 195, 217, 233, 239 and 255), each is a word of a margin
-   note. The same rule at
-   the right edge moved 8 words: one a note's ("Bonds", Domesday's page
+   note. The same rule at the right edge moved 8 words: one a note's ("Bonds", Domesday's page
    92), six a body word and a note word read as one ("ofdemesne-",
    Domesday's page 90), and one a body word ("the", Domesday's page
    270), so it is not applied there.
 
    Each side's margin words are grouped into lines, and the lines into
-   regions: a region ends where the next line's top is more than 1.5 body line pitches below
-   the top of the line before (a guess, so that each printed note is a
+   regions: a region ends where the next line's top is more than 1.5
+   body line pitches below the top of the line before (a guess, so that each printed note is a
    region of its own).
 3. **Running-head line.** Of the remaining words, grouped into rows,
    take the first row that holds a letter or a digit. It and every row
@@ -335,7 +339,7 @@ Where the thresholds come from:
 | rows that measure a book | 15 rows a page | guessed: enough rows for a commonest edge |
 | commonest edge | within 2 pt | measured: body lines start within 2.2 pt of the edge on 99% of Haskins' lines |
 | margin word | 2 pt outside the column edge | measured, above |
-| a word reaching into the column from the left margin | middle 2 pt outside, next word a pitch inside, a margin word of two letters within a pitch | measured on the six books, step 2 |
+| a word reaching into the column from the left margin | middle 2 pt outside, next word a pitch inside, a margin word of two letters within a pitch | measured on the six books, step 2: with one letter, Kadesh's cover also moves "31" beside "U" |
 | margin region split | 1.5 body line pitches | guessed |
 | running-head gap | 1.3 body line pitches | measured: the 5th percentile of the head's gap is 1.42 or more in the four evaluation books |
 | small row | 0.85 of the body word height | measured, section 2 |
@@ -567,12 +571,13 @@ with their boxes, with a `BookMeasures` given in the test:
 - a left margin note "Free" beside a body row that starts with "land.",
   whose box runs from 20 pt left of the left edge to 7 pt right of it,
   and whose next word starts 17 pt inside the edge, with a pitch of 12
-  pt: "land." joins
-  "Free" in the margin region's line. The same row with its next word 6
-  pt inside the edge, or with the margin word "44" instead of "Free",
-  or with the middle of "land." only 1 pt left of the edge, keeps
-  "land." in the body line; so does a ";" whose middle lies 3 pt left of
-  the edge;
+  pt: "land." joins "Free" in the margin region's line, and so it does
+  with its middle exactly 2 pt left of the edge, or with "Free" a line
+  above. The same row keeps "land." in the body line with its next
+  word 6 pt inside the edge, with no next word, with the margin word
+  "44" or "U" instead of "Free", with "Free" 1.1 pitches above or below
+  it, or with the middle of "land." 1.9 pt left of the edge; so does a
+  ";" whose middle lies 3 pt left of the edge;
 - a head row 1.4 pitches above the body gives a running-head region
   first; at 1.2 pitches, no such region; a row of ";" above it goes into
   the head region;
