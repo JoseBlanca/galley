@@ -250,11 +250,14 @@ is laid out as one region, as the skeleton did.
 6. **Drop capital.** A word of the body taller than 2.2 times the body
    word height, whose left side is within 3 pt of the left edge, is set
    aside before the rows of steps 3 to 5 and the lines of step 7 are
-   made. Once the regions' lines are made, it is placed first in the
-   topmost line, of any region but a margin region, whose box overlaps
-   the word's box vertically and lies to its right, that is whose left
-   side is at or right of the word's middle; the line's box then holds
-   the word. (Haskins' "IN" on page 163 has its top 0.5 pt below the
+   made. Once the regions' lines are made, the lines beside it are those,
+   of any region but a margin region, whose box overlaps the word's box
+   vertically and lies to its right, that is whose left side is at or
+   right of the word's middle. Its region is the one holding the line
+   beside it whose left side is nearest it (the smallest left side), so
+   that beside a column cut the left column's lines win over the right's;
+   it is placed first in the topmost line beside it in that region, and
+   the line's box then holds the word. (Haskins' "IN" on page 163 has its top 0.5 pt below the
    first line's centre, so a rule on the line's centre would put it on
    the second line.) A word with no such line is not set aside: the
    page is laid out again with it as a word of the body.
