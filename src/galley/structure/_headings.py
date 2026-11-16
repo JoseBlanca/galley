@@ -12,11 +12,7 @@ from enum import StrEnum
 from galley.model import BlockKind
 from galley.structure._lines import PlacedLine, is_centred
 from galley.structure._measures import Edges
-from galley.structure._runs import BodyRun, Label
-
-# Spec section 14, "Levels": a chapter's heading is level 1, a section's 2.
-_CHAPTER_LEVEL = 1
-_SECTION_LEVEL = 2
+from galley.structure._runs import CHAPTER_LEVEL, SECTION_LEVEL, BodyRun, LabelLine
 
 # Spec section 14, rule 4: a line in capitals has at least 0.7 of its
 # letters upper case (every value from 0.5 to 0.9 gives the same blocks on
@@ -69,7 +65,7 @@ def _texts(line: PlacedLine) -> tuple[str, ...]:
     return tuple(word.text for word in line.line.words)
 
 
-def capitals_share(line: PlacedLine) -> float:
+def _capitals_share(line: PlacedLine) -> float:
     """The share of the line's letters (`str.isalpha`) that are upper case;
     0 for a line without a letter."""
     letters = [c for text in _texts(line) for c in text if c.isalpha()]
@@ -78,7 +74,7 @@ def capitals_share(line: PlacedLine) -> float:
     return sum(c.isupper() for c in letters) / len(letters)
 
 
-def is_chapter_label(line: PlacedLine) -> bool:
+def _is_chapter_label(line: PlacedLine) -> bool:
     """Whether the line is a chapter label (spec section 14): it starts with
     CHAPTER, CHAPITRE, ESSAY, PART, PARTIE, BOOK or LIVRE in any case, or
     it is one word, a roman numeral as the OCR reads one ("V", "Ill.")."""
@@ -182,7 +178,7 @@ def _is_heading_line(
         and _has_long_word(texts)
         and not _ends_with_number(texts)
         and (
-            capitals_share(line) >= _CAPITALS_SHARE_MIN
+            _capitals_share(line) >= _CAPITALS_SHARE_MIN
             or _gap_branch(lines, number, pitch)
         )
     )
@@ -207,13 +203,13 @@ def _is_continuation(lines: Sequence[PlacedLine], number: int, pitch: float) -> 
         return False
     below = _pitches(line, lines[number + 1], pitch)
     return (
-        capitals_share(line) >= _CONTINUATION_CAPITALS_MIN
+        _capitals_share(line) >= _CONTINUATION_CAPITALS_MIN
         and below is not None
         and below >= _CONTINUATION_GAP_BELOW_MIN_PITCHES
     )
 
 
-def heading_line_numbers(
+def _heading_line_numbers(
     lines: Sequence[PlacedLine], pitch: float, side_edges: Edges | None
 ) -> frozenset[int]:
     """The positions in `lines`, a page's body stream, of its heading lines
@@ -231,7 +227,7 @@ def heading_line_numbers(
         number
         for number in range(len(lines) - 1)
         if number + 1 in by_rule
-        and is_chapter_label(lines[number])
+        and _is_chapter_label(lines[number])
         and is_centred(lines[number])
     )
     taken = by_rule | labels
@@ -259,7 +255,7 @@ def _joins(upper: PlacedLine, lower: PlacedLine, pitch: float) -> bool:
     4.0 when the first is a chapter label alone."""
     below = _pitches(upper, lower, pitch)
     limit = (
-        _JOIN_AFTER_LABEL_MAX_PITCHES if is_chapter_label(upper) else _JOIN_MAX_PITCHES
+        _JOIN_AFTER_LABEL_MAX_PITCHES if _is_chapter_label(upper) else _JOIN_MAX_PITCHES
     )
     return below is not None and below <= limit
 
@@ -288,7 +284,7 @@ def heading_runs(
     (which a line starting with a label word is) or the first line of a page without a
     running head (`head`); level 2 otherwise. `band` are the lines of the
     page's band regions; `pitch` is the body line pitch, in points."""
-    numbers = sorted(heading_line_numbers(lines, pitch, _side_edges(lines, band)))
+    numbers = sorted(_heading_line_numbers(lines, pitch, _side_edges(lines, band)))
     groups: list[list[int]] = []
     for number in numbers:
         if (
@@ -303,7 +299,7 @@ def heading_runs(
     for group in groups:
         first = lines[group[0]]
         # A line that starts with a label word is a chapter label.
-        level_1 = is_chapter_label(first) or (
+        level_1 = _is_chapter_label(first) or (
             group[0] == 0 and head is PageHead.NO_RUNNING_HEAD
         )
         runs.append(
@@ -311,11 +307,11 @@ def heading_runs(
                 start=group[0],
                 end=group[-1] + 1,
                 kind=BlockKind.HEADING,
-                level=_CHAPTER_LEVEL if level_1 else _SECTION_LEVEL,
-                label=(
-                    Label.FIRST_LINE
-                    if is_chapter_label(first) and len(group) > 1
-                    else Label.NONE
+                level=CHAPTER_LEVEL if level_1 else SECTION_LEVEL,
+                label_line=(
+                    LabelLine.FIRST
+                    if _is_chapter_label(first) and len(group) > 1
+                    else LabelLine.NONE
                 ),
             )
         )

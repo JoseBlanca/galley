@@ -10,21 +10,19 @@ from galley.model import BlockKind
 from galley.structure._lines import PlacedLine, first_word
 from galley.structure._markers import MarkerForm, marker_form
 from galley.structure._paragraphs import BodyBlock, Entry, PageParts
-from galley.structure._runs import BodyRun
+from galley.structure._runs import SECTION_LEVEL, BodyRun
 
 _TITLE = "bibliographical note"
-# Spec section 14, "Levels": a section's heading.
-_SECTION_LEVEL = 2
 
 
 def _text(lines: Sequence[PlacedLine]) -> str:
     return " ".join(word.text for line in lines for word in line.line.words)
 
 
-def is_bibliographical_note(text: str, level: int | None) -> bool:
+def _is_bibliographical_note(text: str, level: int | None) -> bool:
     """Whether a heading of `text` and `level` heads a bibliographical note:
     level 2, its text "BIBLIOGRAPHICAL NOTE" in any case."""
-    return level == _SECTION_LEVEL and text.casefold() == _TITLE
+    return level == SECTION_LEVEL and text.casefold() == _TITLE
 
 
 def _heading_text(page: PageParts, run: BodyRun) -> str:
@@ -50,7 +48,7 @@ def bibliography(pages: Sequence[PageParts]) -> Bibliography:
     for page in pages:
         for run in page.runs:
             if run.kind is BlockKind.HEADING:
-                inside = is_bibliographical_note(_heading_text(page, run), run.level)
+                inside = _is_bibliographical_note(_heading_text(page, run), run.level)
                 if inside:
                     headed.add(page.index)
         if inside:
@@ -127,7 +125,7 @@ def in_bibliographical_notes(entries: Sequence[Entry]) -> frozenset[int]:
         if not isinstance(entry, BodyBlock):
             continue
         if entry.kind is BlockKind.HEADING:
-            inside = is_bibliographical_note(_text(entry.piece.lines), entry.level)
+            inside = _is_bibliographical_note(_text(entry.piece.lines), entry.level)
         elif inside:
             found.add(position)
     return frozenset(found)
