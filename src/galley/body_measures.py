@@ -1,7 +1,7 @@
 """The measures of a book's body text that layout and structure both take.
 
-`group_rows` groups a page's words into rows (layout spec section 1,
-"Row"); `edge_counts` counts the edges near each edge and `commonest`
+`rows_of` groups words, or lines, into rows (layout spec section 1,
+"Row"), and `group_rows` makes a page's words rows; `edge_counts` counts the edges near each edge and `commonest`
 finds the commonest of a set of edges; and
 `body_measures` gives the book's body word height and body line pitch
 from the rows of its pages (layout spec section 3, "The book's
@@ -13,7 +13,7 @@ points, origin at the top left of the page.
 import bisect
 import itertools
 import statistics
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Final
 
@@ -29,6 +29,7 @@ __all__ = [
     "measured_page_positions",
     "measured_pages",
     "median_word_height",
+    "rows_of",
 ]
 
 # Measured: body lines start within 2.2 pt of the edge on 99% of Haskins'
@@ -53,32 +54,42 @@ class BodyMeasures:
     body_line_pitch: float
 
 
-def group_rows(words: tuple[Word, ...]) -> tuple[Line, ...]:
-    """The rows of a page's `words`, top to bottom, each one's words left to
-    right (layout spec section 1, "Row").
+def rows_of[T](
+    items: Iterable[T], box: Callable[[T], Box]
+) -> tuple[tuple[T, ...], ...]:
+    """`items` grouped into rows, top to bottom, each row's items left to
+    right, by the box `box` gives each (layout spec section 1, "Row").
 
-    The words are taken by top, then left side, equal keys in their given
-    order. The first word starts a row and is its anchor; a later word
+    The items are taken by top, then left side, equal keys in their given
+    order. The first item starts a row and is its anchor; a later item
     joins the current row when its vertical centre lies within the
     anchor's top and bottom, edges included, and otherwise starts the next
-    row as its anchor. A row's box is the smallest box that holds its
+    row as its anchor. Within a row, equal left sides keep their order. No
+    items give no rows.
+    """
+    rows: list[list[T]] = []
+    anchor: Box | None = None
+    for item in sorted(items, key=lambda item: (box(item).top, box(item).x0)):
+        item_box = box(item)
+        centre = (item_box.top + item_box.bottom) / 2
+        if anchor is not None and anchor.top <= centre <= anchor.bottom:
+            rows[-1].append(item)
+        else:
+            rows.append([item])
+            anchor = item_box
+    return tuple(tuple(sorted(row, key=lambda item: box(item).x0)) for row in rows)
+
+
+def group_rows(words: tuple[Word, ...]) -> tuple[Line, ...]:
+    """The rows of a page's `words`, top to bottom, each one's words left to
+    right (`rows_of`). A row's box is the smallest box that holds its
     words, so its top is its anchor's. No words give no rows.
     """
-    rows: list[list[Word]] = []
-    anchor: Word | None = None
-    for word in sorted(words, key=lambda word: (word.box.top, word.box.x0)):
-        centre = (word.box.top + word.box.bottom) / 2
-        if anchor is not None and anchor.box.top <= centre <= anchor.box.bottom:
-            rows[-1].append(word)
-        else:
-            rows.append([word])
-            anchor = word
-    return tuple(_row(tuple(row)) for row in rows)
+    return tuple(_row(row) for row in rows_of(words, lambda word: word.box))
 
 
 def _row(words: tuple[Word, ...]) -> Line:
-    """The row of `words`, sorted left to right; equal left sides keep their
-    order."""
+    """The row of `words`, which are left to right."""
     return Line(
         Box(
             min(word.box.x0 for word in words),
@@ -86,7 +97,7 @@ def _row(words: tuple[Word, ...]) -> Line:
             max(word.box.x1 for word in words),
             max(word.box.bottom for word in words),
         ),
-        tuple(sorted(words, key=lambda word: word.box.x0)),
+        words,
     )
 
 

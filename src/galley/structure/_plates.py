@@ -13,6 +13,7 @@ removed as `plate_text`.
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
+from galley.body_measures import rows_of
 from galley.model import (
     BlockKind,
     LinesFile,
@@ -110,23 +111,11 @@ def _line_removal(
     )
 
 
-def _in_rows(lines: Sequence[PlacedLine]) -> tuple[PlacedLine, ...]:
+def _in_rows(lines: Sequence[PlacedLine]) -> tuple[tuple[PlacedLine, ...], ...]:
     """`lines` from the top down in rows, each row from the left (spec
-    section 18, rule 3). The rows are taken as layout takes the rows of
-    words (layout spec section 1, "Row"): by top, then left side, a line
-    joining the row when its vertical centre lies within the top and
-    bottom of the row's first line."""
-    rows: list[list[PlacedLine]] = []
-    for line in sorted(lines, key=lambda line: (line.line.box.top, line.line.box.x0)):
-        box = line.line.box
-        centre = (box.top + box.bottom) / 2
-        if rows and rows[-1][0].line.box.top <= centre <= rows[-1][0].line.box.bottom:
-            rows[-1].append(line)
-        else:
-            rows.append([line])
-    return tuple(
-        line for row in rows for line in sorted(row, key=lambda line: line.line.box.x0)
-    )
+    section 18, rule 3), as layout takes the rows of words
+    (`body_measures.rows_of`)."""
+    return rows_of(lines, lambda line: line.line.box)
 
 
 def plate_parts(
@@ -192,7 +181,7 @@ def plate_parts(
         figure=PageFigure(
             figure.image,
             figure.box,
-            Piece(_in_rows(caption)),
+            Piece(tuple(line for row in _in_rows(caption) for line in row)),
         ),
     )
 
