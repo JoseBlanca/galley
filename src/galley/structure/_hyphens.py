@@ -111,7 +111,10 @@ class JoinedWords:
 
 
 def join_lines(
-    lines: Sequence[PageLine], book_words: frozenset[str], word_list: frozenset[str]
+    lines: Sequence[PageLine],
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    unjoined: frozenset[int] = frozenset(),
 ) -> JoinedWords:
     """The words of `lines`, one block's lines in order, possibly over a
     page break, with the last word of each line joined to the first of the
@@ -119,7 +122,8 @@ def join_lines(
     first word. A line of one word between two hyphens is joined twice. A
     line that holds only a reference sign ("^") after a line ending with a
     hyphen is passed over, and the sign goes after the word the join gives
-    (spec section 5)."""
+    (spec section 5). A line whose position is in `unjoined` is never
+    joined to the line before."""
     words: list[str] = []
     pages: list[int] = []
     changes: list[WordChange] = []
@@ -139,7 +143,7 @@ def join_lines(
             continue
         joined = (
             join_hyphen(words[-1], texts[0], book_words, word_list)
-            if words and texts
+            if words and texts and number not in unjoined
             else None
         )
         if joined is not None:

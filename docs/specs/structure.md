@@ -947,7 +947,7 @@ exactly.
 | `haskins_eval` | 1 (132) | the reference "^" alone linked to the note whose marker is "*" |
 | `haskins_eval` | 2 (133) | a sign glued to its word, "journalist,^" |
 | `haskins_eval` | 9 (266) | heading "INDEX", level 1; the entries of the left column, then the right, one `index_entry` each, not a quote |
-| `stubbs_51_56-64` | 0 (51) | heading "CHAPTER III. / THE EARLY YEARS OF HENRY II.", level 1, `label` "CHAPTER III."; the 3-line summary, one `chapter_summary`; "Very few epochs…" starts a paragraph; the cut-in note "Importance attached… accession." before its paragraph |
+| `stubbs_51_56-64` | 0 (51) | heading "CHAPTER III. / THE EARLY YEARS OF HENRY II.", level 1, `label` "CHAPTER III."; the 3-line summary, one `chapter_summary`; "Very few epochs…" starts a paragraph; of the cut-in note "Importance attached… accession.", layout takes out only its last line, "accession.", which goes before that paragraph as a margin note; its words "Importance", "attachedby", "contempora-" and "toHenry's" stay in the body lines beside them (layout §3, step 2b) |
 | `stubbs_51_56-64` | 3 (58) | "His great position in Christendom" (as the OCR reads it) beside the middle of a paragraph, placed before it |
 | `stubbs_51_56-64` | 2 (57), 7 (62), 9 (64) | cut-in notes on the left and right (layout §8), each before its paragraph |
 | `domesday_74-83` | 0 (74) | note 6 with the marker "«", linked from "would6.'"; seven glued references, "pleased1/" to "mercy7.'", linked |
@@ -956,7 +956,7 @@ exactly.
 | `domesday_74-83` | 9 (83) | three lines of two notes each; markers "8", "*", "e"; references "12s.2", "30d8" |
 | `mariejol_210-219` | 0 (210) | five notes left in the body, missed by section 11's order test (markers read 1, 2, 3, none, 11, 5): each a paragraph of its own, not a quote, and note 5 ("(S) La thèse…") not run on into pages 211 and 212 |
 | `mariejol_210-219` | 7 (217) | a note left in the body, taken as a note |
-| `mariejol_210-219` | 2 (212) | two broken lines inset on both sides: a known false `verse` block |
+| `mariejol_210-219` | 2 (212) | two broken lines inset on both sides after "se sou-": no `verse` block, since the hyphen joins them to the text (rule 4) |
 | `mariejol_210-219` | 4 (214) | a note run on from page 213, one note; markers "(t)", "(a)", "(3J"; "(» i)" not found, so note 1 unreferenced |
 | `mariejol_210-219` | 6 (216) | marker "U)"; note 2 with no reference in the text |
 | `kadesh_8-17` | 0 (8) | the article title, one level-1 heading of three lines with the author's name |
@@ -967,11 +967,12 @@ exactly.
 | `gierke_86-93_270-271` | 6 (92) | "II. Macrocosm and Microcosm.", level 2, and the known false heading "Macrocosm and Microcosm." at the top |
 | `gierke_86-93_270-271` | 8 (270), 9 (271) | endnotes 291 to 302, kind `endnote`, unreferenced, each margin note inside its note before its text; the end of note 290 at the top of page 270 an endnote with no marker, not joined to the last paragraph of page 93 |
 | `haskins_quotes_index` (new) | 0 (39) | a level-2 heading "BIBLIOGRAPHICAL NOTE" mid-page, paragraphs after it, not quotes (section 16) |
-| `haskins_quotes_index` | 1 (53) | quotes in smaller type across the column |
-| `haskins_quotes_index` | 2 to 4 (71 to 73) | a quote that runs over two page breaks |
-| `haskins_quotes_index` | 5 (129) | the heading "BIBLIOGRAPHICAL NOTE" above a band of small type, whose blocks are paragraphs, not notes |
-| `haskins_quotes_index` | 6 (209), 7 (234) | centred Latin verse and English verse, `verse` blocks with their line breaks |
-| `haskins_quotes_index` | 8 (267), 9 (269) | index rows read across both columns, cut at the gutter; "Calabria", an entry from the foot of one column to the top of the next |
+| `haskins_quotes_index` | 1 (41) | the heading of chapter II, which ends the bibliographical note of page 39 |
+| `haskins_quotes_index` | 2 (53) | quotes in smaller type across the column (checked on the whole book; see below) |
+| `haskins_quotes_index` | 3 to 5 (71 to 73) | a quote that runs over two page breaks (checked on the whole book) |
+| `haskins_quotes_index` | 6 (129) | the heading "BIBLIOGRAPHICAL NOTE" above a band of small type, whose blocks are paragraphs, not notes |
+| `haskins_quotes_index` | 7 (209), 8 (234) | centred Latin verse and English verse, `verse` blocks with their line breaks |
+| `haskins_quotes_index` | 9 (267), 10 (269) | index rows read across both columns, cut at the gutter; "Calabria", an entry from the foot of one column to the top of the next |
 | `stubbs_summaries_index` (new) | 0 (16) | a printed contents page, named in the test's `contents_pages`: no heading |
 | `stubbs_summaries_index` | 1 (28) | a summary whose OCR is out of order: missed, as the first plan made it |
 | `stubbs_summaries_index` | 2 (79) | a summary whose last line is centred |
@@ -999,7 +1000,19 @@ they cover, each from a public-domain book of the evaluation set or of
 the committed excerpts, every page with a text layer:
 
 - `haskins_quotes_index`: Haskins (`normansineuropea00hask`), page
-  indices 39, 53, 71, 72, 73, 129, 209, 234, 267 and 269.
+  indices 39, 41, 53, 71, 72, 73, 129, 209, 234, 267 and 269. Page 41,
+  the opening of chapter II, was added on 16 November 2026: without its
+  heading the bibliographical note of page 39 ran on to page 129's, and
+  the quotes of pages 53 and 71 to 73 came out as its paragraphs. The
+  excerpt still cannot check those quotes: its pages are mostly small
+  type (the quotes, the bibliographical notes, the index), so it
+  measures a body word height of 7.60 pt and a pitch of 11.86 pt against
+  the book's 8.32 and 15.19, and quotes set at 0.93 to 0.95 of the book's
+  height are not smaller than the excerpt's. Six more pages of text
+  (42, 43, 54, 55, 74, 130) bring it only to 7.80 and 12.66 pt; without
+  the index pages and with page 42 it measures 8.05 and 13.68 pt
+  (measured on 16 November 2026).
+  The quotes of pages 53 and 71 to 73 are checked on the whole book.
 - `stubbs_summaries_index`: Stubbs (`earlyplantagenet01stub`), page
   indices 16, 28, 79, 157, 312, 313, 316, 318, 319 and 321.
 - `domesday_headings_quotes`: Domesday (`domesdaybook00maituoft`), page
@@ -1535,6 +1548,13 @@ takes out of the body lines beside them (layout §3, step 2b).
    regions that are not beside a paragraph's first line lie within 2.5
    pitches below another, against 38 that are beside one ("Bodies" /
    "politic." on page 109); in Domesday the counts are 31 and 3.
+   The regions' lines are one after another in the block, but no hyphen
+   is joined (section 5) where one region ends and the next begins: a
+   line between them often went unread, and of the 11 joins made there
+   on Domesday and Gierke, 10 made words that are not printed ("peathe"
+   of "The pea-" and "the rSoyal", Domesday page 90; "Guardianvacant",
+   Gierke page 127). Decided on 16 November 2026, in the review of work
+   package 4.
 2. **The line it is beside.** Take the top of the margin note's first
    line. When the first line of a paragraph of the page has its top
    within 0.5 pitch of it, above or below, that is the line beside;
@@ -1894,10 +1914,19 @@ rule here changes a block's kind and no word, so it needs no record.
    before or after it is one.
 4. **Verse** (per page, before the paragraphs are made: section 2, step
    2.3). A run of at least 2 consecutive body lines, each of at least 3
-   words and inset at least 30 pt from both of its region's edges, more
+   words and inset at least 30 pt from both of the edges its centring is
+   measured against (section 6, rule 2: its region's, or the page's body
+   column for a line of a region of fewer than 5 lines), more
    than half of them starting within 12 pt of the run's median left
    side, is one `verse` block, whatever section 6 would make of it; a
-   heading line is not part of a run. A verse block that is the last
+   heading line is not part of a run, and a run does not start right
+   after a line that ends with a hyphen, which section 6 never lets start
+   a paragraph (Mariéjol page 212: two lines of garbled prose after "se
+   sou-" made a false verse block; decided on 16 November 2026, in the
+   review of work package 4). It costs one real verse block in the six
+   books: Mariéjol page 243's two lines after "et pré-", a line the OCR
+   garbled, whose word "dirent" it read earlier in the same line, so the
+   two lines join the paragraph above. A verse block that is the last
    block of a page's body stream continues on the next page when that
    page's body stream starts with such a run. This was not measured,
    and no excerpt page shows it: Mariéjol's pages 51 and 52, once named
@@ -1952,8 +1981,10 @@ page's median (it fails on Haskins' pages that are all quote).
 - **Tables**: Domesday's tables in small type become quotes, and those
   inset on both sides verse. galley has no table kind; a table read as
   verse keeps its rows on lines of their own.
-- **Broken lines**: on Mariéjol's page 212 (excerpt page 2) two lines
-  the OCR cut short, inset on both sides, become a verse block.
+- **Broken lines**: lines the OCR cut short, inset on both sides, become
+  a verse block unless the line before ends with a hyphen (Mariéjol's
+  page 212, excerpt page 2, now stays prose; pages 121, 156 and 265
+  still give such blocks).
 - **Haskins' "Bibliographical note" sections**, set in small type at
   each chapter's end, would be quotes where layout reads them as body
   (pages 39, 40, 262 to 264) and notes without a marker where it reads
@@ -1975,6 +2006,13 @@ block, are paragraphs, whatever their type:
   joined over page breaks (section 2, step 3.1), each becomes a body
   paragraph of its page, after the page's body blocks, in reading order,
   and is joined over a page break as any paragraph is;
+- except, on the heading's own page, a band block whose first word has
+  the book's marker form (section 1) and the band blocks after it: a
+  footnote of the text above the heading, which stays a note (Haskins
+  page 204, "^ Mont-Saint-Micheland Chartres, p. 4.", the note of
+  "Adams,^"; decided on 16 November 2026, in the review of work
+  package 4). No band block of a bibliographical note in Haskins starts
+  with such a word;
 - the quote rules (1 to 3 above) do not apply to them.
 
 The rule names its words, so it takes nothing in another book. How many

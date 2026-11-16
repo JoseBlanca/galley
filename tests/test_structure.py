@@ -72,6 +72,7 @@ from galley.structure._references import (
     pair_score,
     reference_form,
 )
+from galley.structure._unnumbered import Unnumbered, without_marker
 
 
 def _word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
@@ -2665,6 +2666,27 @@ def test_margin_note_before_each_paragraph_when_the_lower_is_beside_a_first_line
     )
 
 
+def test_margin_note_regions_of_one_note_are_not_joined_at_a_hyphen() -> None:
+    # Two regions of one printed note 1.5 pitches apart: a line between them
+    # went unread, so "pea-" is not joined to "the" (Domesday page 90 gave
+    # "peathe").
+    upper = _region(_spread("The pea-", 310, 345, 40))
+    lower = _region(_spread("the royal", 310, 345, 50 + 22.5))
+    body = _region(
+        _indented("Alpha begins here", 40),
+        *(_full(f"and goes on {n}", 55 + 15 * n) for n in range(4)),
+        _short("its end.", 115),
+    )
+    lines = _lines_of(PageLayout(0, (body, upper, lower), ()))
+    blocks = make_blocks(lines, frozenset({"peathe"}), workers=1)
+    assert tuple(
+        block_text(block)
+        for block in blocks.blocks
+        if block.kind is BlockKind.MARGIN_NOTE
+    ) == ("The pea- the royal",)
+    assert blocks.word_changes == ()
+
+
 def test_margin_notes_on_the_two_sides_are_not_joined() -> None:
     # A region left of the column and one right of it, at the same height
     # within 2.5 pitches: each is a note of its own.
@@ -3728,6 +3750,22 @@ def test_verse_line_ending_with_a_hyphen_is_joined_to_the_next() -> None:
     )
 
 
+@pytest.mark.parametrize(("ending", "verse"), [("se sou-", False), ("se sou", True)])
+def test_verse_run_does_not_start_after_a_line_ending_with_a_hyphen(
+    ending: str, verse: bool
+) -> None:
+    # Mariéjol page 212: two inset lines after "se sou-" are prose.
+    page = _body_page(
+        0,
+        *(_full(f"before {n} of the page", 70 + _PITCH_PT * n) for n in range(3)),
+        _full(f"and the bourgeois {ending}", 115),
+        *(_verse_line(text, 130 + 15 * n) for n, text in enumerate(_VERSE[:2])),
+        *(_full(f"after {n} of the page", 160 + _PITCH_PT * n) for n in range(5)),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert any(block.kind is BlockKind.VERSE for block in blocks.blocks) is verse
+
+
 def test_verse_heading_line_is_not_part_of_a_run() -> None:
     # A centred title in capitals of 3 words, inset on both sides, stays a
     # heading above the verse.
@@ -4070,6 +4108,35 @@ def test_bibliographical_note_blocks_are_paragraphs_up_to_the_next_heading() -> 
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+def test_bibliographical_note_footnote_under_the_heading_s_page_stays_a_note() -> None:
+    # Haskins page 204: on the heading's page, the band's block led by a
+    # marker of the book's form (digits, from page 3) and what follows stay
+    # notes; the unmarked block before them is a paragraph. On page 1, a
+    # marked band block is a paragraph of the section.
+    lines = _bibliography_pages("BIBLIOGRAPHICAL NOTE")
+    band_0 = _region(
+        _note_line("Sources are listed in the general works on", 300),
+        _note_line("the period.", 309, 50, 100),
+        _note_line("1 Mont-Saint-Michel and Chartres, p. 4.", 320, 62, 250),
+        _note_line("2 Ibid.", 329, 62, 100),
+    )
+    band_1 = _region(_note_line("3 Cited above, p. 9.", 300, 62, 200))
+    page_0 = replace(lines.pages[0], regions=(*lines.pages[0].regions, band_0))
+    page_1 = replace(lines.pages[1], regions=(lines.pages[1].regions[0], band_1))
+    blocks = make_blocks(
+        _lines_of(page_0, page_1, *lines.pages[2:]), _NO_WORDS, workers=1
+    )
+    assert tuple((note.origin[0].page_index, note.marker) for note in blocks.notes)[
+        :2
+    ] == ((0, "1"), (0, "2"))
+    # "Sources…" runs on into page 1's body, as any paragraph does.
+    assert tuple(
+        " ".join(block_text(block).split(" ")[:2])
+        for block in blocks.blocks
+        if block_text(block).startswith(("Sources", "3 Cited"))
+    ) == ("Sources are", "3 Cited")
+
+
 def test_bibliographical_note_rule_names_its_title() -> None:
     blocks = make_blocks(_bibliography_pages("FURTHER READING"), _NO_WORDS, workers=1)
     assert tuple(
@@ -4096,7 +4163,8 @@ def test_bibliographical_note_heading_of_level_1_heads_none() -> None:
 def test_bibliographical_note_pages_keep_the_notes_left_in_their_body() -> None:
     # The heading at the foot of page 0 starts a bibliographical note that
     # runs to "CHAPTER II." on page 3: page 1's small lines with rising
-    # markers stay paragraphs, and page 0's band note is one too.
+    # markers stay paragraphs. Page 0's band note, led by a marker on the
+    # heading's page, stays a note.
     pages = _body_notes_pages(("(1)", "(2)", "(3)")).pages
     page_0 = replace(
         pages[0],
@@ -4119,7 +4187,7 @@ def test_bibliographical_note_pages_keep_the_notes_left_in_their_body() -> None:
         (),
     )
     blocks = make_blocks(_lines_of(page_0, *pages[1:], page_3), _NO_WORDS, workers=1)
-    assert tuple(note.origin[0].page_index for note in blocks.notes) == (3,)
+    assert tuple(note.origin[0].page_index for note in blocks.notes) == (0, 3)
     assert _page_1_blocks(blocks)[-3:] == (
         "(1) Note (1) in small type.",
         "(2) Note (2) in small type.",
@@ -4146,6 +4214,102 @@ def test_quote_never_a_block_led_by_the_book_s_marker_form(
     lines = _lines_of(_quote_page(0, *_quote_lines(115, 8.5, texts)), page_1)
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert _kinds(blocks)[1] == kind
+
+
+# Guards that no fixture of the excerpts reaches (review of work package 4).
+
+
+@pytest.mark.parametrize("label", ["VIII", "XIII.", "Ill"])
+def test_heading_label_of_a_roman_numeral_of_up_to_5_characters(label: str) -> None:
+    # Haskins page 233 prints "VIII" above its title.
+    blocks = make_blocks(
+        _lines_of(
+            _around(
+                _centred_line(label, 130, width=25),
+                _centred_line("THE NORMAN KINGDOM OF SICILY", 143.5, width=160),
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert _kinds_and_texts(blocks)[1] == (
+        "heading",
+        1,
+        label,
+        "THE NORMAN KINGDOM OF SICILY",
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "heading"),
+    [("ABCDEFGhij", True), ("ABCDEFghij", False), ("THE EARLY YEArs", True)],
+)
+def test_heading_line_in_capitals_needs_0_7_of_its_letters_upper_case(
+    text: str, heading: bool
+) -> None:
+    # 1.5 pitches below the line before, so the gap branch does not hold:
+    # 7 of 10 letters upper case is a heading, 6 of 10 is not; 11 of 13,
+    # under the 0.9 a continuation needs, is one.
+    blocks = make_blocks(
+        _lines_of(_around(_centred_line(text, 122.5))), _NO_WORDS, workers=1
+    )
+    assert (_kinds_and_texts(blocks)[1][0] == "heading") is heading
+
+
+def test_margin_note_beside_an_indented_verse_line_keeps_the_verse_whole() -> None:
+    # Only a paragraph is split beside a margin note (section 13, rule 3).
+    body = _around(
+        *(_verse_line(text, 122.5 + 15 * n) for n, text in enumerate(_VERSE))
+    ).regions[0]
+    margin = _region(_spread("Aside", 310, 340, 137.5))
+    blocks = make_blocks(
+        _lines_of(PageLayout(0, (body, margin), ())), _NO_WORDS, workers=1
+    )
+    assert _kinds(blocks) == ("paragraph", "margin_note", "verse", "paragraph")
+    assert block_text(blocks.blocks[2]) == "\n".join(_VERSE)
+
+
+def test_chapter_summary_ends_before_the_next_heading() -> None:
+    # A heading straight after the summary's indented lines is a heading of
+    # its own, not more of the summary, though centred lines are indented.
+    blocks = make_blocks(
+        _lines_of(
+            _summary_page(
+                _hanging(_SUMMARY_TEXTS[0], 0),
+                _hanging(_SUMMARY_TEXTS[1], 9),
+                _centred_line("THE FIRST PART", 0),
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert _kinds(blocks)[1:4] == ("heading", "chapter_summary", "heading")
+
+
+def test_note_marker_taken_as_a_whole_word_shifts_the_positions_of_its_changes() -> (
+    None
+):
+    # The block "1 Ali- son wrote" with its join at word 1: once the marker
+    # "1" is dropped, the join is at word 0, as its word is.
+    join = WordChange(
+        page_index=0,
+        before=("Ali-", "son"),
+        after=("Alison",),
+        reason=ChangeReason.HYPHEN_JOIN,
+    )
+    block = Unnumbered(
+        kind=BlockKind.PARAGRAPH,
+        words=("1", "Alison", "wrote"),
+        word_pages=(0, 0, 0),
+        origin=(Origin(0, Box(50, 300, 300, 307)),),
+        changes=((1, join),),
+        line_starts=frozenset({2}),
+    )
+    without, marker = without_marker(block, NoteMarker("1", "", 1))
+    assert marker == "1"
+    assert without.words == ("Alison", "wrote")
+    assert without.changes == ((0, join),)
+    assert without.line_starts == frozenset({1})
 
 
 # The fidelity check at the structure boundary
@@ -4428,7 +4592,8 @@ def test_whole_book_haskins_quotes_and_bibliographical_notes(
     # Structure spec, section 16: the quotes in smaller type across the
     # column on page 53, the quote over two page breaks from 71 to 73, and
     # the band of small type under "BIBLIOGRAPHICAL NOTE" on page 129 as
-    # paragraphs, which the excerpt cannot show (tests/test_excerpts.py).
+    # paragraphs. The excerpt haskins_quotes_index measures its body type
+    # smaller than the book's and cannot show the quotes.
     blocks = _blocks_of_whole_book(whole_book_toml["normansineuropea00hask"], tmp_path)
 
     def kinds_from(page: int) -> tuple[tuple[str, list[int]], ...]:

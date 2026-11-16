@@ -136,10 +136,11 @@ EVALUATION_EXCERPTS = frozendict(
             ),
             Excerpt(
                 name="haskins_quotes_index",
-                page_indices=(39, 53, 71, 72, 73, 129, 209, 234, 267, 269),
+                page_indices=(39, 41, 53, 71, 72, 73, 129, 209, 234, 267, 269),
                 covers=(
                     "a level-2 heading BIBLIOGRAPHICAL NOTE mid-page with "
-                    "paragraphs of small type after it (page index 39) and "
+                    "paragraphs of small type after it (page index 39), "
+                    "ended by the heading of chapter II (41), and "
                     "above a band of small type (129), quotes in smaller type "
                     "(53), a quote over two page breaks (71 to 73), Latin and "
                     "English verse (209, 234), and index pages whose rows are "

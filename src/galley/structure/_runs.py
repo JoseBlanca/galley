@@ -7,12 +7,16 @@ from enum import StrEnum
 
 from galley.model import BlockKind
 
+# Spec section 14, "Levels": a chapter's heading is level 1, a section's 2.
+CHAPTER_LEVEL = 1
+SECTION_LEVEL = 2
 
-class Label(StrEnum):
+
+class LabelLine(StrEnum):
     """Whether a heading's first line is its chapter label, kept apart from
     the title the lines after it hold (spec section 14)."""
 
-    FIRST_LINE = "first_line"
+    FIRST = "first"
     NONE = "none"
 
 
@@ -20,10 +24,10 @@ class Label(StrEnum):
 class BodyRun:
     """Lines of a page's body stream that are one block of `kind`: the
     position of the first and of the line after the last; a heading's
-    `level` and `label`."""
+    `level` and `label_line`, whether its first line is its chapter label."""
 
     start: int
     end: int
     kind: BlockKind
     level: int | None = None
-    label: Label = Label.NONE
+    label_line: LabelLine = LabelLine.NONE

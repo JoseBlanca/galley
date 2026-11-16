@@ -246,8 +246,17 @@ def joined_margin_notes(
 
 
 def _group_piece(entries: Sequence[Entry], positions: Sequence[int]) -> Piece:
-    """The lines of the margin notes at `positions`, one after another."""
-    return Piece(tuple(line for p in positions for line in entries[p].piece.lines))
+    """The lines of the margin notes at `positions`, one after another, the
+    first line of each after the first never joined at a hyphen to the line
+    before it."""
+    pieces = tuple(entries[p].piece for p in positions)
+    starts = itertools.accumulate(
+        (len(piece.lines) for piece in pieces[:-1]), initial=0
+    )
+    return Piece(
+        tuple(line for piece in pieces for line in piece.lines),
+        frozenset(start for start in starts if start > 0),
+    )
 
 
 @dataclass(frozen=True, slots=True)

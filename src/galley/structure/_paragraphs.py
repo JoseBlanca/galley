@@ -31,7 +31,7 @@ from galley.structure._markers import MarkerForm, marker_form
 from galley.structure._measures import Edges, is_short, region_edges
 from galley.structure._regions import RegionKind, region_kinds
 from galley.structure._removals import foot_removals, head_removals
-from galley.structure._runs import BodyRun, Label
+from galley.structure._runs import BodyRun, LabelLine
 from galley.structure._summaries import summary_run
 from galley.structure._survey import BookSurvey
 from galley.structure._verse import verse_runs
@@ -196,7 +196,7 @@ class BodyBlock:
     piece: Piece
     kind: BlockKind = BlockKind.PARAGRAPH
     level: int | None = None
-    label: Label = Label.NONE
+    label_line: LabelLine = LabelLine.NONE
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,7 +256,9 @@ def _block(lines: Sequence[PlacedLine], run: BodyRun | None) -> BodyBlock:
     piece = Piece(tuple(lines))
     if run is None:
         return BodyBlock(piece=piece)
-    return BodyBlock(piece=piece, kind=run.kind, level=run.level, label=run.label)
+    return BodyBlock(
+        piece=piece, kind=run.kind, level=run.level, label_line=run.label_line
+    )
 
 
 def body_entries(
@@ -269,11 +271,11 @@ def body_entries(
     page with no body stream after the last block so far. Each run of a
     page (`PageParts.runs`) is a block of its own, and the line after it
     starts a block; a verse block that ends a page's body stream goes on
-    into a verse run that starts the next. A paragraph whose first word has the book's marker
-    form `form` does not run on into the next page, and no paragraph runs
-    on into or out of `section_pages`, the pages of the endnote section
-    (spec section 12): the first line of its first page, and the first
-    body line after its last page, start a paragraph."""
+    into a verse run that starts the next. A paragraph whose first word has
+    the book's marker form `form` does not run on into the next page, and
+    no paragraph runs on into or out of `section_pages`, the pages of the
+    endnote section (spec section 12): the first line of its first page,
+    and the first body line after its last page, start a paragraph."""
     entries: list[Entry] = []
     current: list[PlacedLine] = []
     current_run: BodyRun | None = None
