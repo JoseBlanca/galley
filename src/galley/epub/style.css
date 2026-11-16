@@ -52,8 +52,20 @@ h6 .label {
   text-align: left;
 }
 
-/* A figure's caption, centred. */
-.figure p {
+/* A figure: its image centred within the page, and its caption under it
+   centred, or, without an image, the caption alone. */
+.figure figure {
+  margin: 1em 0;
+  text-align: center;
+}
+
+.figure img {
+  max-width: 100%;
+  max-height: 95vh;
+}
+
+.figure p,
+.figure figcaption {
   text-align: center;
   text-indent: 0;
   font-size: 0.9em;

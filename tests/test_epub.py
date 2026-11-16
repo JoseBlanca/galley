@@ -9,6 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from galley import epub, markdown
 from galley.book_folder import BookFolder
@@ -67,6 +68,8 @@ def test_pandoc_arguments_without_a_cover() -> None:
         "/books/kadesh/book.epub",
         "--css",
         "/galley/epub/style.css",
+        "--resource-path",
+        "/books/kadesh",
         "--fail-if-warnings",
     )
 
@@ -86,6 +89,8 @@ def test_pandoc_arguments_with_a_cover() -> None:
         "/books/kadesh/book.epub",
         "--css",
         "/galley/epub/style.css",
+        "--resource-path",
+        "/books/kadesh",
         "--fail-if-warnings",
         "--epub-cover-image",
         "/books/kadesh/images/cover.png",
@@ -267,7 +272,13 @@ EVERY_KIND = BlocksFile(
         _block("b-p0001-001", BlockKind.HEADING, "NOTES.", level=1),
         _block("b-p0002-001", BlockKind.HEADING, "INDEX", level=1),
         _block("b-p0002-002", BlockKind.INDEX_ENTRY, "Aachen, 12, 34-36."),
-        _block("b-p0002-003", BlockKind.FIGURE, "PLATE I. The battle."),
+        replace(
+            _block("b-p0002-003", BlockKind.FIGURE, "PLATE I. The battle."),
+            figure="images/plate-0002.png",
+        ),
+        replace(
+            _block("b-p0002-004", BlockKind.FIGURE), figure="images/plate-0003.png"
+        ),
     ),
     notes=(
         _note(
@@ -302,6 +313,7 @@ EVERY_KIND = BlocksFile(
 
 def _book_of(root: Path, blocks: BlocksFile) -> tuple[BookFolder, BookConfig]:
     """A book folder with book.pdf, pages.json of three pages made from it,
+    a small grey image at the path of each figure,
     and `blocks`, and CONFIG with book.pdf as its PDF."""
     pdf = root / "book.pdf"
     pdf.write_bytes(_PDF_BYTES)
@@ -327,6 +339,11 @@ def _book_of(root: Path, blocks: BlocksFile) -> tuple[BookFolder, BookConfig]:
         ),
     )
     write_blocks(folder.blocks_json, blocks)
+    for block in blocks.blocks:
+        if block.figure is not None:
+            image_path = root / block.figure
+            image_path.parent.mkdir(parents=True, exist_ok=True)
+            Image.new("L", (4, 4), color=128).save(image_path)
     return folder, replace(CONFIG, pdf=pdf)
 
 
@@ -366,6 +383,15 @@ def test_the_epub_of_every_kind_and_of_a_footnote_and_endnotes_passes_epubcheck(
         chapters
     )
     assert "<p>2. Code, 2.</p>" in chapters
+    # Each figure's image is in the EPUB, the caption under the first.
+    assert re.search(
+        r'<div id="b-p0002-003" class="figure">\s*<figure>\s*<img src="[^"]+\.png"'
+        r"[^>]*/>\s*<figcaption[^>]*>PLATE I\. The battle\.</figcaption>",
+        chapters,
+    )
+    assert re.search(
+        r'<div id="b-p0002-004" class="figure">\s*<p><img src="[^"]+\.png"', chapters
+    )
     # The footnote is Pandoc's, its margin note inside it.
     assert re.search(
         r'<aside epub:type="footnote"[^>]*>\s*<div id="b-p0000-007" '

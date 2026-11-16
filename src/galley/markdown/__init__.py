@@ -33,9 +33,15 @@ for "_", which the style sheet styles:
   the Markdown ended by a hard line break (a backslash), and an empty line
   of the text, the end of a stanza, a new paragraph in the div. Lines
   empty or of spaces only are not written.
-- `figure`: a fenced div of class `figure` with its caption as text. Its
-  image is not written: the fidelity check reads no Pandoc image, so a
-  figure block with an image is refused until it reads one.
+- `figure`: a fenced div of class `figure` holding its image alone in a
+  paragraph with its caption as the image's text,
+  `![PLATE I\\. The battle\\.](images/plate-0016.png)`, which Pandoc
+  makes a figure with that caption, or `![](images/plate-0016.png)` when
+  the caption is empty. The path is the block's `figure`, relative to the
+  book folder; one that is not, or holds a character other than ASCII
+  letters, digits, "_", ".", "-" and "/", is refused, and so is a note
+  reference in the caption, which Pandoc would copy into the image's alt
+  text. A figure without an image is its caption as text.
 
 Notes (structure spec, section 19; architecture sections 9 and 13):
 
@@ -162,14 +168,42 @@ def _is_footnote_at_its_reference(note: Note) -> bool:
     return note.kind is NoteKind.FOOTNOTE and note.referenced
 
 
-def _block_problems(block: Block) -> tuple[str, ...]:
-    """Why a block cannot be written: a figure with an image, or a
-    character XML 1.0 does not allow; empty when it can."""
-    image = (
-        (f"block {block.id} is a figure with the image {block.figure}",)
-        if block.kind is BlockKind.FIGURE and block.figure is not None
+# An image path as extract writes it, "images/plate-0016.png", relative to
+# the book folder: one Pandoc reads as a link target as it is, with no
+# escaping, which a space or a bracket would need.
+_IMAGE_PATH = re.compile(r"[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*")
+
+
+def _image_problems(block: Block) -> tuple[str, ...]:
+    """Why a figure's image cannot be written: a path that is not relative
+    or holds a character other than ASCII letters, digits, "_", ".", "-"
+    and "/"; or a note reference in its caption, which Pandoc would copy
+    into the image's alt text."""
+    if block.kind is not BlockKind.FIGURE or block.figure is None:
+        return ()
+    path = (
+        ()
+        if _IMAGE_PATH.fullmatch(block.figure)
+        else (
+            (
+                f"figure {block.id} has the image path {block.figure!r}, which is "
+                "not relative or holds a character other than ASCII letters, "
+                "digits, '_', '.', '-' and '/'"
+            ),
+        )
+    )
+    reference = (
+        (f"figure {block.id} has a note reference in its caption",)
+        if _references(block)
         else ()
     )
+    return path + reference
+
+
+def _block_problems(block: Block) -> tuple[str, ...]:
+    """Why a block cannot be written: a figure's image _image_problems
+    refuses, or a character XML 1.0 does not allow; empty when it can."""
+    image = _image_problems(block)
     label = (
         _character_problems(f"the label of block {block.id}", block.label)
         if block.label is not None
@@ -293,7 +327,8 @@ def _check_well_formed(blocks: BlocksFile) -> None:
 
 def _check_writable(blocks: BlocksFile) -> None:
     """Raise InputFileError, naming blocks.json, at what markdown does not
-    write, rather than write it wrongly: a figure with an image, a note
+    write, rather than write it wrongly: a figure's image _image_problems
+    refuses, a note
     block that is not a paragraph, quote, verse or margin note, a reference
     to a footnote inside a referenced footnote, or a character XML 1.0 does
     not allow."""
@@ -442,7 +477,10 @@ def _div(block: Block, notes: frozendict[str, Note], marker: str = "") -> str:
         return _heading(block, notes)
     class_name = _class_name(block.kind)
     attributes = f"#{block.id}" + (f" .{class_name}" if class_name is not None else "")
-    return f"::: {{{attributes}}}\n{_text_markdown(block, notes, marker)}\n:::\n"
+    text = _text_markdown(block, notes, marker)
+    if block.kind is BlockKind.FIGURE and block.figure is not None:
+        text = f"![{text}]({block.figure})"
+    return f"::: {{{attributes}}}\n{text}\n:::\n"
 
 
 def _note_blocks(note: Note, notes: frozendict[str, Note], marker: str) -> str:
@@ -545,7 +583,8 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     class `label`; every other block as a fenced div with its id and the
     class of its kind but a paragraph's, its text escaped by
     escape_markdown on one line, or, for verse, line by line with hard
-    line breaks.
+    line breaks; a figure with an image holds the image alone, its caption
+    as the image's text.
 
     A referenced footnote is a Pandoc footnote at its reference, its
     definition after the block or note that refers to it, holding its
@@ -566,7 +605,9 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     1 to 6, a reference that names no note, a note whose `referenced`
     disagrees with whether a block refers to it, or a footnote referenced
     twice. Raises InputFileError, naming blocks.json and the block or note,
-    for what markdown does not write: a figure with an image, a note block
+    for what markdown does not write: a figure's image path that is not
+    relative or holds other characters than ASCII letters, digits, "_",
+    ".", "-" and "/", a note reference in a figure's caption, a note block
     that is not a paragraph, quote, verse or margin note, a reference to a
     footnote inside a referenced footnote, or a character XML 1.0 does not
     allow (named as U+FFFE).

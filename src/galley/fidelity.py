@@ -625,10 +625,53 @@ def _inlines_tokens(inlines: list[object], block_id: str | None) -> tuple[_Token
     )
 
 
+# Architecture section 13: Pandoc's empty attributes, which a figure and
+# its image must have, and an image's empty title.
+_NO_ATTRIBUTES = ["", [], []]
+_NO_TITLE = ""
+
+
+def _is_figure_image(inline: object, alt: list[object]) -> bool:
+    """Whether an inline is an image whose alt text is `alt`, with no
+    attributes and no title."""
+    match inline:
+        case {"t": "Image", "c": [attributes, list() as image_alt, [str(), title]]}:
+            return (
+                attributes == _NO_ATTRIBUTES and image_alt == alt and title == _NO_TITLE
+            )
+        case _:
+            return False
+
+
+def _is_galley_figure(
+    attributes: object, caption: list[object], body: list[object]
+) -> bool:
+    """Whether a Figure element is a figure as galley writes it (architecture
+    section 13): no attributes, a caption of one Plain block, and a body of
+    one Plain block holding only an image whose alt text is the caption."""
+    match caption, body:
+        case (
+            [{"t": "Plain", "c": list() as inlines}],
+            [{"t": "Plain", "c": [image]}],
+        ):
+            return attributes == _NO_ATTRIBUTES and _is_figure_image(image, inlines)
+        case _:
+            return False
+
+
 def _block_tokens(block: object, block_id: str | None) -> tuple[_Token, ...]:
     """The tokens of a block element, between two breaks. A div or heading
-    with an id gives it to the words inside; one without keeps `block_id`."""
+    with an id gives it to the words inside; one without keeps `block_id`.
+    A figure gives its caption's words once, and an image without a caption
+    alone in a paragraph none (architecture section 13)."""
     match block:
+        case {"t": "Para" | "Plain", "c": [image]} if _is_figure_image(image, []):
+            content = ()
+        case {
+            "t": "Figure",
+            "c": [attributes, [_, list() as caption], list() as body],
+        } if _is_galley_figure(attributes, caption, body):
+            content = _blocks_tokens(caption, block_id)
         case {"t": "Para" | "Plain", "c": list() as inlines}:
             content = _inlines_tokens(inlines, block_id)
         case {"t": "BlockQuote", "c": list() as blocks}:
@@ -742,11 +785,15 @@ def read_markdown(markdown: str) -> MarkdownWords:
 
     Words are split at spaces and line breaks, and at the start and end of
     every block, note and link marked as a note reference, whose text is
-    read as its own words; emphasis does not split a word. The metadata header,
-    the title and authors, gives no words. Raises
+    read as its own words; emphasis does not split a word. A figure's
+    caption is read once, and its image's alt text, which Pandoc copies
+    from the caption, not at all. The metadata header, the title and
+    authors, gives no words. Raises
     ExternalProgramError, with Pandoc's standard error, when `pandoc` is
     missing, fails or warns (a note definition no reference uses), runs
     longer than 60 s, or reads an element galley's Markdown does not make,
-    such as a list or a link that is no note reference.
+    such as a list, a link that is no note reference, or an image that is
+    not alone in its paragraph, whose alt text is not its figure's caption,
+    or that has a title or attributes.
     """
     return _words_of_pandoc_json(_pandoc_json(markdown))

@@ -304,9 +304,30 @@ def _referring(block_id: str, before: str, reference: str, note_id: str) -> Bloc
 @pytest.mark.parametrize(
     ("blocks", "named"),
     [
+        *(
+            (
+                _blocks_file((replace(FIGURE, figure=path),)),
+                f"figure b-p0016-001 has the image path {path!r}, which is not relative",
+            )
+            for path in (
+                "images/plate 0016.png",
+                "/books/kadesh/images/plate-0016.png",
+                "images/plate-(0016).png",
+                "images//plate-0016.png",
+            )
+        ),
         (
-            _blocks_file((replace(FIGURE, figure="images/p0016.png"),)),
-            "block b-p0016-001 is a figure with the image images/p0016.png",
+            _blocks_file(
+                (
+                    replace(
+                        _referring("b-p0016-001", "PLATE I.", "1", "n-p0016-001"),
+                        kind=BlockKind.FIGURE,
+                        figure="images/plate-0016.png",
+                    ),
+                ),
+                (replace(NOTE, id="n-p0016-001"),),
+            ),
+            "figure b-p0016-001 has a note reference in its caption",
         ),
         (
             _blocks_file(
@@ -340,7 +361,15 @@ def _referring(block_id: str, before: str, reference: str, note_id: str) -> Bloc
             ),
         ),
     ],
-    ids=["figure with an image", "heading in a note", "footnote in a footnote"],
+    ids=[
+        "image path with a space",
+        "absolute image path",
+        "image path with brackets",
+        "image path with an empty folder",
+        "note reference in a figure caption",
+        "heading in a note",
+        "footnote in a footnote",
+    ],
 )
 def test_render_markdown_refuses_what_it_does_not_write(
     blocks: BlocksFile, named: str
@@ -932,6 +961,45 @@ def test_render_markdown_refuses_a_label_with_a_character_xml_does_not_allow() -
         InputFileError, match=r"blocks.json.*label of block b-p0002-001.*U\+FFFE"
     ):
         render_markdown(_blocks_file((heading,)), CONFIG)
+
+
+# A figure's image (architecture section 13).
+
+
+@pytest.mark.parametrize(
+    ("caption", "written"),
+    [
+        ("PLATE I. The battle.", "![PLATE I\\. The battle\\.](images/plate-0016.png)"),
+        ("", "![](images/plate-0016.png)"),
+    ],
+    ids=["with a caption", "without a caption"],
+)
+def test_a_figure_is_its_image_with_its_caption_as_the_image_text(
+    caption: str, written: str
+) -> None:
+    figure = replace(
+        _block("b-p0016-001", BlockKind.FIGURE, caption, 16),
+        figure="images/plate-0016.png",
+    )
+
+    assert render_markdown(_blocks_file((figure,)), CONFIG) == (
+        HEADER + f"\n::: {{#b-p0016-001 .figure}}\n{written}\n:::\n"
+    )
+
+
+@pytest.mark.pandoc
+@pytest.mark.parametrize("caption", ["PLATE I. The [battle] of *Kadesh*.", ""])
+def test_fidelity_check_passes_on_a_figure_with_its_image(caption: str) -> None:
+    figure = replace(
+        _block("b-p0016-001", BlockKind.FIGURE, caption, 16),
+        figure="images/plate-0016.png",
+    )
+    blocks = _blocks_file((figure,))
+
+    read = read_markdown(render_markdown(blocks, CONFIG))
+
+    check_stage(FidelityBoundary.MARKDOWN, blocks, read)
+    assert [word.text for word in read.words] == caption.split()
 
 
 # Structure spec section 19: referenced footnotes as Pandoc footnotes,

@@ -1423,6 +1423,105 @@ def test_walk_of_a_link_that_is_no_note_reference_raises(attributes: str) -> Non
         _words_of_pandoc_json(_pandoc_document(_div("b-p0000-001", paragraph)))
 
 
+# A figure's image (architecture section 13): the caption counts once, and
+# no word hides in an image's alt text, title or attributes.
+
+
+@pytest.mark.pandoc
+def test_read_markdown_counts_a_figure_caption_once_in_the_figure_block() -> None:
+    markdown = read_markdown(
+        "::: {#b-p0016-001 .figure}\n![PLATE I\\. The battle\\.](images/plate-0016.png)\n:::\n"
+    )
+
+    assert markdown.words == tuple(
+        MarkdownWord(text, "b-p0016-001") for text in ("PLATE", "I.", "The", "battle.")
+    )
+
+
+@pytest.mark.pandoc
+def test_read_markdown_reads_a_figure_image_without_a_caption_as_no_word() -> None:
+    markdown = read_markdown(
+        "::: {#b-p0016-001 .figure}\n![](images/plate-0016.png)\n:::\n"
+    )
+
+    assert markdown.words == ()
+
+
+@pytest.mark.pandoc
+@pytest.mark.parametrize(
+    "markdown_text",
+    [
+        "Before ![a plate](images/plate-0016.png) after.\n",
+        "![a plate](images/plate-0016.png) after.\n",
+        '![PLATE I](images/plate-0016.png "hidden words")\n',
+        "![PLATE I](images/plate-0016.png){#hidden}\n",
+        '![PLATE I](images/plate-0016.png){fig-alt="hidden words"}\n',
+        '![](images/plate-0016.png "hidden words")\n',
+    ],
+    ids=[
+        "inside a sentence",
+        "before words",
+        "with a title",
+        "with an id",
+        "with an alt text of its own",
+        "without a caption, with a title",
+    ],
+)
+def test_read_markdown_refuses_an_image_that_is_no_figure_of_galley(
+    markdown_text: str,
+) -> None:
+    with pytest.raises(ExternalProgramError, match="(Image|Figure) element"):
+        read_markdown(f"::: {{#b-p0016-001}}\n{markdown_text}:::\n")
+
+
+def _image(alt: str, title: str = "") -> str:
+    return (
+        f'{{"t":"Image","c":[["",[],[]],[{alt}],["images/plate-0016.png","{title}"]]}}'
+    )
+
+
+def _figure(caption: str, body: str) -> str:
+    return (
+        f'{{"t":"Figure","c":[["",[],[]],[null,[{{"t":"Plain","c":[{caption}]}}]],'
+        f"[{body}]]}}"
+    )
+
+
+def test_walk_counts_the_caption_of_a_figure_and_not_its_image_alt_text() -> None:
+    caption = f"{_str('PLATE')},{_SPACE},{_str('I.')}"
+    figure = _figure(caption, f'{{"t":"Plain","c":[{_image(caption)}]}}')
+
+    markdown = _words_of_pandoc_json(_pandoc_document(_div("b-p0016-001", figure)))
+
+    assert _texts(markdown) == ("PLATE", "I.")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        f'{{"t":"Plain","c":[{_image(_str("hidden"))}]}}',
+        f'{{"t":"Plain","c":[{_image(_str("PLATE"))},{_str("hidden")}]}}',
+        f'{{"t":"Plain","c":[{_image(_str("PLATE"))}]}},{{"t":"Para","c":[{_str("x")}]}}',
+        f'{{"t":"Plain","c":[{_image(_str("PLATE"), "hidden")}]}}',
+        f'{{"t":"Para","c":[{_str("hidden")}]}}',
+    ],
+    ids=[
+        "alt text not the caption",
+        "a word beside the image",
+        "a block after the image",
+        "a title",
+        "no image",
+    ],
+)
+def test_walk_of_a_figure_that_galley_does_not_write_raises(body: str) -> None:
+    figure = _figure(_str("PLATE"), body)
+
+    with pytest.raises(
+        ExternalProgramError, match="Figure element in block b-p0016-001"
+    ):
+        _words_of_pandoc_json(_pandoc_document(_div("b-p0016-001", figure)))
+
+
 @pytest.mark.thread_unsafe(reason="changes PATH")
 def test_read_markdown_without_pandoc_raises(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
