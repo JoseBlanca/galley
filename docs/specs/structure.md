@@ -674,7 +674,7 @@ def join_hyphen(first: str, second: str, book_words: frozenset[str],
                 word_list: frozenset[str]) -> HyphenJoin | None: ...
 def note_marker(word: str, *, endnote: bool = False) -> NoteMarker | None: ...
 def reference_candidate(word: str) -> Reference | None: ...
-def make_blocks(lines: LinesFile, word_list: frozenset[str], *,
+def make_blocks(lines: LinesFile, lower_case_words: frozenset[str], *,
                 language: Language = Language.EN,
                 contents_pages: frozenset[int] = frozenset(),
                 workers: int = DEFAULT_WORKERS) -> BlocksFile: ...
@@ -687,11 +687,12 @@ section 11 (with `endnote`, also the endnote form), or `None`;
 `StrEnum` of the module. `language` serves the index title of a French
 book ("table alphabétique", section 17); `contents_pages` is the
 config's (section 14). `join_hyphen` gives `None` when the two words are not joined (section
-5); it takes the word list in lower case, which `make_blocks` makes once
-from the list `wordlist.word_list` gives. `make_blocks` is the whole stage on values: it calls `survey_book`,
+5); it takes the word list in lower case, which `make_blocks` is given
+as `wordlist.lower_case_word_list` gives it. `make_blocks` is the whole stage on values: it calls `survey_book`,
 does the per-page work with `map_pages`, then the work across pages.
 `run` reads `pages.json` and `lines.json` with `read_checked_input` as
-now, takes the word list with `wordlist.word_list(config.language)`,
+now, takes the word list with
+`wordlist.lower_case_word_list(config.language)`,
 deletes `blocks.json` and every later file first, runs
 `check_stage(FidelityBoundary.STRUCTURE, lines, blocks)` and writes
 nothing on a `FidelityError`. The word list needs Tesseract's tools the

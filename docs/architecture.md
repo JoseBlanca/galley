@@ -145,7 +145,7 @@ An unknown key or a wrong type is an error.
 | `exclude_pages` | list of page indices, `[]` | pages left out, as removals |
 | `exclude_regions` | list of `{page, box}`, `[]` | a library stamp, a label |
 | `cover_page` | page index, none | rendered as the EPUB's cover |
-| `plate_pages` | list of page indices, `[]` | pages analyze makes plates whatever its rule finds, for a plate the rule misses (Kadesh's faint relief on page 23); a page in `exclude_pages` is never a plate (`docs/specs/plates.md` §2) |
+| `plate_pages` | list of page indices, `[]` | pages analyze makes plates whatever its rule finds, for a plate the rule misses (Kadesh's faint relief on page 23); a page in `exclude_pages` is never a plate, so a page in both lists is accepted and excluded: `exclude_pages` wins (`docs/specs/plates.md` §2) |
 | `contents_pages` | list of page indices, `[]` | the pages of the book's printed table of contents: structure makes no heading on them, so that the EPUB's table of contents does not list each chapter twice; their lines stay paragraphs (owner, 15 November 2026). Without it, the contents' lines that pass the heading rule become headings, and the EPUB lists those chapters twice (Domesday's three essays). analyze checks its page indices as it checks those of the other keys |
 
 A stage spec adds the keys it needs, here and in `config.py` together.
@@ -218,13 +218,14 @@ for sequences, `frozendict` (a built-in type of Python 3.15) for
 mappings, `StrEnum` for finite sets, and floats for positions. Each file
 has a `format_version` int: 2 for `blocks.json`, 1 for the others.
 `blocks.json` went to 2 with the second plan of structure (16 November
-2026), which added `Note.kind` and the block kinds `verse` and
-`chapter_summary`; reading a file of version 1 is the error below, and
-the owner reruns structure. Each has one pair of functions
+2026), which added `Note.kind`, `Block.label`, the block kinds `verse`
+and `chapter_summary` and the removal reason `guide_words`; reading a
+file of version 1 is the error below, and the owner reruns structure. Each has one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
 Reading a file whose `format_version` is not the current one is an error
-that names both. In JSON, a dataclass is an object with its field names,
+that names both, and the stage to run again (`galley2epub structure`
+for blocks.json). In JSON, a dataclass is an object with its field names,
 a tuple a list, an enum its string value, a `Box` a list of four numbers,
 and a `frozendict` with int keys an object whose keys are the ints as
 strings.
@@ -291,8 +292,10 @@ page_numbers)`:
 - `Block`: `id`, `kind: BlockKind`, `level: int | None` (headings, 1 or
   2), `label: str | None` (headings: the chapter label as printed,
   "CHAPTER III.", "V"; `None` for a heading without one and for every
-  other kind), `spans: tuple[Span, ...]`, `figure: str | None` (figure
-  blocks), `origin: tuple[Origin, ...]`.
+  other kind: reading a blocks.json where a block that is not a heading
+  has a label is an error that names the file and the block),
+  `spans: tuple[Span, ...]`, `figure: str | None` (figure blocks),
+  `origin: tuple[Origin, ...]`.
 - `BlockKind`, each value what the text is:
   - `heading`: a chapter's or a section's heading. A chapter label and
     the title under it ("CHAPTER III." / "THE EARLY YEARS OF HENRY II.")
@@ -528,9 +531,9 @@ A stage imports these and nothing else of galley.
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage` |
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file |
-| `wordlist.py` | `is_known_word(word, word_list)`, whether a word counts as known on a plate (`docs/specs/plates.md` §2; the list in lower case); `word_list(language, cache_dir) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`) and structure |
+| `wordlist.py` | `is_known_word(word, lower_case_words)`, whether a word counts as known on a plate (`docs/specs/plates.md` §2); `lower_case_word_list(language, cache_dir)`, the word list in lower case, made once per language and list folder, which structure and analyze take; `word_list(language, cache_dir) -> frozenset[str]`, with the dictionary's case, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`) and structure |
 | `fidelity.py` | the fidelity check, section 13 |
-| `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `commonest(edges)`, the commonest of a set of edges to 2 pt (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
+| `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
 | `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract) and stops naming any that is missing |
 
 `src/galley/__init__.py` imports gilguard first: a library that stops a
@@ -553,16 +556,23 @@ lists the words, with the pages they came from where the origins say.
   note reference span is a word of its own. Joined, "Greece," and the
   reference "1" would become "Greece,1" again and hide the word change.
 - A note reference span must name a note of the file and have a
-  **marker's shape**: at most 4 characters, at most 3 of them letters or
-  digits and at most 1 a letter, and no white space ("8", "(i)", "^",
-  "345", "(t)"). A word of two letters or more, "the", "and", cannot
-  hide in it; structure links no candidate without this shape (its
-  bracketed form allows two letters read as digits, "(li)" for 11,
-  which then stays in its word). At the markdown
-  boundary the span becomes Pandoc's note or a link and its text is not
-  counted, so the shape keeps an ordinary word from hiding in it. The
-  span need not read as its note's `marker`: the OCR reads the two sides
-  of a superscript differently (section 8; owner, 15 November 2026).
+  **marker's shape**: 1 to 4 characters, at most 3 of them letters or
+  digits, no white space, no "&" and no dash; a letter only in a span
+  that holds a round bracket, and then at most one ("8", "^", "345",
+  "(12)", "(i)", "(t)", "U)", "(3J"). Moreover a span with a letter must
+  have been split off a word by a `note_marker` word change: a span that
+  was a whole word in lines.json holds only digits and symbols. A word
+  of the book cannot hide in it: "the", "and" are too long, "a", "à",
+  "I,", "&c." and "—" have no shape, and "(a)" printed as a word of its
+  own stays one (decided in the review of the plan structure-second, 16
+  November 2026: Mariéjol has 18,247 block words of the earlier shape
+  with a letter).
+  Structure links no candidate without this shape (its bracketed form
+  allows two letters read as digits, "(li)" for 11, which then stays in
+  its word). The span need not read as its note's `marker`: the OCR
+  reads the two sides of a superscript differently (section 8; owner,
+  15 November 2026). These checks run at the structure boundary, and at
+  the markdown boundary on the blocks with the edits applied.
   Before, the check asked for the marker exactly, which left 1,202 of
   Domesday's 1,440 matched references linkable, 182 of Mariéjol's 676
   and none of Gierke's 205 (`docs/specs/structure.md` §11).
@@ -581,11 +591,13 @@ lists the words, with the pages they came from where the origins say.
   Pandoc writes its own numbers (section 17); likewise the `marker` of a
   referenced footnote. A reference to an endnote is a link marked as a
   note reference (section 9), which Pandoc reads as a `Link` element with
-  the attribute `epub:type="noteref"`: its text is not compared as a word
-  either, and the number of such links must equal the number of references
-  to endnotes, as the number of Pandoc's notes must equal the number of
-  references to footnotes. Any other link is an element galley's Markdown
-  does not make, and an error. An endnote stays where it was printed, so its
+  the attribute `epub:type="noteref"`. Its text is the reference span's
+  and is compared as a word of its own, so that a word put into the link
+  is found; an element galley's Markdown does not make is an error inside
+  a link as anywhere else. The number of such links must equal the number
+  of references to endnotes, as the number of Pandoc's notes must equal
+  the number of references to footnotes. Any other link is an element
+  galley's Markdown does not make, and an error. An endnote stays where it was printed, so its
   `marker` is written there and counted, referenced or not (section 9).
   A heading's `label` is written in `book.md`, in the form the markdown
   spec gives, and counted as words of its block.

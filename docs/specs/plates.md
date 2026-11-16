@@ -89,8 +89,8 @@ characters that are not letters, digits, hyphens or apostrophes
 stripped from both ends, has at least 2 letters, is made of letters,
 apostrophes and hyphens, and is in the word list, compared in lower
 case (242,096 of the 338,080 entries of the English list have a
-capital); or it is a number, digits with brackets or punctuation around
-them ("16", "17]"). Its `kind` is `plate` and its `text_source`
+capital); or it is a number, digits with brackets, hyphens or other
+punctuation around them ("16", "17]", "1066-"). Its `kind` is `plate` and its `text_source`
 `text_layer`.
 
 **A page without a text layer** is a plate when its largest group holds
@@ -170,7 +170,8 @@ misses the other 9 plates with a layer, and takes Mariéjol's 16 and
 **The configs of the sample books.** The 7 pages with a text layer that
 are not plates and Mariéjol's cover (page 0, without one) are added to
 the `exclude_pages` of the `whole_book` tests' configs
-(`tests/test_layout.py`) and of `evaluation/books.toml`, or named as the
+(`WHOLE_BOOK_CONFIGS` in `tests/conftest.py`) and of
+`evaluation/books.toml`, or named as the
 `cover_page`, and Kadesh 23 to their `plate_pages`, by the plan of this
 spec; the `whole_book` test asserts the plates those configs leave,
 which are the 22 plates of section 1. The plates without a text layer
@@ -234,13 +235,14 @@ def is_plate(page: RenderedPage, word_boxes: tuple[Box, ...] | None,
 
 # galley.wordlist
 
-def is_known_word(word: str, word_list: frozenset[str]) -> bool: ...
-    # `word_list` in lower case, as structure's `make_blocks` makes it.
+def is_known_word(word: str, lower_case_words: frozenset[str]) -> bool: ...
+    # `lower_case_words` as `wordlist.lower_case_word_list` gives it.
 ```
 
 `run` of each stage is unchanged in what it deletes, checks and writes
 (walking-skeleton spec §6), with analyze also taking the word list
-(`wordlist.word_list(config.language)`), so `galley2epub` checks for
+(`wordlist.lower_case_word_list(config.language)`), so `galley2epub`
+checks for
 Tesseract's tools before analyze when the cache lacks the language.
 analyze's check of the config's page indices (`check_config_pages`)
 covers `contents_pages` too.
@@ -276,8 +278,9 @@ words, not; a block of 49 squares, not; two blocks of 40 touching only
 by a corner, not; a block of gray 20 levels below the median, not, and
 as a page without a text layer covering 0.4 of the squares, a plate,
 and covering 0.3, not. `is_known_word`: "Kadesh" with "kadesh" in the
-list, "17]" and "16" are known; "^U;L", "a" and "Fir" with "fir" absent
-are not.
+list, "17]", "16" and "1066-" are known, "of" with "of" in the
+list is known; "^U;L", "a", "²" and "Fir" with "fir"
+absent are not.
 
 **Excerpt tests**, the owner checking each image by eye before it
 becomes a test:

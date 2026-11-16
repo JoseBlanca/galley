@@ -595,14 +595,14 @@ def run(folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKER
 
 def measure_book(words: WordsFile, *, workers: int = DEFAULT_WORKERS) -> BookMeasures | None: ...
 def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout: ...
-def group_lines(words: tuple[Word, ...]) -> tuple[Line, ...]: ...
 ```
 
 `measure_book` gives `None` for a book with no page of 3 rows, and
 `layout_page` with `None` lays the page out as the skeleton did.
-`group_lines` keeps its present rule and signature, and calls
-`body_measures.group_rows`; `layout_page` takes
-a drop capital out of the words before it calls `group_lines`, and puts
+layout groups words into lines with `body_measures.group_rows`, the
+walking skeleton's rule, and keeps no copy of it under another name
+(the skeleton's `group_lines` is gone); `layout_page` takes a drop
+capital out of the words before it calls `group_rows`, and puts
 it into the line step 6 names afterwards. `measure_book` places every
 page's column (step 1) to measure the cut-in insets; `layout_page`
 places it again, which costs one more grouping of rows per page.
