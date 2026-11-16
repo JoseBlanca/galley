@@ -28,8 +28,10 @@ marked "owner, 15 November 2026", and listed in architecture §17. The
 principle behind several of them is that galley's formats are semantic:
 a kind says what a text is, never how it looks, so two things that will
 look alike in the EPUB still get different kinds, and how each looks is
-decided by the markdown and epub stages (architecture §3). Two points
-are left open (section 20).
+decided by the markdown and epub stages (architecture §3). The two
+points left open, how a heading keeps its chapter label and what
+Haskins' bibliographical notes are, the owner decided on 16 November
+2026 (section 20).
 
 It builds on `docs/architecture.md` (cited as "architecture §8") and
 `docs/glossary.md`, and on the layout spec, whose terms (body column,
@@ -151,9 +153,11 @@ inside it.
       left in the body"), except on the pages of the endnote section
       and the index.
 3. **Across pages**, in page order:
-   1. join the last paragraph of each page with the first of the next
-      when it runs on, and the hyphen at that page break (section 6),
-      and a verse block likewise (section 16); a note taken in step 2.5
+   1. make the band blocks of Haskins' bibliographical notes body
+      paragraphs (section 16); join the last paragraph of each page with
+      the first of the next when it runs on, and the hyphen at that page
+      break (section 6), and a verse block likewise (section 16); a note
+      taken in step 2.5
       never runs on into the next page's body, and no paragraph runs on
       into the first page of the endnote section;
    2. split a paragraph at a line beside a margin note that is indented
@@ -591,7 +595,7 @@ and a joined word in place of its two parts.
 
 | field | in the first plan | added by the second plan |
 |---|---|---|
-| `blocks` | `paragraph` blocks, and `margin_note` blocks (section 10); `level` and `figure` `None` | `heading` blocks with `level` 1 or 2 (section 14); `chapter_summary` (15); `quote` and `verse` (16); `index_entry` (17); `figure` blocks with their image (18); margin notes placed before their paragraph (13) |
+| `blocks` | `paragraph` blocks, and `margin_note` blocks (section 10); `level` and `figure` `None` | `heading` blocks with `level` 1 or 2 and their chapter label in `label` (section 14); `chapter_summary` (15); `quote` and `verse` (16); `index_entry` (17); `figure` blocks with their image (18); margin notes placed before their paragraph (13) |
 | `notes` | one note per block of a band region, `referenced` false, `marker` empty (section 10) | the notes cut and marked by section 11, each with its `kind` (`footnote`, or `endnote` by section 12), `referenced` true when its reference was found, and margin notes among its blocks (13) |
 | `removals` | the running heads, page numbers, signature marks and stray marks | the guide words of an index (`guide_words`, 17); a plate's running head and stray words (`running_head`, `plate_text`, 18) |
 | `word_changes` | the hyphen joins, of the three reasons of section 5 | the `note_marker` splits of section 11 |
@@ -621,8 +625,9 @@ lists of architecture §8 and the glossary changed with them:
   after is the two words joined as they are.
 
 The second plan adds `BlockKind.chapter_summary` and `verse`, `NoteKind`
-and `Note.kind`, and `RemovalReason.guide_words`, and changes the
-fidelity check's rule for a reference span (architecture §8 and §13).
+and `Note.kind`, `Block.label`, and `RemovalReason.guide_words`, and
+changes the fidelity check's rule for a reference span and counts a
+heading's label as words of its block (architecture §8 and §13).
 
 ## 8. The public interface
 
@@ -739,7 +744,8 @@ budget of the `coding` skill in the plan.
   §3, step 4) and become notes, after the paragraph in which the page's
   body ends: their words are kept and keep their order. A quotation
   read as a band stays a note without a marker in the second plan;
-  what the bibliographical notes are is Open 2 (section 20).
+  the bibliographical notes become paragraphs (section 16, "Haskins'
+  bibliographical notes").
 - **The index**: its columns are body regions (or, on its first page
   under a full-size title, band regions); entries become paragraphs by
   rules 1 and 2, which do not fit an index's hanging indents. The second
@@ -882,7 +888,9 @@ whose hyphen should have stayed and 2 not one word.
   paragraph runs on goes before that paragraph, on the page before;
   one beside an endnote's line goes inside the note, before its text;
 - headings: "CHAPTER III." centred above a centred title 1.5 pitches
-  below gives one level-1 heading; a centred line in lower case with gaps
+  below gives one level-1 heading whose `label` is "CHAPTER III." and
+  whose text is the title; a heading block of one line has `label`
+  `None`; a centred line in lower case with gaps
   of 2.5 and 1.5 pitches gives a level-2 heading, and with a gap above of
   1.5 a paragraph; a centred "§ 1. Plan, pp. 9 — 26." is no heading; on a
   page of `contents_pages` no line is a heading;
@@ -900,6 +908,11 @@ whose hyphen should have stayed and 2 not one word.
   none a quote, and the last does not run on into the next page; the
   same lines on a page whose band starts with "(1)" stay paragraphs; the same lines on a page whose lines above are
   also at 0.85 stay paragraphs;
+- Haskins' bibliographical notes: after a level-2 heading
+  "BIBLIOGRAPHICAL NOTE", a body block of small type that rule 1 would
+  make a quote, and on the next page a band block without a marker, are
+  paragraphs, the band block after that page's body blocks; after the
+  next heading, the same blocks are a quote and a note;
 - index: two columns of 20 lines under "INDEX", lines at the edge and
   indented 9 pt, give one `index_entry` per line at the edge; a line
   "BUR CON" is removed as `guide_words`; a row read across the gutter is
@@ -922,11 +935,11 @@ exactly.
 
 | excerpt | page (excerpt page, book page index) | what it checks |
 |---|---|---|
-| `haskins_eval` | 0 (131) | heading "V / NORMANDY AND FRANCE", level 1, one block; the first paragraph starts "IN July, 1189," with the drop capital |
+| `haskins_eval` | 0 (131) | heading "V / NORMANDY AND FRANCE", level 1, one block, `label` "V"; the first paragraph starts "IN July, 1189," with the drop capital |
 | `haskins_eval` | 1 (132) | the reference "^" alone linked to the note whose marker is "*" |
 | `haskins_eval` | 2 (133) | a sign glued to its word, "journalist,^" |
 | `haskins_eval` | 9 (266) | heading "INDEX", level 1; the entries of the left column, then the right, one `index_entry` each, not a quote |
-| `stubbs_51_56-64` | 0 (51) | heading "CHAPTER III. / THE EARLY YEARS OF HENRY II.", level 1; the 3-line summary, one `chapter_summary`; "Very few epochs…" starts a paragraph; the cut-in note "Importance attached… accession." before its paragraph |
+| `stubbs_51_56-64` | 0 (51) | heading "CHAPTER III. / THE EARLY YEARS OF HENRY II.", level 1, `label` "CHAPTER III."; the 3-line summary, one `chapter_summary`; "Very few epochs…" starts a paragraph; the cut-in note "Importance attached… accession." before its paragraph |
 | `stubbs_51_56-64` | 3 (58) | "His great position in Christendom" (as the OCR reads it) beside the middle of a paragraph, placed before it |
 | `stubbs_51_56-64` | 2 (57), 7 (62), 9 (64) | cut-in notes on the left and right (layout §8), each before its paragraph |
 | `domesday_74-83` | 0 (74) | note 7 with the marker "«"; seven glued references, "pleased1/" to "mercy7.'", linked |
@@ -945,10 +958,10 @@ exactly.
 | `gierke_86-93_270-271` | 2 (88) | "Law1" stays unsplit (endnote 1 is outside the excerpt); margin notes before the paragraphs whose first lines they are beside; "Medieval Thought." beside the page's last line |
 | `gierke_86-93_270-271` | 6 (92) | "II. Macrocosm and Microcosm.", level 2, and the known false heading "Macrocosm and Microcosm." at the top |
 | `gierke_86-93_270-271` | 8 (270), 9 (271) | endnotes 291 to 302, kind `endnote`, unreferenced, each margin note inside its note before its text; the end of note 290 at the top of page 270 an endnote with no marker, not joined to the last paragraph of page 93 |
-| `haskins_quotes_index` (new) | 0 (39) | a level-2 heading "BIBLIOGRAPHICAL NOTE" mid-page, quotes after it (section 20, Open 2) |
+| `haskins_quotes_index` (new) | 0 (39) | a level-2 heading "BIBLIOGRAPHICAL NOTE" mid-page, paragraphs after it, not quotes (section 16) |
 | `haskins_quotes_index` | 1 (53) | quotes in smaller type across the column |
 | `haskins_quotes_index` | 2 to 4 (71 to 73) | a quote that runs over two page breaks |
-| `haskins_quotes_index` | 5 (129) | a heading above a band of small type |
+| `haskins_quotes_index` | 5 (129) | the heading "BIBLIOGRAPHICAL NOTE" above a band of small type, whose blocks are paragraphs, not notes |
 | `haskins_quotes_index` | 6 (209), 7 (234) | centred Latin verse and English verse, `verse` blocks with their line breaks |
 | `haskins_quotes_index` | 8 (267), 9 (269) | index rows read across both columns, cut at the gutter; "Calabria", an entry from the foot of one column to the top of the next |
 | `stubbs_summaries_index` (new) | 0 (16) | a printed contents page, named in the test's `contents_pages`: no heading |
@@ -1589,10 +1602,14 @@ the second is at most 2.6 pitches below the first, or at most 4.0 when
 the first is a chapter label alone. So a chapter label and its title are
 one heading, the label being the chapter's number and the title its
 title (owner, 15 November 2026): one entry in the EPUB's table of
-contents per chapter, "CHAPTER III. THE EARLY YEARS OF HENRY II.". The
-block's text is its lines joined as a paragraph's are; how the label is
-kept apart from the title in the format is **Open 1**. A heading block
-starts a block and so does the line after it.
+contents per chapter. When a heading block's first line is a chapter
+label and another line follows it, the first line is the block's
+`label`, its words joined by single spaces as printed ("CHAPTER III.",
+"V"), and the spans hold the title, every line after the first joined
+as a paragraph's are;
+otherwise `label` is `None` and the spans hold every line (owner, 16
+November 2026; section 20). A heading block starts a block and so does
+the line after it.
 
 **Levels.** A heading block is level 1 when its first line is a chapter
 label, or starts with one of the label words (CHAPTER, CHAPITRE, ESSAY,
@@ -1834,10 +1851,31 @@ page's median (it fails on Haskins' pages that are all quote).
 - **Broken lines**: on Mariéjol's page 212 (excerpt page 2) two lines
   the OCR cut short, inset on both sides, become a verse block.
 - **Haskins' "Bibliographical note" sections**, set in small type at
-  each chapter's end, are quotes where layout reads them as body (pages
-  39, 40, 262 to 264) and notes without a marker where it reads them as a
-  band (most of pages 65 to 67, 98, 129, 205, 231). What kind they
-  should be is **Open 2**.
+  each chapter's end, would be quotes where layout reads them as body
+  (pages 39, 40, 262 to 264) and notes without a marker where it reads
+  them as a band (most of pages 65 to 67, 98, 129, 205, 231). They are
+  paragraphs, by the rule below.
+
+### Haskins' bibliographical notes
+
+Each of Haskins' chapters ends with a section headed "BIBLIOGRAPHICAL
+NOTE", a few paragraphs on the sources set in small type. They are
+paragraphs of a section; their small type is how they look (owner, 16
+November 2026; section 20). The blocks after a level-2 heading block
+whose text is "BIBLIOGRAPHICAL NOTE", in any case, in the body or the
+band of its page and of the pages after it, up to the next heading
+block, are paragraphs, whatever their type:
+
+- their band blocks, and the notes that step 2.5 took from the body on
+  those pages, are not cut into notes: before the paragraphs are
+  joined over page breaks (section 2, step 3.1), each becomes a body
+  paragraph of its page, after the page's body blocks, in reading order,
+  and is joined over a page break as any paragraph is;
+- the quote rules (1 to 3 above) do not apply to them.
+
+The rule names its words, so it takes nothing in another book. How many
+band blocks of other books a general form of it ("band text after a
+heading on its page") would take was not measured.
 
 ## 17. Index entries
 
@@ -2035,56 +2073,30 @@ What markdown must do, and how it is checked:
   neither a reference span nor the marker of a referenced footnote; an
   endnote's marker is written and counted as a word.
 
-## 20. Open points
+## 20. Decided on 16 November 2026
 
-**Open 1. Whether the format keeps a heading's chapter label apart from
-its title.** The owner decided that a chapter label and its title are
-one heading, the label being the chapter's number (section 14). The
-format can say which part is the number, or not:
+The two points this spec left open were decided by the owner on 16
+November 2026, each as recommended.
 
-- (a) **One text**: the heading block's spans hold the label and the
-  title, joined by a space, and nothing marks where the label ends. No
-  format change; an edit can correct a misread label ("CHAPITRE Vni");
-  markdown and the style sheet cannot set the number apart from the
-  title.
-- (b) **A field of its own**: `Block` gains `label: str | None`, the
-  chapter label as printed, and the spans hold the title only; the
-  fidelity check counts the label as words of its block, as it counts a
-  note's marker. Semantic, as the owner's principle asks, and markdown
-  can set the number on a line of its own or leave it out of the table
-  of contents; but an edit, which matches the text of the spans, cannot
-  correct the label, as it cannot correct a note's marker, until edits
-  are allowed to name it.
+**1. A heading's chapter label is a field of its own.** `Block` has
+`label: str | None`, the chapter label as printed ("CHAPTER III.",
+"CHAPITRE Vni"), and the heading's spans hold the title only (section
+14 says which line is the label). The fidelity check counts the label as
+words of its block, as it counts a note's marker (architecture §13). It
+says what the text is, the principle the owner set, and markdown can set
+the number on a line of its own or leave it out of the table of
+contents. The cost: an edit matches the text of the spans, so it cannot
+correct a misread label until edits are allowed to name it; a damaged
+label is rare (Mariéjol's "CHAPITRE Vni" was the one met in the second
+research). The answer not taken was one text, the label and title
+joined in the spans with nothing to mark where the label ends.
 
-Recommended: (b), because it says what the text is, which is the
-principle the owner set, and a damaged label is rare (Mariéjol's
-"CHAPITRE Vni" is the one met in the second research). It is a change
-to architecture §8, `model.py` and `fidelity.py`. Meanwhile the
-implementer builds (a), which (b) changes only in where the label goes.
-
-**Open 2. What Haskins' "Bibliographical note" sections are.** Each of
-Haskins' chapters ends with a section headed "BIBLIOGRAPHICAL NOTE" (a
-level-2 heading), a few paragraphs on the sources, set in small type. By
-section 16 they are quotes where layout reads them as body (pages 39,
-40, 262 to 264), and by section 11 notes without a marker where it reads
-them as a band (most of pages 65 to 67, 98, 129, 205, 231); the
-reference text makes them quotes. They are neither, but paragraphs of a
-section; their small type is how they look.
-
-- (a) **As the rules make them**: no work; the same kind of text comes
-  out as quotes in some chapters and as unreferenced notes in others.
-- (b) **Paragraphs**: the blocks after a level-2 heading "BIBLIOGRAPHICAL
-  NOTE", in the body or the band of its page and of the pages after it,
-  up to the next heading, are paragraphs, whatever their type. A rule
-  for one book, about 30 lines; how many band blocks of other books a
-  general form of it ("band text after a heading on its page") would
-  take was not measured.
-
-Recommended: (b), because the kind should say what the text is and the
-same section should not come out in two kinds; the rule names its words,
-so it can take nothing in another book. The answer is not needed before
-the work starts: the implementer builds (a), and (b) is a rule added on
-top of it.
+**2. Haskins' bibliographical notes are paragraphs.** The blocks after
+a level-2 heading "BIBLIOGRAPHICAL NOTE", up to the next heading, are
+paragraphs whatever their type (section 16, "Haskins' bibliographical
+notes"), so that the same section does not come out as quotes in some
+chapters and as unreferenced notes in others. The answer not taken was
+to leave them as the quote and note rules make them.
 
 ## 21. Not in this spec
 
