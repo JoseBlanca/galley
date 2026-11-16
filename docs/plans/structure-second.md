@@ -536,7 +536,7 @@ pop-up itself was never tried on a Kindle (architecture §9). The
 heading target is for the body range, which the tool does not score
 today; the change of task 7.4 has to give it.
 
-- [ ] 7.1 markdown: headings with their label, the classes of
+- [x] 7.1 markdown: headings with their label, the classes of
   `quote`, `verse`, `chapter_summary`, `index_entry` and `figure`
   blocks, verse line breaks, figures as images with their caption, and
   the style sheet for each class, margin notes as a small bold line.
@@ -544,7 +544,7 @@ today; the change of task 7.4 has to give it.
   and architecture §9; the task writes it into a section of the
   markdown stage's docstring and the report. Stream `markdown`.
   Deliverables 1, 2.
-- [ ] 7.2 markdown: referenced footnotes as Pandoc footnotes with their
+- [x] 7.2 markdown: referenced footnotes as Pandoc footnotes with their
   margin notes inside, unreferenced footnotes as now, endnotes as one
   list where `notes` puts them with `epub:type="noteref"` links. Spec:
   structure §19; architecture §9 and §13. Stream `markdown`. Needs 7.1.

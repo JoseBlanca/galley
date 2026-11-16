@@ -107,3 +107,32 @@ threads in 50.4 s; `-m whole_book` 22 passed in 85.3 s; ruff, ty and
 `uv lock --check` pass.
 
 Work package 1 is done.
+
+## Stream `markdown`: tasks 7.1 and 7.2 (5b57b62, 9b1ebd7, merged)
+
+markdown writes every kind, each by what it is (described in the
+markdown stage's docstring, "How each kind is written"):
+
+- a heading is a Pandoc heading with its label as a `.label` span;
+- the other kinds are divs with a class (`quote`, `chapter-summary`,
+  `index-entry`, `figure`, `margin-note`);
+- verse has a hard break at each line end;
+- a referenced footnote is a Pandoc footnote holding its margin notes;
+- an endnote is an `.endnote` div where it was printed, reached by an
+  `epub:type="noteref"` link.
+
+Deliverable 1: 36 tests collected; deliverable 2: the hand-made EPUB
+passes epubcheck, with the noteref link and `<br />` in the verse.
+markdown now also refuses, as malformed, a reference naming no note, a
+note whose `referenced` disagrees with its references, a footnote
+referenced twice, and a footnote reference inside a footnote.
+
+Left open: a figure's image is not yet written, because the fidelity
+check refuses Pandoc's Image and Figure elements; that change to
+`fidelity.py`, a shared file, is made on the plan's branch after the
+`plates` stream merges, before task 6.3. Endnote divs carry no
+`epub:type="endnote"`, which some readers hide from the reading flow;
+the pop-ups have not been tried on a Kindle.
+
+The default pytest run took 39.5–40.9 s while three streams ran (load
+average 11–12); it is measured again when the machine is idle.
