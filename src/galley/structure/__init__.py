@@ -59,12 +59,16 @@ def make_blocks(
     lines: LinesFile,
     lower_case_words: frozenset[str],
     *,
+    contents_pages: frozenset[int] = frozenset(),
     workers: int = DEFAULT_WORKERS,
 ) -> BlocksFile:
     """The blocks of the book, what was removed, the words changed and the
     page numbers, in a pool of `workers` threads; the result does not
     depend on `workers`. `lower_case_words` is the word list of the book's
-    language in lower case, as `wordlist.lower_case_word_list` gives it."""
+    language in lower case, as `wordlist.lower_case_word_list` gives it;
+    `contents_pages` the page indices of the printed table of contents
+    (the config's), after the last of which the references to endnotes
+    are taken (spec section 12)."""
     survey = survey_book(lines, workers=workers)
     pages = map_pages(lambda page: page_parts(page, survey), lines.pages, workers)
     assembled = assemble(
@@ -73,6 +77,7 @@ def make_blocks(
         lower_case_words,
         survey.body_word_height,
         survey.body_line_pitch,
+        max(contents_pages, default=-1),
     )
     return BlocksFile(
         source_pdf_sha256=lines.source_pdf_sha256,
@@ -104,7 +109,9 @@ def run(
     )
     # The cache folder is read here, as the command's check reads it.
     words = wordlist.lower_case_word_list(config.language, wordlist.DEFAULT_CACHE_DIR)
-    blocks = make_blocks(lines, words, workers=workers)
+    blocks = make_blocks(
+        lines, words, contents_pages=frozenset(config.contents_pages), workers=workers
+    )
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
     write_blocks(folder.blocks_json, blocks)
     _logger.info(

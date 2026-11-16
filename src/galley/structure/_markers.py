@@ -42,7 +42,8 @@ _LOOSE_BRACKETED_MAX_ALNUM = 2
 _OPENING_BRACKETS = "([{"
 _CLOSING_BRACKETS = ")]}"
 # 1 or 2 signs among * ^ • † ‡ § » > ' ".
-_SIGNS_FORM = re.compile(r"[*^•†‡§»>'\"]{1,2}")
+_SIGNS = r"[*^•†‡§»>'\"]{1,2}"
+_SIGNS_FORM = re.compile(_SIGNS)
 # In an endnote section, 1 to 3 digits followed by "." or "-", where "I",
 # "l", "!" and "o" count as digits ("I39-", "!6o."); at least one is a
 # digit, so that the word "I." is no marker.
@@ -123,7 +124,7 @@ def note_marker(word: str, *, endnote: bool = False) -> NoteMarker | None:
 
 # Spec section 11: 1 or 2 signs glued to a word that starts with a capital
 # ("'There", Kadesh page 8), a marker only of a note started by its indent.
-_GLUED_SIGNS_FORM = re.compile(r"([*^•†‡§»>'\"]{1,2})([A-Z].*)")
+_GLUED_SIGNS_FORM = re.compile(rf"({_SIGNS})([A-Z].*)")
 
 
 def glued_sign_marker(word: str) -> NoteMarker | None:

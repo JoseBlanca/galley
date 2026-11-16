@@ -1444,3 +1444,29 @@ def test_label_on_a_block_that_is_not_a_heading_names_the_file_and_block(
         f"{tmp_path / 'blocks.json'}: block {block_id} is a paragraph and has "
         "the label 'CHAPTER IV.'; only a heading has a label"
     )
+
+
+# Where a note is written (structure spec, section 6, "Order")
+
+
+@pytest.mark.parametrize(
+    ("block_pages", "note_pages", "places"),
+    [
+        # A paragraph from page 3 to 4, then page 3's margin note: page 3's
+        # and page 4's notes both go after the margin note.
+        ((3, 3), (3, 4), (2, 2)),
+        # A note before every block's page goes first of all.
+        ((5, 6), (4,), (0,)),
+        # Blocks out of page order: the last block on or before the page.
+        ((2, 5, 3), (3, 4, 5), (3, 3, 3)),
+        # A block without an origin is passed over, as if it were not there.
+        ((1, None, 2), (1,), (1,)),
+        ((), (0,), (0,)),
+    ],
+)
+def test_note_places_counts_the_blocks_written_before_each_note(
+    block_pages: tuple[int | None, ...],
+    note_pages: tuple[int, ...],
+    places: tuple[int, ...],
+) -> None:
+    assert model.note_places(block_pages, note_pages) == places

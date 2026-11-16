@@ -26,6 +26,8 @@ class EndnoteSection:
 
 
 def _marked(entry: Entry) -> NoteMarker | None:
+    """The endnote marker the first word of a paragraph has; None for a
+    paragraph without one and for a margin note."""
     match entry:
         case Paragraph(piece):
             return endnote_marker(first_word(piece.lines[0]))

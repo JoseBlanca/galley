@@ -32,7 +32,8 @@ def line_beside(
     the `lines` of its page (spec section 13, rule 2): a block's first line
     whose top is within 0.5 `pitch` of it, the nearest; otherwise the line
     whose top is nearest; the first in the order of `lines` on a tie. None
-    when the page has no line."""
+    when the page has no line. `top` and `pitch`, the body line pitch, are
+    in points."""
 
     def distance(beside: BesideLine) -> float:
         return abs(beside.line.line.box.top - top)

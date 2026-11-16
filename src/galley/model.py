@@ -9,9 +9,11 @@ four JSON files, pages.json, words.json, lines.json and blocks.json, has a
 itself.
 """
 
+import bisect
 import dataclasses
 import functools
 import hashlib
+import itertools
 import json
 import math
 import os
@@ -19,7 +21,7 @@ import re
 import threading
 import types
 import typing
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -924,6 +926,33 @@ def read_checked_input[T: WordsFile | LinesFile | BlocksFile](
 def block_text(block: Block) -> str:
     """The text of a block: its spans' text concatenated, with nothing between."""
     return "".join(span.text for span in block.spans)
+
+
+def note_places(
+    block_first_pages: Sequence[int | None], note_first_pages: Sequence[int]
+) -> tuple[int, ...]:
+    """Where each note is written among the blocks (structure spec, section
+    6, "Order"): for each note, given by the page index of its first
+    origin, how many of the blocks, given in their order by the page index
+    of their first origin, are written before it: all up to the last block
+    whose first page is the note's or an earlier one; none when there is no
+    such block. A block without an origin (None) is passed over. structure
+    numbers the blocks by it and markdown writes the notes by it."""
+    by_first_page = sorted(
+        (page_index, position)
+        for position, page_index in enumerate(block_first_pages, start=1)
+        if page_index is not None
+    )
+    first_pages = tuple(page_index for page_index, _ in by_first_page)
+    last_positions = tuple(
+        itertools.accumulate((position for _, position in by_first_page), max)
+    )
+
+    def place(page_index: int) -> int:
+        on_or_before = bisect.bisect_right(first_pages, page_index)
+        return last_positions[on_or_before - 1] if on_or_before else 0
+
+    return tuple(place(page_index) for page_index in note_first_pages)
 
 
 _BLOCK_SHA256_DIGITS = 12  # architecture section 8, the checksum an Edit carries

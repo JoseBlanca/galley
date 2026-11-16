@@ -20,7 +20,8 @@ _HEIGHT_RATIO_STEP = 0.05
 
 
 def _height_ratio(lines: Sequence[PlacedLine], body_word_height: float) -> float:
-    """The median height of the words of `lines` over the body word height."""
+    """The median height of the words of `lines` over the body word height;
+    0 for no line, so that notes with no line above them fail condition 3."""
     return (
         median_word_height(word for line in lines for word in line.line.words)
         / body_word_height
@@ -65,7 +66,7 @@ def note_lines_start(
         ),
         None,
     )
-    if start is None or start == 0:
+    if start is None:
         return None
     notes, above = body[start:], body[:start]
     notes_ratio = _height_ratio(notes, body_word_height)
@@ -87,7 +88,8 @@ def take_body_notes(
 ) -> PageParts:
     """`page` with the notes left at the foot of its body stream taken out
     of it into `body_notes`, when there are such notes; `page` as it is
-    otherwise, and in a book without a marker form."""
+    otherwise, and in a book without a marker form. `body_word_height` is
+    in points."""
     if form is None:
         return page
     start = note_lines_start(page.body, band_notes, form, body_word_height)

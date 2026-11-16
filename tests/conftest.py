@@ -164,7 +164,7 @@ WHOLE_BOOK_CONFIGS = frozendict(
         ),
         "politicaltheorie00gieruoft": (
             'language = "en"\n'
-            "exclude_pages = [0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 289]\n"
+            "exclude_pages = [0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 288, 289]\n"
             "contents_pages = [10, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, "
             "64, 65, 66, 67]\n"
         ),
