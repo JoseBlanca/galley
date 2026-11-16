@@ -85,25 +85,45 @@ scripts kept outside git. For Haskins, Stubbs, Domesday and Mariéjol
 each line was checked against the reference, aligned by the evaluation
 tool; Kadesh and Gierke, which have none, were checked by eye on the
 pages named. Some terms are used only in one section and are defined
-there.
+there; these are used in several:
+
+- a line's **height ratio** is the median height of its words over the
+  body word height (the text layer gives a word the height of its OCR
+  line, so this says something about type size, not much); a block's is
+  the median over its lines' words;
+- a line's **character density** is its characters, spaces left out,
+  per point of its width, over the book's median for full lines (lines
+  of 5 words or more whose sides lie within 3 pt of their region's
+  edges), so that smaller type gives more than 1;
+- a **wide line** has at least 5 words and is at least 150 pt wide;
+- the **book's marker form** is the form, digits, bracketed or sign
+  (section 11), that the most first words of the book's band blocks
+  have: bracketed in Mariéjol (746 of 752), digits in Domesday (1,268 of
+  1,269), Haskins, Stubbs (its index and lists) and Kadesh. A book whose
+  band blocks start with no such word, as Gierke's 11, has none.
 
 ## 2. What structure does, in order
 
 The steps run in this order, and the order matters where one step
-decides what a later one sees: the notes are found before the quotes,
-because a note that layout left in the body is set in small type and the
-quote rules would take it for a quote (in the second research 32 of
-Domesday's false quotes and 40 of Mariéjol's were such notes); the index
-entries are found before the quotes, because an index is set in small
-type too; and margin notes are placed last, once the notes exist, so
-that a margin note beside an endnote goes inside it.
+decides what a later one sees: the notes left in the body are taken per
+page, before paragraphs are joined over page breaks, so that a note at
+the foot of a page is never joined to the next page's text; all notes
+are found before the quotes, because a note that layout left in the body
+is set in small type and the quote rules would take it for a quote (in
+the second research 32 of Domesday's false quotes and 40 of Mariéjol's
+were such notes); the index entries are found before the quotes,
+because an index is set in small type too; and margin notes are placed
+last, once the notes exist, so that a margin note beside an endnote goes
+inside it.
 
 1. **Survey the book** (one pass over every page): the head lines, the
    book's own words for the hyphen rule, the body word height and body
    line pitch, the offset between page index and printed page number,
    the pages whose lowest line is a signature line (section 4), the
-   index pages (section 17) and the plate pages (the pages that have a
-   figure; section 18). The body word height and body line pitch are
+   index pages (section 17), the plate pages (the pages that have a
+   figure; section 18), the book's marker form (section 1) and the
+   endnote section (section 12), which is found from the lines that
+   start a paragraph by section 6's rules. The body word height and body line pitch are
    measured as layout measures them, by `body_measures.body_measures`
    (architecture §12) on the rows that `body_measures.group_rows` makes
    of each page's words from every region. A book for which it gives
@@ -123,24 +143,31 @@ that a margin note beside an endnote goes inside it.
    3. in the body stream, find the heading lines (section 14), except on
       the config's `contents_pages`, then the chapter summary under a
       heading (section 15) and the runs of verse (section 16, rule 4);
-   4. group the body stream into paragraphs (section 6, with the rule of
-      section 13 for a line beside a margin note), each heading,
+   4. group the body stream into paragraphs (section 6), each heading,
       summary and verse run being a block of its own, and each side
       region into blocks of its own (section 6); join hyphens inside
-      each block (section 5).
+      each block (section 5);
+   5. take the notes left at the foot of the body (section 11, "Notes
+      left in the body"), except on the pages of the endnote section
+      and the index.
 3. **Across pages**, in page order:
    1. join the last paragraph of each page with the first of the next
       when it runs on, and the hyphen at that page break (section 6),
-      and a verse block likewise (section 16);
-   2. the notes (section 11): cut the band blocks into notes, take their
-      markers, take the notes left in the body, join a note that runs
-      over a page break, find the endnotes (section 12), and match the
-      references in the text to the notes, splitting each off its word;
-   3. the index entries (section 17);
-   4. the quotes (section 16, rules 1 to 3), among the body blocks that
+      and a verse block likewise (section 16); a note taken in step 2.5
+      never runs on into the next page's body, and no paragraph runs on
+      into the first page of the endnote section;
+   2. split a paragraph at a line beside a margin note that is indented
+      (section 13, rule 3), which needs the paragraphs as joined;
+   3. the notes (section 11): cut the band blocks and the notes taken
+      from the body into notes, take their markers, join a note that
+      runs over a page break, make the endnotes (section 12), and match
+      the references in the text to the notes, splitting each off its
+      word;
+   4. the index entries (section 17);
+   5. the quotes (section 16, rules 1 to 3), among the body blocks that
       are still paragraphs;
-   5. place the margin notes (section 13);
-   6. put the side text, figures and notes in reading order, and number
+   6. place the margin notes (section 13);
+   7. put the side text, figures and notes in reading order, and number
       the blocks (section 6).
 
 **What each region is.** lines.json says nothing of it (architecture
@@ -153,15 +180,17 @@ that a margin note beside an endnote goes inside it.
 - a **margin region** is narrower than a quarter of the page's widest
   region other than the head line (the first, on a tie) and lies wholly
   left or wholly right of
-  it, or overlaps vertically a region wider than itself (a cut-in note,
-  layout §3, step 2b). Margin notes are about 30
+  it, or overlaps vertically a region wider than itself (a note that
+  Stubbs cuts into the body column, which layout takes out of the body
+  lines into a region of its own: layout §3, step 2b). Margin notes are about 30
   pt wide against columns of 266 to 317 pt; each column of an index is
   about half the width, so it is not a margin region;
 - a **band region** is any other region, not the head line, whose
   median word height (over its words) is at most 0.85 of the body word
   height and whose top is at or below the bottom of another region,
   neither the head line nor a margin region, whose median word height is
-  above that (the threshold of layout §3, step 4);
+  above that (layout's threshold for the footnote band, layout §3,
+  step 4);
 - every other region is a **body region**, in layout's order.
 
 ## 3. Running heads and page numbers in the head
@@ -527,19 +556,24 @@ have started on an earlier page or run on to a later one, come that
 page's figure block (section 18) and, in the first plan, its margin
 notes, by the order of their regions; the second plan places margin
 notes by section 13 instead, and only those with no line beside them
-stay here. A page's notes
-follow in `notes`, in the order of their regions and lines; markdown
-writes a note after the last block, in the order of `blocks`, whose
-first origin is on the note's first page or an earlier one, or first of
-all when there is none (section 10). A paragraph that runs over a page
-break counts for the page it starts on. With a paragraph from page 3 to
-page 4, then page 3's margin note, a note of page 4 comes after that
-margin note and after page 3's notes, not between the paragraph and page
-3's side text, as it would if a note followed the last block with a line
-on its page. So the side
-text of a page is read after the paragraph in which the page's body
-ends, never inside it, and in page order. A page whose body stream is
-empty puts its side text after the last block so far.
+stay here. A page whose body stream is empty puts its side text after
+the last block so far. So the side text of a page is read after the
+paragraph in which the page's body ends, never inside it, and in page
+order.
+
+A page's notes follow in `notes`, in the order of their regions and
+lines. markdown writes each note after a block chosen by the block's
+**first page**, the page of its first origin, which for a paragraph
+that runs over a page break is the page it starts on: after the last
+block in `blocks` whose first page is the note's first page or an
+earlier one, or before every block when there is none (section 10). An
+example: a paragraph runs from page 3 to page 4, and page 3 has a margin
+note and a note. `blocks` holds the paragraph, then page 3's margin
+note; the paragraph's first page is 3, and so is the margin note's, so
+page 3's note goes after the margin note, and a note of page 4 goes
+there too, after page 3's note. Had the rule used the last page a block
+has a line on, the note of page 4 would come between the paragraph and
+page 3's margin note.
 
 **Ids and origins.** A block's id counts the blocks that start on its
 page in this reading order, body, margin-note and the blocks inside
@@ -705,7 +739,7 @@ budget of the `coding` skill in the plan.
   §3, step 4) and become notes, after the paragraph in which the page's
   body ends: their words are kept and keep their order. A quotation
   read as a band stays a note without a marker in the second plan;
-  the bibliographical notes are Open 2.
+  what the bibliographical notes are is Open 2 (section 20).
 - **The index**: its columns are body regions (or, on its first page
   under a full-size title, band regions); entries become paragraphs by
   rules 1 and 2, which do not fit an index's hanging indents. The second
@@ -834,10 +868,13 @@ whose hyphen should have stayed and 2 not one word.
   one line, the second marker 14 pt after "12 b.", give two notes; a
   page whose first band line has no marker and is not indented continues
   the last note of the page before, across a blank page;
-- endnotes: 9 body paragraphs starting "291." to "301." with two
-  missing give 9 endnotes, the one paragraph between two of them joined
-  to the note before; 6 such paragraphs give none; a body word "Law1"
-  before them is linked to endnote 1 when there is one;
+- endnotes: 12 body paragraphs starting "291." to "302.", and one
+  paragraph without a marker between two of them, give 12 endnotes, that
+  paragraph the second block of the note before; a paragraph before
+  "291." at the top of the first page gives an endnote with no marker,
+  and the paragraph ending the page before does not run on into it; 6
+  such paragraphs give no endnote; a body word "Law1" before them is
+  linked to endnote 1 when there is one;
 - margin notes: a margin region whose top lies 0.3 pitch below a
   paragraph's first line goes before that paragraph; one beside the
   middle of a paragraph, beside a line indented 20 pt after a full line,
@@ -856,9 +893,12 @@ whose hyphen should have stayed and 2 not one word.
 - quotes and verse: a block of 3 wide lines at 0.85 of the body height
   and 1.10 of the density is a quote, at 1.0 a paragraph; 3 lines of 4
   words inset 40 pt on both sides are one `verse` block whose text holds
-  two line feeds; a band of small type is still a note, and a body block
-  that ends a page and starts with the book's marker form is a note, not
-  a quote;
+  two line feeds; a band of small type is still a note; body lines at
+  0.85 of the body height at a page's foot, below lines at 1.0, whose
+  markers read "(1)", "(2)", "(3)" in a book whose form is bracketed,
+  are notes, and with markers "(1)", "(3)", "(2)" they stay a paragraph
+  and are not a quote; the same lines on a page whose lines above are
+  also at 0.85 stay paragraphs;
 - index: two columns of 20 lines under "INDEX", lines at the edge and
   indented 9 pt, give one `index_entry` per line at the edge; a line
   "BUR CON" is removed as `guide_words`; a row read across the gutter is
@@ -892,7 +932,8 @@ exactly.
 | `domesday_74-83` | 1 (75) | references "day1.'", "land2.", "land3." linked to notes whose markers read "1", "2", "9"; margin notes beside paragraphs' first lines; "Can the villein be pursued?" beside the page's last line, a paragraph's first line |
 | `domesday_74-83` | 2 (76) | two notes on one line ("1 Dialogus", "2 Dialogus"); note 3 with marker "z" |
 | `domesday_74-83` | 9 (83) | three lines of two notes each; markers "8", "*", "e"; references "12s.2", "30d8" |
-| `mariejol_210-219` | 0 (210) | five notes left in the body, notes and not quotes |
+| `mariejol_210-219` | 0 (210) | five notes left in the body, missed by section 11's order test (markers read 1, 2, 3, none, 11, 5): paragraphs, not quotes |
+| `mariejol_210-219` | 7 (217) | a note left in the body, taken as a note |
 | `mariejol_210-219` | 2 (212) | two broken lines inset on both sides: a known false `verse` block |
 | `mariejol_210-219` | 4 (214) | a note run on from page 213, one note; markers "(t)", "(a)", "(3J"; "(» i)" not found, so note 1 unreferenced |
 | `mariejol_210-219` | 6 (216) | marker "U)"; note 2 with no reference in the text |
@@ -902,8 +943,8 @@ exactly.
 | `gierke_86-93_270-271` | 0 (86) | "POLITICAL THEORIES OF THE / MIDDLE AGE.", level 1; "I. The Evolution of Political Theory.", level 2 |
 | `gierke_86-93_270-271` | 2 (88) | "Law1" stays unsplit (endnote 1 is outside the excerpt); margin notes before the paragraphs whose first lines they are beside; "Medieval Thought." beside the page's last line |
 | `gierke_86-93_270-271` | 6 (92) | "II. Macrocosm and Microcosm.", level 2, and the known false heading "Macrocosm and Microcosm." at the top |
-| `gierke_86-93_270-271` | 8 (270), 9 (271) | endnotes 291 to 301, kind `endnote`, unreferenced, each margin note inside its note before its text; the end of note 290 at the top of page 270 a paragraph |
-| `haskins_quotes_index` (new) | 0 (39) | a level-2 heading "BIBLIOGRAPHICAL NOTE" mid-page, quotes after it (Open 2) |
+| `gierke_86-93_270-271` | 8 (270), 9 (271) | endnotes 291 to 302, kind `endnote`, unreferenced, each margin note inside its note before its text; the end of note 290 at the top of page 270 an endnote with no marker, not joined to the last paragraph of page 93 |
+| `haskins_quotes_index` (new) | 0 (39) | a level-2 heading "BIBLIOGRAPHICAL NOTE" mid-page, quotes after it (section 20, Open 2) |
 | `haskins_quotes_index` | 1 (53) | quotes in smaller type across the column |
 | `haskins_quotes_index` | 2 to 4 (71 to 73) | a quote that runs over two page breaks |
 | `haskins_quotes_index` | 5 (129) | a heading above a band of small type |
@@ -960,9 +1001,10 @@ kinds (section 21), against the scores of the first plan's work report:
 | reference headings in `heading` blocks, body range | at least 17 of 18 | at least 24 of 26 | at least 20 of 23 | at least 24 of 26 |
 | index entries, the index part's paragraph boundaries, precision / recall | at least 0.90 / 0.90 | 0.85 / 0.85 | 0.90 / 0.90 | (no index) |
 
-They are set below the second research's counts, which were taken with
-prototypes on the first plan's output, with room for the rules as
-built. The tool does not score where Domesday's margin notes are placed
+The tool's `as_note` counts a reference-text note as found when at
+least half of its words are in one galley note, and `as_margin_note`
+likewise for a margin note (`docs/specs/evaluation.md` §6). Each target
+is below the second research's count for that book. The tool does not score where Domesday's margin notes are placed
 (its reference text moved them, `margin_notes_moved` in
 `evaluation/books.toml`), so the 317 of 328 of section 13 is not a
 target; the reference pages check the placement.
@@ -1005,9 +1047,7 @@ note, and because the evaluation tool reads a block's kind.
   shows the same text in the same place as (a); the evaluation tool
   scores notes and margin notes from the first plan on.
 
-Chosen: (b). It costs one small change outside the two stages, and
-without it the first plan's work on notes and margins cannot be
-measured and its paragraph scores are wrong.
+Chosen: (b).
 
 ## 11. Notes and their references
 
@@ -1033,9 +1073,9 @@ differently by the OCR:
 
 The size of a superscript cannot be used: the text layer gives every
 character of a word the word's top and height, so a glued reference has
-no box of its own, and in Domesday, Mariéjol and Kadesh a reference
-that is a word of its own has its line's height too (ratio 1.00 for 41,
-805 and 9 such words). Only Haskins' 42 "^" and "*" words are smaller,
+no box of its own, and a reference that is a word of its own has its
+line's height too: the ratio of its height to its line's is 1.00 for
+Domesday's 41 such words, Mariéjol's 805 and Kadesh's 9. Only Haskins' 42 "^" and "*" words are smaller,
 0.50 of their line's height.
 
 ### Where a note starts
@@ -1053,24 +1093,39 @@ a note when any of these holds:
    This rule takes the 132 lines of Mariéjol and 21 of Domesday that
    start with a marker but follow a full line, and so sat inside the
    note before;
-3. its first word has a note marker's form whose value (below) is that
-   of the note before it plus 1: on a page whose notes are each one line
-   long no line is indented against another (Mariéjol's pages 221, 310
-   and 409).
+3. its first word has a note marker's form, and what the marker reads
+   as a number (below, "Its value", the reading of digit-like letters)
+   is what the marker of the note before it reads plus 1; this uses what
+   the marker reads, even in a book numbered per page, where a note's
+   value is otherwise its place, since by place every marker-shaped
+   line, a table's row too, would pass. On a page whose notes are each
+   one line long no line is indented against another (Mariéjol's pages
+   221, 310 and 409).
 
 **Two notes on one line.** A word inside a note line starts a note when
 it has a note marker's form or is one lower-case letter (Domesday's "e"
-for 6), has at most 2 characters, follows a gap of at least 10 pt, comes
-after a word that ends with ".", "'", "’", ":", ";" or ")", and comes
-before a word that starts with a capital or a digit. The gap before such
-markers was 16 to 32 pt in Haskins (4 cases) and 13.5 pt at the median
-in Domesday; the other gaps of note lines were 3.8 to 5.1 pt at the
-median and 14.0 pt at the 99th percentile (Domesday). The punctuation
-test keeps a row of a table in a note ("40 2 42", Domesday page 43)
-whole. The rule finds 191 such notes in Domesday, 4 in Haskins, 4 in
-Kadesh and none in Mariéjol; its precision was measured only on the
-reference pages. The line is cut at the word: the note before ends with
-the word before it.
+for 6), has at most 2 characters, follows a gap of at least 10 pt from
+the word before, comes after a word that ends with ".", "'", "’", ":",
+";" or ")", and comes before a word that starts with a capital or a
+digit. The line is cut at the word: the note before ends with the word
+before it. The gap before such markers was 16 to 32 pt in Haskins (4
+cases) and 13.5 pt at the median in Domesday; the other gaps of note
+lines were 3.8 to 5.1 pt at the median and 14.0 pt at the 99th
+percentile (Domesday). The gap alone would not do; with the punctuation
+and the capital it does. Measured on 16 November 2026 on the whole
+books' band lines of the first plan, against the reference text (a cut
+is right when the words on either side belong to two of its notes):
+
+| gap | Domesday: right / wrong / not in the reference text | Haskins | Kadesh, Mariéjol |
+|---|---|---|---|
+| none | 185 / 148 / 223 | 2 / 0 / 4 | |
+| 10 pt | 176 / 3 / 12 | 2 / 0 / 2 | Kadesh 2, unchecked; Mariéjol none |
+| 12 pt | 172 / 1 / 11 | 2 / 0 / 2 | |
+| 15 pt | 155 / 0 / 11 | 2 / 0 / 2 | |
+
+So 10 pt: 3 wrong cuts in Domesday for 21 more right than at 15 pt. The
+punctuation test keeps a row of a table in a note ("40 2 42", Domesday
+page 43) whole.
 
 A band block whose first line starts no note is part of the note before
 it on the same page (the rest of a note in the second column, or a table
@@ -1120,19 +1175,54 @@ has no value.
 
 Layout leaves some notes in the body when their lines are not small
 enough to make a band: a fifth of Mariéjol's note words, whose OCR lines
-are 9 pt high against the body's 10 (layout §6). The last blocks of a
-page's body stream, from the first of them whose first word has the
-**book's marker form** to the last, each of which starts with a word of
-that form and has a median height ratio (section 16) of at most 0.95,
-are notes of that page, as band blocks are. The book's marker form is
-the form (digits, bracketed, sign) of the most markers of its band notes:
-bracketed in Mariéjol, digits in Domesday. Asking for the book's form
-keeps Domesday's numbered quotes "(i) In Espalle…" (11 of its quotes)
-out, and asking for the last blocks of the page keeps any numbered
-paragraph above them out. This rule was not measured: of the false
-quotes the second research found, 30 of Domesday's 32 notes left in the
-body and 25 of Mariéjol's 40 start with a marker, and the reference page
-Mariéjol 210 (five notes in the body) checks it.
+are 9 pt high against the body's 10 (layout §6). On each page, before
+any paragraph is joined over the page break (section 2, step 2.5), in
+a book numbered per page (below) that has a book's marker form (section
+1), the page's body lines from a **first marker line** to the last body
+line of the page are notes of the page when all of these hold:
+
+1. the first marker line is the first line of the page's body stream
+   whose first word has the book's marker form and reads 1;
+2. the lines from it to the page's last body line have a height ratio
+   (section 1), over all their words, of at most 0.95;
+3. the lines above it have a height ratio at least 0.05 higher: the
+   notes are set smaller than the text above them;
+4. the markers of the lines from it on that have the book's form, read
+   as numbers, never decrease (an unreadable one is skipped).
+
+They are cut into notes as a band is (below, "Where a note starts"),
+and are band blocks from then on: they never run on into the next
+page's body. The rule is not applied on the pages of the endnote
+section (section 12), whose notes are all small type, nor on index
+pages (section 17).
+
+Asking for the book's form keeps Domesday's numbered quotes "(i) In
+Espalle…" out (bracketed, against its digits). Condition 3 keeps out a
+page whose body is all in 9-pt OCR lines (Domesday page 501, where a
+table line "1 H. = 120 A. and 1 v." would otherwise take the page's
+text) and a publisher's list (Stubbs page 331). Condition 4 keeps out
+tables of numbers.
+
+Measured on 16 November 2026 on the six whole books' body lines of the
+first plan, each word labelled by the reference text:
+
+| book | pages | notes taken | words the reference text has in notes | words it has in the body (paragraphs, tables) | words it does not have (mostly OCR garble) |
+|---|---|---|---|---|---|
+| Domesday | 16 | 43 | 900 | 8 (7 of a table, 1 of a paragraph) | 99 |
+| Mariéjol | 43 | 137 | 1,474 | 32 | 1,041 |
+| Haskins, Stubbs, Kadesh | 0 | | | | |
+| Gierke | 0 (no marker form) | | | | |
+
+The 32 words of Mariéjol labelled as body are in garbled note lines
+that the alignment paired with body words ("(a) BmafiOM, Vil, y, 365."
+on page 139); none of the 12 lines looked at is a line of text. Asking
+the markers to read 1, 2, 3 in turn instead of condition 4 takes 11 of
+Domesday's pages and 18 of Mariéjol's, with no body word; with no test
+of order, 171 words of Domesday's paragraphs and 149 of its tables are
+taken. The rule misses pages where a marker misread as a larger number
+comes before a smaller one: Mariéjol's page 210 reads its five markers
+"U)", "li)", "(S)", … as 1, 2, 3, none, 11, 5, and its notes stay in the
+body (section 16 says how they are kept from being quotes).
 
 ### A note that runs over a page break
 
@@ -1156,11 +1246,14 @@ marker, six of them the start of a "Bibliographical note".
 reading order:
 
 - a **glued number**: a letter, then any punctuation, then 1 to 3 digits,
-  then only punctuation ("land3.", "Kadesh,12", "causa)27."), unless the
-  letters before the digits are an abbreviation that a number follows in
-  citations: c, p, pp, f, ff, n, nr, no, vol, ch, cap, art, l, ll, q, a,
-  t, v, s, d, m (any case, with or without "."); or punctuation and 1 to
-  3 digits (Kadesh page 10 reads "14);" and ";13");
+  then only punctuation ("land3.", "Kadesh,12", "causa)27.",
+  "12s.2"), unless the word starts with an abbreviation that a number
+  follows in citations and has no other letters: c, p, pp, f, ff, n, nr,
+  no, vol, ch, cap, art, l, ll, q, a, t, v, s, d, m, in any case, with or
+  without "." ("p.12", "vol.3"); or punctuation and 1 to 3 digits
+  (Kadesh page 10 reads "14);" and ";13"). In "12s.2" and "30d8"
+  (Domesday page 83) the "s" and "d" are shillings and pence after a
+  number, not the start of the word, so they are candidates;
 - a **bracketed number**: an opening bracket, 1 or 2 digits or letters
   read as digits (above), a closing bracket, and only punctuation after
   ("(1)", "(i).", "{2).");
@@ -1169,8 +1262,9 @@ reading order:
   or "t" is not one: in Domesday such a match was right 28 times in 82.
 
 **The book's reference form.** A first pass of the matching below, over
-every page and with every candidate, counts the exact matches of each
-kind of candidate; the kind with the most is the book's reference form:
+every page and with every candidate, counts for each kind of candidate
+its **exact matches**, pairs whose candidate reads as the note's value
+(score 3 below); the kind with the most is the book's reference form:
 the glued number in Domesday and Kadesh, the bracketed number in
 Mariéjol, none in Haskins, which has no exact match. Then only
 candidates of that form are kept, and signs too, unless the form is the
@@ -1179,8 +1273,14 @@ bracketed number: Mariéjol prints its references at full size, and its
 times.
 
 **Matching.** On each page, the notes that start there, with their
-values, and the page's candidates, in order, are aligned so that both
-orders are kept and the total of these scores is highest:
+values, and the page's candidates, in reading order, are aligned: a set
+of pairs, each note with at most one candidate and each candidate with
+at most one note, such that a later note is never paired with an
+earlier candidate, and the total of the pairs' scores is highest. It is
+found by dynamic programming over the two sequences, as in the
+alignment of two strings with no cost for a gap; of two sets with the
+same total, the one that pairs the first note with the earlier
+candidate wins, then the second note, and so on. The scores:
 
 | pair | score |
 |---|---|
@@ -1200,13 +1300,13 @@ Domesday's 1,440 and 182 of Mariéjol's 676. The fidelity check asks
 only that a reference have a marker's shape (architecture §13); every
 reference these rules split off has it.
 
-**What is changed.** A matched glued candidate is split by a
-`note_marker` word change, ("land3.",) to ("land", "3", "."), and its
-block gets three spans, the middle one the reference, with `note_ref`
-the note's id; the spaces stay with the spans around it. A bracketed
-number or a sign that is a word of its own becomes the reference span,
-with any punctuation after it split off the same way ("(i).": "(i)",
-"."). The note's `referenced` becomes true.
+**What is changed.** A matched glued candidate, a number or a sign at
+the end of a word, is split by a `note_marker` word change, ("land3.",)
+to ("land", "3", "."), ("rulers.^",) to ("rulers.", "^"), and its block
+gets two or three spans, the reference one with `note_ref` the note's
+id; the spaces stay with the spans around it. A bracketed number or a
+sign that is a word of its own becomes the reference span, with any
+punctuation after it split off the same way ("(i).": "(i)", "."). The note's `referenced` becomes true.
 
 ### What the rules give
 
@@ -1271,16 +1371,21 @@ November 2026).
 **The endnote section** is a run of consecutive body paragraphs whose
 first words are endnote markers (section 11, the last form) with rising
 values, at least 8 of them, with any number of paragraphs without such a
-marker between them. It starts at the first of them and ends
-with the last paragraph of the page of the last; a paragraph between
-them that starts with no such marker belongs to it. The end is so that
+marker between them. The survey finds it (section 2, step 1) from the
+lines that start a paragraph by section 6's rules. It starts at the
+first of them and ends with the last paragraph of the page of the last;
+a paragraph between them that starts with no such marker belongs to
+it. The section's first page starts a new block: no paragraph of the
+page before runs on into it. A paragraph of the section before its first
+endnote marker (the end of a note whose start is on an earlier page not
+in the PDF or the excerpt) is an endnote with no marker, unreferenced. The end is so that
 the library's card on Gierke's page 288 ("BINDING SECT. NOV 8 1967"),
 after five blank pages, stays out. The 8 is set between what the six
 books hold, measured on the first plan's paragraphs on 16 November 2026:
 the runs of at least 4 rising numbered paragraphs are one in Kadesh, of
-6 (pages 20 to 40), and Gierke's, of 299; and the Gierke excerpt holds 9
-endnotes (pages 270 and 271), which must make a section for its
-reference page. The research's 20 would leave them paragraphs. In Gierke it
+6 (pages 20 to 40), and Gierke's, of 299; and the Gierke excerpt holds 12
+endnotes, 291 to 302 (pages 270 and 271), which must make a section for
+its reference page. The research's 20 would leave them paragraphs. In Gierke it
 runs from "1." on page 186 to page 282: 288 paragraphs start with a
 clean "N.", in rising order without exception, and about 25 more with a
 damaged one ("I4I-", "!6o."). Each paragraph that starts with an endnote
@@ -1312,13 +1417,13 @@ printed, rendered as a small bold line (architecture §9 and §17; the
 owner confirmed it on 15 November 2026, reading margin notes as short
 summaries of their paragraph). The rules say which paragraph that is.
 They apply to every margin region: Gierke's and Domesday's outer margin
-notes, and Stubbs' cut-in notes, which layout now takes out of the body
-lines (layout §3, step 2b).
+notes, and the notes Stubbs cuts into the body column, which layout now
+takes out of the body lines beside them (layout §3, step 2b).
 
 1. **One printed note, one block.** A margin region is part of the
    margin region above it, on the same page and side, when its top is at
    most 2.5 pitches below that region's bottom and its first line is not
-   beside a paragraph's first line (rule 2). Layout cuts a margin region
+   beside a paragraph's first line (this section's rule 2). Layout cuts a margin region
    where the next line is more than 1.5 pitches lower (a guess, layout
    §3, step 2), and Gierke sets its notes loosely: 268 of its margin
    regions that are not beside a paragraph's first line lie within 2.5
@@ -1337,8 +1442,9 @@ lines (layout §3, step 2b).
 3. **An indented line beside a margin note starts a paragraph.** When
    the line beside is not a paragraph's first line but its left side is
    at least 5 pt right of its region's left edge (section 6), it starts a
-   paragraph, even after a full line; this is added to rule 1 of section
-   6 and applied when the paragraphs are found (section 2, step 2.4).
+   paragraph, even after a full line. It is applied once paragraphs have
+   been joined over page breaks (section 2, step 3.2), because the line
+   beside may be the first line of a page whose paragraph runs on.
    In Domesday, each of the 13 margin notes beside the middle of a
    first-plan paragraph that could be checked stood beside an indented
    line (15 to 90 pt) where the reference text starts a paragraph; 27 of
@@ -1367,6 +1473,9 @@ lines (layout §3, step 2b).
 6. A margin note with no body or note line on its page stays where
    section 6 puts side text.
 
+Placing a margin note changes no word, so it needs no record; the
+fidelity check does not look at order (architecture §13).
+
 **What the rules give.** Against Domesday's reference text, whose
 transcriber put each margin note before the paragraph it belongs to: of
 the 328 margin notes that could be found in it, rules 2 and 4 on the
@@ -1393,7 +1502,8 @@ they are specks.
   87: the note reads "Diversity of rials.", and "mate-" stays in the body
   line).
 - Two margin notes within 2.5 pitches beside one paragraph, the second
-  not beside a paragraph's first line, are joined into one (rule 1); how
+  not beside a paragraph's first line, are joined into one (this
+  section's rule 1); how
   often wrongly was not measured.
 
 ## 14. Headings
@@ -1452,8 +1562,10 @@ Two more kinds of line join a heading:
 - a **chapter label** that is centred and whose next line is a heading
   line, although it has fewer than 4 letters ("IV", Haskins' "Ill");
 - a **continuation**: the line right after a heading line, with at least
-  4 letters, at most 2.6 pitches below it, that is centred, or whose
-  capitals share is at least 0.9 and whose gap below is at least 1.5.
+  4 letters, at most 2.6 pitches below it, that is centred, or, when it
+  is not centred, whose capitals share is at least 0.9 and whose gap
+  below is at least 1.5 (a line in capitals set apart from the text
+  below it, but as wide as the column).
   This takes Stubbs' "John." under "CHAPTER VII." (the OCR read the small
   capitals as lower case) and Mariéjol's "L'EXPÉRIENCE ET L'ÉCHEC DE LA
   POLITIQUE MODÉRÉE", which fills the column and so is not centred.
@@ -1469,8 +1581,11 @@ kept apart from the title in the format is **Open 1**. A heading block
 starts a block and so does the line after it.
 
 **Levels.** A heading block is level 1 when its first line is a chapter
-label or starts with one, or when it is the first line of a page that
-has no running head; any other is level 2. In the four books with a
+label, or starts with one of the label words (CHAPTER, CHAPITRE, ESSAY,
+PART, PARTIE, BOOK, LIVRE), or when it is the first line of a page that
+has no running head; any other is level 2. A roman numeral counts as a
+label only as a line of its own, so "I. The Evolution of Political
+Theory." is level 2. In the four books with a
 reference text, this makes the chapters, the preface, the contents, the
 index and Domesday's essays level 1, and Haskins' "BIBLIOGRAPHICAL NOTE"
 sections and Domesday's "§" sections and "NOTE." level 2.
@@ -1570,8 +1685,9 @@ which pass rules 1 to 3. The summary is one block; the line after it
 starts a block. The hanging indent only says where the summary ends; its
 text is its lines joined, as any block's.
 
-**Measured.** It finds 10 of Stubbs' 12 summaries, each whole and
-nothing more (pages 18, 51, 79, 106, 131, 157, 182, 233, 259, 284), and
+**Measured.** Stubbs prints 12 summaries; the reference text makes 11
+of them quotes (which one it does not was not looked at). The rule
+finds 10 of the 12, each whole and nothing more (pages 18, 51, 79, 106, 131, 157, 182, 233, 259, 284), and
 none elsewhere in the six books' body ranges; in the front matter it
 takes 2 lines of a publisher's list on Mariéjol's page 7. It misses
 pages 28 and 210, where the OCR read the small type out of order ("Ste
@@ -1590,12 +1706,8 @@ rules change the kind of a block that the paragraph rules of section 6
 made, except rule 4, which also decides where a verse block starts and
 ends.
 
-Terms: a line's **height ratio** is the median height of its words over
-the body word height; its **character density** is its characters,
-spaces left out, per point of its width, over the book's median for full
-lines (lines of 5 words or more whose sides lie within 3 pt of their
-region's edges), so that smaller type gives more than 1. A **wide line**
-has at least 5 words and is at least 150 pt wide.
+The height ratio, the character density and a wide line are defined in
+section 1.
 
 **What the books show.** The reference texts have 29 quotes in Haskins (8
 of them its "Bibliographical note" sections), 56 in Stubbs (11 chapter
@@ -1621,6 +1733,12 @@ height ratio of 0.95 or less; with the density as well, 1 has.
 
 They run after the notes and the index entries (section 2), on the body
 blocks that are still paragraphs:
+
+A block that ends a page's body stream and whose first word has the
+book's marker form is never made a quote by these rules: it is a note
+that section 11 did not take (Mariéjol's page 210), and stays a
+paragraph. Not measured. A rule here changes a block's kind and no word,
+so it needs no record.
 
 1. **Smaller type.** A block with at least 2 wide lines, whose median
    height ratio over all its lines is at most 0.95 and whose median
@@ -1656,8 +1774,9 @@ the index: Haskins 264, Stubbs 311, Domesday 545, Mariéjol 448):
 | Mariéjol, rule 4 | 38 of 39 | 8 runs | 1 | 0 | 3 runs | 1 garbled run |
 
 The notes left in the body are the false quotes that the notes rules,
-run first, are meant to take (section 11); the counts above were taken
-without them. Rule 4 also takes 2 runs of Haskins' verse (pages 209 and
+run first, are meant to take (section 11), and the rule above keeps out
+those it misses; the counts above were taken without either, and how
+many false quotes remain with them was not measured. Rule 4 also takes 2 runs of Haskins' verse (pages 209 and
 234), 8 runs of Domesday's quotes (pages 136, 137, 291, 406, 407, 443,
 506), which become verse blocks, and 9 runs of its tables (pages 47, 60,
 66, 408, 434, 472). On Kadesh, which has no reference text, rule 1 takes
@@ -1788,7 +1907,9 @@ words the OCR misread ("Hansa" for "Mansa"), not wrong boundaries.
 **Where they fail.**
 
 - **Rows read across both columns** (Haskins 267, 269, 271, 273: 23
-  lines; Stubbs 312 to 321: 39 lines): layout's gutter strip starts at
+  lines; Stubbs 312 to 321: 39 lines): layout cuts columns at a strip 6
+  pt wide that no word of most rows crosses (layout §3, step 5); that
+  strip starts at
   181.8 pt on Haskins' page 267, where the left column is justified to
   182.0, so the column's first rows cross it and are read across (layout
   §3, step 5). Rule 2 repairs this. Letting a word cross the strip by
@@ -1831,15 +1952,18 @@ paragraph of pages 15 to 18).
    (Kadesh 19 and 24) is removed as on any page.
 2. **Caption and stray words.** Every other line is a caption line when
    at least 2 of its words, or at least half of them, are **known
-   words**: a word whose key (section 5) has at least 2 letters, is made
-   of letters, apostrophes and hyphens, and is in the word list, or a
-   number, digits with brackets or punctuation around them ("16",
-   "17]"). Every other line is removed as `plate_text`, one removal per
-   line.
+   words**, by `wordlist.is_known_word`, which analyze uses too
+   (`docs/specs/plates.md` §2): a word whose key (section 5: lower case,
+   with what is not a letter, digit, hyphen or apostrophe stripped from
+   both ends) has at least 2 letters, is made of letters, apostrophes and
+   hyphens, and is in the lower-cased word list; or a number, digits with
+   brackets or punctuation around them ("16", "17]"). Every other line is
+   removed as `plate_text`, one removal per line.
 3. **The figure block.** The caption lines, in order, are the text of
    one `figure` block, whose `figure` is the path of the image of the
-   page's figure; a plate with no caption line gives a figure block with
-   no spans. Its lines are not in the body stream, so a paragraph runs
+   page's figure; a plate with no caption line, or with no text layer
+   (Kadesh 17, 23, 35, 43, 57 and 69, Stubbs 9, 11, 52 and 54), gives a
+   figure block with no spans. Its lines are not in the body stream, so a paragraph runs
    on over the plate (section 6: a page with no body stream does not end
    the paragraph, and a hyphen before the plate joins the word after
    it). The figure block is side text of its page (section 6): it comes
@@ -1889,9 +2013,6 @@ What markdown must do, and how it is checked:
   neither a reference span nor the marker of a referenced footnote; an
   endnote's marker is written and counted as a word.
 
-The markdown spec gives the details; until it is written, the plan of
-this spec carries them, as the first plan carried section 10's.
-
 ## 20. Open points
 
 **Open 1. Whether the format keeps a heading's chapter label apart from
@@ -1939,8 +2060,9 @@ section; their small type is how they look.
 
 Recommended: (b), because the kind should say what the text is and the
 same section should not come out in two kinds; the rule names its words,
-so it can take nothing in another book. Meanwhile the implementer builds
-(a).
+so it can take nothing in another book. The answer is not needed before
+the work starts: the implementer builds (a), and (b) is a rule added on
+top of it.
 
 ## 21. Not in this spec
 
