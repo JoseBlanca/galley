@@ -513,3 +513,38 @@ every block against the commit before. What mattered, all taken:
 
 Fixes run in two worktrees: structure (`fix3-s`) and the evaluation
 tool with the markdown investigation (`fix3-e`).
+
+### The fixes (merged: fix3-e at 2dd81b2, fix3-s at c53962c)
+
+- **Notes lost between blocks and markdown** were the evaluation tool's
+  fault, not galley's: markdown writes a referenced footnote after the
+  block that refers to it and an unreferenced one after its page's last
+  block, so on a page with both the notes come out of printed order, and
+  the tool paired notes page by page in order. The tool now takes the
+  notes in `blocks.json`'s order at markdown. Mariéjol notes as notes at
+  markdown 1,040 → 1,157 (as at blocks), missing 114 → 41; Domesday
+  margin notes 501 → 519.
+- **Hyphen joins across the pieces of a margin note**: 11 → 0
+  (Domesday 6, Gierke 5).
+- **Haskins page 204**: the footnote stays a note, linked from
+  "Adams,^"; Haskins links 62 of its 64 footnotes.
+- **Verse after a hyphenated line**: Mariéjol page 212's false verse is
+  gone; the cost is page 243, whose two real verse lines follow "et
+  pré-" and now run into the paragraph above (structure §16 records it).
+- **The Haskins excerpt** has book page 41 added: its bibliographical
+  note ends at chapter II and the footnotes on 53 and 71 are notes
+  again. Its quotes on 53 and 71–73 still come out as paragraphs,
+  because the excerpt is mostly small type (body height 7.6 pt against
+  the book's 8.32); they stay checked by a whole-book test.
+- **Looked at, not fixed** (no rule covers them): Domesday 443, "land."
+  inside the body region's box; 456, no second line beside "The team-"
+  in the text layer; Stubbs' reference margin notes that repeat a
+  chapter summary's words, so the tool matches them to the summary.
+- Tests for the guards no fixture reached; the conventions points; the
+  six whole books' `blocks.json` unchanged by the refactoring.
+
+The owner raised the default test run's budget to about a minute on 16
+November 2026 (fb6b9c6). After both merges: pytest 1606 passed in 28.9
+s; `-m whole_book` 30 passed (on the fix branch).
+
+Work package 4 is done.
