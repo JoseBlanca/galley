@@ -33,14 +33,14 @@ How the spec is read here, where it leaves a choice:
 - The cause `endnote_reference_far` pairs a reference note with a galley
   endnote at markdown, for the cause only, when the note is not found
   `as_note` there and at least half of its tokens with a non-empty key
-  have their key, counted with repeats, among the endnote's. The
+  have their key among the endnote's keys, the endnote with the most
+  such tokens when several have half. The
   endnote's first reference is placed by the `near_page` of its tokens;
   the reference text's by the page of the reference token before its
   first reference to the note.
 """
 
 import dataclasses
-from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -276,7 +276,10 @@ def evaluation_of(
         else Placement.SCORED
         for page in pages.page_indices
     )
-    in_endnotes = endnote_notes(alignments[2], places, side.blocks, side.galley_blocks)
+    by_output = dict(zip(StageOutput, alignments, strict=True))
+    in_endnotes = endnote_notes(
+        by_output[StageOutput.BLOCKS], places, side.blocks, side.galley_blocks
+    )
     endnote_tokens = frozenset(
         index
         for index, place in enumerate(places)
@@ -312,9 +315,7 @@ def evaluation_of(
             side=side,
             places=places,
             parts=parts,
-            placements=early_placements
-            if output in {StageOutput.WORDS, StageOutput.LINES}
-            else placements,
+            placements=early_placements if output in _BEFORE_NOTES else placements,
             page_indices=pages.page_indices,
             parts_of_pages=parts_of_pages,
             apart_pages=apart_pages,
@@ -327,7 +328,7 @@ def evaluation_of(
         )
     )
     far_notes, far_endnotes = _far_endnotes(
-        reference, alignments[-1], places, side, pages.page_indices
+        reference, by_output[StageOutput.MARKDOWN], places, side, pages.page_indices
     )
     differences = _reference_differences(
         alignments,
@@ -384,7 +385,7 @@ def _check_body_pages(book: EvaluationBook, side: GalleySide) -> None:
     last_page = max((page.index for page in side.words_file.pages), default=-1)
     if book.body_pages[1] > last_page:
         message = (
-            f"the body range of {book.name}, body_pages = "
+            f"evaluation/books.toml: the body range of {book.name}, body_pages = "
             f"[{book.body_pages[0]}, {book.body_pages[1]}], ends after the "
             f"PDF's last page index, {last_page}"
         )
@@ -417,14 +418,16 @@ def _far_endnotes(
     for note_index, indices in by_note.items():
         if note_index in found:
             continue  # found as a note: no cause to give
-        note = Counter(
+        note = tuple(
             key for index in indices if (key := alignment_key(places[index].token.text))
         )
-        total = note.total()
+        total = len(note)
         if total == 0:
             continue
+        # The note's tokens whose key is among each endnote's keys.
         shared = {
-            note_id: (note & endnote).total() for note_id, endnote in keys.items()
+            note_id: sum(1 for key in note if key in endnote)
+            for note_id, endnote in keys.items()
         }
         best = max(shared, key=lambda note_id: shared[note_id])
         page = gutenberg_page.get(reference.notes[note_index].note_id)
@@ -440,11 +443,11 @@ def _far_endnotes(
 
 def _linked_endnotes(
     side: GalleySide,
-) -> tuple[dict[str, int], dict[str, Counter[str]]]:
+) -> tuple[frozendict[str, int], frozendict[str, frozenset[str]]]:
     """For each galley endnote linked from a reference, the page of its
     first reference, and the alignment keys of its tokens at markdown."""
     near: dict[str, int] = {}
-    keys: dict[str, Counter[str]] = {}
+    keys: dict[str, set[str]] = {}
     for token in side.markdown:
         if token.block_id is None or token.near_page is None:
             continue
@@ -452,15 +455,17 @@ def _linked_endnotes(
         if note_id is None:
             continue
         near[note_id] = token.near_page
-        key = alignment_key(token.text)
-        if key:
-            keys.setdefault(note_id, Counter())[key] += 1
-    return near, keys
+        found = keys.setdefault(note_id, set())
+        if key := alignment_key(token.text):
+            found.add(key)
+    return frozendict(near), frozendict(
+        {note_id: frozenset(found) for note_id, found in keys.items()}
+    )
 
 
 def _gutenberg_reference_pages(
     reference: ReferenceText, page_indices: tuple[int | None, ...]
-) -> dict[str, int]:
+) -> frozendict[str, int]:
     """For each reference note, the page of the body token before the
     reference text's first reference to it."""
     pages: dict[str, int] = {}
@@ -471,7 +476,7 @@ def _gutenberg_reference_pages(
         page = page_indices[max(gap.token_index - 1, 0)] if page_indices else None
         if page is not None:
             pages[note_reference.note_id] = page
-    return pages
+    return frozendict(pages)
 
 
 def _apart_pages(book: EvaluationBook) -> frozendict[int, Apart]:

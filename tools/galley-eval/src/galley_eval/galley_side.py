@@ -510,10 +510,12 @@ def _pages_through(
 def markdown_tokens(
     markdown: MarkdownWords, blocks: BlocksFile, blocks_side: tuple[GalleyToken, ...]
 ) -> tuple[GalleyToken, ...]:
-    """The words of `book.md`, in its order, each with the stream of the
-    block its id names and the page of the same word in that block at
-    blocks, `blocks_side`. Raises GalleyFilesError for a word in no block
-    or in a block that `blocks` does not have."""
+    """The words of `book.md`, each with the stream of the block its id
+    names and the page of the same word in that block at blocks,
+    `blocks_side`: the body's and margin notes' in `book.md`'s order, then
+    the notes', in the order of blocks.json's notes and their blocks, as
+    at blocks (spec section 5). Raises GalleyFilesError for a word in no
+    block or in a block that `blocks` does not have."""
     known = galley_blocks(blocks)
     by_block: dict[str, list[tuple[str, int]]] = {}
     for token in blocks_side:
@@ -560,7 +562,7 @@ def markdown_tokens(
         )
         pages.update(zip(positions, found, strict=True))
         in_label.update(positions[: labels[block_id]])
-    return tuple(
+    tokens = tuple(
         GalleyToken(
             text=word.text,
             page_index=pages[position],
@@ -572,6 +574,29 @@ def markdown_tokens(
         for position, word in enumerate(markdown.words)
         if (block_id := word.block_id) is not None and position not in dropped
     )
+    return _notes_in_file_order(tokens, blocks)
+
+
+def _notes_in_file_order(
+    tokens: tuple[GalleyToken, ...], blocks: BlocksFile
+) -> tuple[GalleyToken, ...]:
+    """`tokens` with those of the notes moved after the others, in the
+    order of blocks.json's notes and blocks, each block's in its own
+    order: `book.md` writes a referenced footnote after the block that
+    refers to it and an unreferenced one after the last block of its
+    page, which is not the printed order."""
+    rank = {
+        block.id: position
+        for position, block in enumerate(
+            block for note in blocks.notes for block in note.blocks
+        )
+    }
+    body = tuple(token for token in tokens if token.stream is not GalleyStream.NOTES)
+    notes = sorted(
+        (token for token in tokens if token.stream is GalleyStream.NOTES),
+        key=lambda token: rank[token.block_id] if token.block_id is not None else -1,
+    )
+    return body + tuple(notes)
 
 
 def _endnote_link_words(

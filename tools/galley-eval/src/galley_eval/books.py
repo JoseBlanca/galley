@@ -8,11 +8,12 @@ layer (`exclude_pages`), and the book config's `contents_pages` and
 `plate_pages` (architecture section 6), which galley-eval passes into the
 `book.toml` it writes; the pages whose text Gutenberg left out
 (`not_in_reference`), whether Gutenberg moved the margin notes
-(`margin_notes_moved`), the first and last page index of the body
-range, on which the headings are scored (`body_pages`), the SHA-256 of the HTML file the rules and counts
-were written for (`html_sha256`), the counts the reader must find in the
-HTML and the first five tokens of its body (`expected_counts`), and the reading rules, as changes to the defaults of
-`galley_eval.rules`:
+(`margin_notes_moved`), the first and last page index of the body range,
+on which the headings are scored (`body_pages`), the SHA-256 of the HTML
+file the rules and counts were written for (`html_sha256`), the counts
+the reader must find in the HTML and the first five tokens of its body
+(`expected_counts`), and the reading rules, as changes to the defaults
+of `galley_eval.rules`:
 
     [book.rules.add]
     heading = ["p.ph3"]
