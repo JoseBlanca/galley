@@ -22,7 +22,7 @@ from galley.model import (
     Removal,
     RemovalReason,
 )
-from galley.structure._foot import LinePlace, line_at, line_below_head
+from galley.structure._foot import LinePlace, line_at
 from galley.structure._lines import Piece, PlacedLine
 from galley.structure._measures import (
     Edges,
@@ -32,8 +32,7 @@ from galley.structure._measures import (
     words_text,
 )
 from galley.structure._paragraphs import PageFigure, PageParts
-from galley.structure._regions import head_line, region_kinds
-from galley.structure._removals import head_removals
+from galley.structure._removals import head_removals, running_head_place
 from galley.structure._survey import BookSurvey, alike_to_a_head
 from galley.structure._unnumbered import Unnumbered, first_page, joined
 from galley.wordlist import is_known_word
@@ -69,15 +68,8 @@ def _topmost(page: PageLayout) -> LinePlace | None:
 def _running_head_letters(page: PageLayout, survey: BookSurvey) -> str | None:
     """The letters of the line section 3 makes the page's running head,
     None when it has none."""
-    if page.index in survey.running_heads:
-        head = head_line(page)
-        assert head is not None, "a running head is a head line"
-        return letters(words_text(head.lines[-1].words))
-    if page.index in survey.heads_below_specks:
-        below = line_below_head(page)
-        assert below is not None, "the survey found a line below the speck"
-        return letters(words_text(line_at(page, below).words))
-    return None
+    place = running_head_place(page, survey)
+    return None if place is None else letters(words_text(line_at(page, place).words))
 
 
 def plate_survey(lines: LinesFile, survey: BookSurvey) -> PlateSurvey:
@@ -153,8 +145,7 @@ def plate_parts(
     page has no body stream and no side text but its figure.
     `lower_case_words` is the word list in lower case."""
     figure, *_ = page.figures
-    kinds = region_kinds(page, survey.body_word_height, survey.running_heads)
-    head = head_removals(page, kinds, survey)
+    head = head_removals(page, survey)
     topmost = _topmost(page)
     topmost_words = (
         tuple(word.text for word in line_at(page, topmost).words)

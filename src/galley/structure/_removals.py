@@ -32,7 +32,7 @@ from galley.structure._measures import (
     words_box,
     words_text,
 )
-from galley.structure._regions import RegionKind
+from galley.structure._regions import RegionKind, head_line
 from galley.structure._survey import BookSurvey, number_candidates
 
 
@@ -119,28 +119,28 @@ def _running_head_removals(
     )
 
 
-def head_removals(
-    page: PageLayout, kinds: tuple[RegionKind, ...], survey: BookSurvey
-) -> LineRemovals:
+def running_head_place(page: PageLayout, survey: BookSurvey) -> LinePlace | None:
+    """The place of the line that section 3 makes the page's running head:
+    the text line of its head line, or the line below a speck; None when
+    the page has none."""
+    if page.index in survey.running_heads and (head := head_line(page)) is not None:
+        return (0, len(head.lines) - 1)
+    if page.index in survey.heads_below_specks:
+        below = line_below_head(page)
+        assert below is not None, "the survey found a line below the speck"
+        return below
+    return None
+
+
+def head_removals(page: PageLayout, survey: BookSurvey) -> LineRemovals:
     """The removals of a running head (spec section 3): a line of marks
     above it as `stray_mark`, its page number as `page_number` with a
     `head` page number, and the rest of its line as `running_head`. When
     the head line is a speck and the line below it the running head, that
     line is removed so, and the speck stays. A page with no running head
-    loses nothing. `kinds` are those of the page's regions, in their order."""
-    if RegionKind.RUNNING_HEAD in kinds:
-        head = page.regions[0]
-        *marks, text_line = head.lines
-        head_place = (0, len(marks))
-    elif page.index in survey.heads_below_specks:
-        below = line_below_head(page)
-        assert below is not None, "the survey found a line below the speck"
-        marks = [
-            line for line in page.regions[0].lines if not line_has_letter_or_digit(line)
-        ]
-        text_line = line_at(page, below)
-        head_place = below
-    else:
+    loses nothing."""
+    head_place = running_head_place(page, survey)
+    if head_place is None:
         return _NOTHING_REMOVED
     mark_places = tuple(
         (0, number)
@@ -148,9 +148,12 @@ def head_removals(
         if not line_has_letter_or_digit(line)
     )
     strays = tuple(
-        _removal(page.index, mark.words, RemovalReason.STRAY_MARK) for mark in marks
+        _removal(page.index, line_at(page, place).words, RemovalReason.STRAY_MARK)
+        for place in mark_places
     )
-    removals, page_numbers = _running_head_removals(page.index, text_line, survey)
+    removals, page_numbers = _running_head_removals(
+        page.index, line_at(page, head_place), survey
+    )
     return LineRemovals(
         strays + removals, page_numbers, frozenset((*mark_places, head_place))
     )

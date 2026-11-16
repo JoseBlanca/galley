@@ -140,7 +140,7 @@ def page_parts(
     are the page indices of the printed table of contents, on which no
     heading is found."""
     kinds = region_kinds(page, survey.body_word_height, survey.running_heads)
-    head = head_removals(page, kinds, survey)
+    head = head_removals(page, survey)
     foot = foot_removals(page, kinds, survey)
     removed = head.lines | foot.lines
     index = (
