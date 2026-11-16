@@ -390,8 +390,9 @@ it read (the `coding` skill, "Functional style").
 whether it is blank, text or a plate; applies the config's
 `exclude_pages` and `exclude_regions`; and runs the OCR audit of section
 7b, which decides each page's `text_source`. A plate is recognised from
-a render of each page at 36 dpi, as a large area of ink that no word
-covers, and its picture's box is recorded (`docs/specs/plates.md`).
+a render of each page with a text layer at 36 dpi, as a large area of
+ink that no word covers on a page of few known words, and its picture's
+box is recorded (`docs/specs/plates.md`).
 
 **extract** gives every page its words. Text-layer pages are read with
 pdfplumber, one document per worker thread. OCR pages are rendered at 300
@@ -517,7 +518,7 @@ A stage imports these and nothing else of galley.
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage` |
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file |
-| `wordlist.py` | `word_list(language, cache_dir) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before structure |
+| `wordlist.py` | `word_list(language, cache_dir) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`) and structure |
 | `fidelity.py` | the fidelity check, section 13 |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `commonest(edges)`, the commonest of a set of edges to 2 pt (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
 | `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract) and stops naming any that is missing |
@@ -563,7 +564,8 @@ lists the words, with the pages they came from where the origins say.
   markdown-smart -t json`): a note reference is matched to Pandoc's note
   element and its marker is not compared as a word, because Pandoc writes
   its own numbers (section 17); likewise the `marker` of a
-  referenced note.
+  referenced footnote. An endnote stays where it was printed, so its
+  `marker` is written there and counted, referenced or not (section 9).
 - extract is where the words enter galley, so it has no boundary to check:
   its excerpt tests compare its words with literals.
 - The check stops at `book.md`: turning it into an EPUB is Pandoc's work,
