@@ -966,9 +966,10 @@ def test_plate_text_kadesh_16_two_lines_and_a_figure_block_without_text(
     excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
 ) -> None:
     _, blocks = excerpt_outputs["kadesh_8-17"]
+    # From the top down (spec section 7).
     assert _plate_removals(blocks, 8) == (
-        ("plate_text", "^U;L"),
         ("plate_text", ", ' .."),
+        ("plate_text", "^U;L"),
     )
     assert _figures(blocks) == (
         ("images/plate-0008.png", [8], ""),
@@ -1005,7 +1006,10 @@ def test_caption_kadesh_64_and_68_kept_and_the_back_of_plate_65_removed(
     assert figures[1][2] == ""
     assert _plate_removals(blocks, 6) == (("plate_text", "a"), ("plate_text", "t I"))
     assert figures[2][2].endswith("THE MODERN MODND OF KADESH")
-    assert _plate_removals(blocks, 9) == (("plate_text", "V"),)
+    # "V", the end of the garbled series head, is on the head's row, which
+    # is caption (spec section 18, rule 2, by row).
+    assert "PLATE VIII V THE MODERN" in figures[2][2]
+    assert _plate_removals(blocks, 9) == ()
     # The paragraph of page 63 runs on over the plates 64 and 65.
     assert any(_pages(block.origin) == [4, 7] for block in blocks.blocks)
 

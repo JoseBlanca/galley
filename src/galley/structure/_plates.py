@@ -90,9 +90,9 @@ def plate_survey(lines: LinesFile, survey: BookSurvey) -> PlateSurvey:
     return PlateSurvey(frozendict(topmost), tuple(sorted(heads)))
 
 
-def _is_caption_line(texts: Sequence[str], lower_case_words: frozenset[str]) -> bool:
-    """Whether a line of a plate whose words are `texts` is a caption line
-    (spec section 18, rule 2)."""
+def _is_caption_row(texts: Sequence[str], lower_case_words: frozenset[str]) -> bool:
+    """Whether a row of a plate's lines whose words are `texts` is made of
+    caption lines (spec section 18, rule 2)."""
     known = sum(is_known_word(text, lower_case_words) for text in texts)
     return known >= _CAPTION_MIN_KNOWN_WORDS or known >= _CAPTION_MIN_KNOWN_SHARE * len(
         texts
@@ -111,13 +111,6 @@ def _line_removal(
     )
 
 
-def _in_rows(lines: Sequence[PlacedLine]) -> tuple[tuple[PlacedLine, ...], ...]:
-    """`lines` from the top down in rows, each row from the left (spec
-    section 18, rule 3), as layout takes the rows of words
-    (`body_measures.rows_of`)."""
-    return rows_of(lines, lambda line: line.line.box)
-
-
 def plate_parts(
     page: PageLayout,
     survey: BookSurvey,
@@ -127,9 +120,10 @@ def plate_parts(
     """The per-page work on a plate page, one with a figure (spec section
     18): section 3's running head removed; the topmost line removed as a
     running head when its letters are alike to the topmost line of another
-    plate page or to a running head of the book; each other line a caption
-    line when its words are known enough, else removed as `plate_text`;
-    the caption lines from the top down in rows, each from the left. The
+    plate page or to a running head of the book; the other lines taken
+    from the top down in rows, each from the left, the lines of a row
+    caption lines when the row's words are known enough, else each
+    removed as `plate_text`. The
     page has no body stream and no side text but its figure.
     `lower_case_words` is the word list in lower case."""
     figure, *_ = page.figures
@@ -155,21 +149,26 @@ def plate_parts(
         removed.append(
             _line_removal(page.index, topmost, page, RemovalReason.RUNNING_HEAD)
         )
+    plate_lines = tuple(
+        ((region_number, line_number), PlacedLine(page.index, line, edges, edges))
+        for region_number, region in enumerate(page.regions)
+        for edges in (Edges(region.box.x0, region.box.x1),)
+        for line_number, line in enumerate(region.lines)
+        if (region_number, line_number) not in head.lines
+        and not (rule_1_head and (region_number, line_number) == topmost)
+    )
     caption: list[PlacedLine] = []
-    for region_number, region in enumerate(page.regions):
-        edges = Edges(region.box.x0, region.box.x1)
-        for line_number, line in enumerate(region.lines):
-            place = (region_number, line_number)
-            if place in head.lines or (rule_1_head and place == topmost):
-                continue
-            if _is_caption_line(
-                tuple(word.text for word in line.words), lower_case_words
-            ):
-                caption.append(PlacedLine(page.index, line, edges, edges))
-            else:
-                removed.append(
-                    _line_removal(page.index, place, page, RemovalReason.PLATE_TEXT)
-                )
+    for row in rows_of(plate_lines, lambda placed: placed[1].line.box):
+        if _is_caption_row(
+            tuple(word.text for _, line in row for word in line.line.words),
+            lower_case_words,
+        ):
+            caption.extend(line for _, line in row)
+        else:
+            removed.extend(
+                _line_removal(page.index, place, page, RemovalReason.PLATE_TEXT)
+                for place, _ in row
+            )
     return PageParts(
         index=page.index,
         removals=tuple(removed),
@@ -181,7 +180,7 @@ def plate_parts(
         figure=PageFigure(
             figure.image,
             figure.box,
-            Piece(tuple(line for row in _in_rows(caption) for line in row)),
+            Piece(tuple(caption)),
         ),
     )
 

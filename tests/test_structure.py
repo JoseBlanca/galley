@@ -1426,7 +1426,8 @@ def test_plate_text_lines_removed_and_figure_block_without_text_follows_paragrap
     )
     lines = _lines_of(*pages)
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
-    assert _removed(blocks, 1) == (("plate_text", "^U;L"), ("plate_text", ", ' .."))
+    # Removals go from the top down (spec section 7).
+    assert _removed(blocks, 1) == (("plate_text", ", ' .."), ("plate_text", "^U;L"))
     assert blocks.blocks[1] == Block(
         id="b-p0001-001",
         kind=BlockKind.FIGURE,
@@ -1462,6 +1463,24 @@ def test_caption_lines_have_two_known_words_or_half_their_words_known() -> None:
     figure = blocks.blocks[-1]
     assert figure.kind is BlockKind.FIGURE
     assert block_text(figure) == "THE MODERN MOUND OF KADESH Fir ^X 17]"
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_caption_is_decided_per_row_so_a_garbled_word_beside_it_stays() -> None:
+    # Spec section 18, rule 2: Kadesh 48's "LUXOR", read "l.i v IK" in a
+    # line of its own, beside "RELIEFS; THE" on its row, is kept; a row of
+    # unknown words alone is removed.
+    plate = _plate(
+        1,
+        _spread("l.i v IK", 60, 110, 500),
+        _spread("RELIEFS; THE", 120, 300, 500),
+        _spread("^X.^ MoulslVl^rf", 60, 300, 540),
+    )
+    pages = (_body_page(0, *_five_full_lines(70, "first")), plate)
+    lines = _lines_of(*pages)
+    blocks = make_blocks(lines, frozenset({"reliefs", "the"}), workers=1)
+    assert _removed(blocks, 1) == (("plate_text", "^X.^ MoulslVl^rf"),)
+    assert block_text(blocks.blocks[-1]) == "l.i v IK RELIEFS; THE"
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
