@@ -455,12 +455,12 @@ Kadesh 16's largest group is 70 squares against 50, Mariéjol 265's 26
 known words against 20. A render of every page adds about 12.6 s to
 analyze on Domesday.
 
-- [ ] 6.1 analyze: the render, `is_plate`, `plate_pages`, the warning
+- [x] 6.1 analyze: the render, `is_plate`, `plate_pages`, the warning
   log, the word list taken by analyze and the CLI's check for it; the
   plates without a text layer out of the six books' `exclude_pages` and
   the excerpt configs; the `whole_book` test of the 22 plates. Spec:
   plates §2, §4 and §5. Stream `plates`. Deliverables 1, 3, 4, 6.
-- [ ] 6.2 extract: a plate page's image and figure, its text layer read
+- [x] 6.2 extract: a plate page's image and figure, its text layer read
   as a text page's, and the refusal of a plate page removed. Spec:
   plates §3. Stream `plates`. Needs 6.1. Deliverable 2.
 - [ ] 6.3 structure: a plate's running head, caption lines and stray

@@ -161,3 +161,25 @@ is one line again; pages 4–5, the note "Henry's mismanagement of his
 children." becomes a margin note, joined at its hyphen as a guess
 ("Silmlnagementofhis", the OCR's text). They go into the owner's sheet
 of task 7.3.
+
+## Stream `plates`: tasks 6.1 and 6.2 (42eed95, 003b6aa, merged)
+
+analyze renders each page at 36 dpi in the PDFium thread and applies
+plates §2's rule in the workers; `plate_pages` forces a plate,
+`exclude_pages` wins; each page taken is logged at WARNING and is exempt
+from the blank-page refusal. extract renders each plate at 300 dpi to
+`images/plate-NNNN.png`, gives the page one whole-page figure, and reads
+its text layer. The plates without a text layer (Kadesh 17, 23, 35, 43,
+57, 69; Stubbs 9, 11, 52, 54) are out of `exclude_pages`.
+
+On the six books analyze takes exactly the 22 plates of plates §1 and
+nothing else: Kadesh 16, 17, 19, 22, 23 (by `plate_pages`), 24, 34, 35,
+42, 43, 48, 56, 57, 64, 68, 69; Domesday 39, 40; Stubbs 9, 11, 52, 54.
+Domesday's analyze takes 14.3 s against 4.3 s before; the renders are
+14.5 s of it (the spec measured 12.6 s). `-m whole_book`: 28 passed in
+243 s (under load).
+
+6.2 was committed before 6.1: once analyze takes plates, extract's old
+refusal broke every excerpt run. The stream needed one file outside its
+list, `tests/test_end_to_end.py` (Kadesh's excerpt now has two plate
+images); the orchestrator added it to the stream's files.
