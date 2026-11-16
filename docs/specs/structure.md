@@ -2174,11 +2174,12 @@ inline sub-entry in an item of its own.
    apart from the page numbers before it.
 
    Measured on 16 November 2026 with galley-eval, index paragraph
-   boundaries at markdown, precision / recall, by cutting the blocks of
-   rules 1 to 4 after each word ending in ";": Haskins 0.991 / 0.965
+   boundaries at markdown, precision / recall, with rules 1 to 5 as
+   written here (the review's fixes, at e67a65c): Haskins 0.991 / 0.965
    (0.992 / 0.723 uncut), Stubbs 0.829 / 0.789 (0.869 / 0.396), Domesday
-   unchanged at 0.990 / 0.986. Stubbs' ";" are often read inside spaced
-   letters or lost, and its own targets of section 9 are not met.
+   0.993 / 0.986 (0.990 / 0.986 before the margin lines of rule 2 went
+   in one by one). Stubbs' ";" are often read inside spaced letters or
+   lost, and its own targets of section 9 are not met.
 
 **Measured.** Each entry's first five letters were aligned in order with
 those of the reference text's entries (not its sub-entries), with
@@ -2299,16 +2300,26 @@ paragraph of pages 15 to 18).
    Oxfordshire and Berks/tire. \.Bet^ueen pp. 16 — 17]" (16 November
    2026).
 
-**Measured** in the second research on the 12 plates of the six books
-that have a text layer (Kadesh 16, 19, 22, 24, 34, 42, 48, 56, 64, 68;
-Domesday 39 and 40) and two backs of plates (Kadesh 49 and 65), with
-the running heads of rule 1: 26 lines (87 words) removed, all stray
-(one, Kadesh 68's "V", the end of the plate's head); 24 lines (95 words)
-kept: the running heads of 19 and 24, which section 3 removes first, the
-captions, the plates' labels ("PLATE II", "XXV I XXIV xxm"), the series
-heads, Domesday's binder's note "[Between pp. 16–17]", read as "\.Bet^ueen
-pp. 16 —" and "17]", and 2 strays of Domesday 39, "Fir" and "•'••'""'
-rAr", with one known word each, so half their words.
+**Measured** on 16 November 2026, with the rules as written here (at
+e67a65c), on the 12 plates of the six books that have a text layer
+(Kadesh 16, 19, 22, 24, 34, 42, 48, 56, 64, 68; Domesday 39 and 40):
+section 3 removes the running heads and page numbers of Kadesh 19 and
+24, and rule 1 the series head "DECENNIAL PUBLICATIONS, V" of Kadesh 34,
+42, 48, 56 and 64; rule 2 removes 22 lines (77 words) as `plate_text`,
+4 of Kadesh (16's two lines of strays, and 56's two lines "Lir*" and
+"*t JC«,fflt>; rtC", the lithographer's credit "Lith. ... Kaeppelin et
+C", which the OCR garbled beyond any known word) and 18 of Domesday 39
+and 40, all strays but "Fir" (39), a known word in a row of strays. The
+captions kept are Kadesh 22's "PLATE II", 48's "l.i v IK RELIEFS; THE"
+(its "LUXOR" kept on its row), 56's panel labels "XXV I XXIV xxm XXXII
+XXXI." (the plate prints XXV, XXIV, XXIII over its panels and XXXIII,
+XXXII, XXXI under them; checked against the page image), 64's caption
+and credit, 68's garbled series head with its "V" and its caption, and
+Domesday's two captions with the binder's note "[Between pp. 16–17]",
+read as "\.Bet^ueen pp. 16 —" and "17]", and one stray, "•'••'""' rAr",
+half of whose words are known. The second research, line by line,
+removed 26 lines (87 words), taking "LUXOR" and the "V" of 68 for
+strays.
 
 **Where they fail.** Captions in poor OCR are kept as read ("tlm border
 between tiumersvt and Devon."), for the correct stage. Covers,
