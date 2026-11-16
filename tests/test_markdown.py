@@ -1585,6 +1585,25 @@ def test_run_with_a_config_of_another_pdf_raises_naming_analyze(
     assert not folder.book_md.exists()
 
 
+def test_run_with_a_figure_whose_image_is_missing_raises_naming_it_and_extract(
+    tmp_path: Path,
+) -> None:
+    figure = replace(FIGURE, figure="images/plate-0016.png")
+    outside = replace(FIGURE, id="b-p0017-001", figure="../outside.png")
+    (tmp_path / "outside.png").write_bytes(b"outside the book folder")
+    (tmp_path / "book").mkdir()
+    folder, config = _book(tmp_path / "book", _blocks_file((figure, outside)))
+
+    with pytest.raises(
+        InputFileError,
+        match=r"b-p0016-001 has the image images/plate-0016.png; "
+        r"figure b-p0017-001 has the image \.\./outside.png.*galley2epub extract",
+    ):
+        markdown.run(folder, config)
+
+    assert not folder.book_md.exists()
+
+
 def test_run_without_blocks_json_raises_naming_structure(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
     folder.blocks_json.unlink()
