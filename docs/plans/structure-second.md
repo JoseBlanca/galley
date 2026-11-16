@@ -327,7 +327,7 @@ from the book's (60.4 and 59.0).
   `layout_page`. Spec: layout §3, "The book's measures" and step 2b;
   §4; §6, "Stubbs' cut-in notes"; §8. Stream `layout`. Deliverables 1,
   2, 5.
-- [ ] 3.2 Placing margin notes: one printed note one block, the indented
+- [x] 3.2 Placing margin notes: one printed note one block, the indented
   line beside a margin note, before the paragraph that holds the line,
   and a margin note alone on its page. Spec: structure §13, rules 1, 3,
   4 and 6. Needs 2.5 and 3.1. Deliverables 3, 4.

@@ -388,3 +388,32 @@ What it would need: 23% of the candidates were pencil or ink marks, not
 notes, which Tesseract reads as junk ("id i ;"), and junk gets into real
 notes beside a mark; a filter is needed. One crop cut off a word; 10 of
 layout's 157 margin regions fell outside every cut note.
+
+## Task 3.2: margin notes before their paragraph (a146d35 spec, 5a49c61; merged)
+
+Each margin note goes just before the paragraph beside whose line it was
+printed, even when that paragraph began on an earlier page; the regions
+of one printed note are one block; an indented line beside a note starts
+a paragraph. structure §13 was clarified first (a146d35): rule 3 never
+fires after a line ending in a hyphen (12 of Gierke's 13 such lines
+continue a word), and applies only when the note lies outside the column
+(Stubbs' cut-in notes indent their lines by about 60 pt; without this,
+171 paragraphs would be split wrongly).
+
+Whole Domesday, 611 margin notes from 640 regions: 604 placed before a
+paragraph (547 beside its first line), 24 paragraphs split where a note
+stands beside an indented line, 19 placed on the previous page, 7 inside
+a footnote. Against the Gutenberg text, 240 of the 263 notes whose text
+matches one of its margin notes sit before the same paragraph; most of
+the 23 others look like short notes matched to the wrong Gutenberg note.
+The owner's example, Domesday page 30, now comes out right: "Serf and"
+and "The serf of the Leges." each stand before their paragraph.
+
+15 tests (`-k "margin_note_before or margin_note_inside or beside"`),
+each rule broken in turn and a test failing. Nine reference pages
+changed (Domesday 74, 75, 76, 83; Gierke 88, 270; Stubbs 51, 64, 59–60),
+each named in the commit; the joined notes checked against the page
+images ("The scale" + "holding.", "Natural" + "the level…", "Coercive"
++ "Force of"). On Stubbs page 51, "accession." goes before a paragraph
+that still holds the chapter summary, until work package 4 makes the
+summary a block. Task 3.2 is reviewed with work package 4.
