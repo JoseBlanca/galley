@@ -372,6 +372,12 @@ marker-led blocks of tasks 2.2 and 2.3).
 expected, not fixed. Rule 4 of verse takes Domesday's tables inset on
 both sides.
 
+- [ ] 4.0 Re-cut `domesday_headings_quotes` (added 16 November 2026,
+  from the review of work packages 2, 3.1, 6.1–6.2 and 7.1–7.2): its
+  body height measures 9.0 against the book's 10.0, so its pages have no
+  footnote band and its notes come out as paragraphs; choose pages that
+  keep book pages 93 and 274 and measure as the whole book does, in
+  `scripts/fetch_samples.py`, with structure §9's list. Before 4.1.
 - [ ] 4.1 Heading lines, chapter labels, continuations, heading blocks
   with `label` and levels, and `contents_pages`. Spec: structure §14;
   §2, step 2.3. Deliverables 1 to 3.

@@ -221,9 +221,9 @@ Whole books, 16 November 2026:
 | Domesday | 1,489 of 1,731 | 48 | 42 notes on 15 pages |
 | Mariéjol | 651 of 1,141 | 25 | 147 notes on 44 pages |
 | Kadesh | 31 of 149 | 4 | – |
-| Stubbs | 0 of 163 (its index and lists) | 6 | – |
+| Stubbs | 0 of 163 (its index and lists; 164 and 5 after the layout merge) | 6 | – |
 
-Gierke: 299 endnotes on pages 186 to 282, 213 linked (the spec's
+Gierke: 299 endnotes, from page 186 (the last runs on to the library card on page 288, a fault the review found), 213 linked (the spec's
 prototype linked 205). "Linked" here is the stage's own count; whether
 each link is right is scored in task 7.5.
 
@@ -261,3 +261,48 @@ against 42 in the spec's research.
 
 After the merge: pytest 1370 passed in 34.2 s at load average 3.3;
 `-m whole_book` 28 passed in 232 s.
+
+## Review of work package 2 and the merged streams (75cc16b..cfe6c17)
+
+Four reviewers. The fidelity reviewer ran all six books through markdown:
+the fidelity check passed at every stage, every block's words reach
+`book.md`, and none fall outside a block. What mattered, all taken:
+
+- **Gierke's endnotes 1–7 were linked from Maitland's introduction**,
+  whose footnote references won the match; Gierke's own "Law1" (page 88)
+  and five others stayed unlinked: 7 wrong pop-ups, 6 missing. Decided:
+  endnote references are looked for only after the book's last contents
+  page.
+- **Gierke's library card (page 288) was inside endnote 345**, the last
+  endnote running over the blank pages 283–287. The report's page range
+  above was wrong; corrected.
+- **Stubbs' step 2b moved words out of a sentence**: "as his" on page
+  33, three page numbers of an index entry on page 317. Decided: a word
+  less than 5 pt from a body word of its row stays. This is part of the
+  cost of the 0.913 precision the owner accepted.
+- **The endnote section's rules were untested**: removing its rising
+  order passed every test and, on Gierke, made 304 endnotes with 13
+  linked. Tests on the excerpt and a whole-book test are being added,
+  with one test each for about twenty other rules that survived
+  mutation.
+- **Mariéjol: a reference with a letter is dropped before matching**,
+  where the spec drops it after; 23 links differ. To be scored against
+  the reference text, and the better order kept.
+- **The excerpt `domesday_headings_quotes` has no footnote band** (body
+  height 9.0 against the book's 10.0), so it cannot test what structure
+  §9 names it for; task 4.0 re-cuts it.
+- **Kadesh**: the code is right; structure §1 was wrong to call its
+  marker form digits (24 sign, 14 digits). Its 31 links of 149 follow
+  from markers that are signs with no value.
+- Also: the note placement rule was written in structure and markdown
+  (to one function in `model.py`); a one-letter word taken as a note's
+  marker is guarded; a hyphen split by a reference (Haskins page 71) is
+  joined; a missing figure image gets galley's own error; `_assemble.py`
+  is split.
+
+Not taken now: older guessed joins that make compounds of real
+hyphenated words ("sixteenhundredth", "PLANTAGENETSCHAPTER"), for the
+correct stage; a footnote joining over a plate page, for task 6.3.
+
+The fixes run in two worktrees, structure (`fix-s`) and the other stages
+(`fix-l`).
