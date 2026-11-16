@@ -30,6 +30,11 @@ EXPECTED_EXCERPT_PAGES = {
     "stubbs_51_56-64": 10,
     "domesday_74-83": 10,
     "mariejol_210-219": 10,
+    "haskins_quotes_index": 10,
+    "stubbs_summaries_index": 10,
+    "domesday_headings_quotes": 10,
+    "mariejol_headings_verse": 6,
+    "kadesh_59-68": 10,
 }
 
 # The pages of each excerpt, by index in the excerpt, that have no word in
@@ -43,6 +48,11 @@ PAGES_WITHOUT_WORDS = {
     "stubbs_51_56-64": (),
     "domesday_74-83": (),
     "mariejol_210-219": (),
+    "haskins_quotes_index": (),
+    "stubbs_summaries_index": (),
+    "domesday_headings_quotes": (),
+    "mariejol_headings_verse": (),
+    "kadesh_59-68": (),
 }
 
 

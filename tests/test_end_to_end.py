@@ -5,10 +5,15 @@ Every test reads the folders of the session fixture `excerpt_books`, which
 runs `main(["run", folder])` once per excerpt. The counts are those of spec
 section 2, as literals; the excerpt tests of analyze and extract, in
 test_analyze.py and test_extract.py, read the same folders.
+
+At the end, the configs of the six whole books that tests/conftest.py
+holds for the whole_book tests: the same as evaluation/books.toml for the
+four books of the evaluation set, and taken by analyze on each book.
 """
 
 import shutil
 import subprocess
+import tomllib
 import zipfile
 from collections import Counter
 from pathlib import Path
@@ -17,6 +22,7 @@ from xml.etree import ElementTree
 import pytest
 
 from galley.book_folder import BookFolder
+from galley.cli import main
 from galley.fidelity import read_markdown
 from galley.model import (
     BlocksFile,
@@ -26,6 +32,7 @@ from galley.model import (
     read_lines,
     read_words,
 )
+from galley.text_layer import open_pdf
 
 KADESH = "kadesh_8-17"
 GIERKE = "gierke_86-93_270-271"
@@ -327,3 +334,55 @@ def test_the_excerpt_epub_passes_epubcheck(
     # Not captured, so that pytest shows epubcheck's report on failure;
     # check=True makes any error a CalledProcessError.
     subprocess.run([epubcheck, str(epub_path)], check=True, timeout=60)
+
+
+# The configs of the six whole books (tests/conftest.py, WHOLE_BOOK_CONFIGS)
+
+_BOOKS_TOML = Path(__file__).parents[1] / "evaluation" / "books.toml"
+_PAGE_KEYS = ("exclude_pages", "contents_pages", "plate_pages")
+
+
+def test_the_evaluation_books_have_the_same_config_in_conftest_and_books_toml(
+    whole_book_configs: frozendict[str, str],
+) -> None:
+    books = tomllib.loads(_BOOKS_TOML.read_text(encoding="utf-8"))["book"]
+    assert len(books) == 4
+    for book in books:
+        config = tomllib.loads(whole_book_configs[book["archive_id"]])
+        assert config["language"] == book["language"]
+        for key in _PAGE_KEYS:
+            assert config.get(key, []) == book.get(key, []), (book["name"], key)
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.parametrize(
+    "book",
+    [
+        "battleofkadeshst00breauoft",
+        "catherinedemedic00mariuoft",
+        "domesdaybook00maituoft",
+        "earlyplantagenet01stub",
+        "normansineuropea00hask",
+        "politicaltheorie00gieruoft",
+    ],
+)
+def test_analyze_takes_the_whole_book_config_and_its_contents_pages_say_so(
+    book: str, whole_book_toml: frozendict[str, str], tmp_path: Path
+) -> None:
+    folder = BookFolder(tmp_path)
+    folder.book_toml.write_text(whole_book_toml[book], encoding="utf-8")
+    # analyze raises when a page index is past the end of the book, or a
+    # page without a text layer is not excluded.
+    main(["analyze", str(tmp_path)])
+    assert folder.pages_json.exists()
+    config = tomllib.loads(whole_book_toml[book])
+    # Each contents page has the word at its top (the comment of
+    # WHOLE_BOOK_CONFIGS).
+    with open_pdf(Path(config["pdf"])) as pdf:
+        for page_index in config.get("contents_pages", []):
+            top = " ".join(
+                word["text"] for word in pdf.pages[page_index].extract_words()[:4]
+            ).upper()
+            assert "CONTENTS" in top or "TABLE DES MATI" in top, (page_index, top)

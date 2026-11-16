@@ -11,9 +11,11 @@ for each excerpt, so that the excerpt tests of every stage read the files of
 one run.
 """
 
+import json
 import os
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -22,6 +24,14 @@ from galley.book_folder import BookFolder
 from galley.cli import main
 
 EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
+
+# The excerpts' runs go side by side, each with galley's own workers.
+# Measured on 16 November 2026 on an M5 Pro, the eleven excerpts, as the
+# setup time of excerpt_books: 7.5 to 8.1 s one after another, 6.1 to 6.3 s
+# with 2 at once, 4.4 to 4.6 s with 6, 5.2 to 5.4 s with 11. The files
+# written are the same bytes either way, but for book.epub's identifier
+# and date, which differ between any two runs.
+_EXCERPT_RUNS_AT_ONCE = 6
 
 # The configs of spec section 9, "The end-to-end test", without `pdf`.
 # Kadesh page 9 has no text layer, and its region holds the page number 81.
@@ -61,6 +71,97 @@ EXCERPT_CONFIGS = frozendict(
             'title = "Catherine de Médicis"\n'
             'authors = ["Jean H. Mariéjol"]\n'
             'language = "fr"\n'
+        ),
+        # The excerpts of structure spec section 9, "The second plan".
+        "haskins_quotes_index": (
+            'title = "The Normans in European History"\n'
+            'authors = ["Charles Homer Haskins"]\n'
+            'language = "en"\n'
+        ),
+        # Excerpt page 0 is book page index 16, a printed contents page.
+        "stubbs_summaries_index": (
+            'title = "The Early Plantagenets"\n'
+            'authors = ["William Stubbs"]\n'
+            'language = "en"\n'
+            "contents_pages = [0]\n"
+        ),
+        # Excerpt page 0 is book page index 14, a printed contents page.
+        "domesday_headings_quotes": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+            "contents_pages = [0]\n"
+        ),
+        "mariejol_headings_verse": (
+            'title = "Catherine de Médicis"\n'
+            'authors = ["Jean H. Mariéjol"]\n'
+            'language = "fr"\n'
+        ),
+        "kadesh_59-68": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["J. H. Breasted"]\n'
+            'language = "en"\n'
+        ),
+    }
+)
+
+
+# The configs of the six whole books, by Internet Archive identifier,
+# without `pdf`, `title` and `authors`: the one place the whole_book tests
+# of every stage take them from. The four books of the evaluation set have
+# the same pages as in evaluation/books.toml, which test_end_to_end.py
+# checks.
+#
+# exclude_pages: the pages without a text layer, which analyze refuses
+# unless excluded (the evaluation books' as in evaluation/books.toml,
+# Kadesh's and Gierke's as analyze listed them on 15 November 2026), and
+# the pages with one that analyze's plate rule takes wrongly
+# (docs/specs/plates.md, section 2): Kadesh 0, the cover, and 49 and 65,
+# backs of plates; Mariéjol 1 and 2, marbled endpapers, and 457 and 458,
+# an endpaper and the library's card pocket. The plates without a text
+# layer stay excluded until analyze recognises them.
+#
+# contents_pages: the printed table of contents, found on 16 November 2026
+# by "CONTENTS" or "TABLE DES MATIERES" at the top of the page and checked
+# by reading each page's text layer. Kadesh has none.
+#
+# plate_pages: Kadesh 23, a faint relief that analyze's rule misses. It is
+# also in exclude_pages, which wins, until analyze recognises plates
+# without a text layer: before that, analyze refuses the page.
+WHOLE_BOOK_CONFIGS = frozendict(
+    {
+        "normansineuropea00hask": (
+            'language = "en"\n'
+            "exclude_pages = [0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279]\n"
+            "contents_pages = [14]\n"
+        ),
+        "earlyplantagenet01stub": (
+            'language = "en"\n'
+            "exclude_pages = [0, 2, 3, 4, 5, 8, 9, 10, 11, 52, 53, 54, 55, "
+            "338, 339, 340, 341, 342, 343]\n"
+            "contents_pages = [14, 15, 16]\n"
+        ),
+        "domesdaybook00maituoft": (
+            'language = "en"\n'
+            "exclude_pages = [0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557]\n"
+            "contents_pages = [14, 15, 16, 17, 18, 19, 20]\n"
+        ),
+        "catherinedemedic00mariuoft": (
+            'language = "fr"\n'
+            "exclude_pages = [0, 1, 2, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456, "
+            "457, 458]\n"
+            "contents_pages = [450]\n"
+        ),
+        "battleofkadeshst00breauoft": (
+            'language = "en"\n'
+            "exclude_pages = [0, 1, 2, 3, 17, 23, 35, 43, 49, 57, 65, 69, 70, 71, "
+            "72, 73, 75]\n"
+            "plate_pages = [23]\n"
+        ),
+        "politicaltheorie00gieruoft": (
+            'language = "en"\n'
+            "exclude_pages = [0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 289]\n"
+            "contents_pages = [10]\n"
         ),
     }
 )
@@ -106,17 +207,20 @@ def excerpt_books(
     (the configs of spec section 9) and the files `galley2epub run` wrote
     in it, book.epub last (spec section 9, "The end-to-end test").
 
-    Session-scoped: the stages run once, also under --parallel-threads=8.
+    Session-scoped: the stages run once, also under --parallel-threads=8,
+    and the excerpts' runs go side by side in threads.
     A test reads these folders and never writes in them. Skips every test
     that uses it when Pandoc is missing, which markdown and epub need.
     """
     _require_program("pandoc")
-    folders = {}
-    for name, toml in excerpt_book_toml.items():
-        folder = BookFolder(tmp_path_factory.mktemp(name))
-        folder.book_toml.write_text(toml, encoding="utf-8")
-        main(["run", str(folder.root)])
-        folders[name] = folder
+    folders = {
+        name: BookFolder(tmp_path_factory.mktemp(name)) for name in excerpt_book_toml
+    }
+    for name, folder in folders.items():
+        folder.book_toml.write_text(excerpt_book_toml[name], encoding="utf-8")
+    with ThreadPoolExecutor(max_workers=_EXCERPT_RUNS_AT_ONCE) as pool:
+        # list() waits for every run and raises the first run's error.
+        list(pool.map(lambda folder: main(["run", str(folder.root)]), folders.values()))
     return frozendict(folders)
 
 
@@ -134,6 +238,34 @@ def books_dir() -> Path:
             f"no whole books in {path}; run `uv run python scripts/fetch_samples.py`"
         )
     return path
+
+
+@pytest.fixture(scope="session")
+def whole_book_configs() -> frozendict[str, str]:
+    """WHOLE_BOOK_CONFIGS: the configs of the six whole books, by Internet
+    Archive identifier, without `pdf`, `title` and `authors`."""
+    return WHOLE_BOOK_CONFIGS
+
+
+@pytest.fixture(scope="session")
+def whole_book_toml(
+    books_dir: Path, whole_book_configs: frozendict[str, str]
+) -> frozendict[str, str]:
+    """The `book.toml` of each whole book, by Internet Archive identifier:
+    its config of WHOLE_BOOK_CONFIGS, with the path of its PDF in
+    `books_dir`, the identifier as its title and one made-up author."""
+    # TOML basic strings take JSON's escapes, so json.dumps quotes any path.
+    return frozendict(
+        {
+            book: (
+                f"pdf = {json.dumps(str(books_dir / f'{book}.pdf'))}\n"
+                f"title = {json.dumps(book)}\n"
+                'authors = ["An Author"]\n'
+                f"{toml}"
+            )
+            for book, toml in whole_book_configs.items()
+        }
+    )
 
 
 def _require_program(name: str) -> None:

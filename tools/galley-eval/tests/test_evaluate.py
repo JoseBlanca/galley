@@ -41,6 +41,8 @@ def _book(
         authors=("Nobody",),
         language=Language.EN,
         exclude_pages=exclude_pages,
+        contents_pages=(),
+        plate_pages=(),
         not_in_reference=not_in_reference,
         margin_notes_moved=margin_notes_moved,
         html_sha256="0" * 64,
