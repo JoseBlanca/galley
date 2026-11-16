@@ -2,12 +2,10 @@
 section 6, "Order" and "Ids and origins"; section 11, "What is
 changed")."""
 
-import bisect
-import itertools
 from collections import Counter
 from collections.abc import Sequence
 
-from galley.model import Block, Emphasis, Note, Span
+from galley.model import Block, Emphasis, Note, Span, note_places
 from galley.structure._unnumbered import Unnumbered, UnnumberedNote, first_page
 
 
@@ -46,28 +44,6 @@ def _block(block_id: str, unnumbered: Unnumbered, note_ids: Sequence[str]) -> Bl
     )
 
 
-def _note_places(
-    blocks: tuple[Unnumbered, ...], notes: tuple[UnnumberedNote, ...]
-) -> tuple[int, ...]:
-    """For each note, the position in `blocks` of the block markdown writes
-    it after, -1 for first of all (spec section 6, "Order"): the last block
-    whose first origin is on the note's first page or an earlier one."""
-    first_pages = tuple(first_page(block.origin) for block in blocks)
-    last_by_page: dict[int, int] = {}
-    for position, page_index in enumerate(first_pages):
-        last_by_page[page_index] = position
-    pages = sorted(last_by_page)
-    last_up_to = tuple(
-        itertools.accumulate((last_by_page[page] for page in pages), max)
-    )
-
-    def place(note: UnnumberedNote) -> int:
-        up_to = bisect.bisect_right(pages, first_page(note.origin))
-        return last_up_to[up_to - 1] if up_to > 0 else -1
-
-    return tuple(place(note) for note in notes)
-
-
 def numbered(
     blocks: tuple[Unnumbered, ...], notes: tuple[UnnumberedNote, ...]
 ) -> tuple[tuple[Block, ...], tuple[Note, ...]]:
@@ -80,7 +56,14 @@ def numbered(
         page_index = first_page(note.origin)
         note_counts[page_index] += 1
         note_ids.append(f"n-p{page_index:04d}-{note_counts[page_index]:03d}")
-    places = _note_places(blocks, notes)
+    # note_places counts the blocks written before a note; -1 is first of all.
+    places = tuple(
+        count - 1
+        for count in note_places(
+            tuple(first_page(block.origin) for block in blocks),
+            tuple(first_page(note.origin) for note in notes),
+        )
+    )
     notes_after: dict[int, list[int]] = {}
     for note_number, position in enumerate(places):
         notes_after.setdefault(position, []).append(note_number)

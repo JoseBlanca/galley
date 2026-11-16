@@ -72,7 +72,6 @@ Edits are refused, since none can exist before `galley2epub edits-from`
 is built.
 """
 
-import bisect
 import itertools
 import json
 import logging
@@ -94,6 +93,7 @@ from galley.model import (
     NoteKind,
     Span,
     block_text,
+    note_places,
     read_blocks,
     read_checked_input,
     read_edits,
@@ -549,32 +549,6 @@ def _printed_notes(group: tuple[Note, ...], notes: frozendict[str, Note]) -> str
     return "\n".join(_note_div(note, notes) for note in group)
 
 
-def _note_positions(
-    blocks: tuple[Block, ...], notes: tuple[Note, ...]
-) -> tuple[int, ...]:
-    """For each note, how many blocks of `blocks` are written before it: all
-    up to the last block, in the order of `blocks`, whose first origin is on
-    the note's first page or an earlier one; none when there is no such
-    block (structure spec, sections 6 and 10)."""
-    # Each block's first page and its position from 1, in page order, and
-    # for each the highest position of a block on that page or before.
-    by_first_page = sorted(
-        (block.origin[0].page_index, position)
-        for position, block in enumerate(blocks, start=1)
-        if block.origin
-    )
-    first_pages = tuple(page_index for page_index, _ in by_first_page)
-    last_positions = tuple(
-        itertools.accumulate((position for _, position in by_first_page), max)
-    )
-
-    def position_of(note: Note) -> int:
-        on_or_before = bisect.bisect_right(first_pages, note.origin[0].page_index)
-        return last_positions[on_or_before - 1] if on_or_before else 0
-
-    return tuple(position_of(note) for note in notes)
-
-
 def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     """book.md: the metadata header from the config (title, authors,
     language), then each block in the order of blocks.json, a blank line
@@ -620,7 +594,15 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     )
     printed_at: dict[int, list[Note]] = {}
     for note, position in zip(
-        printed, _note_positions(blocks.blocks, printed), strict=True
+        printed,
+        note_places(
+            tuple(
+                block.origin[0].page_index if block.origin else None
+                for block in blocks.blocks
+            ),
+            tuple(note.origin[0].page_index for note in printed),
+        ),
+        strict=True,
     ):
         printed_at.setdefault(position, []).append(note)
 
