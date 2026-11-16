@@ -188,6 +188,11 @@ gives:
 - the Gutenberg ebook number and the Internet Archive identifier;
 - the `title`, `authors` and `language` that galley's `book.toml` needs;
 - `exclude_pages`, the pages without a text layer, checked by eye;
+- `contents_pages` and `plate_pages`, optional, the book config's keys
+  of the same names (architecture §6): the pages of the printed table of
+  contents, and the plates that analyze's rule misses. galley-eval
+  writes them, with `exclude_pages`, into the `book.toml` it gives
+  galley;
 - the reading rules of section 4;
 - `not_in_reference`, the page indices whose text Gutenberg left out
   (Mariéjol: 14–16);
@@ -224,7 +229,8 @@ takes a look at its HTML.
 `samples/public_domain/gutenberg/pg<n>-images.html` (both ignored by git).
 
 `exclude_pages` lists the pages that have no text layer, because the
-walking skeleton stops on them. When analyze has its OCR audit
+walking skeleton stops on them, and the pages with one that analyze's
+plate rule takes wrongly (`docs/specs/plates.md` §2). When analyze has its OCR audit
 (architecture §7b), the lists are emptied, and Stubbs' map captions are
 then read by Tesseract and compared like any other text.
 
