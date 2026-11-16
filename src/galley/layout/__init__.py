@@ -34,6 +34,7 @@ from galley.body_measures import (
     commonest,
     edge_counts,
     group_rows,
+    measured_page_positions,
     measured_pages,
     median_word_height,
 )
@@ -224,14 +225,8 @@ def measure_book(
         cut_in_inset_left=None,
         cut_in_inset_right=None,
     )
-    # measured_pages keeps the pages of at least 15 rows, or of at least 3
-    # when none has 15, so no page it leaves out has as many rows as the
-    # fewest it keeps: those pages are the measured ones.
-    fewest_rows = min(len(rows) for rows in measured)
     measured_words = tuple(
-        page
-        for page, rows in zip(words.pages, rows_by_page, strict=True)
-        if len(rows) >= fewest_rows
+        words.pages[position] for position in measured_page_positions(rows_by_page)
     )
 
     def page_insets(page: PageWords) -> tuple[tuple[int, ...], tuple[int, ...]]:
