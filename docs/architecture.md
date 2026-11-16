@@ -8,8 +8,8 @@ invented. The specs of the stages, `docs/specs/<stage>.md`, build on it,
 and the names of the things of the domain are those of `docs/glossary.md`.
 Dated 14 November 2026; revised on 16 November 2026 for the second plan
 of structure (`docs/specs/structure.md` §11 to §19), which adds kinds to
-section 8 for chapter summaries, verse and endnotes, plate pictures, the
-config key `contents_pages` and the module `body_measures.py`.
+section 8 for chapter summaries, verse and endnotes, plates as figures,
+the config key `contents_pages` and the module `body_measures.py`.
 
 Decisions marked "owner, 14 November 2026" or "owner, 15 November 2026"
 were taken by the owner in chat. The others were taken while writing,
@@ -144,7 +144,7 @@ An unknown key or a wrong type is an error.
 | `exclude_pages` | list of page indices, `[]` | pages left out, as removals |
 | `exclude_regions` | list of `{page, box}`, `[]` | a library stamp, a label |
 | `cover_page` | page index, none | rendered as the EPUB's cover |
-| `contents_pages` | list of page indices, `[]` | the pages of the book's printed table of contents: structure makes no heading on them, so that the EPUB's table of contents does not list each chapter twice; their lines stay paragraphs (owner, 15 November 2026) |
+| `contents_pages` | list of page indices, `[]` | the pages of the book's printed table of contents: structure makes no heading on them, so that the EPUB's table of contents does not list each chapter twice; their lines stay paragraphs (owner, 15 November 2026). Without it, the contents' lines that pass the heading rule become headings, and the EPUB lists those chapters twice (Domesday's three essays). analyze checks its page indices as it checks those of the other keys |
 
 A stage spec adds the keys it needs, here and in `config.py` together.
 
@@ -214,9 +214,11 @@ but was fitted on 16 books only.
 The formats are frozen dataclasses in `src/galley/model.py`, with tuples
 for sequences, `frozendict` (a built-in type of Python 3.15) for
 mappings, `StrEnum` for finite sets, and floats for positions. Each file
-has a `format_version` int: 2 for `pages.json` and `blocks.json`, whose
-fields the second plan of structure changes (16 November 2026), 1 for
-the others. Each has one pair of functions
+has a `format_version` int: 2 for `blocks.json`, 1 for the others.
+`blocks.json` went to 2 with the second plan of structure (16 November
+2026), which added `Note.kind` and the block kinds `verse` and
+`chapter_summary`; reading a file of version 1 is the error below, and
+the owner reruns structure. Each has one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
 Reading a file whose `format_version` is not the current one is an error
@@ -231,13 +233,12 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
 
 - `PageInfo`: `index`, `width_pt`, `height_pt`, `kind: PageKind`,
   `text_source: TextSource`, `text_layer_score: float | None`,
-  `exclude_regions: tuple[Box, ...]`, `picture: Box | None`.
+  `exclude_regions: tuple[Box, ...]`.
 - `PageKind`: `blank`, `text`, `plate` (mostly a picture), `excluded`.
-  analyze recognises a plate from a small render of the page
-  (`docs/specs/plates.md`).
-- `picture`: on a `plate` page, the box of its picture, which extract
-  cuts; `None` on every other page.
-- `TextSource`: `text_layer`, `ocr`, `none` (blank and excluded pages).
+  analyze recognises a plate from a small render of the page, with a
+  text layer or without one (`docs/specs/plates.md`).
+- `TextSource`: `text_layer`, `ocr`, `none` (blank and excluded pages,
+  and plates without a text layer).
 - `text_layer_score`: the share of the layer's words found in the word
   list (section 12), from 0 to 1; `None` without a layer.
 - `blank_checked_by_ocr: bool`: true for a page without a text layer that
@@ -259,10 +260,10 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
 - `Word`: `text`, `box`, `ocr_confidence: float | None` (Tesseract's,
   0-100; `None` for the text layer). In the order the source gave them.
 - `Figure`: `box`, `image` (path relative to the book folder), `dpi`. For
-  now figures are cut from plate pages only, one per plate, its box the
-  page's `picture`; figures inside text pages are not detected yet. A
-  plate page also has the words of its text layer, which structure sorts
-  into its caption and stray words.
+  now figures are cut from plate pages only, one per plate, and its box
+  is the whole page; figures inside text pages are not detected yet. A
+  plate page with a text layer also has the words of that layer, which
+  structure sorts into its caption and stray words.
 - A word inside an excluded region is a removal, one per word, with reason
   `excluded_region`; the words of an excluded page likewise, with
   `excluded_page`.
@@ -390,17 +391,19 @@ it read (the `coding` skill, "Functional style").
 whether it is blank, text or a plate; applies the config's
 `exclude_pages` and `exclude_regions`; and runs the OCR audit of section
 7b, which decides each page's `text_source`. A plate is recognised from
-a render of each page with a text layer at 36 dpi, as a large area of
-ink that no word covers on a page of few known words, and its picture's
-box is recorded (`docs/specs/plates.md`).
+a render of each page at 36 dpi, as a large area of ink that no word
+covers on a page of few known words, or, on a page without a text
+layer, as a large area of faint ink; such a page does not stop the run
+(`docs/specs/plates.md`).
 
 **extract** gives every page its words. Text-layer pages are read with
 pdfplumber, one document per worker thread. OCR pages are rendered at 300
 dpi by `pdfium.py` and read by Tesseract in parallel; their pixel boxes are
-turned into points. Plate pages are rendered at 300 dpi and their picture
-cut into `images/`; their text layer is read as a text page's is, so
-that structure can keep the caption and remove the rest. The
-`cover_page` of the config is rendered whole, as `images/cover.png`.
+turned into points. A plate page is rendered whole at 300 dpi into
+`images/`; its text layer, when it has one, is read as a text page's
+is, so that structure can keep the caption and remove the rest. The
+`cover_page` of the config is rendered whole, as `images/cover.png`,
+and is never a plate.
 
 **layout** groups each page's words into regions and lines, and orders
 them for reading: a column, then the next; the margin beside the body,
@@ -518,7 +521,7 @@ A stage imports these and nothing else of galley.
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage` |
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file |
-| `wordlist.py` | `word_list(language, cache_dir) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`) and structure |
+| `wordlist.py` | `is_known_word(word, word_list)`, whether a word counts as known on a plate (`docs/specs/plates.md` §2; the list in lower case); `word_list(language, cache_dir) -> frozenset[str]`, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`) and structure |
 | `fidelity.py` | the fidelity check, section 13 |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `commonest(edges)`, the commonest of a set of edges to 2 pt (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
 | `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract) and stops naming any that is missing |
@@ -544,7 +547,11 @@ lists the words, with the pages they came from where the origins say.
   reference "1" would become "Greece,1" again and hide the word change.
 - A note reference span must name a note of the file and have a
   **marker's shape**: at most 4 characters, at most 3 of them letters or
-  digits, and no white space ("8", "(i)", "^", "345"). At the markdown
+  digits and at most 1 a letter, and no white space ("8", "(i)", "^",
+  "345", "(t)"). A word of two letters or more, "the", "and", cannot
+  hide in it; structure links no candidate without this shape (its
+  bracketed form allows two letters read as digits, "(li)" for 11,
+  which then stays in its word). At the markdown
   boundary the span becomes Pandoc's note or a link and its text is not
   counted, so the shape keeps an ordinary word from hiding in it. The
   span need not read as its note's `marker`: the OCR reads the two sides
@@ -651,7 +658,8 @@ On 15 November 2026, for the second plan of structure:
 - **Plates** are recognised by analyze from a small render; extract cuts
   the picture; the caption becomes the plate's figure block, and the
   stray words of the text layer are removed as `plate_text`
-  (`docs/specs/plates.md`).
+  (`docs/specs/plates.md`). A plate without a text layer is a figure
+  too.
 - **Stubbs' cut-in margin notes** are found by layout from the text
   layer, not from a render (`docs/specs/layout.md` §9).
 - **The body measures** are one module of the package root,

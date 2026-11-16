@@ -106,7 +106,8 @@ which edits can name. A **note reference** is the place in a block that
 refers to the note, printed as the marker is, often as a superscript; the
 OCR may read it differently from the marker ("3" for "8"), and it is
 still linked when it has a **marker's shape** (at most 4 characters, at
-most 3 of them letters or digits) and falls in the right order.
+most 3 of them letters or digits and at most 1 a letter) and falls in
+the right order.
 
 **page index**: the position of a page in the PDF, from 0. **page
 number**: what is printed on the page, a string ("47", "xiv"), which may
