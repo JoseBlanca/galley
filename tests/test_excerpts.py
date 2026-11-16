@@ -19,6 +19,7 @@ from galley.model import (
     LinesFile,
     NoteKind,
     Origin,
+    RemovalReason,
     block_text,
     read_blocks,
     read_lines,
@@ -1026,3 +1027,79 @@ def test_caption_domesday_39_and_40_kept_and_their_stray_words_removed(
     assert ("plate_text", '--,. ^X.^ MoulslVl^rf /\\"?') in _plate_removals(blocks, 3)
     assert {reason for reason, _ in _plate_removals(blocks, 4)} == {"plate_text"}
     assert len(_plate_removals(blocks, 4)) == 7
+
+
+# Index entries and guide words (structure spec, section 17).
+
+
+def _index_entries_on(blocks: BlocksFile, page: int) -> tuple[str, ...]:
+    return tuple(
+        block_text(block)
+        for block in blocks.blocks
+        if block.kind is BlockKind.INDEX_ENTRY and block.origin[0].page_index == page
+    )
+
+
+def test_index_haskins_266_heading_then_one_entry_per_entry_left_column_then_right(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["haskins_eval"]
+    assert _kinds_on(blocks, 9) == ("heading",) + ("index_entry",) * 65
+    entries = _index_entries_on(blocks, 9)
+    # The left column's first and last entries, then the right column's
+    # first; "Anjou" holds its sub-entry, and its continuation line.
+    assert entries[0] == "Abacus, 106/."
+    assert entries[17] == (
+        "Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100,"
+        " 112, 131, 136/."
+    )
+    assert entries[33:35] == ("Avranches, 172, 175, 178.", "Avranchin, 28.")
+
+
+def test_index_haskins_267_calabria_one_entry_and_the_rows_cut_at_the_gutter(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # Layout read the first four rows across both columns; the gutter cut
+    # puts "Clermont, 211." and the three entries after it in the right
+    # column, before "Commerce".
+    _, blocks = excerpt_outputs["haskins_quotes_index"]
+    entries = _index_entries_on(blocks, 9)
+    assert entries[:2] == (
+        (
+            "Caen, lo/., 71, 133, 139, 143, 153. 160, 166, 172, 184; abbeys, 12,"
+            " 58,160, 163, 171, 174,186-88,213."
+        ),
+        "Calabria, 176, 198,201-11,222,226, 237, 246.",
+    )
+    clermont = entries.index("Clermont, 211.")
+    assert entries[clermont : clermont + 4] == (
+        "Clermont, 211.",
+        "Clovis, 207.",
+        "Cluny, 164.",
+        "Colombieres, 116.",
+    )
+    assert entries[clermont + 4].startswith("Commerce, Norman, 4, 73, 81,")
+    assert "quote" not in _kinds_on(blocks, 9) + _kinds_on(blocks, 10)
+
+
+def test_index_stubbs_312_to_321_one_guide_words_removal_on_each_page(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["stubbs_summaries_index"]
+    guide_words = tuple(
+        (removal.page_index, removal.text)
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.GUIDE_WORDS
+    )
+    assert guide_words == (
+        (4, "BAL BEC"),
+        (5, "BUR CON"),
+        (6, "HEN HUG"),
+        (7, "MAT ORD"),
+        (8, "PUI ROB"),
+        (9, "WAR YPR"),
+    )
+    # The marks ";;;" above the title stay a paragraph: a head line that is
+    # no running head keeps its stray marks (section 3).
+    assert _kinds_on(blocks, 4)[:3] == ("paragraph", "heading", "index_entry")
+    assert not any(note.origin[0].page_index >= 4 for note in blocks.notes)

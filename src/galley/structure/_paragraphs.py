@@ -21,6 +21,7 @@ from galley.model import (
 )
 from galley.structure._foot import body_column
 from galley.structure._headings import PageHead, heading_runs
+from galley.structure._index import IndexPage, index_page
 from galley.structure._lines import (
     Piece,
     PlacedLine,
@@ -58,7 +59,10 @@ class PageParts:
     positions of other lines of the body stream that start a block (a
     bibliographical note's band blocks, spec section 16), and the lines
     taken from the foot of the body stream as notes (spec section 11, "Notes left
-    in the body"), none until they are taken."""
+    in the body"), none until they are taken. On an index page,
+    `index_lines` are the lines of its columns, left then right, and
+    `index_starts` the positions of those that start an entry (spec
+    section 17)."""
 
     index: int
     removals: tuple[Removal, ...]
@@ -71,6 +75,8 @@ class PageParts:
     runs: tuple[BodyRun, ...] = ()
     block_starts: frozenset[int] = frozenset()
     body_notes: tuple[PlacedLine, ...] = ()
+    index_lines: tuple[PlacedLine, ...] = ()
+    index_starts: frozenset[int] = frozenset()
 
 
 def _pieces(lines: tuple[PlacedLine, ...]) -> tuple[Piece, ...]:
@@ -137,6 +143,12 @@ def page_parts(
     head = head_removals(page, kinds, survey)
     foot = foot_removals(page, kinds, survey)
     removed = head.lines | foot.lines
+    index = (
+        index_page(page, kinds, removed) if page.index in survey.index_pages else None
+    )
+    taken = index.taken if index is not None else frozenset()
+    if index is not None:
+        removed |= index.removed_lines
     column = body_column(page, kinds)
 
     def centring_edges(region: Region, kind: RegionKind, edges: Edges) -> Edges:
@@ -151,6 +163,7 @@ def page_parts(
                 PlacedLine(page.index, line, edges, centring_edges(region, kind, edges))
                 for line_number, line in enumerate(region.lines)
                 if (region_number, line_number) not in removed
+                and region_number not in taken
             ),
         )
         for region_number, (region, kind, edges) in enumerate(
@@ -171,6 +184,7 @@ def page_parts(
     body = tuple(
         line for kind, lines in regions if kind is RegionKind.BODY for line in lines
     )
+    index_lines = _index_lines(page.index, index)
     page_head = (
         PageHead.RUNNING_HEAD
         if any(
@@ -180,7 +194,9 @@ def page_parts(
     )
     return PageParts(
         index=page.index,
-        removals=head.removals + foot.removals,
+        removals=head.removals
+        + (index.removals if index is not None else ())
+        + foot.removals,
         page_numbers=head.page_numbers + foot.page_numbers,
         body=body,
         margin_notes=tuple(
@@ -190,7 +206,28 @@ def page_parts(
         ),
         band_regions=band_regions,
         band_blocks=tuple(piece for lines in band_regions for piece in _pieces(lines)),
-        runs=_runs(page.index, body, band_regions, page_head, survey, contents_pages),
+        # Spec section 17, rule 4: the index columns are the page's body or
+        # band lines for the title's centring (section 14, rule 1).
+        runs=_runs(
+            page.index,
+            body,
+            (*band_regions, index_lines),
+            page_head,
+            survey,
+            contents_pages,
+        ),
+        index_lines=index_lines,
+        index_starts=index.starts if index is not None else frozenset(),
+    )
+
+
+def _index_lines(page_index: int, index: IndexPage | None) -> tuple[PlacedLine, ...]:
+    """The lines of an index page's columns, each with its column's edges."""
+    if index is None:
+        return ()
+    return tuple(
+        PlacedLine(page_index, line, Edges(*edges), Edges(*edges))
+        for line, edges in zip(index.lines, index.column_edges, strict=True)
     )
 
 

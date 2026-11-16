@@ -17,6 +17,7 @@ from galley.structure._bibliography import (
 from galley.structure._body_notes import take_body_notes
 from galley.structure._endnotes import EndnoteSection, endnote_groups, endnote_section
 from galley.structure._ids import numbered
+from galley.structure._index_entries import with_index_breaks, with_index_entries
 from galley.structure._lines import Piece, PlacedLine, first_word
 from galley.structure._linking import body_candidates, linked
 from galley.structure._margins import (
@@ -233,8 +234,9 @@ def _taken_body_notes(
 ) -> tuple[PageParts, ...]:
     """The pages with the notes left at the foot of their body taken, in a
     book numbered per page, except on the pages of the endnote section
-    (spec section 11, "Notes left in the body") and those of `bibliography`,
-    in a bibliographical note (section 16), and each page's body
+    (spec section 11, "Notes left in the body"), those of `bibliography`,
+    in a bibliographical note (section 16), and those of an index (section
+    17), and each page's body
     notes put before its band regions. `band_notes` are each page's notes
     of its band; `body_word_height` is in points."""
     taken = tuple(
@@ -242,6 +244,7 @@ def _taken_body_notes(
         if numbering is Numbering.PER_PAGE
         and page.index not in section_pages
         and page.index not in bibliography
+        and not page.index_lines
         else page
         for page, notes in zip(parts, band_notes, strict=True)
     )
@@ -419,7 +422,9 @@ def assemble(
     # Spec section 16: a bibliographical note's band blocks are paragraphs,
     # and its pages' notes are not taken from the body.
     found = bibliography(parts)
-    parts = tuple(with_band_as_body(page, found, form) for page in parts)
+    parts = with_index_breaks(
+        tuple(with_band_as_body(page, found, form) for page in parts)
+    )
     band_notes = tuple(page_notes(page.band_regions, word_list) for page in parts)
     numbering = book_numbering(band_notes)
     # The paragraphs are found twice: the first time only for the pages of
@@ -456,6 +461,8 @@ def assemble(
     entries = joined_margin_notes(
         entries, _beside(entries, section_pieces, sources), body_line_pitch
     )
+    # Spec section 2, step 3.4: the index entries.
+    entries = with_index_entries(entries, pages)
     in_section = _in_section(entries, section_pieces)
     # Spec section 2, step 3.5: the quotes, among the body's paragraphs.
     entries = with_quotes(

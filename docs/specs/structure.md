@@ -923,7 +923,8 @@ whose hyphen should have stayed and 2 not one word.
   next heading, the same blocks are a quote and a note;
 - index: two columns of 20 lines under "INDEX", lines at the edge and
   indented 9 pt, give one `index_entry` per line at the edge; a line
-  "BUR CON" is removed as `guide_words`; a row read across the gutter is
+  "BUR CON" is removed as `guide_words`, and so are "BUR" and "CON" as
+  the first lines of the two columns; a row read across the gutter is
   cut in two; a skew of 5 pt over the column does not start entries;
 - plates: a page with a figure and the lines "DECENNIAL PUBLICATIONS, V"
   (alike to another plate's top line), "THE MODERN MOUND OF KADESH" and
@@ -2052,45 +2053,90 @@ block.
 1. **Index pages.** The index starts at a page whose title, the head line
    or the first line of its first body region, starts with the word
    "index", in any case ("INDEX.", "INDEX TO LIST OF AUTHORITIES"), or,
-   in a French book, "table alphabétique". It runs on over the following
-   pages while each page that has words has two **index columns**: two
-   regions that are not margin regions, each 0.3 to 0.65 of the width
-   that the page's regions span, one left of the other. A page without
-   words does not end it. Measured: this gives exactly the pages of the
-   table above; Stubbs' 322 (advertisements in one column), Domesday's
-   553 (the printer's imprint) and Gierke's 86 (the text) end them.
+   in a French book, "table alphabétique". A page-number form at the
+   start or end of the title is not part of it, so that a running head
+   "252 INDEX" starts the index too: on Haskins, Stubbs, Domesday,
+   Mariéjol and Gierke this adds no page (every such running head is on
+   a page after the index's first; Kadesh was not checked), and
+   it lets an excerpt that holds index pages without the first
+   (`haskins_quotes_index`) start its index. It runs on over the
+   following pages while each page that has words has two **index
+   columns**: two regions that are neither margin regions nor the head
+   line, each 0.3 to 0.65 of the width that all the page's regions span
+   together, one wholly left of the other (its right side at or left of
+   the other's left side). A row read across the columns can split each
+   column into two regions or more (Stubbs' page 316 has four of that
+   width): every such region that lies wholly left of another is part of
+   the left column, and every one that lies wholly right of another part
+   of the right; a page where one region is both has no index columns.
+   The first page needs no columns. A page without words does not end
+   it. Measured: this gives
+   exactly the pages of the table above; Stubbs' 322 (advertisements in
+   one column), Domesday's 553 (the printer's imprint) and Gierke's 86
+   (the text) end them.
 2. **The regions of an index page.** The head line is decided as on any
    page (section 3). The two index columns are index columns whether
    section 2 would make them body or band regions. A line of exactly two
    words of three capital letters each is the **guide words** (the first
    letters of the page's first and last entries, "BUR CON"), removed with
-   the reason `guide_words` (architecture §8); 10 of Stubbs' 10 index
-   pages have one, and no other page of the six books. A margin region
-   goes into the column on its side, by its top, so that a page number
-   that overhangs the column ("509-515", Domesday page 546) follows the
-   line it ends. A region that crosses the **gutter** (the middle between
-   the left column's right edge and the right column's left edge) is cut
-   there, each word going by its middle, when at least two thirds of its
-   lines have no word over the gutter: its left part is read with the
-   left column and its right part with the right, by their tops. This
-   repairs the rows layout reads across both columns (below). Any other
-   region keeps its kind: Gierke's footnote on page 83 stays a note (1 of
-   its 2 lines crosses the gutter).
+   the reason `guide_words` (architecture §8), as one removal. Layout
+   reads the guide words as one line on 2 of Stubbs' 10 index pages (312
+   and 321); on the other 8 it splits them into the first line of each
+   column, so the first lines of the two columns, when each is one word
+   of three capital letters and their tops are within 3 pt of each other
+   (0.3 to 2.2 pt on those pages), are the guide words too. This second
+   test is made on the columns once the margin regions and cut parts are
+   in them; the first removes a line of two guide words anywhere on the
+   page but the head line, before any region is cut. So 10 of
+   Stubbs' 10 index pages have them, and no other page of the six books.
+   A margin region goes into the column on its side of the gutter (below),
+   by its middle, as a whole, before the first line of the column whose
+   top is below its own (at the column's end when none is), so that a
+   page number that overhangs the column
+   ("509-515", Domesday page 546) follows the line it ends. A region that
+   crosses the **gutter** (the middle between the left column's right
+   edge and the right column's left edge) is cut there, each word going
+   by its middle, when at least two thirds of its lines have no word over
+   the gutter: its left part is read with the left column and its right
+   part with the right, each part as a whole by its top, as a margin
+   region is. This repairs the rows layout reads across both columns
+   (below). Any other region keeps its kind: Gierke's footnote on page
+   83 stays where section 2 puts it (1 of its 2 lines crosses the
+   gutter).
 3. **Entries.** The lines of the left column, then of the right, page
    after page, are one stream. A line starts an entry when its left side
    lies within 5 pt of its column's left edge; otherwise it continues the
    entry before it, also across a column or a page. The left edge is a
    straight line fitted, by least squares on the line's top, through the
    left sides of the lines that start within 3 pt of the column's
-   commonest left side, then fitted again through those within 3 pt of
-   the first fit, because scans are skewed: Gierke's page 84 drifts from
-   42 to 47 pt over 41 lines. A column of fewer than 5 lines takes its
-   smallest left side.
+   **entry side**, then fitted again through those within 3 pt of the
+   first fit, because scans are skewed: Gierke's page 84 drifts from 42
+   to 47 pt over 41 lines. The entry side is the column's commonest left
+   side (layout §1's commonest), unless at least 2 left sides lie more
+   than 5 pt left of it: then it is the commonest of those. A column
+   whose continuation lines outnumber its first lines has the indent as
+   its commonest left side (the left columns of Stubbs' pages 314 and
+   317, where John's and Edward I's entries run to 20 lines and more),
+   and the commonest side alone made every continuation line an entry
+   and every first line a continuation. Measured on 16 November 2026 with
+   galley-eval, index paragraph boundaries at markdown, precision /
+   recall, the commonest side alone against the entry side: Haskins
+   0.903 / 0.698 against 0.992 / 0.723, Stubbs 0.475 / 0.314 against
+   0.869 / 0.396, Domesday 0.990 / 0.986 both. A column of fewer than 5
+   lines takes its smallest left side.
 4. **Blocks.** Each entry is one `index_entry` block, `level` `None`, its
    lines joined as a paragraph's, hyphens joined by section 5 ("72-"
    "81;" gives "72-81;", "Vik-" "ing," gives "Viking,"). Its page numbers
    stay as printed. Its origin has one box per page. The title is a
-   heading (section 14).
+   heading (section 14); for its centring (section 14, rule 1), the lines
+   of the index columns count as the page's body and band lines, which
+   section 2 would have made them. The entries come among the body's
+   blocks by page: after the blocks that start on the same page or
+   earlier, before those that start on a later page. A paragraph does
+   not run on into an index page or out of the last one: the first line
+   of the body stream (the lines outside the index columns, such as the
+   title) of each index page, and the first after the index, start a
+   block.
 
 **Measured.** Each entry's first five letters were aligned in order with
 those of the reference text's entries (not its sub-entries), with
