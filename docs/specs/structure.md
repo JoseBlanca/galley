@@ -967,11 +967,12 @@ exactly.
 | `gierke_86-93_270-271` | 6 (92) | "II. Macrocosm and Microcosm.", level 2, and the known false heading "Macrocosm and Microcosm." at the top |
 | `gierke_86-93_270-271` | 8 (270), 9 (271) | endnotes 291 to 302, kind `endnote`, unreferenced, each margin note inside its note before its text; the end of note 290 at the top of page 270 an endnote with no marker, not joined to the last paragraph of page 93 |
 | `haskins_quotes_index` (new) | 0 (39) | a level-2 heading "BIBLIOGRAPHICAL NOTE" mid-page, paragraphs after it, not quotes (section 16) |
-| `haskins_quotes_index` | 1 (53) | quotes in smaller type across the column |
-| `haskins_quotes_index` | 2 to 4 (71 to 73) | a quote that runs over two page breaks |
-| `haskins_quotes_index` | 5 (129) | the heading "BIBLIOGRAPHICAL NOTE" above a band of small type, whose blocks are paragraphs, not notes |
-| `haskins_quotes_index` | 6 (209), 7 (234) | centred Latin verse and English verse, `verse` blocks with their line breaks |
-| `haskins_quotes_index` | 8 (267), 9 (269) | index rows read across both columns, cut at the gutter; "Calabria", an entry from the foot of one column to the top of the next |
+| `haskins_quotes_index` | 1 (41) | the heading of chapter II, which ends the bibliographical note of page 39 |
+| `haskins_quotes_index` | 2 (53) | quotes in smaller type across the column (checked on the whole book; see below) |
+| `haskins_quotes_index` | 3 to 5 (71 to 73) | a quote that runs over two page breaks (checked on the whole book) |
+| `haskins_quotes_index` | 6 (129) | the heading "BIBLIOGRAPHICAL NOTE" above a band of small type, whose blocks are paragraphs, not notes |
+| `haskins_quotes_index` | 7 (209), 8 (234) | centred Latin verse and English verse, `verse` blocks with their line breaks |
+| `haskins_quotes_index` | 9 (267), 10 (269) | index rows read across both columns, cut at the gutter; "Calabria", an entry from the foot of one column to the top of the next |
 | `stubbs_summaries_index` (new) | 0 (16) | a printed contents page, named in the test's `contents_pages`: no heading |
 | `stubbs_summaries_index` | 1 (28) | a summary whose OCR is out of order: missed, as the first plan made it |
 | `stubbs_summaries_index` | 2 (79) | a summary whose last line is centred |
@@ -999,7 +1000,19 @@ they cover, each from a public-domain book of the evaluation set or of
 the committed excerpts, every page with a text layer:
 
 - `haskins_quotes_index`: Haskins (`normansineuropea00hask`), page
-  indices 39, 53, 71, 72, 73, 129, 209, 234, 267 and 269.
+  indices 39, 41, 53, 71, 72, 73, 129, 209, 234, 267 and 269. Page 41,
+  the opening of chapter II, was added on 16 November 2026: without its
+  heading the bibliographical note of page 39 ran on to page 129's, and
+  the quotes of pages 53 and 71 to 73 came out as its paragraphs. The
+  excerpt still cannot check those quotes: its pages are mostly small
+  type (the quotes, the bibliographical notes, the index), so it
+  measures a body word height of 7.60 pt and a pitch of 11.86 pt against
+  the book's 8.32 and 15.19, and quotes set at 0.93 to 0.95 of the book's
+  height are not smaller than the excerpt's. Six more pages of text
+  (42, 43, 54, 55, 74, 130) bring it only to 7.80 and 12.66 pt; without
+  the index pages and with page 42 it measures 8.05 and 13.68 pt
+  (measured on 16 November 2026).
+  The quotes of pages 53 and 71 to 73 are checked on the whole book.
 - `stubbs_summaries_index`: Stubbs (`earlyplantagenet01stub`), page
   indices 16, 28, 79, 157, 312, 313, 316, 318, 319 and 321.
 - `domesday_headings_quotes`: Domesday (`domesdaybook00maituoft`), page
