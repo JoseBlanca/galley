@@ -20,11 +20,13 @@ def _linkable(reference: Reference) -> bool:
 
 
 def body_candidates(body: Sequence[Unnumbered]) -> tuple[Candidate, ...]:
-    """The candidate references of the body's paragraphs, in reading order."""
+    """The candidate references of the body's blocks other than margin notes,
+    in reading order: a heading holds them too (Kadesh's title,
+    "STRATEGY*")."""
     return tuple(
         Candidate(block_position, word_position, page_index, reference)
         for block_position, block in enumerate(body)
-        if block.kind is BlockKind.PARAGRAPH
+        if block.kind is not BlockKind.MARGIN_NOTE
         for word_position, (word, page_index) in enumerate(
             zip(block.words, block.word_pages, strict=True)
         )

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from galley.structure._lines import first_word, is_centred
 from galley.structure._markers import NoteMarker, endnote_marker
-from galley.structure._paragraphs import Entry, Paragraph
+from galley.structure._paragraphs import BodyBlock, Entry
 
 # Spec section 12: a run of at least 8 rising endnote markers makes the
 # section; the six books hold one run of 6 outside it (Kadesh, pages 20 to
@@ -29,7 +29,7 @@ def _marked(entry: Entry) -> NoteMarker | None:
     """The endnote marker the first word of a paragraph has; None for a
     paragraph without one and for a margin note."""
     match entry:
-        case Paragraph(piece):
+        case BodyBlock(piece=piece):
             return endnote_marker(first_word(piece.lines[0]))
         case _:
             return None
@@ -73,7 +73,7 @@ def endnote_section(entries: Sequence[Entry]) -> EndnoteSection | None:
     while start > 0:
         before = entries[start - 1]
         if (
-            not isinstance(before, Paragraph)
+            not isinstance(before, BodyBlock)
             or _first_page(before) != first_page
             or is_centred(before.piece.lines[0])
         ):
@@ -86,7 +86,7 @@ def endnote_section(entries: Sequence[Entry]) -> EndnoteSection | None:
         tuple(
             position
             for position in range(start, end + 1)
-            if isinstance(entries[position], Paragraph)
+            if isinstance(entries[position], BodyBlock)
         ),
         first_page,
     )

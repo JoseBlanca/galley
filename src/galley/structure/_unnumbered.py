@@ -19,7 +19,8 @@ class Unnumbered:
     each, its origin, its word changes, each with the position of the word
     it gave, so that a block's changes are in the order of its words, and
     its note references: for the position of a word, the reference it
-    holds and the position of its note among the notes."""
+    holds and the position of its note among the notes; a heading's level
+    and chapter label."""
 
     kind: BlockKind
     words: tuple[str, ...]
@@ -27,6 +28,8 @@ class Unnumbered:
     origin: tuple[Origin, ...]
     changes: tuple[tuple[int, WordChange], ...]
     links: frozendict[int, tuple[Reference, int]] = frozendict()
+    level: int | None = None
+    label: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +43,7 @@ class UnnumberedNote:
     referenced: bool
 
 
-def _origin(piece: Piece) -> tuple[Origin, ...]:
+def piece_origin(piece: Piece) -> tuple[Origin, ...]:
     """One origin per page the piece has lines on, with the box of those
     lines."""
     return tuple(
@@ -69,7 +72,7 @@ def joined(
         kind,
         joined.words,
         joined.pages,
-        _origin(piece),
+        piece_origin(piece),
         tuple(zip(joined.positions, joined.changes, strict=True)),
     )
 

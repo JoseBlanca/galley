@@ -36,13 +36,14 @@ from galley.structure._notes import (
     page_notes,
 )
 from galley.structure._paragraphs import (
+    BodyBlock,
     Entry,
     MarginNote,
     PageParts,
-    Paragraph,
     body_entries,
 )
 from galley.structure._references import NoteToMatch, match_endnotes, match_footnotes
+from galley.structure._runs import Label
 from galley.structure._unnumbered import (
     Unnumbered,
     UnnumberedNote,
@@ -50,6 +51,7 @@ from galley.structure._unnumbered import (
     first_page,
     joined,
     merged_origin,
+    piece_origin,
     without_marker,
 )
 
@@ -87,14 +89,38 @@ def _body(
     body: list[Unnumbered] = []
     for entry in entries:
         match entry:
-            case Paragraph(piece):
-                kind = BlockKind.PARAGRAPH
+            case BodyBlock():
+                body.append(_body_block(entry, book_words, word_list))
             case MarginNote(piece):
-                kind = BlockKind.MARGIN_NOTE
+                body.append(joined(piece, BlockKind.MARGIN_NOTE, book_words, word_list))
             case _:
                 assert_never(entry)
-        body.append(joined(piece, kind, book_words, word_list))
     return tuple(body)
+
+
+def _body_block(
+    block: BodyBlock, book_words: frozenset[str], word_list: frozenset[str]
+) -> Unnumbered:
+    """A block of the body stream with its hyphens joined; a heading whose
+    first line is its chapter label has that line's words, joined by single
+    spaces, as its label, and the lines after it as its text (spec section
+    14, "Heading blocks")."""
+    lines = block.piece.lines
+    match block.label:
+        case Label.FIRST_LINE:
+            label = " ".join(word.text for word in lines[0].line.words)
+            text = Piece(lines[1:])
+        case Label.NONE:
+            label = None
+            text = block.piece
+        case _:
+            assert_never(block.label)
+    return replace(
+        joined(text, block.kind, book_words, word_list),
+        origin=piece_origin(block.piece),
+        level=block.level,
+        label=label,
+    )
 
 
 def _endnote(group: EndnoteGroup, body: Sequence[Unnumbered]) -> UnnumberedNote:

@@ -328,9 +328,12 @@ def test_book_epub_is_an_epub_with_the_title_language_and_every_block(
             language = opf.findtext("opf:metadata/dc:language", namespaces=_OPF)
             assert title == TITLES[name]
             assert language == "en"
-            chapter = epub.read("EPUB/text/ch001.xhtml").decode("utf-8")
+            chapters = "".join(
+                ElementTree.tostring(chapter, encoding="unicode")
+                for chapter in _chapters(epub)
+            )
             for block_id in block_ids:
-                assert f'<div id="{block_id}"' in chapter
+                assert f'id="{block_id}"' in chapters
 
 
 def test_each_block_div_of_the_epub_holds_the_words_of_its_block(
@@ -339,13 +342,23 @@ def test_each_block_div_of_the_epub_holds_the_words_of_its_block(
     for folder in excerpt_books.values():
         blocks = read_blocks(folder.blocks_json)
         with zipfile.ZipFile(folder.book_epub) as epub:
-            chapter = ElementTree.fromstring(epub.read("EPUB/text/ch001.xhtml"))
-        # A note's div holds the divs of its blocks; only block divs count.
-        # Pandoc writes its own number for a reference to a footnote.
+            chapters = _chapters(epub)
+        # A note's div holds the divs of its blocks; only block divs count. A
+        # heading is a section whose id is its block's, holding its heading
+        # element, the label first. Pandoc writes its own number for a
+        # reference to a footnote.
         divs = {
             div.get("id"): _text_without_footnote_numbers(div).split()
+            for chapter in chapters
             for div in chapter.iter(f"{{{_XHTML}}}div")
             if (div.get("id") or "").startswith("b-")
+        } | {
+            section.get("id"): _text_without_footnote_numbers(
+                next(child for child in section if child.tag in _HEADING_TAGS)
+            ).split()
+            for chapter in chapters
+            for section in chapter.iter(f"{{{_XHTML}}}section")
+            if (section.get("id") or "").startswith("b-")
         }
         footnotes = frozenset(
             note.id for note in blocks.notes if _is_written_as_a_footnote(note)
@@ -363,11 +376,25 @@ def test_each_block_div_of_the_epub_holds_the_words_of_its_block(
         note_blocks = tuple(block for note in blocks.notes for block in note.blocks)
         assert divs == {
             block.id: markers.get(block.id, [])
+            + (block.label.split() if block.label is not None else [])
             + "".join(
                 span.text for span in block.spans if span.note_ref not in footnotes
             ).split()
             for block in (*blocks.blocks, *note_blocks)
         }
+
+
+_HEADING_TAGS = frozenset(f"{{{_XHTML}}}h{level}" for level in range(1, 7))
+
+
+def _chapters(epub: zipfile.ZipFile) -> tuple[ElementTree.Element, ...]:
+    """The EPUB's chapter files, in order: Pandoc starts one at each level-1
+    heading."""
+    return tuple(
+        ElementTree.fromstring(epub.read(name))
+        for name in sorted(epub.namelist())
+        if name.startswith("EPUB/text/ch") and name.endswith(".xhtml")
+    )
 
 
 def _is_written_as_a_footnote(note: Note) -> bool:

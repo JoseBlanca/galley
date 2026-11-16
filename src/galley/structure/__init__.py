@@ -68,10 +68,13 @@ def make_blocks(
     depend on `workers`. `lower_case_words` is the word list of the book's
     language in lower case, as `wordlist.lower_case_word_list` gives it;
     `contents_pages` the page indices of the printed table of contents
-    (the config's), after the last of which the references to endnotes
-    are taken (spec section 12)."""
+    (the config's), on which no heading is found (spec section 14) and
+    after the last of which the references to endnotes are taken (spec
+    section 12)."""
     survey = survey_book(lines, workers=workers)
-    pages = map_pages(lambda page: page_parts(page, survey), lines.pages, workers)
+    pages = map_pages(
+        lambda page: page_parts(page, survey, contents_pages), lines.pages, workers
+    )
     assembled = assemble(
         pages,
         survey.book_words,

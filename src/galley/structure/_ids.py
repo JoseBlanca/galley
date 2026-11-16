@@ -36,8 +36,8 @@ def _block(block_id: str, unnumbered: Unnumbered, note_ids: Sequence[str]) -> Bl
     return Block(
         id=block_id,
         kind=unnumbered.kind,
-        level=None,
-        label=None,
+        level=unnumbered.level,
+        label=unnumbered.label,
         spans=_spans(unnumbered, note_ids),
         figure=None,
         origin=unnumbered.origin,

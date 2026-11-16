@@ -6,10 +6,11 @@ holds it (rule 5), or where section 6 puts side text (rule 6)."""
 
 import itertools
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
+from galley.model import BlockKind
 from galley.structure._lines import INDENT_MIN_PT, Piece, PlacedLine, hyphen_between
-from galley.structure._paragraphs import Entry, MarginNote, Paragraph
+from galley.structure._paragraphs import BodyBlock, Entry, MarginNote
 
 # Spec section 13, rule 2: a paragraph's first line whose top lies within
 # 0.5 pitch of the margin note's top is the line beside, before any other
@@ -85,7 +86,7 @@ def beside_lines(
     body = (
         BesideLine(line, number == 0, InParagraph(position, number))
         for position, entry in enumerate(entries)
-        if isinstance(entry, Paragraph) and position not in in_notes
+        if isinstance(entry, BodyBlock) and position not in in_notes
         for number, line in enumerate(entry.piece.lines)
     )
     notes = (
@@ -156,9 +157,15 @@ def split_beside_margin_notes(
         if beside is None or not isinstance(beside.holder, InParagraph):
             continue
         holder = beside.holder
-        if holder.number == 0:
+        held = entries[holder.entry]
+        # Only a paragraph is split; a heading, summary or verse stays whole.
+        if (
+            holder.number == 0
+            or not isinstance(held, BodyBlock)
+            or held.kind is not BlockKind.PARAGRAPH
+        ):
             continue
-        paragraph = entries[holder.entry].piece.lines
+        paragraph = held.piece.lines
         if _starts_beside(entry.piece, beside, paragraph[holder.number - 1]):
             starts.setdefault(holder.entry, set()).add(holder.number)
     split: list[Entry] = []
@@ -169,7 +176,7 @@ def split_beside_margin_notes(
             continue
         bounds = (0, *cuts, len(entry.piece.lines))
         split.extend(
-            Paragraph(Piece(entry.piece.lines[start:end]))
+            replace(entry, piece=Piece(entry.piece.lines[start:end]))
             for start, end in itertools.pairwise(bounds)
         )
     return tuple(split)

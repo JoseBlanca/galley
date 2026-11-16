@@ -2958,6 +2958,465 @@ def test_make_blocks_with_notes_with_1_worker_and_with_3_gives_the_same_value() 
     )
 
 
+# Headings (structure spec, section 14). The body line pitch is 15 pt: the
+# pages hold more lines 15 pt apart than any other distance.
+
+
+def _centred_line(text: str, top: float, width: float = 90.0) -> Line:
+    """A line `width` pt wide centred in the column from 50 to 300 pt."""
+    return _spread(text, 175 - width / 2, 175 + width / 2, top)
+
+
+def _around(*heading: Line, gap_after: float = 22.5) -> PageLayout:
+    """Page 0: three full lines from 70 pt, then the lines `heading`, then
+    five full lines from `gap_after` pt below the last of them."""
+    after = heading[-1].box.top + gap_after
+    return _body_page(
+        0,
+        *(_full(f"before {n} of the page", 70 + _PITCH_PT * n) for n in range(3)),
+        *heading,
+        *(_full(f"after {n} of the page", after + _PITCH_PT * n) for n in range(5)),
+    )
+
+
+def _kinds_and_texts(
+    blocks: BlocksFile,
+) -> tuple[tuple[str, int | None, str | None, str], ...]:
+    return tuple(
+        (block.kind.value, block.level, block.label, block_text(block))
+        for block in blocks.blocks
+    )
+
+
+_BEFORE = (
+    "paragraph",
+    None,
+    None,
+    "before 0 of the page before 1 of the page before 2 of the page",
+)
+_AFTER = (
+    "paragraph",
+    None,
+    None,
+    " ".join(f"after {n} of the page" for n in range(5)),
+)
+
+
+def test_heading_chapter_label_and_its_title_are_one_level_1_heading() -> None:
+    # "CHAPTER III." 2 pitches below the text, its title 1.5 pitches below it.
+    lines = _lines_of(
+        _around(
+            _centred_line("CHAPTER III.", 130), _centred_line("THE EARLY YEARS.", 152.5)
+        )
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _kinds_and_texts(blocks) == (
+        _BEFORE,
+        ("heading", 1, "CHAPTER III.", "THE EARLY YEARS."),
+        _AFTER,
+    )
+    assert blocks.blocks[1].origin == (Origin(0, Box(130, 130, 220, 162.5)),)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_heading_of_one_line_has_no_label() -> None:
+    blocks = make_blocks(
+        _lines_of(_around(_centred_line("INDEX", 130))), _NO_WORDS, workers=1
+    )
+    assert _kinds_and_texts(blocks)[1] == ("heading", 2, None, "INDEX")
+
+
+def test_heading_label_alone_has_no_label_and_is_level_1() -> None:
+    blocks = make_blocks(
+        _lines_of(_around(_centred_line("CHAPTER III.", 130))), _NO_WORDS, workers=1
+    )
+    assert _kinds_and_texts(blocks)[1] == ("heading", 1, None, "CHAPTER III.")
+
+
+@pytest.mark.parametrize(
+    ("gap_above", "heading"), [(37.5, True), (30.0, True), (29.5, False), (22.5, False)]
+)
+def test_heading_in_lower_case_needs_a_gap_above_of_2_pitches(
+    gap_above: float, heading: bool
+) -> None:
+    # The line before the title is at 100 pt; the title is 1.5 pitches above
+    # the text after it.
+    blocks = make_blocks(
+        _lines_of(_around(_centred_line("The Plan of the Survey.", 100 + gap_above))),
+        _NO_WORDS,
+        workers=1,
+    )
+    title = _kinds_and_texts(blocks)[1]
+    assert title == (
+        ("heading", 2, None, "The Plan of the Survey.")
+        if heading
+        else ("paragraph", None, None, "The Plan of the Survey.")
+    )
+
+
+@pytest.mark.parametrize(("gap_below", "heading"), [(19.5, True), (19.0, False)])
+def test_heading_in_lower_case_needs_a_gap_below_of_1_3_pitches(
+    gap_below: float, heading: bool
+) -> None:
+    blocks = make_blocks(
+        _lines_of(
+            _around(
+                _centred_line("The Plan of the Survey.", 137.5), gap_after=gap_below
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert (_kinds_and_texts(blocks)[1][0] == "heading") is heading
+
+
+@pytest.mark.parametrize(
+    ("text", "heading"),
+    [
+        ("§ 1. Plan of the Survey.", True),
+        ("§ 1. Plan of the Survey, pp. 9 — 26.", False),
+        ("(VIII)", False),
+        ("2»K O ) ? 4. )5", False),
+    ],
+)
+def test_heading_line_ending_with_a_number_or_without_a_long_word_is_none(
+    text: str, heading: bool
+) -> None:
+    blocks = make_blocks(
+        _lines_of(_around(_centred_line(text, 137.5, width=150))), _NO_WORDS, workers=1
+    )
+    assert (_kinds_and_texts(blocks)[1][0] == "heading") is heading
+
+
+def test_heading_none_on_a_page_of_contents_pages() -> None:
+    lines = _lines_of(
+        _around(
+            _centred_line("CHAPTER III.", 130), _centred_line("THE EARLY YEARS.", 152.5)
+        )
+    )
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    assert not any(block.kind is BlockKind.HEADING for block in blocks.blocks)
+    assert _texts(blocks.blocks)[1:3] == ("CHAPTER III.", "THE EARLY YEARS.")
+
+
+def test_heading_label_of_a_roman_numeral_joins_its_title() -> None:
+    # Haskins' "V", fewer than 4 letters, 0.9 pitch above its title.
+    blocks = make_blocks(
+        _lines_of(
+            _around(
+                _centred_line("V", 130, width=10),
+                _centred_line("NORMANDY AND FRANCE", 143.5),
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert _kinds_and_texts(blocks)[1] == ("heading", 1, "V", "NORMANDY AND FRANCE")
+
+
+def test_heading_roman_numeral_alone_is_no_heading() -> None:
+    blocks = make_blocks(
+        _lines_of(_around(_centred_line("V", 130, width=10))), _NO_WORDS, workers=1
+    )
+    assert _kinds_and_texts(blocks)[1] == ("paragraph", None, None, "V")
+
+
+@pytest.mark.parametrize(
+    ("title", "heading"),
+    [
+        ("L'EXPERIENCE ET L'ECHEC DE LA POLITIQUE MODEREE", True),
+        ("L'Experience et l'echec de la politique moderee", False),
+    ],
+)
+def test_heading_continuation_in_capitals_as_wide_as_the_column(
+    title: str, heading: bool
+) -> None:
+    # Mariéjol's title that fills the column, 2.2 pitches below "CHAPITRE V"
+    # and 2.2 above the text.
+    blocks = make_blocks(
+        _lines_of(
+            _around(_centred_line("CHAPITRE V", 130), _full(title, 163), gap_after=33)
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    after = " ".join(f"after {n} of the page" for n in range(5))
+    assert _kinds_and_texts(blocks)[1:] == (
+        (("heading", 1, "CHAPITRE V", title), _AFTER)
+        if heading
+        else (
+            ("heading", 1, None, "CHAPITRE V"),
+            ("paragraph", None, None, f"{title} {after}"),
+        )
+    )
+
+
+def test_heading_continuation_in_lower_case_centred() -> None:
+    # Stubbs' "John.", read in lower case, under "CHAPTER VII.".
+    blocks = make_blocks(
+        _lines_of(
+            _around(
+                _centred_line("CHAPTER VII.", 130), _centred_line("John.", 152.5, 30)
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert _kinds_and_texts(blocks)[1] == ("heading", 1, "CHAPTER VII.", "John.")
+
+
+@pytest.mark.parametrize(("distance", "one_block"), [(39.0, True), (39.5, False)])
+def test_heading_lines_are_one_block_within_2_6_pitches(
+    distance: float, one_block: bool
+) -> None:
+    blocks = make_blocks(
+        _lines_of(
+            _around(
+                _centred_line("THE NORMANS IN HISTORY", 130),
+                _centred_line("NORMANDY AND FRANCE", 130 + distance),
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    headings = tuple(
+        block_text(block) for block in blocks.blocks if block.kind is BlockKind.HEADING
+    )
+    assert headings == (
+        ("THE NORMANS IN HISTORY NORMANDY AND FRANCE",)
+        if one_block
+        else ("THE NORMANS IN HISTORY", "NORMANDY AND FRANCE")
+    )
+
+
+@pytest.mark.parametrize(("distance", "one_block"), [(60.0, True), (60.5, False)])
+def test_heading_title_joins_a_label_alone_within_4_pitches(
+    distance: float, one_block: bool
+) -> None:
+    # Domesday's "ESSAY I." 3.4 pitches above "DOMESDAY BOOK.".
+    blocks = make_blocks(
+        _lines_of(
+            _around(
+                _centred_line("ESSAY I.", 130),
+                _centred_line("DOMESDAY BOOK.", 130 + distance),
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    headings = tuple(
+        (block.label, block_text(block))
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING
+    )
+    assert headings == (
+        (("ESSAY I.", "DOMESDAY BOOK."),)
+        if one_block
+        else ((None, "ESSAY I."), (None, "DOMESDAY BOOK."))
+    )
+
+
+def test_heading_first_on_a_page_without_running_head_is_level_1() -> None:
+    # "PREFACE" first on its page; "I. The Evolution of Political Theory."
+    # lower in it, a numbered section, level 2.
+    page = _body_page(
+        0,
+        _centred_line("PREFACE", 70),
+        *(_full(f"first {n} of the page", 100 + _PITCH_PT * n) for n in range(5)),
+        _centred_line("I. The Evolution of Political Theory.", 205, width=200),
+        *(_full(f"second {n} of the page", 235 + _PITCH_PT * n) for n in range(5)),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert tuple(
+        (block.level, block_text(block))
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING
+    ) == ((1, "PREFACE"), (2, "I. The Evolution of Political Theory."))
+
+
+def _headed_page(index: int, *body: Region) -> PageLayout:
+    """A page whose head line is "THE BOOK" and its printed page number,
+    index + 15, above the regions `body`."""
+    head = _region(_line(f"THE BOOK {index + 15}", _BODY_LEFT_PT, 36))
+    return PageLayout(index, (head, *body), ())
+
+
+def _headed_pages(page_11: tuple[Region, ...]) -> LinesFile:
+    """Pages 10 to 15, each with a running head; page 11 holds the regions
+    `page_11`, every other five full lines."""
+    return _lines_of(
+        *(
+            _headed_page(index, *page_11)
+            if index == 11
+            else _headed_page(index, _region(*_five_full_lines(70, f"page{index}")))
+            for index in range(10, 16)
+        )
+    )
+
+
+def test_heading_first_on_a_page_with_a_running_head_is_level_2() -> None:
+    # Page 11's body starts with "PREFACE", centred in a region of its own.
+    blocks = make_blocks(
+        _headed_pages(
+            (
+                _region(_centred_line("PREFACE", 70)),
+                _region(*_five_full_lines(100, "page11")),
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert len(_removals_of(11, blocks)) == 2
+    assert tuple(
+        (block.level, block_text(block))
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING
+    ) == ((2, "PREFACE"),)
+
+
+@pytest.mark.parametrize(("body_lines", "heading"), [(0, True), (3, True), (4, False)])
+def test_heading_centred_over_a_band_on_a_page_of_fewer_than_5_body_lines(
+    body_lines: int, heading: bool
+) -> None:
+    # Haskins' page 129: "BIBLIOGRAPHICAL NOTE" in a region of its own above
+    # a band of small type, so that the body column is the heading itself.
+    # With 4 more short body lines at the left, the heading's region is
+    # measured against them, and the band is not looked at.
+    short_lines = tuple(
+        _spread(f"short {n} line", 50, 140, 85 + _PITCH_PT * n)
+        for n in range(body_lines)
+    )
+    band_top = 100 + _PITCH_PT * body_lines
+    band = _region(
+        *(
+            _spread(
+                f"small {n} of the band type", 50, 300, band_top + 9 * n, height=7.0
+            )
+            for n in range(6)
+        )
+    )
+    regions = (
+        _region(_centred_line("BIBLIOGRAPHICAL NOTE", 65, 120)),
+        *((_region(*short_lines),) if short_lines else ()),
+        band,
+    )
+    blocks = make_blocks(_headed_pages(regions), _NO_WORDS, workers=1)
+    assert any(r.reason is RemovalReason.RUNNING_HEAD for r in _removals_of(11, blocks))
+    assert len(blocks.notes) == 1
+    assert tuple(
+        block_text(block) for block in blocks.blocks if block.kind is BlockKind.HEADING
+    ) == (("BIBLIOGRAPHICAL NOTE",) if heading else ())
+
+
+@pytest.mark.parametrize(
+    ("text", "heading"),
+    [
+        ("ONE TWO", False),
+        ("ONE FOUR", True),
+        ("12345 ABCD", False),
+        ("1234 ABCD", True),
+    ],
+)
+def test_heading_needs_a_word_of_4_letters_and_half_its_characters_letters(
+    text: str, heading: bool
+) -> None:
+    blocks = make_blocks(
+        _lines_of(_around(_centred_line(text, 130))), _NO_WORDS, workers=1
+    )
+    assert (_kinds_and_texts(blocks)[1][0] == "heading") is heading
+
+
+@pytest.mark.parametrize(("centred", "heading"), [(True, True), (False, False)])
+def test_heading_label_joins_its_title_only_when_centred(
+    centred: bool, heading: bool
+) -> None:
+    label = _centred_line("V", 130, width=10) if centred else _spread("V", 50, 60, 130)
+    blocks = make_blocks(
+        _lines_of(_around(label, _centred_line("NORMANDY AND FRANCE", 143.5))),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert (_kinds_and_texts(blocks)[1][2] == "V") is heading
+
+
+def test_heading_starting_with_a_label_word_is_level_1_with_its_words() -> None:
+    # "PART THE FIRST" starts with a label word, mid-page: level 1, no label
+    # since it is one line.
+    blocks = make_blocks(
+        _lines_of(_around(_centred_line("PART THE FIRST", 130))), _NO_WORDS, workers=1
+    )
+    assert _kinds_and_texts(blocks)[1] == ("heading", 1, None, "PART THE FIRST")
+
+
+@pytest.mark.parametrize(
+    ("distance", "gap_after", "continued"),
+    [(39.0, 33.0, True), (39.5, 33.0, False), (33.0, 22.5, True), (33.0, 22.0, False)],
+)
+def test_heading_continuation_in_capitals_within_2_6_pitches_and_1_5_above_the_text(
+    distance: float, gap_after: float, continued: bool
+) -> None:
+    title = "L'EXPERIENCE ET L'ECHEC DE LA POLITIQUE MODEREE"
+    blocks = make_blocks(
+        _lines_of(
+            _around(
+                _centred_line("CHAPITRE V", 130),
+                _full(title, 130 + distance),
+                gap_after=gap_after,
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert (_kinds_and_texts(blocks)[1][3] == title) is continued
+
+
+@pytest.mark.parametrize(
+    ("title", "continued"),
+    [
+        ("L'EXPERIENCE ET L'ECHEC DE LA POLITIQUE MODEREe", True),
+        ("L'EXPERIENCE ET L'ECHEC DE LA POLITIQUE Moderee", False),
+    ],
+)
+def test_heading_continuation_has_0_9_of_its_letters_in_capitals(
+    title: str, continued: bool
+) -> None:
+    # 37 of 38 letters upper case, 0.97, against 33 of 38, 0.87.
+    blocks = make_blocks(
+        _lines_of(
+            _around(_centred_line("CHAPITRE V", 130), _full(title, 163), gap_after=33)
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert (_kinds_and_texts(blocks)[1][3] == title) is continued
+
+
+def test_reference_in_a_heading_is_linked() -> None:
+    # Kadesh's title, "STRATEGY*", linked to the note the band starts with "*".
+    page = PageLayout(
+        0,
+        (
+            _region(
+                *(
+                    _full(f"before {n} of the page", 70 + _PITCH_PT * n)
+                    for n in range(3)
+                ),
+                _centred_line("A MILITARY STRATEGY*", 130, width=140),
+                *(
+                    _full(f"after {n} of the page", 152.5 + _PITCH_PT * n)
+                    for n in range(5)
+                ),
+            ),
+            _region(_note_line("* Paper read at Hamburg.", 300, 62, 200)),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    heading = blocks.blocks[1]
+    assert heading.kind is BlockKind.HEADING
+    assert [span.note_ref for span in heading.spans] == [None, blocks.notes[0].id]
+
+
 # The fidelity check at the structure boundary
 
 
@@ -3194,7 +3653,7 @@ def test_whole_book_gierke_endnote_section_runs_from_186_to_282(
 ) -> None:
     # Structure spec, section 12: 299 endnotes on pages 186 to 282, the
     # library card of page 288 (excluded) not among them, and "NOTES."
-    # a block of the body (a heading once work package 4 finds headings).
+    # a heading of the body (section 14).
     endnotes = tuple(
         note for note in gierke_blocks.notes if note.kind is NoteKind.ENDNOTE
     )
@@ -3203,7 +3662,9 @@ def test_whole_book_gierke_endnote_section_runs_from_186_to_282(
     assert (min(pages), max(pages)) == (186, 282)
     assert endnotes[0].marker == "1."
     assert any(
-        block_text(block) == "NOTES." and block.origin[0].page_index == 186
+        block_text(block) == "NOTES."
+        and block.kind is BlockKind.HEADING
+        and block.origin[0].page_index == 186
         for block in gierke_blocks.blocks
     )
 

@@ -95,4 +95,13 @@ def take_body_notes(
     start = note_lines_start(page.body, band_notes, form, body_word_height)
     if start is None:
         return page
-    return replace(page, body=page.body[:start], body_notes=page.body[start:])
+    return replace(
+        page,
+        body=page.body[:start],
+        runs=tuple(
+            replace(run, end=min(run.end, start))
+            for run in page.runs
+            if run.start < start
+        ),
+        body_notes=page.body[start:],
+    )

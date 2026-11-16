@@ -13,6 +13,7 @@ from galley.book_folder import BookFolder
 from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage, read_markdown
 from galley.model import (
+    Block,
     BlockKind,
     BlocksFile,
     LinesFile,
@@ -152,6 +153,16 @@ def _pages(origin: tuple[Origin, ...]) -> list[int]:
     return [part.page_index for part in origin]
 
 
+def _block_fields(block: Block) -> dict[str, Any]:
+    """A block's kind and text, and a heading's level and label."""
+    heading = (
+        {"level": block.level, "label": block.label}
+        if block.kind is BlockKind.HEADING
+        else {}
+    )
+    return {"kind": block.kind.value, "text": block_text(block)} | heading
+
+
 def _blocks_and_notes_on(blocks: BlocksFile, pages: tuple[int, ...]) -> dict[str, Any]:
     """The blocks and notes with lines on every page of `pages`, in order."""
 
@@ -160,21 +171,14 @@ def _blocks_and_notes_on(blocks: BlocksFile, pages: tuple[int, ...]) -> dict[str
 
     return {
         "blocks": [
-            {
-                "kind": block.kind.value,
-                "text": block_text(block),
-                "pages": _pages(block.origin),
-            }
+            _block_fields(block) | {"pages": _pages(block.origin)}
             for block in blocks.blocks
             if on_pages(block.origin)
         ],
         "notes": [
             {
                 "marker": note.marker,
-                "blocks": [
-                    {"kind": block.kind.value, "text": block_text(block)}
-                    for block in note.blocks
-                ],
+                "blocks": [_block_fields(block) for block in note.blocks],
                 "pages": _pages(note.origin),
             }
             for note in blocks.notes
@@ -531,4 +535,102 @@ def test_margin_note_beside_the_middle_stubbs_58_goes_before_its_paragraph(
     assert _margin_notes_before(blocks, 2) == (
         ("Characterof Henry II.", "Henry II. was", [2, 3]),
         ("Hisfamily policy.", "Henry II. was", [2, 3]),
+    )
+
+
+# Headings (structure spec, section 14), on the reference pages of section 9,
+# "The second plan": each heading block that starts on the page, with its
+# level, label and text.
+
+_HEADINGS_ON_REFERENCE_PAGES = (
+    ("haskins_eval", 0, ((1, "V", "NORMANDY AND FRANCE"),)),
+    ("haskins_eval", 9, ((1, None, "INDEX"),)),
+    ("stubbs_51_56-64", 0, ((1, "CHAPTER III.", "THE EARLY YEARS OF HENRY II."),)),
+    # A printed contents page, named in contents_pages.
+    ("stubbs_summaries_index", 0, ()),
+    # "John." in lower case, a continuation.
+    ("stubbs_summaries_index", 3, ((1, "CHAPTER VII.", "John."),)),
+    ("domesday_headings_quotes", 0, ()),
+    # The label 3.4 pitches above its title.
+    ("domesday_headings_quotes", 1, ((1, "ESSAY I.", "DOMESDAY BOOK."),)),
+    ("domesday_headings_quotes", 2, ((2, None, "§ 1 . Plan of the Survey."),)),
+    # A table's title in capitals: a known false heading.
+    ("domesday_headings_quotes", 5, ((2, None, "ARMINGFORD HUNDRED."),)),
+    (
+        "mariejol_headings_verse",
+        0,
+        ((1, "CHAPITRE PREMIER", "LA JEUNESSE DE CATHERINE DE MÉDICIS"),),
+    ),
+    # A title that fills the column, a continuation.
+    (
+        "mariejol_headings_verse",
+        3,
+        ((1, "CHAPITRE V", "L'EXPÉRIENCE ET L'ÉCHEC DE LA POLITIQUE MODÉRÉE"),),
+    ),
+    (
+        "mariejol_headings_verse",
+        5,
+        (
+            (
+                1,
+                None,
+                "APPENDICE LES DROITS DE CATHERINE SUR LA SUCCESSION DES MÉDICIS",
+            ),
+        ),
+    ),
+    (
+        "kadesh_8-17",
+        0,
+        (
+            (
+                1,
+                None,
+                (
+                    "THE BATTLE OF KADESH A STUDY IN THE EARLIEST KNOWN MILITARY "
+                    "STRATEGY* JAMES HENRY BREASTED"
+                ),
+            ),
+        ),
+    ),
+    (
+        "gierke_86-93_270-271",
+        0,
+        (
+            (1, None, "POLITICAL THEORIES OF THE MIDDLE AGE."),
+            (2, None, "I. The Evolution of Political Theory."),
+        ),
+    ),
+    # The running head the excerpt does not remove: a known false heading.
+    (
+        "gierke_86-93_270-271",
+        6,
+        (
+            (1, None, "Macrocosm and Microcosm."),
+            (2, None, "II. Macrocosm and Microcosm."),
+        ),
+    ),
+    ("haskins_quotes_index", 0, ((2, None, "BIBLIOGRAPHICAL NOTE"),)),
+    ("haskins_quotes_index", 5, ((2, None, "BIBLIOGRAPHICAL NOTE"),)),
+)
+
+
+@pytest.mark.parametrize(
+    ("excerpt", "page", "headings"),
+    _HEADINGS_ON_REFERENCE_PAGES,
+    ids=[f"{excerpt}-{page}" for excerpt, page, _ in _HEADINGS_ON_REFERENCE_PAGES],
+)
+def test_heading_blocks_of_the_reference_pages(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+    excerpt: str,
+    page: int,
+    headings: tuple[tuple[int, str | None, str], ...],
+) -> None:
+    _, blocks = excerpt_outputs[excerpt]
+    assert (
+        tuple(
+            (block.level, block.label, block_text(block))
+            for block in blocks.blocks
+            if block.kind is BlockKind.HEADING and block.origin[0].page_index == page
+        )
+        == headings
     )
