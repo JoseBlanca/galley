@@ -68,7 +68,11 @@ def make_blocks(
     survey = survey_book(lines, workers=workers)
     pages = map_pages(lambda page: page_parts(page, survey), lines.pages, workers)
     assembled = assemble(
-        pages, survey.book_words, lower_case_words, survey.body_word_height
+        pages,
+        survey.book_words,
+        lower_case_words,
+        survey.body_word_height,
+        survey.body_line_pitch,
     )
     return BlocksFile(
         source_pdf_sha256=lines.source_pdf_sha256,

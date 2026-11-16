@@ -25,7 +25,8 @@ from galley.model import (
 from galley.structure._body_notes import take_body_notes
 from galley.structure._endnotes import EndnoteGroup, endnote_groups, endnote_section
 from galley.structure._hyphens import PageLine, join_lines
-from galley.structure._lines import Piece, first_word
+from galley.structure._lines import Piece, PlacedLine, first_word
+from galley.structure._margins import BesideLine, line_beside
 from galley.structure._markers import (
     MarkerForm,
     NoteMarker,
@@ -422,10 +423,11 @@ def _merged_origin(blocks: Sequence[_Unnumbered]) -> tuple[Origin, ...]:
 @dataclass(frozen=True, slots=True)
 class _Note:
     """A note before it has its id, with its value (spec section 11, "Its
-    value"; section 12)."""
+    value"; section 12) and the lines of each of its blocks."""
 
     note: _UnnumberedNote
     value: int | None
+    block_lines: tuple[tuple[PlacedLine, ...], ...]
 
 
 def _in_order(
@@ -477,11 +479,94 @@ def _section_pages(entries: Sequence[Entry]) -> range:
     return range(section.first_page, last + 1)
 
 
+def _beside_lines(
+    entries: Sequence[Entry], in_section: frozenset[int], notes: Sequence[_Note]
+) -> dict[int, list[BesideLine]]:
+    """The lines a margin note may stand beside, by page index: those of
+    the body's paragraphs and of every note's blocks."""
+    by_page: dict[int, list[BesideLine]] = {}
+
+    def add(lines: Sequence[PlacedLine], note_block: tuple[int, int] | None) -> None:
+        for number, line in enumerate(lines):
+            by_page.setdefault(line.page_index, []).append(
+                BesideLine(line, number == 0, note_block)
+            )
+
+    for position, entry in enumerate(entries):
+        if isinstance(entry, Paragraph) and position not in in_section:
+            add(entry.piece.lines, None)
+    for note_position, note in enumerate(notes):
+        for block_position, lines in enumerate(note.block_lines):
+            add(lines, (note_position, block_position))
+    return by_page
+
+
+def _margin_notes_in_notes(
+    entries: Sequence[Entry],
+    in_section: frozenset[int],
+    notes: Sequence[_Note],
+    pitch: float,
+) -> dict[int, tuple[int, int]]:
+    """For each margin note beside a line of a note (spec section 13, rule
+    5), by its position among the entries: the note's position and that of
+    the note's block that holds the line."""
+    by_page = _beside_lines(entries, in_section, notes)
+    placed: dict[int, tuple[int, int]] = {}
+    for position, entry in enumerate(entries):
+        if not isinstance(entry, MarginNote):
+            continue
+        first = entry.piece.lines[0]
+        beside = line_beside(
+            first.line.box.top, by_page.get(first.page_index, ()), pitch
+        )
+        if beside is not None and beside.note_block is not None:
+            placed[position] = beside.note_block
+    return placed
+
+
+def _with_margin_notes_inside(
+    body: tuple[_Unnumbered, ...],
+    notes: tuple[_UnnumberedNote, ...],
+    kept_positions: Sequence[int],
+    placed: dict[int, tuple[int, int]],
+) -> tuple[tuple[_Unnumbered, ...], tuple[_UnnumberedNote, ...]]:
+    """The body without the margin notes of `placed`, and the notes with
+    each of them as a block before the block it is beside, after those
+    already placed there. `kept_positions` gives the entry position of
+    each block of `body`."""
+    before_block: dict[tuple[int, int], list[_Unnumbered]] = {}
+    for block, entry_position in zip(body, kept_positions, strict=True):
+        if entry_position in placed:
+            before_block.setdefault(placed[entry_position], []).append(block)
+    return (
+        tuple(
+            block
+            for block, entry_position in zip(body, kept_positions, strict=True)
+            if entry_position not in placed
+        ),
+        tuple(
+            replace(
+                note,
+                blocks=tuple(
+                    block
+                    for number, note_block in enumerate(note.blocks)
+                    for block in (
+                        *before_block.get((note_position, number), ()),
+                        note_block,
+                    )
+                ),
+            )
+            for note_position, note in enumerate(notes)
+        ),
+    )
+
+
 def assemble(
     parts: Sequence[PageParts],
     book_words: frozenset[str],
     word_list: frozenset[str],
     body_word_height: float,
+    body_line_pitch: float,
 ) -> Assembled:
     """The work after the per-page parts (spec section 2, steps 2.5 and 3),
     in page order: the notes left at the foot of each page's body taken
@@ -501,7 +586,11 @@ def assemble(
     groups = endnote_groups(entries, section) if section is not None else ()
     in_section = frozenset(section.paragraphs if section is not None else ())
     endnotes = tuple(
-        _Note(_endnote(group, body), group.marker.value if group.marker else None)
+        _Note(
+            _endnote(group, body),
+            group.marker.value if group.marker else None,
+            tuple(entries[position].piece.lines for position in group.paragraphs),
+        )
         for group in groups
     )
     book_footnotes = footnotes(
@@ -511,7 +600,11 @@ def assemble(
     notes = _in_order(
         endnotes,
         tuple(
-            _Note(_footnote(footnote, book_words, word_list), footnote.value)
+            _Note(
+                _footnote(footnote, book_words, word_list),
+                footnote.value,
+                (footnote.lines,),
+            )
             for footnote in book_footnotes
         ),
     )
@@ -547,6 +640,13 @@ def assemble(
     )
     linked_body, linked_notes = _linked(
         kept, tuple(note.note for note in notes), footnote_links + endnote_links
+    )
+    placed = _margin_notes_in_notes(entries, in_section, notes, body_line_pitch)
+    kept_positions = tuple(
+        position for position in range(len(entries)) if position not in in_section
+    )
+    linked_body, linked_notes = _with_margin_notes_inside(
+        linked_body, linked_notes, kept_positions, placed
     )
     blocks, numbered_notes = _numbered(linked_body, linked_notes)
     return Assembled(

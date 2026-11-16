@@ -60,6 +60,9 @@ from galley.structure import (
     reference_candidate,
     survey_book,
 )
+from galley.structure._lines import PlacedLine
+from galley.structure._margins import BesideLine, line_beside
+from galley.structure._measures import Edges
 from galley.structure._references import align
 
 
@@ -2246,6 +2249,79 @@ def test_endnote_is_linked_to_a_glued_number_of_the_body_before_it() -> None:
         True,
     )
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def _with_margin(lines: LinesFile, page: int, *margins: Line) -> LinesFile:
+    """`lines` with a margin region of each of `margins` on page `page`."""
+    pages = tuple(
+        replace(
+            layout,
+            regions=(*layout.regions, *(_region(margin) for margin in margins)),
+        )
+        if layout.index == page
+        else layout
+        for layout in lines.pages
+    )
+    return _lines_of(*pages)
+
+
+def test_margin_note_inside_an_endnote_beside_its_line_before_its_text() -> None:
+    # Endnote 292's first line is at 160 pt; the margin note's top is 4 pt
+    # lower (structure spec, section 13, rules 2 and 5).
+    lines = _with_margin(
+        _endnote_pages(291, 12), 1, _spread("Natural Law.", 310, 340, 164)
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    note = next(note for note in blocks.notes if note.marker == "292.")
+    assert tuple((block.kind, block_text(block)) for block in note.blocks) == (
+        (BlockKind.MARGIN_NOTE, "Natural Law."),
+        (BlockKind.PARAGRAPH, "The note 292 which goes on over a full line ends."),
+    )
+    assert all(block.kind is not BlockKind.MARGIN_NOTE for block in blocks.blocks)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_margin_note_inside_a_footnote_beside_its_line() -> None:
+    page = _page_with_band(
+        0,
+        _note_line("1 The first note.", 300, 62, 160),
+        _note_line("2 The second note runs", 300 + _NOTE_PITCH_PT, 62),
+        _note_line("on here.", 300 + 2 * _NOTE_PITCH_PT, 50, 120),
+    )
+    lines = _with_margin(_lines_of(page), 0, _spread("Aside", 310, 340, 309))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert tuple(
+        tuple(block.kind for block in note.blocks) for note in blocks.notes
+    ) == ((BlockKind.PARAGRAPH,), (BlockKind.MARGIN_NOTE, BlockKind.PARAGRAPH))
+
+
+def test_margin_note_beside_a_body_line_stays_in_the_body() -> None:
+    page = _page_with_band(0, _note_line("1 A note.", 300, 62, 160))
+    lines = _with_margin(_lines_of(page), 0, _spread("Aside", 310, 340, 85))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert tuple(block.kind for block in blocks.blocks) == (
+        BlockKind.PARAGRAPH,
+        BlockKind.MARGIN_NOTE,
+    )
+    assert tuple(block.kind for block in blocks.notes[0].blocks) == (
+        BlockKind.PARAGRAPH,
+    )
+
+
+def _beside(top: float, *, first: bool) -> BesideLine:
+    line = _spread("a line", 50, 300, top)
+    edges = Edges(50, 300)
+    return BesideLine(PlacedLine(0, line, edges, edges), first, None)
+
+
+def test_beside_a_paragraph_s_first_line_within_half_a_pitch_before_a_nearer_one() -> (
+    None
+):
+    # The margin note's top is 100: the middle line at 101 is nearer, but a
+    # first line at 107 is within 0.5 of a 15 pt pitch.
+    lines = (_beside(101, first=False), _beside(107, first=True))
+    assert line_beside(100, lines, 15.0) == lines[1]
+    assert line_beside(100, (lines[0], _beside(108, first=True)), 15.0) == lines[0]
 
 
 def test_make_blocks_with_notes_with_1_worker_and_with_3_gives_the_same_value() -> None:

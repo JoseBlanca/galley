@@ -426,3 +426,20 @@ def test_endnote_gierke_270_and_271_give_endnotes_291_to_302(
         for block in blocks.blocks
         if block.kind is BlockKind.PARAGRAPH
     )
+
+
+def test_endnote_gierke_270_margin_notes_go_inside_their_endnotes(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # Each margin note beside an endnote's line is a block of that note,
+    # before its text (structure spec, section 13, rule 5).
+    _, blocks = excerpt_outputs["gierke_86-93_270-271"]
+    assert not any(
+        block.kind is BlockKind.MARGIN_NOTE and _pages(block.origin)[0] in (8, 9)
+        for block in blocks.blocks
+    )
+    note_292 = next(note for note in blocks.notes if note.marker == "292.")
+    assert tuple(block.kind for block in note_292.blocks) == (
+        BlockKind.MARGIN_NOTE,
+        BlockKind.PARAGRAPH,
+    )

@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed by task 2.4 (structure spec section 12): the page is the first of the endnote section, so no paragraph of book page 93 runs on into it; its paragraphs are endnotes, the first, the end of note 290 with the head line \"Notes. 185\" that the excerpt keeps, an endnote without a marker, then 291. to 294., each its marker taken out of its text into `marker`, unreferenced; the margin notes stay blocks after the last block of the page until task 2.5.",
+  "changed": "Changed by task 2.4 (structure spec section 12): the page is the first of the endnote section, so no paragraph of book page 93 runs on into it; its paragraphs are endnotes, the first, the end of note 290 with the head line \"Notes. 185\" that the excerpt keeps, an endnote without a marker, then 291. to 294., each its marker taken out of its text into `marker`, unreferenced; the margin notes stay blocks after the last block of the page until task 2.5. Changed by task 2.5 (structure spec section 13, rules 2 and 5): each margin note is inside the endnote beside whose line it stands, before its text: \"Tribunals… liberate!?.\" in 292, \"Natural\" and \"the level £tJJ*\" in 293, \"Coercive\" and \"Force of\" in 294; none is left among the page's blocks.",
   "excerpt_only": "What the excerpt gives, not what the whole book gives: the head line \"Notes. 185\" stays, because the running-head rule compares it with other \"Notes.\" heads or with the offset of other page numbers, and the excerpt has neither; it is therefore the first words of the endnote that ends note 290 (until task 2.4 it was joined, with the lines below it, to the last paragraph of book page 93, which the excerpt puts before 270). On the whole book \"Notes.\" and \"185\" are removed (the whole_book test of tests/test_structure.py).",
   "excerpt": "gierke_86-93_270-271",
   "page": 8,
@@ -75,43 +75,7 @@
       "Force of"
     ]
   ],
-  "blocks": [
-    {
-      "kind": "margin_note",
-      "text": "Tribunals «£** P ve Acts of the jj^J^jjJJ liberate!?.",
-      "pages": [
-        8
-      ]
-    },
-    {
-      "kind": "margin_note",
-      "text": "Natural",
-      "pages": [
-        8
-      ]
-    },
-    {
-      "kind": "margin_note",
-      "text": "the level £tJJ*",
-      "pages": [
-        8
-      ]
-    },
-    {
-      "kind": "margin_note",
-      "text": "Coercive",
-      "pages": [
-        8
-      ]
-    },
-    {
-      "kind": "margin_note",
-      "text": "Force of",
-      "pages": [
-        8
-      ]
-    }
-  ],
+  "blocks": [],
   "notes": [
     {
       "marker": "",
@@ -141,6 +105,10 @@
       "marker": "292.",
       "blocks": [
         {
+          "kind": "margin_note",
+          "text": "Tribunals «£** P ve Acts of the jj^J^jjJJ liberate!?."
+        },
+        {
           "kind": "paragraph",
           "text": "This is the core of the doctrine that the lack of a iusta causa for any invasion of vested rights by the Sovereign can be supplied by the deliberateness (ex certa scientia) with which he exercises his plenitudo potestatis : deliberateness which can be mani- Tested by such a clause as ' l ege non obstante.' This doctrJne, which first appears in a rough form in Durantis, Speculum, i. tit. interd. leg. et sedi Apost. reserv. nr. 89 (cf. G. Meyer, op. cit. p. 101), is attacked by the jurists cited in our Note 273 (though Jason in Cons. n. c. 233, c. 236, n. 12 — 13 and iv. c. 107, nr. 4, makes large concessions) and is defended, though to a varying degree, by the jurists mentioned in our Note 274. See in particular Alber. Rose. 1. c. where practically all d ifference between Positive and Natural Right disappears and the same formal omnipotence is claimed both for rescripts and for acts of legislation. Baldus, 1. c. ; Felin. Sand. 1. c. nr. 60 — 66 (despite nr. 45 — 52); Riminald. Cons. i. c. 73; Capra, Reg. 10, nr. 48 — 52, 56 — 59; Decius, c. 7, X. i, 2, nr. 27 — 28, Cons. 198, nr. 7, 269, nr. 4 — 5, 271, nr. 3, 640, nr. 6 — 7, and esp. 588, nr. i — 14; also Aen. Sylv. c. 16 — 17. — The rejection of the right of active resistance is a logical consequence; see above, Note 127."
         }
@@ -153,6 +121,14 @@
       "marker": "293.",
       "blocks": [
         {
+          "kind": "margin_note",
+          "text": "Natural"
+        },
+        {
+          "kind": "margin_note",
+          "text": "the level £tJJ*"
+        },
+        {
           "kind": "paragraph",
           "text": "This is made externally visible by the treatment as two different subjects of (i) the ' l ex naturalis et divina,' which is binding on rulers as on others, but like all other 'leges' is concerned with 'actus exteriores,' and (2) that Instruction for the Virtuous Prince, in the development of which medieval publicists expend much of their pains."
         }
@@ -164,6 +140,14 @@
     {
       "marker": "294.",
       "blocks": [
+        {
+          "kind": "margin_note",
+          "text": "Coercive"
+        },
+        {
+          "kind": "margin_note",
+          "text": "Force of"
+        },
         {
           "kind": "paragraph",
           "text": "Already John of Salisbury, iv. c. i, 2 and 4, speaks of a 'lex iustitiae,' to which the Ruler remains subject, since the 'aequitas et iustitia,' of which the 'lex' is the 'interpres,' should govern his will. Then in Aquinas there comes to the front the formula that the Prince, in so far as the rules of law have no ' v is coactiva ' a gainst him, is still bound by them. * q uantum ad vim directivam ' ; comp. Sum. Theol. n. i, q. 96, a. 5, also q. 93, a. 3. With Thomas himself it is only the ' l ex humana ' which is reduced to the exercise of a merely directive force over the Prince ; i n this province unrighteous laws (e.g. those which proceed * u ltra sibi commissam potestatem,' which impose unjust taxes and unjust divisions of burdens, or which are 'contra commune bonum') have formally the force of laws, though they are not binding ' i n foro conscientiae ' : comp. ib. q. 90, a. 2, and q. 96, a. i — 4. Similarly Joh. Friburg. c. n. t. 5, q. 204. On the other hand, those who unconditionally maintain the formal sovereignty of the legislator and in so doing refuse even to Natural Law any ' c oactive force ' a gainst him, are unanimous in allowing to it at least a ' d irective force.' See also Ptol. Luc. De reg. princ. TV. c. i. Ockham, Dial. in. tr. 2, 1. 2, c. 28. Gerson, iv. p. 593 ff. esp. 601."
