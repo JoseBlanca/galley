@@ -453,7 +453,7 @@ Whole books (the stage's own counts; the tool's scores come in 7.5):
 |---|---|---|---|
 | Haskins | 18 of 18 | 29 | 2 |
 | Stubbs | 25 of 26 | 66 | 0 |
-| Domesday | 22 of 23 (and 5 false: 4 table titles, 1 imprint) | 61 | 17 |
+| Domesday | 22 of 23 (and 4 false on the body range: table titles on pages 28, 42, 156, 470; the imprint on page 553 is a fifth, outside it) | 61 | 17 |
 | Mariéjol | 26 of 26 | 11 | 13 |
 | Kadesh | – | 23 | 0 |
 | Gierke | – | 22 | 2 |
@@ -474,3 +474,40 @@ the orchestrator).
 Checks at 59eee02: pytest 1581 passed in 27.8 s; with 8 threads in 49.9
 s; `-m whole_book` 30 passed in 242 s. Four reference pages changed
 (Haskins 131 and 266, Kadesh 8, Stubbs 51).
+
+## Review of task 3.2, work package 4 and task 7.4 (24d7d0f..977b2ed)
+
+Four reviewers. The evaluation run at 977b2ed meets every heading, note
+and margin-note target of structure §9: headings on the body range 18
+of 18, 25 of 26, 22 of 23, 26 of 26; notes with the right reference
+Haskins 59, Domesday 1,262 (target 1,250), Mariéjol 457; margin notes
+Stubbs 241, Domesday 501. The fidelity reviewer found no word lost,
+doubled or reordered in the six books, comparing the text order of
+every block against the commit before. What mattered, all taken:
+
+- **Margin notes of several pieces invented words**: a hyphen was
+  joined across the gap between two pieces of one note, where a line
+  went unread: 11 joins on Domesday and Gierke, 10 wrong ("peathe",
+  "Persona", "Guardianvacant"), three recorded as certain. Decided: no
+  join across the pieces of a note.
+- **A real footnote became a bibliography paragraph** (Haskins page
+  204, so "Adams,^" lost its pop-up). Decided: on the heading's page, a
+  band block starting with the book's marker stays a note.
+- **Verse started after a hyphenated line** (Mariéjol page 212, a false
+  verse block of prose).
+- **Notes lost between blocks and markdown in the scores**: Mariéjol's
+  notes found as notes drop from 1,157 at blocks to 1,040 at markdown,
+  Domesday's margin notes from 519 to 501, though the fidelity check
+  passes. It predates this range; the cause is being found before 7.5.
+- **Tests**: 15 of 76 mutants survived; five change real output or
+  evaluation results (a 4-letter roman label "VIII" losing its label on
+  Haskins page 233; the endnote-far cause; the summary rule). Each gets
+  a test.
+- **Conventions**: a list of notes built in two orders, so an index
+  named different notes; `label` naming both an enum and a text; the
+  tool copying two of markdown's rules with no test tying them.
+- **Report corrections**: the 240 of 263 above, and Domesday's false
+  headings on the body range are 4, not 5.
+
+Fixes run in two worktrees: structure (`fix3-s`) and the evaluation
+tool with the markdown investigation (`fix3-e`).
