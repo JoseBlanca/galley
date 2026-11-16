@@ -601,6 +601,18 @@ lists the words, with the pages they came from where the origins say.
   `marker` is written there and counted, referenced or not (section 9).
   A heading's `label` is written in `book.md`, in the form the markdown
   spec gives, and counted as words of its block.
+- A figure's image is the one place `book.md` holds an image. Pandoc
+  reads a figure block with a caption as a `Figure` element whose
+  caption holds the caption's words and whose body is one `Image`, and
+  copies the caption into the image's alt text (Pandoc 3.14, checked on
+  16 November 2026); without a caption, as a paragraph that holds only
+  an `Image` with no alt text. The check counts the caption's words
+  once, as words of the figure's block, and reads the alt text only to
+  require that it is the caption, word for word, or empty without one;
+  the image's title and attributes must be empty. Any other `Image` or
+  `Figure`, an image inside a sentence, an alt text of its own, is an
+  element galley's Markdown does not make, and an error, so that no word
+  hides where the check does not count it.
 - extract is where the words enter galley, so it has no boundary to check:
   its excerpt tests compare its words with literals.
 - The check stops at `book.md`: turning it into an EPUB is Pandoc's work,
