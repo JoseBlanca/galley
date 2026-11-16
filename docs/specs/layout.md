@@ -185,9 +185,13 @@ applied to all the page's words):
   pages, made of the words that step 2 leaves in the column, take each
   row's **inset**, the distance from the column's left edge to the row's
   left side (on the right, from the row's right side to the column's
-  right edge), to 0.1 pt. Every inset between 30 and 100 pt is tried as
-  the peak, and the peak is the one with the most rows whose inset lies
-  within 2 pt of it, the smaller on a tie. The book has cut-in notes on
+  right edge), to 0.1 pt. Each inset that a row has, between 30 and 100
+  pt, is tried as the peak, and the peak is the one with the most rows
+  whose inset lies within 2 pt of it, the smaller on a tie. Only the rows'
+  own insets are tried, not every 0.1 pt of the range: tried at every 0.1
+  pt, the peak of the excerpt `stubbs_51_56-64` on the right moves to 58.1
+  pt with 15 rows, and the excerpt `mariejol_headings_verse` gets a left
+  inset of 71.5 pt (14 rows at it, 1 beside), where it has none. The book has cut-in notes on
   that side when those rows are at least 10, and at least 4 times as
   many as the rows whose inset is 6 to 12 pt smaller than the peak's,
   and 4 times as many as those 6 to 12 pt larger; otherwise it has no
