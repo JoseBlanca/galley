@@ -289,8 +289,12 @@ exceptions below the top of the program.
      Excluded from the default run; run with `uv run pytest -m whole_book`
      at the end of a work package, not after every change.
 - Speed is part of the test's design. `uv run pytest` (tiers 1 and 2)
-  stays under 30 seconds in total, and pytest prints the five slowest
-  tests on every run (`--durations=5`). A unit test that reads a PDF, or
+  stays around a minute at most (the owner, 16 November 2026: a minute
+  is not a problem; a run that grows past it is cut down), and pytest
+  prints the five slowest tests on every run (`--durations=5`). While a
+  task is under way, running only the tests of the module being changed
+  is fine; the whole run, with 8 threads, comes before each commit. A
+  unit test that reads a PDF, or
   an excerpt test that needs more pages, is in the wrong tier: cut a
   smaller fixture or a new excerpt. A fixture is never a copyrighted text;
   excerpts come only from the public-domain books of
