@@ -220,8 +220,7 @@ has a `format_version` int: 2 for `blocks.json`, 1 for the others.
 `blocks.json` went to 2 with the second plan of structure (16 November
 2026), which added `Note.kind` and the block kinds `verse` and
 `chapter_summary`; reading a file of version 1 is the error below, and
-the owner reruns structure. (`tests/test_model.py` uses 2 as its example of an
-unsupported version; the plan of the second structure plan changes it.) Each has one pair of functions
+the owner reruns structure. Each has one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
 Reading a file whose `format_version` is not the current one is an error
