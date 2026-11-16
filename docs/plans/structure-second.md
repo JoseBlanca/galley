@@ -200,7 +200,7 @@ their own scope, and the report says so. The plates without a text
 layer stay in `exclude_pages` until task 6.1, because analyze refuses
 them until then.
 
-- [ ] 1.1 The format changes in `model.py`, the config keys in
+- [x] 1.1 The format changes in `model.py`, the config keys in
   `config.py` and analyze's check of their page indices, and the
   fidelity changes in `fidelity.py`, with their tests. Spec:
   architecture §6, §8 and §13; structure §7. Deliverables 1 to 3. A
