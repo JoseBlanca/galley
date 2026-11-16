@@ -26,15 +26,19 @@ from galley.model import (
     write_blocks,
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
+from galley.structure._assemble import assemble
 from galley.structure._hyphens import HyphenJoin, join_hyphen
-from galley.structure._paragraphs import assemble, page_parts
+from galley.structure._markers import NoteMarker, note_marker
+from galley.structure._paragraphs import page_parts
 from galley.structure._survey import BookSurvey, survey_book
 
 __all__ = [
     "BookSurvey",
     "HyphenJoin",
+    "NoteMarker",
     "join_hyphen",
     "make_blocks",
+    "note_marker",
     "run",
     "survey_book",
 ]

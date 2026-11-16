@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed since that check by task 2.5: on book page 75 \"land.\" leaves the body line for the margin note \"Free land.\", so the last paragraph of page 74 ends at \"privilege.\" on 75. Checked against the page image by the orchestrator on 15 November 2026.",
+  "changed": "Changed since that check by task 2.5: on book page 75 \"land.\" leaves the body line for the margin note \"Free land.\", so the last paragraph of page 74 ends at \"privilege.\" on 75. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"Where a note starts\" and \"The marker of a note\"): each note's marker is taken out of its text into `marker`; the first band line holds two notes, \"1\" and \"3\" (note 2 misread), cut at the second marker; note 6's marker \"«\" is taken as a one-character marker of an indented note.",
   "excerpt": "domesday_74-83",
   "page": 0,
   "book_page_index": 74,
@@ -97,11 +97,11 @@
   ],
   "notes": [
     {
-      "marker": "",
+      "marker": "1",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "1 D. B. i. 35 b, Tornecrosta. 3 D. B. i. 212 b, Stanford."
+          "text": "D. B. i. 35 b, Tornecrosta."
         }
       ],
       "pages": [
@@ -109,11 +109,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "3",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "3 D. B. i. 249 b: ' T res taini tenuerunt et liberi homines fuerunt'; 256, ' I psi taini liberi erant ' ; 259 b, ' Q uatuor taini tenuerunt ante eum et liberi fuerunt.'"
+          "text": "D. B. i. 212 b, Stanford."
         }
       ],
       "pages": [
@@ -121,11 +121,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "3",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "4 Chron. Abingd. i. 4 90: 'Nam quidam dives, Turkillus nomine, sub Haroldi comitis testimonio et consultu, de ae cum sua terra quae Kingestun dicitur, ecclesiae Abbendonensi et abbati Ordrico homagium fecit ; l icitum quippe libero cuique, illo in tempore, sic agere erat.'"
+          "text": "D. B. i. 249 b: ' T res taini tenuerunt et liberi homines fuerunt'; 256, ' I psi taini liberi erant ' ; 259 b, ' Q uatuor taini tenuerunt ante eum et liberi fuerunt.'"
         }
       ],
       "pages": [
@@ -133,11 +133,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "4",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "6 D. B. i. 180 b: 'et poterant ire curn terra quo volebant, et habebant sub se 4 milites, ita liberos ut ipsi erant.'"
+          "text": "Chron. Abingd. i. 4 90: 'Nam quidam dives, Turkillus nomine, sub Haroldi comitis testimonio et consultu, de ae cum sua terra quae Kingestun dicitur, ecclesiae Abbendonensi et abbati Ordrico homagium fecit ; l icitum quippe libero cuique, illo in tempore, sic agere erat.'"
         }
       ],
       "pages": [
@@ -145,11 +145,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "6",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "« D. B. ii. 59."
+          "text": "D. B. i. 180 b: 'et poterant ire curn terra quo volebant, et habebant sub se 4 milites, ita liberos ut ipsi erant.'"
         }
       ],
       "pages": [
@@ -157,11 +157,23 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "«",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "7 D. B. i. 172: 'si ita liber homo est ut habeat socam suam et sacarn et cum terra sua possit ire quo voluerit.'"
+          "text": "D. B. ii. 59."
+        }
+      ],
+      "pages": [
+        0
+      ]
+    },
+    {
+      "marker": "7",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "D. B. i. 172: 'si ita liber homo est ut habeat socam suam et sacarn et cum terra sua possit ire quo voluerit.'"
         }
       ],
       "pages": [

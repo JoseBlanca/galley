@@ -25,6 +25,7 @@ from galley.book_folder import BookFolder
 from galley.cli import main
 from galley.fidelity import read_markdown
 from galley.model import (
+    BlockKind,
     BlocksFile,
     RemovalReason,
     block_text,
@@ -185,8 +186,10 @@ def _structure_words(blocks: BlocksFile) -> Counter[str]:
             *blocks.blocks,
             *(b for note in blocks.notes for b in note.blocks),
         )
-        for word in block_text(block).split()
+        for span in block.spans
+        for word in span.text.split()
     )
+    words.update(word for note in blocks.notes for word in note.marker.split())
     words.update(word for removal in blocks.removals for word in removal.text.split())
     words.update(word for change in blocks.word_changes for word in change.before)
     words.subtract(word for change in blocks.word_changes for word in change.after)
@@ -297,9 +300,19 @@ def test_each_block_div_of_the_epub_holds_the_words_of_its_block(
             for div in chapter.iter(f"{{{_XHTML}}}div")
             if (div.get("id") or "").startswith("b-")
         }
+        # markdown writes an unreferenced note's marker at the start of its
+        # first block that is not a margin note.
+        markers = {
+            next(
+                (b for b in note.blocks if b.kind is not BlockKind.MARGIN_NOTE),
+                note.blocks[0],
+            ).id: note.marker.split()
+            for note in blocks.notes
+            if not note.referenced
+        }
         note_blocks = tuple(block for note in blocks.notes for block in note.blocks)
         assert divs == {
-            block.id: block_text(block).split()
+            block.id: markers.get(block.id, []) + block_text(block).split()
             for block in (*blocks.blocks, *note_blocks)
         }
 

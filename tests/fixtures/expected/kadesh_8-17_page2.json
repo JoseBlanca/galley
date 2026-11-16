@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
+  "changed": "Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): each note's marker, \"\\\"'\", \"11\", \"12\", \"13\", \"u\", is taken out of its text into `marker`; the glued \"13The\" is split by a note_marker word change; note 12's second piece, \"(Histoire. 1875…\" in the right column, is part of note 12.",
   "excerpt": "kadesh_8-17",
   "page": 2,
   "book_page_index": 10,
@@ -89,11 +90,11 @@
   ],
   "notes": [
     {
-      "marker": "",
+      "marker": "\"'",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "\"' Th i- is the title of the second volume of the last editiou of his Histoire in the English edition."
+          "text": "Th i- is the title of the second volume of the last editiou of his Histoire in the English edition."
         }
       ],
       "pages": [
@@ -101,11 +102,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "11",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "11 This cnn only be duo to the exclusive use of the Abu Simbel version of the \"Record/* in which the ancient scribe has carelessly overlooked and omitted several passages (see infra, p. 7, n. 21). One of these passages contained the march from Shabtuna to Kadesh. !"
+          "text": "This cnn only be duo to the exclusive use of the Abu Simbel version of the \"Record/* in which the ancient scribe has carelessly overlooked and omitted several passages (see infra, p. 7, n. 21). One of these passages contained the march from Shabtuna to Kadesh. !"
         }
       ],
       "pages": [
@@ -113,11 +114,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "12",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "12 T his is recognized by MASPEEO, in his first treatment"
+          "text": "T his is recognized by MASPEEO, in his first treatment (Histoire. 1875, p. 221), for he says the attack of the Asiatics was made \" tandis que le roi (Ramses) etait d6ja au nurd de la ville.\""
         }
       ],
       "pages": [
@@ -125,11 +126,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "13",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "(Histoire. 1875, p. 221), for he says the attack of the Asiatics was made \" tandis que le roi (Ramses) etait d6ja au nurd de la ville.\""
+          "text": "The hieroglyphic passages quoted herein are all translated and numbered, and they will be cited by camber."
         }
       ],
       "pages": [
@@ -137,23 +138,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "u",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "13The hieroglyphic passages quoted herein are all translated and numbered, and they will be cited by camber."
-        }
-      ],
-      "pages": [
-        2
-      ]
-    },
-    {
-      "marker": "",
-      "blocks": [
-        {
-          "kind": "paragraph",
-          "text": "u There have been many other modern accounts of the battle, but they have no independent value."
+          "text": "There have been many other modern accounts of the battle, but they have no independent value."
         }
       ],
       "pages": [
@@ -241,6 +230,16 @@
         "contained"
       ],
       "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "13The"
+      ],
+      "after": [
+        "13",
+        "The"
+      ],
+      "reason": "note_marker"
     },
     {
       "before": [

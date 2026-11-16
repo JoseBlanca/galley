@@ -1,0 +1,161 @@
+"""The marker of a note and what it reads as a number (spec section 11,
+"The marker of a note" and "Its value"), and the book's marker form
+(section 1)."""
+
+import re
+from collections import Counter
+from collections.abc import Iterable
+from enum import StrEnum
+from typing import NamedTuple
+
+# Spec section 11, "Its value": the letters the OCR gives for digits, read
+# as those digits; inside brackets also "a" for 2 and "t" for 1.
+_DIGIT_LIKE = frozendict(
+    {
+        **{letter: "1" for letter in "ilI|!J"},
+        "o": "0",
+        "O": "0",
+        "s": "5",
+        "S": "5",
+        "z": "2",
+        "Z": "2",
+    }
+)
+_DIGIT_LIKE_IN_BRACKETS = frozendict({**_DIGIT_LIKE, "a": "2", "t": "1"})
+
+# Spec section 11, "The marker of a note": 1 to 3 digits, with or without
+# a "." after them ("8", "291.").
+_DIGITS_FORM = re.compile(r"[0-9]{1,3}\.?")
+# 1 to 3 digits glued to a word that starts with a capital or a quotation
+# mark ("13The", Kadesh).
+_GLUED_FORM = re.compile(r"([0-9]{1,3})([A-Z\"'“‘’«].*)")
+# A bracketed marker: 1 or 2 letters or digits followed by ")", "]", "}"
+# or "J", with "(", "[" or "{" before them or not, and an optional "."
+# after ("(3)", "(t)", "U)", "(3J").
+_BRACKETED_FORM = re.compile(r"[(\[{]?([A-Za-z0-9]{1,2})[)\]}J]\.?")
+# Or a word of at most 4 characters, with at most 2 letters or digits,
+# that starts with an opening bracket or ends with a closing one
+# (Mariéjol's damaged "(4", "i»)", "(*)").
+_LOOSE_BRACKETED_MAX_CHARACTERS = 4
+_LOOSE_BRACKETED_MAX_ALNUM = 2
+_OPENING_BRACKETS = "([{"
+_CLOSING_BRACKETS = ")]}"
+# 1 or 2 signs among * ^ • † ‡ § » > ' ".
+_SIGNS_FORM = re.compile(r"[*^•†‡§»>'\"]{1,2}")
+# In an endnote section, 1 to 3 digits followed by "." or "-", where "I",
+# "l", "!" and "o" count as digits ("I39-", "!6o."); at least one is a
+# digit, so that the word "I." is no marker.
+_ENDNOTE_FORM = re.compile(r"(?=[Il!o]*[0-9])[0-9Il!o]{1,3}[.\-]")
+
+
+class MarkerForm(StrEnum):
+    """The forms of a note's marker that a book's notes share (spec section
+    1, the book's marker form): digits, bracketed or a sign."""
+
+    DIGITS = "digits"
+    BRACKETED = "bracketed"
+    SIGN = "sign"
+
+
+class NoteMarker(NamedTuple):
+    """The marker of a note's first word: `marker` as the OCR read it
+    ("13", "(t)", "291."), `rest` what follows it in the word ("The" for
+    "13The", else ""), and `value` the number it reads, digit-like letters
+    read as digits, or None (a sign)."""
+
+    marker: str
+    rest: str
+    value: int | None
+
+
+def read_number(text: str, *, in_brackets: bool = False) -> int | None:
+    """The number `text`, which holds only letters and digits, reads once
+    the letters the OCR gives for digits are read as those digits ("l3"
+    reads 13; inside brackets "a" reads 2 and "t" 1); None when a
+    character is neither or `text` is empty."""
+    table = _DIGIT_LIKE_IN_BRACKETS if in_brackets else _DIGIT_LIKE
+    digits = "".join(
+        character
+        if character.isascii() and character.isdigit()
+        else table.get(character, "")
+        for character in text
+    )
+    if not text or len(digits) != len(text):
+        return None
+    return int(digits)
+
+
+def _bracketed(word: str) -> NoteMarker | None:
+    match = _BRACKETED_FORM.fullmatch(word)
+    if match is not None:
+        return NoteMarker(word, "", read_number(match.group(1), in_brackets=True))
+    alnum = "".join(character for character in word if character.isalnum())
+    if (
+        len(word) <= _LOOSE_BRACKETED_MAX_CHARACTERS
+        and len(alnum) <= _LOOSE_BRACKETED_MAX_ALNUM
+        and (word[:1] in _OPENING_BRACKETS or word[-1:] in _CLOSING_BRACKETS)
+        and word
+    ):
+        return NoteMarker(word, "", read_number(alnum, in_brackets=True))
+    return None
+
+
+def note_marker(word: str, *, endnote: bool = False) -> NoteMarker | None:
+    """The marker of a note whose first word is `word`, by the forms of spec
+    section 11, or None when the word has none of them: digits ("8",
+    "291."), digits glued to a capitalised word ("13The": marker "13",
+    rest "The"), a bracketed marker ("(3)", "(t)", "U)", "(3J"), or 1 or 2
+    signs ("*"). With `endnote`, also the endnote form, digits followed by
+    "." or "-" where "I", "l", "!" and "o" count as digits ("I39-")."""
+    if _DIGITS_FORM.fullmatch(word):
+        return NoteMarker(word, "", int(word.rstrip(".")))
+    glued = _GLUED_FORM.fullmatch(word)
+    if glued is not None:
+        return NoteMarker(glued.group(1), glued.group(2), int(glued.group(1)))
+    bracketed = _bracketed(word)
+    if bracketed is not None:
+        return bracketed
+    if _SIGNS_FORM.fullmatch(word):
+        return NoteMarker(word, "", None)
+    if endnote and _ENDNOTE_FORM.fullmatch(word):
+        return NoteMarker(word, "", read_number(word[:-1]))
+    return None
+
+
+# Spec section 11: 1 or 2 signs glued to a word that starts with a capital
+# ("'There", Kadesh page 8), a marker only of a note started by its indent.
+_GLUED_SIGNS_FORM = re.compile(r"([*^•†‡§»>'\"]{1,2})([A-Z].*)")
+
+
+def glued_sign_marker(word: str) -> NoteMarker | None:
+    """The signs at the start of `word` as a marker, the rest of the word as
+    its rest, when `word` is 1 or 2 signs glued to a word that starts with
+    a capital ("'There": marker "'", rest "There"); None otherwise."""
+    match = _GLUED_SIGNS_FORM.fullmatch(word)
+    if match is None:
+        return None
+    return NoteMarker(match.group(1), match.group(2), None)
+
+
+def marker_form(word: str) -> MarkerForm | None:
+    """The form of the note marker `word` has, without the endnote form, or
+    None when it has none."""
+    if _DIGITS_FORM.fullmatch(word) or _GLUED_FORM.fullmatch(word):
+        return MarkerForm.DIGITS
+    if _bracketed(word) is not None:
+        return MarkerForm.BRACKETED
+    if _SIGNS_FORM.fullmatch(word):
+        return MarkerForm.SIGN
+    return None
+
+
+def book_marker_form(first_words: Iterable[str]) -> MarkerForm | None:
+    """The book's marker form (spec section 1): the form that the most of
+    `first_words`, the first words of the book's band blocks, have, the
+    first of digits, bracketed and sign on a tie; None when none has one."""
+    counts = Counter(
+        form for word in first_words if (form := marker_form(word)) is not None
+    )
+    if not counts:
+        return None
+    return max(MarkerForm, key=lambda form: counts[form])
