@@ -6,8 +6,10 @@ Tesseract's `combine_tessdata -u` and turns it into plain text with
 `dawg2wordlist`, once per language, and keeps the text, one word per line,
 in a cache folder (`~/.cache/galley/wordlist/` by default); later calls
 read that file. The words are as the dictionary gives them, with their
-case and accents ("Médicis"); how a word of the book is looked up in them
-is the caller's choice.
+case and accents ("Médicis"). A word of the book is looked up by its key,
+`word_key`, the form structure's hyphen rule compares (structure spec
+section 5); `is_known_word` says whether a word counts as known on a
+plate (plates spec section 2).
 
 Adapted from `setup.sh` of the owner's ocr_lab
 (`~/devel/tomato_history_web_site/tools/ocr_lab/setup.sh`), which runs the
@@ -45,6 +47,13 @@ _EXTRACTION_LOCK = threading.Lock()
 _LIST_LANGS_HEADER = re.compile(r'List of available languages in "(.+)" \(\d+\):')
 
 _DELETE_CACHE = "delete it to extract it again"
+
+# Structure spec section 5: the apostrophes a word's key keeps, and after
+# which a French elision's word is looked up.
+APOSTROPHES = ("'", "’")
+# Plates spec section 2: a known word's key has at least 2 letters ("a" and
+# stray marks of one letter are not known).
+_KNOWN_WORD_MIN_LETTERS = 2
 
 
 def is_cached(language: Language, cache_dir: Path = DEFAULT_CACHE_DIR) -> bool:
@@ -201,3 +210,43 @@ def _run(program: str, *arguments: str) -> str:
         msg = f"{' '.join(command)} did not finish in {_TIMEOUT_S} s"
         raise ExternalProgramError(msg) from err
     return completed.stdout
+
+
+def _kept_in_key(character: str) -> bool:
+    return character.isalnum() or character == "-" or character in APOSTROPHES
+
+
+def word_key(text: str) -> str:
+    """The key of a word (structure spec section 5): lower case, with the
+    characters that are not letters, digits, hyphens or apostrophes
+    stripped from both ends. "(Normandy)," gives "normandy"; punctuation
+    alone gives the empty string."""
+    lowered = text.lower()
+    start = 0
+    end = len(lowered)
+    while start < end and not _kept_in_key(lowered[start]):
+        start += 1
+    while end > start and not _kept_in_key(lowered[end - 1]):
+        end -= 1
+    return lowered[start:end]
+
+
+def is_known_word(word: str, word_list: frozenset[str]) -> bool:
+    """Whether `word` counts as known on a plate (plates spec section 2).
+
+    It is known when its key (`word_key`) has at least 2 letters, holds
+    nothing but letters, apostrophes and hyphens, and is in `word_list`,
+    which is in lower case; or when its key is ASCII digits, a number with
+    brackets or punctuation around it ("16", "17]").
+    """
+    key = word_key(word)
+    if key.isascii() and key.isdigit():
+        return True
+    return (
+        sum(character.isalpha() for character in key) >= _KNOWN_WORD_MIN_LETTERS
+        and all(
+            character.isalpha() or character == "-" or character in APOSTROPHES
+            for character in key
+        )
+        and key in word_list
+    )

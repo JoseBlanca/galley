@@ -4,12 +4,9 @@ region lies and the height of its words."""
 
 from enum import StrEnum
 
+from galley.body_measures import median_word_height
 from galley.model import PageLayout, Region
-from galley.structure._measures import (
-    line_has_letter_or_digit,
-    median_word_height,
-    region_words,
-)
+from galley.structure._measures import line_has_letter_or_digit, region_words
 
 # Spec section 2: a margin region is narrower than a quarter of the widest.
 _MARGIN_WIDTH_SHARE = 0.25
