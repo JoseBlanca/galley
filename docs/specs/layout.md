@@ -42,7 +42,8 @@ November 2026). And the rules that measure the body text, the row rule,
 the commonest edge, the body word height and body line pitch, move to
 the module `body_measures.py` of the package root (architecture §12),
 which structure uses too, so that the two stages stop keeping a copy
-each (owner, 15 November 2026).
+each (owner, 15 November 2026). The cut-in rule does not reach the bar
+on precision set in section 9, which is the one open point there.
 
 ## 1. Terms
 
@@ -121,8 +122,8 @@ are built on:
   1,360 line pieces, Stubbs' in 585 of 968, and words outside Gierke's
   body column share a row with body words in 1,417 of 1,488 lines.
   Domesday's and Gierke's notes are about 6 pt outside the body column,
-  on the outer side (Gierke: right on even page indices 687 times, left
-  on odd 662). Stubbs' cut-in notes are about 31 pt wide, inside the
+  on the outer side (Gierke: in 687 of those lines on the right, on even
+  page indices, and in 662 on the left, on odd ones). Stubbs' cut-in notes are about 31 pt wide, inside the
   column on its outer side (left on odd page indices 480 times, right on
   even 339), and the body lines beside them start, or end, 58 to 62 pt
   inside the column's edge.
@@ -180,21 +181,36 @@ applied to all the page's words):
 
 - **cut-in inset**, for the left side and for the right, measured after
   step 1 has placed every page's column: over the rows of the measured
-  pages, made of the words that step 2 leaves in the column, the
-  distance from the column's left edge to a row's left side (on the
-  right, from a row's right side to the right edge), to the point,
-  between 30 and 100 pt, with the most rows within 2 pt of it. The book
-  has cut-in notes on that side when those rows are at least 50 and at
-  least 4 times the rows 6 to 12 pt below that inset, and 4 times those 6
-  to 12 pt above it; otherwise it has no inset on that side. Measured in
-  the second research (structure §1) on the lines of the body regions of
-  the six whole books, each against its region's commonest sides: Stubbs has 399 lines at its peak on the left (59 to 62 pt)
-  and 364 on the right (57 to 61 pt), about 15 times the lines 6 to 12 pt
-  to either side; Domesday, Mariéjol, Gierke and Kadesh have their
-  highest point on the left at 30 to 35 pt (quotations, paragraph
-  indents) with as many lines or more 6 to 12 pt to one side; Haskins
-  has 14 lines at its highest point; no book but Stubbs has a peak on
-  the right. So only Stubbs has cut-in notes, on both sides.
+  pages, made of the words that step 2 leaves in the column, take each
+  row's **inset**, the distance from the column's left edge to the row's
+  left side (on the right, from the row's right side to the column's
+  right edge), to 0.1 pt. Every inset between 30 and 100 pt is tried as
+  the peak, and the peak is the one with the most rows whose inset lies
+  within 2 pt of it, the smaller on a tie. The book has cut-in notes on
+  that side when those rows are at least 10, and at least 4 times as
+  many as the rows whose inset is 6 to 12 pt smaller than the peak's,
+  and 4 times as many as those 6 to 12 pt larger; otherwise it has no
+  inset on that side. Measured on 16 November 2026 on the six whole
+  books and the six excerpts:
+
+  | | left: peak, rows at it, rows 6–12 pt smaller, rows 6–12 pt larger | right: the same |
+  |---|---|---|
+  | Stubbs | 60.4 pt, 394, 31, 20 | 59.0 pt, 359, 40, 32 |
+  | Haskins | 43.5, 28, 31, 20 | 79.2, 30, 31, 29 |
+  | Domesday | 30.2, 191, 152, 165 | 97.8, 155, 96, 87 |
+  | Mariéjol | 30.1, 286, 452, 175 | 31.9, 80, 149, 85 |
+  | Kadesh | 30.0, 13, 134, 10 | 42.0, 8, 8, 12 |
+  | Gierke | 30.0, 111, 221, 98 | 35.7, 54, 73, 49 |
+  | excerpt `stubbs_51_56-64` | 60.3, 17, 1, 0 | 58.2, 13, 1, 0 |
+  | the five other excerpts | at most 11 rows at the peak, and Mariéjol's 11 against 9 | at most 8 |
+
+  Stubbs' peaks are 12.7 times (left) and 9.0 times (right) the larger of
+  their neighbours; no other book's is more than 1.3 times. So only
+  Stubbs has cut-in notes, on both sides, and so does its excerpt. The
+  floor of 10 rows lets the excerpt of ten pages pass (17 and 13); the
+  first form of this rule asked for 50, which the excerpt does not
+  reach, and which none of the other books came near deciding, since the
+  ratio of 4 rejects them all.
 
 A book with no page of 15 rows is measured on its pages of at least 3
 rows; a book with none of those has no measures, and each of its pages
@@ -306,15 +322,19 @@ is laid out as one region, as the skeleton did.
       column width. The last condition keeps out a speck that happens to
       stand at the inset (";" on Stubbs' page 51);
    2. cut rows whose tops lie within 1.6 body line pitches of the one
-      before form a chain; a chain of at least 2 cut rows, at least one
-      of which has no word whose right side lies at most L + I − 4 pt (a
-      shortened line), is a **cut-in zone**, from the top of its first
-      row to the bottom of its last. The shortened line keeps out
-      justified lines that have a wide space at the inset by chance
-      (Stubbs' page 31: "England. Whilst the"; "Lewis" at 87 pt on page
-      116);
-   3. a word of a row whose vertical middle lies in a zone, within 1 pt,
-      and whose right side lies at most L + I − 4 pt, is a margin word.
+      before form a chain. A **shortened** row has no word whose right
+      side lies at most L + I − 4 pt: nothing stands in the strip beside
+      it. The chain is trimmed at both ends to its first and last
+      shortened rows; when at least 2 rows remain, it is a **cut-in
+      zone**, from the top of its first row to the bottom of its last.
+      A full body line with a wide space at the inset by chance is a cut
+      row too ("of John. The same year Johanna", page 120; "averted open
+      war. Henry was", 125); at a chain's end it is trimmed off, and a
+      chain of such lines alone, with no shortened row, is no zone
+      (Stubbs' page 31: "England. Whilst the");
+   3. a word of a row whose vertical middle lies between the zone's top
+      less 1 pt and its bottom plus 1 pt, and whose right side lies at
+      most L + I − 4 pt, is a margin word.
 
    On the right the same, mirrored: a word's right side within 3 pt of
    R − I, the gap after it, the words up to it spanning half the column,
@@ -324,22 +344,34 @@ is laid out as one region, as the skeleton did.
    a margin region, since it overlaps vertically a region wider than
    itself (structure §2).
 
-   Measured in the second research on Stubbs' body regions of lines.json,
-   with each region's commonest sides as its edges (not on step 1's
-   edges, as written here; the reference pages check the difference):
-   406 zones on 250 pages, 1,949 words moved, of which 1,202 have fewer
-   than 3 letters, nearly all single letters of notes the OCR spaced out
-   ("B an i s h m e n t"). Of the 747 words of 3 letters or more, 597
-   have their letters in the margin notes of their page or the pages next
-   to it in the reference text, 31 only in its body text, and 119 in
-   neither (OCR damage: "Chanceiior.", "pr0motion"). The 31 are an upper
-   bound on the body words moved (about a third of them are damaged note
-   words that also occur in the body, "Hem-"), so at least 716 of the
-   747, 96%, are note words, above section 9's bar of 95 in 100. The
-   letters moved are 59% of the letters of the reference text's notes.
-   Each condition was added for a case measured: without the shortened
-   line, 56 words found only in the body were moved; with chains of one
-   cut row, 47; with chains up to 2.6 pitches, 53.
+   **Measured** on 16 November 2026 on Stubbs' whole book, on step 1's
+   edges and the rows of the words step 2 leaves in the column, with the
+   insets above. Each moved word was labelled by where the evaluation
+   tool's alignment puts it in the reference text (a margin note or the
+   body), the same labels as the evaluation's scores; all words count,
+   short ones too:
+
+   | rule | words moved | aligned to a margin note | aligned to the body | not aligned | share of the aligned that are note words | the reference text's margin-note words found |
+   |---|---|---|---|---|---|---|
+   | zone from the first to the last cut row (the first form) | 1,977 | 1,070 | 132 | 775 | 0.89 | 1,070 of 1,469 |
+   | zone trimmed to its shortened rows (as written) | 1,314 | 767 | 73 | 474 | 0.91 | 767 of 1,469 |
+
+   The label is a lower bound on precision: of the 28 words of 3 letters
+   or more that the alignment puts in the body, 24 are words of the
+   margin note printed on their page ("Hisfamily", "Breach", "Bishops."),
+   which the alignment paired with the same word in the body text; with
+   those counted as note words, 791 of 840, 0.94. The 474 words not
+   aligned are 394 of fewer than 3 letters, nearly all single letters of
+   notes the OCR spaced out ("B an i s h m e n t"), and 80 longer, mostly
+   OCR damage ("Chanceiior."). The reviewer's full lines on pages 96,
+   120, 125 and 139 lose no word with the trimmed zone. The rule as
+   written does not reach section 9's bar of 95 in 100 on this measure:
+   0.91 by the labels, 0.94 with the 24 words corrected (**Open 1**).
+   Each condition was added for a case measured: without a shortened
+   row, 56 words found only in the body were moved; with chains of one
+   cut row, 47; with chains up to 2.6 pitches, 53 (counted, in the first
+   research, by the words of 3 letters or more found only in the body
+   text of the page).
 3. **Running-head line.** Of the remaining words, grouped into rows,
    take the first row that holds a letter or a digit. It and every row
    above it (specks) form the running-head region when the next row's
@@ -440,9 +472,9 @@ Where the thresholds come from:
 | gutter | 6 pt wide, middle third, 8 open rows in the body, 3 in the band | measured, below |
 | band gutter off the column's middle | 10 pt | measured, below |
 | drop capital | 2.2 times the body word height, within 3 pt of the edge | measured: Haskins' are 2.67 ("IN", page 163) to 4 times |
-| cut-in inset | the most rows within 2 pt, 30 to 100 pt in; 50 rows and 4 times the rows 6 to 12 pt to each side | measured on the six books, "The book's measures" |
+| cut-in inset | the most rows within 2 pt, 30 to 100 pt in; 10 rows and 4 times the rows 6 to 12 pt to each side | measured on the six books and excerpts, "The book's measures" |
 | cut row | within 3 pt of the inset, after 8 pt, spanning half the column | measured on Stubbs, step 2b |
-| cut-in zone | chain within 1.6 pitches, 2 rows, one shortened | measured on Stubbs, step 2b |
+| cut-in zone | chain within 1.6 pitches, trimmed to its shortened rows, 2 rows | measured on Stubbs, step 2b |
 | cut-in note word | 4 pt short of the inset | measured on Stubbs, step 2b |
 
 An earlier form of the column rule, which asked every row of a run to
@@ -625,13 +657,16 @@ runs the fidelity check and writes lines.json, 2.5 s in all.
   height) are inside the body when body rows follow them; at the foot
   of a page they are read as a band. Their words keep their place in the
   reading order either way (structure §6).
-- **Plate pages, blank pages**: no words, no region, as now.
+- **Blank pages, and plates without a text layer**: no words, no
+  region. A plate with a text layer (`docs/specs/plates.md`) has its
+  words, laid out as any page's; its figure is copied from `words.json`.
 - **Stubbs' cut-in notes** (step 2b): a note whose words are taken
   becomes a margin region. A note word glued to a body word
   ("inChris- tendom.") stays in its body line, since layout moves words
   and does not split them; so does a note beside which no line is
   shortened, or whose shortened lines are more than 1.6 pitches apart,
-  which is most of the 41% of the notes' letters not found; and when the
+  which is most of the 48% of the notes' words not found (section 3,
+  step 2b); and when the
   OCR set a note's first letter or word off at the column's edge ("f
   reform" on page 60, "Plan of reform."), the part in the zone moves
   and the rest stays.
@@ -711,10 +746,12 @@ with their boxes, with a `BookMeasures` given in the test:
 - `run` on a hand-made `words.json` of 8 pages with 1 worker and with 3
   gives the same bytes;
 - cut-in notes, with a cut-in inset of 60 pt on the left: three rows
-  whose body words start 60 pt in, one of them with nothing left of
+  whose body words start 60 pt in, two of them with nothing left of
   that, and the note words "Character", "of" and "Henry" 5 pt in, give a
   margin region of those words; the same rows with a word starting at 60
   pt after a gap of 4 pt, or two such rows 2 pitches apart, give none; a
+  full body line at the end of such a chain, with a word at 60 pt after
+  a 9-pt space, keeps its words; a
   ";" at the inset on a row whose words from it span a quarter of the
   column is no cut row;
 - `measure_book` on pages whose rows start 60 pt in on 60 rows and 0 to
@@ -737,10 +774,15 @@ differ slightly from the whole book's.
 | `haskins_eval` (committed) | 0 (131) | a chapter's first page: chapter number, title, drop capital ("IN") |
 | `haskins_eval` | 1 (132) | footnotes in the band |
 | `haskins_eval` | 9 (266) | the first index page: title, two columns |
-| `stubbs_51_56-64` | 0 (51) | a cut-in note at the left, "Importance attachedby contempora- ries toHenry's accession." taken, "Youth and education of Henry." left in the body; specks above the head |
+| `stubbs_51_56-64` | 0 (51) | a cut-in note at the left of which only its last line, "accession.", is taken, the rest beside lines that are not shortened; "Youth and education of Henry." left in the body; specks above the head |
 | `stubbs_51_56-64` | 2 (57) | two cut-in notes at the left, "Characterof Henry II." and "Hisfamily policy." |
-| `stubbs_51_56-64` | 7 (62) | cut-in notes at the right, "Arrival of successor tep en i°54. ' advUers." taken, the rest of its five notes left |
-| `stubbs_51_56-64` | 9 (64) | cut-in notes at the right, "B an i s h m e n t D f m e r c e n a - nes -" and "Cti°n °£ J^tE." taken |
+| `stubbs_51_56-64` | 3 (58) | a cut-in note at the right, "Hisgreatposi. tion inChris- tendom." |
+| `stubbs_51_56-64` | 7 (62) | cut-in notes at the right, "Arrival of successor tep en i°54. '" taken, the rest of its five notes left |
+| `stubbs_51_56-64` | 9 (64) | cut-in notes at the right, "B an i s h m e n t" and "Cti°n °£ J^tE." taken |
+
+The words each page loses to its margin notes were listed by running
+the rule as written on the whole book (16 November 2026); the owner
+checks them against the page images before they become the test.
 | `domesday_74-83` (new) | 2 (76) | an outer margin note on the right, short notes side by side, signature "4—2" |
 | `domesday_74-83` | 0 (74) | an outer margin note on the right, signature "M. 4" |
 | `domesday_74-83` | 1 (75) | outer margin notes on the left; one word of a note, "land.", whose box reaches into the column, goes to its note, "Free land." |
@@ -774,19 +816,40 @@ targets (structure §9): paragraph breaks that margin and note text no
 longer cause, notes and margin notes found as such. The table of section
 3 is what layout's rules gave on a prototype; it is not a target.
 
-## 9. Decided: Stubbs' cut-in notes, from the text layer
+## 9. Stubbs' cut-in notes: decided, with one open point
 
-There are no open points. How layout finds Stubbs' notes cut into the
-text column was decided twice by the owner. On 15 November 2026, for
-the first plan, they stayed in the body lines (option (c) below), and
-option (a), a render of each page, was to be tried in the second plan.
-Later the same day, on the second research, the owner chose instead the
-rule on the text layer of section 3, step 2b, which looks at the
-shortened body lines rather than at the note's words, keeps layout
-reading only `pages.json` and `words.json`, and meets the bar set here:
-at least 95 of every 100 words it moves are note words (96% of the
-words of 3 letters or more, measured). A render is tried only if the
-reference pages show that the rule moves body words the measure missed.
+How layout finds Stubbs' notes cut into the text column was decided
+twice by the owner. On 15 November 2026, for the first plan, they
+stayed in the body lines (option (c) below), and option (a), a render
+of each page, was to be tried in the second plan. Later the same day,
+on the second research, the owner chose instead the rule on the text
+layer of section 3, step 2b, which looks at the shortened body lines
+rather than at the note's words and keeps layout reading only
+`pages.json` and `words.json`. The bar set here, at least 95 of every
+100 moved words being note words, was then thought met (96%, counted on
+words of 3 letters or more, found by their letters in the note or body
+text of the page); measured on all words by their alignment, it is not
+(section 3, step 2b).
+
+**Open 1. Step 2b below the bar.** The rule as written moves 1,314
+words in Stubbs, of which 767 are aligned to margin notes and 73 to
+the body (0.91; 0.94 once 24 note words the alignment misplaced are
+counted as notes), and 474 are not aligned, mostly single letters of
+spaced-out notes.
+
+- (a) **Keep step 2b** as written: about half of the notes' words leave
+  the body lines, and at most about 50 body words of Stubbs' 90,100
+  (0.06%) move into margin notes.
+- (b) **Try the render of each page** (option (a) below), at the cost of
+  a render per page and layout reading the PDF, with the same bar, and
+  keep step 2b only if the render does no better.
+- (c) **Leave the cut-in notes in the body lines**, as the first plan
+  does.
+
+Recommended: (a). The body words it moves are a few tens in a book, and
+every cut-in note left in the body breaks a paragraph a reader reads.
+Meanwhile the implementer builds (a), behind the book's cut-in inset,
+so that (c) is the inset set to none.
 
 What was weighed for the first plan. The text layer does not show the
 note's words reliably. Five rules were tried on Stubbs' words, each
