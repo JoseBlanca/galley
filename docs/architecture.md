@@ -289,8 +289,15 @@ its own stage made.
 **blocks.json**, `BlocksFile(blocks, notes, removals, word_changes,
 page_numbers)`:
 
-- `Block`: `id`, `kind: BlockKind`, `level: int | None` (headings, 1 or
-  2), `label: str | None` (headings: the chapter label as printed,
+- `Block`: `id`, `kind: BlockKind`, `level: int | None` (a heading's
+  level, 1 or 2; an index entry's depth, 1 for an entry and 2 for a
+  sub-entry printed inside it, more if a book prints deeper ones, so that
+  the EPUB can indent it as printed (owner, 16 November 2026); `None` for
+  every other kind: reading a blocks.json where an index entry has no
+  depth from 1, or a block of another kind but a heading has a level, is
+  an error that names the file and the block. The format stays at
+  version 2: a file written before the depth has index entries without
+  one, and the error says to run structure again), `label: str | None` (headings: the chapter label as printed,
   "CHAPTER III.", "V"; `None` for a heading without one and for every
   other kind: reading a blocks.json where a block that is not a heading
   has a label is an error that names the file and the block),
@@ -314,7 +321,8 @@ page_numbers)`:
   - `figure`: a picture, with its caption as the block's text (empty when
     it has none) and its image in `figure`;
   - `margin_note`: a short heading printed beside the text (section 17);
-  - `index_entry`: one entry of the book's printed index (section 11).
+  - `index_entry`: one entry of the book's printed index, or one
+    sub-entry of it, its depth in `level` (section 11).
 - `Span`: `text`, `emphasis: Emphasis`, `note_ref: str | None`. A span
   with a `note_ref` is a note reference: `note_ref` is the id of the
   note, and its `text` is the reference as printed, or as the OCR read

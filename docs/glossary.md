@@ -85,7 +85,9 @@ change recorded as guessed, for review.
 
 **index entry**: one entry of a book's printed index, its first line at
 the column's left edge and its continuation lines indented (a **hanging
-indent**). A block kind.
+indent**). A block kind. A **sub-entry**, a heading under an entry that
+Haskins and Stubbs print inline after a ";" ("Amari, M., 216, 248;
+quoted, 234."), is an index entry of its own, of depth 2.
 
 **line**: a line of one region of a page, as layout groups the words, left
 to right. Not what pdfplumber calls a line, which runs across columns.
