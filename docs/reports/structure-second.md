@@ -31,3 +31,13 @@ reads a link to an endnote, and the markdown stream may not change
 links marked `epub:type="noteref"` and refuses any other link. The
 evaluation tool learnt the two new kinds so that it still reads
 `blocks.json`; which reference kinds they match stays task 7.4's.
+
+### Task 1.2 (baaa226, merged)
+
+`body_measures.py` holds the row grouping, the commonest edge, the word
+height and pitch, used by layout and structure; their copies and the
+test that compared them are gone. `wordlist.word_key` and
+`is_known_word` are shared. The six excerpts' `lines.json` and
+`blocks.json` are byte-for-byte the same before and after. pytest on the
+plan's branch after the merge: 1133 passed in 28.0 s, close to the
+coding skill's 30 s budget before the five new excerpts.

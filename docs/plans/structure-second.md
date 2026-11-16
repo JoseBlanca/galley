@@ -205,7 +205,7 @@ them until then.
   fidelity changes in `fidelity.py`, with their tests. Spec:
   architecture §6, §8 and §13; structure §7. Deliverables 1 to 3. A
   commit of its own, first: every other task stands on it.
-- [ ] 1.2 `body_measures.py`, replacing layout's and structure's
+- [x] 1.2 `body_measures.py`, replacing layout's and structure's
   copies, and `wordlist.is_known_word` with the word key. Spec:
   architecture §12; layout §3, "The book's measures"; structure §2,
   step 1; plates §2 and §4. Deliverables 4, 5, 8.
