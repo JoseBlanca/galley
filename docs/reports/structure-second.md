@@ -403,9 +403,11 @@ continue a word), and applies only when the note lies outside the column
 Whole Domesday, 611 margin notes from 640 regions: 604 placed before a
 paragraph (547 beside its first line), 24 paragraphs split where a note
 stands beside an indented line, 19 placed on the previous page, 7 inside
-a footnote. Against the Gutenberg text, 240 of the 263 notes whose text
-matches one of its margin notes sit before the same paragraph; most of
-the 23 others look like short notes matched to the wrong Gutenberg note.
+a footnote. Against the Gutenberg text the stream reported 240 of 263
+matched notes before the same paragraph, but did not record how notes
+were matched, and the review could not reproduce it; the reviewer's own
+matching gives 61 of 64 on exact text and 185 of 213 at 0.8 similarity,
+about 9 in 10 either way. The tool's margin-note scores come in 7.5.
 The owner's example, Domesday page 30, now comes out right: "Serf and"
 and "The serf of the Leges." each stand before their paragraph.
 
