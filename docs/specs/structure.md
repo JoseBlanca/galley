@@ -922,7 +922,8 @@ whose hyphen should have stayed and 2 not one word.
   paragraphs, the band block after that page's body blocks; after the
   next heading, the same blocks are a quote and a note;
 - index: two columns of 20 lines under "INDEX", lines at the edge and
-  indented 9 pt, give one `index_entry` per line at the edge; a line
+  indented 9 pt, give one `index_entry` per line at the edge, `level` 1,
+  and one of `level` 2 per part after a word ending in ";"; a line
   "BUR CON" is removed as `guide_words`, and so are "BUR" and "CON" as
   the first lines of the two columns; a row read across the gutter is
   cut in two; a skew of 5 pt over the column does not start entries;
@@ -2044,9 +2045,9 @@ words, was part of the book's last paragraph.
 Between a column's edge (lines within 0 to 2 pt of it, up to 4 pt of
 scan noise in Domesday) and the smallest indent (6 pt, 35 lines in
 Stubbs), no line of the four indexes lies at 5 pt, so 5 pt is the
-threshold. The reference texts put each inline sub-entry on a line of
-its own; galley keeps an entry with its sub-entries as printed, one
-block.
+threshold. Each printed sub-entry is a block of its own, with its depth
+(rule 5; owner, 16 November 2026), as the reference texts put each
+inline sub-entry in an item of its own.
 
 ### The rules
 
@@ -2124,8 +2125,8 @@ block.
    0.903 / 0.698 against 0.992 / 0.723, Stubbs 0.475 / 0.314 against
    0.869 / 0.396, Domesday 0.990 / 0.986 both. A column of fewer than 5
    lines takes its smallest left side.
-4. **Blocks.** Each entry is one `index_entry` block, `level` `None`, its
-   lines joined as a paragraph's, hyphens joined by section 5 ("72-"
+4. **Blocks.** Each entry is one `index_entry` block, or several by rule
+   5, its lines joined as a paragraph's, hyphens joined by section 5 ("72-"
    "81;" gives "72-81;", "Vik-" "ing," gives "Viking,"). Its page numbers
    stay as printed. Its origin has one box per page. The title is a
    heading (section 14); for its centring (section 14, rule 1), the lines
@@ -2137,6 +2138,26 @@ block.
    of the body stream (the lines outside the index columns, such as the
    title) of each index page, and the first after the index, start a
    block.
+5. **Sub-entries.** Haskins and Stubbs print an entry's sub-entries
+   inline, each after a ";" ("Amari, M., 216, 248; quoted, 234."). An
+   entry is cut after each of its words that ends with ";", the cut
+   going between two words of a line when the ";" is inside it: the
+   part up to the first such word is the entry, `level` 1, and each part
+   after one a sub-entry, `level` 2; an entry without one is one block
+   of `level` 1. Each part's origin has the boxes of its own words, one
+   per page. No book of the six prints a sub-entry inside a sub-entry,
+   so no part is deeper than 2; Domesday and Gierke print no ";" in an
+   entry but a few that the OCR read into one. A cross-reference after
+   a full stop ("See Odo, Turold, ...", which Haskins' reference text
+   puts in an item of its own) is not cut off: nothing in print sets it
+   apart from the page numbers before it.
+
+   Measured on 16 November 2026 with galley-eval, index paragraph
+   boundaries at markdown, precision / recall, by cutting the blocks of
+   rules 1 to 4 after each word ending in ";": Haskins 0.991 / 0.965
+   (0.992 / 0.723 uncut), Stubbs 0.829 / 0.789 (0.869 / 0.396), Domesday
+   unchanged at 0.990 / 0.986. Stubbs' ";" are often read inside spaced
+   letters or lost, and its own targets of section 9 are not met.
 
 **Measured.** Each entry's first five letters were aligned in order with
 those of the reference text's entries (not its sub-entries), with
@@ -2278,7 +2299,9 @@ What markdown must do, and how it is checked:
 - a `quote`, `chapter_summary`, `index_entry` or `figure` block, and
   a `verse` block, each with its id and a class of its own kind, so that
   the style sheet can tell them apart; a `verse` block with a hard line
-  break at each line feed of its text;
+  break at each line feed of its text; an `index_entry` block's depth
+  (its `level`, section 17, rule 5) as well, so that the style sheet
+  sets a sub-entry in from its entry;
 - a referenced footnote as a Pandoc footnote at its reference, with its
   margin notes inside it;
 - the endnotes, referenced or not, where `notes` puts them (section 6,
