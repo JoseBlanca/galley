@@ -144,6 +144,7 @@ An unknown key or a wrong type is an error.
 | `exclude_pages` | list of page indices, `[]` | pages left out, as removals |
 | `exclude_regions` | list of `{page, box}`, `[]` | a library stamp, a label |
 | `cover_page` | page index, none | rendered as the EPUB's cover |
+| `plate_pages` | list of page indices, `[]` | pages analyze makes plates whatever its rule finds, for a plate the rule misses (Kadesh's faint relief on page 23); a page in `exclude_pages` is never a plate (`docs/specs/plates.md` §2) |
 | `contents_pages` | list of page indices, `[]` | the pages of the book's printed table of contents: structure makes no heading on them, so that the EPUB's table of contents does not list each chapter twice; their lines stay paragraphs (owner, 15 November 2026). Without it, the contents' lines that pass the heading rule become headings, and the EPUB lists those chapters twice (Domesday's three essays). analyze checks its page indices as it checks those of the other keys |
 
 A stage spec adds the keys it needs, here and in `config.py` together.
@@ -218,7 +219,8 @@ has a `format_version` int: 2 for `blocks.json`, 1 for the others.
 `blocks.json` went to 2 with the second plan of structure (16 November
 2026), which added `Note.kind` and the block kinds `verse` and
 `chapter_summary`; reading a file of version 1 is the error below, and
-the owner reruns structure. Each has one pair of functions
+the owner reruns structure. (`tests/test_model.py` uses 2 as its example of an
+unsupported version; the plan of the second structure plan changes it.) Each has one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
 Reading a file whose `format_version` is not the current one is an error
