@@ -1,0 +1,79 @@
+{
+  "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "known": "The caption starts with the stray words \"•'••'\"\"' rAr\", kept because half their words count as known words (structure spec section 18).",
+  "excerpt": "domesday_headings_quotes",
+  "page": 3,
+  "book_page_index": 39,
+  "shows": "a map as a plate: stray words removed, the caption and the binder's note kept",
+  "layout": [
+    [
+      "r/_- • C r <> w",
+      "# /• />// l-w f I I fi<",
+      "Fir I </",
+      "I•n k \\ «^ ^O/ ^^m*^or S fio?pewn^iu.i i",
+      "r"
+    ],
+    [
+      "n> a /•.(- It ^^T§",
+      "/,/"
+    ],
+    [
+      "--,. ^X.^ MoulslVl^rf /\\\"?",
+      ">i^$ /•-„",
+      "•'••'\"\"' rAr",
+      "A LAND OF VILLAGES",
+      "On the border between Oxfordshire and Berks/tire.",
+      "\\.Bet^ueen pp. 16 — 17]"
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "figure",
+      "text": "•'••'\"\"' rAr A LAND OF VILLAGES On the border between Oxfordshire and Berks/tire. \\.Bet^ueen pp. 16 — 17]",
+      "pages": [
+        3
+      ]
+    }
+  ],
+  "notes": [],
+  "removals": [
+    {
+      "reason": "plate_text",
+      "text": "r/_- • C r <> w"
+    },
+    {
+      "reason": "plate_text",
+      "text": "n> a /•.(- It ^^T§"
+    },
+    {
+      "reason": "plate_text",
+      "text": "# /• />// l-w f I I fi<"
+    },
+    {
+      "reason": "plate_text",
+      "text": "/,/"
+    },
+    {
+      "reason": "plate_text",
+      "text": "Fir I </"
+    },
+    {
+      "reason": "plate_text",
+      "text": "I•n k \\ «^ ^O/ ^^m*^or S fio?pewn^iu.i i"
+    },
+    {
+      "reason": "plate_text",
+      "text": "r"
+    },
+    {
+      "reason": "plate_text",
+      "text": "--,. ^X.^ MoulslVl^rf /\\\"?"
+    },
+    {
+      "reason": "plate_text",
+      "text": ">i^$ /•-„"
+    }
+  ],
+  "word_changes": [],
+  "page_numbers": []
+}

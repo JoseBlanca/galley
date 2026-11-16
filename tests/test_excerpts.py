@@ -114,15 +114,19 @@ def test_excerpt_has_its_pages_and_words_on_each_but_its_blank_pages(
 # Each file of tests/fixtures/expected/ holds what galley must give on one
 # reference page, or on one pair of pages across a page break, as checked
 # by eye against the page image: its "checked" line says by whom and when,
-# and "changed" says what a later task changed and who checked that. The
-# expected values are those files, compared exactly; boxes are not compared.
+# "changed" says what a later task changed and who checked that, and
+# "known" what the owner found galley gives wrong there, recorded and not
+# yet fixed. The expected values are those files, compared exactly; boxes
+# are not compared.
 #
 # Two files record what the excerpt gives, not what the whole book gives
 # (their "excerpt_only" says why): Gierke 270, whose head line "Notes. 185"
 # stays, and Mariéjol 210, whose foot line with the signature and "(l93)"
 # stays. The running-head and signature rules compare a page with others
 # that the excerpt lacks; the whole_book test of tests/test_structure.py
-# checks both pages on the whole books.
+# checks both pages on the whole books. Two more, Domesday 30 and 42, record
+# a footnote of page 30 that the excerpt runs on to page 42, its next text
+# page.
 
 EXPECTED_DIR = Path(__file__).parent / "fixtures" / "expected"
 REFERENCE_PAGES = tuple(
@@ -217,8 +221,10 @@ def _structure_of_page(blocks: BlocksFile, page: int) -> dict[str, Any]:
 
 def test_every_reference_page_and_page_break_pair_has_its_expected_file() -> None:
     # Layout spec section 8 lists 15 reference pages; structure spec section
-    # 9 adds the two pairs.
-    assert len(REFERENCE_PAGES) == 15
+    # 9 adds the two pairs, and, of the pages of "The second plan", the 10
+    # the owner checked on 16 November 2026 (Domesday 14, 22, 30, 39, 40, 42
+    # and 47, Haskins 41 and 209, Mariéjol 51).
+    assert len(REFERENCE_PAGES) == 25
     assert PAGE_BREAK_PAIRS == ("haskins_eval_pages1-2", "stubbs_51_56-64_pages4-5")
 
 

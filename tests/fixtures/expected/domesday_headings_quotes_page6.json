@@ -1,0 +1,188 @@
+{
+  "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "known": "The owner: they are three tables. galley makes each a verse block (structure spec section 9).",
+  "excerpt": "domesday_headings_quotes",
+  "page": 6,
+  "book_page_index": 47,
+  "shows": "small tables of figures, read as verse",
+  "layout": [
+    [
+      "22 Domesday Book."
+    ],
+    [
+      "South -Western Group : 49,155",
+      "Mid- Western Group: 33,191",
+      "Eastern Group: 72,883",
+      "These figures are so emphatic that they may cause us for a",
+      "moment to doubt their value, and on details we must lay no",
+      "stress. But we have materials which enable us to check the",
+      "general effect. In 1297 Edward I. levied a lay subsidy of a",
+      "ninth1. The sums borne by our three groups of counties were",
+      "these :—",
+      "£",
+      "South- Western Group : 4,038",
+      "Mid-Western Group: 3,514",
+      "Eastern Group : 7,329",
+      "There is a curious resemblance between these two sets of figures.",
+      "Then in 1377 and 1381 returns were made for a poll-tax2. The",
+      "number of polls returned in our three groups were these :—",
+      "1377 1381",
+      "South- Western Group : 183,842 106,086",
+      "Mid- Western Group : 158,245 115,679",
+      "Eastern Group : 255,498 182,830",
+      "No doubt all inferences drawn from medieval statistics are",
+      "exceedingly precarious ; but, unless a good many figures have",
+      "conspired to deceive us, Lincolnshire, Norfolk and Suffolk were",
+      "at the time of the Conquest and for three centuries afterwards",
+      "vastly richer and more populous than any tract of equal area",
+      "in the West.",
+      "Another distinction between the eastern counties and the",
+      "n - r T T> i j • T",
+      "res t ot E n g l a n d i s app aren t. I n many shires we shall find that",
+      "the name of each vill is mentioned once and no more. This is",
+      "so because the land of each vill belongs in its entirety to some",
+      "one tenant in chief. We may go further : we may say, though",
+      "at present in an untechnical sense, that each vill is a manor.",
+      "Such is the general rule, though there will be exceptions to it.",
+      "On the other hand, in the eastern counties this rule will become",
+      "the exception. For example, of the fourteen vills in the",
+      "Armingford hundred of Cambridgeshire there is but one of"
+    ],
+    [
+      "Manorial",
+      "an d n o",
+      "m a n o ri al"
+    ],
+    [
+      "1 L a y S u b s i d y , 2 5 E d w . I . ( Y o r k shire Archaeological Society), pp. xxxi-xxxv.",
+      "Frac t i o n s o f a p o u n d ar e n e g l e c t e d .",
+      "2 Powell, The Eising in East Anglia, 120-3. The great decrease between",
+      "1377 and 1381 in the number of persons taxed, we must not try to explain."
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "verse",
+      "text": "South -Western Group : 49,155\nMid- Western Group: 33,191\nEastern Group: 72,883",
+      "pages": [
+        6
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "These figures are so emphatic that they may cause us for a moment to doubt their value, and on details we must lay no stress. But we have materials which enable us to check the general effect. In 1297 Edward I. levied a lay subsidy of a ninth1. The sums borne by our three groups of counties were these :— £",
+      "pages": [
+        6
+      ]
+    },
+    {
+      "kind": "verse",
+      "text": "South- Western Group : 4,038\nMid-Western Group: 3,514\nEastern Group : 7,329",
+      "pages": [
+        6
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "There is a curious resemblance between these two sets of figures. Then in 1377 and 1381 returns were made for a poll-tax2. The number of polls returned in our three groups were these :— 1377 1381",
+      "pages": [
+        6
+      ]
+    },
+    {
+      "kind": "verse",
+      "text": "South- Western Group : 183,842 106,086\nMid- Western Group : 158,245 115,679\nEastern Group : 255,498 182,830",
+      "pages": [
+        6
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "No doubt all inferences drawn from medieval statistics are exceedingly precarious ; but, unless a good many figures have conspired to deceive us, Lincolnshire, Norfolk and Suffolk were at the time of the Conquest and for three centuries afterwards vastly richer and more populous than any tract of equal area in the West.",
+      "pages": [
+        6
+      ]
+    },
+    {
+      "kind": "margin_note",
+      "text": "Manorial an d n o m a n o ri al",
+      "pages": [
+        6
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "Another distinction between the eastern counties and the n - r T T> i j • T res t ot E n g l a n d i s app aren t. I n many shires we shall find that the name of each vill is mentioned once and no more. This is so because the land of each vill belongs in its entirety to some one tenant in chief. We may go further : we may say, though at present in an untechnical sense, that each vill is a manor. Such is the general rule, though there will be exceptions to it. On the other hand, in the eastern counties this rule will become the exception. For example, of the fourteen vills in the Armingford hundred of Cambridgeshire there is but one of Two free men, of whom .^Elfwin had not even the commendation1.",
+      "pages": [
+        6,
+        7
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "marker": "1",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "L a y S u b s i d y , 2 5 E d w . I . ( Y o r k shire Archaeological Society), pp. xxxi-xxxv. Frac t i o n s o f a p o u n d ar e n e g l e c t e d ."
+        }
+      ],
+      "pages": [
+        6
+      ]
+    },
+    {
+      "marker": "2",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "Powell, The Eising in East Anglia, 120-3. The great decrease between 1377 and 1381 in the number of persons taxed, we must not try to explain."
+        }
+      ],
+      "pages": [
+        6
+      ]
+    }
+  ],
+  "removals": [
+    {
+      "reason": "page_number",
+      "text": "22"
+    },
+    {
+      "reason": "running_head",
+      "text": "Domesday Book."
+    }
+  ],
+  "word_changes": [
+    {
+      "before": [
+        "ninth1."
+      ],
+      "after": [
+        "ninth",
+        "1",
+        "."
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "poll-tax2."
+      ],
+      "after": [
+        "poll-tax",
+        "2",
+        "."
+      ],
+      "reason": "note_marker"
+    }
+  ],
+  "page_numbers": [
+    {
+      "text": "22",
+      "position": "head"
+    }
+  ]
+}

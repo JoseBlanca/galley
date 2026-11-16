@@ -1,0 +1,70 @@
+{
+  "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "excerpt": "domesday_headings_quotes",
+  "page": 4,
+  "book_page_index": 40,
+  "shows": "a second map as a plate: stray words removed, the caption kept",
+  "layout": [
+    [
+      ".^^<^«»W»L= f ^ , a U"
+    ],
+    [
+      "^^^B^^^r^m^",
+      "• \\ | / .\": ;,///;'///.».\"''*,. ^;\\ \\\\ . ((1^^*^==%-^^^^^^*"
+    ],
+    [
+      "-"
+    ],
+    [
+      "/\\L'l><<r/uimt M &*"
+    ],
+    [
+      "&^ffif&''n!fc>'\\",
+      "^^ ^ > -Wf\"1'' ••• .y&t'yHj ^.fe-/«vT%CV.\" f",
+      "A LAND OF HAMLETS",
+      "tlm border between tiumersvt and Devon."
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "figure",
+      "text": "A LAND OF HAMLETS tlm border between tiumersvt and Devon.",
+      "pages": [
+        4
+      ]
+    }
+  ],
+  "notes": [],
+  "removals": [
+    {
+      "reason": "plate_text",
+      "text": ".^^<^«»W»L= f ^ , a U"
+    },
+    {
+      "reason": "plate_text",
+      "text": "^^^B^^^r^m^"
+    },
+    {
+      "reason": "plate_text",
+      "text": "-"
+    },
+    {
+      "reason": "plate_text",
+      "text": "• \\ | / .\": ;,///;'///.».\"''*,. ^;\\ \\\\ . ((1^^*^==%-^^^^^^*"
+    },
+    {
+      "reason": "plate_text",
+      "text": "&^ffif&''n!fc>'\\"
+    },
+    {
+      "reason": "plate_text",
+      "text": "/\\L'l><<r/uimt M &*"
+    },
+    {
+      "reason": "plate_text",
+      "text": "^^ ^ > -Wf\"1'' ••• .y&t'yHj ^.fe-/«vT%CV.\" f"
+    }
+  ],
+  "word_changes": [],
+  "page_numbers": []
+}
