@@ -53,13 +53,18 @@ The owner decided in chat on 15 November 2026:
 (`docs/specs/structure.md` §21), which gives `blocks.json` version 2
 (architecture §8): a heading's chapter label in a field of its own, the
 block kinds `verse` and `chapter_summary`, and notes of kind `endnote`.
-The reference text has none of these: it marks verse and chapter
-summaries as quotes, and every note alike. What changes:
+The reference text marks every note alike, and marks verse with
+classes of its own (`div.poem`, `div.poetry`) and Stubbs' chapter
+summaries as prose quotes. What changes:
 
+- the reader keeps verse and chapter summaries apart from prose quotes
+  (section 4), so that each galley kind is scored against its own
+  (decided in the review of 16 November 2026);
 - a heading's label is tokens of its block, and an endnote's marker
   tokens of its note, as the fidelity check counts them (section 5);
-- a `verse` or `chapter_summary` block holding a reference quote, and
-  an endnote holding a reference note, are the right kind (section 6);
+- an endnote is aligned near its reference, and its tokens are not
+  scored at words and lines, where they cannot be aligned (section 5);
+  a difference caused by a link to the wrong page says so (section 7);
 - one heading block with a label holds both headings that Stubbs' and
   Mariéjol's reference texts make of a chapter's label and title: both
   are found, and no paragraph boundary is missed between them (section
@@ -104,8 +109,9 @@ this spec.
 - **Body range**: the pages of a book from the page of its first
   chapter heading to the last page of its text, given in `books.toml`
   (section 3). It leaves out the title pages, the preface and the
-  printed table of contents before it, and publisher's lists after it,
-  where the reference text makes a heading of every line.
+  printed table of contents before it, where the reference text makes a
+  heading of every line of a title page, and publisher's lists after
+  it.
 
 Page always means a PDF page, given by its page index from 0, unless it
 says "printed page".
@@ -161,8 +167,9 @@ number was measured another way than this spec defines, it says how.
 - **Headings.** Haskins' and Domesday's reference texts make one heading
   of a chapter's label and title ("V NORMANDY AND FRANCE", "ESSAY I.
   DOMESDAY BOOK."); Stubbs' and Mariéjol's make two ("CHAPTER III." and
-  "THE EARLY YEARS OF HENRY II."). Every line of a title page and of
-  Stubbs' publisher's lists is a heading too. The reference texts of
+  "THE EARLY YEARS OF HENRY II."). Every line of a title page is a
+  heading too, and Stubbs' publisher's lists (pages 322 to 337) have
+  two. The reference texts of
   the four books hold 21, 37, 28 and 34 headings, of which 18, 26, 23
   and 26 are in their body ranges (section 3): measured on 16 November
   2026 with the tool's reader (section 4), each heading placed on its
@@ -231,16 +238,20 @@ gives:
   (Mariéjol: 14–16);
 - `margin_notes_moved`, true when Gutenberg moved the margin notes, so
   that their position is not scored (Domesday);
-- `body_pages`, the first and last page index of the book's body range,
-  on which the headings are scored (section 6). They are those
-  structure's heading rule was measured on (`docs/specs/structure.md`
-  §14): Haskins 16 to 279, Stubbs 18 to 321, Domesday 22 to 557,
-  Mariéjol 18 to 448. Each starts at the page of the first chapter
-  heading. Stubbs' ends before its publisher's lists (pages 322 to 337),
+- `body_pages`, required, the first and last page index of the book's
+  body range, on which the headings are scored (section 6). They are
+  those structure's heading rule was measured on
+  (`docs/specs/structure.md` §14): Haskins 16 to 279, Stubbs 18 to 321,
+  Domesday 22 to 552, Mariéjol 18 to 448. Each starts at the page of the
+  first chapter heading. Stubbs' ends before its publisher's lists
+  (pages 322 to 337), Domesday's before its printer's imprint (553),
   Mariéjol's before its table of contents (page 450, one of its
-  `contents_pages`, where galley makes no heading; 449 is excluded), the others at the
-  book's last page. A range is written by hand, not found by a rule,
-  because a target is set on it;
+  `contents_pages`, where galley makes no heading; 449 is excluded),
+  Haskins' at the book's last page. A range is written by hand, not
+  found by a rule, because a target is set on it. The reader of
+  `books.toml` stops with an error when the first is above the last;
+  the comparison stops with one when the last is above the PDF's last
+  page index;
 - `html_sha256`: the SHA-256 of the HTML file the rules and counts were
   written for. Gutenberg may publish a new version of a book; the reader
   stops with an error when the file differs, so that the counts are not
@@ -283,7 +294,8 @@ The reference is read from the HTML with Python's `html.parser`, by the
 book's reading rules. It becomes the things blocks.json holds:
 
 - **body blocks** in order, each with its kind: heading, paragraph,
-  quote, figure, margin note, index entry, or table;
+  quote, verse, chapter summary, figure, margin note, index entry, or
+  table;
 - **notes** in order, each with its blocks;
 - the **places of the note references** in the body, each with the note
   it points to;
@@ -308,7 +320,9 @@ one list of selectors for each of these:
 | `notes_section` | the part of the page that holds the notes | Domesday `div.footnote`; the others none |
 | `note` | one note | Haskins `div.footnote`, Mariéjol `blockquote.footnote`; Domesday none: inside its notes section, a note starts at each element that holds an `id` some note reference points to, and an element without one, such as the centred formula, continues the note before it |
 | `note_reference` | an `a` outside the notes whose `href` matches a regular expression | Haskins and Domesday `#Footnote_\d+`; Mariéjol `#footnote\d+`, which leaves out the "(retour)" links to `#footnotetag…`. A link of the same form inside a note is a cross-reference, and its text stays as tokens |
-| `quote` | quotes and verse | `div.blockquot`, `div.quote`, `p.quote`, `div.poem`, `div.poetry`, `div.verse` |
+| `quote` | quotes in prose | `div.blockquot` (Haskins 25, Stubbs 56), `div.quote` (Domesday 13), `p.quote` (Domesday 10) |
+| `verse` | verse | `div.poem` (Mariéjol 10), `div.poetry` (Haskins 4, Domesday 7, each inside a `div.poetry-container` and holding `div.stanza` and `div.verse`), `div.verse` |
+| `summary_after` | headings after which a quote is a chapter summary: an element of the `quote` rule that comes right after such a heading, its sibling with no block between them, is a chapter summary | none; Stubbs `p.ph3`, its chapter titles, which gives its 11 summaries and leaves out the two quotes after headings of its title page |
 | `index` | the index; each `li` inside is an index entry | `div.index`, `ul.index`, `ul.IX` |
 | `figure` | figures; the caption is the figure's text | `figure`, `div.figcenter` |
 | `table` | tables outside the index | `table` |
@@ -492,12 +506,26 @@ An **endnote** is printed pages away from its reference: Gierke's note
 provisional page is that of its reference, so an endnote on its own page
 would be out of the window. In passes 2 and 3, and in book order, the
 tokens of an endnote that galley links from a note reference stand on
-the page of galley's first reference to it: the page of the token
-before that reference in its block, or of the block's first token when
-the reference opens the block. An endnote that galley does not link
-keeps its own pages, and is aligned only when the reference's note has
-a provisional page within one page of them. Everywhere else, for the pages of reference tokens, the scores
-and the differences, a token keeps the page where it was printed.
+the page of galley's first reference to it, in galley's order, when
+several link it: the page of the token before that reference in its
+block, or of the block's first token when the reference opens the
+block. An endnote that galley does not link keeps its own pages, and
+is aligned only when the reference's note has a provisional page within
+one page of them. Everywhere else, for the pages of reference tokens,
+the scores and the differences, a token keeps the page where it was
+printed.
+
+At words and lines galley has no notes: an endnote's words are body
+words on the page where it was printed, out of the window of its
+reference's note. So the tokens of the reference's notes that galley
+makes endnotes, those of each reference note found `as_note` in a
+galley endnote at blocks (section 6), are not scored at words and
+lines. For the attribution to stages their states at words and lines
+are taken as matched: a difference on them is attributed to blocks or
+markdown, and blocks does not count them as `repaired`. galley's words
+of those endnotes stay `extra` at words and lines, since nothing there
+says which words they are; they are not followed to markdown, where
+they are aligned.
 
 In difflib's result, an equal stretch gives aligned pairs. A replaced
 stretch is examined as "Differences" below says. A deleted or
@@ -699,9 +727,12 @@ These are scored at blocks and markdown.
   has. A galley boundary at a page break where the reference's paragraph
   runs on is a wrong boundary. The boundary between two consecutive
   reference headings is not a reference boundary when one galley heading
-  block with a `label` holds most of the aligned tokens of each: it is
-  the chapter label and title that Stubbs' and Mariéjol's reference texts
-  make two headings of, and galley one (section 2).
+  block with a `label` holds most of the aligned tokens of each, the
+  first's mostly in its label and the second's mostly in its spans: it
+  is the chapter label and title that Stubbs' and Mariéjol's reference
+  texts make two headings of, and galley one (section 2). Mariéjol's
+  "APPENDICE" and its title, which galley makes one heading with no
+  label, are not covered: the boundary between them is missed.
 - **Block kinds.** For each reference block, the kind of the galley block
   that holds most of its aligned tokens. The scorecard gives the count of
   each pair, reference kind against galley kind, and `kinds_right`, the
@@ -709,16 +740,15 @@ These are scored at blocks and markdown.
 
   | reference kind | right galley kinds |
   |---|---|
-  | heading, paragraph, margin note, index entry, figure | the same kind |
-  | quote | `quote`, `verse`, `chapter_summary` |
+  | every kind but table | the same kind |
   | table | none: galley has no table kind yet |
 
-  The reference text marks verse, and Stubbs' chapter summaries, as
-  quotes (`div.poem` and `div.blockquot` among the `quote` selectors of
-  section 4), so a galley `verse` or `chapter_summary` block that holds
-  one is right. A galley `verse` block that holds a reference table,
-  as structure makes of some of Domesday's (`docs/specs/structure.md`
-  §16), is wrong.
+  A galley `verse` block is right only on the reference's verse, a
+  `quote` only on its prose quotes, a `chapter_summary` only on Stubbs'
+  summaries (section 4, rules `verse` and `summary_after`; decided in
+  the review of 16 November 2026). A `verse` block that holds a
+  reference table, as structure makes of some of Domesday's
+  (`docs/specs/structure.md` §16), is wrong.
 - **Headings.** On the body range (section 3), as structure's heading
   targets are set (`docs/specs/structure.md` §9):
   - `reference_headings`: the reference's heading blocks whose first
@@ -745,8 +775,8 @@ These are scored at blocks and markdown.
   - `in_body`: at least half are in body blocks;
   - otherwise `missing`.
 
-  For a note found `as_note`, its reference is right when galley's note
-  reference for that note, mapped onto the gaps between the reference's
+  For a note found `as_note`, its reference is right when one of
+  galley's note references to that note, mapped onto the gaps between the reference's
   tokens through the alignment, is within 3 tokens of the gap where
   Gutenberg's reference is.
 - **Margin notes.** Each reference margin note is `as_margin_note`,
@@ -799,7 +829,19 @@ Each line of `differences.jsonl` is one difference:
   the place in the book): the reference's of the same stream, or, for an
   extra, galley's of its page;
 - `block_id` and `note_id` where galley's side has them;
-- `edge_of_page`.
+- `edge_of_page`;
+- `cause`: `endnote_reference_far` for a difference on a reference
+  note's tokens, or on an extra token of a galley endnote, when galley
+  linked that endnote to a reference more than one page from where the
+  reference text has it; else null. Such a note is out of the window
+  (section 5) and scored `missing`, not as a note with a wrong
+  reference; the cause says why. A reference note and a galley endnote
+  are taken as the same note, for this field only, when at least half
+  of the note's tokens with a non-empty alignment key have their key
+  among the endnote's, the endnote with the most such keys when several
+  have half; galley's reference is its first, as above, and the
+  reference text's place is the page of the reference token before its
+  first reference to the note (section 5, "Pages").
 
 ## 8. Finding pages with bad OCR
 
@@ -928,16 +970,22 @@ them is a separate function.
     galley's structure does not make them all yet: a heading whose
     `label` "CHAPTER III." gives the block's first two tokens at blocks
     and at markdown; a `verse` block whose line feeds separate words as
-    spaces do, and a
-    `chapter_summary` block, each holding a reference quote and counted
-    in `kinds_right`; an endnote whose marker is a token, referenced or
+    spaces do, right on the reference's verse and wrong on a prose
+    quote; a `chapter_summary` block right on a quote after a heading of
+    `summary_after`; an endnote whose marker is a token, referenced or
     not, placed after a margin note inside it, and whose reference's
     text is a token neither at blocks nor at markdown; a referenced
     endnote printed ten pages after its reference, found `as_note` with
-    its reference right; the two reference headings "CHAPTER III." and
-    its title against one galley heading with a label, both in heading
-    blocks and no boundary missed; a reference heading outside the body
-    range, not counted.
+    its reference right, and its tokens not scored at words; an endnote
+    linked from a reference ten pages from the reference text's, scored
+    `missing` with the cause `endnote_reference_far`; the two reference
+    headings "CHAPTER III." and its title against one galley heading
+    with a label, both in heading blocks and no boundary missed, and
+    against one with no label, the boundary missed; a reference heading
+    outside the body range, not counted;
+  - the reader on the rules `verse` and `summary_after`, and
+    `books.toml` without `body_pages` or with a first page above the
+    last, an error.
 - **An excerpt test.** A new excerpt, `haskins_eval`, cut by
   `scripts/fetch_samples.py`: about ten PDF pages of Haskins with
   footnotes, a chapter start and an index page. With it go:
