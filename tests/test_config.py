@@ -59,6 +59,8 @@ def test_config_with_every_key_is_read_into_its_values(
             "exclude_pages": "[9, 8]",
             "exclude_regions": "[{page = 0, box = [240, 620, 252, 632.5]}, {page = 3, box = [1.5, 2, 3, 4]}]",
             "cover_page": "1",
+            "plate_pages": "[5, 2]",
+            "contents_pages": "[0, 1]",
         },
     )
 
@@ -75,6 +77,8 @@ def test_config_with_every_key_is_read_into_its_values(
             ExcludedRegion(page_index=3, box=Box(1.5, 2.0, 3.0, 4.0)),
         ),
         cover_page=1,
+        plate_pages=(5, 2),
+        contents_pages=(0, 1),
     )
 
 
@@ -94,7 +98,24 @@ def test_config_with_only_the_required_keys_has_the_defaults(
         exclude_pages=(),
         exclude_regions=(),
         cover_page=None,
+        plate_pages=(),
+        contents_pages=(),
     )
+
+
+def test_contents_pages_and_plate_pages_keep_the_order_of_the_config(
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
+) -> None:
+    # Stubbs' three contents pages and Kadesh's faint plate (architecture
+    # section 6, plates spec section 2).
+    keys = _required_keys(excerpt_pdf[KADESH]) | {
+        "contents_pages": "[16, 14, 15]",
+        "plate_pages": "[23]",
+    }
+    config = read_config(_write_config(tmp_path, keys))
+
+    assert config.contents_pages == (16, 14, 15)
+    assert config.plate_pages == (23,)
 
 
 def test_relative_pdf_is_resolved_against_the_folder_of_the_config(
@@ -208,6 +229,10 @@ def test_region_without_its_box_is_an_error(
         ("exclude_pages", "[1.5]", "exclude_pages[0]"),
         ("exclude_pages", "3", "exclude_pages"),
         ("cover_page", "true", "cover_page"),
+        ("plate_pages", "[23, true]", "plate_pages[1]"),
+        ("plate_pages", "23", "plate_pages"),
+        ("contents_pages", '["14"]', "contents_pages[0]"),
+        ("contents_pages", "{page = 14}", "contents_pages"),
         ("exclude_regions", '"x"', "exclude_regions"),
         ("exclude_regions", "[3]", "exclude_regions[0]"),
         (
@@ -251,6 +276,8 @@ def test_ocr_that_is_not_one_of_its_values_is_an_error(
     [
         ("exclude_pages", "[3, -1]", "exclude_pages[1]"),
         ("cover_page", "-1", "cover_page"),
+        ("plate_pages", "[-23]", "plate_pages[0]"),
+        ("contents_pages", "[14, 15, -16]", "contents_pages[2]"),
         (
             "exclude_regions",
             "[{page = -2, box = [1, 2, 3, 4]}]",

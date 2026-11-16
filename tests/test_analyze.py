@@ -158,9 +158,17 @@ def test_ocr_verify_and_trust_with_pages_below_the_count_pass(ocr: OcrMode) -> N
         exclude_pages=(0, 9),
         exclude_regions=(ExcludedRegion(9, REGION_A),),
         cover_page=9,
+        plate_pages=(0, 9),
+        contents_pages=(0, 9),
     )
 
     check_config_pages(config, 10)
+
+
+def test_contents_pages_and_plate_pages_below_the_page_count_pass() -> None:
+    config = replace(CONFIG, contents_pages=(14, 15, 16), plate_pages=(23,))
+
+    check_config_pages(config, 24)
 
 
 @pytest.mark.parametrize(
@@ -178,8 +186,16 @@ def test_ocr_verify_and_trust_with_pages_below_the_count_pass(ocr: OcrMode) -> N
             "exclude_regions[1].page",
         ),
         (replace(CONFIG, cover_page=10), "cover_page"),
+        (replace(CONFIG, plate_pages=(10,)), "plate_pages[0]"),
+        (replace(CONFIG, contents_pages=(4, 5, 10)), "contents_pages[2]"),
     ],
-    ids=["exclude_pages", "exclude_regions", "cover_page"],
+    ids=[
+        "exclude_pages",
+        "exclude_regions",
+        "cover_page",
+        "plate_pages",
+        "contents_pages",
+    ],
 )
 def test_page_index_equal_to_the_page_count_is_a_config_error(
     config: BookConfig, key: str

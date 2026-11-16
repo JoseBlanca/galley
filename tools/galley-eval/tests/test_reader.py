@@ -529,10 +529,16 @@ def test_reference_file_that_is_not_utf8_is_an_error(tmp_path: Path) -> None:
         read_reference_file(path, DEFAULT_RULES, _sha256(data))
 
 
+# Galley's kinds that the reference has no rule for yet: how its quotes
+# match them is a change to docs/specs/evaluation.md (structure spec
+# section 21), task 7.4 of the plan structure-second.
+_KINDS_WITHOUT_A_REFERENCE_RULE = frozenset({"verse", "chapter_summary"})
+
+
 def test_reference_kinds_are_galleys_block_kinds_and_table() -> None:
-    assert {kind.value for kind in ReferenceKind} == {
-        kind.value for kind in BlockKind
-    } | {"table"}
+    assert {kind.value for kind in ReferenceKind} == (
+        {kind.value for kind in BlockKind} - _KINDS_WITHOUT_A_REFERENCE_RULE
+    ) | {"table"}
 
 
 @pytest.mark.parametrize(

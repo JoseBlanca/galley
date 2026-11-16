@@ -749,3 +749,10 @@ def test_note_reference_at_the_end_of_its_block_is_after_its_last_token() -> Non
     # After "fourth" is gap 4, three tokens from Gutenberg's 7; before
     # "fourth" would be 3, four tokens away.
     assert scores.reference_right == 1
+
+
+def test_galley_kinds_are_galleys_block_kinds_and_none() -> None:
+    # A galley block's kind is read into a GalleyKind by its value.
+    assert {kind.value for kind in GalleyKind} == {kind.value for kind in BlockKind} | {
+        "none"
+    }

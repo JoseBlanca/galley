@@ -32,6 +32,7 @@ from galley.model import (
     Edit,
     Emphasis,
     Note,
+    NoteKind,
     Origin,
     PageInfo,
     PageKind,
@@ -191,6 +192,7 @@ def _paragraph(block_id: str, *texts: str, note_ref: str | None = None) -> Block
         id=block_id,
         kind=BlockKind.PARAGRAPH,
         level=None,
+        label=None,
         spans=tuple(Span(text, Emphasis.NONE, note_ref) for text in texts),
         figure=None,
         origin=(Origin(0, Box(10.0, 20.0, 300.0, 400.0)),),
@@ -262,6 +264,7 @@ def test_render_markdown_writes_title_and_authors_as_json_strings() -> None:
 
 NOTE = Note(
     id="n-p0000-001",
+    kind=NoteKind.FOOTNOTE,
     marker="1",
     blocks=(_paragraph("b-p0000-002", "A note."),),
     origin=(Origin(0, Box(10.0, 500.0, 300.0, 520.0)),),
@@ -385,6 +388,7 @@ def _block(block_id: str, kind: BlockKind, text: str, *page_indices: int) -> Blo
         id=block_id,
         kind=kind,
         level=None,
+        label=None,
         spans=(Span(text, Emphasis.NONE, None),),
         figure=None,
         origin=tuple(
@@ -399,6 +403,7 @@ def _unreferenced_note(
 ) -> Note:
     return Note(
         id=note_id,
+        kind=NoteKind.FOOTNOTE,
         marker=marker,
         blocks=blocks,
         origin=(Origin(page_index, Box(10.0, 500.0, 300.0, 520.0)),),

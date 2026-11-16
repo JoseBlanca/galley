@@ -22,6 +22,7 @@ from galley.model import (
     Emphasis,
     Line,
     Note,
+    NoteKind,
     Origin,
     PageLayout,
     PageNumber,
@@ -303,6 +304,7 @@ def _block(block_id: str, unnumbered: _Unnumbered) -> Block:
         id=block_id,
         kind=unnumbered.kind,
         level=None,
+        label=None,
         spans=(Span(unnumbered.text, Emphasis.NONE, None),),
         figure=None,
         origin=unnumbered.origin,
@@ -377,6 +379,7 @@ def _numbered(
         numbered_notes.append(
             Note(
                 id=f"n-p{page_index:04d}-{note_counts[page_index]:03d}",
+                kind=NoteKind.FOOTNOTE,
                 marker="",
                 blocks=(_block(note_block_ids[note_number], note),),
                 origin=note.origin,

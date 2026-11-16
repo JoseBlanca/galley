@@ -46,7 +46,12 @@ class ExcludedRegion:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class BookConfig:
-    """The config of one book. `pdf` is absolute; page indices count from 0."""
+    """The config of one book. `pdf` is absolute; page indices count from 0.
+
+    `plate_pages` are pages analyze makes plates whatever its rule finds;
+    `contents_pages` are the pages of the printed table of contents, on
+    which structure makes no heading (architecture section 6).
+    """
 
     pdf: Path
     title: str
@@ -57,10 +62,20 @@ class BookConfig:
     exclude_pages: tuple[int, ...] = ()
     exclude_regions: tuple[ExcludedRegion, ...] = ()
     cover_page: int | None = None
+    plate_pages: tuple[int, ...] = ()
+    contents_pages: tuple[int, ...] = ()
 
 
 _REQUIRED_KEYS = ("pdf", "title", "authors", "language")
-_OPTIONAL_KEYS = ("ocr", "correct", "exclude_pages", "exclude_regions", "cover_page")
+_OPTIONAL_KEYS = (
+    "ocr",
+    "correct",
+    "exclude_pages",
+    "exclude_regions",
+    "cover_page",
+    "plate_pages",
+    "contents_pages",
+)
 _REGION_KEYS = ("page", "box")
 _BOX_COORDINATES = 4
 
@@ -106,7 +121,6 @@ def _config_from_toml(content: dict[str, object], path: Path) -> BookConfig:
     if not pdf.is_absolute():
         pdf = path.parent / pdf
     regions = _list(content.get("exclude_regions", []), "exclude_regions", path)
-    pages = _list(content.get("exclude_pages", []), "exclude_pages", path)
     cover_page = content.get("cover_page")
     return BookConfig(
         pdf=pdf,
@@ -124,10 +138,7 @@ def _config_from_toml(content: dict[str, object], path: Path) -> BookConfig:
         language=_enum(Language, content["language"], "language", path),
         ocr=_enum(OcrMode, content.get("ocr", OcrMode.VERIFY.value), "ocr", path),
         correct=_bool(content.get("correct", False), "correct", path),
-        exclude_pages=tuple(
-            _page_index(page, f"exclude_pages[{position}]", path)
-            for position, page in enumerate(pages)
-        ),
+        exclude_pages=_page_indices(content, "exclude_pages", path),
         exclude_regions=tuple(
             _region(region, f"exclude_regions[{position}]", path)
             for position, region in enumerate(regions)
@@ -135,6 +146,8 @@ def _config_from_toml(content: dict[str, object], path: Path) -> BookConfig:
         cover_page=None
         if cover_page is None
         else _page_index(cover_page, "cover_page", path),
+        plate_pages=_page_indices(content, "plate_pages", path),
+        contents_pages=_page_indices(content, "contents_pages", path),
     )
 
 
@@ -198,6 +211,16 @@ def _page_index(value: object, key: str, path: Path) -> int:
     if value < 0:
         raise _error(path, key, f"a page index counts from 0, found {value}")
     return value
+
+
+def _page_indices(content: dict[str, object], key: str, path: Path) -> tuple[int, ...]:
+    """The list of page indices at `key` of `content`, in its order; none
+    when the key is absent."""
+    pages = _list(content.get(key, []), key, path)
+    return tuple(
+        _page_index(page, f"{key}[{position}]", path)
+        for position, page in enumerate(pages)
+    )
 
 
 def _region(value: object, key: str, path: Path) -> ExcludedRegion:

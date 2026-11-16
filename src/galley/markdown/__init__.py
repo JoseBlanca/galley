@@ -9,9 +9,9 @@ with `referenced` false is a div with its id and the class `note` around
 its blocks' divs, its marker first, after the last block, in the order
 of blocks.json, whose first origin is on the note's first page or an
 earlier one, or first of all (structure spec, sections 6 and 10, option
-b). Headings, quotes, figures, index
-entries, note references and referenced notes are refused, and so are
-edits, since none can exist before `galley2epub edits-from` is built.
+b). Headings, quotes, verse, chapter summaries, figures, index entries,
+note references and referenced notes are refused, and so are edits,
+since none can exist before `galley2epub edits-from` is built.
 """
 
 import bisect
@@ -195,6 +195,8 @@ def _div_attributes(block: Block) -> str:
             BlockKind.PARAGRAPH
             | BlockKind.HEADING
             | BlockKind.QUOTE
+            | BlockKind.VERSE
+            | BlockKind.CHAPTER_SUMMARY
             | BlockKind.FIGURE
             | BlockKind.INDEX_ENTRY
         ):

@@ -153,6 +153,8 @@ class GalleyKind(StrEnum):
     HEADING = "heading"
     PARAGRAPH = "paragraph"
     QUOTE = "quote"
+    VERSE = "verse"
+    CHAPTER_SUMMARY = "chapter_summary"
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"

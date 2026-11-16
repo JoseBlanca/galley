@@ -18,6 +18,7 @@ from galley.model import (
     Line,
     LinesFile,
     Note,
+    NoteKind,
     Origin,
     PageLayout,
     PageWords,
@@ -118,7 +119,13 @@ def _block(
     origin: tuple[Origin, ...],
 ) -> Block:
     return Block(
-        id=block_id, kind=kind, level=None, spans=spans, figure=None, origin=origin
+        id=block_id,
+        kind=kind,
+        level=None,
+        label=None,
+        spans=spans,
+        figure=None,
+        origin=origin,
     )
 
 
@@ -144,6 +151,7 @@ _BLOCKS = BlocksFile(
     notes=(
         Note(
             id="n-p0001-001",
+            kind=NoteKind.FOOTNOTE,
             marker="1",
             blocks=(
                 _block(
@@ -302,6 +310,7 @@ def _markdown(*words: tuple[str, str | None]) -> MarkdownWords:
     return MarkdownWords(
         words=tuple(MarkdownWord(text, block_id) for text, block_id in words),
         note_count=0,
+        note_link_count=0,
     )
 
 
@@ -401,6 +410,7 @@ def _note_blocks(*, referenced: bool) -> BlocksFile:
         notes=(
             Note(
                 id="n-p0001-001",
+                kind=NoteKind.FOOTNOTE,
                 marker="*",
                 blocks=(
                     _block(

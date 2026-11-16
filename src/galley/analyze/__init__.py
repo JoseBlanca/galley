@@ -135,9 +135,9 @@ def classify_page(
 
 def check_config_pages(config: BookConfig, page_count: int) -> None:
     """Raises ConfigError when the config's `ocr` is `redo`, which needs OCR,
-    or when a page index of `exclude_pages`, `exclude_regions` or
-    `cover_page` is not below `page_count`, naming the key, the index and
-    the count."""
+    or when a page index of `exclude_pages`, `exclude_regions`,
+    `cover_page`, `plate_pages` or `contents_pages` is not below
+    `page_count`, naming the key, the index and the count."""
     if config.ocr is OcrMode.REDO:
         message = (
             "ocr = redo needs OCR, which the walking skeleton does not have; "
@@ -154,6 +154,14 @@ def check_config_pages(config: BookConfig, page_count: int) -> None:
             for position, region in enumerate(config.exclude_regions)
         ),
         *(() if config.cover_page is None else (("cover_page", config.cover_page),)),
+        *(
+            (f"plate_pages[{position}]", index)
+            for position, index in enumerate(config.plate_pages)
+        ),
+        *(
+            (f"contents_pages[{position}]", index)
+            for position, index in enumerate(config.contents_pages)
+        ),
     )
     for key, index in indices:
         if index >= page_count:

@@ -75,6 +75,7 @@ def _paragraph(block_id: str, text: str, page_index: int, box: Box) -> Block:
         id=block_id,
         kind=BlockKind.PARAGRAPH,
         level=None,
+        label=None,
         spans=(Span(text, Emphasis.NONE, None),),
         figure=None,
         origin=(Origin(page_index, box),),
@@ -1643,6 +1644,7 @@ def test_run_writes_a_paragraph_that_runs_over_a_blank_page(tmp_path: Path) -> N
                 id="b-p0000-001",
                 kind=BlockKind.PARAGRAPH,
                 level=None,
+                label=None,
                 spans=(
                     Span("Alpha beta, gamma delta. gamma delta.", Emphasis.NONE, None),
                 ),

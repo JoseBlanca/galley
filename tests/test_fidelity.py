@@ -27,6 +27,7 @@ from galley.model import (
     Line,
     LinesFile,
     Note,
+    NoteKind,
     Origin,
     PageLayout,
     PageWords,
@@ -97,6 +98,7 @@ def _block(block_id: str, pages: tuple[int, ...], spans: tuple[Span, ...]) -> Bl
         id=block_id,
         kind=BlockKind.PARAGRAPH,
         level=None,
+        label=None,
         spans=spans,
         figure=None,
         origin=tuple(Origin(page, _BOX) for page in pages),
@@ -120,11 +122,14 @@ def _blocks_file(
 
 
 def _markdown(
-    words: tuple[tuple[str, str | None], ...], note_count: int
+    words: tuple[tuple[str, str | None], ...],
+    note_count: int,
+    note_link_count: int = 0,
 ) -> MarkdownWords:
     return MarkdownWords(
         words=tuple(MarkdownWord(text, block_id) for text, block_id in words),
         note_count=note_count,
+        note_link_count=note_link_count,
     )
 
 
@@ -151,6 +156,7 @@ def _greece_blocks(marker: str, *, referenced: bool) -> BlocksFile:
         notes=(
             Note(
                 id="n-p0000-001",
+                kind=NoteKind.FOOTNOTE,
                 marker=marker,
                 blocks=(_block("b-p0000-002", (0,), (_span("A note."),)),),
                 origin=(Origin(0, _BOX),),
@@ -359,7 +365,7 @@ def test_structure_note_reference_span_holding_a_body_word_fails() -> None:
     assert raised.value.invented == frozendict()
     assert "block b-p0000-001" in raised.value.detail
     assert "'1 and'" in raised.value.detail
-    assert "marker '1'" in raised.value.detail
+    assert "does not have a marker's shape" in raised.value.detail
 
 
 def test_structure_note_reference_to_no_note_fails() -> None:
@@ -379,6 +385,126 @@ def test_structure_note_reference_to_no_note_fails() -> None:
 
     assert "block b-p0000-001" in raised.value.detail
     assert "n-p0009-001" in raised.value.detail
+
+
+def test_structure_reference_reading_differently_from_its_marker_passes() -> None:
+    # The OCR reads the two sides of a superscript differently: the
+    # reference "1" against a note whose marker reads "8" (architecture
+    # section 8).
+    lines = _lines_file((("as in Greece,1 and", "8 A note."),))
+    blocks = _greece_blocks("8", referenced=True)
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_structure_reference_span_land_fails_as_no_marker_shape() -> None:
+    # Structure spec section 9, the second plan: a reference span "land" is
+    # a word, which would vanish into Pandoc's note at the markdown boundary.
+    lines = _lines_file((("as in Greece, land", "1 A note."),))
+    blocks = replace(
+        _greece_blocks_with_reference(_span("land", "n-p0000-001")), word_changes=()
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict()
+    assert raised.value.detail == (
+        "block b-p0000-001: the note reference span 'land' does not have a "
+        "marker's shape (at most 4 characters, at most 3 of them letters or "
+        "digits and at most 1 a letter, no white space)"
+    )
+
+
+def test_structure_reference_span_naming_no_note_fails_with_a_marker_shape() -> None:
+    # Structure spec section 9, the second plan: a span with a marker's
+    # shape still fails when its note is not in the file.
+    blocks = _greece_blocks_with_reference(_span("1", "n-p0009-001"))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, _GREECE_LINES, blocks)
+
+    assert raised.value.detail == (
+        "block b-p0000-001: the note reference span '1' names n-p0009-001, "
+        "which is no note"
+    )
+
+
+@pytest.mark.parametrize(
+    "reference",
+    ["8", "(i)", "^", "345", "(t)", "U)", "(3J", "*", "\u00ab", "12s"],
+)
+def test_structure_reference_span_with_a_marker_shape_passes(reference: str) -> None:
+    lines = _lines_file(((f"as in Greece,{reference}", "1 A note."),))
+    word_change = WordChange(
+        page_index=0,
+        before=(f"Greece,{reference}",),
+        after=("Greece,", reference),
+        reason=ChangeReason.NOTE_MARKER,
+    )
+    blocks = replace(
+        _greece_blocks_with_reference(_span(reference, "n-p0000-001")),
+        word_changes=(word_change,),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+@pytest.mark.parametrize(
+    "reference",
+    ["the", "land", "(li)", "a1b", "1234", "12345", "(123)", "1 2", "", "1\n"],
+)
+def test_structure_reference_span_without_a_marker_shape_fails(
+    reference: str,
+) -> None:
+    blocks = _greece_blocks_with_reference(_span(reference, "n-p0000-001"))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, _GREECE_LINES, blocks)
+
+    assert f"span {reference!r} does not have a marker's shape" in (raised.value.detail)
+
+
+def _heading(label: str | None, title: str) -> Block:
+    return replace(
+        _block("b-p0000-001", (0,), (_span(title),)),
+        kind=BlockKind.HEADING,
+        level=1,
+        label=label,
+    )
+
+
+def test_structure_heading_label_counts_as_words_of_its_block() -> None:
+    lines = _lines_file((("CHAPTER III.", "THE EARLY YEARS"),))
+    blocks = _blocks_file((_heading("CHAPTER III.", "THE EARLY YEARS"),))
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_structure_heading_label_not_in_the_lines_is_invented() -> None:
+    lines = _lines_file((("THE EARLY YEARS",),))
+    blocks = _blocks_file((_heading("CHAPTER III.", "THE EARLY YEARS"),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict({"CHAPTER": 1, "III.": 1})
+    assert "'CHAPTER': input none, output block b-p0000-001 page 0" in (
+        raised.value.detail
+    )
+
+
+def test_structure_heading_label_dropped_from_the_block_is_missing() -> None:
+    lines = _lines_file((("V", "NORMANDY AND FRANCE"),))
+    blocks = _blocks_file((_heading(None, "NORMANDY AND FRANCE"),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert raised.value.missing == frozendict({"V": 1})
+    assert raised.value.invented == frozendict()
 
 
 @pytest.mark.parametrize(
@@ -644,6 +770,7 @@ def test_markdown_unreferenced_note_marker_is_a_word() -> None:
         notes=(
             Note(
                 id="n-p0000-001",
+                kind=NoteKind.FOOTNOTE,
                 marker="*",
                 blocks=(_block("b-p0000-002", (0,), (_span("An endnote."),)),),
                 origin=(Origin(0, _BOX),),
@@ -682,6 +809,7 @@ def test_markdown_two_note_references_against_one_pandoc_note_fail() -> None:
         notes=tuple(
             Note(
                 id=f"n-p0000-00{number}",
+                kind=NoteKind.FOOTNOTE,
                 marker=str(number),
                 blocks=(
                     _block(
@@ -712,7 +840,7 @@ def test_markdown_two_note_references_against_one_pandoc_note_fail() -> None:
     assert raised.value.missing == frozendict()
     assert raised.value.invented == frozendict()
     assert (
-        "note references in blocks.json: 2; notes in the Markdown: 1"
+        "references to footnotes in blocks.json: 2; notes in the Markdown: 1"
         in raised.value.detail
     )
 
@@ -751,7 +879,7 @@ def test_markdown_reference_pandoc_left_as_text_is_an_invented_word() -> None:
 
     assert raised.value.missing == frozendict({"Greece,": 1})
     assert raised.value.invented == frozendict({"Greece,[^1]": 1})
-    assert "note references in blocks.json: 1; notes in the Markdown: 0" in (
+    assert "references to footnotes in blocks.json: 1; notes in the Markdown: 0" in (
         raised.value.detail
     )
 
@@ -763,6 +891,7 @@ def test_markdown_counts_note_references_inside_note_blocks() -> None:
         notes=(
             Note(
                 id="n-p0000-001",
+                kind=NoteKind.FOOTNOTE,
                 marker="1",
                 blocks=(
                     _block(
@@ -776,6 +905,7 @@ def test_markdown_counts_note_references_inside_note_blocks() -> None:
             ),
             Note(
                 id="n-p0000-002",
+                kind=NoteKind.FOOTNOTE,
                 marker="2",
                 blocks=(_block("b-p0000-003", (0,), (_span("Second"),)),),
                 origin=(Origin(0, _BOX),),
@@ -791,8 +921,117 @@ def test_markdown_counts_note_references_inside_note_blocks() -> None:
     with pytest.raises(FidelityError) as raised:
         check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
 
-    assert "note references in blocks.json: 2; notes in the Markdown: 1" in (
+    assert "references to footnotes in blocks.json: 2; notes in the Markdown: 1" in (
         raised.value.detail
+    )
+
+
+def test_markdown_heading_label_counts_as_words_of_its_block() -> None:
+    blocks = _blocks_file((_heading("V", "NORMANDY AND FRANCE"),))
+    markdown = _markdown(
+        (
+            ("V", "b-p0000-001"),
+            ("NORMANDY", "b-p0000-001"),
+            ("AND", "b-p0000-001"),
+            ("FRANCE", "b-p0000-001"),
+        ),
+        note_count=0,
+    )
+
+    check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+
+def test_markdown_heading_label_left_out_of_the_markdown_is_missing() -> None:
+    blocks = _blocks_file((_heading("V", "NORMANDY AND FRANCE"),))
+    markdown = _markdown(
+        (
+            ("NORMANDY", "b-p0000-001"),
+            ("AND", "b-p0000-001"),
+            ("FRANCE", "b-p0000-001"),
+        ),
+        note_count=0,
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+    assert raised.value.missing == frozendict({"V": 1})
+    assert raised.value.invented == frozendict()
+    assert "'V': input block b-p0000-001 page 0, output none" in raised.value.detail
+
+
+def _endnote_blocks(*, referenced: bool) -> BlocksFile:
+    """A paragraph whose word "Law" is followed by a reference to the
+    endnote "291." when `referenced`, and the endnote."""
+    reference = (_span("291", "n-p0001-001"),) if referenced else ()
+    return _blocks_file(
+        (_block("b-p0000-001", (0,), (_span("of the Law"), *reference)),),
+        notes=(
+            Note(
+                id="n-p0001-001",
+                kind=NoteKind.ENDNOTE,
+                marker="291.",
+                blocks=(_block("b-p0001-001", (1,), (_span("See Gierke."),)),),
+                origin=(Origin(1, _BOX),),
+                referenced=referenced,
+            ),
+        ),
+    )
+
+
+_ENDNOTE_MARKDOWN = (
+    ("of", "b-p0000-001"),
+    ("the", "b-p0000-001"),
+    ("Law", "b-p0000-001"),
+    ("291.", "b-p0001-001"),
+    ("See", "b-p0001-001"),
+    ("Gierke.", "b-p0001-001"),
+)
+
+
+@pytest.mark.parametrize("referenced", [True, False], ids=["referenced", "not"])
+def test_markdown_endnote_marker_is_a_word_referenced_or_not(
+    referenced: bool,
+) -> None:
+    blocks = _endnote_blocks(referenced=referenced)
+    markdown = _markdown(
+        _ENDNOTE_MARKDOWN, note_count=0, note_link_count=1 if referenced else 0
+    )
+
+    check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+
+def test_markdown_referenced_endnote_without_its_marker_fails() -> None:
+    blocks = _endnote_blocks(referenced=True)
+    markdown = _markdown(
+        tuple(word for word in _ENDNOTE_MARKDOWN if word[0] != "291."),
+        note_count=0,
+        note_link_count=1,
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+    assert raised.value.missing == frozendict({"291.": 1})
+    assert raised.value.invented == frozendict()
+    assert "'291.': input note n-p0001-001 page 1, output none" in (raised.value.detail)
+
+
+def test_markdown_endnote_reference_made_a_pandoc_note_fails() -> None:
+    # A reference to an endnote is a link to the endnote's place; a Pandoc
+    # note would show the endnote's text twice.
+    blocks = _endnote_blocks(referenced=True)
+    markdown = _markdown(_ENDNOTE_MARKDOWN, note_count=1, note_link_count=0)
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict()
+    assert raised.value.detail == (
+        "references to footnotes in blocks.json: 0; notes in the Markdown: 1; "
+        "references to endnotes in blocks.json: 1; note reference links in the "
+        "Markdown: 0"
     )
 
 
@@ -902,6 +1141,25 @@ def test_read_markdown_with_an_element_galley_does_not_write_raises() -> None:
         read_markdown("::: {#b-p0000-001}\n- an item\n:::\n")
 
 
+@pytest.mark.pandoc
+def test_read_markdown_counts_a_link_to_an_endnote_and_not_its_text() -> None:
+    markdown = read_markdown(
+        "::: {#b-p0000-001}\n"
+        'of the Law[291](#n-p0001-001){epub:type="noteref"} and\n'
+        ":::\n"
+    )
+
+    assert _texts(markdown) == ("of", "the", "Law", "and")
+    assert markdown.note_link_count == 1
+    assert markdown.note_count == 0
+
+
+@pytest.mark.pandoc
+def test_read_markdown_with_a_link_that_is_no_note_reference_raises() -> None:
+    with pytest.raises(ExternalProgramError, match=r"Link.*b-p0000-001"):
+        read_markdown("::: {#b-p0000-001}\nsee [the law](#n-p0001-001)\n:::\n")
+
+
 # The walk of Pandoc's JSON, on literal JSON as Pandoc 3.14 writes it
 
 
@@ -959,6 +1217,36 @@ def test_walk_of_an_element_outside_any_div_raises_saying_so() -> None:
         ExternalProgramError, match="BulletList element outside any block"
     ):
         _words_of_pandoc_json(_pandoc_document(bullet_list))
+
+
+def _link(attributes: str, inlines: str) -> str:
+    return (
+        f'{{"t":"Link","c":[["",[],[{attributes}]],[{inlines}],["#n-p0001-001",""]]}}'
+    )
+
+
+def test_walk_counts_a_link_to_an_endnote_and_leaves_out_its_text() -> None:
+    link = _link('["epub:type","noteref"]', _str("291"))
+    paragraph = f'{{"t":"Para","c":[{_str("Law")},{link},{_str("and")}]}}'
+
+    markdown = _words_of_pandoc_json(_pandoc_document(_div("b-p0000-001", paragraph)))
+
+    assert _texts(markdown) == ("Law", "and")
+    assert markdown.note_link_count == 1
+    assert markdown.note_count == 0
+
+
+@pytest.mark.parametrize(
+    "attributes",
+    ['["epub:type","chapter"]', '["class","noteref"]', ""],
+    ids=["other-epub-type", "other-attribute", "none"],
+)
+def test_walk_of_a_link_that_is_no_note_reference_raises(attributes: str) -> None:
+    link = _link(attributes, _str("291"))
+    paragraph = f'{{"t":"Para","c":[{_str("Law")},{link}]}}'
+
+    with pytest.raises(ExternalProgramError, match="Link element in block b-p0000-001"):
+        _words_of_pandoc_json(_pandoc_document(_div("b-p0000-001", paragraph)))
 
 
 @pytest.mark.thread_unsafe(reason="changes PATH")

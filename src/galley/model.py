@@ -29,7 +29,8 @@ from galley.errors import EditError, InputFileError
 PAGES_FORMAT_VERSION = 1
 WORDS_FORMAT_VERSION = 1
 LINES_FORMAT_VERSION = 1
-BLOCKS_FORMAT_VERSION = 1
+# 2 since the second plan of structure, 16 November 2026 (architecture section 8).
+BLOCKS_FORMAT_VERSION = 2
 EDITS_FORMAT_VERSION = 1
 
 
@@ -167,6 +168,7 @@ class RemovalReason(StrEnum):
     SIGNATURE_MARK = "signature_mark"
     PLATE_TEXT = "plate_text"  # stray text-layer characters on a plate
     STRAY_MARK = "stray_mark"  # a line with no letter or digit above a running head
+    GUIDE_WORDS = "guide_words"  # "BUR CON" under the running head of an index page
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -233,11 +235,14 @@ class LinesFile:
 
 
 class BlockKind(StrEnum):
-    """What a block of the book is."""
+    """What the text of a block is, never how it is printed (architecture
+    section 8)."""
 
-    HEADING = "heading"
+    HEADING = "heading"  # a chapter's or a section's, its label in Block.label
     PARAGRAPH = "paragraph"
-    QUOTE = "quote"
+    QUOTE = "quote"  # a passage quoted from another text, in prose
+    VERSE = "verse"  # lines of a poem, separated by line feeds in the text
+    CHAPTER_SUMMARY = "chapter_summary"  # a chapter's topics under its heading
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"
@@ -252,7 +257,8 @@ class Emphasis(StrEnum):
 @dataclass(frozen=True, slots=True)
 class Span:
     """A run of a block's text. A span with a `note_ref` is a note reference:
-    its text is the marker as printed and `note_ref` the id of the note."""
+    `note_ref` is the id of the note, and its text the reference as printed
+    or as the OCR read it, which may differ from the note's marker."""
 
     text: str
     emphasis: Emphasis
@@ -269,29 +275,46 @@ class Origin:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Block:
-    """A heading, paragraph, quote, figure, margin note or index entry.
+    """A block of the book: a heading, paragraph, quote, verse, chapter
+    summary, figure, margin note or index entry.
 
     `id` is `b-p<page index, 4 digits>-<n, 3 digits>`; `level` is a
-    heading's, from 1, and None otherwise; `figure` is the image path of a
-    figure block; `origin` has one entry per page the block was printed on.
+    heading's, from 1, and None otherwise; `label` is a heading's chapter
+    label as printed ("CHAPTER III.", "V"), whose title is in the spans,
+    and None for a heading without one and for every other kind; `figure`
+    is the image path of a figure block; `origin` has one entry per page
+    the block was printed on.
     """
 
     id: str
     kind: BlockKind
     level: int | None
+    label: str | None
     spans: tuple[Span, ...]
     figure: str | None
     origin: tuple[Origin, ...]
+
+
+class NoteKind(StrEnum):
+    """Where a note was printed: at the foot of its page, or with the
+    others in a section of their own at the end of the book or of a
+    chapter."""
+
+    FOOTNOTE = "footnote"
+    ENDNOTE = "endnote"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Note:
     """A footnote or endnote. `id` is `n-p<page index, 4 digits>-<n, 3
     digits>`, for the n-th note that starts on that page; `marker` is as
-    printed at the start of the note; `referenced` is false when no
-    reference to it was found."""
+    printed at the start of the note, or as the OCR read it, and empty when
+    it has none; `blocks` are its paragraphs, quotes or verse, with each
+    margin note printed beside one of them as a block just before it;
+    `referenced` is false when no reference to it was found."""
 
     id: str
+    kind: NoteKind
     marker: str
     blocks: tuple[Block, ...]
     origin: tuple[Origin, ...]
