@@ -4091,6 +4091,35 @@ def test_bibliographical_note_blocks_are_paragraphs_up_to_the_next_heading() -> 
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+def test_bibliographical_note_footnote_under_the_heading_s_page_stays_a_note() -> None:
+    # Haskins page 204: on the heading's page, the band's block led by a
+    # marker of the book's form (digits, from page 3) and what follows stay
+    # notes; the unmarked block before them is a paragraph. On page 1, a
+    # marked band block is a paragraph of the section.
+    lines = _bibliography_pages("BIBLIOGRAPHICAL NOTE")
+    band_0 = _region(
+        _note_line("Sources are listed in the general works on", 300),
+        _note_line("the period.", 309, 50, 100),
+        _note_line("1 Mont-Saint-Michel and Chartres, p. 4.", 320, 62, 250),
+        _note_line("2 Ibid.", 329, 62, 100),
+    )
+    band_1 = _region(_note_line("3 Cited above, p. 9.", 300, 62, 200))
+    page_0 = replace(lines.pages[0], regions=(*lines.pages[0].regions, band_0))
+    page_1 = replace(lines.pages[1], regions=(lines.pages[1].regions[0], band_1))
+    blocks = make_blocks(
+        _lines_of(page_0, page_1, *lines.pages[2:]), _NO_WORDS, workers=1
+    )
+    assert tuple((note.origin[0].page_index, note.marker) for note in blocks.notes)[
+        :2
+    ] == ((0, "1"), (0, "2"))
+    # "Sources…" runs on into page 1's body, as any paragraph does.
+    assert tuple(
+        " ".join(block_text(block).split(" ")[:2])
+        for block in blocks.blocks
+        if block_text(block).startswith(("Sources", "3 Cited"))
+    ) == ("Sources are", "3 Cited")
+
+
 def test_bibliographical_note_rule_names_its_title() -> None:
     blocks = make_blocks(_bibliography_pages("FURTHER READING"), _NO_WORDS, workers=1)
     assert tuple(
@@ -4117,7 +4146,8 @@ def test_bibliographical_note_heading_of_level_1_heads_none() -> None:
 def test_bibliographical_note_pages_keep_the_notes_left_in_their_body() -> None:
     # The heading at the foot of page 0 starts a bibliographical note that
     # runs to "CHAPTER II." on page 3: page 1's small lines with rising
-    # markers stay paragraphs, and page 0's band note is one too.
+    # markers stay paragraphs. Page 0's band note, led by a marker on the
+    # heading's page, stays a note.
     pages = _body_notes_pages(("(1)", "(2)", "(3)")).pages
     page_0 = replace(
         pages[0],
@@ -4140,7 +4170,7 @@ def test_bibliographical_note_pages_keep_the_notes_left_in_their_body() -> None:
         (),
     )
     blocks = make_blocks(_lines_of(page_0, *pages[1:], page_3), _NO_WORDS, workers=1)
-    assert tuple(note.origin[0].page_index for note in blocks.notes) == (3,)
+    assert tuple(note.origin[0].page_index for note in blocks.notes) == (0, 3)
     assert _page_1_blocks(blocks)[-3:] == (
         "(1) Note (1) in small type.",
         "(2) Note (2) in small type.",

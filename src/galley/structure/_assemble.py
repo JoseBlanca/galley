@@ -10,7 +10,7 @@ from typing import assert_never
 
 from galley.model import Block, BlockKind, Note, NoteKind, WordChange
 from galley.structure._bibliography import (
-    bibliographical_pages,
+    bibliography,
     in_bibliographical_notes,
     with_band_as_body,
 )
@@ -318,11 +318,8 @@ def assemble(
     density = book_density(tuple(line for page in parts for line in page.body))
     # Spec section 16: a bibliographical note's band blocks are paragraphs,
     # and its pages' notes are not taken from the body.
-    bibliography = bibliographical_pages(parts)
-    parts = tuple(
-        with_band_as_body(page) if page.index in bibliography else page
-        for page in parts
-    )
+    found = bibliography(parts)
+    parts = tuple(with_band_as_body(page, found, form) for page in parts)
     band_notes = tuple(page_notes(page.band_regions, word_list) for page in parts)
     numbering = book_numbering(band_notes)
     # The paragraphs are found twice: the first time only for the pages of
@@ -337,7 +334,7 @@ def assemble(
         form,
         body_word_height,
         section_pages,
-        bibliography,
+        found.pages,
     )
     book_footnotes = footnotes(
         tuple(page_notes(page.band_regions, word_list) for page in pages),
