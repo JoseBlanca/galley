@@ -9,7 +9,8 @@ read that file. The words are as the dictionary gives them, with their
 case and accents ("Médicis"). A word of the book is looked up by its key,
 `word_key`, the form structure's hyphen rule compares (structure spec
 section 5); `is_known_word` says whether a word counts as known on a
-plate (plates spec section 2).
+plate (plates spec section 2), against the list in lower case that
+`lower_case_word_list` gives.
 
 Adapted from `setup.sh` of the owner's ocr_lab
 (`~/devel/tomato_history_web_site/tools/ocr_lab/setup.sh`), which runs the
@@ -19,6 +20,7 @@ On Tesseract 5.5.4 (Homebrew, 15 November 2026) the English dictionary
 holds 338,080 words and the French one 74,068.
 """
 
+import functools
 import logging
 import os
 import re
@@ -108,6 +110,16 @@ def word_list(
         msg = f"the cached word list {cache_file} is empty; {_DELETE_CACHE}"
         raise InputFileError(msg)
     return words
+
+
+@functools.cache
+def lower_case_word_list(
+    language: Language, cache_dir: Path = DEFAULT_CACHE_DIR
+) -> frozenset[str]:
+    """The words of `word_list(language, cache_dir)` in lower case, the form
+    `is_known_word` and structure's hyphen rule compare keys with. Made once
+    per language and folder in a process; raises as `word_list` does."""
+    return frozenset(word.lower() for word in word_list(language, cache_dir))
 
 
 def words_of_list(text: str) -> frozenset[str]:
@@ -231,22 +243,36 @@ def word_key(text: str) -> str:
     return lowered[start:end]
 
 
-def is_known_word(word: str, word_list: frozenset[str]) -> bool:
+def is_known_word(word: str, lower_case_words: frozenset[str]) -> bool:
     """Whether `word` counts as known on a plate (plates spec section 2).
 
     It is known when its key (`word_key`) has at least 2 letters, holds
-    nothing but letters, apostrophes and hyphens, and is in `word_list`,
-    which is in lower case; or when its key is ASCII digits, a number with
-    brackets or punctuation around it ("16", "17]").
+    nothing but letters, apostrophes and hyphens, and is in
+    `lower_case_words`, the word list as `lower_case_word_list` gives it;
+    or when it is ASCII digits with brackets, hyphens or other punctuation
+    around them ("16", "17]", "1066-").
     """
-    key = word_key(word)
-    if key.isascii() and key.isdigit():
+    number = _without_punctuation_around(word)
+    if number.isascii() and number.isdigit():
         return True
+    key = word_key(word)
     return (
         sum(character.isalpha() for character in key) >= _KNOWN_WORD_MIN_LETTERS
         and all(
             character.isalpha() or character == "-" or character in APOSTROPHES
             for character in key
         )
-        and key in word_list
+        and key in lower_case_words
     )
+
+
+def _without_punctuation_around(text: str) -> str:
+    """`text` without the characters that are not letters or digits at its
+    ends: "(1066)-" gives "1066"."""
+    start = 0
+    end = len(text)
+    while start < end and not text[start].isalnum():
+        start += 1
+    while end > start and not text[end - 1].isalnum():
+        end -= 1
+    return text[start:end]

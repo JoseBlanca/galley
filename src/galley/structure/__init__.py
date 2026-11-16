@@ -43,16 +43,18 @@ _logger = logging.getLogger(__name__)
 
 
 def make_blocks(
-    lines: LinesFile, word_list: frozenset[str], *, workers: int = DEFAULT_WORKERS
+    lines: LinesFile,
+    lower_case_words: frozenset[str],
+    *,
+    workers: int = DEFAULT_WORKERS,
 ) -> BlocksFile:
     """The blocks of the book, what was removed, the words changed and the
     page numbers, in a pool of `workers` threads; the result does not
-    depend on `workers`. `word_list` is the word list of the book's
-    language as `wordlist.word_list` gives it, in any case."""
+    depend on `workers`. `lower_case_words` is the word list of the book's
+    language in lower case, as `wordlist.lower_case_word_list` gives it."""
     survey = survey_book(lines, workers=workers)
-    lower_word_list = frozenset(word.lower() for word in word_list)
     pages = map_pages(lambda page: page_parts(page, survey), lines.pages, workers)
-    assembled = assemble(pages, survey.book_words, lower_word_list)
+    assembled = assemble(pages, survey.book_words, lower_case_words)
     return BlocksFile(
         source_pdf_sha256=lines.source_pdf_sha256,
         blocks=assembled.blocks,
@@ -82,7 +84,7 @@ def run(
         folder.pages_json, config.pdf, folder.lines_json, read_lines
     )
     # The cache folder is read here, as the command's check reads it.
-    words = wordlist.word_list(config.language, wordlist.DEFAULT_CACHE_DIR)
+    words = wordlist.lower_case_word_list(config.language, wordlist.DEFAULT_CACHE_DIR)
     blocks = make_blocks(lines, words, workers=workers)
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
     write_blocks(folder.blocks_json, blocks)

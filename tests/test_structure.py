@@ -816,7 +816,7 @@ def test_hyphen_at_a_line_end_is_joined_inside_a_block_and_recorded() -> None:
     )
     blocks = make_blocks(
         _lines_of(page, PageLayout(4, (_body(70, "an Anglo-Saxon thing"),), ())),
-        frozenset({"Necessary"}),
+        frozenset({"necessary"}),
         workers=1,
     )
     assert block_text(blocks.blocks[0]) == (

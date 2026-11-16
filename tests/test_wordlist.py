@@ -22,6 +22,7 @@ from galley.wordlist import (
     WORD_LIST_TOOLS,
     is_cached,
     is_known_word,
+    lower_case_word_list,
     missing_tools,
     tessdata_dir_and_languages,
     word_key,
@@ -238,3 +239,32 @@ def test_known_word_may_hold_a_hyphen_and_an_apostrophe() -> None:
 
 def test_known_word_is_not_a_number_with_a_letter() -> None:
     assert not is_known_word("17th", frozenset())
+
+
+def test_known_word_is_a_number_with_a_hyphen_after_it() -> None:
+    # Plates spec section 2: a number with punctuation around it.
+    assert is_known_word("1066-", frozenset())
+    assert is_known_word("(1066)-", frozenset())
+
+
+def test_known_word_of_2_letters_in_the_list() -> None:
+    assert is_known_word("of", frozenset({"of"}))
+
+
+def test_known_word_is_not_a_digit_outside_ascii() -> None:
+    # "²" is a digit to Python, not a number of the book.
+    assert not is_known_word("\u00b2", frozenset())
+
+
+# lower_case_word_list
+
+
+def test_lower_case_word_list_is_the_list_in_lower_case(tmp_path: Path) -> None:
+    cache_dir = _own_folder(tmp_path)
+    (cache_dir / "eng.txt").write_text(
+        "Normandy\nreplicate\nGLOUCESTER\n", encoding="utf-8"
+    )
+
+    assert lower_case_word_list(Language.EN, cache_dir) == frozenset(
+        {"normandy", "replicate", "gloucester"}
+    )
