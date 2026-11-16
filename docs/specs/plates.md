@@ -43,8 +43,7 @@ holds a plate's figure, and the plate's image in `images/`.
 
 | book | page | what it is | its text layer |
 |---|---|---|---|
-| Kadesh | 16 | a relief, lightly printed | `, ' ..` and `^U;L` (a faint caption) |
-| | 19, 24 | maps with the book's running head | "12 THE BATTLE o? KADERH", "JAMES HENRY BREASTED 15"; 24's caption is printed sideways and is not in the layer |
+| Kadesh | 19, 24 | maps with the book's running head | "12 THE BATTLE o? KADERH", "JAMES HENRY BREASTED 15"; 24's caption is printed sideways and is not in the layer |
 | | 22 | a relief | "PLATE II" |
 | | 34, 42, 48, 56, 64 | reliefs and a photograph | "DECENNIAL PUBLICATIONS, V", the series' head, on each; captions on 48, 56 and 64 ("PALIMPSEST WALL SHOWING LATER RELIEFS…") and labels in the picture on 56 ("XXV I XXIV xxm") |
 | | 68 | a drawing | "l>i .• I:N\IAL PUBLICATIONS, PLATE VIII", "V", "THE MODERN MODND OF KADESH" |
@@ -53,6 +52,15 @@ holds a plate's figure, and the plate's image in `images/`.
 | | 69 | a photograph with a running head and a few lines of text above it | none |
 | Domesday | 39, 40 | maps, "A LAND OF VILLAGES", "A LAND OF HAMLETS" | 13 and 7 lines of stray words (`^X.^ MoulslVl^rf /\"?`), the caption in two lines, and on 39 the binder's note "[Between pp. 16–17]" |
 | Stubbs | 9, 11, 52, 54 | maps in colour, two of them folded | none (53 and 55, their backs, are blank) |
+
+Kadesh 16 was in this list, as a relief lightly printed with the stray
+words `, ' ..` and `^U;L` in its layer, until the owner looked at it on
+16 November 2026: it is not a plate but "the scan of a cover (of the
+book or of the plate), no plate and no text". The configs exclude it.
+The rule of section 2 still takes it, and the measures of sections 2
+and 3 were made with it among the plates, then 22, 12 of them with a
+text layer; they are kept as measured. The plates are 21, 11 of them
+with a text layer.
 
 Pictures inside text pages (Kadesh's maps on pages 29, 33 and 36, its
 lines of hieroglyphs) are not plates and are left out: architecture §8
@@ -174,7 +182,7 @@ the `exclude_pages` of the `whole_book` tests' configs
 `evaluation/books.toml`, or named as the
 `cover_page`, and Kadesh 23 to their `plate_pages`, by the plan of this
 spec; the `whole_book` test asserts the plates those configs leave,
-which are the 22 plates of section 1. The plates without a text layer
+which are the 21 plates of section 1. The plates without a text layer
 are taken out of those `exclude_pages`.
 
 **Cost.** Rendering every page at 36 dpi took 12.6 s for Domesday's 558
@@ -208,7 +216,7 @@ A `plate` page is read as follows:
   the page has one `Figure(box=Box(0, 0, width_pt, height_pt),
   image="images/plate-0016.png", dpi=300)`. At 300 dpi a page of Kadesh
   is 2118 × 3034 pixels, 2.36 MB as the cover (walking-skeleton spec
-  §6), so Kadesh's 16 plates add about 38 MB to the book folder; making
+  §6), so Kadesh's 15 plates add about 36 MB to the book folder; making
   the EPUB's images smaller is the epub spec's work.
 
 The walking skeleton's refusal of a `plate` page goes; a page whose
@@ -249,13 +257,16 @@ covers `contents_pages` too.
 
 ## 5. Cases
 
-- **A plate without a caption** (Kadesh 16): a figure; structure makes
-  its two lines `plate_text` and gives a figure block with no text.
+- **A plate without a caption**, whose layer holds only stray words: a
+  figure; structure makes its lines `plate_text` and gives a figure
+  block with no text. The six books had one, Kadesh 16, until the owner
+  found it the scan of a cover (section 1); the unit tests of structure
+  §18 keep the case.
 - **A plate without a text layer** (Kadesh 17; Stubbs 52): a figure with
   no words, and a figure block with no text.
-- **What the rules get wrong, on the six books**: they take as plates 7
-  pages with a text layer that are not (Kadesh 0, 49, 65; Mariéjol 1,
-  2, 457, 458) and 1 without (Mariéjol 0, a cover), which the configs
+- **What the rules get wrong, on the six books**: they take as plates 8
+  pages with a text layer that are not (Kadesh 0, 16, 49, 65; Mariéjol
+  1, 2, 457, 458) and 1 without (Mariéjol 0, a cover), which the configs
   exclude; they miss 1 plate, Kadesh 23, which the config names in
   `plate_pages`. Every page taken by the rule is logged at WARNING.
 - **The back of a plate**, the picture showing through (Kadesh 49, 65),
@@ -287,14 +298,14 @@ becomes a test:
 
 | excerpt | page (excerpt page, book page index) | expected |
 |---|---|---|
-| `kadesh_8-17` (committed) | 8 (16) | `plate`, with its image; every other page `text`, but 9 (17) |
+| `kadesh_8-17` (committed) | 8 (16) | excluded in the test's config, the scan of a cover (section 1); every other page `text`, but 9 (17) |
 | `kadesh_8-17` | 9 (17) | `plate` without a text layer, no longer excluded in the test's config |
 | `kadesh_59-68` (new, structure §9) | 5 (64), 9 (68) | `plate`, with their images; the other pages `text` but 6 (65) |
 | `kadesh_59-68` | 6 (65) | the back of plate 64, `plate` and logged (a known case) |
 | `domesday_headings_quotes` (new, structure §9) | 3 (39), 4 (40) | `plate`, the maps |
 
 A `whole_book` test asserts, with the configs of section 2, that the
-plates of the six books are the 22 of section 1.
+plates of the six books are the 21 of section 1.
 
 ## 7. Not in this spec
 

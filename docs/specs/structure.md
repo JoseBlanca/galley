@@ -963,7 +963,7 @@ exactly.
 | `mariejol_210-219` | 6 (216) | marker "U)"; note 2 with no reference in the text |
 | `kadesh_8-17` | 0 (8) | the article title, one level-1 heading of three lines with the author's name |
 | `kadesh_8-17` | 2 (10) | glued marker "13The"; note 12 run on into the right column; references "Kadesh,12", ";13" and "above).'*" (note 14, marker "u"); notes 10 and 11 unreferenced |
-| `kadesh_8-17` | 8 (16) | a plate with no caption: its two lines removed as `plate_text`, a figure block with no text after the paragraph that runs over it |
+| `kadesh_8-17` | 8 (16) | not a plate but the scan of a cover, with no plate and no text (owner, 16 November 2026): excluded in the test's config, so no block |
 | `gierke_86-93_270-271` | 0 (86) | "POLITICAL THEORIES OF THE / MIDDLE AGE.", level 1; "I. The Evolution of Political Theory.", level 2 |
 | `gierke_86-93_270-271` | 2 (88) | "Law1" stays unsplit (endnote 1 is outside the excerpt); margin notes before the paragraphs whose first lines they are beside; "Medieval Thought." beside the page's last line |
 | `gierke_86-93_270-271` | 6 (92) | "II. Macrocosm and Microcosm.", level 2, and the known false heading "Macrocosm and Microcosm." at the top |
