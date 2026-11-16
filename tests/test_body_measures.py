@@ -14,6 +14,7 @@ from galley.body_measures import (
     commonest,
     edge_counts,
     group_rows,
+    measured_page_positions,
     measured_pages,
     median_word_height,
 )
@@ -195,6 +196,18 @@ def test_measured_pages_are_those_of_3_rows_when_none_has_15() -> None:
 
 def test_no_page_is_measured_when_none_has_3_rows() -> None:
     assert measured_pages((_rows(2, height=10, pitch=12), ())) == ()
+
+
+def test_measured_page_positions_are_those_of_the_measured_pages() -> None:
+    pages = (
+        _rows(14, height=10, pitch=12),
+        _rows(15, height=10, pitch=12),
+        _rows(3, height=10, pitch=12),
+        _rows(16, height=10, pitch=12),
+    )
+    assert measured_page_positions(pages) == (1, 3)
+    assert measured_page_positions(pages[:1] + pages[2:3]) == (0, 1)
+    assert measured_page_positions((_rows(2, height=10, pitch=12), ())) == ()
 
 
 # body_measures

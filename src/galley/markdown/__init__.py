@@ -460,9 +460,7 @@ def _text_markdown(block: Block, notes: frozendict[str, Note], marker: str) -> s
 def _heading(block: Block, notes: frozendict[str, Note]) -> str:
     """A heading of its level with its id, its label first as a span of
     class `label`."""
-    if block.level is None:
-        message = f"blocks.json is malformed: heading {block.id} has no level"
-        raise InputFileError(message)
+    assert block.level is not None, "_check_well_formed refuses a heading without one"
     label = (
         f"[{escape_markdown(block.label)}]{{.label}}" if block.label is not None else ""
     )
@@ -673,6 +671,29 @@ def _check_no_edits(folder: BookFolder) -> None:
         raise EditError(message)
 
 
+def _check_figure_images(folder: BookFolder, blocks: BlocksFile) -> None:
+    """Raise InputFileError when the image of a figure of `blocks` is not a
+    file inside `folder`, naming each such figure and its image, so that
+    Pandoc does not fail on it later."""
+    root = folder.root.resolve()
+    missing = tuple(
+        f"figure {block.id} has the image {block.figure}"
+        for block in blocks.blocks
+        if block.kind is BlockKind.FIGURE
+        and block.figure is not None
+        and not (
+            (image := (folder.root / block.figure).resolve()).is_relative_to(root)
+            and image.is_file()
+        )
+    )
+    if missing:
+        message = (
+            f"{folder.blocks_json}: {'; '.join(missing)}, which is not a file in "
+            f"{folder.root}; run `galley2epub extract` to cut the figures again"
+        )
+        raise InputFileError(message)
+
+
 def run(
     folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS
 ) -> None:
@@ -685,7 +706,9 @@ def run(
     blocks.json was made from another PDF than pages.json; raises
     EditError when an edits file holds an edit; raises FidelityError when
     the words differ, and ExternalProgramError when Pandoc is missing or
-    fails. markdown runs once, so `workers` is not used.
+    fails. Raises InputFileError, naming each figure, when a figure's image
+    is not a file in the book folder. markdown runs once, so `workers` is
+    not used.
     """
     del workers  # every stage's run takes it; markdown is not per page
     delete_stage_outputs(folder, Stage.MARKDOWN)
@@ -693,6 +716,7 @@ def run(
         folder.pages_json, config.pdf, folder.blocks_json, read_blocks
     )
     _check_no_edits(folder)
+    _check_figure_images(folder, blocks)
     book_markdown = render_markdown(blocks, config)
     check_stage(FidelityBoundary.MARKDOWN, blocks, read_markdown(book_markdown))
     folder.book_md.write_text(book_markdown, encoding="utf-8", newline="\n")

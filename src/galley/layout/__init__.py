@@ -34,6 +34,7 @@ from galley.body_measures import (
     commonest,
     edge_counts,
     group_rows,
+    measured_page_positions,
     measured_pages,
     median_word_height,
 )
@@ -224,14 +225,8 @@ def measure_book(
         cut_in_inset_left=None,
         cut_in_inset_right=None,
     )
-    # measured_pages keeps the pages of at least 15 rows, or of at least 3
-    # when none has 15, so no page it leaves out has as many rows as the
-    # fewest it keeps: those pages are the measured ones.
-    fewest_rows = min(len(rows) for rows in measured)
     measured_words = tuple(
-        page
-        for page, rows in zip(words.pages, rows_by_page, strict=True)
-        if len(rows) >= fewest_rows
+        words.pages[position] for position in measured_page_positions(rows_by_page)
     )
 
     def page_insets(page: PageWords) -> tuple[tuple[int, ...], tuple[int, ...]]:
@@ -817,7 +812,11 @@ def _split_at_column(
 # (with 1, 47 more) and a shortened row, with nothing 4 pt short of the
 # inset (without one, 56 more). A note word's middle lies within 1 pt of
 # its zone. With these, 1,314 words moved: 767 aligned to a margin note of
-# the reference, 73 to the body (this code moves 1,324 there).
+# the reference, 73 to the body (this code moved 1,324 there). A word less
+# than 5 pt from a body word of its row stays, as a word of a sentence does
+# (the body's word spaces are 4.5 pt at the median; "issued as his", page
+# 33): with it 1,318 words move, and 0.940 of those aligned are note words
+# by the evaluation tool of 16 November 2026, 0.936 without it.
 _CUT_ROW_INSET_PT: Final[float] = 3.0
 _CUT_ROW_GAP_PT: Final[float] = 8.0
 _CUT_ROW_SPAN_SHARE: Final[float] = 0.5
@@ -825,10 +824,11 @@ _CUT_IN_CHAIN_PITCHES: Final[float] = 1.6
 _CUT_IN_CHAIN_ROWS: Final[int] = 2
 _CUT_IN_STRIP_PT: Final[float] = 4.0
 _CUT_IN_ZONE_PT: Final[float] = 1.0
+_CUT_IN_BODY_GAP_PT: Final[float] = 5.0
 
 
 @dataclass(frozen=True, slots=True)
-class _Span:
+class _SideWord:
     """A word of the column seen from one side of it, in points: on the
     left, `start` and `end` are its left and right sides; on the right,
     its right and left sides negated, so that the rules of the left side
@@ -849,13 +849,15 @@ class _Side(StrEnum):
     RIGHT = "right"
 
 
-def _spans(row: Line, side: _Side, index_of: dict[int, int]) -> tuple[_Span, ...]:
-    """The words of `row` as spans seen from `side`, in the order of their
+def _side_words(
+    row: Line, side: _Side, index_of: dict[int, int]
+) -> tuple[_SideWord, ...]:
+    """The words of `row` seen from `side`, in the order of their
     start; `index_of` gives a word's place by its identity."""
     match side:
         case _Side.LEFT:
-            spans = (
-                _Span(
+            side_words = (
+                _SideWord(
                     index_of[id(word)],
                     word.box.x0,
                     word.box.x1,
@@ -865,8 +867,8 @@ def _spans(row: Line, side: _Side, index_of: dict[int, int]) -> tuple[_Span, ...
                 for word in row.words
             )
         case _Side.RIGHT:
-            spans = (
-                _Span(
+            side_words = (
+                _SideWord(
                     index_of[id(word)],
                     -word.box.x1,
                     -word.box.x0,
@@ -877,58 +879,58 @@ def _spans(row: Line, side: _Side, index_of: dict[int, int]) -> tuple[_Span, ...
             )
         case _:
             assert_never(side)
-    return tuple(sorted(spans, key=lambda span: span.start))
+    return tuple(sorted(side_words, key=lambda word: word.start))
 
 
-def _is_cut_row(spans: tuple[_Span, ...], at: float, least_span: float) -> bool:
-    """Whether a row of `spans`, seen from its side, is cut at the inset
+def _is_cut_row(row: tuple[_SideWord, ...], at: float, least_span: float) -> bool:
+    """Whether `row`, seen from its side, is cut at the inset
     `at` (step 2b, rule 1): a word starts within `_CUT_ROW_INSET_PT` of
     `at`, first in the row or after a gap of `_CUT_ROW_GAP_PT`, and the
     row's words from it on span `least_span` or more."""
     return any(
-        abs(span.start - at) <= _CUT_ROW_INSET_PT
+        abs(word.start - at) <= _CUT_ROW_INSET_PT
         and (
             position == 0
-            or span.start - max(before.end for before in spans[:position])
+            or word.start - max(before.end for before in row[:position])
             >= _CUT_ROW_GAP_PT
         )
-        and max(after.end for after in spans[position:]) - span.start >= least_span
-        for position, span in enumerate(spans)
+        and max(after.end for after in row[position:]) - word.start >= least_span
+        for position, word in enumerate(row)
     )
 
 
 def _cut_in_zones(
-    rows: tuple[tuple[_Span, ...], ...], at: float, least_span: float, pitch: float
+    rows: tuple[tuple[_SideWord, ...], ...], at: float, least_span: float, pitch: float
 ) -> tuple[tuple[float, float], ...]:
     """The cut-in zones of a page's `rows`, seen from one side, as (top,
     bottom) in points (step 2b, rule 2): each chain of at least
     `_CUT_IN_CHAIN_ROWS` cut rows, each within `_CUT_IN_CHAIN_PITCHES`
     pitches of the one before, that holds a shortened row, trimmed to its
     first and last shortened rows."""
-    chains: list[list[tuple[_Span, ...]]] = []
-    for spans in rows:
-        if not _is_cut_row(spans, at, least_span):
+    chains: list[list[tuple[_SideWord, ...]]] = []
+    for row in rows:
+        if not _is_cut_row(row, at, least_span):
             continue
-        top = min(span.top for span in spans)
-        if chains and top - min(span.top for span in chains[-1][-1]) <= (
+        top = min(word.top for word in row)
+        if chains and top - min(word.top for word in chains[-1][-1]) <= (
             _CUT_IN_CHAIN_PITCHES * pitch
         ):
-            chains[-1].append(spans)
+            chains[-1].append(row)
         else:
-            chains.append([spans])
+            chains.append([row])
     strip_end = at - _CUT_IN_STRIP_PT
     zones = []
     for chain in chains:
         shortened = tuple(
             position
-            for position, spans in enumerate(chain)
-            if all(span.end > strip_end for span in spans)
+            for position, row in enumerate(chain)
+            if all(word.end > strip_end for word in row)
         )
         if len(chain) < _CUT_IN_CHAIN_ROWS or not shortened:
             continue
         first, last = chain[shortened[0]], chain[shortened[-1]]
         zones.append(
-            (min(span.top for span in first), max(span.bottom for span in last))
+            (min(word.top for word in first), max(word.bottom for word in last))
         )
     return tuple(zones)
 
@@ -940,7 +942,7 @@ def _cut_in_note_indices(
     the column at `side` (step 2b, rule 3): their middle in a cut-in zone,
     give or take `_CUT_IN_ZONE_PT`, and ending `_CUT_IN_STRIP_PT` or more
     short of the inset. `edge` is the column's edge on that side, seen from
-    it as `_Span` sees it: the right edge negated. Empty when the book has
+    it as `_SideWord` sees it: the right edge negated. Empty when the book has
     no inset on that side."""
     match side:
         case _Side.LEFT:
@@ -952,23 +954,49 @@ def _cut_in_note_indices(
     if inset is None:
         return frozenset()
     index_of = {id(word): index for index, word in enumerate(column)}
-    rows = tuple(_spans(row, side, index_of) for row in group_rows(column))
+    rows = tuple(_side_words(row, side, index_of) for row in group_rows(column))
     at = edge + inset
     zones = _cut_in_zones(
         rows, at, _CUT_ROW_SPAN_SHARE * measures.column_width, measures.body_line_pitch
     )
-    return frozenset(
-        span.index
-        for spans in rows
-        for span in spans
-        if span.end <= at - _CUT_IN_STRIP_PT
+    in_zones = frozenset(
+        word.index
+        for row in rows
+        for word in row
+        if word.end <= at - _CUT_IN_STRIP_PT
         and any(
             top - _CUT_IN_ZONE_PT
-            <= (span.top + span.bottom) / 2
+            <= (word.top + word.bottom) / 2
             <= bottom + _CUT_IN_ZONE_PT
             for top, bottom in zones
         )
     )
+    return frozenset(index for row in rows for index in _apart_from_body(row, in_zones))
+
+
+def _apart_from_body(
+    row: tuple[_SideWord, ...], in_zones: frozenset[int]
+) -> frozenset[int]:
+    """The places of the words of `row` that are in `in_zones`
+    and lie `_CUT_IN_BODY_GAP_PT` or more from every body word of the row
+    (step 2b, rule 3): a word not in `in_zones` is a body word, and so is
+    a word of `in_zones` that lies nearer than that to one."""
+    notes = {word.index for word in row if word.index in in_zones}
+    while True:
+        body = tuple(word for word in row if word.index not in notes)
+        near = {
+            word.index
+            for word in row
+            if word.index in notes
+            and any(
+                max(other.start - word.end, word.start - other.end)
+                < _CUT_IN_BODY_GAP_PT
+                for other in body
+            )
+        }
+        if not near:
+            return frozenset(notes)
+        notes -= near
 
 
 def _page_regions(
@@ -1002,10 +1030,10 @@ def _page_regions(
     # The cut-in notes' words are grouped apart from the outer margin notes
     # of their side, and their regions placed among them by their top.
     margin_words = (
-        (0, split.left_margin),
-        (0, tuple(split.column[index] for index in sorted(left_cut_in))),
-        (1, split.right_margin),
-        (1, tuple(split.column[index] for index in sorted(right_cut_in))),
+        (_Side.LEFT, split.left_margin),
+        (_Side.LEFT, tuple(split.column[index] for index in sorted(left_cut_in))),
+        (_Side.RIGHT, split.right_margin),
+        (_Side.RIGHT, tuple(split.column[index] for index in sorted(right_cut_in))),
     )
     margins = sorted(
         (
@@ -1013,7 +1041,11 @@ def _page_regions(
             for side, side_words in margin_words
             for region in _margin_regions(side_words, pitch)
         ),
-        key=lambda side_region: (side_region[1].box.top, side_region[0]),
+        # By top, and at the same top the left side first.
+        key=lambda side_region: (
+            side_region[1].box.top,
+            side_region[0] is _Side.RIGHT,
+        ),
     )
     return (*upper, *(region for _, region in margins), *band)
 

@@ -26,6 +26,7 @@ __all__ = [
     "commonest",
     "edge_counts",
     "group_rows",
+    "measured_page_positions",
     "measured_pages",
     "median_word_height",
 ]
@@ -121,16 +122,30 @@ def median_word_height(words: Iterable[Word]) -> float:
     return statistics.median(heights) if heights else 0.0
 
 
+def measured_page_positions(
+    rows_by_page: tuple[tuple[Line, ...], ...],
+) -> tuple[int, ...]:
+    """The positions in `rows_by_page`, in increasing order, of the pages on
+    which a book is measured: those of at least 15 rows, or, when none has
+    15, those of at least 3; none when no page has 3 rows."""
+    return tuple(
+        position
+        for position, rows in enumerate(rows_by_page)
+        if len(rows) >= _MEASURED_PAGE_ROWS
+    ) or tuple(
+        position
+        for position, rows in enumerate(rows_by_page)
+        if len(rows) >= _MEASURED_PAGE_ROWS_FALLBACK
+    )
+
+
 def measured_pages(
     rows_by_page: tuple[tuple[Line, ...], ...],
 ) -> tuple[tuple[Line, ...], ...]:
-    """The pages, given by their rows, on which a book is measured: those of
-    at least 15 rows, or, when none has 15, those of at least 3, in their
-    given order; none when no page has 3 rows."""
+    """The pages, given by their rows, on which a book is measured (see
+    `measured_page_positions`), in their given order."""
     return tuple(
-        rows for rows in rows_by_page if len(rows) >= _MEASURED_PAGE_ROWS
-    ) or tuple(
-        rows for rows in rows_by_page if len(rows) >= _MEASURED_PAGE_ROWS_FALLBACK
+        rows_by_page[position] for position in measured_page_positions(rows_by_page)
     )
 
 

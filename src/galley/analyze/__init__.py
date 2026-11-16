@@ -206,6 +206,10 @@ def _test_plate(
     layer_words: tuple[tuple[str, Box], ...],
     lower_case_words: frozenset[str],
 ) -> _PlateTest:
+    """The plate rule on a page rendered as `rendered` whose text layer
+    holds `layer_words`, each its text and box in points (none without a
+    layer): its picture area, its words found in `lower_case_words`, and
+    whether the rule takes it as a plate (plates spec, section 2)."""
     word_boxes = tuple(box for _, box in layer_words) if layer_words else None
     known_words = sum(
         1 for text, _ in layer_words if wordlist.is_known_word(text, lower_case_words)

@@ -1280,6 +1280,39 @@ def test_endnotes_with_a_body_block_between_them_are_two_lists() -> None:
     )
 
 
+def test_a_footnote_and_an_endnote_at_one_place_are_written_apart() -> None:
+    # An unreferenced footnote and an endnote, both printed on page 9, are
+    # written after the page's paragraph; only the endnote is in the
+    # endnotes' list.
+    blocks = _blocks_file(
+        (_block("b-p0009-001", BlockKind.PARAGRAPH, "Text.", 9),),
+        (
+            _note(
+                "n-p0009-001",
+                NoteKind.FOOTNOTE,
+                "*",
+                _block("b-p0009-002", BlockKind.PARAGRAPH, "A footnote.", 9),
+                referenced=False,
+            ),
+            _note(
+                "n-p0009-002",
+                NoteKind.ENDNOTE,
+                "1.",
+                _block("b-p0009-003", BlockKind.PARAGRAPH, "An endnote.", 9),
+                referenced=False,
+            ),
+        ),
+    )
+
+    written = render_markdown(blocks, CONFIG)
+
+    assert written.count("::::: {.endnotes}") == 1
+    endnotes = written[written.index("::::: {.endnotes}") :]
+    assert "b-p0009-003" in endnotes
+    assert "b-p0009-002" not in endnotes
+    assert written.index("b-p0009-002") < written.index("::::: {.endnotes}")
+
+
 @pytest.mark.pandoc
 def test_pandoc_reads_one_footnote_one_noteref_link_and_every_word_in_its_block() -> (
     None
@@ -1548,6 +1581,25 @@ def test_run_with_a_config_of_another_pdf_raises_naming_analyze(
 
     with pytest.raises(InputFileError, match=r"pages\.json.*galley2epub analyze"):
         markdown.run(folder, replace(config, pdf=other_pdf))
+
+    assert not folder.book_md.exists()
+
+
+def test_run_with_a_figure_whose_image_is_missing_raises_naming_it_and_extract(
+    tmp_path: Path,
+) -> None:
+    figure = replace(FIGURE, figure="images/plate-0016.png")
+    outside = replace(FIGURE, id="b-p0017-001", figure="../outside.png")
+    (tmp_path / "outside.png").write_bytes(b"outside the book folder")
+    (tmp_path / "book").mkdir()
+    folder, config = _book(tmp_path / "book", _blocks_file((figure, outside)))
+
+    with pytest.raises(
+        InputFileError,
+        match=r"b-p0016-001 has the image images/plate-0016.png; "
+        r"figure b-p0017-001 has the image \.\./outside.png.*galley2epub extract",
+    ):
+        markdown.run(folder, config)
 
     assert not folder.book_md.exists()
 

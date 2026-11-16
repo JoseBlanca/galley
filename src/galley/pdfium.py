@@ -15,13 +15,15 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
 import pypdfium2
 
 from galley.errors import PdfError
 from galley.model import RenderedPage
 
-_POINTS_PER_INCH = 72
+# A PDF point is 1/72 of an inch.
+POINTS_PER_INCH: Final[int] = 72
 
 # One worker: a ThreadPoolExecutor keeps its thread for the life of the
 # process and takes submissions from any thread.
@@ -141,9 +143,7 @@ def _render(pdf: Path, page_index: int, dpi: int) -> RenderedPage:
         _check_page_index(pdf, document, page_index)
         with (
             closing(document[page_index]) as page,
-            closing(
-                page.render(scale=dpi / _POINTS_PER_INCH, grayscale=True)
-            ) as bitmap,
+            closing(page.render(scale=dpi / POINTS_PER_INCH, grayscale=True)) as bitmap,
         ):
             # Grayscale is one byte per pixel; anything else would make the
             # stripped rows a slice of each pixel's channels.

@@ -19,12 +19,12 @@ from dataclasses import dataclass
 from typing import Final
 
 from galley.model import Box, RenderedPage
+from galley.pdfium import POINTS_PER_INCH
 
 # Plates spec section 2, "render": guessed, enough to see a picture and cheap
 # to render (12.6 s for Domesday's 558 pages on an M5 Pro).
 PLATE_RENDER_DPI: Final[int] = 36
 
-_POINTS_PER_INCH: Final[int] = 72
 # Guessed: 12 pixels at 36 dpi.
 _SQUARE_PT: Final[int] = 24
 # Measured on the six books: at 50, Kadesh 16 and Domesday 39 and 40 are lost.
@@ -89,7 +89,7 @@ def is_plate_by_area(
 def picture_area(page: RenderedPage, word_boxes: tuple[Box, ...] | None) -> PictureArea:
     """The largest group of picture squares of `page` and the number of
     squares looked at; `word_boxes` as `is_plate` takes them."""
-    square_px = max(1, round(_SQUARE_PT * page.dpi / _POINTS_PER_INCH))
+    square_px = max(1, round(_SQUARE_PT * page.dpi / POINTS_PER_INCH))
     rows = page.height_px // square_px
     columns = page.width_px // square_px
     # The outer ring, and without a layer the binding's column on each side.
@@ -143,7 +143,7 @@ def _ink_pixels(ink: bytes, width_px: int, square: _Square, square_px: int) -> i
 def _squares_touched(box: Box, dpi: int, square_px: int) -> Iterator[_Square]:
     """The squares that `box`, grown by 2 pt on every side, overlaps or
     touches by an edge."""
-    scale = dpi / _POINTS_PER_INCH
+    scale = dpi / POINTS_PER_INCH
     x0 = (box.x0 - _WORD_BOX_GROWTH_PT) * scale
     x1 = (box.x1 + _WORD_BOX_GROWTH_PT) * scale
     top = (box.top - _WORD_BOX_GROWTH_PT) * scale

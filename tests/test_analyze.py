@@ -236,6 +236,18 @@ def test_is_plate_false_with_a_word_box_over_the_block() -> None:
     assert not is_plate(BLACK_BLOCK, (word_box,), 1)
 
 
+@pytest.mark.parametrize(("inset_pt", "largest_group"), [(25.0, 0), (27.0, 36)])
+def test_word_box_touches_the_squares_within_2_pt_of_it(
+    inset_pt: float, largest_group: int
+) -> None:
+    # The block's squares span 120 to 360 pt. A box 25 pt inside its edges
+    # lies 1 pt from the outer ring of squares and, grown by 2 pt, touches
+    # it; 27 pt inside it lies 3 pt away and leaves the ring of 36 squares.
+    word_box = Box(120 + inset_pt, 120 + inset_pt, 360 - inset_pt, 360 - inset_pt)
+
+    assert picture_area(BLACK_BLOCK, (word_box,)).largest_group == largest_group
+
+
 def test_is_plate_false_with_21_known_words_and_true_with_20() -> None:
     assert not is_plate(BLACK_BLOCK, (), 21)
     assert is_plate(BLACK_BLOCK, (), 20)

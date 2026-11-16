@@ -185,9 +185,13 @@ applied to all the page's words):
   pages, made of the words that step 2 leaves in the column, take each
   row's **inset**, the distance from the column's left edge to the row's
   left side (on the right, from the row's right side to the column's
-  right edge), to 0.1 pt. Every inset between 30 and 100 pt is tried as
-  the peak, and the peak is the one with the most rows whose inset lies
-  within 2 pt of it, the smaller on a tie. The book has cut-in notes on
+  right edge), to 0.1 pt. Each inset that a row has, between 30 and 100
+  pt, is tried as the peak, and the peak is the one with the most rows
+  whose inset lies within 2 pt of it, the smaller on a tie. Only the rows'
+  own insets are tried, not every 0.1 pt of the range: tried at every 0.1
+  pt, the peak of the excerpt `stubbs_51_56-64` on the right moves to 58.1
+  pt with 15 rows, and the excerpt `mariejol_headings_verse` gets a left
+  inset of 71.5 pt (14 rows at it, 1 beside), where it has none. The book has cut-in notes on
   that side when those rows are at least 10, and at least 4 times as
   many as the rows whose inset is 6 to 12 pt smaller than the peak's,
   and 4 times as many as those 6 to 12 pt larger; otherwise it has no
@@ -336,7 +340,22 @@ is laid out as one region, as the skeleton did.
       (Stubbs' page 31: "England. Whilst the");
    3. a word of a row whose vertical middle lies between the zone's top
       less 1 pt and its bottom plus 1 pt, and whose right side lies at
-      most L + I − 4 pt, is a margin word.
+      most L + I − 4 pt, is a margin word, unless it lies less than 5 pt
+      from a body word of its row (the gap between their boxes, or their
+      overlap): a word of the row that rule 3 does not take is a body
+      word, and so is a word kept by this guard, so that the words before
+      it are tested again. The body's word spaces are 4.5 pt at the
+      median (section 9), so a word of a sentence that lies in a zone
+      mostly stays with the word before it (Stubbs' page 33, "issued as his", "as" 4.1 pt after "issued",
+      in a zone beside a cut-in note; page 317, an index entry "Langton,
+      Walter, 249, 255, 266, 274" whose last numbers lie in a zone),
+      while three quarters of the gaps between a note word and the body
+      word beside it are 5.7 pt or more (page 58's "tendom.", 7.0 pt, still
+      moves). The guard keeps one note word of the book in the body:
+      page 226's "heBarons", the OCR's reading of "the Barons.", the last
+      line of the note "Battle of Lewes. Victory of the Barons.", whose
+      "t" the text layer gives as a word of its own 0.2 pt away and
+      outside the zone.
 
    On the right the same, mirrored: a word's right side within 3 pt of
    R − I, the gap after it, the words up to it spanning half the column,
@@ -371,6 +390,15 @@ is laid out as one region, as the skeleton did.
    written does not reach section 9's bar of 95 in 100 on this measure:
    0.91 by the labels, 0.94 with the 24 words corrected; the owner kept
    the rule as written (section 9).
+   With the 5 pt guard of rule 3 (added on 16 November 2026 after the
+   review of the second plan), the rule moves 1,318 words, 6 fewer: "as
+   his" on page 33, "255, 266, 274" on page 317 and "heBarons" on page
+   226. Measured the same day by the evaluation tool of that day, whose
+   reference counts 1,908 margin-note words of Stubbs (the counts above
+   were taken with an earlier version of it): without the guard, 692 of
+   the moved words are aligned to a margin note, 47 to the body and 585
+   to nothing (0.936 of the aligned are note words); with it, 691, 44
+   and 583 (0.940).
    Each condition was added for a case measured: without a shortened
    row, 56 words found only in the body were moved; with chains of one
    cut row, 47; with chains up to 2.6 pitches, 53 (counted, in the first
@@ -480,6 +508,7 @@ Where the thresholds come from:
 | cut row | within 3 pt of the inset, after 8 pt, spanning half the column | measured on Stubbs, step 2b |
 | cut-in zone | chain within 1.6 pitches, trimmed to its shortened rows, 2 rows | measured on Stubbs, step 2b |
 | cut-in note word | 4 pt short of the inset | measured on Stubbs, step 2b |
+| cut-in note word apart from the body | 5 pt from a body word of its row | measured on Stubbs, step 2b: the body's word spaces are 4.5 pt at the median, three quarters of the gaps beside a note word 5.7 pt or more |
 
 An earlier form of the column rule, which asked every row of a run to
 be open, was run on the skeleton's rows of whole pages (not on the body
@@ -671,7 +700,8 @@ runs the fidelity check and writes lines.json, 2.5 s in all.
   shortened, or whose shortened lines are more than 1.6 pitches apart,
   which is most of the 48% of the notes' words not found (section 3,
   step 2b: 1,314 words moved, 767 aligned to notes, 73 to the body, 474
-  not aligned; precision 0.913, recall 0.52); and when the
+  not aligned; precision 0.913, recall 0.52; with the 5 pt guard of rule
+  3, 1,318 moved by this code and 0.940 by the later tool); and when the
   OCR set a note's first letter or word off at the column's edge ("f
   reform" on page 60, "Plan of reform."), the part in the zone moves
   and the rest stays.
@@ -847,7 +877,12 @@ November 2026). The rule moves 1,314 words in Stubbs, of which 767 are
 aligned to margin notes and 73 to the body (precision 0.913; 0.94 once
 24 note words the alignment misplaced are counted as notes), and 474
 are not aligned, mostly single letters of spaced-out notes. It finds 767
-of the reference text's 1,469 margin-note words (recall 0.52). The
+of the reference text's 1,469 margin-note words (recall 0.52). After
+the review of the second plan, rule 3 keeps a word less than 5 pt from
+a body word of its row, which a word of a sentence is: on 16 November
+2026 the rule then moved 1,318 words, and by the evaluation tool of that
+day 0.940 of those aligned are note words (0.936 without the guard on
+the same tool; section 3, step 2b). The
 owner accepted the precision below the bar of 95 in 100: at most about
 50 body words of Stubbs' 90,100 (0.06%) move into margin notes, and
 every cut-in note left in the body breaks a paragraph a reader reads.
