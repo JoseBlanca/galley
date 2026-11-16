@@ -6,9 +6,10 @@ removes from each page its running head, with the page number and the
 stray marks above it, and the page number, signature line or printer's
 signature mark at its foot, each kept as a removal with its reason; finds
 the paragraphs of the body, which run over page breaks; joins the hyphens
-at line ends (`join_hyphen`), each join kept as a word change; and keeps
-the text of the margins as margin notes and that of the footnote band as
-notes, after the paragraph in which their page's body ends.
+at line ends (`join_hyphen`), each join kept as a word change; keeps the
+text of the footnote band as notes, after the paragraph in which their
+page's body ends; and puts each margin note before the paragraph, or
+inside the note, beside whose line it was printed.
 """
 
 import logging

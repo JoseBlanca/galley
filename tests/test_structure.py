@@ -61,7 +61,7 @@ from galley.structure import (
     survey_book,
 )
 from galley.structure._lines import PlacedLine
-from galley.structure._margins import BesideLine, line_beside
+from galley.structure._margins import BesideLine, InParagraph, line_beside
 from galley.structure._markers import MarkerForm, book_marker_form
 from galley.structure._measures import Edges
 from galley.structure._references import (
@@ -1162,13 +1162,14 @@ def test_side_text_keeps_the_order_of_its_regions_and_lines() -> None:
         (
             _region(*_five_full_lines(70, "first")),
             _region(_spread("Upper", 310, 340, 75)),
-            _region(_spread("Lower", 310, 340, 120)),
+            _region(_spread("Lower", 310, 340, 130)),
             band,
         ),
         (),
     )
     blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
-    assert _texts(blocks.blocks)[1:] == ("Upper", "Lower")
+    # Both stand beside the paragraph, Lower 3 pitches below Upper's bottom.
+    assert _texts(blocks.blocks)[:2] == ("Upper", "Lower")
     assert tuple(
         (note.marker, block_text(note.blocks[0])) for note in blocks.notes
     ) == (("1", "The first note."), ("2", "The second note."))
@@ -1464,21 +1465,21 @@ def _side_text_pages() -> tuple[PageLayout, ...]:
     return page_0, page_1
 
 
-def test_margin_and_band_follow_the_paragraph_in_which_the_page_ends() -> None:
+def test_margin_note_before_and_band_after_the_paragraph_the_page_ends_in() -> None:
     lines = _lines_of(*_side_text_pages())
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert tuple((block.id, block.kind) for block in blocks.blocks) == (
-        ("b-p0000-001", BlockKind.PARAGRAPH),
-        ("b-p0000-002", BlockKind.MARGIN_NOTE),
+        ("b-p0000-001", BlockKind.MARGIN_NOTE),
+        ("b-p0000-002", BlockKind.PARAGRAPH),
         ("b-p0001-001", BlockKind.PARAGRAPH),
     )
-    assert tuple(origin.page_index for origin in blocks.blocks[0].origin) == (0, 1)
-    assert block_text(blocks.blocks[1]) == "Margin note"
+    assert tuple(origin.page_index for origin in blocks.blocks[1].origin) == (0, 1)
+    assert block_text(blocks.blocks[0]) == "Margin note"
     assert block_text(blocks.blocks[2]) == "Another paragraph"
     (note,) = blocks.notes
     assert (note.id, note.marker, note.referenced) == ("n-p0000-001", "1", False)
-    # Markdown writes the note after the margin note, the last block whose
-    # origin includes page 0, so its block is the third to start there.
+    # Markdown writes the note after the paragraph, the last block whose
+    # first origin is page 0, so its block is the third to start there.
     assert tuple((block.id, block.kind) for block in note.blocks) == (
         ("b-p0000-003", BlockKind.PARAGRAPH),
     )
@@ -1506,10 +1507,10 @@ def test_margin_note_of_a_page_whose_body_is_empty_follows_the_last_block() -> N
 
 def test_note_follows_the_blocks_that_start_on_its_page_or_earlier() -> None:
     # A paragraph runs from page 0 to page 1; page 1 has a margin note and a
-    # band, and no paragraph of its own. Markdown writes page 1's note after
-    # the last block whose first origin is on page 1 or earlier, the margin
-    # note of page 1, not after the paragraph that has a line on page 1
-    # (structure spec, section 6, "Order").
+    # band, and no paragraph of its own. The margin note goes before the
+    # paragraph (section 13, rule 4). Markdown writes page 1's note after
+    # the last block whose first origin is on page 1 or earlier, the
+    # paragraph, after the margin note of page 1 (section 6, "Order").
     page_0 = _body_page(0, *_five_full_lines(70, "first"), _full("runs on to", 145))
     page_1 = PageLayout(
         1,
@@ -1522,8 +1523,8 @@ def test_note_follows_the_blocks_that_start_on_its_page_or_earlier() -> None:
     )
     blocks = make_blocks(_lines_of(page_0, page_1), _NO_WORDS, workers=1)
     assert tuple((block.id, block.kind) for block in blocks.blocks) == (
-        ("b-p0000-001", BlockKind.PARAGRAPH),
         ("b-p0001-001", BlockKind.MARGIN_NOTE),
+        ("b-p0000-001", BlockKind.PARAGRAPH),
     )
     assert blocks.notes[0].blocks[0].id == "b-p0001-002"
 
@@ -2456,8 +2457,8 @@ def test_margin_note_beside_a_body_line_stays_in_the_body() -> None:
     lines = _with_margin(_lines_of(page), 0, _spread("Aside", 310, 340, 85))
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert tuple(block.kind for block in blocks.blocks) == (
-        BlockKind.PARAGRAPH,
         BlockKind.MARGIN_NOTE,
+        BlockKind.PARAGRAPH,
     )
     assert tuple(block.kind for block in blocks.notes[0].blocks) == (
         BlockKind.PARAGRAPH,
@@ -2467,7 +2468,7 @@ def test_margin_note_beside_a_body_line_stays_in_the_body() -> None:
 def _beside(top: float, *, first: bool) -> BesideLine:
     line = _spread("a line", 50, 300, top)
     edges = Edges(50, 300)
-    return BesideLine(PlacedLine(0, line, edges, edges), first, None)
+    return BesideLine(PlacedLine(0, line, edges, edges), first, InParagraph(0, 0))
 
 
 def test_beside_a_paragraph_s_first_line_within_half_a_pitch_before_a_nearer_one() -> (
@@ -2478,6 +2479,199 @@ def test_beside_a_paragraph_s_first_line_within_half_a_pitch_before_a_nearer_one
     lines = (_beside(101, first=False), _beside(107, first=True))
     assert line_beside(100, lines, 15.0) == lines[1]
     assert line_beside(100, (lines[0], _beside(108, first=True)), 15.0) == lines[0]
+
+
+# Margin notes placed before their paragraphs (structure spec, section 13).
+# The body's lines run from 50 to 300 pt, 15 pt apart; a margin note stands
+# right of them, from 310 pt.
+
+
+def _placed(*pages: PageLayout) -> tuple[tuple[BlockKind, str], ...]:
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    check_stage(FidelityBoundary.STRUCTURE, _lines_of(*pages), blocks)
+    return tuple((block.kind, block_text(block)) for block in blocks.blocks)
+
+
+def _two_paragraphs(*margins: Line, beside: Line | None = None) -> PageLayout:
+    """Page 0: a paragraph of three lines from 70 pt, and one of three from
+    115 pt whose second line, at 130 pt, is `beside` or a full line; a
+    margin region of each of `margins`."""
+    body = _region(
+        _indented("Alpha begins here", 70),
+        _full("and goes on over", 85),
+        _short("its end.", 100),
+        _indented("Beta begins here", 115),
+        beside or _full("and goes on over", 130),
+        _short("its own end.", 145),
+    )
+    return PageLayout(0, (body, *(_region(margin) for margin in margins)), ())
+
+
+_ALPHA = "Alpha begins here and goes on over its end."
+_BETA = "Beta begins here and goes on over its own end."
+
+
+def test_margin_note_before_the_paragraph_whose_first_line_it_is_beside() -> None:
+    # Its top is 0.3 pitch below Beta's first line (rules 2 and 4).
+    page = _two_paragraphs(_spread("Aside", 310, 340, 115 + 0.3 * _PITCH_PT))
+    assert _placed(page) == (
+        (BlockKind.PARAGRAPH, _ALPHA),
+        (BlockKind.MARGIN_NOTE, "Aside"),
+        (BlockKind.PARAGRAPH, _BETA),
+    )
+
+
+def test_margin_note_before_the_paragraph_of_the_flush_line_it_is_beside() -> None:
+    # Beside Beta's second line, a full one: before Beta, which stays whole.
+    page = _two_paragraphs(_spread("Aside", 310, 340, 130))
+    assert _placed(page)[1:] == (
+        (BlockKind.MARGIN_NOTE, "Aside"),
+        (BlockKind.PARAGRAPH, _BETA),
+    )
+
+
+def test_margin_note_beside_an_indented_line_starts_a_paragraph_there() -> None:
+    # Beta's second line is indented 20 pt after a full line: no paragraph
+    # start by section 6, but one beside a margin note (rule 3).
+    page = _two_paragraphs(
+        _spread("Aside", 310, 340, 130), beside=_indented("Gamma starts here", 130)
+    )
+    assert _placed(page)[1:] == (
+        (BlockKind.PARAGRAPH, "Beta begins here"),
+        (BlockKind.MARGIN_NOTE, "Aside"),
+        (BlockKind.PARAGRAPH, "Gamma starts here its own end."),
+    )
+
+
+def test_margin_note_beside_an_indented_line_after_a_hyphen_does_not_split() -> None:
+    body = _region(
+        _indented("Alpha begins here", 70),
+        _full("and goes on a hyph-", 85),
+        _indented("enated word on", 100),
+        _short("its end.", 115),
+    )
+    page = PageLayout(0, (body, _region(_spread("Aside", 310, 340, 100))), ())
+    assert _placed(page) == (
+        (BlockKind.MARGIN_NOTE, "Aside"),
+        (
+            BlockKind.PARAGRAPH,
+            "Alpha begins here and goes on a hyphenated word on its end.",
+        ),
+    )
+
+
+def test_margin_note_cut_into_the_column_beside_an_indented_line_does_not_split() -> (
+    None
+):
+    # A note cut into the column at 50 to 105 pt pushes the line beside it
+    # to 110 pt (Stubbs): its indent is the note's, not a paragraph's.
+    body = _region(
+        _indented("Alpha begins here", 70),
+        _full("and goes on over", 85),
+        _spread("the cut in note", 110, 300, 100),
+        _short("its end.", 115),
+    )
+    page = PageLayout(0, (body, _region(_spread("Cut in", 50, 105, 100))), ())
+    assert _placed(page) == (
+        (BlockKind.MARGIN_NOTE, "Cut in"),
+        (
+            BlockKind.PARAGRAPH,
+            "Alpha begins here and goes on over the cut in note its end.",
+        ),
+    )
+
+
+def test_margin_note_before_a_paragraph_run_on_from_the_page_before() -> None:
+    # Page 1's margin note stands beside its first line, which continues the
+    # paragraph of page 0: it goes before that paragraph, after page 0's
+    # margin note, which stands beside the paragraph's first line.
+    page_0 = PageLayout(
+        0,
+        (
+            _region(_indented("Alpha begins here", 70), *_five_full_lines(85, "body")),
+            _region(_spread("Zero", 310, 340, 70)),
+        ),
+        (),
+    )
+    page_1 = PageLayout(
+        1,
+        (
+            _region(
+                *_five_full_lines(70, "more"),
+                _short("its end.", 145),
+                _indented("Beta begins here", 160),
+            ),
+            _region(_spread("One", 310, 340, 72)),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page_0, page_1), _NO_WORDS, workers=1)
+    assert tuple(
+        (block.id, block.kind, block_text(block).split(" ")[0])
+        for block in blocks.blocks
+    ) == (
+        ("b-p0000-001", BlockKind.MARGIN_NOTE, "Zero"),
+        ("b-p0001-001", BlockKind.MARGIN_NOTE, "One"),
+        ("b-p0000-002", BlockKind.PARAGRAPH, "Alpha"),
+        ("b-p0001-002", BlockKind.PARAGRAPH, "Beta"),
+    )
+
+
+def test_margin_note_before_one_paragraph_goes_from_the_top_down() -> None:
+    # Layout gives the lower region first, 2.7 pitches below the upper's
+    # bottom; both stand beside Beta, the lower nearest its last line.
+    page = _two_paragraphs(
+        _spread("Lower", 310, 340, 165), _spread("Upper", 310, 340, 115)
+    )
+    assert _placed(page)[1:3] == (
+        (BlockKind.MARGIN_NOTE, "Upper"),
+        (BlockKind.MARGIN_NOTE, "Lower"),
+    )
+
+
+@pytest.mark.parametrize(("gap", "joined"), [(37.5, True), (38.0, False)])
+def test_margin_note_before_its_paragraph_one_block_within_2_5_pitches(
+    gap: float, joined: bool
+) -> None:
+    # Two regions on the right, the lower beside a flush line of Alpha
+    # (rule 1): one printed note within 2.5 pitches, 37.5 pt.
+    upper = _region(_spread("One", 310, 340, 40))
+    lower = _region(_spread("note.", 310, 340, 50 + gap))
+    body = _region(
+        _indented("Alpha begins here", 40),
+        *(_full(f"and goes on {n}", 55 + 15 * n) for n in range(4)),
+        _short("its end.", 115),
+    )
+    page = PageLayout(0, (body, upper, lower), ())
+    kinds = tuple(kind for kind, _ in _placed(page))
+    texts = tuple(text for kind, text in _placed(page) if kind is BlockKind.MARGIN_NOTE)
+    assert texts == (("One note.",) if joined else ("One", "note."))
+    assert kinds[-1] is BlockKind.PARAGRAPH
+
+
+def test_margin_note_before_each_paragraph_when_the_lower_is_beside_a_first_line() -> (
+    None
+):
+    # The lower region is 1.2 pitches below the upper, but beside Beta's
+    # first line: two printed notes (rule 1).
+    page = _two_paragraphs(
+        _spread("Upper", 310, 340, 87), _spread("Lower", 310, 340, 115)
+    )
+    assert _placed(page) == (
+        (BlockKind.MARGIN_NOTE, "Upper"),
+        (BlockKind.PARAGRAPH, _ALPHA),
+        (BlockKind.MARGIN_NOTE, "Lower"),
+        (BlockKind.PARAGRAPH, _BETA),
+    )
+
+
+def test_margin_notes_on_the_two_sides_are_not_joined() -> None:
+    # A region left of the column and one right of it, at the same height
+    # within 2.5 pitches: each is a note of its own.
+    page = _two_paragraphs(_spread("Right", 310, 340, 85), _spread("Left", 10, 40, 95))
+    assert tuple(
+        text for kind, text in _placed(page) if kind is BlockKind.MARGIN_NOTE
+    ) == ("Right", "Left")
 
 
 # Rules of sections 11 and 12 each pinned by a literal case (review S11)

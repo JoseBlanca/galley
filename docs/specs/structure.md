@@ -1523,7 +1523,13 @@ takes out of the body lines beside them (layout §3, step 2b).
 1. **One printed note, one block.** A margin region is part of the
    margin region above it, on the same page and side, when its top is at
    most 2.5 pitches below that region's bottom and its first line is not
-   beside a paragraph's first line (this section's rule 2). Layout cuts a margin region
+   beside a paragraph's first line (this section's rule 2). The same
+   side means that the two regions overlap across the page; the margin
+   region above is the nearest one above on that side, with the regions
+   already joined to it. Rule 1 is applied after rule 3 has split the
+   paragraphs, so a region beside an indented line that rule 3 makes a
+   paragraph's first line starts a note of its own; a paragraph's first
+   line here is the first line of any block, a note's too. Layout cuts a margin region
    where the next line is more than 1.5 pitches lower (a guess, layout
    §3, step 2), and Gierke sets its notes loosely: 268 of its margin
    regions that are not beside a paragraph's first line lie within 2.5
@@ -1549,8 +1555,24 @@ takes out of the body lines beside them (layout §3, step 2b).
    first-plan paragraph that could be checked stood beside an indented
    line (15 to 90 pt) where the reference text starts a paragraph; 27 of
    its margin notes are beside such a line.
+   The line is one of a body paragraph, not of a note, and it does not
+   follow a line that ends with a hyphen (section 6). Measured on 16
+   November 2026 on the whole books: in Gierke 13 of the 36 indented
+   lines beside a margin note printed outside the column follow one, and
+   12 of them continue their word ("Univer- / sal Church", page 109).
+   The margin note must be printed outside the column: the middle of its
+   box lies left of the line's region's left edge or right of its right
+   edge. A note cut into the column (Stubbs) indents the body lines
+   beside it by its own width, about 60 pt, so their indent says
+   nothing: in Stubbs 171 margin notes stand beside such a line, as
+   "accession." (excerpt page 0) beside "f or instance…" in the middle
+   of a paragraph. The middle of the box is taken, not the whole box,
+   because Domesday prints some of its outer notes up to 5 pt into the
+   column: 9 of its 24 margin notes beside an indented line are so.
 4. **Before the paragraph that holds that line**, in `blocks`, after any
-   margin note already placed before the same paragraph. So:
+   margin note already placed before the same paragraph: the margin notes
+   before one paragraph, or before one block of a note (rule 5), go in
+   page order and, on a page, from the top down. So:
    - beside the middle of a paragraph (Stubbs' cut-in notes, several to
      a paragraph; 40 margin blocks beside a flush line on Gierke's pages
      86 to 185, many of them specks): before the paragraph, not where it
