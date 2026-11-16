@@ -30,10 +30,21 @@ How the spec is read here, where it leaves a choice:
   aligned one. A boundary's part is that of the reference
   token after its gap. Two galley boundaries mapped to the same gap count
   as one right one and one wrong one.
+- The boundary between two consecutive reference headings is left out
+  when one galley heading with a label holds both, more than half of the
+  first's held tokens in its label and more than half of the second's
+  outside it.
 - For a block kind, note or margin note, a reference token's galley token
   is the first galley token of its pairing; only aligned tokens (matched,
   changed, split, glued) are counted. A reference block with no aligned
-  token is paired with the galley kind `none`.
+  token is paired with the galley kind `none`. The block that holds a
+  reference block is the one that holds most of those tokens, the first
+  seen on a tie.
+- `kinds_right` counts, per part, the reference blocks held by a galley
+  block of the same kind; a table is never right.
+- The headings of the body range are those of the body stream. A galley
+  heading is right when it holds a reference heading, in the range or
+  not.
 - A note's reference is right when any galley reference to the galley
   note that holds the note is within 3 tokens of any of Gutenberg's
   references to it.
@@ -51,6 +62,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import assert_never
 
+from galley.model import BlockKind, NoteKind
 from galley_eval.align import (
     Alignment,
     GalleyStream,
@@ -65,6 +77,7 @@ from galley_eval.reader import ReferenceKind, ReferenceText, Stream
 __all__ = [
     "BoundaryScores",
     "GalleyKind",
+    "HeadingScores",
     "KindCount",
     "MarginNoteScores",
     "NoteScores",
@@ -72,9 +85,13 @@ __all__ = [
     "Placement",
     "TextScores",
     "block_kinds",
+    "endnote_notes",
     "galley_parts",
+    "heading_scores",
+    "kinds_right",
     "margin_note_scores",
     "note_scores",
+    "notes_found_as_notes",
     "page_parts",
     "paragraph_boundaries",
     "reference_part",
@@ -169,6 +186,18 @@ class KindCount:
     reference: ReferenceKind
     galley: GalleyKind
     count: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class HeadingScores:
+    """The headings of the body range (spec section 6, "Headings"): the
+    reference's, those of them held by a galley heading, galley's, and
+    those of galley's that hold a reference heading."""
+
+    reference_headings: int
+    in_heading_blocks: int
+    galley_headings: int
+    galley_headings_right: int
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -397,14 +426,21 @@ def _reference_gaps(
 # Paragraph boundaries
 
 
+_NO_BLOCKS = frozendict[str, GalleyBlock]()
+
+
 def paragraph_boundaries(
     alignment: Alignment,
     places: tuple[ReferencePlace, ...],
     galley: tuple[GalleyToken, ...],
     parts: tuple[Part, ...],
+    *,
+    galley_blocks: frozendict[str, GalleyBlock] = _NO_BLOCKS,
 ) -> frozendict[Part, BoundaryScores]:
     """Paragraph boundary precision and recall, for every part, of one
-    output: blocks or markdown, whose tokens have their block ids."""
+    output: blocks or markdown, whose tokens have their block ids. With
+    `galley_blocks`, the boundary between a chapter's label and title
+    that one galley heading holds is not a reference boundary."""
     paragraph = tuple(
         index for index, place in enumerate(places) if _is_paragraph_place(place)
     )
@@ -412,7 +448,7 @@ def paragraph_boundaries(
         current
         for previous, current in itertools.pairwise(paragraph)
         if places[previous].block_index != places[current].block_index
-    )
+    ) - _label_and_title_gaps(alignment, places, galley, galley_blocks)
     gaps = _reference_gaps(alignment, places, galley)
     body = tuple(
         index for index, token in enumerate(galley) if token.stream is GalleyStream.BODY
@@ -447,6 +483,62 @@ def paragraph_boundaries(
     )
 
 
+def _label_and_title_gaps(
+    alignment: Alignment,
+    places: tuple[ReferencePlace, ...],
+    galley: tuple[GalleyToken, ...],
+    galley_blocks: frozendict[str, GalleyBlock],
+) -> frozenset[int]:
+    """The gaps between two consecutive reference headings of the body
+    that one galley heading with a label holds, the first mostly in its
+    label and the second mostly outside it."""
+    groups = tuple(
+        indices
+        for indices in _groups(places)
+        if places[indices[0]].stream is Stream.BODY
+        and places[indices[0]].kind is not ReferenceKind.MARGIN_NOTE
+    )
+    gaps: set[int] = set()
+    for first, second in itertools.pairwise(groups):
+        if not (
+            places[first[0]].kind is ReferenceKind.HEADING
+            and places[second[0]].kind is ReferenceKind.HEADING
+        ):
+            continue
+        holder = _holder(alignment, first, galley)
+        if (
+            holder is None
+            or holder != _holder(alignment, second, galley)
+            or not galley_blocks[holder].has_label
+        ):
+            continue
+        if _label_share(alignment, first, galley, holder) > _HALF and (
+            _label_share(alignment, second, galley, holder) < _HALF
+        ):
+            gaps.add(second[0])
+    return frozenset(gaps)
+
+
+_HALF = 0.5
+
+
+def _label_share(
+    alignment: Alignment,
+    indices: tuple[int, ...],
+    galley: tuple[GalleyToken, ...],
+    holder: str,
+) -> float:
+    """The share of a reference block's tokens held by `holder` that are
+    in its label."""
+    held = tuple(
+        galley[galley_index]
+        for index in indices
+        if (galley_index := _first_galley(alignment, index)) is not None
+        and galley[galley_index].block_id == holder
+    )
+    return sum(token.in_label for token in held) / len(held) if held else 0.0
+
+
 def share(count: int, total: int) -> float | None:
     """`count` divided by `total`; None when `total` is 0."""
     return count / total if total else None
@@ -477,15 +569,10 @@ def block_kinds(
         part: Counter() for part in Part
     }
     for indices in _groups(places):
-        holders = Counter(
-            block_id
-            for index in indices
-            if (galley_index := _first_galley(alignment, index)) is not None
-            and (block_id := galley[galley_index].block_id) is not None
-        )
+        holder = _holder(alignment, indices, galley)
         galley_kind = (
-            GalleyKind(galley_blocks[holders.most_common(1)[0][0]].kind.value)
-            if holders
+            GalleyKind(galley_blocks[holder].kind.value)
+            if holder is not None
             else GalleyKind.NONE
         )
         place = places[indices[0]]
@@ -498,6 +585,87 @@ def block_kinds(
             )
             for part, counter in counts.items()
         }
+    )
+
+
+def _holder(
+    alignment: Alignment, indices: tuple[int, ...], galley: tuple[GalleyToken, ...]
+) -> str | None:
+    """The id of the galley block that holds most of the aligned tokens of
+    a reference block, None when none is aligned."""
+    holders = Counter(
+        block_id
+        for index in indices
+        if (galley_index := _first_galley(alignment, index)) is not None
+        and (block_id := galley[galley_index].block_id) is not None
+    )
+    return holders.most_common(1)[0][0] if holders else None
+
+
+def kinds_right(
+    kinds: frozendict[Part, tuple[KindCount, ...]],
+) -> frozendict[Part, int]:
+    """For every part, the reference blocks held by a galley block of the
+    same kind (spec section 6, "Block kinds"): a quote by a quote, verse by
+    verse, a chapter summary by a chapter summary; a table never."""
+    return frozendict(
+        {
+            part: sum(
+                count.count
+                for count in counts
+                if count.reference.value == count.galley.value
+            )
+            for part, counts in kinds.items()
+        }
+    )
+
+
+# Headings
+
+
+def heading_scores(
+    alignment: Alignment,
+    places: tuple[ReferencePlace, ...],
+    galley: tuple[GalleyToken, ...],
+    galley_blocks: frozendict[str, GalleyBlock],
+    *,
+    page_indices: tuple[int | None, ...],
+    body_pages: tuple[int, int],
+) -> HeadingScores:
+    """The headings of the body range, `body_pages`, first and last page
+    index: the reference's headings whose first token's page, from
+    `page_indices`, is in it, and galley's body headings whose first
+    origin is; and which of each the other side holds."""
+    first, last = body_pages
+    reference = 0
+    found = 0
+    holders: set[str] = set()
+    for indices in _groups(places):
+        place = places[indices[0]]
+        if place.stream is not Stream.BODY or place.kind is not ReferenceKind.HEADING:
+            continue
+        holder = _holder(alignment, indices, galley)
+        is_heading = False
+        if holder is not None and galley_blocks[holder].kind is BlockKind.HEADING:
+            holders.add(holder)
+            is_heading = True
+        page = page_indices[indices[0]]
+        if page is not None and first <= page <= last:
+            reference += 1
+            found += is_heading
+    galley_headings = tuple(
+        block_id
+        for block_id, block in galley_blocks.items()
+        if block.kind is BlockKind.HEADING
+        and block.stream is GalleyStream.BODY
+        and block.first_page is not None
+        and first <= block.first_page <= last
+    )
+    return HeadingScores(
+        reference_headings=reference,
+        in_heading_blocks=found,
+        galley_headings=len(galley_headings),
+        galley_headings_right=sum(1 for block in galley_headings if block in holders),
     )
 
 
@@ -597,6 +765,56 @@ def note_scores(
         in_body=found[_Found.IN_BODY],
         missing=found[_Found.MISSING],
         reference_right=right,
+    )
+
+
+def notes_found_as_notes(
+    alignment: Alignment,
+    places: tuple[ReferencePlace, ...],
+    galley: tuple[GalleyToken, ...],
+    galley_blocks: frozendict[str, GalleyBlock],
+) -> frozendict[int, str]:
+    """The indices of the reference's notes found `as_note` at the output
+    of `alignment`, each with the id of the galley note that holds it."""
+
+    def note_of(token: GalleyToken) -> str | None:
+        if token.stream is not GalleyStream.NOTES or token.block_id is None:
+            return None
+        return galley_blocks[token.block_id].note_id
+
+    by_note: dict[int, list[int]] = {}
+    for index, place in enumerate(places):
+        if place.note_index is not None:
+            by_note.setdefault(place.note_index, []).append(index)
+    found: dict[int, str] = {}
+    for note_index, indices in by_note.items():
+        where, holder = _found_where(alignment, tuple(indices), galley, note_of)
+        if where is _Found.AS_ITSELF and holder is not None:
+            found[note_index] = holder
+    return frozendict(found)
+
+
+def endnote_notes(
+    alignment: Alignment,
+    places: tuple[ReferencePlace, ...],
+    galley: tuple[GalleyToken, ...],
+    galley_blocks: frozendict[str, GalleyBlock],
+) -> frozenset[int]:
+    """The indices of the reference's notes found `as_note` in a galley
+    endnote, at the output of `alignment`, blocks (spec section 5)."""
+    endnote_ids = frozenset(
+        block.note_id
+        for block in galley_blocks.values()
+        if block.note_kind is NoteKind.ENDNOTE
+    )
+    if not endnote_ids:
+        return frozenset()
+    return frozenset(
+        note_index
+        for note_index, holder in notes_found_as_notes(
+            alignment, places, galley, galley_blocks
+        ).items()
+        if holder in endnote_ids
     )
 
 

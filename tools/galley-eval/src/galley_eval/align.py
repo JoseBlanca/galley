@@ -112,13 +112,25 @@ class GalleyToken:
     fidelity check splits words. `page_index` counts PDF pages from 0;
     `edge_of_page` is true for a word of words or lines on the first or
     last line of its page; `block_id` is the id of the block it is in, at
-    blocks and markdown, and None at words and lines."""
+    blocks and markdown, and None at words and lines. `in_label` is true
+    for a word of a heading's label. `near_page`, set for the words of an
+    endnote that galley links from a reference, is the page of that
+    reference: the page the near-page passes and book order take for the
+    token, which keeps `page_index` everywhere else (spec section 5)."""
 
     text: str
     page_index: int
     stream: GalleyStream
     edge_of_page: bool
     block_id: str | None
+    in_label: bool = False
+    near_page: int | None = None
+
+    @property
+    def window_page(self) -> int:
+        """The page the near-page passes and book order take: `near_page`
+        when it is set, else `page_index`."""
+        return self.near_page if self.near_page is not None else self.page_index
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -499,7 +511,7 @@ def align(
         sorted(
             range(len(galley)),
             key=lambda index: (
-                galley[index].page_index,
+                galley[index].window_page,
                 _BOOK_ORDER[galley[index].stream],
             ),
         )
@@ -658,7 +670,7 @@ def _near_page_pass(
             by_page.setdefault(page, []).append(index)
     galley_by_page: dict[int, list[int]] = {}
     for index in galley_indices:
-        galley_by_page.setdefault(sides.galley[index].page_index, []).append(index)
+        galley_by_page.setdefault(sides.galley[index].window_page, []).append(index)
     taken: set[int] = set()
     pairings: list[Pairing] = []
     for offsets in ((0,), _EITHER_SIDE):

@@ -82,6 +82,7 @@ def _small_book(name: str = "small") -> EvaluationBook:
         plate_pages=(2,),
         not_in_reference=(),
         margin_notes_moved=False,
+        body_pages=(0, 0),
         html_sha256="0" * 64,
         expected_counts=ExpectedCounts(
             notes=0,

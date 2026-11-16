@@ -8,7 +8,8 @@ layer (`exclude_pages`), and the book config's `contents_pages` and
 `plate_pages` (architecture section 6), which galley-eval passes into the
 `book.toml` it writes; the pages whose text Gutenberg left out
 (`not_in_reference`), whether Gutenberg moved the margin notes
-(`margin_notes_moved`), the SHA-256 of the HTML file the rules and counts
+(`margin_notes_moved`), the first and last page index of the body
+range, on which the headings are scored (`body_pages`), the SHA-256 of the HTML file the rules and counts
 were written for (`html_sha256`), the counts the reader must find in the
 HTML and the first five tokens of its body (`expected_counts`), and the reading rules, as changes to the defaults of
 `galley_eval.rules`:
@@ -66,6 +67,7 @@ class EvaluationBook:
     plate_pages: tuple[int, ...]
     not_in_reference: tuple[int, ...]
     margin_notes_moved: bool
+    body_pages: tuple[int, int]
     html_sha256: str
     expected_counts: ExpectedCounts
     rules: ReadingRules
@@ -89,6 +91,7 @@ _REQUIRED_KEYS = (
     "authors",
     "language",
     "exclude_pages",
+    "body_pages",
     "html_sha256",
     "expected_counts",
 )
@@ -183,6 +186,7 @@ def _book(table: object, key: str, path: Path) -> EvaluationBook:
         margin_notes_moved=_bool(
             book.get("margin_notes_moved", False), f"{key}.margin_notes_moved", path
         ),
+        body_pages=_page_range(book["body_pages"], f"{key}.body_pages", path),
         html_sha256=_sha256(book["html_sha256"], f"{key}.html_sha256", path),
         expected_counts=_counts(
             book["expected_counts"], f"{key}.expected_counts", path
@@ -340,6 +344,19 @@ def _page_indices(value: object, key: str, path: Path) -> tuple[int, ...]:
                 path, f"{key}[{position}]", f"a page index counts from 0, found {page}"
             )
     return pages
+
+
+def _page_range(value: object, key: str, path: Path) -> tuple[int, int]:
+    pages = _page_indices(value, key, path)
+    match pages:
+        case (first, last) if first <= last:
+            return first, last
+        case (first, last):
+            raise _error(
+                path, key, f"the first page, {first}, is above the last, {last}"
+            )
+        case _:
+            raise _error(path, key, f"expected two page indices, found {len(pages)}")
 
 
 def _language(value: object, key: str, path: Path) -> Language:

@@ -64,6 +64,7 @@ def _difference(
         note_id=None,
         edge_of_page=edge_of_page,
         apart=None,
+        cause=None,
     )
 
 
@@ -122,6 +123,7 @@ def test_differences_jsonl_has_one_line_per_difference_in_the_spec_order(
         "note_id",
         "edge_of_page",
         "apart",
+        "cause",
     ]
     assert first == {
         "stage": "words",
@@ -142,6 +144,7 @@ def test_differences_jsonl_has_one_line_per_difference_in_the_spec_order(
         "note_id": None,
         "edge_of_page": False,
         "apart": None,
+        "cause": None,
     }
     # The running head's two words, extra from words on.
     assert len(lines) == 3

@@ -63,6 +63,8 @@ class ReferenceKind(StrEnum):
     HEADING = "heading"
     PARAGRAPH = "paragraph"
     QUOTE = "quote"
+    VERSE = "verse"
+    CHAPTER_SUMMARY = "chapter_summary"
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"
@@ -516,6 +518,7 @@ def _block_kind(
         (rules.table, ReferenceKind.TABLE),
         (rules.figure, ReferenceKind.FIGURE),
         (rules.quote, ReferenceKind.QUOTE),
+        (rules.verse, ReferenceKind.VERSE),
         (rules.heading, ReferenceKind.HEADING),
     ):
         if _matches(selectors, element, parent):
@@ -546,7 +549,12 @@ def _container(
     no block itself, in document order."""
     rules = context.rules
     items: list[_Item] = []
+    # How far the blocks among `children` are into a chapter's opening: an
+    # element of the rule `summary_after` (the chapter's label), then one
+    # heading (its title), after which a quote is a chapter summary.
+    opening = _Opening.NONE
     for child in children:
+        found = len(items)
         if isinstance(child, _Data):
             if not _is_dropped_text(child.text, rules):
                 message = (
@@ -568,7 +576,7 @@ def _container(
             index_context = replace(context, in_index=True)
             items.extend(_container(child.children, child, index_context))
         elif (kind := _block_kind(child, parent, rules)) is not None:
-            items.extend(_block(kind, child, context, lift=False))
+            items.extend(_block(_in_opening(kind, opening), child, context, lift=False))
         elif child.tag not in _DOCUMENT_TAGS and (
             child.tag == "p"
             or (context.in_index and child.tag == "li")
@@ -582,7 +590,51 @@ def _container(
             items.extend(_block(kind, child, context, lift=True))
         else:
             items.extend(_container(child.children, child, context))
+        if any(_is_block_item(item) for item in items[found:]):
+            opening = _opening_after(child, parent, rules, opening)
     return tuple(items)
+
+
+class _Opening(StrEnum):
+    """Where a chapter's opening stands, for the rule `summary_after`."""
+
+    NONE = "none"
+    LABEL = "label"  # after an element of `summary_after`
+    TITLE = "title"  # after the one heading that follows it
+
+
+def _in_opening(kind: ReferenceKind, opening: _Opening) -> ReferenceKind:
+    """The kind of a rule's block at `opening`: a quote after a chapter's
+    label and title is its chapter summary."""
+    if kind is ReferenceKind.QUOTE and opening is _Opening.TITLE:
+        return ReferenceKind.CHAPTER_SUMMARY
+    return kind
+
+
+def _opening_after(
+    child: _Element, parent: _Element, rules: ReadingRules, opening: _Opening
+) -> _Opening:
+    """Where a chapter's opening stands after `child`, which gave blocks:
+    an element of `summary_after` is a chapter's label, and the heading
+    right after a label its title."""
+    if _matches(rules.summary_after, child, parent):
+        return _Opening.LABEL
+    if opening is _Opening.LABEL and (
+        _block_kind(child, parent, rules) is ReferenceKind.HEADING
+    ):
+        return _Opening.TITLE
+    return _Opening.NONE
+
+
+def _is_block_item(item: _Item) -> bool:
+    """Whether `item` is a block or a note, not a marker between blocks."""
+    match item:
+        case _RawNote():
+            return True
+        case _RawBlock(kind=kind):
+            return kind is not None
+        case _:
+            assert_never(item)
 
 
 def _marker(element: _Element, parent: _Element, context: _Context) -> _Marker | None:

@@ -541,6 +541,10 @@ _SUMMARY_COLUMNS: tuple[tuple[str, tuple[str, ...]], ...] = (
         ("outputs", "markdown", "paragraph_boundaries", "body", "recall"),
     ),
     ("notes as notes", ("outputs", "markdown", "notes", "as_note")),
+    (
+        "notes whose reference is right",
+        ("outputs", "markdown", "notes", "reference_right"),
+    ),
     ("notes in body", ("outputs", "markdown", "notes", "in_body")),
     ("notes missing", ("outputs", "markdown", "notes", "missing")),
     (
@@ -549,6 +553,22 @@ _SUMMARY_COLUMNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     ("margin notes in body", ("outputs", "markdown", "margin_notes", "in_body")),
     ("margin notes missing", ("outputs", "markdown", "margin_notes", "missing")),
+    (
+        "reference headings, body range",
+        ("outputs", "markdown", "headings", "reference_headings"),
+    ),
+    (
+        "reference headings in heading blocks, body range",
+        ("outputs", "markdown", "headings", "in_heading_blocks"),
+    ),
+    (
+        "index paragraph precision, markdown",
+        ("outputs", "markdown", "paragraph_boundaries", "index", "precision"),
+    ),
+    (
+        "index paragraph recall, markdown",
+        ("outputs", "markdown", "paragraph_boundaries", "index", "recall"),
+    ),
     ("unplaced", ("unplaced",)),
     ("anchor mismatches", ("anchor_mismatches",)),
 )
