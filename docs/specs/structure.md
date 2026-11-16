@@ -1535,6 +1535,13 @@ takes out of the body lines beside them (layout §3, step 2b).
    regions that are not beside a paragraph's first line lie within 2.5
    pitches below another, against 38 that are beside one ("Bodies" /
    "politic." on page 109); in Domesday the counts are 31 and 3.
+   The regions' lines are one after another in the block, but no hyphen
+   is joined (section 5) where one region ends and the next begins: a
+   line between them often went unread, and of the 11 joins made there
+   on Domesday and Gierke, 10 made words that are not printed ("peathe"
+   of "The pea-" and "the rSoyal", Domesday page 90; "Guardianvacant",
+   Gierke page 127). Decided on 16 November 2026, in the review of work
+   package 4.
 2. **The line it is beside.** Take the top of the margin note's first
    line. When the first line of a paragraph of the page has its top
    within 0.5 pitch of it, above or below, that is the line beside;
