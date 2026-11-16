@@ -2214,6 +2214,68 @@ def test_endnote_references_are_taken_after_the_last_contents_page() -> None:
     assert _references_to_endnotes(without) == (("1.", "Maitland"), ("4.", "Law"))
 
 
+def test_endnote_marker_that_does_not_rise_starts_a_new_run() -> None:
+    # A list numbered 1 to 5 on page 0, then the section's 1 to 12: "1."
+    # does not rise above "5.", so the list is a run of its own, too short
+    # for a section, and stays paragraphs (structure spec, section 12).
+    section = _endnote_pages(1, 12)
+    listed = _body_page(
+        0,
+        *(
+            line
+            for n in range(1, 6)
+            for line in (
+                _indented(f"{n}. An item of a list", 25 + 45 * n),
+                _full("goes on over a full line", 40 + 45 * n),
+                _short("ends.", 55 + 45 * n),
+            )
+        ),
+    )
+    lines = _lines_of(
+        listed, *(replace(page, index=page.index + 1) for page in section.pages)
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert tuple(marker for marker, _ in _endnotes_of(blocks))[1:] == tuple(
+        f"{n}." for n in range(1, 13)
+    )
+    assert tuple(block_text(block) for block in blocks.blocks[:5]) == tuple(
+        f"{n}. An item of a list goes on over a full line ends." for n in range(1, 6)
+    )
+
+
+def test_endnote_section_stops_back_at_a_centred_line() -> None:
+    # "NOTES." centred above the first endnote stays a body block; the end
+    # of a note between it and "1." is an endnote without a marker.
+    section = _endnote_pages(1, 12)
+    page = section.pages[1]
+    region = page.regions[0]
+    title = _spread("NOTES.", 150, 200, 50)
+    page = replace(page, regions=(replace(region, lines=(title, *region.lines)),))
+    blocks = make_blocks(_lines_of(section.pages[0], page), _NO_WORDS, workers=1)
+    assert block_text(blocks.blocks[-1]) == "NOTES."
+    assert _endnotes_of(blocks)[0][0] == ""
+
+
+def test_endnote_section_does_not_run_on_over_blank_pages() -> None:
+    # The last endnote ends with a full line; after two blank pages, a
+    # page's first line, not indented, does not run on into it.
+    section = _endnote_pages(1, 12)
+    last = section.pages[1]
+    region = last.regions[0]
+    full_end = replace(region, lines=(*region.lines[:-1], _full("and runs on", 640)))
+    card = _body_page(4, _full("PLEASE DO NOT REMOVE CARDS", 70))
+    lines = _lines_of(
+        section.pages[0],
+        replace(last, regions=(full_end,)),
+        PageLayout(2, (), ()),
+        PageLayout(3, (), ()),
+        card,
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _endnotes_of(blocks)[-1][1][-1].endswith("and runs on")
+    assert block_text(blocks.blocks[-1]) == "PLEASE DO NOT REMOVE CARDS"
+
+
 def test_endnote_section_of_12_paragraphs_gives_12_endnotes() -> None:
     lines = _endnote_pages(291, 12, between=True)
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
@@ -2574,21 +2636,52 @@ def _numbers_on(blocks: BlocksFile, page: int) -> tuple[PageNumber, ...]:
     return tuple(number for number in blocks.page_numbers if number.page_index == page)
 
 
+@pytest.fixture(scope="module")
+def gierke_blocks(
+    whole_book_toml: frozendict[str, str], tmp_path_factory: pytest.TempPathFactory
+) -> BlocksFile:
+    """blocks.json of the whole Gierke book, made once for its tests."""
+    return _blocks_of_whole_book(
+        whole_book_toml["politicaltheorie00gieruoft"],
+        tmp_path_factory.mktemp("gierke"),
+    )
+
+
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 def test_whole_book_gierke_270_loses_its_notes_head_and_page_number(
-    whole_book_toml: frozendict[str, str], tmp_path: Path
+    gierke_blocks: BlocksFile,
 ) -> None:
-    blocks = _blocks_of_whole_book(
-        whole_book_toml["politicaltheorie00gieruoft"], tmp_path
-    )
+    blocks = gierke_blocks
     assert _removed_on(blocks, 270) == (
         (RemovalReason.RUNNING_HEAD, "Notes."),
         (RemovalReason.PAGE_NUMBER, "185"),
     )
     assert _numbers_on(blocks, 270) == (
         PageNumber(270, "185", PageNumberPosition.HEAD),
+    )
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+def test_whole_book_gierke_endnote_section_runs_from_186_to_282(
+    gierke_blocks: BlocksFile,
+) -> None:
+    # Structure spec, section 12: 299 endnotes on pages 186 to 282, the
+    # library card of page 288 (excluded) not among them, and "NOTES."
+    # a block of the body (a heading once work package 4 finds headings).
+    endnotes = tuple(
+        note for note in gierke_blocks.notes if note.kind is NoteKind.ENDNOTE
+    )
+    assert len(endnotes) == 299
+    pages = {origin.page_index for note in endnotes for origin in note.origin}
+    assert (min(pages), max(pages)) == (186, 282)
+    assert endnotes[0].marker == "1."
+    assert any(
+        block_text(block) == "NOTES." and block.origin[0].page_index == 186
+        for block in gierke_blocks.blocks
     )
 
 

@@ -287,7 +287,7 @@ def assemble(
     pages = _taken_body_notes(
         parts, band_notes, numbering, form, body_word_height, section_pages
     )
-    entries = body_entries(pages, form, section_pages.start if section_pages else None)
+    entries = body_entries(pages, form, section_pages)
     section = endnote_section(entries)
     body = _body(entries, book_words, word_list)
     groups = endnote_groups(entries, section) if section is not None else ()

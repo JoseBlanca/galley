@@ -157,17 +157,31 @@ def _marker_led(lines: Sequence[PlacedLine], form: MarkerForm | None) -> bool:
     )
 
 
+def _crosses_section_edge(
+    before: PlacedLine | None, line: PlacedLine, section_pages: range
+) -> bool:
+    """Whether a paragraph running on from `before` into `line`, the first
+    line of a page, would run into or out of the endnote section."""
+    return (
+        before is not None
+        and bool(section_pages)
+        and (before.page_index in section_pages) != (line.page_index in section_pages)
+    )
+
+
 def body_entries(
     pages: Sequence[PageParts],
     form: MarkerForm | None = None,
-    starting_page: int | None = None,
+    section_pages: range = range(0),
 ) -> tuple[Entry, ...]:
     """The paragraphs of the book's body stream in order, each followed by
     the margin notes of the pages whose body ends in it; the margin notes
     of a page with no body stream after the last block so far. A paragraph
     whose first word has the book's marker form `form` does not run on
-    into the next page, and no paragraph runs on into `starting_page`, the
-    first page of the endnote section (spec section 12)."""
+    into the next page, and no paragraph runs on into or out of
+    `section_pages`, the pages of the endnote section (spec section 12):
+    the first line of its first page, and the first body line after its
+    last page, start a paragraph."""
     entries: list[Entry] = []
     current: list[PlacedLine] = []
     pending: list[MarginNote] = []
@@ -182,7 +196,8 @@ def body_entries(
                 and not (before is not None and hyphen_between(before, line))
             )
             note_break = number == 0 and (
-                _marker_led(current, form) or line.page_index == starting_page
+                _marker_led(current, form)
+                or _crosses_section_edge(before, line, section_pages)
             )
             if plate_break or note_break or starts_paragraph(line, before):
                 if current:
