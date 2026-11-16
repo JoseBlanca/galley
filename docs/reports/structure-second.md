@@ -31,11 +31,23 @@ paragraphs:
 - **Plates**: found from a small image of each page, the picture in the
   EPUB with its caption, the stray OCR words removed with a record.
 
-No word is lost or invented at any stage on the six books; all six
-EPUBs pass epubcheck. The fidelity check is stricter than before: no
-word can hide in a note reference, a link or a picture's description.
+On the six sample books (the four above, Kadesh and Gierke), galley's
+check that every word of the scan reaches the output, or is recorded as
+removed, passes at every stage, and all six EPUBs pass epubcheck (the
+EPUB validator). That check is stricter than before: a real word can no
+longer be taken for a note's reference number and dropped, and the text
+of a link and of a picture's caption is counted.
 
-**The targets** (this plan's start → now, at blocks):
+**The targets.** Each score compares galley's output, as `blocks.json`
+(the file structure writes, before markdown), with the Project Gutenberg
+edition of four of the six sample books (Haskins, Stubbs, Domesday,
+Mariéjol), using the evaluation tool. "Reference is right" means galley
+linked the note from the reference the Gutenberg text links it from.
+The index row is the precision and recall of galley's entry boundaries
+against Gutenberg's. Page numbers here and below are page indices of
+the whole PDF, counted from 0, unless "book page" says printed. Values
+are this plan's start → now (target); Domesday's margin notes start at
+514 because the first plan already found them.
 
 | score | Haskins | Stubbs | Domesday | Mariéjol |
 |---|---|---|---|---|
@@ -44,11 +56,12 @@ word can hide in a note reference, a link or a picture's description.
 | reference headings in heading blocks, body pages | 0 → 18 of 18 | 0 → 25 of 26 | 0 → 23 of 23 | 0 → 26 of 26 |
 | index entries, precision / recall | 0.991 / 0.965 (0.90 / 0.90) | **0.829 / 0.789 (0.85 / 0.85), missed** | 0.993 / 0.986 (0.90 / 0.90) | – |
 
-Paragraphs improved on all four books (precision / recall, first plan →
-now): Haskins .84/.86 → .86/.90, Stubbs .72/.72 → .74/.74, Domesday
+Paragraph boundaries improved on all four books (precision / recall of
+galley's paragraph starts against Gutenberg's, first plan → now): Haskins .84/.86 → .86/.90, Stubbs .72/.72 → .74/.74, Domesday
 .80/.83 → .86/.87, Mariéjol .69/.74 → .73/.75. Stubbs' index misses
-because of its text layer: 94% of its differences come from the words
-as the scan's OCR gives them, before any rule runs.
+because of its text layer, the text the scanner's OCR put in the PDF:
+of the 6,865 differences on its index pages, 94% come from those words
+as read, before any rule of galley runs.
 
 **Decided by the orchestrator, which the owner may reverse** (each a
 commit of its own; the sections below give the reasons):
@@ -62,43 +75,58 @@ commit of its own; the sections below give the reasons):
   contents pages, so their headings are not made twice;
 - a Stubbs cut-in word less than 5 pt from a body word stays in the
   body;
-- a plate's caption judged per printed row;
-- the default test run's budget raised to about a minute (the owner's
-  word, 16 November 2026).
+- a plate's caption judged per printed row.
+
+Reversing one means reverting its commits, named in its section below,
+and the evaluation shows the cost. Also recorded: the default test run
+may take about a minute, as the owner said on 16 November 2026.
 
 **What is still wrong**:
 
 - Stubbs' index (above); its page 312 is the worst, garbled across the
   gutter.
-- Gierke's "Law1" (page 88) has no pop-up: endnote 1 is taken by "(1."
-  in the List of Authorities on page 74.
+- Gierke's "Law1" (page index 88) has no pop-up: endnote 1 is linked
+  instead from "(1." in the List of Authorities on page index 74.
 - OCR text: margin notes misread (Domesday, Gierke), notes the OCR did
   not read at all ("Medieval Thought." on Gierke page 88), Mariéjol's
-  notes; and references the OCR read with a letter ("(i)" for "(1)")
-  or split ("(" "2).", 54 in Mariéjol) stay unlinked.
+  notes; and note references the OCR read with a letter ("(i)" for "(1)") or
+  split in two words (a lone "(" before "2)."; 54 of them in Mariéjol)
+  stay unlinked.
 - Domesday's tables come out as verse or with false headings (4 table
   titles); Gierke's 22 introduction footnotes left in the body come out
   as quotes.
-- Of the owner's sheet of 67 reference pages, 17 were checked by the
-  owner; the other 50 are not exact tests.
+- Of the 67 pages on the owner's sheet of reference pages, the owner
+  checked 17, which are now tests of galley's exact output; the other 50
+  are not tested that way.
 
 **What is asked of the owner**:
 
 1. **The order to merge** `plan/structure-second` into `main`. It
    brings the specs of this plan too.
 2. **A look at the EPUBs** in `runs/structure-second/epubs/` of the
-   main checkout, at the places in "For the owner on the Kindle" at the
-   end: Gierke's endnote pop-ups (they were never tried on a Kindle),
-   Domesday around book page 76, Stubbs' chapter III, Mariéjol's verse,
-   Kadesh's plate on page 64; and whether other faint Kadesh plates are
-   covers like page 16.
+   main checkout (the table "For the owner on the Kindle" at the end
+   gives the chapter file of each):
+   - gierke.epub: the pop-up from "communities2" at the start of section
+     "II. Macrocosm and Microcosm." (book page 93), and the endnote list
+     in the last chapter, "NOTES."; endnote pop-ups were never tried on a
+     Kindle;
+   - domesday.epub: essay I, "§ 3. The Villeins.", around book page 76:
+     footnote pop-ups and margin notes before their paragraphs;
+   - stubbs.epub: "CHAPTER III." (book page 51): the heading with its
+     number, the chapter summary, the cut-in note "accession.";
+   - mariejol.epub: the verse in "CHAPITRE II" (book pages 51–52);
+   - kadesh.epub: the plate on page index 64, and whether other faint
+     plates are covers like page index 16.
 3. **Decisions for the next plan**, no hurry:
    - re-reading small print with Tesseract where the scan is otherwise
-     good (measured on Gierke's margin notes: 96% of words right against
-     37% in the scan's OCR, about 50 s for the book; task 7.6);
+     good (measured on 30 of Gierke's margin notes, 139 words: 96% right
+     against 37% in the scan's OCR; about 50 s for the 290-page book on
+     an 18-core Mac; section "Task 7.6");
    - how a printed contents page keeps its own structure (the owner's
-     answer on D-14);
-   - re-OCR of Stubbs' index, which is what its target needs.
+     answer on Domesday's contents page, section "Task 7.3"); not yet
+     costed;
+   - re-OCR of Stubbs' index pages (10 pages), which is what its target
+     needs; it would use the same Tesseract step as the first point.
 
 ## Before the first task
 
