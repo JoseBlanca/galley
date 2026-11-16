@@ -29,6 +29,8 @@ title = "The Normans in European History"
 authors = ["Charles Homer Haskins"]
 language = "en"
 exclude_pages = [8]
+# The body range is the whole excerpt, from chapter V to the index.
+body_pages = [0, 9]
 html_sha256 = "d9c32547bf2741c4ef412a90499d16edb6c5012c0b921d1af121d31153a6611b"
 expected_counts = { notes = 3, margin_notes = 0, note_references = 3, page_anchors = 9, headings = 2, first_tokens = ["V", "NORMANDY", "AND", "FRANCE", "In"] }
 

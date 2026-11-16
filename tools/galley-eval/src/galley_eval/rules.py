@@ -78,7 +78,10 @@ class ReadingRules:
     expressions that must match a whole run of text, its white space at
     both ends aside; `note_reference` holds regular expressions that must
     match the whole `href` of an `a`. `separate` names inline elements
-    whose start and end separate words, as a space would.
+    whose start and end separate words, as a space would. `quote` names
+    quotes in prose and `verse` verse; `summary_after` names the elements
+    that open a chapter, its label: an element of `quote` after one of
+    them and the one heading after it is a chapter summary.
     """
 
     start: tuple[Selector, ...]
@@ -92,6 +95,8 @@ class ReadingRules:
     note: tuple[Selector, ...]
     note_reference: tuple[re.Pattern[str], ...]
     quote: tuple[Selector, ...]
+    verse: tuple[Selector, ...]
+    summary_after: tuple[Selector, ...]
     index: tuple[Selector, ...]
     figure: tuple[Selector, ...]
     table: tuple[Selector, ...]
@@ -121,9 +126,9 @@ DEFAULT_RULES = ReadingRules(
     notes_section=(),
     note=(),
     note_reference=(re.compile(r"#Footnote_\d+"),),
-    quote=_selectors(
-        "div.blockquot", "div.quote", "p.quote", "div.poem", "div.poetry", "div.verse"
-    ),
+    quote=_selectors("div.blockquot", "div.quote", "p.quote"),
+    verse=_selectors("div.poem", "div.poetry", "div.verse"),
+    summary_after=(),
     index=_selectors("div.index", "ul.index", "ul.IX"),
     figure=_selectors("figure", "div.figcenter"),
     table=_selectors("table"),

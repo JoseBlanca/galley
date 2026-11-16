@@ -5,12 +5,27 @@ reference and galley's side to the differences and scores (spec sections
 import pytest
 
 from galley.config import Language
-from galley.model import BlockKind, Box, PageWords, TextSource, Word, WordsFile
+from galley.model import (
+    BlockKind,
+    Box,
+    NoteKind,
+    PageWords,
+    TextSource,
+    Word,
+    WordsFile,
+)
 from galley_eval.align import GalleyStream, GalleyToken, State, Subkind
 from galley_eval.books import EvaluationBook, ExpectedCounts
-from galley_eval.errors import AlignmentError
-from galley_eval.evaluate import Apart, Difference, Evaluation, evaluation_of
-from galley_eval.galley_side import GalleyBlock, GalleySide
+from galley_eval.errors import AlignmentError, BooksFileError
+from galley_eval.evaluate import (
+    Apart,
+    Cause,
+    Difference,
+    Evaluation,
+    OutputScores,
+    evaluation_of,
+)
+from galley_eval.galley_side import GalleyBlock, GalleyNoteReference, GalleySide
 from galley_eval.reader import (
     Gap,
     NoteReference,
@@ -23,7 +38,7 @@ from galley_eval.reader import (
     Stream,
 )
 from galley_eval.rules import DEFAULT_RULES
-from galley_eval.scores import Part
+from galley_eval.scores import GalleyKind, HeadingScores, NoteScores, Part
 from galley_eval.stages import StageOutput
 
 
@@ -32,6 +47,7 @@ def _book(
     not_in_reference: tuple[int, ...] = (),
     *,
     margin_notes_moved: bool = False,
+    body_pages: tuple[int, int] = (0, 0),
 ) -> EvaluationBook:
     return EvaluationBook(
         name="test",
@@ -45,6 +61,7 @@ def _book(
         plate_pages=(),
         not_in_reference=not_in_reference,
         margin_notes_moved=margin_notes_moved,
+        body_pages=body_pages,
         html_sha256="0" * 64,
         expected_counts=ExpectedCounts(
             notes=0,
@@ -509,3 +526,316 @@ def test_difference_records_its_state_at_its_stage_and_at_markdown() -> None:
         replicate.state,
         replicate.subkind,
     ) == (StageOutput.WORDS, State.SPLIT, State.CHANGED, Subkind.LETTERS)
+
+
+# blocks.json version 2 (spec sections 5 and 6): verse, chapter summaries,
+# headings with a label, and endnotes, on galley tokens made by hand.
+
+
+def _reference_block(kind: ReferenceKind, text: str) -> ReferenceBlock:
+    return ReferenceBlock(
+        kind,
+        tuple(ReferenceToken(word, marked_correction=False) for word in text.split()),
+    )
+
+
+def _v2_tokens(
+    text: str,
+    block_id: str,
+    *,
+    page_index: int = 0,
+    stream: GalleyStream = GalleyStream.BODY,
+    label_words: int = 0,
+    near_page: int | None = None,
+) -> tuple[GalleyToken, ...]:
+    return tuple(
+        GalleyToken(
+            text=word,
+            page_index=page_index,
+            stream=stream,
+            edge_of_page=False,
+            block_id=block_id,
+            in_label=position < label_words,
+            near_page=near_page,
+        )
+        for position, word in enumerate(text.split())
+    )
+
+
+def _words_of(tokens: tuple[GalleyToken, ...]) -> tuple[GalleyToken, ...]:
+    """`tokens` as words.json would have them: body words with no block."""
+    return tuple(
+        GalleyToken(
+            text=token.text,
+            page_index=token.page_index,
+            stream=GalleyStream.BODY,
+            edge_of_page=False,
+            block_id=None,
+        )
+        for token in sorted(tokens, key=lambda token: token.page_index)
+    )
+
+
+def _side_of(
+    words: tuple[GalleyToken, ...],
+    blocks: tuple[GalleyToken, ...],
+    galley_blocks: dict[str, GalleyBlock],
+    note_references: tuple[GalleyNoteReference, ...] = (),
+) -> GalleySide:
+    # The PDF ends with a blank page after the last with words.
+    pages = range(max(token.page_index for token in words) + 2)
+    return GalleySide(
+        words=words,
+        lines=words,
+        blocks=blocks,
+        markdown=blocks,
+        galley_blocks=frozendict(galley_blocks),
+        note_references=note_references,
+        words_file=WordsFile(
+            source_pdf_sha256="0" * 64,
+            pages=tuple(
+                PageWords(
+                    index=page,
+                    text_source=TextSource.TEXT_LAYER,
+                    words=tuple(
+                        Word(token.text, Box(0.0, 0.0, 1.0, 1.0), None)
+                        for token in words
+                        if token.page_index == page
+                    ),
+                    figures=(),
+                )
+                for page in pages
+            ),
+            removals=(),
+        ),
+    )
+
+
+def _body_block(kind: BlockKind, *, label: bool = False) -> GalleyBlock:
+    return GalleyBlock(
+        kind=kind,
+        stream=GalleyStream.BODY,
+        note_id=None,
+        has_label=label,
+        first_page=0,
+    )
+
+
+# Stubbs' chapter III: its reference text makes two headings of the label
+# and the title, and a quote of the summary.
+_CHAPTER = ReferenceText(
+    blocks=(
+        _reference_block(ReferenceKind.HEADING, "CHAPTER III."),
+        _reference_block(ReferenceKind.HEADING, "THE EARLY YEARS OF HENRY II."),
+        _reference_block(
+            ReferenceKind.CHAPTER_SUMMARY, "Terms of accession \u2014 His character"
+        ),
+        _reference_block(ReferenceKind.QUOTE, "prose quoted from a chronicle"),
+        _reference_block(ReferenceKind.VERSE, "O Roma nobilis orbis et domina"),
+        _reference_block(ReferenceKind.PARAGRAPH, "Very few epochs indeed"),
+    ),
+    notes=(),
+    note_references=(),
+    page_anchors=(),
+    anchors_in_notes=(),
+)
+
+
+def _chapter(*, label: bool, body_pages: tuple[int, int] = (0, 0)) -> Evaluation:
+    blocks = (
+        _v2_tokens(
+            "CHAPTER III. THE EARLY YEARS OF HENRY II.",
+            "h",
+            label_words=2 if label else 0,
+        )
+        + _v2_tokens("Terms of accession \u2014 His character", "s")
+        + _v2_tokens("prose quoted from a chronicle", "q")
+        + _v2_tokens("O Roma nobilis orbis et domina", "v")
+        + _v2_tokens("Very few epochs indeed", "p")
+    )
+    side = _side_of(
+        _words_of(blocks),
+        blocks,
+        {
+            "h": _body_block(BlockKind.HEADING, label=label),
+            "s": _body_block(BlockKind.CHAPTER_SUMMARY),
+            # A verse block on a prose quote is the wrong kind.
+            "q": _body_block(BlockKind.VERSE),
+            "v": _body_block(BlockKind.VERSE),
+            "p": _body_block(BlockKind.PARAGRAPH),
+        },
+    )
+    return evaluation_of(_book(body_pages=body_pages), _CHAPTER, side, frozenset())
+
+
+def _at_markdown(evaluation: Evaluation) -> OutputScores:
+    return evaluation.scorecard.outputs[-1]
+
+
+def test_verse_and_chapter_summary_are_right_only_on_their_own_kind() -> None:
+    scores = _at_markdown(_chapter(label=True))
+    assert scores.kinds_right is not None
+    # The two headings, the summary, the verse and the paragraph; not the
+    # prose quote held by a verse block.
+    assert scores.kinds_right[Part.BODY] == 5
+    assert scores.block_kinds is not None
+    pairs = {
+        (count.reference, count.galley): count.count
+        for count in scores.block_kinds[Part.BODY]
+    }
+    assert pairs[ReferenceKind.QUOTE, GalleyKind.VERSE] == 1
+    assert pairs[ReferenceKind.CHAPTER_SUMMARY, GalleyKind.CHAPTER_SUMMARY] == 1
+
+
+def test_heading_label_and_title_against_two_reference_headings_miss_no_boundary() -> (
+    None
+):
+    scores = _at_markdown(_chapter(label=True))
+    assert scores.headings == HeadingScores(
+        reference_headings=2,
+        in_heading_blocks=2,
+        galley_headings=1,
+        galley_headings_right=1,
+    )
+    assert scores.paragraph_boundaries is not None
+    body = scores.paragraph_boundaries[Part.BODY]
+    assert (body.reference_boundaries, body.found, body.right) == (4, 4, 4)
+    assert (body.precision, body.recall) == (1.0, 1.0)
+
+
+def test_heading_with_no_label_holding_two_reference_headings_misses_a_boundary() -> (
+    None
+):
+    # Mariéjol's "APPENDICE" and its title, made one heading with no label.
+    scores = _at_markdown(_chapter(label=False))
+    assert scores.paragraph_boundaries is not None
+    body = scores.paragraph_boundaries[Part.BODY]
+    assert (body.reference_boundaries, body.found) == (5, 4)
+    assert scores.headings is not None
+    assert scores.headings.in_heading_blocks == 2
+
+
+def test_heading_outside_the_body_range_is_not_counted() -> None:
+    scores = _at_markdown(_chapter(label=True, body_pages=(1, 1)))
+    assert scores.headings == HeadingScores(
+        reference_headings=0,
+        in_heading_blocks=0,
+        galley_headings=0,
+        galley_headings_right=0,
+    )
+
+
+def test_body_range_after_the_last_page_of_the_pdf_is_an_error() -> None:
+    with pytest.raises(BooksFileError, match="body_pages = \\[0, 3\\]"):
+        _chapter(label=True, body_pages=(0, 3))
+
+
+# Gierke's "Law1" on page 0 refers to endnote 1, printed on page 10.
+_ENDNOTE_REFERENCE = ReferenceText(
+    blocks=(
+        _reference_block(ReferenceKind.PARAGRAPH, "the Law of the land"),
+        _reference_block(ReferenceKind.PARAGRAPH, "another Law in another realm"),
+    ),
+    notes=(
+        ReferenceNote(
+            "note1",
+            (_reference_block(ReferenceKind.PARAGRAPH, "See Bracton on this point"),),
+        ),
+    ),
+    note_references=(NoteReference("note1", Gap(Stream.BODY, 2)),),
+    page_anchors=(),
+    anchors_in_notes=(),
+)
+
+
+def _endnote_evaluation(*, reference_on_page: int) -> Evaluation:
+    """galley's endnote on page 10 linked from "Law" on `reference_on_page`,
+    0 where the reference text has it, or 20, where galley put the link
+    by mistake."""
+    blocks = (
+        _v2_tokens("the Law of the land", "b0")
+        + _v2_tokens("another Law in another realm", "b20", page_index=20)
+        + _v2_tokens(
+            "1. See Bracton on this point",
+            "e1",
+            page_index=10,
+            stream=GalleyStream.NOTES,
+            near_page=reference_on_page,
+        )
+    )
+    linked_block = "b0" if reference_on_page == 0 else "b20"
+    side = _side_of(
+        _words_of(blocks),
+        blocks,
+        {
+            "b0": _body_block(BlockKind.PARAGRAPH),
+            "b20": GalleyBlock(
+                kind=BlockKind.PARAGRAPH,
+                stream=GalleyStream.BODY,
+                note_id=None,
+                first_page=20,
+            ),
+            "e1": GalleyBlock(
+                kind=BlockKind.PARAGRAPH,
+                stream=GalleyStream.NOTES,
+                note_id="n-p0010-001",
+                note_kind=NoteKind.ENDNOTE,
+                first_page=10,
+            ),
+        },
+        (
+            GalleyNoteReference(
+                note_id="n-p0010-001", block_id=linked_block, tokens_before=2
+            ),
+        ),
+    )
+    return evaluation_of(_book(), _ENDNOTE_REFERENCE, side, frozenset())
+
+
+def test_endnote_ten_pages_after_its_reference_is_found_with_its_reference_right() -> (
+    None
+):
+    evaluation = _endnote_evaluation(reference_on_page=0)
+    scores = {score.output: score for score in evaluation.scorecard.outputs}
+    for output in (StageOutput.BLOCKS, StageOutput.MARKDOWN):
+        assert scores[output].notes == NoteScores(
+            as_note=1, in_body=0, missing=0, reference_right=1
+        )
+    # At words the endnote's words lie on page 10, out of the window of
+    # its reference on page 0: they are not scored there, and blocks is
+    # not credited with them.
+    words_notes = scores[StageOutput.WORDS].text[Part.NOTES]
+    assert (words_notes.missing, words_notes.not_scored) == (0, 5)
+    assert scores[StageOutput.BLOCKS].text[Part.NOTES].repaired == 0
+    assert scores[StageOutput.BLOCKS].text[Part.NOTES].matched == 5
+    assert not any(difference.reference for difference in evaluation.differences)
+
+
+def test_endnote_linked_ten_pages_from_its_reference_is_missing_with_its_cause() -> (
+    None
+):
+    evaluation = _endnote_evaluation(reference_on_page=20)
+    markdown = _at_markdown(evaluation)
+    assert markdown.notes is not None
+    assert (markdown.notes.as_note, markdown.notes.reference_right) == (0, 0)
+    missing = tuple(
+        difference
+        for difference in evaluation.differences
+        if difference.state is State.MISSING and difference.part is Part.NOTES
+    )
+    assert missing
+    assert {difference.cause for difference in missing} == {Cause.ENDNOTE_REFERENCE_FAR}
+    extra_in_endnote = tuple(
+        difference
+        for difference in evaluation.differences
+        if difference.state is State.EXTRA and difference.note_id == "n-p0010-001"
+    )
+    assert extra_in_endnote
+    assert {difference.cause for difference in extra_in_endnote} == {
+        Cause.ENDNOTE_REFERENCE_FAR
+    }
+    assert {
+        difference
+        for difference in evaluation.differences
+        if difference.cause is not None
+    } == set(missing + extra_in_endnote)
