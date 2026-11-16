@@ -62,6 +62,7 @@ from galley.structure import (
 )
 from galley.structure._index import entry_side, index_page
 from galley.structure._lines import PlacedLine
+from galley.structure._linking import body_candidates
 from galley.structure._margins import BesideLine, InParagraph, line_beside
 from galley.structure._markers import MarkerForm, book_marker_form
 from galley.structure._measures import Edges
@@ -5291,3 +5292,21 @@ def test_index_entr_sub_entries_cut_after_each_semicolon_inside_a_line() -> None
         ("character, 92.", 2, Box(59, 92, 159, 114)),
     )
     check_stage(FidelityBoundary.STRUCTURE, _lines_of(page), blocks)
+
+
+def test_index_entr_is_not_searched_for_note_references() -> None:
+    # Spec section 17, rule 4: Stubbs 312's "^" in an entry linked to a
+    # garbled region made a note. The same words in a paragraph are a
+    # candidate.
+    def block(kind: BlockKind) -> Unnumbered:
+        return Unnumbered(
+            kind=kind,
+            words=("Acre,^", "siege", "of,", "116"),
+            word_pages=(0, 0, 0, 0),
+            origin=(Origin(0, Box(50, 300, 300, 307)),),
+            changes=(),
+            level=1 if kind is BlockKind.INDEX_ENTRY else None,
+        )
+
+    assert len(body_candidates((block(BlockKind.PARAGRAPH),))) == 1
+    assert body_candidates((block(BlockKind.INDEX_ENTRY),)) == ()
