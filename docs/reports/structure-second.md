@@ -599,3 +599,44 @@ page 83 are a margin region taken into the index column; a "See …"
 cross-reference stays in its entry, where Haskins' reference text makes
 it an item. After the merges: pytest 1648 passed in 28.0 s; with 8
 threads 49.3 s; `-m whole_book` 32 passed.
+
+## Review of work package 5 and task 6.3 (dc65034..ee9e649), and the fixes
+
+Four reviewers; fourteen fix commits (spec 5a411fa, 112ba13, 1c80849;
+code 1a48d00 to e67a65c). What mattered, all taken:
+
+- **Index page numbers attached to the wrong entry**: a margin region
+  of an index column (the page numbers printed beside it) was placed as
+  one block, so Domesday 546's "519" moved from "Beer" to "Bede" and
+  Stubbs 321's "Wallingford" and "Walter" came out in three pieces. Each
+  line of a margin region is now placed at its own top.
+- **Gierke page 84's folio glued into an index entry**; **a Stubbs index
+  entry linked as a footnote reference** (index entries are no longer
+  searched for references, as captions are not); **Domesday's index
+  running heads** "Index. 522" and "527 Index." left among the entries
+  (now removed as running heads and page numbers).
+- **A real caption word removed as stray** (Kadesh 48's "LUXOR"):
+  decided by the orchestrator, a caption line is judged per printed row,
+  not per piece of a row (structure §18; reversible by reverting 112ba13
+  and 78a2d38). Kadesh 48 now keeps "l.i v IK RELIEFS; THE". Removed as
+  `plate_text` after the fix: Kadesh 4 lines (8 words), Domesday 18
+  (69).
+- **Plate labels "PLATE II", "PLATE III" could be taken for running
+  heads** in a book that prints them atop each plate: lines that differ
+  only in a numeral are no longer alike. A plate page with two figures
+  is refused with an error naming the page.
+- **Tests**: about twenty rules of §17 and §18 survived mutation; the
+  worst, the fitted edge of a slanted index column (without it Stubbs
+  makes 916 entries, not 910). Each now has a test that fails when
+  broken; one rule was dead code and is gone.
+
+Index scores after the fixes: Haskins 0.991 / 0.965, Stubbs 0.829 /
+0.789 (target 0.85 / 0.85, missed), Domesday 0.993 / 0.986.
+
+Reported, not fixed (the rules as written give them): Stubbs' "Ma^arthy-"
+on page 7 joined over its plates to a stamp "s" on page 12; Stubbs
+312's ";;;" mark kept as a paragraph; Kadesh's piece on page 33 read as
+a footnote and joined into page 36 across plates 34–35.
+
+Checks at the end: pytest 1673 passed in 28.9 s; with 8 threads 50.3 s;
+`-m whole_book` 32 passed. Work packages 5 and 6 are done.
