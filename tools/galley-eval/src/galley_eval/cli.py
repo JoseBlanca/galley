@@ -170,14 +170,20 @@ def _toml_string(text: str) -> str:
 def book_toml(book: EvaluationBook, pdf: Path) -> str:
     """The text of galley's `book.toml` for `book`, whose PDF is `pdf`."""
     authors = ", ".join(_toml_string(author) for author in book.authors)
-    pages = ", ".join(str(page) for page in book.exclude_pages)
     return (
         f"pdf = {_toml_string(str(pdf))}\n"
         f"title = {_toml_string(book.title)}\n"
         f"authors = [{authors}]\n"
         f"language = {_toml_string(book.language.value)}\n"
-        f"exclude_pages = [{pages}]\n"
+        f"exclude_pages = [{_toml_pages(book.exclude_pages)}]\n"
+        f"contents_pages = [{_toml_pages(book.contents_pages)}]\n"
+        f"plate_pages = [{_toml_pages(book.plate_pages)}]\n"
     )
+
+
+def _toml_pages(pages: tuple[int, ...]) -> str:
+    """The items of a TOML list of page indices."""
+    return ", ".join(str(page) for page in pages)
 
 
 def galley_error_lines(stderr: str) -> str:

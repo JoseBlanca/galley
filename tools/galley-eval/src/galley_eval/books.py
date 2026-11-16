@@ -4,7 +4,9 @@ values (spec section 3).
 Each `[[book]]` table of the file is one evaluation book: its name, its
 Gutenberg ebook number and Internet Archive identifier, the title, authors
 and language that galley's `book.toml` needs, the pages without a text
-layer (`exclude_pages`), the pages whose text Gutenberg left out
+layer (`exclude_pages`), and the book config's `contents_pages` and
+`plate_pages` (architecture section 6), which galley-eval passes into the
+`book.toml` it writes; the pages whose text Gutenberg left out
 (`not_in_reference`), whether Gutenberg moved the margin notes
 (`margin_notes_moved`), the SHA-256 of the HTML file the rules and counts
 were written for (`html_sha256`), the counts the reader must find in the
@@ -60,6 +62,8 @@ class EvaluationBook:
     authors: tuple[str, ...]
     language: Language
     exclude_pages: tuple[int, ...]
+    contents_pages: tuple[int, ...]
+    plate_pages: tuple[int, ...]
     not_in_reference: tuple[int, ...]
     margin_notes_moved: bool
     html_sha256: str
@@ -88,7 +92,13 @@ _REQUIRED_KEYS = (
     "html_sha256",
     "expected_counts",
 )
-_OPTIONAL_KEYS = ("not_in_reference", "margin_notes_moved", "rules")
+_OPTIONAL_KEYS = (
+    "contents_pages",
+    "plate_pages",
+    "not_in_reference",
+    "margin_notes_moved",
+    "rules",
+)
 _COUNT_KEYS = ("notes", "margin_notes", "note_references", "page_anchors", "headings")
 _FIRST_TOKENS = 5
 _SHA256 = re.compile(r"[0-9a-f]{64}")
@@ -160,6 +170,12 @@ def _book(table: object, key: str, path: Path) -> EvaluationBook:
         language=_language(book["language"], f"{key}.language", path),
         exclude_pages=_page_indices(
             book["exclude_pages"], f"{key}.exclude_pages", path
+        ),
+        contents_pages=_page_indices(
+            book.get("contents_pages", []), f"{key}.contents_pages", path
+        ),
+        plate_pages=_page_indices(
+            book.get("plate_pages", []), f"{key}.plate_pages", path
         ),
         not_in_reference=_page_indices(
             book.get("not_in_reference", []), f"{key}.not_in_reference", path

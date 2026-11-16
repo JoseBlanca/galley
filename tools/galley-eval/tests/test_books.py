@@ -50,6 +50,16 @@ def test_the_evaluation_set_has_the_four_books_of_the_spec() -> None:
     assert mariejol.html_name == "pg36315-images.html"
     assert mariejol.pdf_name == "catherinedemedic00mariuoft.pdf"
     assert books[2].margin_notes_moved
+    # docs/specs/plates.md section 2: the printed contents pages, and no
+    # plate that analyze's rule misses.
+    assert [book.contents_pages for book in books] == [
+        (14,),
+        (14, 15, 16),
+        (14, 15, 16, 17, 18, 19, 20),
+        (450,),
+    ]
+    assert [book.plate_pages for book in books] == [(), (), (), ()]
+    assert {1, 2, 457, 458} <= set(mariejol.exclude_pages)
     assert books[2].expected_counts == ExpectedCounts(
         notes=1729,
         margin_notes=593,
@@ -70,6 +80,8 @@ def test_book_with_only_required_keys_takes_the_defaults(tmp_path: Path) -> None
         authors=("Charles Homer Haskins",),
         language=Language.EN,
         exclude_pages=(0, 3),
+        contents_pages=(),
+        plate_pages=(),
         not_in_reference=(),
         margin_notes_moved=False,
         html_sha256=HASKINS_SHA256,
@@ -83,6 +95,12 @@ def test_book_with_only_required_keys_takes_the_defaults(tmp_path: Path) -> None
         ),
         rules=DEFAULT_RULES,
     )
+
+
+def test_contents_and_plate_pages_are_read_in_their_order(tmp_path: Path) -> None:
+    text = MINIMAL_BOOK + "contents_pages = [15, 14]\nplate_pages = [23]\n"
+    (book,) = read_books(_write(tmp_path, text))
+    assert (book.contents_pages, book.plate_pages) == ((15, 14), (23,))
 
 
 def test_rules_are_added_to_or_replace_the_defaults(tmp_path: Path) -> None:
@@ -147,6 +165,8 @@ def test_selector_of_another_form_is_a_value_error(text: str) -> None:
         ("exclude_pages = [-1]", "book[0].exclude_pages[0]", "counts from 0"),
         ("exclude_pages = [true]", "book[0].exclude_pages[0]", "whole number"),
         ("not_in_reference = 14", "book[0].not_in_reference", "expected a list"),
+        ("contents_pages = [-1]", "book[0].contents_pages[0]", "counts from 0"),
+        ("plate_pages = 23", "book[0].plate_pages", "expected a list"),
         ("margin_notes_moved = 1", "book[0].margin_notes_moved", "true or false"),
         (
             "expected_counts = { notes = 1, margin_notes = 0, note_references = 1, headings = 0, first_tokens = ['a', 'b', 'c', 'd', 'e'] }",

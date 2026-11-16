@@ -3,7 +3,13 @@
 # Each book is an Internet Archive scan and the Project Gutenberg edition
 # that Distributed Proofreaders made from it. Page indices count from 0 in
 # the PDF. `exclude_pages` are the pages without a text layer, with which
-# `galley2epub run` succeeded on 15 November 2026. `html_sha256` is that of
+# `galley2epub run` succeeded on 15 November 2026, and the pages with one
+# that analyze's plate rule takes wrongly (docs/specs/plates.md, section
+# 2). The contents pages are those of the printed table of contents,
+# found on 16 November 2026 by "CONTENTS" or "TABLE DES MATIERES" at the
+# top of the page and checked by reading each page's text layer. galley-eval
+# writes these keys, and `plate_pages` when a book has it, into the
+# book.toml it gives galley (architecture section 6). `html_sha256` is that of
 # the HTML file downloaded on 15 November 2026, for which the rules and
 # counts were written. `expected_counts` were counted by hand in the HTML,
 # with a search for each class and href, never by running the reader;
@@ -19,6 +25,7 @@ title = "The Normans in European History"
 authors = ["Charles Homer Haskins"]
 language = "en"
 exclude_pages = [0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279]
+contents_pages = [14]
 html_sha256 = "d88ef036c5def555a899a2df51aea1d337cd2583ca9ae5d154c06185ed552ea7"
 expected_counts = { notes = 72, margin_notes = 0, note_references = 72, page_anchors = 260, headings = 21, first_tokens = ["THE", "NORMANS", "IN", "EUROPEAN", "HISTORY"] }
 
@@ -34,6 +41,7 @@ title = "The Early Plantagenets"
 authors = ["William Stubbs"]
 language = "en"
 exclude_pages = [0, 2, 3, 4, 5, 8, 9, 10, 11, 52, 53, 54, 55, 338, 339, 340, 341, 342, 343]
+contents_pages = [14, 15, 16]
 html_sha256 = "0c026dfc971d6fe8e8e55e00aaaa6bd3e4c109095011836c6cb411e24304b0dc"
 expected_counts = { notes = 0, margin_notes = 467, note_references = 0, page_anchors = 322, headings = 37, first_tokens = ["Epochs", "of", "Modern", "History", "EDITED"] }
 
@@ -51,6 +59,7 @@ title = "Domesday Book and Beyond"
 authors = ["Frederic William Maitland"]
 language = "en"
 exclude_pages = [0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557]
+contents_pages = [14, 15, 16, 17, 18, 19, 20]
 # The transcriber put each margin note at the start of its paragraph.
 margin_notes_moved = true
 html_sha256 = "91163a068f2249c4c199b7ab9f725976b803a6eedb718a2e39206a8ac32743ea"
@@ -72,7 +81,10 @@ archive_id = "catherinedemedic00mariuoft"
 title = "Catherine de Médicis"
 authors = ["Jean H. Mariéjol"]
 language = "fr"
-exclude_pages = [0, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456]
+# 1, 2, 457 and 458 have a text layer: marbled endpapers, an endpaper and
+# the library's card pocket.
+exclude_pages = [0, 1, 2, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456, 457, 458]
+contents_pages = [450]
 # Gutenberg leaves out the bibliography.
 not_in_reference = [14, 15, 16]
 html_sha256 = "33f2ca44a5a04b289494dd378f7b97b93806849edc6440b3383700517acecbee"
