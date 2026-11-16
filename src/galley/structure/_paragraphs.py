@@ -9,7 +9,6 @@ margin notes after the paragraph in which its body ends.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 
 from galley.model import (
     BlockKind,
@@ -39,14 +38,6 @@ from galley.structure._survey import BookSurvey
 from galley.structure._verse import verse_runs
 
 
-class IndexLines(StrEnum):
-    """Whether a page's body stream ends with the lines of an index's
-    columns (spec section 17)."""
-
-    NONE = "none"
-    AT_THE_END = "at_the_end"
-
-
 @dataclass(frozen=True, slots=True)
 class PageParts:
     """What the per-page work gives for one page: its index, the removals and page
@@ -57,9 +48,10 @@ class PageParts:
     other lines of the body stream that start a block (a bibliographical
     note's band blocks, spec section 16), and the lines taken
     from the foot of the body stream as notes (spec section 11, "Notes left
-    in the body"), none until they are taken. On an index page, the lines
-    of its columns, left then right, end its body stream (spec section
-    17), and `index_lines` says whether it is one."""
+    in the body"), none until they are taken. On an index page,
+    `index_lines` are the lines of its columns, left then right, and
+    `index_starts` the positions of those that start an entry (spec
+    section 17)."""
 
     index: int
     removals: tuple[Removal, ...]
@@ -72,7 +64,8 @@ class PageParts:
     runs: tuple[BodyRun, ...] = ()
     block_starts: frozenset[int] = frozenset()
     body_notes: tuple[PlacedLine, ...] = ()
-    index_lines: IndexLines = IndexLines.NONE
+    index_lines: tuple[PlacedLine, ...] = ()
+    index_starts: frozenset[int] = frozenset()
 
 
 def _pieces(lines: tuple[PlacedLine, ...]) -> tuple[Piece, ...]:
@@ -194,7 +187,7 @@ def page_parts(
         + (index.removals if index is not None else ())
         + foot.removals,
         page_numbers=head.page_numbers + foot.page_numbers,
-        body=body + index_lines,
+        body=body,
         margin_notes=tuple(
             Piece(lines)
             for kind, lines in regions
@@ -213,8 +206,8 @@ def page_parts(
             survey,
             contents_pages,
         ),
-        block_starts=frozenset({len(body)}) if index_lines else frozenset(),
-        index_lines=IndexLines.AT_THE_END if index_lines else IndexLines.NONE,
+        index_lines=index_lines,
+        index_starts=index.starts if index is not None else frozenset(),
     )
 
 

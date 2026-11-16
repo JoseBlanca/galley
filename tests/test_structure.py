@@ -60,7 +60,7 @@ from galley.structure import (
     reference_candidate,
     survey_book,
 )
-from galley.structure._index import index_page
+from galley.structure._index import entry_side, index_page
 from galley.structure._lines import PlacedLine
 from galley.structure._margins import BesideLine, InParagraph, line_beside
 from galley.structure._markers import MarkerForm, book_marker_form
@@ -4836,3 +4836,216 @@ def test_index_pages_start_at_a_running_head_index_and_end_without_columns() -> 
 def test_index_pages_none_without_a_title_that_starts_with_index() -> None:
     page = _index_page(0, "252 CHAPTER", _LEFT_ENTRIES, _RIGHT_ENTRIES)
     assert survey_book(_lines_of(page), workers=1).index_pages == frozenset()
+
+
+# Index entries (structure spec, section 17, rules 3 and 4).
+
+
+def _index_entries_of(blocks: BlocksFile) -> tuple[str, ...]:
+    return tuple(
+        block_text(block)
+        for block in blocks.blocks
+        if block.kind is BlockKind.INDEX_ENTRY
+    )
+
+
+def test_index_entries_one_per_line_at_the_edge_left_column_then_right() -> None:
+    page = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert [block.kind for block in blocks.blocks] == [BlockKind.HEADING] + [
+        BlockKind.INDEX_ENTRY
+    ] * 8
+    assert block_text(blocks.blocks[0]) == "INDEX"
+    assert _index_entries_of(blocks) == (
+        "Abacus, 106.",
+        "Abruzzi, 196, 204.",
+        "Anjou, counts of, 61, 85; relations, 61.",
+        "Apulia, 186, 197.",
+        "Bari, 189, 197.",
+        "Bayeux, 10, 46, 49, 67, 76.",
+        "Becket, 4, 100.",
+        "Bessin, 10, 28.",
+    )
+    assert all(block.level is None for block in blocks.blocks[1:])
+
+
+def test_index_entry_continues_over_the_column_and_the_page_with_one_origin_each() -> (
+    None
+):
+    first = _index_page(
+        0,
+        "INDEX",
+        _LEFT_ENTRIES,
+        (">197, 202.", *_RIGHT_ENTRIES[:-1], "Calabria, 176,"),
+    )
+    second = _index_page(
+        1, "254 INDEX", (">237, 246.", "Caliphs, 196."), ("Canne, 199.",)
+    )
+    blocks = make_blocks(_lines_of(first, second), _NO_WORDS, workers=1)
+    entries = tuple(
+        block for block in blocks.blocks if block.kind is BlockKind.INDEX_ENTRY
+    )
+    assert block_text(entries[3]) == "Apulia, 186, 197. 197, 202."
+    assert block_text(entries[-3]) == "Calabria, 176, 237, 246."
+    assert [origin.page_index for origin in entries[-3].origin] == [0, 1]
+    assert _index_entries_of(blocks)[-2:] == ("Caliphs, 196.", "Canne, 199.")
+
+
+def test_index_entry_hyphens_are_joined_and_page_numbers_kept() -> None:
+    page = _index_page(
+        0,
+        "INDEX",
+        ("Commerce, Norman, 72-", ">81; Vik-", ">ing, 37.", *_LEFT_ENTRIES),
+        _RIGHT_ENTRIES,
+    )
+    blocks = make_blocks(_lines_of(page), frozenset({"viking"}), workers=1)
+    assert _index_entries_of(blocks)[0] == "Commerce, Norman, 72-81; Viking, 37."
+
+
+def test_index_entr_skewed_column_edge_does_not_start_entries() -> None:
+    # Spec section 17, rule 3: the column's left edge drifts 5 pt over 20
+    # lines; a first line follows it and a continuation line is 9 pt in.
+    texts = tuple(
+        f">cont {number}," if number % 2 else f"Entry {number}," for number in range(20)
+    )
+    page = PageLayout(
+        0,
+        (
+            _region(_line("INDEX", 155, 36)),
+            _index_column(_INDEX_LEFT_PT, texts, skew_pt=5.0),
+            _index_column(_INDEX_RIGHT_PT, _RIGHT_ENTRIES),
+        ),
+        (),
+    )
+    entries = _index_entries_of(make_blocks(_lines_of(page), _NO_WORDS, workers=1))
+    assert entries[:10] == tuple(
+        f"Entry {number}, cont {number + 1}," for number in range(0, 20, 2)
+    )
+
+
+def test_index_entr_column_of_more_continuation_lines_than_first_lines() -> None:
+    # Spec section 17, rule 3: the commonest left side is the indent; the
+    # first lines, more than 5 pt left of it, give the edge.
+    left = (
+        "John, son of Henry,",
+        ">99; cursed, 109;",
+        ">his reign, 125;",
+        ">loses Normandy, 142;",
+        ">his death, 160.",
+        "Jews, 112;",
+        ">banished, 239.",
+    )
+    page = _index_page(0, "INDEX", left, _RIGHT_ENTRIES)
+    assert _index_entries_of(make_blocks(_lines_of(page), _NO_WORDS, workers=1))[
+        :2
+    ] == (
+        (
+            "John, son of Henry, 99; cursed, 109; his reign, 125; loses Normandy,"
+            " 142; his death, 160."
+        ),
+        "Jews, 112; banished, 239.",
+    )
+
+
+def test_entry_side_is_the_commonest_or_the_commonest_of_two_left_of_it() -> None:
+    assert entry_side((50.0, 50.0, 59.0)) == 50.0
+    assert entry_side((50.0, 59.0, 59.0, 59.0)) == 59.0
+    assert entry_side((50.0, 50.0, 59.0, 59.0, 59.0)) == 50.0
+    # Left sides 5 pt left of the commonest are not further left than 5 pt.
+    assert entry_side((54.0, 54.0, 59.0, 59.0, 59.0)) == 59.0
+
+
+def test_index_entr_no_paragraph_runs_on_over_the_index() -> None:
+    before = _page_with_head(0, "THE BOOK")
+    continued = _index_page(1, "252 INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    after = PageLayout(
+        2,
+        (_region(_line("ADVERTISEMENTS", 140, 36)), _body(80, *_BODY_TEXTS)),
+        (),
+    )
+    lines = _lines_of(before, continued, after)
+    assert survey_book(lines, workers=1).index_pages == frozenset({1})
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    # The paragraph of page 0 does not run on over the index into page 2.
+    assert [
+        (block.kind, [origin.page_index for origin in block.origin])
+        for block in blocks.blocks
+    ] == [
+        (BlockKind.PARAGRAPH, [0]),
+        *[(BlockKind.INDEX_ENTRY, [1])] * 8,
+        (BlockKind.PARAGRAPH, [2]),
+    ]
+
+
+@pytest.mark.parametrize("workers", [1, 3])
+def test_index_entries_with_1_and_3_workers_give_the_same_blocks(workers: int) -> None:
+    pages = (
+        _index_page(0, "INDEX", ("BUR", *_LEFT_ENTRIES), ("CON", *_RIGHT_ENTRIES)),
+        *(
+            _index_page(index, f"{index + 250} INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+            for index in range(1, 5)
+        ),
+    )
+    assert make_blocks(_lines_of(*pages), _NO_WORDS, workers=workers) == make_blocks(
+        _lines_of(*pages), _NO_WORDS, workers=1
+    )
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+def test_whole_book_gierke_index_entr_one_per_line_on_its_skewed_pages(
+    gierke_blocks: BlocksFile,
+) -> None:
+    # Structure spec section 17: Gierke's index of authorities, pages 83 to
+    # 85, has one line per entry ("Accursius No. 105"); page 84 drifts from
+    # 42 to 47 pt. Every entry holds one "No" but "Tr. U. J. [tractatus
+    # universi iuris]", printed without one.
+    entries = tuple(
+        block_text(block)
+        for block in gierke_blocks.blocks
+        if block.kind is BlockKind.INDEX_ENTRY
+    )
+    assert {
+        origin.page_index
+        for block in gierke_blocks.blocks
+        if block.kind is BlockKind.INDEX_ENTRY
+        for origin in block.origin
+    } == {83, 84, 85}
+    assert len(entries) == 213
+    assert [entry for entry in entries if entry.count("No") != 1] == [
+        "Tr. U. J. [tractatus universi iuris]"
+    ]
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+def test_whole_book_stubbs_guide_words_on_each_of_its_ten_index_pages(
+    whole_book_toml: frozendict[str, str], tmp_path: Path
+) -> None:
+    blocks = _blocks_of_whole_book(whole_book_toml["earlyplantagenet01stub"], tmp_path)
+    assert tuple(
+        (removal.page_index, removal.text)
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.GUIDE_WORDS
+    ) == (
+        (312, "BAL BEC"),
+        (313, "BUR CON"),
+        (314, "EDM EDW"),
+        (315, "FRA HAR"),
+        (316, "HEN HUG"),
+        (317, "JOH LEW"),
+        (318, "MAT ORD"),
+        (319, "PUI ROB"),
+        (320, "SPA TRA"),
+        (321, "WAR YPR"),
+    )
+    # Only page 312 keeps notes: two regions across the gutter whose spaced
+    # letters lie over it on more than a third of their lines keep their
+    # kind, a band (section 17, rule 2).
+    assert {
+        note.origin[0].page_index
+        for note in blocks.notes
+        if 312 <= note.origin[0].page_index <= 321
+    } == {312}

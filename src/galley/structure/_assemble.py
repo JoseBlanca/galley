@@ -17,6 +17,7 @@ from galley.structure._bibliography import (
 from galley.structure._body_notes import take_body_notes
 from galley.structure._endnotes import EndnoteSection, endnote_groups, endnote_section
 from galley.structure._ids import numbered
+from galley.structure._index_entries import with_index_breaks, with_index_entries
 from galley.structure._lines import Piece, PlacedLine, first_word
 from galley.structure._linking import body_candidates, linked
 from galley.structure._margins import (
@@ -43,7 +44,6 @@ from galley.structure._notes import (
 from galley.structure._paragraphs import (
     BodyBlock,
     Entry,
-    IndexLines,
     MarginNote,
     PageParts,
     body_entries,
@@ -243,7 +243,7 @@ def _taken_body_notes(
         if numbering is Numbering.PER_PAGE
         and page.index not in section_pages
         and page.index not in bibliography
-        and page.index_lines is IndexLines.NONE
+        and not page.index_lines
         else page
         for page, notes in zip(parts, band_notes, strict=True)
     )
@@ -421,7 +421,9 @@ def assemble(
     # Spec section 16: a bibliographical note's band blocks are paragraphs,
     # and its pages' notes are not taken from the body.
     found = bibliography(parts)
-    parts = tuple(with_band_as_body(page, found, form) for page in parts)
+    parts = with_index_breaks(
+        tuple(with_band_as_body(page, found, form) for page in parts)
+    )
     band_notes = tuple(page_notes(page.band_regions, word_list) for page in parts)
     numbering = book_numbering(band_notes)
     # The paragraphs are found twice: the first time only for the pages of
@@ -458,6 +460,8 @@ def assemble(
     entries = joined_margin_notes(
         entries, _beside(entries, section_pieces, sources), body_line_pitch
     )
+    # Spec section 2, step 3.4: the index entries.
+    entries = with_index_entries(entries, pages)
     in_section = _in_section(entries, section_pieces)
     # Spec section 2, step 3.5: the quotes, among the body's paragraphs.
     entries = with_quotes(

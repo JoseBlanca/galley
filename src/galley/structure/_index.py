@@ -1,11 +1,14 @@
-"""A printed index (spec section 17): its pages, and the regions of an
-index page read as two columns, the guide words removed.
+"""A printed index (spec section 17): its pages, the regions of an index
+page read as two columns, the guide words removed, and which lines start
+an entry.
 
 Positions are PDF points, origin at the top left of the page."""
 
+import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from galley.body_measures import commonest
 from galley.model import Line, PageLayout, Region, Removal, RemovalReason, Word
 from galley.structure._foot import LinePlace
 from galley.structure._measures import (
@@ -34,6 +37,21 @@ _GUIDE_WORDS_TOPS_PT = 3.0
 # thirds of its lines have no word over it (Gierke's footnote on page 83,
 # 1 of 2 lines over it, is not).
 _UNCROSSED_SHARE = 2 / 3
+# Spec section 17, rule 3: a line starts an entry within 5 pt of its
+# column's left edge (no line of the four indexes lies at 5 pt; the
+# smallest indent is 6 pt); the edge is fitted through the left sides
+# within 3 pt of the entry side, then of the first fit; a column of
+# fewer than 5 lines takes its smallest left side. The entry side is the
+# commonest left side, or the commonest of the left sides more than 5 pt
+# left of it when there are at least 2 (Stubbs' columns of long entries,
+# whose continuation lines outnumber their first lines).
+_ENTRY_START_PT = 5.0
+_EDGE_FIT_PT = 3.0
+_EDGE_FIT_MIN_LINES = 5
+_LEFT_OF_COMMONEST_PT = 5.0
+_LEFT_OF_COMMONEST_MIN_SIDES = 2
+# A straight line is fitted through at least two different tops.
+_FIT_MIN_TOPS = 2
 
 
 def _title_line(page: PageLayout, kinds: Sequence[RegionKind]) -> Line | None:
@@ -213,13 +231,15 @@ _GROUP = 1
 class IndexPage:
     """What an index page gives (spec section 17, rule 2): the guide words
     removed; the lines of the left column, then of the right, in reading
-    order; the left and right edge of each line's column; the numbers of the regions
+    order, and the positions of those that start an entry (rule 3); the
+    left and right edge of each line's column; the numbers of the regions
     read into the columns, which leave the page's other streams; and the
     lines of guide words removed from regions not read into the columns,
     as (region number, line number)."""
 
     removals: tuple[Removal, ...]
     lines: tuple[Line, ...]
+    starts: frozenset[int]
     column_edges: tuple[tuple[float, float], ...]
     taken: frozenset[int]
     removed_lines: frozenset[LinePlace]
@@ -232,6 +252,55 @@ def _guide_words_removal(page_index: int, words: Sequence[Word]) -> Removal:
         text=words_text(words),
         reason=RemovalReason.GUIDE_WORDS,
     )
+
+
+def entry_side(left_sides: Sequence[float]) -> float:
+    """The side, in points, that a column's first lines start at (spec
+    section 17, rule 3): the commonest of `left_sides`, which are not none,
+    unless at least 2 of them lie more than 5 pt left of it; then the
+    commonest of those."""
+    usual = commonest(left_sides)
+    further_left = tuple(
+        side for side in left_sides if side < usual - _LEFT_OF_COMMONEST_PT
+    )
+    if len(further_left) >= _LEFT_OF_COMMONEST_MIN_SIDES:
+        return commonest(further_left)
+    return usual
+
+
+def column_left_edge(lines: Sequence[Line]) -> tuple[float, float]:
+    """The column's left edge as (x at top 0, points per point of top), a
+    straight line through its lines' left sides (spec section 17, rule 3):
+    fitted by least squares on the line's top through the left sides within
+    3 pt of the entry side (`entry_side`), then again through those within
+    3 pt of the first fit. A column of fewer than 5 lines takes its
+    smallest left side; a fit through fewer than 2 tops, the mean of its
+    left sides."""
+    if len(lines) < _EDGE_FIT_MIN_LINES:
+        return (min(line.box.x0 for line in lines), 0.0) if lines else (0.0, 0.0)
+    usual = entry_side(tuple(line.box.x0 for line in lines))
+    first = _fit(
+        tuple(line for line in lines if abs(line.box.x0 - usual) <= _EDGE_FIT_PT)
+    )
+    near_first = tuple(
+        line for line in lines if abs(line.box.x0 - _at(first, line)) <= _EDGE_FIT_PT
+    )
+    return _fit(near_first) if near_first else first
+
+
+def _at(edge: tuple[float, float], line: Line) -> float:
+    return edge[0] + edge[1] * line.box.top
+
+
+def _fit(lines: Sequence[Line]) -> tuple[float, float]:
+    """The least-squares line x = a + b * top through the left sides of
+    `lines`, which are not none; (mean, 0) when their tops are all one."""
+    tops = tuple(line.box.top for line in lines)
+    sides = tuple(line.box.x0 for line in lines)
+    if len(set(tops)) < _FIT_MIN_TOPS:
+        return statistics.fmean(sides), 0.0
+    slope, intercept = statistics.linear_regression(tops, sides)
+    return intercept, slope
 
 
 def _column(items: Sequence[_Item]) -> tuple[Line, ...]:
@@ -329,7 +398,7 @@ def index_page(
     )
     columns = index_columns(page, kinds)
     if columns is None:
-        return IndexPage(removals, (), (), frozenset(), guide_lines)
+        return IndexPage(removals, (), frozenset(), (), frozenset(), guide_lines)
     sides, taken = _column_items(page, kinds, columns, removed | guide_lines)
     left, right = _column(sides[0]), _column(sides[1])
     if _are_guide_words(left, right):
@@ -343,14 +412,22 @@ def index_page(
             )
         )
         left, right = left[1:], right[1:]
+    starts: list[int] = []
     edges: list[tuple[float, float]] = []
-    for column in (left, right):
+    for offset, column in ((0, left), (len(left), right)):
+        edge = column_left_edge(column)
+        starts.extend(
+            offset + position
+            for position, line in enumerate(column)
+            if abs(line.box.x0 - _at(edge, line)) <= _ENTRY_START_PT
+        )
         if column:
             box = box_of(tuple(line.box for line in column))
             edges.extend((box.x0, box.x1) for _ in column)
     return IndexPage(
         removals,
         left + right,
+        frozenset(starts),
         tuple(edges),
         frozenset(taken),
         frozenset(place for place in guide_lines if place[0] not in taken),

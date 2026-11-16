@@ -942,7 +942,57 @@ def test_quote_none_of_the_notes_left_in_the_body_of_mariejol_210(
     assert set(_kinds_on(blocks, 0)) == {"paragraph"}
 
 
-# Index pages and guide words (structure spec, section 17).
+# Index entries and guide words (structure spec, section 17).
+
+
+def _index_entries_on(blocks: BlocksFile, page: int) -> tuple[str, ...]:
+    return tuple(
+        block_text(block)
+        for block in blocks.blocks
+        if block.kind is BlockKind.INDEX_ENTRY and block.origin[0].page_index == page
+    )
+
+
+def test_index_haskins_266_heading_then_one_entry_per_entry_left_column_then_right(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["haskins_eval"]
+    assert _kinds_on(blocks, 9) == ("heading",) + ("index_entry",) * 65
+    entries = _index_entries_on(blocks, 9)
+    # The left column's first and last entries, then the right column's
+    # first; "Anjou" holds its sub-entry, and its continuation line.
+    assert entries[0] == "Abacus, 106/."
+    assert entries[17] == (
+        "Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100,"
+        " 112, 131, 136/."
+    )
+    assert entries[33:35] == ("Avranches, 172, 175, 178.", "Avranchin, 28.")
+
+
+def test_index_haskins_267_calabria_one_entry_and_the_rows_cut_at_the_gutter(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # Layout read the first four rows across both columns; the gutter cut
+    # puts "Clermont, 211." and the three entries after it in the right
+    # column, before "Commerce".
+    _, blocks = excerpt_outputs["haskins_quotes_index"]
+    entries = _index_entries_on(blocks, 9)
+    assert entries[:2] == (
+        (
+            "Caen, lo/., 71, 133, 139, 143, 153. 160, 166, 172, 184; abbeys, 12,"
+            " 58,160, 163, 171, 174,186-88,213."
+        ),
+        "Calabria, 176, 198,201-11,222,226, 237, 246.",
+    )
+    clermont = entries.index("Clermont, 211.")
+    assert entries[clermont : clermont + 4] == (
+        "Clermont, 211.",
+        "Clovis, 207.",
+        "Cluny, 164.",
+        "Colombieres, 116.",
+    )
+    assert entries[clermont + 4].startswith("Commerce, Norman, 4, 73, 81,")
+    assert "quote" not in _kinds_on(blocks, 9) + _kinds_on(blocks, 10)
 
 
 def test_index_stubbs_312_to_321_one_guide_words_removal_on_each_page(
@@ -962,30 +1012,7 @@ def test_index_stubbs_312_to_321_one_guide_words_removal_on_each_page(
         (8, "PUI ROB"),
         (9, "WAR YPR"),
     )
-    assert "heading" in _kinds_on(blocks, 4)[:2]
-    # The columns, small type under the guide words, are no longer a band.
+    # The marks ";;;" above the title stay a paragraph: a head line that is
+    # no running head keeps its stray marks (section 3).
+    assert _kinds_on(blocks, 4)[:3] == ("paragraph", "heading", "index_entry")
     assert not any(note.origin[0].page_index >= 4 for note in blocks.notes)
-
-
-def test_index_haskins_266_heading_then_the_columns_no_quote(
-    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
-) -> None:
-    _, blocks = excerpt_outputs["haskins_eval"]
-    kinds = _kinds_on(blocks, 9)
-    assert kinds[0] == "heading"
-    assert "quote" not in kinds
-
-
-def test_index_haskins_267_rows_cut_at_the_gutter(
-    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
-) -> None:
-    # Layout read the first four rows across both columns; the cut puts
-    # "Clermont, 211." with the right column, after the left column's last
-    # line, "Greek, in Sicily, 239/., 246.".
-    _, blocks = excerpt_outputs["haskins_quotes_index"]
-    text = " ".join(
-        block_text(block) for block in blocks.blocks if block.origin[0].page_index == 9
-    )
-    assert "Calabria, 176, 198,201-11,222,226, 237, 246." in text
-    assert "Greek, in Sicily, 239/., 246. Clermont, 211. Clovis, 207." in text
-    assert "quote" not in _kinds_on(blocks, 9) + _kinds_on(blocks, 10)
