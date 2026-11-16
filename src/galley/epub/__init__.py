@@ -1,9 +1,9 @@
 """The epub stage: book.md to book.epub, built by Pandoc with galley's style
 sheet and, when the config has a `cover_page`, the cover extract rendered.
 
-The style sheet is `style.css`, a file of this package, empty in the
-walking skeleton (spec section 8). The stage does not run epubcheck, which
-only the tests use (architecture section 16).
+The style sheet is `style.css`, a file of this package, which styles each
+kind of block by the class the markdown stage gives it. The stage does not
+run epubcheck, which only the tests use (architecture section 16).
 """
 
 import logging

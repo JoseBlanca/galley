@@ -1,6 +1,7 @@
 """Tests of the markdown stage: escaping, rendering and run (spec section 8)."""
 
 import hashlib
+import json
 import re
 import shutil
 import string
@@ -276,16 +277,19 @@ def _block_of_kind(block_id: str, kind: BlockKind) -> Block:
     return replace(_paragraph(block_id, "Chapter one"), kind=kind)
 
 
-HEADING = replace(_block_of_kind("b-p0000-001", BlockKind.HEADING), level=1)
+FIGURE = replace(
+    _paragraph("b-p0016-001", "PLATE I. The battle."), kind=BlockKind.FIGURE
+)
 
 
 @pytest.mark.parametrize(
     ("blocks", "named"),
     [
-        (_blocks_file((HEADING,)), "b-p0000-001"),
-        *(
-            (_blocks_file((_block_of_kind("b-p0000-004", kind),)), "b-p0000-004")
-            for kind in (BlockKind.QUOTE, BlockKind.FIGURE, BlockKind.INDEX_ENTRY)
+        (
+            _blocks_file(
+                (replace(FIGURE, figure="images/p0016.png"),),
+            ),
+            "b-p0016-001",
         ),
         (_blocks_file((_paragraph("b-p0000-001", "Text."),), (NOTE,)), "n-p0000-001"),
         (
@@ -339,10 +343,7 @@ HEADING = replace(_block_of_kind("b-p0000-001", BlockKind.HEADING), level=1)
         ),
     ],
     ids=[
-        "heading",
-        "quote",
-        "figure",
-        "index entry",
+        "figure with an image",
         "referenced note",
         "note reference",
         "heading in a note",
@@ -350,12 +351,12 @@ HEADING = replace(_block_of_kind("b-p0000-001", BlockKind.HEADING), level=1)
         "note reference in a note",
     ],
 )
-def test_render_markdown_refuses_what_it_does_not_write_yet(
+def test_render_markdown_refuses_what_it_does_not_write(
     blocks: BlocksFile, named: str
 ) -> None:
     with pytest.raises(
         InputFileError,
-        match=f"blocks.json holds what markdown does not write yet: .*{named}",
+        match=f"blocks.json holds what markdown does not write: .*{named}",
     ):
         render_markdown(blocks, CONFIG)
 
@@ -646,6 +647,255 @@ def test_fidelity_check_finds_a_word_lost_from_a_note_or_margin_note(
         check_stage(FidelityBoundary.MARKDOWN, SIDE_TEXT, read_markdown(markdown_text))
 
     assert lost in raised.value.missing
+
+
+# Structure spec section 19 and the module's docstring: how each kind is
+# written.
+
+
+def _heading(block_id: str, level: int | None, label: str | None, title: str) -> Block:
+    return replace(
+        _block(block_id, BlockKind.HEADING, title, 2), level=level, label=label
+    )
+
+
+@pytest.mark.parametrize(
+    ("heading", "written"),
+    [
+        (
+            _heading("b-p0002-001", 1, "CHAPTER III.", "THE EARLY YEARS."),
+            "# [CHAPTER III\\.]{.label} THE EARLY YEARS\\. {#b-p0002-001}\n",
+        ),
+        (
+            _heading("b-p0002-001", 2, None, "BIBLIOGRAPHICAL NOTE"),
+            "## BIBLIOGRAPHICAL NOTE {#b-p0002-001}\n",
+        ),
+        (
+            _heading("b-p0002-001", 1, "V", ""),
+            "# [V]{.label} {#b-p0002-001}\n",
+        ),
+    ],
+    ids=["with a label", "level 2 without a label", "label without a title"],
+)
+def test_a_heading_is_written_at_its_level_with_its_label_as_a_span(
+    heading: Block, written: str
+) -> None:
+    assert render_markdown(_blocks_file((heading,)), CONFIG) == HEADER + "\n" + written
+
+
+@pytest.mark.parametrize("level", [None, 0, 7])
+def test_a_heading_without_a_level_from_1_to_6_is_malformed(level: int | None) -> None:
+    heading = _heading("b-p0002-001", level, None, "Title")
+
+    with pytest.raises(
+        InputFileError,
+        match=f"blocks.json is malformed: heading b-p0002-001 has the level {level}",
+    ):
+        render_markdown(_blocks_file((heading,)), CONFIG)
+
+
+@pytest.mark.parametrize(
+    ("kind", "class_name"),
+    [
+        (BlockKind.QUOTE, "quote"),
+        (BlockKind.CHAPTER_SUMMARY, "chapter-summary"),
+        (BlockKind.INDEX_ENTRY, "index-entry"),
+        (BlockKind.FIGURE, "figure"),
+        (BlockKind.MARGIN_NOTE, "margin-note"),
+    ],
+)
+def test_quote_chapter_summary_index_entry_figure_and_margin_note_have_a_class_of_their_kind(
+    kind: BlockKind, class_name: str
+) -> None:
+    block = _block("b-p0002-001", kind, "Henry's youth. — His accession.", 2)
+
+    assert render_markdown(_blocks_file((block,)), CONFIG) == (
+        HEADER
+        + f"\n::: {{#b-p0002-001 .{class_name}}}\n"
+        + "Henry\\'s youth\\. — His accession\\.\n:::\n"
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "written"),
+    [
+        (
+            "Mignonne, allons voir\nsi la rose,\n* qui ce matin",
+            "Mignonne\\, allons voir\\\nsi la rose\\,\\\n\\* qui ce matin",
+        ),
+        (
+            "First line,\nsecond.\n\n  \nStanza two\nends.\n",
+            "First line\\,\\\nsecond\\.\n\nStanza two\\\nends\\.",
+        ),
+        ("  one\tline  \r\n    two", "one line\\\ntwo"),
+    ],
+    ids=["lines", "stanzas", "white space"],
+)
+def test_verse_ends_each_line_with_a_hard_line_break_and_a_stanza_with_a_blank_line(
+    text: str, written: str
+) -> None:
+    verse = _block("b-p0002-001", BlockKind.VERSE, text, 2)
+
+    assert render_markdown(_blocks_file((verse,)), CONFIG) == (
+        HEADER + f"\n::: {{#b-p0002-001 .verse}}\n{written}\n:::\n"
+    )
+
+
+EVERY_KIND = _blocks_file(
+    (
+        _heading("b-p0002-001", 1, "CHAPTER III.", "THE EARLY YEARS OF HENRY II."),
+        _block(
+            "b-p0002-002",
+            BlockKind.CHAPTER_SUMMARY,
+            "Henry's youth. — His accession.",
+            2,
+        ),
+        _block("b-p0002-003", BlockKind.MARGIN_NOTE, "Of kings.", 2),
+        _block("b-p0002-004", BlockKind.PARAGRAPH, "1. Of the three estates.", 2),
+        _block("b-p0002-005", BlockKind.QUOTE, '"Rex in regno suo."', 2),
+        _block(
+            "b-p0002-006",
+            BlockKind.VERSE,
+            "Mignonne, allons voir\nsi la rose,\n\n# qui ce matin\\",
+            2,
+        ),
+        _heading("b-p0003-001", 2, None, "INDEX"),
+        _block("b-p0003-002", BlockKind.INDEX_ENTRY, "Aachen, 12, 34-36.", 3),
+        _block("b-p0003-003", BlockKind.FIGURE, "PLATE I. The battle.", 3),
+    )
+)
+
+
+@pytest.mark.pandoc
+def test_pandoc_reads_every_kind_and_the_label_in_their_blocks() -> None:
+    assert _words_by_block(render_markdown(EVERY_KIND, CONFIG)) == {
+        "b-p0002-001": [
+            "CHAPTER",
+            "III.",
+            "THE",
+            "EARLY",
+            "YEARS",
+            "OF",
+            "HENRY",
+            "II.",
+        ],
+        "b-p0002-002": ["Henry's", "youth.", "—", "His", "accession."],
+        "b-p0002-003": ["Of", "kings."],
+        "b-p0002-004": ["1.", "Of", "the", "three", "estates."],
+        "b-p0002-005": ['"Rex', "in", "regno", 'suo."'],
+        "b-p0002-006": ["Mignonne,", "allons", "voir", "si", "la", "rose,"]
+        + ["#", "qui", "ce", "matin\\"],
+        "b-p0003-001": ["INDEX"],
+        "b-p0003-002": ["Aachen,", "12,", "34-36."],
+        "b-p0003-003": ["PLATE", "I.", "The", "battle."],
+    }
+
+
+def _pandoc_blocks(markdown_text: str) -> object:
+    """The blocks of Pandoc's JSON of a Markdown text."""
+    pandoc = shutil.which("pandoc")
+    assert pandoc is not None
+    completed = subprocess.run(
+        [pandoc, "--from", "markdown-smart-auto_identifiers", "--to", "json"],
+        input=markdown_text,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+        timeout=60,
+    )
+    return json.loads(completed.stdout)["blocks"]
+
+
+@pytest.mark.pandoc
+def test_pandoc_reads_a_verse_as_one_paragraph_a_stanza_with_a_line_break_a_line() -> (
+    None
+):
+    verse = _block("b-p0002-001", BlockKind.VERSE, "One,\ntwo.\n\nThree", 2)
+
+    match _pandoc_blocks(render_markdown(_blocks_file((verse,)), CONFIG)):
+        case [
+            {
+                "t": "Div",
+                "c": [
+                    ["b-p0002-001", ["verse"], []],
+                    [
+                        {
+                            "t": "Para",
+                            "c": [{"t": "Str"}, {"t": "LineBreak"}, {"t": "Str"}],
+                        },
+                        {"t": "Para", "c": [{"t": "Str"}]},
+                    ],
+                ],
+            }
+        ]:
+            pass
+        case blocks:
+            pytest.fail(f"not one verse div of two stanzas: {blocks}")
+
+
+@pytest.mark.pandoc
+def test_pandoc_reads_a_level_2_heading_with_its_label_in_a_label_span() -> None:
+    heading = _heading("b-p0002-001", 2, "CHAPTER III.", "THE EARLY YEARS.")
+
+    match _pandoc_blocks(render_markdown(_blocks_file((heading,)), CONFIG)):
+        case [
+            {
+                "t": "Header",
+                "c": [
+                    2,
+                    ["b-p0002-001", [], []],
+                    [{"t": "Span", "c": [["", ["label"], []], _]}, *_],
+                ],
+            }
+        ]:
+            pass
+        case blocks:
+            pytest.fail(f"not one heading with a label span: {blocks}")
+
+
+@pytest.mark.pandoc
+def test_fidelity_check_passes_on_every_kind_with_a_heading_label() -> None:
+    check_stage(
+        FidelityBoundary.MARKDOWN,
+        EVERY_KIND,
+        read_markdown(render_markdown(EVERY_KIND, CONFIG)),
+    )
+
+
+@pytest.mark.pandoc
+@pytest.mark.parametrize(
+    ("written", "damaged", "lost"),
+    [
+        ("[CHAPTER III\\.]{.label}", "[CHAPTER]{.label}", "III."),
+        ("allons voir\\\n", "allons\\\n", "voir"),
+        ("Henry\\'s youth", "youth", "Henry's"),
+    ],
+    ids=["label", "verse", "chapter_summary"],
+)
+def test_fidelity_check_finds_a_word_lost_from_a_label_verse_or_chapter_summary(
+    written: str, damaged: str, lost: str
+) -> None:
+    markdown_text = render_markdown(EVERY_KIND, CONFIG)
+    assert written in markdown_text
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(
+            FidelityBoundary.MARKDOWN,
+            EVERY_KIND,
+            read_markdown(markdown_text.replace(written, damaged, 1)),
+        )
+
+    assert lost in raised.value.missing
+
+
+def test_render_markdown_refuses_a_label_with_a_character_xml_does_not_allow() -> None:
+    heading = _heading("b-p0002-001", 1, "CHAPTER￾", "Title")
+
+    with pytest.raises(
+        InputFileError, match=r"blocks.json.*label of block b-p0002-001.*U\+FFFE"
+    ):
+        render_markdown(_blocks_file((heading,)), CONFIG)
 
 
 # Spec section 8: XML 1.0 does not allow these, and Pandoc copies them into

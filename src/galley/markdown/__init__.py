@@ -1,17 +1,49 @@
 """The markdown stage: blocks.json to book.md, the Pandoc Markdown the epub
 stage reads and the owner proofreads.
 
-book.md is a metadata header and one fenced div per block, `::: {#b-p0012-003}`,
-whose text has every ASCII punctuation character escaped (walking-skeleton
-spec, section 8). A paragraph's div has no class; a margin note's has the
-class `margin-note` and stands where the block is in blocks.json; a note
-with `referenced` false is a div with its id and the class `note` around
-its blocks' divs, its marker first, after the last block, in the order
-of blocks.json, whose first origin is on the note's first page or an
-earlier one, or first of all (structure spec, sections 6 and 10, option
-b). Headings, quotes, verse, chapter summaries, figures, index entries,
-note references and referenced notes are refused, and so are edits,
-since none can exist before `galley2epub edits-from` is built.
+book.md is a metadata header, then the blocks in the order of blocks.json,
+one after the other with a blank line between. Every ASCII punctuation
+character of the book's text is escaped, so that Pandoc reads it back as
+written (walking-skeleton spec, section 8).
+
+How each kind is written
+------------------------
+
+A kind says what a text is; this stage and the epub stage's style sheet,
+`galley/epub/style.css`, decide how it looks (owner, 15 November 2026).
+Every block keeps its id, so that an edit or a link can name it, and
+every kind but the paragraph has a class of its own, its name with "-"
+for "_", which the style sheet styles:
+
+- `heading`: a Pandoc heading of its level with its id,
+  `## [CHAPTER III\\.]{.label} THE EARLY YEARS {#b-p0040-001}`. The
+  label, when the heading has one, is a span of class `label` before the
+  title, which the style sheet sets on a line of its own; in the table of
+  contents it stays before the title. The heading is not a div, because
+  Pandoc starts a chapter file at each level-1 heading and a div around
+  it would leave its id in the file before.
+- `paragraph`: a fenced div with its id and no class, `::: {#b-p0012-003}`,
+  its text on one line.
+- `quote`, `chapter_summary`, `index_entry`, `margin_note`: a fenced div
+  with its id and the class `quote`, `chapter-summary`, `index-entry` or
+  `margin-note`, its text on one line. A margin note stands where it is in
+  blocks.json, before the paragraph it was printed beside; the style sheet
+  sets it as a small bold line.
+- `verse`: a fenced div of class `verse`, each line of the text a line of
+  the Markdown ended by a hard line break (a backslash), and an empty line
+  of the text, the end of a stanza, a new paragraph in the div. Lines
+  empty or of spaces only are not written.
+- `figure`: a fenced div of class `figure` with its caption as text. Its
+  image is not written: the fidelity check reads no Pandoc image, so a
+  figure block with an image is refused.
+- A note with `referenced` false is a fenced div with its id and the class
+  `note` around its blocks' divs, its marker first, after the last block,
+  in the order of blocks.json, whose first origin is on the note's first
+  page or an earlier one, or first of all (structure spec, sections 6 and
+  10, option b).
+
+Note references and referenced notes are refused, and so are edits, since
+none can exist before `galley2epub edits-from` is built.
 """
 
 import bisect
@@ -86,9 +118,11 @@ def _character_problems(where: str, text: str) -> tuple[str, ...]:
     )
 
 
-# The kinds of block written now: in the body, and inside a note.
-_BODY_KINDS = frozenset({BlockKind.PARAGRAPH, BlockKind.MARGIN_NOTE})
+# The kinds of block written in the body and inside a note.
+_BODY_KINDS = frozenset(BlockKind)
 _NOTE_KINDS = frozenset({BlockKind.PARAGRAPH})
+# The levels a Pandoc heading can have.
+_HEADING_LEVELS = range(1, 7)
 
 
 def _block_problems(block: Block, kinds: frozenset[BlockKind]) -> tuple[str, ...]:
@@ -98,13 +132,32 @@ def _block_problems(block: Block, kinds: frozenset[BlockKind]) -> tuple[str, ...
         if block.kind not in kinds
         else ()
     )
+    image = (
+        (
+            (
+                f"block {block.id} is a figure with the image {block.figure}, and the "
+                "fidelity check reads no image"
+            ),
+        )
+        if block.kind is BlockKind.FIGURE and block.figure is not None
+        else ()
+    )
     reference = (
         (f"block {block.id} holds a note reference",)
         if any(span.note_ref is not None for span in block.spans)
         else ()
     )
+    label = (
+        _character_problems(f"the label of block {block.id}", block.label)
+        if block.label is not None
+        else ()
+    )
     return (
-        kind + reference + _character_problems(f"block {block.id}", block_text(block))
+        kind
+        + image
+        + reference
+        + _character_problems(f"block {block.id}", block_text(block))
+        + label
     )
 
 
@@ -123,8 +176,9 @@ def _note_problems(note: Note) -> tuple[str, ...]:
 def _check_well_formed(blocks: BlocksFile) -> None:
     """Raise InputFileError, naming blocks.json, when it is malformed: an
     id given more than once among the blocks, the notes and the notes'
-    blocks (each becomes the id of a div in book.md and the EPUB), or a
-    note without blocks or without origin, which cannot be placed."""
+    blocks (each becomes the id of a div in book.md and the EPUB), a note
+    without blocks or without origin, which cannot be placed, or a heading
+    without a level Pandoc has (1 to 6)."""
     id_counts = Counter(
         (
             *(block.id for block in blocks.blocks),
@@ -143,7 +197,12 @@ def _check_well_formed(blocks: BlocksFile) -> None:
     placeless = tuple(
         f"note {note.id} has no origin" for note in blocks.notes if not note.origin
     )
-    problems = repeated + empty + placeless
+    levelless = tuple(
+        f"heading {block.id} has the level {block.level}"
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING and block.level not in _HEADING_LEVELS
+    )
+    problems = repeated + empty + placeless + levelless
     if problems:
         message = f"blocks.json is malformed: {'; '.join(problems)}"
         raise InputFileError(message)
@@ -151,9 +210,9 @@ def _check_well_formed(blocks: BlocksFile) -> None:
 
 def _check_writable(blocks: BlocksFile) -> None:
     """Raise InputFileError, naming blocks.json, at what markdown does not
-    write yet, rather than write it wrongly: a block that is not a paragraph
-    or a margin note, a note reference, a referenced note, a note block that
-    is not a paragraph, or a character XML 1.0 does not allow."""
+    write, rather than write it wrongly: a figure with an image, a note
+    reference, a referenced note, a note block that is not a paragraph, or
+    a character XML 1.0 does not allow."""
     problems = tuple(
         problem
         for block in blocks.blocks
@@ -161,7 +220,7 @@ def _check_writable(blocks: BlocksFile) -> None:
     ) + tuple(problem for note in blocks.notes for problem in _note_problems(note))
     if problems:
         message = (
-            f"blocks.json holds what markdown does not write yet: {'; '.join(problems)}"
+            f"blocks.json holds what markdown does not write: {'; '.join(problems)}"
         )
         raise InputFileError(message)
 
@@ -186,32 +245,97 @@ def _header(config: BookConfig) -> str:
     )
 
 
-def _div_attributes(block: Block) -> str:
-    """The id of a block's div, and its class when it has one."""
-    match block.kind:
-        case BlockKind.MARGIN_NOTE:
-            return f"#{block.id} .margin-note"
+def _class_name(kind: BlockKind) -> str | None:
+    """The class of a block's div, which the style sheet styles; None for
+    a paragraph."""
+    match kind:
+        case BlockKind.PARAGRAPH:
+            return None
         case (
-            BlockKind.PARAGRAPH
-            | BlockKind.HEADING
+            BlockKind.HEADING
             | BlockKind.QUOTE
             | BlockKind.VERSE
             | BlockKind.CHAPTER_SUMMARY
             | BlockKind.FIGURE
+            | BlockKind.MARGIN_NOTE
             | BlockKind.INDEX_ENTRY
         ):
-            return f"#{block.id}"
+            return kind.value.replace("_", "-")
+        case _:
+            assert_never(kind)
+
+
+# White space made a space, as escape_markdown does, but the line feed,
+# which a verse block keeps.
+_PLAIN_WHITE_SPACE_BUT_LINE_FEED = frozendict(
+    {key: value for key, value in _PLAIN_WHITE_SPACE.items() if key != ord("\n")}
+)
+# Pandoc's hard line break: a backslash at the end of a line.
+_HARD_LINE_BREAK = "\\\n"
+
+
+def _verse_markdown(text: str) -> str:
+    """A verse block's text with each line ended by a hard line break,
+    escaped by escape_markdown line by line, and a blank line where the
+    text has an empty line or one of spaces only, the end of a stanza."""
+    lines = (
+        escape_markdown(line)
+        for line in text.translate(_PLAIN_WHITE_SPACE_BUT_LINE_FEED).split("\n")
+    )
+    stanzas = tuple(
+        tuple(stanza)
+        for is_line, stanza in itertools.groupby(lines, key=bool)
+        if is_line
+    )
+    return "\n\n".join(_HARD_LINE_BREAK.join(stanza) for stanza in stanzas)
+
+
+def _text_markdown(block: Block, marker: str) -> str:
+    """A block's text in Markdown: on one line, escaped by escape_markdown,
+    or, for verse, line by line; a note's `marker`, when given, first, with
+    one space after it. An empty marker adds nothing."""
+    match block.kind:
+        case BlockKind.VERSE:
+            text = _verse_markdown(block_text(block))
+            return f"{escape_markdown(marker)} {text}" if marker else text
+        case (
+            BlockKind.HEADING
+            | BlockKind.PARAGRAPH
+            | BlockKind.QUOTE
+            | BlockKind.CHAPTER_SUMMARY
+            | BlockKind.FIGURE
+            | BlockKind.MARGIN_NOTE
+            | BlockKind.INDEX_ENTRY
+        ):
+            return escape_markdown(f"{marker} {block_text(block)}")
         case _:
             assert_never(block.kind)
 
 
+def _heading(block: Block) -> str:
+    """A heading of its level with its id, its label first as a span of
+    class `label`."""
+    label = (
+        (f"[{escape_markdown(block.label)}]{{.label}}",)
+        if block.label is not None
+        else ()
+    )
+    if block.level is None:
+        message = f"blocks.json is malformed: heading {block.id} has no level"
+        raise InputFileError(message)
+    title = _text_markdown(block, "")
+    words = " ".join((*label, *((title,) if title else ())))
+    return f"{'#' * block.level} {words} {{#{block.id}}}\n"
+
+
 def _div(block: Block, marker: str = "") -> str:
-    """A block's fenced div, with its text on one line, escaped by
-    escape_markdown; a note's `marker`, when given, is joined before the
-    text with one space and escaped with it. An empty marker adds
-    nothing."""
-    text = escape_markdown(f"{marker} {block_text(block)}")
-    return f"::: {{{_div_attributes(block)}}}\n{text}\n:::\n"
+    """A block's fenced div with its id and its class, or for a heading a
+    Pandoc heading; `marker` as _text_markdown takes it."""
+    if block.kind is BlockKind.HEADING:
+        return _heading(block)
+    class_name = _class_name(block.kind)
+    attributes = f"#{block.id}" + (f" .{class_name}" if class_name is not None else "")
+    return f"::: {{{attributes}}}\n{_text_markdown(block, marker)}\n:::\n"
 
 
 def _note_div(note: Note) -> str:
@@ -250,23 +374,26 @@ def _note_positions(
 
 def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     """book.md: the metadata header from the config (title, authors,
-    language), then one fenced div per block with the block's id, in the
-    order of blocks.json, its text escaped by escape_markdown on one line,
-    a blank line between each. A margin note's div also has the class
-    `margin-note`. Each note, all with `referenced` false, is a div with its
-    id and the class `note` around its blocks' divs, the marker first in the
-    first one's text; it follows the last block, in the order of
+    language), then each block in the order of blocks.json, a blank line
+    between each, as the module's docstring says for each kind: a heading
+    as a Pandoc heading of its level with its id and its label as a span of
+    class `label`; every other block as a fenced div with its id and the
+    class of its kind but a paragraph's, its text escaped by
+    escape_markdown on one line, or, for verse, line by line with hard
+    line breaks. Each note, all with `referenced` false, is a div with its
+    id and the class `note` around its blocks' divs, the marker first in
+    the first one's text; it follows the last block, in the order of
     blocks.json, whose first origin is on the note's first page or an
-    earlier one, or comes first of all when there is none. Notes written at
-    the same place keep the order of blocks.json.
+    earlier one, or comes first of all when there is none. Notes written
+    at the same place keep the order of blocks.json.
 
     The title and each author are escaped by escape_markdown too. Raises
     InputFileError, naming blocks.json, when it is malformed: an id given
-    twice, or a note without blocks or origin. Raises InputFileError, naming
-    blocks.json and the block or note, for what markdown does not write
-    yet: a heading, quote, figure or index entry, a note reference, a
-    referenced note, a note block that is not a paragraph, or a character
-    XML 1.0 does not allow (named as U+FFFE).
+    twice, a note without blocks or origin, or a heading without a level
+    from 1 to 6. Raises InputFileError, naming blocks.json and the block or
+    note, for what markdown does not write: a figure with an image, a note
+    reference, a referenced note, a note block that is not a paragraph, or
+    a character XML 1.0 does not allow (named as U+FFFE).
     """
     _check_well_formed(blocks)
     _check_writable(blocks)
