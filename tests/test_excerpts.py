@@ -35,7 +35,7 @@ EXPECTED_EXCERPT_PAGES = {
     "mariejol_210-219": 10,
     "haskins_quotes_index": 10,
     "stubbs_summaries_index": 10,
-    "domesday_headings_quotes": 10,
+    "domesday_headings_quotes": 11,
     "mariejol_headings_verse": 6,
     "kadesh_59-68": 10,
 }
