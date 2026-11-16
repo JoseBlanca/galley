@@ -22,11 +22,12 @@ from galley.model import (
     Span,
     WordChange,
 )
+from galley.structure._body_notes import take_body_notes
 from galley.structure._hyphens import PageLine, join_lines
-from galley.structure._lines import Piece
-from galley.structure._markers import NoteMarker
+from galley.structure._lines import Piece, first_word
+from galley.structure._markers import NoteMarker, book_marker_form
 from galley.structure._measures import box_of
-from galley.structure._notes import Footnote, footnotes, page_notes
+from galley.structure._notes import Footnote, footnotes, numbered_per_page, page_notes
 from galley.structure._paragraphs import MarginNote, PageParts, Paragraph, body_entries
 
 
@@ -241,15 +242,37 @@ def _changes(blocks: Sequence[_Unnumbered]) -> tuple[WordChange, ...]:
 
 
 def assemble(
-    pages: Sequence[PageParts], book_words: frozenset[str], word_list: frozenset[str]
+    parts: Sequence[PageParts],
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    body_word_height: float,
 ) -> Assembled:
-    """The work across pages (spec section 2, step 3), in page order: the
-    paragraphs of the body stream with their hyphens joined, the margin
-    notes after the paragraph in which their page's body ends, the notes
-    of the band with their markers, and the ids. `word_list` is in lower
-    case."""
+    """The work after the per-page parts (spec section 2, steps 2.5 and 3),
+    in page order: the notes left at the foot of each page's body taken
+    out of it, the paragraphs of the body stream with their hyphens joined,
+    the margin notes after the paragraph in which their page's body ends,
+    the notes of the band and of the body with their markers, and the ids.
+    `word_list` is in lower case; `body_word_height` is in points."""
+    form = book_marker_form(
+        first_word(piece.lines[0]) for page in parts for piece in page.band_blocks
+    )
+    band_notes = tuple(page_notes(page.band_regions) for page in parts)
+    taken = (
+        tuple(
+            take_body_notes(page, notes, form, body_word_height)
+            for page, notes in zip(parts, band_notes, strict=True)
+        )
+        if numbered_per_page(band_notes)
+        else tuple(parts)
+    )
+    pages = tuple(
+        page
+        if not page.body_notes
+        else replace(page, band_regions=(page.body_notes, *page.band_regions))
+        for page in taken
+    )
     body: list[_Unnumbered] = []
-    for entry in body_entries(pages):
+    for entry in body_entries(pages, form):
         match entry:
             case Paragraph(piece):
                 kind = BlockKind.PARAGRAPH

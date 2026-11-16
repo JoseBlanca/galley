@@ -1855,6 +1855,114 @@ def test_footnote_first_on_its_page_and_indented_does_not_run_on() -> None:
     )
 
 
+_SMALL_PT = 8.5  # 0.85 of the body word height, 10 pt
+
+
+def _body_notes_pages(
+    markers: tuple[str, str, str],
+    *,
+    band_on_the_page: bool = False,
+    text_height: float = _WORD_HEIGHT_PT,
+) -> LinesFile:
+    """Page 0: a body and a band note "(1)", which give the book the
+    bracketed marker form, numbered per page. Page 1: five body lines of
+    `text_height` ending short, then three short lines indented 20 pt at
+    0.85 of the body height starting with `markers`. Page 2: a body whose
+    first line is not indented."""
+    band = _region(_note_line("(1) A note in the band.", 300, 62, 200))
+    page_0 = PageLayout(0, (_region(*_five_full_lines(70, "zero")), band), ())
+    text = (
+        *(
+            _spread(f"text {n} of the page", 50, 300, 70 + 15 * n, text_height)
+            for n in range(4)
+        ),
+        _spread("its end.", 50, 150, 130, text_height),
+    )
+    notes = tuple(
+        _spread(
+            f"{marker} Note {marker} in small type.", 70, 200, 145 + 12 * n, _SMALL_PT
+        )
+        for n, marker in enumerate(markers)
+    )
+    regions = (_region(*text, *notes),) + (
+        (_region(_note_line("(1) Another band note.", 300, 62, 200)),)
+        if band_on_the_page
+        else ()
+    )
+    page_1 = PageLayout(1, regions, ())
+    page_2 = _body_page(2, *_five_full_lines(70, "two"))
+    return _lines_of(page_0, page_1, page_2)
+
+
+def _page_1_blocks(blocks: BlocksFile) -> tuple[str, ...]:
+    return tuple(
+        block_text(block) for block in blocks.blocks if block.origin[0].page_index == 1
+    )
+
+
+def test_footnote_left_in_the_body_in_rising_order_is_taken_as_notes() -> None:
+    lines = _body_notes_pages(("(1)", "(2)", "(3)"))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks)[1:] == (
+        ("(1)", "Note (1) in small type."),
+        ("(2)", "Note (2) in small type."),
+        ("(3)", "Note (3) in small type."),
+    )
+    assert tuple(note.origin[0].page_index for note in blocks.notes) == (0, 1, 1, 1)
+    assert _page_1_blocks(blocks) == ()
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_footnote_left_in_the_body_out_of_order_stays_and_does_not_run_on() -> None:
+    blocks = make_blocks(_body_notes_pages(("(1)", "(3)", "(2)")), _NO_WORDS, workers=1)
+    assert len(blocks.notes) == 1
+    page_1 = _page_1_blocks(blocks)
+    assert page_1[-3:] == (
+        "(1) Note (1) in small type.",
+        "(3) Note (3) in small type.",
+        "(2) Note (2) in small type.",
+    )
+    # The marker-led paragraph does not run on; page 2 starts its own.
+    assert block_text(blocks.blocks[-1]).startswith("two 0 of the page")
+
+
+def test_footnote_lines_in_the_body_of_a_page_whose_band_starts_at_1_stay() -> None:
+    blocks = make_blocks(
+        _body_notes_pages(("(1)", "(2)", "(3)"), band_on_the_page=True),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert tuple(note.marker for note in blocks.notes) == ("(1)", "(1)")
+    assert _page_1_blocks(blocks)[-3:] == (
+        "(1) Note (1) in small type.",
+        "(2) Note (2) in small type.",
+        "(3) Note (3) in small type.",
+    )
+
+
+def test_footnote_lines_in_the_body_below_text_as_small_stay() -> None:
+    blocks = make_blocks(
+        _body_notes_pages(("(1)", "(2)", "(3)"), text_height=_SMALL_PT),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert len(blocks.notes) == 1
+    assert _page_1_blocks(blocks) == (
+        "(1) Note (1) in small type.",
+        "(2) Note (2) in small type.",
+        "(3) Note (3) in small type.",
+    )
+
+
+def test_footnote_lines_in_the_body_of_a_book_with_digit_markers_stay() -> None:
+    # The book's band starts its notes with digits, not brackets.
+    pages = _body_notes_pages(("(1)", "(2)", "(3)")).pages
+    band = _region(_note_line("1 A note in the band.", 300, 62, 200))
+    page_0 = replace(pages[0], regions=(pages[0].regions[0], band))
+    blocks = make_blocks(_lines_of(page_0, *pages[1:]), _NO_WORDS, workers=1)
+    assert len(blocks.notes) == 1
+
+
 def test_make_blocks_with_notes_with_1_worker_and_with_3_gives_the_same_value() -> None:
     lines = _lines_of(
         *_note_running_over((PageLayout(1, (), ()),)).pages,

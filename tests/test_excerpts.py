@@ -234,3 +234,76 @@ def test_fidelity_check_passes_on_the_excerpt_at_every_boundary(
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
     markdown = read_markdown(folder.book_md.read_text(encoding="utf-8"))
     check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+
+# Notes (structure spec section 11), on the reference pages of section 9,
+# "The second plan", before the owner checks the whole pages.
+
+MARIEJOL = "mariejol_210-219"
+DOMESDAY = "domesday_74-83"
+
+
+def _notes_on(blocks: BlocksFile, page: int) -> tuple[tuple[str, list[int]], ...]:
+    """The marker and the pages of each note that has lines on `page`."""
+    return tuple(
+        (note.marker, _pages(note.origin))
+        for note in blocks.notes
+        if page in _pages(note.origin)
+    )
+
+
+def test_footnote_two_on_one_line_domesday_76_gives_two_notes(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[DOMESDAY]
+    notes = tuple(note for note in blocks.notes if _pages(note.origin) == [2])
+    assert tuple(
+        (note.marker, block_text(note.blocks[0]).split()[0]) for note in notes[:3]
+    ) == (("1", "Dialogus,"), ("2", "Dialogus,"), ("z", "Will."))
+
+
+def test_footnote_run_on_from_mariejol_213_is_one_note_on_214(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[MARIEJOL]
+    assert _notes_on(blocks, 4) == (
+        ("(4)", [3, 4]),
+        ("(t)", [4]),
+        ("(a)", [4]),
+        ("(3J", [4]),
+    )
+
+
+def test_footnote_left_in_the_body_mariejol_210_stays_paragraphs_not_run_on(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # The markers read 1, 2, 3, none, 11, 5: out of order, so the notes stay
+    # in the body, each a paragraph of page 210 alone (structure spec,
+    # sections 11 and 16).
+    _, blocks = excerpt_outputs[MARIEJOL]
+    led = tuple(
+        (block_text(block).split()[0], _pages(block.origin))
+        for block in blocks.blocks
+        if 0 in _pages(block.origin)
+    )[-6:]
+    assert led == (
+        ("(t)", [0]),
+        ("(2)", [0]),
+        ("(3)", [0]),
+        ("U)", [0]),
+        ("li)", [0]),
+        ("(S)", [0]),
+    )
+    assert _notes_on(blocks, 0) == ()
+
+
+def test_footnote_left_in_the_body_mariejol_217_is_taken_as_a_note(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[MARIEJOL]
+    assert _notes_on(blocks, 7)[0] == ("(I)", [7])
+    assert not any(
+        block_text(block).startswith("(I)")
+        for block in blocks.blocks
+        if 7 in _pages(block.origin)
+    )

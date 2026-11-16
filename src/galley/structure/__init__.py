@@ -58,7 +58,9 @@ def make_blocks(
     language in lower case, as `wordlist.lower_case_word_list` gives it."""
     survey = survey_book(lines, workers=workers)
     pages = map_pages(lambda page: page_parts(page, survey), lines.pages, workers)
-    assembled = assemble(pages, survey.book_words, lower_case_words)
+    assembled = assemble(
+        pages, survey.book_words, lower_case_words, survey.body_word_height
+    )
     return BlocksFile(
         source_pdf_sha256=lines.source_pdf_sha256,
         blocks=assembled.blocks,

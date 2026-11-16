@@ -191,7 +191,7 @@ def page_notes(regions: Sequence[Sequence[PlacedLine]]) -> tuple[PageNote, ...]:
     return tuple(notes)
 
 
-def _numbered_per_page(pages: Sequence[Sequence[PageNote]]) -> bool:
+def numbered_per_page(pages: Sequence[Sequence[PageNote]]) -> bool:
     """Whether the book numbers its notes per page (spec section 11, "Its
     value"): on at least half of the pages with a note whose marker reads
     as a number, the first such marker reads 1."""
@@ -226,7 +226,7 @@ def footnotes(
     (blank, plate and excluded pages) aside. In a book numbered per page,
     the k-th note that starts on a page has the value k; otherwise its
     value is what its marker reads."""
-    per_page = _numbered_per_page(pages)
+    per_page = numbered_per_page(pages)
     joined: list[list[PageNote]] = []
     last_page_with_notes: int | None = None
     for page_number, notes in enumerate(pages):

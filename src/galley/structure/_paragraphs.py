@@ -20,9 +20,11 @@ from galley.structure._foot import body_column
 from galley.structure._lines import (
     Piece,
     PlacedLine,
+    first_word,
     hyphen_between,
     starts_paragraph,
 )
+from galley.structure._markers import MarkerForm, marker_form
 from galley.structure._measures import Edges, is_short, region_edges
 from galley.structure._regions import RegionKind, region_kinds
 from galley.structure._removals import foot_removals, head_removals
@@ -34,7 +36,9 @@ class PageParts:
     """What the per-page work gives for one page: the removals and page
     numbers, the body stream, the margin notes, the lines of each band
     region and the band blocks they make by rules 1 and 2, each of one
-    page, and whether the page has a figure."""
+    page, whether the page has a figure, and the lines taken from the foot
+    of the body stream as notes (spec section 11, "Notes left in the
+    body"), none until they are taken."""
 
     removals: tuple[Removal, ...]
     page_numbers: tuple[PageNumber, ...]
@@ -43,6 +47,7 @@ class PageParts:
     band_regions: tuple[tuple[PlacedLine, ...], ...]
     band_blocks: tuple[Piece, ...]
     has_figure: bool
+    body_notes: tuple[PlacedLine, ...] = ()
 
 
 def _pieces(lines: tuple[PlacedLine, ...]) -> tuple[Piece, ...]:
@@ -138,10 +143,23 @@ class MarginNote:
 type Entry = Paragraph | MarginNote
 
 
-def body_entries(pages: Sequence[PageParts]) -> tuple[Entry, ...]:
+def _marker_led(lines: Sequence[PlacedLine], form: MarkerForm | None) -> bool:
+    """Whether a paragraph of `lines` starts with a word of the book's
+    marker form `form`: a note that section 11 did not take, which never
+    runs on into the next page (spec section 16)."""
+    return (
+        form is not None and bool(lines) and marker_form(first_word(lines[0])) is form
+    )
+
+
+def body_entries(
+    pages: Sequence[PageParts], form: MarkerForm | None = None
+) -> tuple[Entry, ...]:
     """The paragraphs of the book's body stream in order, each followed by
     the margin notes of the pages whose body ends in it; the margin notes
-    of a page with no body stream after the last block so far."""
+    of a page with no body stream after the last block so far. A paragraph
+    whose first word has the book's marker form `form` does not run on
+    into the next page."""
     entries: list[Entry] = []
     current: list[PlacedLine] = []
     pending: list[MarginNote] = []
@@ -155,7 +173,8 @@ def body_entries(pages: Sequence[PageParts]) -> tuple[Entry, ...]:
                 and (page.has_figure or page_before_has_figure)
                 and not (before is not None and hyphen_between(before, line))
             )
-            if plate_break or starts_paragraph(line, before):
+            note_break = number == 0 and _marker_led(current, form)
+            if plate_break or note_break or starts_paragraph(line, before):
                 if current:
                     entries.append(Paragraph(Piece(tuple(current))))
                     entries.extend(pending)
