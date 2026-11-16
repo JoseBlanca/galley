@@ -256,15 +256,6 @@ class IndexPage:
     page_numbers: tuple[PageNumber, ...] = ()
 
 
-def _guide_words_removal(page_index: int, words: Sequence[Word]) -> Removal:
-    return Removal(
-        page_index=page_index,
-        box=words_box(words),
-        text=words_text(words),
-        reason=RemovalReason.GUIDE_WORDS,
-    )
-
-
 def entry_side(left_sides: Sequence[float]) -> float:
     """The side, in points, that a column's first lines start at (spec
     section 17, rule 3): the commonest of `left_sides`, which are not none,
@@ -511,7 +502,11 @@ def index_page(
         if (number, line_number) not in removed and _is_guide_words_line(line)
     )
     removals = index_head.removals + tuple(
-        _guide_words_removal(page.index, page.regions[number].lines[line_number].words)
+        words_removal(
+            page.index,
+            page.regions[number].lines[line_number].words,
+            RemovalReason.GUIDE_WORDS,
+        )
         for number, line_number in sorted(
             guide_lines,
             key=lambda place: page.regions[place[0]].lines[place[1]].box.top,
@@ -535,7 +530,11 @@ def index_page(
             sorted(
                 (
                     *removals,
-                    _guide_words_removal(page.index, (*left[0].words, *right[0].words)),
+                    words_removal(
+                        page.index,
+                        (*left[0].words, *right[0].words),
+                        RemovalReason.GUIDE_WORDS,
+                    ),
                 ),
                 key=lambda removal: removal.box.top,
             )

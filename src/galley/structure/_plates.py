@@ -28,7 +28,7 @@ from galley.structure._measures import (
     Edges,
     is_roman_form,
     letters,
-    words_box,
+    words_removal,
     words_text,
 )
 from galley.structure._paragraphs import PageFigure, PageParts
@@ -117,18 +117,6 @@ def _is_caption_row(texts: Sequence[str], lower_case_words: frozenset[str]) -> b
     )
 
 
-def _line_removal(
-    page_index: int, place: LinePlace, page: PageLayout, reason: RemovalReason
-) -> Removal:
-    words = line_at(page, place).words
-    return Removal(
-        page_index=page_index,
-        box=words_box(words),
-        text=words_text(words),
-        reason=reason,
-    )
-
-
 def plate_parts(
     page: PageLayout,
     survey: BookSurvey,
@@ -169,7 +157,9 @@ def plate_parts(
     if rule_1_head:
         assert topmost is not None
         removed.append(
-            _line_removal(page.index, topmost, page, RemovalReason.RUNNING_HEAD)
+            words_removal(
+                page.index, line_at(page, topmost).words, RemovalReason.RUNNING_HEAD
+            )
         )
     plate_lines = tuple(
         ((region_number, line_number), PlacedLine(page.index, line, edges, edges))
@@ -188,7 +178,9 @@ def plate_parts(
             caption.extend(line for _, line in row)
         else:
             removed.extend(
-                _line_removal(page.index, place, page, RemovalReason.PLATE_TEXT)
+                words_removal(
+                    page.index, line_at(page, place).words, RemovalReason.PLATE_TEXT
+                )
                 for place, _ in row
             )
     return PageParts(
