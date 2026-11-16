@@ -20,7 +20,7 @@ It is built from `docs/specs/structure.md` §11 to §20,
 §13 and §17, settled by the owner on 15 and 16 November 2026. It ends
 with the six books' EPUBs and the evaluation tool's scores against the
 targets of structure §9, "The second plan". Dated 16 November 2026.
-State: approved breakdown, plan draft.
+State: under way (approved by the owner on 16 November 2026).
 
 The seven work packages are the breakdown the owner approved in chat on
 16 November 2026. "Structure §11" below is section 11 of
