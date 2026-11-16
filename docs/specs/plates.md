@@ -94,16 +94,25 @@ them ("16", "17]"). Its `kind` is `plate` and its `text_source`
 `text_layer`.
 
 **A page without a text layer** is a plate when its largest group holds
-at least 0.35 of the page's squares (outer ring left out). Its `kind` is
+at least 0.34 of the page's squares, counted without the outer ring and
+without the next column of squares on the left and on the right, where
+the shadow of the binding falls (on either side, depending on the
+page). Its `kind` is
 `plate` and its `text_source` `none`, and it does not stop the run: a
 picture without OCR text is still a picture. A page without a text
 layer that is not a plate goes to the OCR audit of architecture §7b;
 until analyze has it, it stops the run unless the config excludes it,
 as in the walking skeleton.
 
-analyze logs, at the level INFO, each page it takes for a plate, with
-its largest group and its known words, so that the owner sees the
-covers and endpapers it takes too and can exclude them.
+**A page the config names in `plate_pages`** (architecture §6) is a
+plate whatever the rule finds, with a text layer or without; a page in
+`exclude_pages` is never one. So a plate the rule misses is put in the
+book by naming it, and a page it takes wrongly is left out by excluding
+it.
+
+analyze logs, at the level WARNING, each page it takes for a plate by
+the rule, with its largest group and its known words, so that the owner
+sees the covers and endpapers it takes too and can exclude them.
 
 **Measured, pages with a text layer.** The rule finds all 12 plates of
 section 1 that have a text layer, with largest groups of 70 to 403
@@ -119,20 +128,25 @@ printer's device have 25 or fewer.
 
 **Measured, pages without a text layer**, 79 in the six books, on 16
 November 2026. The share of the page in the largest group, at an ink
-threshold of 10:
+threshold of 10, with the binding columns left out:
 
 | pages | share |
 |---|---|
-| the plates: Kadesh 17, 35, 43, 57; Stubbs 9, 11, 52, 54 | 0.46 to 0.95 |
-| Kadesh 23 (a faint relief) and 69 (a photograph under text) | 0.36 and 0.37 |
-| covers: Stubbs 0, Mariéjol 0 | 0.50 and 0.77 |
-| the highest of the others: Kadesh 72 (a blank page, the next page showing through), Domesday 6 (a handwritten note), Mariéjol 449 to 453 (endpapers), Domesday 554 | 0.34, 0.31, 0.29 to 0.31, 0.30 |
-| the rest, blank pages among them | 0.27 or less |
+| the plates: Kadesh 17, 35, 43, 57; Stubbs 9, 11, 52, 54 | 0.48 to 0.94 |
+| Kadesh 69 (a photograph under text) | 0.36 |
+| Kadesh 23 (a faint relief) | 0.26 |
+| covers: Mariéjol 0, Stubbs 0 | 0.75 and 0.16 |
+| the highest of the others: Kadesh 72 (a blank page, the next page showing through), Domesday 6 (a handwritten note), Domesday 554, Gierke 287 | 0.32, 0.30, 0.29, 0.28 |
+| the rest, blank pages among them | 0.26 or less |
 
-So 0.35 takes the 10 plates and the 2 covers, with a margin of 0.02
-between Kadesh 23 and Kadesh 72. At the ink threshold of 25 used for
-pages with a layer, the faint reliefs are hardly ink: Kadesh 23 has 5
-inked squares, as many as a blank page. Kadesh 69 holds a running head
+With the binding columns counted, as first measured, the shares were
+higher, and mostly the binding's shadow: Kadesh 23 was 0.36 and Kadesh
+72 0.34. Without them, 0.34 takes 9 of the 10 plates and Mariéjol's
+cover, with a margin of 0.02 between Kadesh 69 and Kadesh 72. It misses
+Kadesh 23, whose relief is too faint to tell from a page showing
+through: the owner names it in `plate_pages`. At the ink threshold of
+25 used for pages with a layer, the faint reliefs are hardly ink:
+Kadesh 23 has 5 inked squares, as many as a blank page. Kadesh 69 holds a running head
 and a few lines of text as well as its photograph; as a plate its
 whole page is its picture, so those lines are shown in the image,
 though not as text, which needs the OCR audit.
@@ -146,7 +160,7 @@ though not as text, which needs the OCR audit.
 | word box grown | 2 pt | guessed |
 | largest group, page with a layer | 50 squares | measured: plates 70 to 403, title pages 25 or fewer, Mariéjol 265 107 |
 | known words | at most 20 | measured: plates 17 or fewer, Mariéjol 265 26 |
-| largest group, page without a layer | 0.35 of the page | measured, above |
+| largest group, page without a layer | 0.34 of the page, binding columns left out | measured, above |
 
 A rule on the text layer alone, a page whose lines mostly fail the
 caption test of structure §18, finds Kadesh 16 and Domesday 39 and 40,
@@ -154,12 +168,13 @@ misses the other 9 plates with a layer, and takes Mariéjol's 16 and
 265, pages of garbled text.
 
 **The configs of the sample books.** The 7 pages with a text layer that
-are not plates and the 2 covers without one are added to the
-`exclude_pages` of the `whole_book` tests' configs (`tests/test_layout.py`)
-and of `evaluation/books.toml`, or named as the `cover_page`, by the
-plan of this spec; the `whole_book` test asserts the plates those
-configs leave, which are the 22 plates of section 1. The plates without
-a text layer are taken out of those `exclude_pages`.
+are not plates and Mariéjol's cover (page 0, without one) are added to
+the `exclude_pages` of the `whole_book` tests' configs
+(`tests/test_layout.py`) and of `evaluation/books.toml`, or named as the
+`cover_page`, and Kadesh 23 to their `plate_pages`, by the plan of this
+spec; the `whole_book` test asserts the plates those configs leave,
+which are the 22 plates of section 1. The plates without a text layer
+are taken out of those `exclude_pages`.
 
 **Cost.** Rendering every page at 36 dpi took 12.6 s for Domesday's 558
 pages on the one PDFium thread, against about 2.5 s for the whole of
@@ -236,6 +251,11 @@ covers `contents_pages` too.
   its two lines `plate_text` and gives a figure block with no text.
 - **A plate without a text layer** (Kadesh 17; Stubbs 52): a figure with
   no words, and a figure block with no text.
+- **What the rules get wrong, on the six books**: they take as plates 7
+  pages with a text layer that are not (Kadesh 0, 49, 65; Mariéjol 1,
+  2, 457, 458) and 1 without (Mariéjol 0, a cover), which the configs
+  exclude; they miss 1 plate, Kadesh 23, which the config names in
+  `plate_pages`. Every page taken by the rule is logged at WARNING.
 - **The back of a plate**, the picture showing through (Kadesh 49, 65),
   a cover, an endpaper or a card pocket: a plate, logged. Its image is
   cut and the lines of its layer that pass structure's caption test are
