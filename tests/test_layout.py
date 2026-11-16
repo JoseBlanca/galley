@@ -9,6 +9,7 @@ exact regions of the reference pages are tested in tests/test_excerpts.py.
 """
 
 import hashlib
+import math
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
@@ -144,6 +145,8 @@ def test_measure_book_on_20_pages_gives_the_medians() -> None:
         body_word_height=_ROW_HEIGHT,
         body_line_pitch=_PITCH,
         usual_left_edge=frozendict({0: 50.0, 1: 60.0}),
+        cut_in_inset_left=None,
+        cut_in_inset_right=None,
     )
 
 
@@ -175,6 +178,8 @@ def test_measure_book_with_no_page_of_15_rows_measures_pages_of_3() -> None:
         body_word_height=_ROW_HEIGHT,
         body_line_pitch=_PITCH,
         usual_left_edge=frozendict({0: 50.0, 1: 50.0}),
+        cut_in_inset_left=None,
+        cut_in_inset_right=None,
     )
 
 
@@ -279,6 +284,62 @@ def test_book_without_a_wide_row_takes_the_median_commonest_left_edge() -> None:
     assert measures.usual_left_edge == frozendict({0: 55.0, 1: 55.0})
 
 
+# The cut-in insets (layout spec section 3, "The book's measures")
+
+
+def _inset_pages(insets: tuple[float, ...]) -> WordsFile:
+    """Pages of 17 full rows of the column at 50, 200 wide, starting 0 to 2
+    pt inside its left edge, each with 3 rows of `insets` more, rows that
+    start that far inside the left edge and end at the right one."""
+    pages = []
+    for index in range(math.ceil(len(insets) / 3)):
+        page_insets = insets[3 * index : 3 * index + 3]
+        full = tuple(
+            word
+            for row in range(17)
+            for word in _full_row(row, 50 + row % 3, 200 - row % 3, row * _PITCH)
+        )
+        inset_rows = tuple(
+            word
+            for row, inset in enumerate(page_insets, start=17)
+            for word in (
+                _word(
+                    f"i{row}", 50 + inset, row * _PITCH, 50 + inset + 40, 8 + row * 12
+                ),
+                _word(f"j{row}", 50 + inset + 44, row * _PITCH, 250, 8 + row * _PITCH),
+            )
+        )
+        pages.append(_page(index, full + inset_rows))
+    return _words_file(tuple(pages))
+
+
+def test_cut_in_inset_of_60_rows_60_pt_in_is_measured() -> None:
+    measures = measure_book(_inset_pages((60.0,) * 60))
+    assert measures is not None
+    assert (measures.cut_in_inset_left, measures.cut_in_inset_right) == (60.0, None)
+
+
+def test_cut_in_inset_with_as_many_rows_8_pt_further_in_is_none() -> None:
+    measures = measure_book(_inset_pages((30.0,) * 30 + (38.0,) * 30))
+    assert measures is not None
+    assert measures.cut_in_inset_left is None
+
+
+@pytest.mark.parametrize(("rows", "inset"), [(9, None), (10, 60.0)])
+def test_cut_in_inset_needs_10_rows_at_its_peak(rows: int, inset: float | None) -> None:
+    measures = measure_book(_inset_pages((60.0,) * rows))
+    assert measures is not None
+    assert measures.cut_in_inset_left == inset
+
+
+def test_cut_in_inset_takes_the_smaller_peak_within_2_pt_and_rounds_to_0_1_pt() -> None:
+    # 59.97 rounds to 60.0, 4 tenths from 59.6: both peaks have every row
+    # within 2 pt, and the tie goes to the smaller.
+    measures = measure_book(_inset_pages((59.6,) * 10 + (59.97,) * 10))
+    assert measures is not None
+    assert measures.cut_in_inset_left == 59.6
+
+
 # layout_page: outer margin notes and the running-head line (layout spec
 # section 3, steps 1 to 3)
 
@@ -289,6 +350,8 @@ _MEASURES = BookMeasures(
     body_word_height=_ROW_HEIGHT,
     body_line_pitch=_PITCH,
     usual_left_edge=frozendict({0: 50.0, 1: 50.0}),
+    cut_in_inset_left=None,
+    cut_in_inset_right=None,
 )
 
 
@@ -1108,6 +1171,195 @@ def test_line_starting_left_of_the_capitals_middle_does_not_receive_it() -> None
 # The fidelity check at the layout boundary
 
 
+# layout_page: Stubbs' cut-in notes (layout spec section 3, step 2b)
+
+_CUT_IN_MEASURES = replace(_MEASURES, cut_in_inset_left=60.0, cut_in_inset_right=60.0)
+
+
+def _row_top(row: int) -> float:
+    return 100 + row * _PITCH
+
+
+def _cut_row(row: int, start: float = 110) -> tuple[Word, ...]:
+    """Row `row` of the column of `_MEASURES`, its words from `start`, by
+    default 110, 60 pt inside the left edge at 50, to the right edge."""
+    top = _row_top(row)
+    return (
+        _word(f"d{row}", start, top, start + 65, top + 8),
+        _word(f"e{row}", start + 69, top, 250, top + 8),
+    )
+
+
+def _note_words(
+    row: int, words: tuple[tuple[str, float, float], ...]
+) -> tuple[Word, ...]:
+    """The words (text, left side, right side) on row `row`."""
+    top = _row_top(row)
+    return tuple(_word(text, x0, top, x1, top + 8) for text, x0, x1 in words)
+
+
+_CHARACTER_OF_HENRY = (("Character", 55, 80), ("of", 82, 88), ("Henry", 90, 102))
+
+
+def _cut_in_page(
+    rows: dict[int, tuple[Word, ...]], measures: BookMeasures = _CUT_IN_MEASURES
+) -> PageLayout:
+    """A page of 20 full rows of the column of `_MEASURES`, but for the
+    rows of `rows`."""
+    full = tuple(word for word in _rows(20) if int(word.text[1:]) not in rows)
+    return layout_page(
+        _page(0, (*full, *(word for words in rows.values() for word in words))),
+        measures,
+    )
+
+
+def test_cut_in_note_beside_shortened_rows_is_a_margin_region() -> None:
+    result = _cut_in_page(
+        {
+            10: _cut_row(10),
+            11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+            12: _cut_row(12),
+        }
+    )
+    body, margin = _region_texts(result)
+    assert body[10:13] == (("d10", "e10"), ("d11", "e11"), ("d12", "e12"))
+    assert len(body) == 20
+    assert margin == (("Character", "of", "Henry"),)
+
+
+@pytest.mark.parametrize(("start", "margin"), [(113, 1), (114, 0)])
+def test_cut_in_row_starts_within_3_pt_of_the_inset(start: float, margin: int) -> None:
+    rows = {
+        10: _cut_row(10, start),
+        11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+        12: _cut_row(12, start),
+    }
+    assert len(_cut_in_page(rows).regions) == 1 + margin
+
+
+def test_cut_in_note_stays_in_the_body_without_a_cut_in_inset() -> None:
+    rows = {
+        10: _cut_row(10),
+        11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+        12: _cut_row(12),
+    }
+    (body,) = _region_texts(_cut_in_page(rows, _MEASURES))
+    assert body[11] == ("Character", "of", "Henry", "d11", "e11")
+
+
+def test_cut_in_word_at_the_inset_after_a_4_pt_gap_makes_no_cut_row() -> None:
+    # "Henry" ends at 106, 4 pt short of the word at the inset: row 11 is
+    # not cut, and rows 10 and 12, 2 pitches apart, are no chain.
+    rows = {
+        10: _cut_row(10),
+        11: (
+            *_note_words(
+                11, (("Character", 55, 80), ("of", 82, 88), ("Henry", 90, 106))
+            ),
+            *_cut_row(11),
+        ),
+        12: _cut_row(12),
+    }
+    (body,) = _region_texts(_cut_in_page(rows))
+    assert body[11] == ("Character", "of", "Henry", "d11", "e11")
+
+
+def test_cut_in_rows_2_pitches_apart_are_no_chain() -> None:
+    rows = {
+        10: _cut_row(10),
+        11: _note_words(11, _CHARACTER_OF_HENRY),
+        12: _cut_row(12),
+    }
+    (body,) = _region_texts(_cut_in_page(rows))
+    assert body[11] == ("Character", "of", "Henry")
+
+
+def test_cut_in_full_line_at_the_end_of_a_chain_keeps_its_words() -> None:
+    # Row 13 is a full line with a 9-pt space before the word at the inset:
+    # a cut row, but not shortened, so the zone ends at row 12.
+    top = _row_top(13)
+    rows = {
+        10: _cut_row(10),
+        11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+        12: _cut_row(12),
+        13: (_word("a13", 50, top, 101, top + 8), *_cut_row(13)),
+    }
+    body, margin = _region_texts(_cut_in_page(rows))
+    assert body[13] == ("a13", "d13", "e13")
+    assert margin == (("Character", "of", "Henry"),)
+
+
+def test_cut_in_speck_at_the_inset_spanning_a_quarter_of_the_column_is_no_cut_row() -> (
+    None
+):
+    # Row 12's words from ";" span 50 pt, a quarter of the column: had it
+    # been cut, the zone would run from row 10 to row 12 and take row 11's
+    # note.
+    top = _row_top(12)
+    rows = {
+        10: _cut_row(10),
+        11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+        12: (_word(";", 110, top, 113, top + 8), _word("end", 120, top, 160, top + 8)),
+    }
+    (body,) = _region_texts(_cut_in_page(rows))
+    assert body[11] == ("Character", "of", "Henry", "d11", "e11")
+
+
+def test_cut_in_zone_of_one_shortened_row_takes_a_note_word_1_pt_below_it() -> None:
+    # Rows 10 and 11 are cut; only row 11 is shortened, so the zone is row
+    # 11, from 232 to 240. "accession.", a row of its own, has its middle
+    # at 240.75, inside the zone and its 1 pt; row 10's "of" is outside it.
+    top = _row_top(11)
+    rows = {
+        10: (*_note_words(10, (("of", 55, 70),)), *_cut_row(10)),
+        11: (*_cut_row(11), _word("accession.", 55, top + 4.5, 100, top + 13)),
+    }
+    body, margin = _region_texts(_cut_in_page(rows))
+    assert body[10] == ("of", "d10", "e10")
+    assert margin == (("accession.",),)
+
+
+def test_cut_in_zone_keeps_a_word_ending_3_pt_short_of_the_inset() -> None:
+    # "Henry", a row of its own inside the zone, ends at 107, 3 pt short of
+    # the inset at 110: not 4, so it stays in the body.
+    top = _row_top(11)
+    rows = {
+        10: _cut_row(10),
+        11: (
+            *_note_words(11, (("Character", 55, 80), ("of", 82, 88))),
+            *_cut_row(11),
+            _word("Henry", 90, top + 4.5, 107, top + 13),
+        ),
+        12: _cut_row(12),
+    }
+    body, margin = _region_texts(_cut_in_page(rows))
+    assert ("Henry",) in body
+    assert margin == (("Character", "of"),)
+
+
+def test_cut_in_note_at_the_right_is_a_margin_region() -> None:
+    # The mirror of the first case: body words from the left edge to 190,
+    # 60 pt inside the right edge at 250, and the note right of them.
+    def shortened(row: int) -> tuple[Word, ...]:
+        top = _row_top(row)
+        return (
+            _word(f"d{row}", 50, top, 120, top + 8),
+            _word(f"e{row}", 124, top, 190, top + 8),
+        )
+
+    rows = {
+        10: shortened(10),
+        11: (
+            *shortened(11),
+            *_note_words(11, (("His", 200, 215), ("family", 217, 245))),
+        ),
+        12: shortened(12),
+    }
+    body, margin = _region_texts(_cut_in_page(rows))
+    assert body[11] == ("d11", "e11")
+    assert margin == (("His", "family"),)
+
+
 def _words_file(pages: tuple[PageWords, ...]) -> WordsFile:
     return WordsFile(source_pdf_sha256="0" * 64, pages=pages, removals=())
 
@@ -1325,6 +1577,38 @@ def test_layout_of_an_excerpt_keeps_every_word(
     folder = excerpt_books[excerpt]
     words, lines = read_words(folder.words_json), read_lines(folder.lines_json)
     _assert_laid_out_in_regions(words, lines)
+
+
+def test_cut_in_insets_of_the_excerpts_are_stubbs_only(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Layout spec section 3, "The book's measures": the Stubbs excerpt's
+    # insets are 60.3 pt (17 rows) and 58.2 pt (13 rows); no other excerpt
+    # has 10 rows at its peak and 4 times those beside it.
+    insets = {}
+    for name, folder in excerpt_books.items():
+        measures = measure_book(read_words(folder.words_json))
+        assert measures is not None
+        insets[name] = (measures.cut_in_inset_left, measures.cut_in_inset_right)
+    assert insets == {
+        name: (60.3, 58.2) if name == "stubbs_51_56-64" else (None, None)
+        for name in excerpt_books
+    }
+    assert len(insets) == 11
+
+
+def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Layout spec section 8: excerpt page 2, book page index 57, has two
+    # notes cut into the column at the left.
+    lines = read_lines(excerpt_books["stubbs_51_56-64"].lines_json)
+    page = next(page for page in lines.pages if page.index == 2)
+    regions = [
+        [" ".join(word.text for word in line.words) for line in region.lines]
+        for region in page.regions
+    ]
+    assert regions[2:] == [["Characterof", "Henry II."], ["Hisfamily", "policy."]]
 
 
 @pytest.mark.whole_book
