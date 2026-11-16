@@ -378,13 +378,13 @@ both sides.
   footnote band and its notes come out as paragraphs; choose pages that
   keep book pages 93 and 274 and measure as the whole book does, in
   `scripts/fetch_samples.py`, with structure §9's list. Before 4.1.
-- [ ] 4.1 Heading lines, chapter labels, continuations, heading blocks
+- [x] 4.1 Heading lines, chapter labels, continuations, heading blocks
   with `label` and levels, and `contents_pages`. Spec: structure §14;
   §2, step 2.3. Deliverables 1 to 3.
-- [ ] 4.2 Chapter summaries and verse (rule 4), per page, and a verse
+- [x] 4.2 Chapter summaries and verse (rule 4), per page, and a verse
   block over a page break. Spec: structure §15; §16, rule 4; §2, steps
   2.3, 2.4 and 3.1. Needs 4.1. Deliverables 1 to 3.
-- [ ] 4.3 Quotes (rules 1 to 3), the marker-led exclusion, and Haskins'
+- [x] 4.3 Quotes (rules 1 to 3), the marker-led exclusion, and Haskins'
   bibliographical notes. Spec: structure §16, "The rules" and "Haskins'
   bibliographical notes"; §2, steps 3.1 and 3.5. Needs 4.2.
   Deliverables 1 to 3.
@@ -563,7 +563,7 @@ today; the change of task 7.4 has to give it.
   the owner; 7.4 and 7.6 run while waiting. Spec: structure §9, "The
   second plan", "Reference pages"; plates §6, "Excerpt tests".
   Deliverable 3.
-- [ ] 7.4 The change to `docs/specs/evaluation.md` that structure §21
+- [x] 7.4 The change to `docs/specs/evaluation.md` that structure §21
   names (`chapter_summary` and `verse` against the reference text's
   quotes, `endnote` against its notes, one heading block with a label
   against the two headings Stubbs' and Mariéjol's reference texts make,

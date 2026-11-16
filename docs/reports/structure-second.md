@@ -417,3 +417,60 @@ images ("The scale" + "holding.", "Natural" + "the level…", "Coercive"
 + "Force of"). On Stubbs page 51, "accession." goes before a paragraph
 that still holds the chapter summary, until work package 4 makes the
 summary a block. Task 3.2 is reviewed with work package 4.
+
+## Task 7.4: the evaluation tool's new kinds (9a93672, 5ca7490, 4e325b8 spec; fb20ff7; merged at 1fe2519)
+
+The change to `docs/specs/evaluation.md` went to the spec-reviewer before
+the tool. It found one rule that would have scored galley better than it
+is: a `verse` block on a prose quote counted right. Decided by the
+orchestrator: the reader keeps poetry apart from prose quotes; `verse` is
+right only on poetry, `quote` only on prose quotes, `chapter_summary`
+only on the quote right after a chapter's label and title in Stubbs'
+reference text (11 summaries). Also: at words and lines, endnote tokens
+are not scored (galley's endnote words stay `extra` there); an endnote
+linked more than a page from its reference is recorded with the cause
+`endnote_reference_far`; `body_pages` is required (Haskins 16–279,
+Stubbs 18–321, Domesday 22–552, before its imprint, Mariéjol 18–448),
+and the heading scores are taken on it. The reference headings on those
+ranges: 18, 26, 23, 26, as the plan's targets assume. Deliverable 4: 8
+tests collected (4 asked).
+
+## Work package 4: headings, chapter summaries, quotes and verse (20d0fc8, 89ee392, 59eee02; spec dd8a4dc, bfe483b)
+
+Headings are centred lines, of level 1 or 2, with the chapter label in
+`label`, none on contents pages; note references are also looked for in
+headings (Kadesh's "STRATEGY*" stays linked). Chapter summaries and
+verse are found per page; verse keeps a line feed at each printed line
+end. Quotes by structure §16's rules 1–3, with the marker-led exclusion;
+Haskins' bibliographical notes stay paragraphs. Spec corrections: the
+Mariéjol verse reference pages (no verse runs over 51–52), and a
+contents page makes no summary, verse or quote (Domesday page 14 had
+given 5 false quotes).
+
+Whole books (the stage's own counts; the tool's scores come in 7.5):
+
+| book | reference headings in heading blocks, body range | quote blocks | verse blocks |
+|---|---|---|---|
+| Haskins | 18 of 18 | 29 | 2 |
+| Stubbs | 25 of 26 | 66 | 0 |
+| Domesday | 22 of 23 (and 5 false: 4 table titles, 1 imprint) | 61 | 17 |
+| Mariéjol | 26 of 26 | 11 | 13 |
+| Kadesh | – | 23 | 0 |
+| Gierke | – | 22 | 2 |
+
+Stubbs has 10 chapter summaries, on the ten pages structure §15 names.
+Known faults: Domesday's verse blocks are mostly tables; Stubbs' 66
+quotes are its publisher's lists (the reference text makes them quotes
+too); Gierke's 22 quotes are footnotes of Maitland's introduction left
+in the body, since the book has no marker form; Haskins' index rows on
+pages 267 and 271 are quotes until work package 5.
+
+The excerpt `haskins_quotes_index` lacks the chapter II heading (book
+page 41), so its bibliographical note runs on and its quotes on pages
+53 and 71–73 stay paragraphs; these are checked by a whole-book test,
+and page 41 is added to the excerpt in the review's fixes (decided by
+the orchestrator).
+
+Checks at 59eee02: pytest 1581 passed in 27.8 s; with 8 threads in 49.9
+s; `-m whole_book` 30 passed in 242 s. Four reference pages changed
+(Haskins 131 and 266, Kadesh 8, Stubbs 51).
