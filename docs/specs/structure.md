@@ -101,8 +101,10 @@ there; these are used in several:
 - the **book's marker form** is the form, digits, bracketed or sign
   (section 11), that the most first words of the book's band blocks
   have: bracketed in Mariéjol (746 of 752), digits in Domesday (1,268 of
-  1,269), Haskins, Stubbs (its index and lists) and Kadesh. A book whose
-  band blocks start with no such word, as Gierke's 11, has none.
+  1,269), Haskins and Stubbs (its index and lists), sign in Kadesh (24
+  of its band blocks start with a sign, 14 with digits and 142 with
+  neither, measured on 16 November 2026). A book whose band blocks start
+  with no such word, as Gierke's 11, has none.
 
 ## 2. What structure does, in order
 
@@ -466,8 +468,13 @@ or prints hyphenated only at line ends: "sea-faring", "pre-eminently",
 hyphens are lines the skeleton mixed with a margin note or a note
 column, misreadings, or hyphens the reference does not show; Kadesh (110
 hyphens, 71 with evidence) and Gierke (714, 483) have no reference. A
-hyphen whose next word is not in the same block, or does not start with
-a letter or digit, is left as it is, with no record. A line of one word
+line that holds only a sign of a note reference ("^", "*" or "•",
+section 11) between a line that ends with a hyphen and the next line is
+passed over: the hyphen is joined with the first word of the line after
+it, and the sign goes after the joined word, where section 11 finds it
+as a reference (Haskins page 71: "fol-", "^", "lows:" give "follows:",
+"^"). A hyphen whose next word is not in the same block, or does not
+start with a letter or digit, is left as it is, with no record. A line of one word
 between two line-end hyphens is joined twice: the second change has the
 first join's word as its first word ("pre-" "Anglo-" then "preAnglo-"
 "Saxon"), and the fidelity check, which undoes every change, still
@@ -1181,7 +1188,9 @@ The first word of a note has a **note marker's form** when it is:
 A note started by its indent (rule 1 or 2) whose first word has none of
 these forms still takes it as its marker when it is one character and
 the next word starts with a capital ("«" on Domesday page 74, "z" on
-page 76), and the signs when the word is 1 or 2 of the signs above glued
+page 76), unless it is "A", "I" or "a", which are words, and the next
+word is a known word (`wordlist.is_known_word`, architecture §12):
+"A Treatise", "I have" keep their first word, and the signs when the word is 1 or 2 of the signs above glued
 to a word that starts with a capital ("'There" on Kadesh page 8: the
 marker is "'" and the text starts with "There"). Otherwise the note has
 no marker: `marker` is empty and every word stays in its text.
@@ -1361,9 +1370,15 @@ id; the spaces stay with the spans around it. A bracketed number or a
 sign that is a word of its own becomes the reference span, with any
 punctuation after it split off the same way ("(i).": "(i)", "."). A
 candidate whose reference would hold a letter ("(i)", "(li)", read as
-1 and 11) is not linked and stays in its word, since the fidelity check
-refuses a reference span with a letter that was a whole word of the
-lines (architecture §13): only digits and signs are linked. The note's `referenced` becomes true.
+1 and 11) stays in its word, since the fidelity check refuses a
+reference span with a letter that was a whole word of the lines
+(architecture §13): only digits and signs are linked. Such a candidate
+is left out before the matching, not matched and then left unlinked:
+scored by the evaluation tool against Mariéjol's reference text on 16
+November 2026, 543 of its notes have the right reference when it is left
+out first, 521 when it is matched first, since a matched "(i)" takes the
+place of a later "(1)" (pages 279 and 334). The note's `referenced`
+becomes true.
 
 ### What the rules give
 
@@ -1425,19 +1440,29 @@ them as body. They are notes of kind `endnote` (architecture §8), a
 kind of their own although they are notes, as footnotes are (owner, 15
 November 2026).
 
-**The endnote section** is a run of consecutive body paragraphs whose
-first words are endnote markers (section 11, the last form) with rising
-values, at least 8 of them, with any number of paragraphs without such a
-marker between them. The survey finds it (section 2, step 1) from the
-lines that start a paragraph by section 6's rules. It starts at the
-first of them and ends with the last paragraph of the page of the last;
-a paragraph between them that starts with no such marker belongs to
-it. The section's first page starts a new block: no paragraph of the
-page before runs on into it. A paragraph of the section before its first
-endnote marker (the end of a note whose start is on an earlier page not
-in the PDF or the excerpt) is an endnote with no marker, unreferenced. The end is so that
-the library's card on Gierke's page 288 ("BINDING SECT. NOV 8 1967"),
-after five blank pages, stays out. The 8 is set between what the six
+**The endnote section** is found from runs of consecutive body
+paragraphs whose first words are endnote markers (section 11, the last
+form) with rising values, with any number of paragraphs without such a
+marker between them: a marker that does not rise above the one before
+ends a run and starts the next. The survey finds them (section 2, step
+1) from the lines that start a paragraph by section 6's rules. The
+section runs from the first marker of the first run of at least 8 to
+the last marker of the last such run, so that a damaged marker that
+reads lower does not cut it in two. On its first page it reaches back
+over the paragraphs before its first marker up to the first centred
+line above them, which stays out ("NOTES." on Gierke's page 186); it
+ends with the last paragraph that starts on the page of its last
+marker. A paragraph between them that starts with no such marker
+belongs to it. The section's first page starts a new block: no
+paragraph of the page before runs on into it; and no paragraph runs on
+out of it: the first body line after its last page starts a paragraph,
+so that its last endnote does not run on over pages with no body text
+into a later page. A paragraph of the section before its first endnote
+marker (the end of a note whose start is on an earlier page not in the
+PDF or the excerpt) is an endnote with no marker, unreferenced. The end
+is so that the library's card on Gierke's page 288 ("BINDING SECT. NOV
+8 1967"), after five blank pages, stays out; the card is also among
+Gierke's `exclude_pages`. The 8 is set between what the six
 books hold, measured on the first plan's paragraphs on 16 November 2026:
 the runs of at least 4 rising numbered paragraphs are one in Kadesh, of
 6 (pages 20 to 40), and Gierke's, of 299; and the Gierke excerpt holds 12
@@ -1454,8 +1479,13 @@ in `blocks`. Every note of section 11 is of kind `footnote`.
 **References.** Endnotes are numbered through the book, so they are
 matched as in section 11, but once over the whole book, not per page:
 the endnotes in order of their values against the glued numbers of the
-body before the section, in reading order (pages 86 to 185 in Gierke),
-by the same scores. Gierke's markers end with "." ("1.") and its
+body before the section, in reading order, by the same scores. The
+candidates are taken only from the pages after the last of the config's
+`contents_pages` (Gierke: after page 67, so pages 68 to 185), and only
+those no footnote took: Maitland's introduction, before Gierke's own
+table of contents, refers to its own notes, and its glued numbers took
+endnotes 1 to 7 from Gierke's "Law1" (page 88), "communities2." (93)
+and the rest (decided in the review of 16 November 2026). Gierke's markers end with "." ("1.") and its
 references do not ("Law1"), so none reads as its marker; linked as
 section 11 says, 205 of them are, 186 by an exact value. Maitland's
 introduction (pages 0 to 85) has notes of its own, printed on pages 62
@@ -1807,6 +1837,10 @@ and 35 of Mariéjol's 40 (with 3 and 15 more blocks the reference text
 has as neither notes nor quotes, tables and garble), and no real quote
 (Domesday's "(i) A Somersetshire manor…" are bracketed, against its
 digits). False note-quotes remain: 2 in Domesday, 5 in Mariéjol. A
+book whose form is digits and whose paragraphs start with a number
+("1. Of the three…") would have such a paragraph cut at a page break,
+since it never runs on (how often the six books do so was not
+measured). A
 rule here changes a block's kind and no word, so it needs no record.
 
 1. **Smaller type.** A block with at least 2 wide lines, whose median
@@ -2095,8 +2129,9 @@ What markdown must do, and how it is checked:
 - a referenced footnote as a Pandoc footnote at its reference, with its
   margin notes inside it;
 - the endnotes, referenced or not, where `notes` puts them (section 6,
-  "Order"), as one list in the book's order, each a div with its id and
-  its marker first; each reference to an endnote as a link to it, marked
+  "Order"), as one list in the book's order, each a div with its id: a
+  margin note printed beside its first block first (section 13, rule
+  5), then its marker and text; each reference to an endnote as a link to it, marked
   as a note reference (`epub:type="noteref"`), which Pandoc 3.14 keeps
   and points into the right chapter file (architecture §9);
 - the fidelity check at the markdown boundary (architecture §13) counts
