@@ -1718,7 +1718,10 @@ sections and Domesday's "§" sections and "NOTE." level 2.
 
 **Contents pages.** On the pages of the config's `contents_pages`, no
 line is a heading line; their lines stay paragraphs (owner, 15 November
-2026). A printed table of contents repeats the chapter headings, and
+2026): no chapter summary, verse (section 15 and 16, rule 4) or quote
+(section 16, rules 1 to 3) is made of them either, a block counting as
+on such a page when its first line is. Without that, Domesday's
+contents page 14, set in small type, gives 5 quotes. A printed table of contents repeats the chapter headings, and
 without the key the rule makes headings of them: Domesday's "ESSAY I. /
 DOMESDAY BOOK." on pages 14, 17 and 19, Stubbs' "CHAPTER IX." and
 "EDWARD I." on page 16. No rule plain enough was found to find such
