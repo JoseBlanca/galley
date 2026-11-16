@@ -8,10 +8,11 @@ invented. The specs of the stages, `docs/specs/<stage>.md`, build on it,
 and the names of the things of the domain are those of `docs/glossary.md`.
 Dated 14 November 2026; revised on 16 November 2026 for the second plan
 of structure (`docs/specs/structure.md` §11 to §19), which adds kinds to
-section 8 for chapter summaries, verse and endnotes, plates as figures,
-the config key `contents_pages` and the module `body_measures.py`.
+section 8 for chapter summaries, verse and endnotes, a heading's chapter
+label, plates as figures, the config key `contents_pages` and the module
+`body_measures.py`.
 
-Decisions marked "owner, 14 November 2026" or "owner, 15 November 2026"
+Decisions marked "owner", with a date from 14 to 16 November 2026,
 were taken by the owner in chat. The others were taken while writing,
 from what the committed excerpts show (section 2), and can be questioned.
 
@@ -289,13 +290,18 @@ its own stage made.
 page_numbers)`:
 
 - `Block`: `id`, `kind: BlockKind`, `level: int | None` (headings, 1 or
-  2), `spans: tuple[Span, ...]`, `figure: str | None` (figure blocks),
-  `origin: tuple[Origin, ...]`.
+  2), `label: str | None` (headings: the chapter label as printed,
+  "CHAPTER III.", "V"; `None` for a heading without one and for every
+  other kind), `spans: tuple[Span, ...]`, `figure: str | None` (figure
+  blocks), `origin: tuple[Origin, ...]`.
 - `BlockKind`, each value what the text is:
   - `heading`: a chapter's or a section's heading. A chapter label and
     the title under it ("CHAPTER III." / "THE EARLY YEARS OF HENRY II.")
     are one heading, the label being the chapter's number and the title
-    its title (owner, 15 November 2026);
+    its title (owner, 15 November 2026); the label is in `label` and the
+    spans hold the title (owner, 16 November 2026), so that markdown can
+    set the number apart. An edit matches the spans' text, so it cannot
+    correct a label;
   - `paragraph`: a paragraph of running text;
   - `quote`: a passage quoted from another text, in prose;
   - `verse`: lines of a poem, quoted or not; its text keeps the printed
@@ -568,13 +574,16 @@ lists the words, with the pages they came from where the origins say.
   by structure's tests.
 - The boundaries: layout, words.json against lines.json; structure,
   lines.json against blocks.json (the text of every body and note block,
-  with a note's `marker` counted as a word of it); markdown, blocks.json
+  with a note's `marker` and a heading's `label` counted as words of
+  it); markdown, blocks.json
   with the edits applied against `book.md` as Pandoc reads it (`pandoc -f
   markdown-smart -t json`): a note reference is matched to Pandoc's note
   element and its marker is not compared as a word, because Pandoc writes
   its own numbers (section 17); likewise the `marker` of a
   referenced footnote. An endnote stays where it was printed, so its
   `marker` is written there and counted, referenced or not (section 9).
+  A heading's `label` is written in `book.md`, in the form the markdown
+  spec gives, and counted as words of its block.
 - extract is where the words enter galley, so it has no boundary to check:
   its excerpt tests compare its words with literals.
 - The check stops at `book.md`: turning it into an EPUB is Pandoc's work,
@@ -666,6 +675,18 @@ On 15 November 2026, for the second plan of structure:
   layer, not from a render (`docs/specs/layout.md` §9).
 - **The body measures** are one module of the package root,
   `body_measures.py` (section 12).
+
+On 16 November 2026, for the same plan:
+
+- **Stubbs' cut-in rule is kept as written**, below the bar set for it:
+  precision 0.913 against 0.95, recall 0.52 on Stubbs' whole book
+  (`docs/specs/layout.md` §9).
+- **A heading's chapter label is a field of its own**, `Block.label`,
+  and the spans hold the title; the fidelity check counts the label as
+  words of its block (sections 8 and 13).
+- **Haskins' bibliographical notes are paragraphs**: the blocks after a
+  level-2 heading "BIBLIOGRAPHICAL NOTE", up to the next heading,
+  whatever their type (`docs/specs/structure.md` §16).
 
 ## 18. Not in this document
 
