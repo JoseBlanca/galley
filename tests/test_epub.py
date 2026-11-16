@@ -1,6 +1,7 @@
 """Tests of the epub stage: Pandoc's arguments and run (spec section 8)."""
 
 import hashlib
+import re
 import shutil
 import subprocess
 import zipfile
@@ -20,6 +21,8 @@ from galley.model import (
     BlocksFile,
     Box,
     Emphasis,
+    Note,
+    NoteKind,
     Origin,
     PageInfo,
     PageKind,
@@ -192,23 +195,46 @@ _PDF_BYTES = b"%PDF-1.4 a stand-in: markdown reads only its hash"
 def _block(
     block_id: str,
     kind: BlockKind,
-    text: str,
-    *,
+    *texts: str | tuple[str, str],
     level: int | None = None,
     label: str | None = None,
 ) -> Block:
+    """A block on the page of its id, of a span for each text, a pair being
+    a reference's text and the id of its note."""
     page_index = int(block_id[3:7])
     return Block(
         id=block_id,
         kind=kind,
         level=level,
         label=label,
-        spans=(Span(text, Emphasis.NONE, None),),
+        spans=tuple(
+            Span(text[0], Emphasis.NONE, text[1])
+            if isinstance(text, tuple)
+            else Span(text, Emphasis.NONE, None)
+            for text in texts
+        ),
         figure=None,
         origin=(Origin(page_index, Box(10.0, 20.0, 300.0, 400.0)),),
     )
 
 
+def _note(
+    note_id: str, kind: NoteKind, marker: str, *blocks: Block, referenced: bool
+) -> Note:
+    page_index = int(note_id[3:7])
+    return Note(
+        id=note_id,
+        kind=kind,
+        marker=marker,
+        blocks=blocks,
+        origin=(Origin(page_index, Box(10.0, 500.0, 300.0, 520.0)),),
+        referenced=referenced,
+    )
+
+
+# Chapter III on page 0, with a footnote that has a margin note, and a
+# reference to an endnote; the endnotes on page 1, the second unreferenced;
+# the index on page 2.
 EVERY_KIND = BlocksFile(
     source_pdf_sha256=hashlib.sha256(_PDF_BYTES).hexdigest(),
     blocks=(
@@ -223,18 +249,51 @@ EVERY_KIND = BlocksFile(
             "b-p0000-002", BlockKind.CHAPTER_SUMMARY, "Henry's youth. — His accession."
         ),
         _block("b-p0000-003", BlockKind.MARGIN_NOTE, "Of kings."),
-        _block("b-p0000-004", BlockKind.PARAGRAPH, "1. Of the three estates."),
+        _block(
+            "b-p0000-004",
+            BlockKind.PARAGRAPH,
+            "1. Of the three estates,",
+            ("*", "n-p0000-001"),
+            " and the Law",
+            ("1", "n-p0001-001"),
+            " of the realm.",
+        ),
         _block("b-p0000-005", BlockKind.QUOTE, '"Rex in regno suo."'),
         _block(
             "b-p0000-006",
             BlockKind.VERSE,
             "Mignonne, allons voir\nsi la rose,\n\nqui ce matin",
         ),
-        _block("b-p0001-001", BlockKind.HEADING, "INDEX", level=2),
-        _block("b-p0001-002", BlockKind.INDEX_ENTRY, "Aachen, 12, 34-36."),
-        _block("b-p0001-003", BlockKind.FIGURE, "PLATE I. The battle."),
+        _block("b-p0001-001", BlockKind.HEADING, "NOTES.", level=1),
+        _block("b-p0002-001", BlockKind.HEADING, "INDEX", level=1),
+        _block("b-p0002-002", BlockKind.INDEX_ENTRY, "Aachen, 12, 34-36."),
+        _block("b-p0002-003", BlockKind.FIGURE, "PLATE I. The battle."),
     ),
-    notes=(),
+    notes=(
+        _note(
+            "n-p0000-001",
+            NoteKind.FOOTNOTE,
+            "*",
+            _block("b-p0000-007", BlockKind.MARGIN_NOTE, "The estates."),
+            _block("b-p0000-008", BlockKind.PARAGRAPH, "See the rolls."),
+            referenced=True,
+        ),
+        _note(
+            "n-p0001-001",
+            NoteKind.ENDNOTE,
+            "1.",
+            _block("b-p0001-002", BlockKind.MARGIN_NOTE, "Roman law."),
+            _block("b-p0001-003", BlockKind.PARAGRAPH, "Digest, 1."),
+            referenced=True,
+        ),
+        _note(
+            "n-p0001-002",
+            NoteKind.ENDNOTE,
+            "2.",
+            _block("b-p0001-004", BlockKind.PARAGRAPH, "Code, 2."),
+            referenced=False,
+        ),
+    ),
     removals=(),
     word_changes=(),
     page_numbers=(),
@@ -242,7 +301,7 @@ EVERY_KIND = BlocksFile(
 
 
 def _book_of(root: Path, blocks: BlocksFile) -> tuple[BookFolder, BookConfig]:
-    """A book folder with book.pdf, pages.json of two pages made from it,
+    """A book folder with book.pdf, pages.json of three pages made from it,
     and `blocks`, and CONFIG with book.pdf as its PDF."""
     pdf = root / "book.pdf"
     pdf.write_bytes(_PDF_BYTES)
@@ -262,7 +321,7 @@ def _book_of(root: Path, blocks: BlocksFile) -> tuple[BookFolder, BookConfig]:
                     exclude_regions=(),
                     blank_checked_by_ocr=False,
                 )
-                for index in range(2)
+                for index in range(3)
             ),
             ocr_audit=None,
         ),
@@ -285,7 +344,7 @@ def _chapters(epub_path: Path) -> str:
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
 @pytest.mark.epubcheck
-def test_the_epub_of_every_kind_passes_epubcheck_with_the_verse_lines_kept(
+def test_the_epub_of_every_kind_and_of_a_footnote_and_endnotes_passes_epubcheck(
     tmp_path: Path,
 ) -> None:
     folder, config = _book_of(tmp_path, EVERY_KIND)
@@ -294,10 +353,25 @@ def test_the_epub_of_every_kind_passes_epubcheck_with_the_verse_lines_kept(
     epub.run(folder, config)
 
     chapters = _chapters(folder.book_epub)
-    assert '<span class="label">CHAPTER III.</span>' in chapters
-    assert '<div id="b-p0000-006" class="verse">' in chapters
-    assert "Mignonne, allons voir<br />\nsi la rose,</p>" in chapters
+    assert '<h1><span class="label">CHAPTER III.</span> THE EARLY YEARS' in chapters
     assert '<div id="b-p0000-002" class="chapter-summary">' in chapters
+    assert '<div id="b-p0000-006" class="verse">' in chapters
+    assert "<p>Mignonne, allons voir<br />\nsi la rose,</p>" in chapters
+    # The reference to the endnote, in chapter III, points into the file of
+    # the notes, where the endnotes are one list.
+    assert (
+        'the Law<a href="ch002.xhtml#n-p0001-001" epub:type="noteref">1</a>' in chapters
+    )
+    assert '<div class="endnotes">\n<div id="n-p0001-001" class="endnote">' in (
+        chapters
+    )
+    assert "<p>2. Code, 2.</p>" in chapters
+    # The footnote is Pandoc's, its margin note inside it.
+    assert re.search(
+        r'<aside epub:type="footnote"[^>]*>\s*<div id="b-p0000-007" '
+        r'class="margin-note">',
+        chapters,
+    )
     epubcheck = shutil.which("epubcheck")
     assert epubcheck is not None
     # Not captured here, so that pytest shows epubcheck's report on failure;

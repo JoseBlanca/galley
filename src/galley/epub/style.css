@@ -59,7 +59,13 @@ h6 .label {
   font-size: 0.9em;
 }
 
-/* A note printed where it was, its marker first. */
-.note {
+/* A note printed where it was, its marker first: an unreferenced
+   footnote, or an endnote in its list, a little apart from the next. */
+.note,
+.endnote {
   font-size: 0.85em;
+}
+
+.endnote {
+  margin-bottom: 0.6em;
 }

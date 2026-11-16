@@ -19,6 +19,7 @@ from galley.book_folder import BookFolder
 from galley.config import BookConfig, Language
 from galley.errors import (
     EditError,
+    ExternalProgramError,
     FidelityBoundary,
     FidelityError,
     InputFileError,
@@ -282,21 +283,30 @@ FIGURE = replace(
 )
 
 
+def _referring(block_id: str, before: str, reference: str, note_id: str) -> Block:
+    """A paragraph of `before` and a reference span of `reference` to the
+    note `note_id`, on the page of its id."""
+    page_index = int(block_id[3:7])
+    return Block(
+        id=block_id,
+        kind=BlockKind.PARAGRAPH,
+        level=None,
+        label=None,
+        spans=(
+            Span(before, Emphasis.NONE, None),
+            Span(reference, Emphasis.NONE, note_id),
+        ),
+        figure=None,
+        origin=(Origin(page_index, Box(10.0, 20.0, 300.0, 400.0)),),
+    )
+
+
 @pytest.mark.parametrize(
     ("blocks", "named"),
     [
         (
-            _blocks_file(
-                (replace(FIGURE, figure="images/p0016.png"),),
-            ),
-            "b-p0016-001",
-        ),
-        (_blocks_file((_paragraph("b-p0000-001", "Text."),), (NOTE,)), "n-p0000-001"),
-        (
-            _blocks_file(
-                (_paragraph("b-p0000-003", "Greece,", "1", note_ref="n-p0000-001"),),
-            ),
-            "b-p0000-003",
+            _blocks_file((replace(FIGURE, figure="images/p0016.png"),)),
+            "block b-p0016-001 is a figure with the image images/p0016.png",
         ),
         (
             _blocks_file(
@@ -309,54 +319,80 @@ FIGURE = replace(
                     ),
                 ),
             ),
-            "b-p0000-005",
+            "block b-p0000-005 of note n-p0000-001 is a heading",
         ),
         (
             _blocks_file(
-                (),
+                (_referring("b-p0000-003", "Greece,", "1", "n-p0000-001"),),
                 (
                     replace(
                         NOTE,
-                        referenced=False,
-                        blocks=(_block_of_kind("b-p0000-006", BlockKind.MARGIN_NOTE),),
-                    ),
-                ),
-            ),
-            "b-p0000-006",
-        ),
-        (
-            _blocks_file(
-                (),
-                (
-                    replace(
-                        NOTE,
-                        referenced=False,
                         blocks=(
-                            _paragraph(
-                                "b-p0000-007", "Ibid.", "2", note_ref="n-p0000-009"
-                            ),
+                            _referring("b-p0000-002", "Ibid.", "2", "n-p0000-009"),
                         ),
                     ),
+                    replace(NOTE, id="n-p0000-009", blocks=(FIGURE,)),
                 ),
             ),
-            "b-p0000-007",
+            (
+                "block b-p0000-002 of footnote n-p0000-001 refers to footnote "
+                "n-p0000-009, and Pandoc cannot put a footnote in a footnote"
+            ),
         ),
     ],
-    ids=[
-        "figure with an image",
-        "referenced note",
-        "note reference",
-        "heading in a note",
-        "margin note in a note",
-        "note reference in a note",
-    ],
+    ids=["figure with an image", "heading in a note", "footnote in a footnote"],
 )
 def test_render_markdown_refuses_what_it_does_not_write(
     blocks: BlocksFile, named: str
 ) -> None:
     with pytest.raises(
         InputFileError,
-        match=f"blocks.json holds what markdown does not write: .*{named}",
+        match=f"blocks.json holds what markdown does not write: .*{re.escape(named)}",
+    ):
+        render_markdown(blocks, CONFIG)
+
+
+@pytest.mark.parametrize(
+    ("blocks", "problem"),
+    [
+        (
+            _blocks_file((_referring("b-p0000-003", "Greece,", "1", "n-p0000-001"),)),
+            "block b-p0000-003 refers to n-p0000-001, which is no note",
+        ),
+        (
+            _blocks_file((_paragraph("b-p0000-001", "Text."),), (NOTE,)),
+            "note n-p0000-001 is referenced and no block refers to it",
+        ),
+        (
+            _blocks_file(
+                (_referring("b-p0000-003", "Law", "1", "n-p0000-001"),),
+                (replace(NOTE, kind=NoteKind.ENDNOTE, referenced=False),),
+            ),
+            "note n-p0000-001 is not referenced and a block refers to it",
+        ),
+        (
+            _blocks_file(
+                (
+                    _referring("b-p0000-003", "Greece,", "1", "n-p0000-001"),
+                    _referring("b-p0000-004", "Rome,", "1", "n-p0000-001"),
+                ),
+                (NOTE,),
+            ),
+            "footnote n-p0000-001 is referenced 2 times",
+        ),
+    ],
+    ids=[
+        "reference to no note",
+        "referenced footnote without a reference",
+        "unreferenced endnote with a reference",
+        "footnote referenced twice",
+    ],
+)
+def test_render_markdown_refuses_a_note_reference_that_disagrees_with_the_notes(
+    blocks: BlocksFile, problem: str
+) -> None:
+    with pytest.raises(
+        InputFileError, match=f"blocks.json is malformed: .*{re.escape(problem)}"
     ):
         render_markdown(blocks, CONFIG)
 
@@ -896,6 +932,348 @@ def test_render_markdown_refuses_a_label_with_a_character_xml_does_not_allow() -
         InputFileError, match=r"blocks.json.*label of block b-p0002-001.*U\+FFFE"
     ):
         render_markdown(_blocks_file((heading,)), CONFIG)
+
+
+# Structure spec section 19: referenced footnotes as Pandoc footnotes,
+# endnotes as one list where they were printed.
+
+
+def _note(
+    note_id: str,
+    kind: NoteKind,
+    marker: str,
+    *blocks: Block,
+    referenced: bool,
+) -> Note:
+    page_index = int(note_id[3:7])
+    return Note(
+        id=note_id,
+        kind=kind,
+        marker=marker,
+        blocks=blocks,
+        origin=(Origin(page_index, Box(10.0, 500.0, 300.0, 520.0)),),
+        referenced=referenced,
+    )
+
+
+# Page 5 refers to a footnote, with a margin note beside it, and to an
+# endnote; page 9 holds the endnotes after their heading, the first with a
+# margin note, the second unreferenced; page 10 a paragraph after them.
+NOTES = _blocks_file(
+    (
+        _referring("b-p0005-001", "Of Greece,", "1", "n-p0005-001"),
+        _referring("b-p0005-002", "The Law", "3", "n-p0009-001"),
+        replace(_block("b-p0009-001", BlockKind.HEADING, "NOTES.", 9), level=1),
+        _block("b-p0010-001", BlockKind.PARAGRAPH, "After.", 10),
+    ),
+    (
+        _note(
+            "n-p0005-001",
+            NoteKind.FOOTNOTE,
+            "1",
+            _block("b-p0005-003", BlockKind.MARGIN_NOTE, "Greek law.", 5),
+            _block("b-p0005-004", BlockKind.PARAGRAPH, "See Plato.", 5),
+            referenced=True,
+        ),
+        _note(
+            "n-p0009-001",
+            NoteKind.ENDNOTE,
+            "3.",
+            _block("b-p0009-002", BlockKind.MARGIN_NOTE, "Roman law.", 9),
+            _block("b-p0009-003", BlockKind.PARAGRAPH, "Digest, 1.", 9),
+            _block("b-p0009-004", BlockKind.QUOTE, "Quod principi placuit.", 9),
+            referenced=True,
+        ),
+        _note(
+            "n-p0009-002",
+            NoteKind.ENDNOTE,
+            "4.",
+            _block("b-p0009-005", BlockKind.PARAGRAPH, "Code, 2.", 9),
+            referenced=False,
+        ),
+    ),
+)
+
+NOTES_MARKDOWN = (
+    HEADER
+    + """
+::: {#b-p0005-001}
+Of Greece\\,[^n-p0005-001]
+:::
+
+[^n-p0005-001]:
+    ::: {#b-p0005-003 .margin-note}
+    Greek law\\.
+    :::
+
+    ::: {#b-p0005-004}
+    See Plato\\.
+    :::
+
+::: {#b-p0005-002}
+The Law[3](#n-p0009-001){epub:type="noteref"}
+:::
+
+# NOTES\\. {#b-p0009-001}
+
+::::: {.endnotes}
+:::: {#n-p0009-001 .endnote}
+::: {#b-p0009-002 .margin-note}
+Roman law\\.
+:::
+
+::: {#b-p0009-003}
+3\\. Digest\\, 1\\.
+:::
+
+::: {#b-p0009-004 .quote}
+Quod principi placuit\\.
+:::
+::::
+
+:::: {#n-p0009-002 .endnote}
+::: {#b-p0009-005}
+4\\. Code\\, 2\\.
+:::
+::::
+:::::
+
+::: {#b-p0010-001}
+After\\.
+:::
+"""
+)
+
+
+def test_footnote_at_its_reference_and_endnotes_as_one_list_with_a_noteref_link() -> (
+    None
+):
+    assert render_markdown(NOTES, CONFIG) == NOTES_MARKDOWN
+
+
+def test_a_footnote_referred_to_from_an_endnote_is_defined_after_the_endnote_list() -> (
+    None
+):
+    blocks = _blocks_file(
+        (_block("b-p0009-001", BlockKind.PARAGRAPH, "NOTES.", 9),),
+        (
+            _note(
+                "n-p0009-001",
+                NoteKind.ENDNOTE,
+                "",
+                _referring("b-p0009-002", "Ibid.", "*", "n-p0009-002"),
+                referenced=False,
+            ),
+            _note(
+                "n-p0009-002",
+                NoteKind.FOOTNOTE,
+                "*",
+                _block("b-p0009-003", BlockKind.PARAGRAPH, "A footnote.", 9),
+                referenced=True,
+            ),
+        ),
+    )
+
+    assert render_markdown(blocks, CONFIG) == (
+        HEADER
+        + """
+::: {#b-p0009-001}
+NOTES\\.
+:::
+
+::::: {.endnotes}
+:::: {#n-p0009-001 .endnote}
+::: {#b-p0009-002}
+Ibid\\.[^n-p0009-002]
+:::
+::::
+:::::
+
+[^n-p0009-002]:
+    ::: {#b-p0009-003}
+    A footnote\\.
+    :::
+"""
+    )
+
+
+def test_a_footnote_reference_in_verse_stays_on_its_line_and_its_verse_lines_are_indented() -> (
+    None
+):
+    verse = replace(
+        _block("b-p0005-001", BlockKind.VERSE, "", 5),
+        spans=(
+            Span("Arma virumque\ncano,", Emphasis.NONE, None),
+            Span("1", Emphasis.NONE, "n-p0005-001"),
+            Span("\nTroiae", Emphasis.NONE, None),
+        ),
+    )
+    note = _note(
+        "n-p0005-001",
+        NoteKind.FOOTNOTE,
+        "1",
+        _block("b-p0005-002", BlockKind.VERSE, "Virgil,\nAeneid.", 5),
+        referenced=True,
+    )
+
+    assert render_markdown(_blocks_file((verse,), (note,)), CONFIG) == (
+        HEADER
+        + """
+::: {#b-p0005-001 .verse}
+Arma virumque\\
+cano\\,[^n-p0005-001]\\
+Troiae
+:::
+
+[^n-p0005-001]:
+    ::: {#b-p0005-002 .verse}
+    Virgil\\,\\
+    Aeneid\\.
+    :::
+"""
+    )
+
+
+def test_an_unreferenced_footnote_writes_its_marker_after_its_margin_note() -> None:
+    note = _note(
+        "n-p0003-001",
+        NoteKind.FOOTNOTE,
+        "*",
+        _block("b-p0003-002", BlockKind.MARGIN_NOTE, "Of kings.", 3),
+        _block("b-p0003-003", BlockKind.PARAGRAPH, "A note.", 3),
+        referenced=False,
+    )
+
+    assert render_markdown(_blocks_file((), (note,)), CONFIG) == (
+        HEADER
+        + """
+:::: {#n-p0003-001 .note}
+::: {#b-p0003-002 .margin-note}
+Of kings\\.
+:::
+
+::: {#b-p0003-003}
+\\* A note\\.
+:::
+::::
+"""
+    )
+
+
+def test_an_endnote_of_margin_notes_only_writes_its_marker_in_the_first() -> None:
+    note = _note(
+        "n-p0009-001",
+        NoteKind.ENDNOTE,
+        "7.",
+        _block("b-p0009-002", BlockKind.MARGIN_NOTE, "Of kings.", 9),
+        referenced=False,
+    )
+
+    assert "::: {#b-p0009-002 .margin-note}\n7\\. Of kings\\.\n:::" in (
+        render_markdown(_blocks_file((), (note,)), CONFIG)
+    )
+
+
+def test_endnotes_with_a_body_block_between_them_are_two_lists() -> None:
+    blocks = _blocks_file(
+        (
+            _block("b-p0009-001", BlockKind.PARAGRAPH, "Notes of chapter one.", 9),
+            _block("b-p0010-001", BlockKind.PARAGRAPH, "Notes of chapter two.", 10),
+        ),
+        (
+            _note(
+                "n-p0009-001",
+                NoteKind.ENDNOTE,
+                "1.",
+                _block("b-p0009-002", BlockKind.PARAGRAPH, "One.", 9),
+                referenced=False,
+            ),
+            _note(
+                "n-p0010-001",
+                NoteKind.ENDNOTE,
+                "1.",
+                _block("b-p0010-002", BlockKind.PARAGRAPH, "Two.", 10),
+                referenced=False,
+            ),
+        ),
+    )
+
+    written = render_markdown(blocks, CONFIG)
+
+    assert written.count("::::: {.endnotes}") == 2
+    assert _ids_in_order(written) == (
+        "b-p0009-001",
+        "n-p0009-001",
+        "b-p0009-002",
+        "b-p0010-001",
+        "n-p0010-001",
+        "b-p0010-002",
+    )
+
+
+@pytest.mark.pandoc
+def test_pandoc_reads_one_footnote_one_noteref_link_and_every_word_in_its_block() -> (
+    None
+):
+    read = read_markdown(NOTES_MARKDOWN)
+
+    assert (read.note_count, read.note_link_count) == (1, 1)
+    assert _words_by_block(NOTES_MARKDOWN) == {
+        "b-p0005-001": ["Of", "Greece,"],
+        "b-p0005-003": ["Greek", "law."],
+        "b-p0005-004": ["See", "Plato."],
+        "b-p0005-002": ["The", "Law", "3"],
+        "b-p0009-001": ["NOTES."],
+        "b-p0009-002": ["Roman", "law."],
+        "b-p0009-003": ["3.", "Digest,", "1."],
+        "b-p0009-004": ["Quod", "principi", "placuit."],
+        "b-p0009-005": ["4.", "Code,", "2."],
+        "b-p0010-001": ["After."],
+    }
+
+
+@pytest.mark.pandoc
+def test_fidelity_check_passes_on_a_footnote_and_endnotes() -> None:
+    check_stage(FidelityBoundary.MARKDOWN, NOTES, read_markdown(NOTES_MARKDOWN))
+
+
+@pytest.mark.pandoc
+@pytest.mark.parametrize(
+    ("written", "damaged", "lost"),
+    [
+        ("    See Plato\\.", "    See", "Plato."),
+        ("Law[3](#n-p0009-001)", "Law[](#n-p0009-001)", "3"),
+        ("3\\. Digest", "Digest", "3."),
+        ("    Greek law\\.", "    Greek", "law."),
+    ],
+    ids=[
+        "footnote word",
+        "endnote reference",
+        "endnote marker",
+        "margin note in a footnote",
+    ],
+)
+def test_fidelity_check_finds_a_word_lost_from_a_footnote_or_endnote(
+    written: str, damaged: str, lost: str
+) -> None:
+    assert written in NOTES_MARKDOWN
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(
+            FidelityBoundary.MARKDOWN,
+            NOTES,
+            read_markdown(NOTES_MARKDOWN.replace(written, damaged, 1)),
+        )
+
+    assert lost in raised.value.missing
+
+
+@pytest.mark.pandoc
+def test_fidelity_check_finds_an_endnote_reference_written_as_a_plain_link() -> None:
+    markdown_text = NOTES_MARKDOWN.replace('{epub:type="noteref"}', "", 1)
+
+    with pytest.raises(ExternalProgramError, match="Link element in block b-p0005-002"):
+        read_markdown(markdown_text)
 
 
 # Spec section 8: XML 1.0 does not allow these, and Pandoc copies them into
