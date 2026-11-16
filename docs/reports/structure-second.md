@@ -306,3 +306,42 @@ correct stage; a footnote joining over a plate page, for task 6.3.
 
 The fixes run in two worktrees, structure (`fix-s`) and the other stages
 (`fix-l`).
+
+### The fixes (merged: fix-l at 97b8f32, fix-s at 934befa)
+
+- **Stubbs' step 2b** (e87ec43): a word less than 5 pt from a body word
+  of its row stays. Whole Stubbs: 1,318 words moved (1,324 before);
+  "as his" (page 33) and "255, 266, 274" (page 317) stay in their
+  sentences; the cost is one note word, "heBarons" on page 226 (the
+  OCR's "the Barons.", checked on the image). Precision with today's
+  evaluation tool: 0.940 with the guard, 0.936 without; these do not
+  compare with the spec's 0.913, measured on another count of note words.
+- **Gierke's endnotes** (b197fb9, 77d7ac8): 299 endnotes on pages 186 to
+  282, 213 linked; the library card stays out (page 288 excluded, and no
+  paragraph runs into or out of the section). Endnotes 2 to 6 now link
+  to Gierke's own references. **Endnote 1 is still wrong**: "(1." on
+  page 74, in the List of Authorities (pages 68–85, after the last
+  contents page), takes it, and "Law1" on page 88 stays unlinked. One
+  wrong pop-up and one missing; left as a known case.
+- **Mariéjol's letter references** (S2): scored against the reference
+  text, dropping them before matching gives 543 right references,
+  matching first gives 521. The code's order is kept and the spec says
+  so.
+- **Tests**: a literal test for each of the 16 listed rules (each broken
+  in turn, a test failing every time); four boundary tests in layout,
+  plates and markdown; a whole-book test pinning Gierke's section.
+- **Other**: one `model.note_places` used by structure and markdown;
+  `_assemble.py` split in three; "A", "I", "a" before a known word are
+  never markers; a hyphen joins across a line holding only a reference
+  sign (Haskins page 71); a missing figure image is an input error
+  naming its block; `body_measures.measured_page_positions` used by
+  layout.
+- **Not fixed**: Gierke's publisher lines (page 7) and printer's line
+  (page 282) are small type below larger type, so they come out as
+  footnotes; no spec rule covers them. The rule that would fix them (an
+  unmarked band block in a book with no marker form is a paragraph)
+  would turn 5 of Gierke's 7 real footnotes into paragraphs, so it is
+  not taken.
+
+After both merges, at the plan's branch: pytest 1418 passed in 27.6 s;
+with 8 threads in 48.6 s; ruff, ty pass.
