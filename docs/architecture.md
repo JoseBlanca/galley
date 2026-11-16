@@ -294,8 +294,8 @@ page_numbers)`:
   sub-entry printed inside it, more if a book prints deeper ones, so that
   the EPUB can indent it as printed (owner, 16 November 2026); `None` for
   every other kind: reading a blocks.json where an index entry has no
-  depth from 1, or a block of another kind but a heading has a level, is
-  an error that names the file and the block. The format stays at
+  depth from 1, or a block that is neither a heading nor an index entry
+  has a level, is an error that names the file and the block. The format stays at
   version 2: a file written before the depth has index entries without
   one, and the error says to run structure again), `label: str | None` (headings: the chapter label as printed,
   "CHAPTER III.", "V"; `None` for a heading without one and for every

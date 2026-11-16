@@ -2076,7 +2076,13 @@ inline sub-entry in an item of its own.
    one column), Domesday's 553 (the printer's imprint) and Gierke's 86
    (the text) end them.
 2. **The regions of an index page.** The head line is decided as on any
-   page (section 3). The two index columns are index columns whether
+   page (section 3). A first region that lies wholly above every other
+   and whose lines are only a page-number form and the word "index", in
+   any case and either order, one line each, is the page's running head:
+   layout makes it a region of two lines on Domesday's pages 547 ("Index."
+   over "522") and 552 ("527" over "Index."), so section 3 finds no head
+   line there. Its "index" line is removed as `running_head` and its
+   number as `page_number`, with a head page number. The two index columns are index columns whether
    section 2 would make them body or band regions. A line of exactly two
    words of three capital letters each is the **guide words** (the first
    letters of the page's first and last entries, "BUR CON"), removed with
@@ -2091,10 +2097,21 @@ inline sub-entry in an item of its own.
    page but the head line, before any region is cut. So 10 of
    Stubbs' 10 index pages have them, and no other page of the six books.
    A margin region goes into the column on its side of the gutter (below),
-   by its middle, as a whole, before the first line of the column whose
-   top is below its own (at the column's end when none is), so that a
-   page number that overhangs the column
-   ("509-515", Domesday page 546) follows the line it ends. A region that
+   by its middle, each of its lines on its own: a line that shares a row
+   with a line of the column (its vertical centre within that line's top
+   and bottom, layout §1, "Row") goes just before that line when it lies
+   left of it and just after when it lies right of it; any other goes
+   before the first line of the column whose top is below its own (at the
+   column's end when none is). So a page number that overhangs the column
+   ("509-515", "519", Domesday page 546) follows the line it ends, and
+   each of Stubbs' letter initials read as a line "W" of its own (page
+   321) goes before the line it starts. Placed as a whole by its top, a
+   margin region of several lines moved Domesday's "519" from "Beer,
+   Consumption of, 439," to "Bede", and gave Stubbs' 321 three entries
+   for "Wallingford" and "Walter". A margin region that lies wholly above
+   the top of every column region, beside the head line, is not read
+   into a column and keeps its kind: Gierke's folio "lxxix" on page 84
+   would otherwise end the entry "Isernia No. 108". A region that
    crosses the **gutter** (the middle between the left column's right
    edge and the right column's left edge) is cut there, each word going
    by its middle, when at least two thirds of its lines have no word over
@@ -2124,11 +2141,15 @@ inline sub-entry in an item of its own.
    recall, the commonest side alone against the entry side: Haskins
    0.903 / 0.698 against 0.992 / 0.723, Stubbs 0.475 / 0.314 against
    0.869 / 0.396, Domesday 0.990 / 0.986 both. A column of fewer than 5
-   lines takes its smallest left side.
+   lines takes its smallest left side; a fit through lines whose tops are
+   all one is the mean of their left sides, with no slope.
 4. **Blocks.** Each entry is one `index_entry` block, or several by rule
    5, its lines joined as a paragraph's, hyphens joined by section 5 ("72-"
    "81;" gives "72-81;", "Vik-" "ing," gives "Viking,"). Its page numbers
-   stay as printed. Its origin has one box per page. The title is a
+   stay as printed, and it is not searched for note references (section
+   11), as a caption is not (section 18): Stubbs' page 312 has a "^" in an
+   entry, which matched a garbled region of the page made a note, in a
+   book with no footnotes. Its origin has one box per page. The title is a
    heading (section 14); for its centring (section 14, rule 1), the lines
    of the index columns count as the page's body and band lines, which
    section 2 would have made them. The entries come among the body's
@@ -2191,8 +2212,11 @@ words the OCR misread ("Hansa" for "Mansa"), not wrong boundaries.
   about 20 entries.
 - **Spaced letters** in Stubbs' OCR ("t i o n w i t h B e c k e t"): the
   entries are found, their words are not; the correct stage's work.
-- **A head line that is a number alone** (Domesday 547: "522") is no
-  running head (section 3) and becomes an entry "522".
+- **Rows across the gutter that rule 2 does not cut**: on Stubbs' page
+  312, two regions of spaced letters ("A CCURSI, Francesco, 221
+  BaldwintheLeper, 104" and "B A D L E S M E R E , ...") have a word over
+  the gutter on more than a third of their lines, so they keep their
+  kind, a band, and come out as notes.
 
 ## 18. Plates
 
