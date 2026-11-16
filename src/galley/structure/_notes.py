@@ -26,6 +26,7 @@ from galley.structure._markers import (
     note_marker,
     read_number,
 )
+from galley.wordlist import is_known_word
 
 # Spec section 11, rule 2: a note's first line is indented from the band's
 # left edge, the smallest left side among the page's note lines within 60
@@ -36,6 +37,9 @@ _COLUMN_PT = 60.0
 # more right ones than at 15 pt), after a word ending with one of these
 # and before a word starting with a capital or a digit.
 _LINE_MARKER_MAX_CHARACTERS = 2
+# Spec section 11, "The marker of a note": one-letter words, which are no
+# marker before a known word ("A Treatise", "I have").
+_ONE_LETTER_WORDS = frozenset({"A", "I", "a"})
 _LINE_MARKER_GAP_PT = 10.0
 _ENDS_BEFORE_A_NOTE = (".", "'", "’", ":", ";", ")")
 
@@ -76,12 +80,16 @@ def _indent(line: PlacedLine, lines: Sequence[PlacedLine]) -> float:
     return line.line.box.x0 - _column_left(line, lines)
 
 
-def _indent_marker(line: PlacedLine) -> NoteMarker | None:
+def _indent_marker(
+    line: PlacedLine, lower_case_words: frozenset[str]
+) -> NoteMarker | None:
     """The marker of a note started by its indent whose first word has no
     marker's form: the word, when it is one character and the next word
-    starts with a capital ("«", "z"); the signs, when the word is 1 or 2
-    signs glued to a word that starts with a capital ("'There"); None
-    otherwise (spec section 11, "The marker of a note")."""
+    starts with a capital ("«", "z"), unless it is the word "A", "I" or
+    "a" and the next word is known in `lower_case_words` ("A Treatise");
+    the signs, when the word is 1 or 2 signs glued to a word that starts
+    with a capital ("'There"); None otherwise (spec section 11, "The
+    marker of a note")."""
     words = line.line.words
     if not words:
         return None
@@ -89,6 +97,10 @@ def _indent_marker(line: PlacedLine) -> NoteMarker | None:
     if glued is not None:
         return glued
     if len(words) <= 1 or len(words[0].text) != 1 or not words[1].text[:1].isupper():
+        return None
+    if words[0].text in _ONE_LETTER_WORDS and is_known_word(
+        words[1].text, lower_case_words
+    ):
         return None
     return NoteMarker(words[0].text, "", read_number(words[0].text))
 
@@ -132,9 +144,13 @@ def _cut_line(line: PlacedLine) -> tuple[tuple[PlacedLine, NoteMarker | None], .
     )
 
 
-def page_notes(regions: Sequence[Sequence[PlacedLine]]) -> tuple[PageNote, ...]:
+def page_notes(
+    regions: Sequence[Sequence[PlacedLine]], lower_case_words: frozenset[str]
+) -> tuple[PageNote, ...]:
     """The notes of one page's note lines, `regions` being the lines of each
-    band region in reading order (spec section 11, "Where a note starts").
+    band region in reading order (spec section 11, "Where a note starts");
+    `lower_case_words` is the word list in lower case, which tells the
+    word "A" from a marker.
 
     A line starts a note when section 6's indent rule starts a block there;
     when its first word has a note marker's form and it is indented 5 to 40
@@ -173,7 +189,7 @@ def page_notes(regions: Sequence[Sequence[PlacedLine]]) -> tuple[PageNote, ...]:
             first_part, _ = parts[0]
             if starts:
                 if marker is None and (by_indent or indented):
-                    marker = _indent_marker(line)
+                    marker = _indent_marker(line, lower_case_words)
                 notes.append(
                     PageNote(
                         (first_part,),

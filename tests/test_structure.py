@@ -1740,6 +1740,29 @@ def test_footnote_one_character_marker_is_taken_when_the_note_is_indented() -> N
     )
 
 
+@pytest.mark.parametrize(
+    ("word_list", "expected"),
+    [
+        (frozenset({"treatise"}), ("", "A Treatise on law, and on")),
+        (_NO_WORDS, ("A", "Treatise on law, and on")),
+    ],
+)
+def test_footnote_a_word_a_or_i_before_a_known_word_is_no_marker(
+    word_list: frozenset[str], expected: tuple[str, str]
+) -> None:
+    # "A" is a word: before a known word it is no one-character marker
+    # (structure spec, section 11, "The marker of a note").
+    page = _page_with_band(
+        0,
+        _note_line("1 The first note.", 300, 62, 160),
+        _note_line("A Treatise on law, and on", 300 + _NOTE_PITCH_PT, 62),
+        _note_line("its second line.", 300 + 2 * _NOTE_PITCH_PT, 50, 160),
+    )
+    blocks = make_blocks(_lines_of(page), word_list, workers=1)
+    marker, text = _markers_and_texts(blocks)[1]
+    assert (marker, text.removesuffix(" its second line.")) == expected
+
+
 def test_footnote_glued_marker_is_split_off_its_word() -> None:
     page = _page_with_band(0, _note_line("13The note glued to its marker.", 300, 62))
     lines = _lines_of(page)

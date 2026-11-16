@@ -277,7 +277,7 @@ def assemble(
     form = book_marker_form(
         first_word(piece.lines[0]) for page in parts for piece in page.band_blocks
     )
-    band_notes = tuple(page_notes(page.band_regions) for page in parts)
+    band_notes = tuple(page_notes(page.band_regions, word_list) for page in parts)
     numbering = book_numbering(band_notes)
     # The paragraphs are found twice: the first time only for the pages of
     # the endnote section, which the notes left in the body (step 2.5) skip
@@ -301,7 +301,7 @@ def assemble(
         for group in groups
     )
     book_footnotes = footnotes(
-        tuple(page_notes(page.band_regions) for page in pages),
+        tuple(page_notes(page.band_regions, word_list) for page in pages),
         tuple(bool(page.body) for page in pages),
         numbering,
     )
