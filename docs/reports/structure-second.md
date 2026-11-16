@@ -154,8 +154,8 @@ the Mariéjol excerpt a false inset.
 
 Three Stubbs reference pages changed, checked by the orchestrator
 against the excerpt text: page 0, "accession." leaves the body line as
-a margin note; page 9, the notes "Banishment of mercenaries." and
-"Destruction of castles." (OCR "B an i s h m e n t", "Cti°n °£ J^tE.")
+a margin note; page 9, the notes "Banishment of mercenaries." and the one
+the OCR reads "Cti°n °£ J^tE." (the first read "B an i s h m e n t")
 leave the body, and "fifteen, was a still greater boon ; for these,"
 is one line again; pages 4–5, the note "Henry's mismanagement of his
 children." becomes a margin note, joined at its hyphen as a guess
