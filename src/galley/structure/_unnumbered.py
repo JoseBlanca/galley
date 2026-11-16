@@ -20,8 +20,9 @@ class Unnumbered:
     it gave, so that a block's changes are in the order of its words, and
     its note references: for the position of a word, the reference it
     holds and the position of its note among the notes; a heading's level
-    and chapter label; and the positions of the words that start a printed
-    line after the first, which a verse block keeps (spec section 16)."""
+    and chapter label; the positions of the words that start a printed
+    line after the first, which a verse block keeps (spec section 16); and
+    a figure block's image path (section 18)."""
 
     kind: BlockKind
     words: tuple[str, ...]
@@ -32,6 +33,7 @@ class Unnumbered:
     level: int | None = None
     label: str | None = None
     line_starts: frozenset[int] = frozenset()
+    figure: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

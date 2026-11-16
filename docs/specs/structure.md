@@ -2151,7 +2151,17 @@ paragraph of pages 15 to 18).
    "DECENNIAL PUBLICATIONS, V" on pages 34, 42, 48, 56 and 64 is then
    removed; page 68's garbled form is 0.68 alike and stays, as a
    caption line. A head line that section 3 makes a running head
-   (Kadesh 19 and 24) is removed as on any page.
+   (Kadesh 19 and 24) is removed as on any page, with its page number
+   and the marks above it. The topmost line is the line of the page,
+   in any region, whose top is highest, the first in layout's order on
+   a tie; the lines it is compared with are the topmost line, so
+   found, of each other plate page, and the lines section 3 makes
+   running heads, on every page of the book. When section 3 has
+   already removed the topmost line, rule 1 removes nothing more. A
+   line rule 1 removes is one `running_head` removal of the whole line:
+   no page number is taken from it. Section 4 does not run on a plate
+   page: a number at its foot is a line of the plate, which rule 2
+   keeps or removes (Domesday 39's "17]").
 2. **Caption and stray words.** Every other line is a caption line when
    at least 2 of its words, or at least half of them, are **known
    words**, by `wordlist.is_known_word`, which analyze uses too
@@ -2161,15 +2171,34 @@ paragraph of pages 15 to 18).
    hyphens, and is in the lower-cased word list; or a number, digits with
    brackets or punctuation around them ("16", "17]"). Every other line is
    removed as `plate_text`, one removal per line.
-3. **The figure block.** The caption lines, in order, are the text of
-   one `figure` block, whose `figure` is the path of the image of the
-   page's figure; a plate with no caption line, or with no text layer
-   (Kadesh 17, 23, 35, 43, 57 and 69, Stubbs 9, 11, 52 and 54), gives a
-   figure block with no spans. Its lines are not in the body stream, so a paragraph runs
-   on over the plate (section 6: a page with no body stream does not end
-   the paragraph, and a hyphen before the plate joins the word after
-   it). The figure block is side text of its page (section 6): it comes
-   after the paragraph in which the body before it ends.
+3. **The figure block.** The caption lines, from the top down in rows
+   and each row from the left, are the text of one `figure` block, whose
+   `figure` is the path of the image of the page's figure (a plate page
+   has one, `docs/specs/plates.md` §3); a plate with no caption line, or
+   with no text layer (Kadesh 17, 23, 35, 43, 57 and 69, Stubbs 9, 11,
+   52 and 54), gives a figure block with no spans. Its lines are not in
+   the body stream, so a paragraph runs on over the plate (section 6: a
+   page with no body stream does not end the paragraph, and a hyphen
+   before the plate joins the word after it). The figure block is side
+   text of its page (section 6): it comes after the paragraph in which
+   the body before it ends, and after the margin notes of earlier pages
+   that stay there (section 13). The hyphens inside its caption are
+   joined as in any block (section 5); its caption is not searched for
+   note references, so it holds none. Its `origin` is one entry, the
+   figure's box (the whole page, `docs/specs/plates.md` §3), so that a
+   figure without a caption has a page and a place like any other block.
+   A plate before any body block goes first. The rows are those layout
+   makes of words (layout §1, "Row"), made of lines: by top, then left
+   side, a line joins the row when its vertical centre lies within the
+   top and bottom of the row's first line, so that Kadesh 64's
+   "HTPOSTTLE, KJ", 0.7 pt higher than the line it ends, comes after it.
+   Layout's order is not used for the caption because the stray words
+   break a plate into regions that cut across it: on Domesday 39 it gave
+   "Fir \.Bet^ueen pp. 16 — •'••'""' rAr A LAND OF VILLAGES On the
+   border between Oxfordshire and Berks/tire. 17]", and from the top
+   down "Fir •'••'""' rAr A LAND OF VILLAGES On the border between
+   Oxfordshire and Berks/tire. \.Bet^ueen pp. 16 — 17]" (16 November
+   2026).
 
 **Measured** in the second research on the 12 plates of the six books
 that have a text layer (Kadesh 16, 19, 22, 24, 34, 42, 48, 56, 64, 68;

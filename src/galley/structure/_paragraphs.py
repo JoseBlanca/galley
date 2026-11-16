@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from galley.model import (
     BlockKind,
+    Box,
     PageLayout,
     PageNumber,
     Region,
@@ -24,7 +25,6 @@ from galley.structure._lines import (
     Piece,
     PlacedLine,
     first_word,
-    hyphen_between,
     starts_paragraph,
 )
 from galley.structure._markers import MarkerForm, marker_form
@@ -38,15 +38,26 @@ from galley.structure._verse import verse_runs
 
 
 @dataclass(frozen=True, slots=True)
+class PageFigure:
+    """A plate page's figure (spec section 18): the path of its image, its
+    box on the page, and its caption lines from the top down, none when it
+    has no caption."""
+
+    image: str
+    box: Box
+    caption: Piece
+
+
+@dataclass(frozen=True, slots=True)
 class PageParts:
     """What the per-page work gives for one page: its index, the removals and page
     numbers, the body stream, the margin notes, the lines of each band
     region and the band blocks they make by rules 1 and 2, each of one
-    page, whether the page has a figure, the runs of the body stream that
-    are blocks of their own (spec section 2, step 2.3), the positions of
-    other lines of the body stream that start a block (a bibliographical
-    note's band blocks, spec section 16), and the lines taken
-    from the foot of the body stream as notes (spec section 11, "Notes left
+    page, a plate page's figure (spec section 18), the runs of the body
+    stream that are blocks of their own (spec section 2, step 2.3), the
+    positions of other lines of the body stream that start a block (a
+    bibliographical note's band blocks, spec section 16), and the lines
+    taken from the foot of the body stream as notes (spec section 11, "Notes left
     in the body"), none until they are taken."""
 
     index: int
@@ -56,7 +67,7 @@ class PageParts:
     margin_notes: tuple[Piece, ...]
     band_regions: tuple[tuple[PlacedLine, ...], ...]
     band_blocks: tuple[Piece, ...]
-    has_figure: bool
+    figure: PageFigure | None = None
     runs: tuple[BodyRun, ...] = ()
     block_starts: frozenset[int] = frozenset()
     body_notes: tuple[PlacedLine, ...] = ()
@@ -179,7 +190,6 @@ def page_parts(
         ),
         band_regions=band_regions,
         band_blocks=tuple(piece for lines in band_regions for piece in _pieces(lines)),
-        has_figure=bool(page.figures),
         runs=_runs(page.index, body, band_regions, page_head, survey, contents_pages),
     )
 
@@ -281,7 +291,6 @@ def body_entries(
     current_run: BodyRun | None = None
     pending: list[MarginNote] = []
     before: PlacedLine | None = None
-    page_before_has_figure = False
     for page in pages:
         for number, line in enumerate(page.body):
             run = _run_at(page.runs, number)
@@ -291,19 +300,12 @@ def body_entries(
                 # A run is a block of its own, and so is what follows it.
                 starts = run is None or run.start == number or number == 0
             else:
-                # The hyphen rule comes before the plate break (spec section 6).
-                plate_break = (
-                    number == 0
-                    and (page.has_figure or page_before_has_figure)
-                    and not (before is not None and hyphen_between(before, line))
-                )
                 note_break = number == 0 and (
                     _marker_led(current, form)
                     or _crosses_section_edge(before, line, section_pages)
                 )
                 starts = (
                     number in page.block_starts
-                    or plate_break
                     or note_break
                     or starts_paragraph(line, before)
                 )
@@ -316,8 +318,6 @@ def body_entries(
                 current_run = run
             current.append(line)
             before = line
-        if page.body:
-            page_before_has_figure = page.has_figure
         notes = tuple(MarginNote(piece) for piece in page.margin_notes)
         if current:
             pending.extend(notes)

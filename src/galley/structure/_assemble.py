@@ -47,6 +47,7 @@ from galley.structure._paragraphs import (
     PageParts,
     body_entries,
 )
+from galley.structure._plates import with_figures
 from galley.structure._quotes import book_density, with_quotes
 from galley.structure._references import (
     Link,
@@ -405,8 +406,8 @@ def assemble(
     printed margin note joined, the footnotes of the band and of the body
     with their markers, the endnotes, the references linked to their
     notes, the quotes, each margin note placed before the paragraph whose
-    line it is beside or inside the note whose line it is beside, and the
-    ids. A bibliographical note's band blocks are body paragraphs (spec
+    line it is beside or inside the note whose line it is beside, the
+    figure block of each plate page, and the ids. A bibliographical note's band blocks are body paragraphs (spec
     section 16). `word_list` is in lower case; `body_word_height` and
     `body_line_pitch` are in points; `contents_pages` are the pages of the
     printed table of contents, whose lines are never quotes and after the
@@ -494,6 +495,8 @@ def assemble(
     linked_body, linked_notes = _with_margin_notes_placed(
         linked_body, linked_notes, kept_positions, entries, places
     )
+    # Spec section 18: the figure blocks, side text of their pages.
+    linked_body = with_figures(linked_body, parts, book_words, word_list)
     blocks, numbered_notes = numbered(linked_body, linked_notes)
     return Assembled(
         blocks=blocks,

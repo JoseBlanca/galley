@@ -939,3 +939,90 @@ def test_quote_none_of_the_notes_left_in_the_body_of_mariejol_210(
 ) -> None:
     _, blocks = excerpt_outputs[MARIEJOL]
     assert set(_kinds_on(blocks, 0)) == {"paragraph"}
+
+
+# Plates (structure spec section 18; plates spec section 1)
+
+
+def _plate_removals(blocks: BlocksFile, page: int) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        (removal.reason.value, removal.text)
+        for removal in blocks.removals
+        if removal.page_index == page
+    )
+
+
+def _figures(blocks: BlocksFile) -> tuple[tuple[str | None, list[int], str], ...]:
+    """Each figure block's image, pages and text, in order."""
+    return tuple(
+        (block.figure, _pages(block.origin), block_text(block))
+        for block in blocks.blocks
+        if block.kind is BlockKind.FIGURE
+    )
+
+
+def test_plate_text_kadesh_16_two_lines_and_a_figure_block_without_text(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["kadesh_8-17"]
+    assert _plate_removals(blocks, 8) == (
+        ("plate_text", "^U;L"),
+        ("plate_text", ", ' .."),
+    )
+    assert _figures(blocks) == (
+        ("images/plate-0008.png", [8], ""),
+        ("images/plate-0009.png", [9], ""),
+    )
+    # The figure blocks follow the paragraph of page 15 (excerpt page 7),
+    # which runs on over the plates: no paragraph holds a plate's words.
+    kinds = tuple(block.kind for block in blocks.blocks)
+    first_figure = kinds.index(BlockKind.FIGURE)
+    assert _pages(blocks.blocks[first_figure - 1].origin)[-1] == 7
+    assert all(
+        8 not in _pages(block.origin)
+        for block in blocks.blocks
+        if block.kind is not BlockKind.FIGURE
+    )
+
+
+def test_caption_kadesh_64_and_68_kept_and_the_back_of_plate_65_removed(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["kadesh_59-68"]
+    figures = _figures(blocks)
+    assert tuple((image, pages) for image, pages, _ in figures) == (
+        ("images/plate-0005.png", [5]),
+        ("images/plate-0006.png", [6]),
+        ("images/plate-0009.png", [9]),
+    )
+    # The excerpt has one plate with the series head, so rule 1 finds
+    # nothing alike to it and it stays a caption line.
+    assert figures[0][2].startswith(
+        "DECENNIAL PUBLICATIONS, V PALIMPSEST WALL SHOWING LATER RELIEFS"
+    )
+    assert figures[0][2].endswith("(From a photograph by Borchardt)")
+    assert figures[1][2] == ""
+    assert _plate_removals(blocks, 6) == (("plate_text", "a"), ("plate_text", "t I"))
+    assert figures[2][2].endswith("THE MODERN MODND OF KADESH")
+    assert _plate_removals(blocks, 9) == (("plate_text", "V"),)
+    # The paragraph of page 63 runs on over the plates 64 and 65.
+    assert any(_pages(block.origin) == [4, 7] for block in blocks.blocks)
+
+
+def test_caption_domesday_39_and_40_kept_and_their_stray_words_removed(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["domesday_headings_quotes"]
+    figures = _figures(blocks)
+    assert tuple((image, pages) for image, pages, _ in figures) == (
+        ("images/plate-0003.png", [3]),
+        ("images/plate-0004.png", [4]),
+    )
+    assert "A LAND OF VILLAGES On the border between Oxfordshire" in figures[0][2]
+    assert figures[0][2].endswith("16 — 17]")
+    assert figures[1][2] == (
+        "A LAND OF HAMLETS tlm border between tiumersvt and Devon."
+    )
+    assert ("plate_text", '--,. ^X.^ MoulslVl^rf /\\"?') in _plate_removals(blocks, 3)
+    assert {reason for reason, _ in _plate_removals(blocks, 4)} == {"plate_text"}
+    assert len(_plate_removals(blocks, 4)) == 7

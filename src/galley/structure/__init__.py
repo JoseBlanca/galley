@@ -9,7 +9,10 @@ the paragraphs of the body, which run over page breaks; joins the hyphens
 at line ends (`join_hyphen`), each join kept as a word change; keeps the
 text of the footnote band as notes, after the paragraph in which their
 page's body ends; and puts each margin note before the paragraph, or
-inside the note, beside whose line it was printed.
+inside the note, beside whose line it was printed. A plate page's lines
+are its running head, its caption, kept as the text of a figure block
+placed after the paragraph that runs over the plate, and its stray words,
+removed.
 """
 
 import logging
@@ -37,6 +40,7 @@ from galley.structure._markers import (
     reference_candidate,
 )
 from galley.structure._paragraphs import page_parts
+from galley.structure._plates import plate_parts, plate_survey
 from galley.structure._survey import BookSurvey, survey_book
 
 __all__ = [
@@ -72,8 +76,15 @@ def make_blocks(
     after the last of which the references to endnotes are taken (spec
     section 12)."""
     survey = survey_book(lines, workers=workers)
+    plates = plate_survey(lines, survey)
     pages = map_pages(
-        lambda page: page_parts(page, survey, contents_pages), lines.pages, workers
+        lambda page: (
+            plate_parts(page, survey, plates, lower_case_words)
+            if page.figures
+            else page_parts(page, survey, contents_pages)
+        ),
+        lines.pages,
+        workers,
     )
     assembled = assemble(
         pages,

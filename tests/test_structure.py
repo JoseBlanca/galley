@@ -1131,11 +1131,13 @@ def test_word_changes_are_in_page_order_a_band_join_before_the_next_page() -> No
     assert tuple(change.page_index for change in blocks.word_changes) == (0, 1)
 
 
-def test_page_after_a_plate_and_a_blank_page_starts_a_paragraph() -> None:
+def test_paragraph_runs_on_over_a_plate_and_a_blank_page() -> None:
+    # Spec section 6: a page with no body stream does not end the paragraph,
+    # and a plate's lines are not in the body stream (section 18).
     plate = PageLayout(
         1,
         (_region(_spread(", ' ..", 60, 90, 300)),),
-        (Figure(Box(40, 40, 300, 500), "images/p0001.png", 150),),
+        (Figure(Box(0, 0, 400, 600), "images/plate-0001.png", 300),),
     )
     pages = (
         _body_page(0, *_five_full_lines(70, "first")),
@@ -1144,7 +1146,11 @@ def test_page_after_a_plate_and_a_blank_page_starts_a_paragraph() -> None:
         _body_page(3, *_five_full_lines(70, "third")),
     )
     blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
-    assert blocks.blocks[-1].id == "b-p0003-001"
+    assert tuple((block.id, block.kind) for block in blocks.blocks) == (
+        ("b-p0000-001", BlockKind.PARAGRAPH),
+        ("b-p0001-001", BlockKind.FIGURE),
+    )
+    assert tuple(origin.page_index for origin in blocks.blocks[0].origin) == (0, 3)
 
 
 def test_u_and_a_digit_centred_at_the_foot_is_a_page_number() -> None:
@@ -1384,58 +1390,216 @@ def test_page_not_indented_continues_the_paragraph_across_a_blank_page() -> None
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
-def test_words_of_a_plate_are_a_paragraph_of_their_own() -> None:
+# Plates (spec section 18)
+
+_PLATE_BOX = Box(0, 0, 400, 600)
+
+
+def _plate(index: int, *lines: Line) -> PageLayout:
+    """A plate page: its figure, the whole page, and `lines` in one region."""
+    return PageLayout(
+        index,
+        (_region(*lines),) if lines else (),
+        (Figure(_PLATE_BOX, f"images/plate-{index:04d}.png", 300),),
+    )
+
+
+def _removed(blocks: BlocksFile, page_index: int) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        (removal.reason.value, removal.text)
+        for removal in blocks.removals
+        if removal.page_index == page_index
+    )
+
+
+def test_plate_text_lines_removed_and_figure_block_without_text_follows_paragraph() -> (
+    None
+):
+    # Kadesh's page 16: two lines of stray words and no caption.
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first"), _full("runs on to", 145)),
+        _plate(1, _spread("^U;L", 60, 90, 627), _spread(", ' ..", 60, 90, 222)),
+        _body_page(2, *_five_full_lines(70, "second")),
+    )
+    lines = _lines_of(*pages)
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _removed(blocks, 1) == (("plate_text", "^U;L"), ("plate_text", ", ' .."))
+    assert blocks.blocks[1] == Block(
+        id="b-p0001-001",
+        kind=BlockKind.FIGURE,
+        level=None,
+        label=None,
+        spans=(),
+        figure="images/plate-0001.png",
+        origin=(Origin(1, _PLATE_BOX),),
+    )
+    assert len(blocks.blocks) == 2
+    assert tuple(origin.page_index for origin in blocks.blocks[0].origin) == (0, 2)
+    assert "runs on to second 0 of the page" in block_text(blocks.blocks[0])
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_caption_lines_have_two_known_words_or_half_their_words_known() -> None:
+    plate = _plate(
+        1,
+        _spread("THE MODERN MOUND OF KADESH", 60, 300, 100),
+        _spread("^X.^ MoulslVl^rf", 60, 300, 300),
+        _spread("Fir ^X", 60, 300, 400),
+        _spread("Fir </ I", 60, 300, 450),
+        _spread("17]", 60, 90, 500),
+    )
+    pages = (_body_page(0, *_five_full_lines(70, "first")), plate)
+    lines = _lines_of(*pages)
+    known = frozenset({"the", "modern", "mound", "of", "fir"})
+    blocks = make_blocks(lines, known, workers=1)
+    assert _removed(blocks, 1) == (
+        ("plate_text", "^X.^ MoulslVl^rf"),
+        ("plate_text", "Fir </ I"),
+    )
+    figure = blocks.blocks[-1]
+    assert figure.kind is BlockKind.FIGURE
+    assert block_text(figure) == "THE MODERN MOUND OF KADESH Fir ^X 17]"
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_caption_hyphen_is_joined_and_a_number_at_the_plate_foot_stays_caption() -> (
+    None
+):
+    # Spec section 18: section 4 does not run on a plate page.
+    plate = _plate(
+        1,
+        _spread("A LAND OF VIL-", 60, 300, 500),
+        _spread("LAGES OF OLD", 60, 300, 515),
+        _spread("17", 190, 210, 560),
+    )
+    pages = (_body_page(0, *_five_full_lines(70, "first")), plate)
+    lines = _lines_of(*pages)
+    blocks = make_blocks(
+        lines, frozenset({"land", "of", "villages", "a", "old"}), workers=1
+    )
+    assert block_text(blocks.blocks[-1]) == "A LAND OF VILLAGES OF OLD 17"
+    assert blocks.page_numbers == ()
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_caption_lines_are_read_from_the_top_down_whatever_their_regions() -> None:
+    # Domesday 39: layout put "17]" and the caption in a region after the
+    # one of "Between pp. 16 —", which stands left of "17]" on its line.
     plate = PageLayout(
         1,
-        (_region(_spread(", ' ..", 60, 90, 300)),),
-        (Figure(Box(40, 40, 300, 500), "images/p0001.png", 150),),
+        (
+            _region(_spread("Between pp. 16 —", 28, 80, 626)),
+            _region(
+                _spread("A LAND OF VILLAGES", 150, 240, 597),
+                _spread("17]", 84, 90, 626),
+            ),
+        ),
+        (Figure(_PLATE_BOX, "images/plate-0001.png", 300),),
     )
+    pages = (_body_page(0, *_five_full_lines(70, "first")), plate)
+    known = frozenset({"between", "land", "of", "villages", "a", "pp"})
+    blocks = make_blocks(_lines_of(*pages), known, workers=1)
+    assert block_text(blocks.blocks[-1]) == "A LAND OF VILLAGES Between pp. 16 — 17]"
+
+
+def test_plate_topmost_line_alike_to_another_plates_is_a_running_head() -> None:
+    # Kadesh's "DECENNIAL PUBLICATIONS, V" on its plates, no head line by
+    # section 3 since it shares its region with the caption; the third
+    # plate's garbled head is not alike and stays a caption line.
+    known = frozenset({"plate", "publications"})
     pages = (
         _body_page(0, *_five_full_lines(70, "first")),
-        plate,
-        _body_page(2, *_five_full_lines(70, "third")),
+        _plate(
+            1,
+            _spread("DECENNIAL PUBLICATIONS, V", 60, 300, 191),
+            _spread("PLATE II", 60, 300, 520),
+        ),
+        _plate(
+            2,
+            _spread("DECENNIAL PUBLICATIONS, V", 60, 300, 185),
+            _spread("PLATE III", 60, 300, 520),
+        ),
+        _plate(
+            3,
+            _spread("l>i .• I:N\\IAL PUBLICATIONS, PLATE VIII", 60, 300, 166),
+            _spread("PLATE IX", 60, 300, 520),
+        ),
     )
-    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
-    assert tuple(block.id for block in blocks.blocks) == (
-        "b-p0000-001",
-        "b-p0001-001",
-        "b-p0002-001",
+    lines = _lines_of(*pages)
+    blocks = make_blocks(lines, known, workers=1)
+    assert _removed(blocks, 1) == (("running_head", "DECENNIAL PUBLICATIONS, V"),)
+    assert _removed(blocks, 2) == (("running_head", "DECENNIAL PUBLICATIONS, V"),)
+    assert _removed(blocks, 3) == ()
+    assert _texts(blocks.blocks)[1:] == (
+        "PLATE II",
+        "PLATE III",
+        "l>i .• I:N\\IAL PUBLICATIONS, PLATE VIII PLATE IX",
     )
-    assert block_text(blocks.blocks[1]) == ", ' .."
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
-def test_hyphen_before_a_plate_page_is_joined_across_it() -> None:
-    plate = PageLayout(
-        1,
-        (_region(_spread("cate the plate", 60, 160, 300)),),
-        (Figure(Box(40, 40, 300, 500), "images/p0001.png", 150),),
+def test_plate_topmost_line_alike_to_a_running_head_of_the_book_is_removed() -> None:
+    heads = tuple(
+        _page_with_head(index, head)
+        for index, head in enumerate(_HEADS_WITHOUT_NUMBERS, start=10)
     )
+    plate = _plate(
+        16, _spread("THE BOOK", 60, 300, 200), _spread("PLATE II", 60, 300, 500)
+    )
+    blocks = make_blocks(_lines_of(*heads, plate), frozenset({"plate"}), workers=1)
+    assert _removed(blocks, 16) == (("running_head", "THE BOOK"),)
+    assert block_text(blocks.blocks[-1]) == "PLATE II"
+
+
+def test_hyphen_before_a_plate_page_is_joined_with_the_word_after_it() -> None:
     pages = (
         _body_page(0, *_five_full_lines(70, "first"), _full("we repli-", 145)),
-        plate,
+        _plate(1, _spread("^U;L", 60, 90, 627)),
+        _body_page(2, _full("cate the text", 70), *_five_full_lines(85, "third")),
     )
     blocks = make_blocks(_lines_of(*pages), frozenset({"replicate"}), workers=1)
-    assert len(blocks.blocks) == 1
-    assert block_text(blocks.blocks[0]).endswith("we replicate the plate")
-
-
-def test_page_with_a_figure_after_a_number_and_hyphen_starts_a_paragraph() -> None:
-    # "136-39-" is a number before a word, not a hyphen to join: the plate's
-    # first line starts a paragraph, and so does the indented "Bryce," after.
-    plate = PageLayout(
-        1,
-        (_region(_spread("Plate one", 60, 160, 300)),),
-        (Figure(Box(40, 40, 300, 500), "images/p0001.png", 150),),
+    assert tuple(block.kind for block in blocks.blocks) == (
+        BlockKind.PARAGRAPH,
+        BlockKind.FIGURE,
     )
+    assert "we replicate the text" in block_text(blocks.blocks[0])
+
+
+def test_figure_block_after_a_number_and_hyphen_and_before_the_next_paragraph() -> None:
+    # "136-39-" is a number before a word, not a hyphen to join, and the
+    # indented "Bryce," after the short line starts a paragraph.
     pages = (
         _body_page(0, *_five_full_lines(70, "first"), _short("Britain, 136-39-", 145)),
-        plate,
+        _plate(1, _spread("Plate one", 60, 300, 160)),
         _body_page(2, _indented("Bryce, James, 12", 70), _full("and so on", 85)),
     )
-    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    blocks = make_blocks(_lines_of(*pages), frozenset({"plate", "one"}), workers=1)
     assert _texts(blocks.blocks)[1:] == ("Plate one", "Bryce, James, 12 and so on")
     assert block_text(blocks.blocks[0]).endswith("Britain, 136-39-")
     assert blocks.word_changes == ()
+
+
+def test_figure_block_of_a_plate_without_a_text_layer_has_no_spans() -> None:
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first")),
+        _plate(1),
+        _plate(2),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(
+        (block.kind, block.spans, block.figure) for block in blocks.blocks
+    ) == (
+        (BlockKind.PARAGRAPH, blocks.blocks[0].spans, None),
+        (BlockKind.FIGURE, (), "images/plate-0001.png"),
+        (BlockKind.FIGURE, (), "images/plate-0002.png"),
+    )
+
+
+def test_figure_block_of_a_plate_before_any_body_comes_first() -> None:
+    pages = (_plate(0), _body_page(1, *_five_full_lines(70, "first")))
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(block.id for block in blocks.blocks) == ("b-p0000-001", "b-p0001-001")
+    assert blocks.blocks[0].kind is BlockKind.FIGURE
 
 
 def _side_text_pages() -> tuple[PageLayout, ...]:
@@ -1898,6 +2062,21 @@ def test_footnote_running_over_a_blank_page_is_one_note_with_two_origins() -> No
     running = blocks.notes[1]
     assert running.id == "n-p0000-002"
     assert tuple(origin.page_index for origin in running.origin) == (0, 2)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_footnote_running_over_a_plate_page_is_one_note_with_two_origins() -> None:
+    # Spec section 18: a plate's lines are not in the body stream, so the
+    # plate is passed over as a blank page is (section 11).
+    plate = _plate(1, _spread("^U;L", 60, 90, 627))
+    lines = _note_running_over((plate,))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "A note."),
+        ("2", "A note that runs over the page break."),
+        ("1", "The next page's note."),
+    )
+    assert tuple(origin.page_index for origin in blocks.notes[1].origin) == (0, 2)
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
