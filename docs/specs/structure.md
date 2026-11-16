@@ -896,8 +896,9 @@ whose hyphen should have stayed and 2 not one word.
   two line feeds; a band of small type is still a note; body lines at
   0.85 of the body height at a page's foot, below lines at 1.0, whose
   markers read "(1)", "(2)", "(3)" in a book whose form is bracketed,
-  are notes, and with markers "(1)", "(3)", "(2)" they stay a paragraph
-  and are not a quote; the same lines on a page whose lines above are
+  are notes, and with markers "(1)", "(3)", "(2)" they stay paragraphs,
+  none a quote, and the last does not run on into the next page; the
+  same lines on a page whose band starts with "(1)" stay paragraphs; the same lines on a page whose lines above are
   also at 0.85 stay paragraphs;
 - index: two columns of 20 lines under "INDEX", lines at the edge and
   indented 9 pt, give one `index_entry` per line at the edge; a line
@@ -932,7 +933,7 @@ exactly.
 | `domesday_74-83` | 1 (75) | references "day1.'", "land2.", "land3." linked to notes whose markers read "1", "2", "9"; margin notes beside paragraphs' first lines; "Can the villein be pursued?" beside the page's last line, a paragraph's first line |
 | `domesday_74-83` | 2 (76) | two notes on one line ("1 Dialogus", "2 Dialogus"); note 3 with marker "z" |
 | `domesday_74-83` | 9 (83) | three lines of two notes each; markers "8", "*", "e"; references "12s.2", "30d8" |
-| `mariejol_210-219` | 0 (210) | five notes left in the body, missed by section 11's order test (markers read 1, 2, 3, none, 11, 5): paragraphs, not quotes |
+| `mariejol_210-219` | 0 (210) | five notes left in the body, missed by section 11's order test (markers read 1, 2, 3, none, 11, 5): each a paragraph of its own, not a quote, and note 5 ("(S) La thèse…") not run on into pages 211 and 212 |
 | `mariejol_210-219` | 7 (217) | a note left in the body, taken as a note |
 | `mariejol_210-219` | 2 (212) | two broken lines inset on both sides: a known false `verse` block |
 | `mariejol_210-219` | 4 (214) | a note run on from page 213, one note; markers "(t)", "(a)", "(3J"; "(» i)" not found, so note 1 unreferenced |
@@ -1118,7 +1119,7 @@ is right when the words on either side belong to two of its notes):
 
 | gap | Domesday: right / wrong / not in the reference text | Haskins | Kadesh, Mariéjol |
 |---|---|---|---|
-| none | 185 / 148 / 223 | 2 / 0 / 4 | |
+| none | 182 / 148 / 222 | 2 / 0 / 4 | |
 | 10 pt | 176 / 3 / 12 | 2 / 0 / 2 | Kadesh 2, unchecked; Mariéjol none |
 | 12 pt | 172 / 1 / 11 | 2 / 0 / 2 | |
 | 15 pt | 155 / 0 / 11 | 2 / 0 / 2 | |
@@ -1188,7 +1189,13 @@ line of the page are notes of the page when all of these hold:
 3. the lines above it have a height ratio at least 0.05 higher: the
    notes are set smaller than the text above them;
 4. the markers of the lines from it on that have the book's form, read
-   as numbers, never decrease (an unreadable one is skipped).
+   as numbers, never decrease (an unreadable one is skipped);
+5. the page's band does not already start with a note whose marker
+   reads 1: then the band holds the page's notes from the first, and a
+   line reading 1 in the body is something else (Domesday's page 200,
+   where a table's rows "1 2 Winchcombe" read 1, 1, 10, 15 and would
+   have made 4 notes of 12 rows, and the band's notes 1 to 3 values 5 to
+   7, so that "Chichester3" would link to a false note).
 
 They are cut into notes as a band is (below, "Where a note starts"),
 and are band blocks from then on: they never run on into the next
@@ -1201,14 +1208,14 @@ Espalle…" out (bracketed, against its digits). Condition 3 keeps out a
 page whose body is all in 9-pt OCR lines (Domesday page 501, where a
 table line "1 H. = 120 A. and 1 v." would otherwise take the page's
 text) and a publisher's list (Stubbs page 331). Condition 4 keeps out
-tables of numbers.
+tables of numbers that do not rise.
 
 Measured on 16 November 2026 on the six whole books' body lines of the
 first plan, each word labelled by the reference text:
 
-| book | pages | notes taken | words the reference text has in notes | words it has in the body (paragraphs, tables) | words it does not have (mostly OCR garble) |
+| book | pages | lines starting with a marker taken (each starts a note) | words the reference text has in notes | words it has in the body (paragraphs, tables) | words the alignment did not place (mostly OCR garble) |
 |---|---|---|---|---|---|
-| Domesday | 16 | 43 | 900 | 8 (7 of a table, 1 of a paragraph) | 99 |
+| Domesday | 15 | 39 | 900 | 1 (of a paragraph) | 88 |
 | Mariéjol | 43 | 137 | 1,474 | 32 | 1,041 |
 | Haskins, Stubbs, Kadesh | 0 | | | | |
 | Gierke | 0 (no marker form) | | | | |
@@ -1219,7 +1226,11 @@ on page 139); none of the 12 lines looked at is a line of text. Asking
 the markers to read 1, 2, 3 in turn instead of condition 4 takes 11 of
 Domesday's pages and 18 of Mariéjol's, with no body word; with no test
 of order, 171 words of Domesday's paragraphs and 149 of its tables are
-taken. The rule misses pages where a marker misread as a larger number
+taken. Condition 5 skips 394 of Domesday's pages and 165 of Mariéjol's,
+whose bands start at 1, and of the pages taken without it removes only
+Domesday 200. Mariéjol's 1,041 words the alignment did not place are
+the words of its garbled note lines; how many of them are body words
+cannot be told from the alignment. The rule misses pages where a marker misread as a larger number
 comes before a smaller one: Mariéjol's page 210 reads its five markers
 "U)", "li)", "(S)", … as 1, 2, 3, none, 11, 5, and its notes stay in the
 body (section 16 says how they are kept from being quotes).
@@ -1737,11 +1748,19 @@ height ratio of 0.95 or less; with the density as well, 1 has.
 They run after the notes and the index entries (section 2), on the body
 blocks that are still paragraphs:
 
-A block that ends a page's body stream and whose first word has the
-book's marker form is never made a quote by these rules: it is a note
-that section 11 did not take (Mariéjol's page 210), and stays a
-paragraph. Not measured. A rule here changes a block's kind and no word,
-so it needs no record.
+A body block whose first word has the book's marker form (section 1)
+is never made a quote by these rules: it is a note that section 11 did
+not take (Mariéjol's page 210), and stays a paragraph; such a block
+never runs on into the next page's body (section 6 is not applied to
+it), and the paragraph the next page starts is a block of its own.
+Measured on 16 November 2026 on the first plan's blocks of Domesday's
+and Mariéjol's body ranges, against the reference text: of the quotes
+rules 1 to 3 make there, the exclusion takes 28 of Domesday's 30 notes
+and 35 of Mariéjol's 40 (with 3 and 15 more blocks the reference text
+has as neither notes nor quotes, tables and garble), and no real quote
+(Domesday's "(i) A Somersetshire manor…" are bracketed, against its
+digits). False note-quotes remain: 2 in Domesday, 5 in Mariéjol. A
+rule here changes a block's kind and no word, so it needs no record.
 
 1. **Smaller type.** A block with at least 2 wide lines, whose median
    height ratio over all its lines is at most 0.95 and whose median
