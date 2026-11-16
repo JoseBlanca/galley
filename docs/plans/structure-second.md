@@ -413,10 +413,10 @@ as `guide_words`.
 **Stands on:** work package 4 (the index title is a heading; quotes run
 after the index entries, structure §2).
 
-- [ ] 5.1 Index pages, the regions of an index page, the cut at the
+- [x] 5.1 Index pages, the regions of an index page, the cut at the
   gutter, and guide words. Spec: structure §17, rules 1 and 2.
   Deliverables 1 to 3.
-- [ ] 5.2 Entries over columns and pages, with the skewed left edge, and
+- [x] 5.2 Entries over columns and pages, with the skewed left edge, and
   the `index_entry` blocks. Spec: structure §17, rules 3 and 4. Needs
   5.1. Deliverables 1 to 3.
 
@@ -469,7 +469,7 @@ analyze on Domesday.
 - [x] 6.2 extract: a plate page's image and figure, its text layer read
   as a text page's, and the refusal of a plate page removed. Spec:
   plates §3. Stream `plates`. Needs 6.1. Deliverable 2.
-- [ ] 6.3 structure: a plate's running head, caption lines and stray
+- [x] 6.3 structure: a plate's running head, caption lines and stray
   words, and the figure block as side text of its page. Spec: structure
   §18; §2, step 2.2; §6. Needs 6.2 and work package 5. Deliverable 5.
 

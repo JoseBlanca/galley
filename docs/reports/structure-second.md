@@ -548,3 +548,54 @@ November 2026 (fb6b9c6). After both merges: pytest 1606 passed in 28.9
 s; `-m whole_book` 30 passed (on the fix branch).
 
 Work package 4 is done.
+
+## Task 6.3: plates in structure (6ed5478 spec, d6f176b; merged)
+
+A page with a figure is a plate: its running head goes, each other line
+is caption when it has 2 known words or half its words known, the rest
+is removed as `plate_text`; the caption becomes a figure block with the
+plate's image, placed after the paragraph that runs over the plate;
+paragraphs, hyphens and footnotes continue across a plate (a footnote
+over a plate has its own test). A caption reads top to bottom by rows,
+not in layout's order, which had scrambled Domesday page 39's caption
+(decided by the stream, accepted by the orchestrator: it is the printed
+order). All six EPUBs show their plates and pass epubcheck.
+
+| book | figures | with caption | lines removed as `plate_text` |
+|---|---|---|---|
+| Kadesh | 16 | 5 | 6 lines, 12 words |
+| Domesday | 2 | 2 | 17 lines, 68 words |
+| Stubbs | 4 | 0 | 0 |
+
+## Work package 5: index entries (b02de71 spec, b7f033a, 0488618; merged at 2851f51; sub-entries 0fc9544, 29e4318, 3a1bd01)
+
+structure finds the index pages, reads each page's two columns, cuts
+regions that cross the gutter, removes Stubbs' guide words (10, one on
+each of pages 312–321), and makes `index_entry` blocks across columns
+and pages. Rule 3's entry side was corrected by the orchestrator: where
+continuation lines outnumber entry lines, the commonest left side is the
+indent, so when at least 2 left sides lie more than 5 pt left of it,
+the commonest of those is the entry side.
+
+**Sub-entries, decided by the owner on 16 November 2026**: each
+sub-entry is an `index_entry` block of its own with its depth in
+`Block.level` (1 entry, 2 sub-entry; architecture §8), written with a
+`.depth-N` class and indented by the style sheet. The orchestrator's
+first question described sub-entries as printed on their own indented
+lines; in Haskins and Stubbs they are run on after a ";". Told so, the
+owner kept the split: an entry is cut after each word ending in ";".
+
+Index paragraph boundaries, precision / recall:
+
+| book | target | result |
+|---|---|---|
+| Haskins | 0.90 / 0.90 | 0.991 / 0.965 |
+| Stubbs | 0.85 / 0.85 | **0.828 / 0.788**, missed: its OCR glues or loses ";" |
+| Domesday | 0.90 / 0.90 | 0.990 / 0.986 |
+
+Open: on Stubbs page 312 two garbled regions cross the gutter on too
+many lines and come out as notes; Gierke's footnote words "List of" on
+page 83 are a margin region taken into the index column; a "See …"
+cross-reference stays in its entry, where Haskins' reference text makes
+it an item. After the merges: pytest 1648 passed in 28.0 s; with 8
+threads 49.3 s; `-m whole_book` 32 passed.
