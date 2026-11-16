@@ -69,6 +69,7 @@ def joined(
         ),
         book_words,
         word_list,
+        piece.unjoined,
     )
     return Unnumbered(
         kind,

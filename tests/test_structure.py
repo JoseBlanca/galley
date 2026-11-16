@@ -2665,6 +2665,27 @@ def test_margin_note_before_each_paragraph_when_the_lower_is_beside_a_first_line
     )
 
 
+def test_margin_note_regions_of_one_note_are_not_joined_at_a_hyphen() -> None:
+    # Two regions of one printed note 1.5 pitches apart: a line between them
+    # went unread, so "pea-" is not joined to "the" (Domesday page 90 gave
+    # "peathe").
+    upper = _region(_spread("The pea-", 310, 345, 40))
+    lower = _region(_spread("the royal", 310, 345, 50 + 22.5))
+    body = _region(
+        _indented("Alpha begins here", 40),
+        *(_full(f"and goes on {n}", 55 + 15 * n) for n in range(4)),
+        _short("its end.", 115),
+    )
+    lines = _lines_of(PageLayout(0, (body, upper, lower), ()))
+    blocks = make_blocks(lines, frozenset({"peathe"}), workers=1)
+    assert tuple(
+        block_text(block)
+        for block in blocks.blocks
+        if block.kind is BlockKind.MARGIN_NOTE
+    ) == ("The pea- the royal",)
+    assert blocks.word_changes == ()
+
+
 def test_margin_notes_on_the_two_sides_are_not_joined() -> None:
     # A region left of the column and one right of it, at the same height
     # within 2.5 pitches: each is a note of its own.

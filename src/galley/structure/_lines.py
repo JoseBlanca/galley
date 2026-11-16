@@ -38,9 +38,14 @@ class PlacedLine:
 
 @dataclass(frozen=True, slots=True)
 class Piece:
-    """A block's lines, all on one page or over several, in order."""
+    """A block's lines, all on one page or over several, in order, and the
+    positions of those lines that a hyphen never joins to the line before:
+    the first line of each region but the first of a margin note printed
+    in several regions, where a line between them went unread (spec
+    section 13, rule 1)."""
 
     lines: tuple[PlacedLine, ...]
+    unjoined: frozenset[int] = frozenset()
 
 
 def first_word(line: PlacedLine) -> str:
