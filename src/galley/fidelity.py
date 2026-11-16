@@ -625,10 +625,19 @@ def _inlines_tokens(inlines: list[object], block_id: str | None) -> tuple[_Token
     )
 
 
-# Architecture section 13: Pandoc's empty attributes, which a figure and
-# its image must have, and an image's empty title.
-_NO_ATTRIBUTES = ["", [], []]
+# Architecture section 13: an image's empty title.
 _NO_TITLE = ""
+
+
+def _has_no_attributes(attributes: object) -> bool:
+    """Whether Pandoc's attributes of an element are empty: no id, no
+    class, no key and value, which a figure and its image must have
+    (architecture section 13)."""
+    match attributes:
+        case ["", [], []]:
+            return True
+        case _:
+            return False
 
 
 def _is_figure_image(inline: object, alt: list[object]) -> bool:
@@ -637,7 +646,9 @@ def _is_figure_image(inline: object, alt: list[object]) -> bool:
     match inline:
         case {"t": "Image", "c": [attributes, list() as image_alt, [str(), title]]}:
             return (
-                attributes == _NO_ATTRIBUTES and image_alt == alt and title == _NO_TITLE
+                _has_no_attributes(attributes)
+                and image_alt == alt
+                and title == _NO_TITLE
             )
         case _:
             return False
@@ -654,7 +665,7 @@ def _is_galley_figure(
             [{"t": "Plain", "c": list() as inlines}],
             [{"t": "Plain", "c": [image]}],
         ):
-            return attributes == _NO_ATTRIBUTES and _is_figure_image(image, inlines)
+            return _has_no_attributes(attributes) and _is_figure_image(image, inlines)
         case _:
             return False
 

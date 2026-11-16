@@ -460,9 +460,7 @@ def _text_markdown(block: Block, notes: frozendict[str, Note], marker: str) -> s
 def _heading(block: Block, notes: frozendict[str, Note]) -> str:
     """A heading of its level with its id, its label first as a span of
     class `label`."""
-    if block.level is None:
-        message = f"blocks.json is malformed: heading {block.id} has no level"
-        raise InputFileError(message)
+    assert block.level is not None, "_check_well_formed refuses a heading without one"
     label = (
         f"[{escape_markdown(block.label)}]{{.label}}" if block.label is not None else ""
     )
