@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 
 from galley.book_folder import BookFolder
-from galley.fidelity import MarkdownWord, MarkdownWords
+from galley.config import BookConfig, Language
+from galley.fidelity import MarkdownWord, MarkdownWords, read_markdown
+from galley.markdown import render_markdown
 from galley.model import (
     Block,
     BlockKind,
@@ -334,11 +336,12 @@ def test_markdown_tokens_take_stream_and_page_from_their_block() -> None:
         ("We", 0, GalleyStream.BODY, "b-p0000-001"),
         ("must", 0, GalleyStream.BODY, "b-p0000-001"),
         ("replicate", 0, GalleyStream.BODY, "b-p0000-001"),
-        ("cate", 1, GalleyStream.NOTES, "b-p0001-002"),
         ("it", 1, GalleyStream.BODY, "b-p0000-001"),
         # "here" against "here." of blocks is a replaced pair: page 1.
         ("here", 1, GalleyStream.BODY, "b-p0000-001"),
         ("OTHER", 1, GalleyStream.MARGIN_NOTES, "b-p0001-001"),
+        # The notes come after, in blocks.json's order (spec section 5).
+        ("cate", 1, GalleyStream.NOTES, "b-p0001-002"),
     )
 
 
@@ -833,3 +836,184 @@ def test_endnote_words_stand_near_the_page_of_their_first_reference(
         ("Glanvill.", 10, None),
     }
     assert {token.window_page for token in tokens[5:9]} == {0}
+
+
+# The order of the notes at markdown (spec section 5): book.md writes a
+# referenced footnote after the block that refers to it and an
+# unreferenced one after the last block of its page, as on Mariéjol's
+# page 20, where the unreferenced note 1 follows notes 2 and 3.
+
+
+def _footnote(
+    note_id: str, block_id: str, marker: str, text: str, *, referenced: bool
+) -> Note:
+    return Note(
+        id=note_id,
+        kind=NoteKind.FOOTNOTE,
+        marker=marker,
+        blocks=(_block(block_id, BlockKind.PARAGRAPH, (_span(text),), _origin(0)),),
+        origin=_origin(0),
+        referenced=referenced,
+    )
+
+
+_PAGE_OF_NOTES = LinesFile(
+    source_pdf_sha256=_SHA,
+    pages=(_page_lines(0, "the text2 here", "(1) A stray note.", "(2) Glanvill."),),
+)
+
+
+def _page_of_notes(tmp_path: Path) -> BlocksFile:
+    return _hand_made(
+        tmp_path,
+        _blocks_file(
+            (
+                _block(
+                    "b-p0000-001",
+                    BlockKind.PARAGRAPH,
+                    (_span("the text"), _span("2", "n-p0000-002"), _span(" here")),
+                    _origin(0),
+                ),
+            ),
+            (
+                _footnote(
+                    "n-p0000-001",
+                    "b-p0000-002",
+                    "(1)",
+                    "A stray note.",
+                    referenced=False,
+                ),
+                _footnote(
+                    "n-p0000-002", "b-p0000-003", "(2)", "Glanvill.", referenced=True
+                ),
+            ),
+        ),
+    )
+
+
+def test_notes_at_markdown_keep_the_order_of_blocks_json(tmp_path: Path) -> None:
+    blocks = _page_of_notes(tmp_path)
+    # book.md's order: the referenced note's definition after its block,
+    # then the unreferenced note, printed first.
+    markdown = _markdown(
+        ("the", "b-p0000-001"),
+        ("text", "b-p0000-001"),
+        ("here", "b-p0000-001"),
+        ("Glanvill.", "b-p0000-003"),
+        ("(1)", "b-p0000-002"),
+        ("A", "b-p0000-002"),
+        ("stray", "b-p0000-002"),
+        ("note.", "b-p0000-002"),
+    )
+    tokens = markdown_tokens(markdown, blocks, blocks_tokens(blocks, _PAGE_OF_NOTES))
+    assert [token.text for token in tokens] == [
+        "the",
+        "text",
+        "here",
+        "(1)",
+        "A",
+        "stray",
+        "note.",
+        "Glanvill.",
+    ]
+
+
+# galley's markdown stage on a file with every kind of note: its words, as
+# read_markdown reads them, are the tokens at blocks, word for word.
+
+_EVERY_NOTE_LINES = LinesFile(
+    source_pdf_sha256=_SHA,
+    pages=(
+        _page_lines(
+            0,
+            "CHAPTER I.",
+            "OF LAW",
+            "the Law1 of the land2 here",
+            "* A stray note.",
+            "2 Glanvill.",
+        ),
+        _page_lines(10, "Lex.", "1. See Bracton.", "2. And more."),
+    ),
+)
+
+
+def _every_note(tmp_path: Path) -> BlocksFile:
+    return _hand_made(
+        tmp_path,
+        _blocks_file(
+            (
+                _heading("b-p0000-001", "CHAPTER I.", "OF LAW"),
+                _block(
+                    "b-p0000-002",
+                    BlockKind.PARAGRAPH,
+                    (
+                        _span("the Law"),
+                        _span("1", "n-p0010-001"),
+                        _span(" of the land"),
+                        _span("2", "n-p0000-002"),
+                        _span(" here"),
+                    ),
+                    _origin(0),
+                ),
+            ),
+            (
+                _footnote(
+                    "n-p0000-001", "b-p0000-003", "*", "A stray note.", referenced=False
+                ),
+                _footnote(
+                    "n-p0000-002", "b-p0000-004", "2", "Glanvill.", referenced=True
+                ),
+                _endnote(
+                    "n-p0010-001",
+                    "1.",
+                    (
+                        _block(
+                            "b-p0010-001",
+                            BlockKind.MARGIN_NOTE,
+                            (_span("Lex."),),
+                            _origin(10),
+                        ),
+                        _block(
+                            "b-p0010-002",
+                            BlockKind.PARAGRAPH,
+                            (_span("See Bracton."),),
+                            _origin(10),
+                        ),
+                    ),
+                    referenced=True,
+                ),
+                _endnote(
+                    "n-p0010-002",
+                    "2.",
+                    (
+                        _block(
+                            "b-p0010-003",
+                            BlockKind.PARAGRAPH,
+                            (_span("And more."),),
+                            _origin(10),
+                        ),
+                    ),
+                    referenced=False,
+                ),
+            ),
+        ),
+    )
+
+
+@pytest.mark.pandoc
+def test_markdown_tokens_of_galleys_book_md_are_the_tokens_at_blocks(
+    tmp_path: Path,
+) -> None:
+    blocks = _every_note(tmp_path)
+    config = BookConfig(
+        pdf=tmp_path / "book.pdf", title="Law", authors=("A",), language=Language.EN
+    )
+    markdown = read_markdown(render_markdown(blocks, config))
+    at_blocks = blocks_tokens(blocks, _EVERY_NOTE_LINES)
+    at_markdown = markdown_tokens(markdown, blocks, at_blocks)
+    assert [(token.text, token.block_id) for token in at_markdown] == [
+        (token.text, token.block_id) for token in at_blocks
+    ]
+    assert [token.in_label for token in at_markdown] == [
+        token.in_label for token in at_blocks
+    ]
