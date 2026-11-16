@@ -1982,6 +1982,13 @@ block, are paragraphs, whatever their type:
   joined over page breaks (section 2, step 3.1), each becomes a body
   paragraph of its page, after the page's body blocks, in reading order,
   and is joined over a page break as any paragraph is;
+- except, on the heading's own page, a band block whose first word has
+  the book's marker form (section 1) and the band blocks after it: a
+  footnote of the text above the heading, which stays a note (Haskins
+  page 204, "^ Mont-Saint-Micheland Chartres, p. 4.", the note of
+  "Adams,^"; decided on 16 November 2026, in the review of work
+  package 4). No band block of a bibliographical note in Haskins starts
+  with such a word;
 - the quote rules (1 to 3 above) do not apply to them.
 
 The rule names its words, so it takes nothing in another book. How many
