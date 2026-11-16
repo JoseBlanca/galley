@@ -4592,7 +4592,8 @@ def test_whole_book_haskins_quotes_and_bibliographical_notes(
     # Structure spec, section 16: the quotes in smaller type across the
     # column on page 53, the quote over two page breaks from 71 to 73, and
     # the band of small type under "BIBLIOGRAPHICAL NOTE" on page 129 as
-    # paragraphs, which the excerpt cannot show (tests/test_excerpts.py).
+    # paragraphs. The excerpt haskins_quotes_index measures its body type
+    # smaller than the book's and cannot show the quotes.
     blocks = _blocks_of_whole_book(whole_book_toml["normansineuropea00hask"], tmp_path)
 
     def kinds_from(page: int) -> tuple[tuple[str, list[int]], ...]:

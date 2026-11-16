@@ -34,7 +34,7 @@ EXPECTED_EXCERPT_PAGES = {
     "stubbs_51_56-64": 10,
     "domesday_74-83": 10,
     "mariejol_210-219": 10,
-    "haskins_quotes_index": 10,
+    "haskins_quotes_index": 11,
     "stubbs_summaries_index": 10,
     "domesday_headings_quotes": 11,
     "mariejol_headings_verse": 6,
@@ -610,7 +610,8 @@ _HEADINGS_ON_REFERENCE_PAGES = (
         ),
     ),
     ("haskins_quotes_index", 0, ((2, None, "BIBLIOGRAPHICAL NOTE"),)),
-    ("haskins_quotes_index", 5, ((2, None, "BIBLIOGRAPHICAL NOTE"),)),
+    ("haskins_quotes_index", 1, ((1, "II", "THE COMING OF THE NORTHMEN"),)),
+    ("haskins_quotes_index", 6, ((2, None, "BIBLIOGRAPHICAL NOTE"),)),
 )
 
 
@@ -761,7 +762,7 @@ _VERSE_ON_REFERENCE_PAGES = (
     # two lines, one of them a word the OCR glued, stay a paragraph.
     (
         "haskins_quotes_index",
-        6,
+        7,
         (
             (
                 "O Roma nobilis, orbiset domina,\nCunctarum urbium excellentissima,\n"
@@ -772,7 +773,7 @@ _VERSE_ON_REFERENCE_PAGES = (
     ),
     (
         "haskins_quotes_index",
-        7,
+        8,
         (
             (
                 "A sea-side house to the farther South,\nWhere the baked dies drouth ,\n"
@@ -835,9 +836,9 @@ def test_verse_blocks_of_the_reference_pages_keep_their_lines(
 # Quotes and Haskins' bibliographical notes (structure spec, section 16), on
 # the reference pages of section 9, "The second plan". Haskins' quotes on
 # book pages 53 and 71 to 73 are checked on the whole book
-# (tests/test_structure.py): in the excerpt the heading of chapter II
-# (book page 41) is missing, so the bibliographical note of page 39 runs
-# on to page 129's and takes them in.
+# (tests/test_structure.py): the excerpt, mostly small type, measures a
+# body word height of 7.60 pt against the book's 8.32, so they are not
+# smaller than its body (structure spec, section 9, the excerpt's list).
 
 
 def _kinds_on(blocks: BlocksFile, page: int) -> tuple[str, ...]:
@@ -865,8 +866,17 @@ def test_bibliographical_note_haskins_129_band_of_small_type_is_paragraphs(
     excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
 ) -> None:
     _, blocks = excerpt_outputs["haskins_quotes_index"]
-    assert _kinds_on(blocks, 5) == ("heading", "paragraph", "paragraph")
-    assert _note_markers_on(blocks, 5) == ()
+    assert _kinds_on(blocks, 6) == ("heading", "paragraph", "paragraph")
+    assert _note_markers_on(blocks, 6) == ()
+
+
+def test_bibliographical_note_haskins_39_ends_at_the_heading_of_chapter_ii(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # Book pages 53 and 71 to 73 are outside the note: their bands are notes.
+    _, blocks = excerpt_outputs["haskins_quotes_index"]
+    assert _note_markers_on(blocks, 2) == ("*",)
+    assert _note_markers_on(blocks, 3) == ("^",)
 
 
 def test_quote_domesday_93_inset_quotes_and_its_footnotes_in_the_band(
