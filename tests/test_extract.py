@@ -1,4 +1,5 @@
-"""Tests of galley.extract (spec section 6).
+"""Tests of galley.extract (walking skeleton spec section 6, plates spec
+section 3).
 
 The unit tests of `page_words` build their pages and words by hand. The
 excerpt tests read the folders of the session fixture `excerpt_books`; a
@@ -17,11 +18,13 @@ from galley import analyze, extract
 from galley.book_folder import BookFolder
 from galley.config import read_config
 from galley.errors import InputFileError
-from galley.extract import page_words
+from galley.extract import page_words, plate_image
 from galley.model import (
     Box,
+    Figure,
     PageInfo,
     PageKind,
+    PagesFile,
     PageWords,
     Removal,
     RemovalReason,
@@ -40,6 +43,19 @@ KADESH_WORD_COUNTS = (584, 641, 671, 904, 822, 764, 909, 822, 4, 0)
 GIERKE_WORD_COUNTS = (192, 311, 297, 325, 319, 309, 292, 273, 547, 541)
 
 REGION = Box(10.0, 10.0, 20.0, 20.0)
+
+# The figures of the Kadesh excerpt's plates, pages 8 and 9 (book pages 16
+# and 17): the whole page, at 300 dpi.
+KADESH_PLATE_FIGURE = frozendict(
+    {
+        index: Figure(
+            box=Box(0.0, 0.0, 508.32, 728.16),
+            image=f"images/plate-{index:04d}.png",
+            dpi=300,
+        )
+        for index in (8, 9)
+    }
+)
 
 
 def page(
@@ -158,16 +174,64 @@ def test_blank_page_has_no_words_and_no_removals() -> None:
     )
 
 
+# A plate page (plates spec section 3)
+
+PLATE_FIGURE = Figure(
+    box=Box(0.0, 0.0, 400.0, 600.0), image="images/plate-0004.png", dpi=300
+)
+
+
+def test_plate_image_is_named_by_its_page_index_in_4_digits() -> None:
+    assert plate_image(16) == "images/plate-0016.png"
+    assert plate_image(4) == "images/plate-0004.png"
+    assert plate_image(12345) == "images/plate-12345.png"
+
+
+def test_plate_page_with_a_layer_keeps_its_words_and_has_the_whole_page_figure() -> (
+    None
+):
+    plate = page(PageKind.PLATE, TextSource.TEXT_LAYER, (REGION,))
+    stray = word("^U;L", Box(330.0, 627.0, 351.0, 637.0))
+    in_region = word("81", Box(12.0, 12.0, 16.0, 16.0))
+
+    assert page_words(plate, (stray, in_region)) == (
+        PageWords(
+            index=4,
+            text_source=TextSource.TEXT_LAYER,
+            words=(stray,),
+            figures=(PLATE_FIGURE,),
+        ),
+        (
+            Removal(
+                page_index=4,
+                box=in_region.box,
+                text="81",
+                reason=RemovalReason.EXCLUDED_REGION,
+            ),
+        ),
+    )
+
+
+def test_plate_page_without_a_layer_has_its_figure_and_no_words() -> None:
+    assert page_words(page(PageKind.PLATE, TextSource.NONE), ()) == (
+        PageWords(
+            index=4, text_source=TextSource.NONE, words=(), figures=(PLATE_FIGURE,)
+        ),
+        (),
+    )
+
+
 @pytest.mark.parametrize(
     ("kind", "text_source", "layer_words"),
     [
         (PageKind.BLANK, TextSource.NONE, (word("lost", Box(1.0, 1.0, 2.0, 2.0)),)),
-        (PageKind.PLATE, TextSource.NONE, ()),
+        (PageKind.PLATE, TextSource.NONE, (word("lost", Box(1.0, 1.0, 2.0, 2.0)),)),
         (PageKind.TEXT, TextSource.OCR, ()),
+        (PageKind.PLATE, TextSource.OCR, ()),
     ],
-    ids=["blank_with_words", "plate", "ocr"],
+    ids=["blank_with_words", "plate_without_layer_with_words", "ocr", "plate_ocr"],
 )
-def test_page_the_skeleton_cannot_read_is_a_value_error(
+def test_page_extract_cannot_read_or_whose_words_would_be_lost_is_a_value_error(
     kind: PageKind, text_source: TextSource, layer_words: tuple[Word, ...]
 ) -> None:
     with pytest.raises(ValueError, match=r"^page 4 "):
@@ -192,7 +256,7 @@ def test_word_counts_per_page_are_those_of_the_text_layer_but_81_and_page_9(
     )
 
 
-def test_pages_have_their_index_their_text_source_and_no_figure(
+def test_pages_have_their_index_their_text_source_and_figures_on_plates_alone(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     kadesh = read_words(excerpt_books[KADESH].words_json)
@@ -202,8 +266,9 @@ def test_pages_have_their_index_their_text_source_and_no_figure(
         (page_words.index, page_words.text_source, page_words.figures)
         for page_words in kadesh.pages
     ) == (
-        *((index, TextSource.TEXT_LAYER, ()) for index in range(9)),
-        (9, TextSource.NONE, ()),
+        *((index, TextSource.TEXT_LAYER, ()) for index in range(8)),
+        (8, TextSource.TEXT_LAYER, (KADESH_PLATE_FIGURE[8],)),
+        (9, TextSource.NONE, (KADESH_PLATE_FIGURE[9],)),
     )
     assert tuple(
         (page_words.index, page_words.text_source, page_words.figures)
@@ -291,9 +356,45 @@ def test_kadesh_cover_is_page_0_at_300_dpi_in_8_bit_grayscale(
 ) -> None:
     with Image.open(excerpt_books[KADESH].cover_png) as cover:
         assert (cover.format, cover.mode, cover.size) == ("PNG", "L", (2118, 3034))
-    assert sorted(excerpt_books[KADESH].images_dir.iterdir()) == [
-        excerpt_books[KADESH].cover_png
-    ]
+
+
+# The plates of the excerpts (plates spec section 6), by page index in the
+# excerpt: Kadesh 16 and 17; Kadesh 64, 65 (the back of plate 64) and 68;
+# Domesday's maps 39 and 40. Each has its image, and nothing else is in
+# images/ but the cover.
+EXCERPT_PLATES = frozendict(
+    {
+        "kadesh_8-17": (8, 9),
+        "kadesh_59-68": (5, 6, 9),
+        "domesday_headings_quotes": (3, 4),
+    }
+)
+
+
+def test_each_excerpt_plate_has_its_whole_page_figure_and_its_image_alone(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    for name, folder in excerpt_books.items():
+        plates = EXCERPT_PLATES.get(name, ())
+        pages = read_pages(folder.pages_json).pages
+        words = read_words(folder.words_json)
+        assert tuple(
+            page_words.index for page_words in words.pages if page_words.figures
+        ) == (plates), name
+        for index in plates:
+            assert words.pages[index].figures == (
+                Figure(
+                    box=Box(0.0, 0.0, pages[index].width_pt, pages[index].height_pt),
+                    image=f"images/plate-{index:04d}.png",
+                    dpi=300,
+                ),
+            ), name
+            with Image.open(folder.root / words.pages[index].figures[0].image) as plate:
+                assert (plate.format, plate.mode) == ("PNG", "L"), name
+        cover = ("cover.png",) if name == KADESH else ()
+        assert sorted(path.name for path in folder.images_dir.iterdir()) == sorted(
+            (*cover, *(f"plate-{index:04d}.png" for index in plates))
+        ), name
 
 
 def test_gierke_without_cover_page_has_an_empty_images_folder(
@@ -461,25 +562,119 @@ def test_extract_without_pages_json_names_analyze(
         extract.run(folder, read_config(folder.book_toml))
 
 
+def _pages_with_plates_8_and_9(kadesh_pages: PagesFile) -> PagesFile:
+    """The Kadesh excerpt's pages with page 8 a plate with a text layer and
+    page 9 a plate without one, as plates spec section 6 has them."""
+    return replace(
+        kadesh_pages,
+        pages=(
+            *kadesh_pages.pages[:8],
+            replace(
+                kadesh_pages.pages[8],
+                kind=PageKind.PLATE,
+                text_source=TextSource.TEXT_LAYER,
+            ),
+            replace(
+                kadesh_pages.pages[9], kind=PageKind.PLATE, text_source=TextSource.NONE
+            ),
+        ),
+    )
+
+
 @pytest.mark.thread_unsafe
-def test_extract_on_pages_json_with_a_plate_and_an_ocr_page_names_both_and_analyze(
+def test_kadesh_plates_8_and_9_get_their_images_and_figures_and_8_keeps_its_words(
     tmp_path: Path,
     excerpt_pdf: frozendict[str, Path],
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "exclude_pages = [9]\n")
-    pages = read_pages(excerpt_books[KADESH].pages_json)
+    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "cover_page = 0\n")
+    write_pages(
+        folder.pages_json,
+        _pages_with_plates_8_and_9(read_pages(excerpt_books[KADESH].pages_json)),
+    )
+
+    extract.run(folder, read_config(folder.book_toml))
+
+    words = read_words(folder.words_json)
+    assert words.pages[8] == PageWords(
+        index=8,
+        text_source=TextSource.TEXT_LAYER,
+        words=words.pages[8].words,
+        figures=(
+            Figure(
+                box=Box(0.0, 0.0, 508.32, 728.16),
+                image="images/plate-0008.png",
+                dpi=300,
+            ),
+        ),
+    )
+    assert tuple(kept.text for kept in words.pages[8].words) == (
+        ",",
+        "'",
+        "..",
+        "^U;L",
+    )
+    assert words.pages[9] == PageWords(
+        index=9,
+        text_source=TextSource.NONE,
+        words=(),
+        figures=(
+            Figure(
+                box=Box(0.0, 0.0, 508.32, 728.16),
+                image="images/plate-0009.png",
+                dpi=300,
+            ),
+        ),
+    )
+    assert all(page_words.figures == () for page_words in words.pages[:8])
+    # The page number 81 in the region of page 0 alone: the plate's words stay.
+    assert words.removals == KADESH_REMOVALS[:1]
+    assert sorted(path.name for path in folder.images_dir.iterdir()) == [
+        "cover.png",
+        "plate-0008.png",
+        "plate-0009.png",
+    ]
+    for name in ("plate-0008.png", "plate-0009.png"):
+        with Image.open(folder.images_dir / name) as plate:
+            assert (plate.format, plate.mode, plate.size) == ("PNG", "L", (2118, 3034))
+
+
+@pytest.mark.thread_unsafe
+def test_kadesh_plates_with_1_worker_and_with_6_give_the_same_bytes(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    pages = _pages_with_plates_8_and_9(read_pages(excerpt_books[KADESH].pages_json))
+    folders = {}
+    for workers in (1, 6):
+        folder = kadesh_folder(tmp_path / str(workers), excerpt_pdf[KADESH], "")
+        write_pages(folder.pages_json, pages)
+        extract.run(folder, read_config(folder.book_toml), workers=workers)
+        folders[workers] = folder
+
+    assert folders[1].words_json.read_bytes() == folders[6].words_json.read_bytes()
+    for name in ("plate-0008.png", "plate-0009.png"):
+        assert (folders[1].images_dir / name).read_bytes() == (
+            folders[6].images_dir / name
+        ).read_bytes()
+
+
+@pytest.mark.thread_unsafe
+def test_extract_on_pages_json_with_an_ocr_page_names_it_and_analyze(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "")
+    pages = _pages_with_plates_8_and_9(read_pages(excerpt_books[KADESH].pages_json))
     write_pages(
         folder.pages_json,
         replace(
             pages,
             pages=(
                 replace(pages.pages[0], text_source=TextSource.OCR),
-                *pages.pages[1:8],
-                replace(
-                    pages.pages[8], kind=PageKind.PLATE, text_source=TextSource.NONE
-                ),
-                pages.pages[9],
+                *pages.pages[1:],
             ),
         ),
     )
@@ -488,7 +683,7 @@ def test_extract_on_pages_json_with_a_plate_and_an_ocr_page_names_both_and_analy
         extract.run(folder, read_config(folder.book_toml))
 
     assert str(raised.value) == (
-        f"{folder.pages_json}: page indices 0, 8 are plates or read by OCR, "
-        "which the walking skeleton cannot read; run `galley2epub analyze` again"
+        f"{folder.pages_json}: page indices 0 are read by OCR, which extract "
+        "cannot read yet; run `galley2epub analyze` again"
     )
     assert not folder.words_json.exists()

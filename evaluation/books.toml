@@ -3,11 +3,13 @@
 # Each book is an Internet Archive scan and the Project Gutenberg edition
 # that Distributed Proofreaders made from it. Page indices count from 0 in
 # the PDF. `exclude_pages` are the pages without a text layer, with which
-# `galley2epub run` succeeded on 15 November 2026, and the pages with one
-# that analyze's plate rule takes wrongly (docs/specs/plates.md, section
-# 2). The contents pages are those of the printed table of contents,
-# found on 16 November 2026 by "CONTENTS" or "TABLE DES MATIERES" at the
-# top of the page and checked by reading each page's text layer. galley-eval
+# `galley2epub run` succeeded on 15 November 2026, but the plates (Stubbs
+# 9, 11, 52 and 54), which analyze takes since 16 November 2026, and the
+# pages with one that analyze's plate rule takes wrongly
+# (docs/specs/plates.md, section 2). The contents pages are those of the
+# printed table of contents, found on 16 November 2026 by "CONTENTS" or
+# "TABLE DES MATIERES" at the top of the page and checked by reading each
+# page's text layer. galley-eval
 # writes `exclude_pages`, `contents_pages` and `plate_pages`, each an empty
 # list when a book has none, into the book.toml it gives galley
 # (architecture section 6). `html_sha256` is that of
@@ -41,7 +43,7 @@ archive_id = "earlyplantagenet01stub"
 title = "The Early Plantagenets"
 authors = ["William Stubbs"]
 language = "en"
-exclude_pages = [0, 2, 3, 4, 5, 8, 9, 10, 11, 52, 53, 54, 55, 338, 339, 340, 341, 342, 343]
+exclude_pages = [0, 2, 3, 4, 5, 8, 10, 53, 55, 338, 339, 340, 341, 342, 343]
 contents_pages = [14, 15, 16]
 html_sha256 = "0c026dfc971d6fe8e8e55e00aaaa6bd3e4c109095011836c6cb411e24304b0dc"
 expected_counts = { notes = 0, margin_notes = 467, note_references = 0, page_anchors = 322, headings = 37, first_tokens = ["Epochs", "of", "Modern", "History", "EDITED"] }

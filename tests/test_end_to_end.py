@@ -73,8 +73,11 @@ def test_every_file_of_the_book_folder_but_edits_is_written(
             "pages.json",
             "words.json",
         ]
-    assert list(excerpt_books[KADESH].images_dir.iterdir()) == [
-        excerpt_books[KADESH].cover_png
+    # The cover and the images of the plates on pages 8 and 9.
+    assert sorted(path.name for path in excerpt_books[KADESH].images_dir.iterdir()) == [
+        "cover.png",
+        "plate-0008.png",
+        "plate-0009.png",
     ]
     assert list(excerpt_books[GIERKE].images_dir.iterdir()) == []
 

@@ -4,7 +4,8 @@ every stage, and a stage's name runs that stage alone (spec section 9).
 The command reads `book.toml` from the folder and calls each stage's `run`.
 Before any stage, it refuses `correct = true` under `run` and checks that
 Pandoc is installed when a stage it runs needs it, and Tesseract when
-structure runs and the word list of the book's language is not cached.
+analyze or structure runs and the word list of the book's language is not
+cached.
 Errors propagate to `main`, which logs them and raises them again
 (architecture section 14).
 """
@@ -60,7 +61,7 @@ _STAGES: tuple[_Stage, ...] = (
         help="what each page is: pages.json",
         run=analyze.run,
         needs_pandoc=False,
-        needs_word_list=False,
+        needs_word_list=True,
     ),
     _Stage(
         name="extract",
@@ -158,7 +159,8 @@ def _check_before_any_stage(
 ) -> None:
     """ConfigError for `correct = true` under run, then ExternalProgramError
     when a stage needs Pandoc and it is not on the PATH (spec section 9),
-    or structure needs Tesseract's tools to extract the word list."""
+    or analyze or structure needs Tesseract's tools to extract the word
+    list."""
     if command == _RUN and config.correct:
         message = (
             f"{folder.book_toml} has correct = true, but the walking skeleton "
@@ -168,14 +170,16 @@ def _check_before_any_stage(
     if any(stage.needs_pandoc for stage in stages) and shutil.which("pandoc") is None:
         message = "pandoc is not installed; install it with `brew install pandoc`"
         raise ExternalProgramError(message)
-    if any(stage.needs_word_list for stage in stages):
-        _check_word_list_tools(config)
+    needing_word_list = tuple(stage.name for stage in stages if stage.needs_word_list)
+    if needing_word_list:
+        _check_word_list_tools(config, needing_word_list[0])
 
 
-def _check_word_list_tools(config: BookConfig) -> None:
+def _check_word_list_tools(config: BookConfig, first_stage: str) -> None:
     """ExternalProgramError when the word list of the book's language is
     not in the word list's cache folder and Tesseract's tools are not on
-    the PATH (structure spec, section 8)."""
+    the PATH (structure spec, section 8; plates spec, section 4), naming
+    `first_stage`, the first stage to run that needs the list."""
     # The cache folder is read here, as structure.run reads it, so that both
     # look at the same folder and a test can point it elsewhere.
     missing = wordlist.missing_tools(config.language, wordlist.DEFAULT_CACHE_DIR)
@@ -189,7 +193,7 @@ def _check_word_list_tools(config: BookConfig) -> None:
     verb, pronoun = ("is", "it") if len(missing) == 1 else ("are", "them")
     code = tesseract_language(config.language)
     message = (
-        f"{names} {verb} not installed; structure needs {pronoun} once to "
+        f"{names} {verb} not installed; {first_stage} needs {pronoun} once to "
         f"extract the word list of {code} from Tesseract's data: install "
         f"{pronoun} with `brew install tesseract`"
     )
