@@ -44,8 +44,10 @@ GIERKE_WORD_COUNTS = (192, 311, 297, 325, 319, 309, 292, 273, 547, 541)
 
 REGION = Box(10.0, 10.0, 20.0, 20.0)
 
-# The figures of the Kadesh excerpt's plates, pages 8 and 9 (book pages 16
-# and 17): the whole page, at 300 dpi.
+# The figures of Kadesh excerpt pages 8 and 9 (book pages 16 and 17) when
+# both are plates, as the tests with pages of their own make them: the
+# whole page, at 300 dpi. The excerpt's config excludes page 8, the scan
+# of a cover (the owner, 16 November 2026).
 KADESH_PLATE_FIGURE = frozendict(
     {
         index: Figure(
@@ -241,15 +243,18 @@ def test_page_extract_cannot_read_or_whose_words_would_be_lost_is_a_value_error(
 # The excerpts, from the session fixture.
 
 
-def test_word_counts_per_page_are_those_of_the_text_layer_but_81_and_page_9(
+def test_word_counts_per_page_are_those_of_the_text_layer_but_81_and_pages_8_9(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     kadesh = read_words(excerpt_books[KADESH].words_json)
     gierke = read_words(excerpt_books[GIERKE].words_json)
 
+    # Page 8 is excluded; page 9 has no text layer.
     assert tuple(len(page_words.words) for page_words in kadesh.pages) == (
         583,
-        *KADESH_WORD_COUNTS[1:],
+        *KADESH_WORD_COUNTS[1:8],
+        0,
+        0,
     )
     assert tuple(len(page_words.words) for page_words in gierke.pages) == (
         GIERKE_WORD_COUNTS
@@ -267,7 +272,7 @@ def test_pages_have_their_index_their_text_source_and_figures_on_plates_alone(
         for page_words in kadesh.pages
     ) == (
         *((index, TextSource.TEXT_LAYER, ()) for index in range(8)),
-        (8, TextSource.TEXT_LAYER, (KADESH_PLATE_FIGURE[8],)),
+        (8, TextSource.NONE, ()),
         (9, TextSource.NONE, (KADESH_PLATE_FIGURE[9],)),
     )
     assert tuple(
@@ -286,17 +291,10 @@ def test_words_json_carries_the_pdf_hash_of_pages_json(
         )
 
 
-def test_kadesh_only_removal_is_the_page_number_81_in_its_region(
+def test_kadesh_removals_are_81_in_its_region_and_the_4_words_of_excluded_page_8(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    assert read_words(excerpt_books[KADESH].words_json).removals == (
-        Removal(
-            page_index=0,
-            box=Box(241.68, 622.509, 249.07648, 629.509),
-            text="81",
-            reason=RemovalReason.EXCLUDED_REGION,
-        ),
-    )
+    assert read_words(excerpt_books[KADESH].words_json).removals == KADESH_REMOVALS
 
 
 def test_kadesh_word_touching_the_region_with_its_centre_outside_stays(
@@ -326,15 +324,6 @@ def test_kadesh_page_0_starts_with_the_title(
     )
 
 
-def test_kadesh_page_8_holds_exactly_the_four_stray_words_of_the_plate(
-    excerpt_books: frozendict[str, BookFolder],
-) -> None:
-    page_8 = read_words(excerpt_books[KADESH].words_json).pages[8]
-
-    assert tuple(kept.text for kept in page_8.words) == (",", "'", "..", "^U;L")
-    assert all(kept.ocr_confidence is None for kept in page_8.words)
-
-
 def test_gierke_page_9_starts_with_its_running_head_and_has_no_removal(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
@@ -359,12 +348,13 @@ def test_kadesh_cover_is_page_0_at_300_dpi_in_8_bit_grayscale(
 
 
 # The plates of the excerpts (plates spec section 6), by page index in the
-# excerpt: Kadesh 16 and 17; Kadesh 64, 65 (the back of plate 64) and 68;
+# excerpt: Kadesh 17 (16, the scan of a cover, is excluded); Kadesh 64, 65
+# (the back of plate 64) and 68;
 # Domesday's maps 39 and 40. Each has its image, and nothing else is in
 # images/ but the cover.
 EXCERPT_PLATES = frozendict(
     {
-        "kadesh_8-17": (8, 9),
+        "kadesh_8-17": (9,),
         "kadesh_59-68": (5, 6, 9),
         "domesday_headings_quotes": (3, 4),
     }
@@ -426,7 +416,7 @@ def kadesh_folder(root: Path, pdf: Path, settings: str) -> BookFolder:
 
 
 # Removals on two pages, so that their order is tested: the page number 81
-# in the region of page 0, and the 4 words of the plate on page 8.
+# in the region of page 0, and the 4 words of page 8, the scan of a cover.
 TWO_PAGES_OF_REMOVALS = (
     "exclude_pages = [8, 9]\n"
     "exclude_regions = [{page = 0, box = [240, 620, 252, 632]}]\n"
@@ -573,7 +563,9 @@ def test_extract_without_pages_json_names_analyze(
 
 def _pages_with_plates_8_and_9(kadesh_pages: PagesFile) -> PagesFile:
     """The Kadesh excerpt's pages with page 8 a plate with a text layer and
-    page 9 a plate without one, as plates spec section 6 has them."""
+    page 9 a plate without one: page 8 as analyze's plate rule takes it when
+    the config does not exclude it (it is the scan of a cover, the owner
+    found on 16 November 2026), a page with a layer of stray words alone."""
     return replace(
         kadesh_pages,
         pages=(

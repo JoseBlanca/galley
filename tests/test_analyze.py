@@ -443,7 +443,7 @@ def test_page_index_equal_to_the_page_count_is_a_config_error(
 # The excerpts, from the session fixture.
 
 
-def test_kadesh_pages_are_text_but_plates_8_and_9_with_the_region_on_page_0(
+def test_kadesh_pages_are_text_but_8_excluded_and_plate_9_with_the_region_on_0(
     excerpt_books: frozendict[str, BookFolder], excerpt_pdf: frozendict[str, Path]
 ) -> None:
     pages = read_pages(excerpt_books[KADESH].pages_json)
@@ -466,13 +466,14 @@ def test_kadesh_pages_are_text_but_plates_8_and_9_with_the_region_on_page_0(
             )
             for index in range(8)
         ),
-        # Book page 16, a relief whose layer holds 4 stray words.
+        # Book page 16, the scan of a cover (the owner, 16 November 2026),
+        # excluded by the config.
         PageInfo(
             index=8,
             width_pt=508.32,
             height_pt=728.16,
-            kind=PageKind.PLATE,
-            text_source=TextSource.TEXT_LAYER,
+            kind=PageKind.EXCLUDED,
+            text_source=TextSource.NONE,
             text_layer_score=None,
             exclude_regions=(),
             blank_checked_by_ocr=False,
@@ -492,12 +493,12 @@ def test_kadesh_pages_are_text_but_plates_8_and_9_with_the_region_on_page_0(
 
 
 # The plates of each excerpt, by page index in the excerpt (plates spec
-# section 6): Kadesh 16 and 17; Kadesh 64, 65 (the back of plate 64, a
-# known wrong case) and 68; Domesday's maps 39 and 40. The other
+# section 6): Kadesh 17 (16, the scan of a cover, is excluded); Kadesh 64,
+# 65 (the back of plate 64, a known wrong case) and 68; Domesday's maps 39 and 40. The other
 # excerpts have none.
 EXCERPT_PLATES = frozendict(
     {
-        "kadesh_8-17": (8, 9),
+        "kadesh_8-17": (9,),
         "kadesh_59-68": (5, 6, 9),
         "domesday_headings_quotes": (3, 4),
     }
@@ -510,8 +511,9 @@ def test_the_excerpts_plates_are_those_of_the_spec_and_every_other_page_is_text(
     for name, folder in excerpt_books.items():
         pages = read_pages(folder.pages_json).pages
         plates = EXCERPT_PLATES.get(name, ())
-        # Haskins' blank page before the index is excluded by its config.
-        excluded = (8,) if name == "haskins_eval" else ()
+        # Haskins' blank page before the index and Kadesh's scan of a cover
+        # are excluded by their configs.
+        excluded = (8,) if name in ("haskins_eval", KADESH) else ()
         assert tuple(page.index for page in pages if page.kind is PageKind.PLATE) == (
             plates
         ), name
@@ -589,7 +591,8 @@ def test_each_page_the_plate_rule_takes_is_logged_at_warning_with_its_measures(
     excerpt_pdf: frozendict[str, Path],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    # Page 8 by the rule is logged, page 9 made a plate by the config is not.
+    # Page 8, the scan of a cover that the rule takes when the config does
+    # not exclude it, is logged; page 9 made a plate by the config is not.
     folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "plate_pages = [9]\n")
 
     with caplog.at_level(logging.WARNING, logger="galley.analyze"):
@@ -643,13 +646,12 @@ def test_ocr_redo_stops_analyze_before_writing_and_leaves_no_file(
 
 # The whole books (plates spec section 1)
 
-# The 22 plates of the six books, by Internet Archive identifier, with the
+# The 21 plates of the six books, by Internet Archive identifier, with the
 # configs of tests/conftest.py: those without a text layer are Kadesh 17,
 # 23 (named in plate_pages), 35, 43, 57 and 69, and Stubbs' four maps.
 WHOLE_BOOK_PLATES = frozendict(
     {
         "battleofkadeshst00breauoft": (
-            (16, TextSource.TEXT_LAYER),
             (17, TextSource.NONE),
             (19, TextSource.TEXT_LAYER),
             (22, TextSource.TEXT_LAYER),
@@ -683,8 +685,9 @@ WHOLE_BOOK_PLATES = frozendict(
 )
 
 
-def test_the_whole_book_plates_are_22() -> None:
-    assert sum(len(plates) for plates in WHOLE_BOOK_PLATES.values()) == 22
+def test_the_whole_book_plates_are_21_of_them_15_of_kadesh() -> None:
+    assert sum(len(plates) for plates in WHOLE_BOOK_PLATES.values()) == 21
+    assert len(WHOLE_BOOK_PLATES["battleofkadeshst00breauoft"]) == 15
 
 
 @pytest.mark.whole_book

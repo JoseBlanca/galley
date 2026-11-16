@@ -35,8 +35,10 @@ EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 _EXCERPT_RUNS_AT_ONCE = 6
 
 # The configs of spec section 9, "The end-to-end test", without `pdf`.
-# Kadesh's region on page 0 holds the page number 81. Its page 9, without a
-# text layer, is a plate, which analyze takes (plates spec section 6).
+# Kadesh's region on page 0 holds the page number 81. Its page 8 (book page
+# 16) is the scan of a cover, not a plate (the owner, 16 November 2026),
+# which analyze's plate rule would take; its page 9, without a text layer,
+# is a plate, which analyze takes (plates spec section 6).
 EXCERPT_CONFIGS = frozendict(
     {
         "kadesh_8-17": (
@@ -45,6 +47,7 @@ EXCERPT_CONFIGS = frozendict(
             'language = "en"\n'
             "cover_page = 0\n"
             "exclude_regions = [{page = 0, box = [240, 620, 252, 632]}]\n"
+            "exclude_pages = [8]\n"
         ),
         "gierke_86-93_270-271": (
             'title = "Political Theories of the Middle Age"\n'
@@ -117,8 +120,9 @@ EXCERPT_CONFIGS = frozendict(
 # analyze refuses unless excluded (the evaluation books' as in
 # evaluation/books.toml, Kadesh's and Gierke's as analyze listed them on 15
 # November 2026), and the pages that analyze's plate rule takes wrongly
-# (docs/specs/plates.md, section 2): Kadesh 0, the cover, and 49 and 65,
-# backs of plates; Mariéjol 1 and 2, marbled endpapers, and 457 and 458,
+# (docs/specs/plates.md, sections 1 and 2): Kadesh 0, the cover, 16, the
+# scan of a cover (the owner, 16 November 2026), and 49 and 65, backs of
+# plates; Mariéjol 1 and 2, marbled endpapers, and 457 and 458,
 # an endpaper and the library's card pocket; Mariéjol 0, its cover, has no
 # layer. The plates without a text layer (Kadesh 17, 23, 35, 43, 57 and 69;
 # Stubbs 9, 11, 52 and 54) are not excluded: analyze takes them as plates
@@ -159,7 +163,7 @@ WHOLE_BOOK_CONFIGS = frozendict(
         ),
         "battleofkadeshst00breauoft": (
             'language = "en"\n'
-            "exclude_pages = [0, 1, 2, 3, 49, 65, 70, 71, 72, 73, 75]\n"
+            "exclude_pages = [0, 1, 2, 3, 16, 49, 65, 70, 71, 72, 73, 75]\n"
             "plate_pages = [23]\n"
         ),
         "politicaltheorie00gieruoft": (

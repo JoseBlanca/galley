@@ -1423,7 +1423,8 @@ def _removed(blocks: BlocksFile, page_index: int) -> tuple[tuple[str, str], ...]
 def test_plate_text_lines_removed_and_figure_block_without_text_follows_paragraph() -> (
     None
 ):
-    # Kadesh's page 16: two lines of stray words and no caption.
+    # Two lines of stray words and no caption, as on Kadesh's page 16 (the
+    # scan of a cover, which the configs exclude, the owner found).
     pages = (
         _body_page(0, *_five_full_lines(70, "first"), _full("runs on to", 145)),
         _plate(1, _spread("^U;L", 60, 90, 627), _spread(", ' ..", 60, 90, 222)),

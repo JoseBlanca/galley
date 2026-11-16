@@ -41,10 +41,11 @@ KADESH = "kadesh_8-17"
 GIERKE = "gierke_86-93_270-271"
 
 # Spec sections 2 and 6: the words of each page in words.json. Kadesh page 0
-# loses 81 to its excluded region, and page 9 is excluded.
+# loses 81 to its excluded region, page 8, the scan of a cover, is
+# excluded, and page 9 has no text layer.
 WORD_COUNTS = frozendict(
     {
-        KADESH: (583, 641, 671, 904, 822, 764, 909, 822, 4, 0),
+        KADESH: (583, 641, 671, 904, 822, 764, 909, 822, 0, 0),
         GIERKE: (192, 311, 297, 325, 319, 309, 292, 273, 547, 541),
     }
 )
@@ -76,10 +77,9 @@ def test_every_file_of_the_book_folder_but_edits_is_written(
             "pages.json",
             "words.json",
         ]
-    # The cover and the images of the plates on pages 8 and 9.
+    # The cover and the image of the plate on page 9.
     assert sorted(path.name for path in excerpt_books[KADESH].images_dir.iterdir()) == [
         "cover.png",
-        "plate-0008.png",
         "plate-0009.png",
     ]
     assert list(excerpt_books[GIERKE].images_dir.iterdir()) == []
@@ -114,13 +114,14 @@ def test_every_word_of_a_page_is_in_one_line_of_that_page(
         )
 
 
-def test_every_page_has_regions_but_the_excluded_kadesh_page_9(
+def test_every_page_has_regions_but_kadesh_pages_8_and_9_without_words(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     kadesh = read_lines(excerpt_books[KADESH].lines_json)
     gierke = read_lines(excerpt_books[GIERKE].lines_json)
 
-    assert tuple(len(page.regions) > 0 for page in kadesh.pages) == (True,) * 9 + (
+    assert tuple(len(page.regions) > 0 for page in kadesh.pages) == (True,) * 8 + (
+        False,
         False,
     )
     assert all(page.regions for page in gierke.pages)
@@ -213,22 +214,20 @@ def test_blocks_json_with_its_records_holds_every_word_of_words_json(
         assert _structure_words(blocks).total() == sum(word_counts)
 
 
-def test_the_stray_words_of_the_kadesh_plate_are_removed_as_plate_text(
+def test_the_kadesh_excerpt_ends_with_the_figure_of_plate_9_without_text(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    # analyze finds page 8 a plate, and structure removes its two lines of
-    # stray words (structure spec, section 18); the last blocks are the
-    # figure blocks of pages 8 and 9, without text.
+    # Page 8, the scan of a cover, is excluded, so no word of it reaches
+    # structure; page 9, a plate without a text layer, is the last block, a
+    # figure without text (structure spec, section 18).
     blocks = read_blocks(excerpt_books[KADESH].blocks_json)
-    assert sorted(
-        removal.text
-        for removal in blocks.removals
-        if removal.reason is RemovalReason.PLATE_TEXT
-    ) == [", ' ..", "^U;L"]
+    assert not any(
+        removal.reason is RemovalReason.PLATE_TEXT for removal in blocks.removals
+    )
     assert tuple(
         (block.kind, block.figure, block_text(block)) for block in blocks.blocks[-2:]
     ) == (
-        (BlockKind.FIGURE, "images/plate-0008.png", ""),
+        (BlockKind.PARAGRAPH, None, block_text(blocks.blocks[-2])),
         (BlockKind.FIGURE, "images/plate-0009.png", ""),
     )
 
@@ -414,7 +413,7 @@ def test_each_figure_block_div_of_the_epub_holds_one_image(
         for block_id in figures:
             assert len(tuple(divs[block_id].iter(f"{{{_XHTML}}}img"))) == 1, block_id
     assert {name: count for name, count in figure_counts.items() if count} == {
-        "kadesh_8-17": 2,
+        "kadesh_8-17": 1,
         "kadesh_59-68": 3,
         "domesday_headings_quotes": 2,
     }

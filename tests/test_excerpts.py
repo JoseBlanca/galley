@@ -965,29 +965,19 @@ def _figures(blocks: BlocksFile) -> tuple[tuple[str | None, list[int], str], ...
     )
 
 
-def test_plate_text_kadesh_16_two_lines_and_a_figure_block_without_text(
+def test_figure_block_kadesh_17_without_text_after_the_paragraph_of_page_15(
     excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
 ) -> None:
+    # Page 8 (book page 16), the scan of a cover (the owner, 16 November
+    # 2026), is excluded by the config; page 9 (17), a plate without a text
+    # layer, gives a figure block with no text after the paragraph of page
+    # 15 (excerpt page 7), the last page of text in the excerpt.
     _, blocks = excerpt_outputs["kadesh_8-17"]
-    # From the top down (spec section 7).
-    assert _plate_removals(blocks, 8) == (
-        ("plate_text", ", ' .."),
-        ("plate_text", "^U;L"),
-    )
-    assert _figures(blocks) == (
-        ("images/plate-0008.png", [8], ""),
-        ("images/plate-0009.png", [9], ""),
-    )
-    # The figure blocks follow the paragraph of page 15 (excerpt page 7),
-    # which runs on over the plates: no paragraph holds a plate's words.
+    assert _plate_removals(blocks, 8) == ()
+    assert _figures(blocks) == (("images/plate-0009.png", [9], ""),)
     kinds = tuple(block.kind for block in blocks.blocks)
     first_figure = kinds.index(BlockKind.FIGURE)
     assert _pages(blocks.blocks[first_figure - 1].origin)[-1] == 7
-    assert all(
-        8 not in _pages(block.origin)
-        for block in blocks.blocks
-        if block.kind is not BlockKind.FIGURE
-    )
 
 
 def test_caption_kadesh_64_and_68_kept_and_the_back_of_plate_65_removed(
