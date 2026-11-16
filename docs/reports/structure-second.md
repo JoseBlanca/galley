@@ -183,3 +183,23 @@ Domesday's analyze takes 14.3 s against 4.3 s before; the renders are
 refusal broke every excerpt run. The stream needed one file outside its
 list, `tests/test_end_to_end.py` (Kadesh's excerpt now has two plate
 images); the orchestrator added it to the stream's files.
+
+## Figure images in markdown (eda92f2 spec, 5c2380e code)
+
+The open point of the `markdown` stream, made on the plan's branch: a
+figure is a div of class `figure` holding only its image, the caption as
+the image's text (`![PLATE I\. The battle\.](images/plate-0016.png)`).
+The fidelity check (architecture §13) counts the caption's words once,
+requires the alt text to equal the caption (or be empty with no
+caption) and title and attributes to be empty, and refuses every other
+Image or Figure. epub passes the book folder to Pandoc as its resource
+path. A test EPUB with a captioned and an uncaptioned figure passes
+epubcheck.
+
+**The test budget.** The default run took 41.1 s at load average 5.7
+(the `notes` stream running), against the coding skill's 30 s. The
+slowest parts: the excerpt fixture's setup, 5.5 s (now with plate
+renders), and seven tests of about 1.6–2.2 s each, five of them
+epubcheck runs. Added to the plan: after the `notes` stream merges, the
+run is measured on an idle machine, and if it is over 30 s a task brings
+it back under (before work package 2's review).
