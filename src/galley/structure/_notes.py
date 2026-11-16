@@ -9,6 +9,7 @@ whole book in page order.
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from enum import StrEnum
 
 from galley.structure._lines import (
     INDENT_MAX_PT,
@@ -224,9 +225,12 @@ def footnotes(
     when it may (`PageNote.may_continue`) and the last page before it with
     notes is the page before, pages with neither notes nor a body stream
     (blank, plate and excluded pages) aside. In a book numbered per page,
-    the k-th note that starts on a page has the value k; otherwise its
-    value is what its marker reads."""
-    per_page = numbered_per_page(pages)
+    the k-th note that starts on a page has the value k, a first note that
+    may continue and does not being left uncounted; otherwise its value is
+    what its marker reads."""
+    numbering = (
+        _Numbering.PER_PAGE if numbered_per_page(pages) else _Numbering.BY_MARKER
+    )
     joined: list[list[PageNote]] = []
     last_page_with_notes: int | None = None
     for page_number, notes in enumerate(pages):
@@ -245,14 +249,31 @@ def footnotes(
         if starts:
             joined.append(starts)
         last_page_with_notes = page_number
-    return tuple(
+    return tuple(footnote for notes in joined for footnote in _valued(notes, numbering))
+
+
+class _Numbering(StrEnum):
+    """How a book numbers its notes (spec section 11, "Its value")."""
+
+    PER_PAGE = "per_page"
+    BY_MARKER = "by_marker"
+
+
+def _valued(notes: Sequence[PageNote], numbering: _Numbering) -> tuple[Footnote, ...]:
+    """The footnotes that start on one page, with their values. A first
+    note that may continue one of the page before and does not, the end of
+    a note that started elsewhere, is not counted and has no value."""
+    leftover = notes[0].may_continue
+    counted = notes[1:] if leftover else notes
+    return (
+        (Footnote(notes[0].lines, notes[0].marker, None),) if leftover else ()
+    ) + tuple(
         Footnote(
             lines=note.lines,
             marker=note.marker,
             value=place
-            if per_page
+            if numbering is _Numbering.PER_PAGE
             else (note.marker.value if note.marker is not None else None),
         )
-        for notes in joined
-        for place, note in enumerate(notes, start=1)
+        for place, note in enumerate(counted, start=1)
     )

@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): each note's marker, \"\\\"'\", \"11\", \"12\", \"13\", \"u\", is taken out of its text into `marker`; the glued \"13The\" is split by a note_marker word change; note 12's second piece, \"(Histoire. 1875…\" in the right column, is part of note 12.",
+  "changed": "Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): each note's marker, \"\\\"'\", \"11\", \"12\", \"13\", \"u\", is taken out of its text into `marker`; the glued \"13The\" is split by a note_marker word change; note 12's second piece, \"(Histoire. 1875…\" in the right column, is part of note 12. Changed by task 2.3 (structure spec section 11, \"References\"): \"Kadesh,12\", \";13\" and \"above).'*\" are linked to notes 12, 13 and 14 (marked \"u\"), each split off its word by a note_marker word change; notes 10 and 11 stay unreferenced.",
   "excerpt": "kadesh_8-17",
   "page": 2,
   "book_page_index": 10,
@@ -183,6 +183,26 @@
     },
     {
       "before": [
+        "Kadesh,12"
+      ],
+      "after": [
+        "Kadesh,",
+        "12"
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        ";13"
+      ],
+      "after": [
+        ";",
+        "13"
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
         "north-",
         "west"
       ],
@@ -190,6 +210,16 @@
         "northwest"
       ],
       "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "above).'*"
+      ],
+      "after": [
+        "above).'",
+        "*"
+      ],
+      "reason": "note_marker"
     },
     {
       "before": [

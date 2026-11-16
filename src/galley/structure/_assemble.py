@@ -25,23 +25,32 @@ from galley.model import (
 from galley.structure._body_notes import take_body_notes
 from galley.structure._hyphens import PageLine, join_lines
 from galley.structure._lines import Piece, first_word
-from galley.structure._markers import NoteMarker, book_marker_form
+from galley.structure._markers import (
+    NoteMarker,
+    Reference,
+    book_marker_form,
+    reference_candidate,
+)
 from galley.structure._measures import box_of
 from galley.structure._notes import Footnote, footnotes, numbered_per_page, page_notes
 from galley.structure._paragraphs import MarginNote, PageParts, Paragraph, body_entries
+from galley.structure._references import Candidate, Link, NoteToMatch, match_footnotes
 
 
 @dataclass(frozen=True, slots=True)
 class _Unnumbered:
     """A block before it has its id: its kind, its words with the page of
-    each, its origin, and its word changes, each with the position of the
-    word it gave, so that a block's changes are in the order of its words."""
+    each, its origin, its word changes, each with the position of the word
+    it gave, so that a block's changes are in the order of its words, and
+    its note references: for the position of a word, the reference it
+    holds and the position of its note among the notes."""
 
     kind: BlockKind
     words: tuple[str, ...]
     word_pages: tuple[int, ...]
     origin: tuple[Origin, ...]
     changes: tuple[tuple[int, WordChange], ...]
+    links: frozendict[int, tuple[Reference, int]] = frozendict()
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,13 +148,36 @@ def _footnote(
     )
 
 
-def _block(block_id: str, unnumbered: _Unnumbered) -> Block:
+def _spans(unnumbered: _Unnumbered, note_ids: Sequence[str]) -> tuple[Span, ...]:
+    """The block's words joined by single spaces, each note reference a span
+    of its own with the id of its note; the spaces stay with the spans
+    around it (spec section 11, "What is changed")."""
+    spans: list[Span] = []
+    text = ""
+    for position, word in enumerate(unnumbered.words):
+        space = " " if position > 0 else ""
+        link = unnumbered.links.get(position)
+        if link is None:
+            text += space + word
+            continue
+        reference, note = link
+        text += space + reference.before
+        if text:
+            spans.append(Span(text, Emphasis.NONE, None))
+        spans.append(Span(reference.reference, Emphasis.NONE, note_ids[note]))
+        text = reference.after
+    if text or not spans:
+        spans.append(Span(text, Emphasis.NONE, None))
+    return tuple(spans)
+
+
+def _block(block_id: str, unnumbered: _Unnumbered, note_ids: Sequence[str]) -> Block:
     return Block(
         id=block_id,
         kind=unnumbered.kind,
         level=None,
         label=None,
-        spans=(Span(" ".join(unnumbered.words), Emphasis.NONE, None),),
+        spans=_spans(unnumbered, note_ids),
         figure=None,
         origin=unnumbered.origin,
     )
@@ -183,6 +215,12 @@ def _numbered(
     """Block and note ids (spec section 6): a block's counts the blocks that
     start on its page in reading order, each note's blocks where markdown
     writes the note; a note's counts the notes that start on its page."""
+    note_counts: Counter[int] = Counter()
+    note_ids: list[str] = []
+    for note in notes:
+        page_index = _first_page(note.origin)
+        note_counts[page_index] += 1
+        note_ids.append(f"n-p{page_index:04d}-{note_counts[page_index]:03d}")
     places = _note_places(blocks, notes)
     notes_after: dict[int, list[int]] = {}
     for note_number, position in enumerate(places):
@@ -198,19 +236,17 @@ def _numbered(
     body: list[Block] = []
     for position in range(-1, len(blocks)):
         if position >= 0:
-            body.append(_block(next_id(blocks[position]), blocks[position]))
+            body.append(_block(next_id(blocks[position]), blocks[position], note_ids))
         for note_number in notes_after.get(position, []):
             note_blocks[note_number] = tuple(
-                _block(next_id(block), block) for block in notes[note_number].blocks
+                _block(next_id(block), block, note_ids)
+                for block in notes[note_number].blocks
             )
-    note_counts: Counter[int] = Counter()
     numbered_notes: list[Note] = []
     for note_number, note in enumerate(notes):
-        page_index = _first_page(note.origin)
-        note_counts[page_index] += 1
         numbered_notes.append(
             Note(
-                id=f"n-p{page_index:04d}-{note_counts[page_index]:03d}",
+                id=note_ids[note_number],
                 kind=note.kind,
                 marker=note.marker,
                 blocks=note_blocks[note_number],
@@ -238,6 +274,90 @@ def _changes(blocks: Sequence[_Unnumbered]) -> tuple[WordChange, ...]:
         change
         for block in blocks
         for _, change in sorted(block.changes, key=lambda placed: placed[0])
+    )
+
+
+def _linkable(reference: Reference) -> bool:
+    """Whether a candidate can be linked: its reference span has no letter,
+    since a span that was a whole word holds only digits and symbols
+    (architecture section 13), and every reference with a letter is a
+    bracketed word of its own ("(i)", "(li)"), which stays in its word."""
+    return not any(character.isalpha() for character in reference.reference)
+
+
+def _candidates(body: Sequence[_Unnumbered]) -> tuple[Candidate, ...]:
+    """The candidate references of the body's paragraphs, in reading order."""
+    return tuple(
+        Candidate(block_position, word_position, page_index, reference)
+        for block_position, block in enumerate(body)
+        if block.kind is BlockKind.PARAGRAPH
+        for word_position, (word, page_index) in enumerate(
+            zip(block.words, block.word_pages, strict=True)
+        )
+        if (reference := reference_candidate(word)) is not None and _linkable(reference)
+    )
+
+
+def _with_links(block: _Unnumbered, links: Sequence[Link]) -> _Unnumbered:
+    """`block` with `links`, its references to notes, each glued reference
+    split off its word by a note_marker word change on the word's page."""
+    changes = tuple(
+        (
+            link.candidate.word,
+            WordChange(
+                page_index=link.candidate.page_index,
+                before=(block.words[link.candidate.word],),
+                after=parts,
+                reason=ChangeReason.NOTE_MARKER,
+            ),
+        )
+        for link in links
+        if len(
+            parts := tuple(
+                part
+                for part in (
+                    link.candidate.reference.before,
+                    link.candidate.reference.reference,
+                    link.candidate.reference.after,
+                )
+                if part
+            )
+        )
+        > 1
+    )
+    return replace(
+        block,
+        changes=block.changes + changes,
+        links=frozendict(
+            block.links
+            | {
+                link.candidate.word: (link.candidate.reference, link.note)
+                for link in links
+            }
+        ),
+    )
+
+
+def _linked(
+    body: tuple[_Unnumbered, ...],
+    notes: tuple[_UnnumberedNote, ...],
+    links: Sequence[Link],
+) -> tuple[tuple[_Unnumbered, ...], tuple[_UnnumberedNote, ...]]:
+    """The body's blocks with `links`, and the notes linked to marked as
+    referenced."""
+    by_block: dict[int, list[Link]] = {}
+    for link in links:
+        by_block.setdefault(link.candidate.block, []).append(link)
+    referenced = frozenset(link.note for link in links)
+    return (
+        tuple(
+            _with_links(block, by_block[position]) if position in by_block else block
+            for position, block in enumerate(body)
+        ),
+        tuple(
+            replace(note, referenced=True) if position in referenced else note
+            for position, note in enumerate(notes)
+        ),
     )
 
 
@@ -281,21 +401,33 @@ def assemble(
             case _:
                 assert_never(entry)
         body.append(_joined(piece, kind, book_words, word_list))
-    notes = tuple(
-        _footnote(footnote, book_words, word_list)
-        for footnote in footnotes(
-            tuple(page_notes(page.band_regions) for page in pages),
-            tuple(bool(page.body) for page in pages),
-        )
+    book_footnotes = footnotes(
+        tuple(page_notes(page.band_regions) for page in pages),
+        tuple(bool(page.body) for page in pages),
     )
-    blocks, numbered_notes = _numbered(tuple(body), notes)
+    notes = tuple(
+        _footnote(footnote, book_words, word_list) for footnote in book_footnotes
+    )
+    links = match_footnotes(
+        tuple(
+            NoteToMatch(position, _first_page(note.origin), footnote.value)
+            for position, (note, footnote) in enumerate(
+                zip(notes, book_footnotes, strict=True)
+            )
+        ),
+        _candidates(body),
+    )
+    linked_body, linked_notes = _linked(tuple(body), notes, links)
+    blocks, numbered_notes = _numbered(linked_body, linked_notes)
     return Assembled(
         blocks=blocks,
         notes=numbered_notes,
         word_changes=tuple(
             sorted(
-                _changes(body)
-                + _changes(tuple(block for note in notes for block in note.blocks)),
+                _changes(linked_body)
+                + _changes(
+                    tuple(block for note in linked_notes for block in note.blocks)
+                ),
                 key=lambda change: change.page_index,
             )
         ),

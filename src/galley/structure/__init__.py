@@ -28,7 +28,13 @@ from galley.model import (
 from galley.parallel import DEFAULT_WORKERS, map_pages
 from galley.structure._assemble import assemble
 from galley.structure._hyphens import HyphenJoin, join_hyphen
-from galley.structure._markers import NoteMarker, note_marker
+from galley.structure._markers import (
+    NoteMarker,
+    Reference,
+    ReferenceForm,
+    note_marker,
+    reference_candidate,
+)
 from galley.structure._paragraphs import page_parts
 from galley.structure._survey import BookSurvey, survey_book
 
@@ -36,9 +42,12 @@ __all__ = [
     "BookSurvey",
     "HyphenJoin",
     "NoteMarker",
+    "Reference",
+    "ReferenceForm",
     "join_hyphen",
     "make_blocks",
     "note_marker",
+    "reference_candidate",
     "run",
     "survey_book",
 ]

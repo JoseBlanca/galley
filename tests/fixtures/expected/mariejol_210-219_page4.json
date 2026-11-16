@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the orchestrator against the page image on 15 November 2026 (galley at ec2edc4); the owner did not check this page.",
-  "changed": "Changed by task 2.1 (structure spec section 11, \"A note that runs over a page break\" and \"The marker of a note\"): the first band block, without a marker and not indented, is the end of note 4 of page 213, one note with an origin on 213 and 214; the markers \"(t)\", \"(a)\", \"(3J\" are taken out of their notes' text.",
+  "changed": "Changed by task 2.1 (structure spec section 11, \"A note that runs over a page break\" and \"The marker of a note\"): the first band block, without a marker and not indented, is the end of note 4 of page 213, one note with an origin on 213 and 214; the markers \"(t)\", \"(a)\", \"(3J\" are taken out of their notes' text. Changed by task 2.3 (structure spec section 11, \"References\"): \"(2).\" and \"(3).\" are linked to the notes marked \"(a)\" and \"(3J\", the \".\" split off each by a note_marker word change; note 1, \"(t)\", stays unreferenced, its reference read \"(» i)\".",
   "excerpt": "mariejol_210-219",
   "page": 4,
   "book_page_index": 214,
@@ -149,6 +149,16 @@
     },
     {
       "before": [
+        "(2)."
+      ],
+      "after": [
+        "(2)",
+        "."
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
         "cou-",
         "ronne"
       ],
@@ -156,6 +166,16 @@
         "couronne"
       ],
       "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "(3)."
+      ],
+      "after": [
+        "(3)",
+        "."
+      ],
+      "reason": "note_marker"
     }
   ],
   "page_numbers": []

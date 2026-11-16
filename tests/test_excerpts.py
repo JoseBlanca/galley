@@ -307,3 +307,99 @@ def test_footnote_left_in_the_body_mariejol_217_is_taken_as_a_note(
         for block in blocks.blocks
         if 7 in _pages(block.origin)
     )
+
+
+def _references_on(blocks: BlocksFile, page: int) -> tuple[tuple[str, str], ...]:
+    """For each reference in the body blocks that start on `page`: the word
+    it was printed in, rebuilt from the spans around it, and the marker of
+    its note."""
+    markers = {note.id: note.marker for note in blocks.notes}
+    found: list[tuple[str, str]] = []
+    for block in blocks.blocks:
+        if block.origin[0].page_index != page:
+            continue
+        for position, span in enumerate(block.spans):
+            if span.note_ref is None:
+                continue
+            before = block.spans[position - 1].text if position > 0 else ""
+            after = (
+                block.spans[position + 1].text
+                if position + 1 < len(block.spans)
+                else ""
+            )
+            word = (
+                (before.split(" ")[-1] if before else "")
+                + span.text
+                + (after.split(" ")[0] if after else "")
+            )
+            found.append((word, markers[span.note_ref]))
+    return tuple(found)
+
+
+def test_referenced_domesday_74_links_seven_glued_references(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[DOMESDAY]
+    assert _references_on(blocks, 0) == (
+        ("pleased1/", "1"),
+        ("it2.'", "3"),
+        ("free3.", "3"),
+        ("things4.", "4"),
+        ("themselves5.'", "6"),
+        ("would6.'", "«"),
+        ("mercy7.'", "7"),
+    )
+    assert all(note.referenced for note in blocks.notes if _pages(note.origin) == [0])
+
+
+def test_referenced_domesday_75_links_references_to_misread_markers(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[DOMESDAY]
+    assert _references_on(blocks, 1)[:3] == (
+        ("day1.'", "1"),
+        ("land2.", "2"),
+        ("land3.", "9"),
+    )
+
+
+def test_referenced_domesday_83_links_shillings_and_pence_references(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[DOMESDAY]
+    words = tuple(word for word, _ in _references_on(blocks, 8))
+    assert "12s.2" in words
+    assert "30d8" in words
+    assert not any(word.startswith("£") for word in words)
+
+
+def test_referenced_haskins_132_and_133_link_signs(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["haskins_eval"]
+    assert _references_on(blocks, 1) == (("^", "*"), ("protojournalist,^", "*"))
+
+
+def test_referenced_kadesh_10_links_notes_12_to_14_and_leaves_10_and_11(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["kadesh_8-17"]
+    assert ("Kadesh,12", "12") in _references_on(blocks, 1)
+    assert (";13", "13") in _references_on(blocks, 1)
+    assert ("above).'*", "u") in _references_on(blocks, 1)
+    assert tuple(
+        (note.marker, note.referenced)
+        for note in blocks.notes
+        if _pages(note.origin)[0] == 2
+    )[:2] == (("\"'", False), ("11", False))
+
+
+def test_referenced_mariejol_214_leaves_note_1_unreferenced(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[MARIEJOL]
+    assert tuple(
+        (note.marker, note.referenced)
+        for note in blocks.notes
+        if _pages(note.origin) == [4]
+    ) == (("(t)", False), ("(a)", True), ("(3J", True))

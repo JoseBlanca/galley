@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the orchestrator against the page image on 15 November 2026 (galley at ec2edc4); the owner did not check this page.",
-  "changed": "Changed since that check by task 2.5: \"land.\" leaves the body line for the margin note, which reads \"Free land.\", and \"The idea of freedom\" starts a paragraph. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): each note's marker, \"1\", \"2\", \"9\", is taken out of its text into `marker`.",
+  "changed": "Changed since that check by task 2.5: \"land.\" leaves the body line for the margin note, which reads \"Free land.\", and \"The idea of freedom\" starts a paragraph. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): each note's marker, \"1\", \"2\", \"9\", is taken out of its text into `marker`. Changed by task 2.3 (structure spec section 11, \"References\"): \"day1.'\", \"land2.\" and \"land3.\" are linked to the notes whose markers read \"1\", \"2\" and \"9\", each split off its word by a note_marker word change.",
   "excerpt": "domesday_74-83",
   "page": 1,
   "book_page_index": 75,
@@ -178,6 +178,39 @@
         "jurisdiction"
       ],
       "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "day1.'"
+      ],
+      "after": [
+        "day",
+        "1",
+        ".'"
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "land2."
+      ],
+      "after": [
+        "land",
+        "2",
+        "."
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "land3."
+      ],
+      "after": [
+        "land",
+        "3",
+        "."
+      ],
+      "reason": "note_marker"
     },
     {
       "before": [

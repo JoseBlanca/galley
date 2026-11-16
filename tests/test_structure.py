@@ -52,11 +52,15 @@ from galley.model import (
 from galley.structure import (
     HyphenJoin,
     NoteMarker,
+    Reference,
+    ReferenceForm,
     join_hyphen,
     make_blocks,
     note_marker,
+    reference_candidate,
     survey_book,
 )
+from galley.structure._references import align
 
 
 def _word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
@@ -1961,6 +1965,180 @@ def test_footnote_lines_in_the_body_of_a_book_with_digit_markers_stay() -> None:
     page_0 = replace(pages[0], regions=(pages[0].regions[0], band))
     blocks = make_blocks(_lines_of(page_0, *pages[1:]), _NO_WORDS, workers=1)
     assert len(blocks.notes) == 1
+
+
+@pytest.mark.parametrize(
+    ("word", "expected"),
+    [
+        ("land3.", Reference("land", "3", ".", ReferenceForm.GLUED, 3)),
+        ("Kadesh,12", Reference("Kadesh,", "12", "", ReferenceForm.GLUED, 12)),
+        ("causa)27.", Reference("causa)", "27", ".", ReferenceForm.GLUED, 27)),
+        ("12s.2", Reference("12s.", "2", "", ReferenceForm.GLUED, 2)),
+        ("30d8", Reference("30d", "8", "", ReferenceForm.GLUED, 8)),
+        (";13", Reference(";", "13", "", ReferenceForm.GLUED, 13)),
+        ("14);", None),
+        ("13,", None),
+        ("(i).", Reference("", "(i)", ".", ReferenceForm.BRACKETED, 1)),
+        ("{2).", Reference("", "{2)", ".", ReferenceForm.BRACKETED, 2)),
+        ("rulers.^", Reference("rulers.", "^", "", ReferenceForm.SIGN, None)),
+        ("^", Reference("", "^", "", ReferenceForm.SIGN, None)),
+        ("p.12", None),
+        ("pp.3", None),
+        ("vol.3", None),
+        ("1066", None),
+        ("'", None),
+        ("t", None),
+        ("£2", None),
+        ("(1907)", None),
+    ],
+)
+def test_reference_candidate_gives_the_reference_in_a_word(
+    word: str, expected: Reference | None
+) -> None:
+    assert reference_candidate(word) == expected
+
+
+def _referenced_page(
+    index: int, body_words: str, *notes: str, right: float = 300.0
+) -> PageLayout:
+    """A page of five full body lines, the last ending with `body_words`,
+    and a band of `notes`, each on one line indented 12 pt, with a line at
+    the band's left edge after them."""
+    body = (
+        *_five_full_lines(70, "body")[:4],
+        _spread(f"words of the page {body_words}", 50, right, 130),
+    )
+    band = (
+        *(
+            _note_line(text, 300 + _NOTE_PITCH_PT * n, 62, 200)
+            for n, text in enumerate(notes)
+        ),
+        _note_line("and its end.", 300 + _NOTE_PITCH_PT * len(notes), 50, 120),
+    )
+    return PageLayout(index, (_region(*body), _region(*band)), ())
+
+
+def _references(blocks: BlocksFile) -> tuple[tuple[str, str], ...]:
+    """Each reference span's text and the marker of its note."""
+    markers = {note.id: note.marker for note in blocks.notes}
+    return tuple(
+        (span.text, markers[span.note_ref])
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref is not None
+    )
+
+
+def test_referenced_glued_numbers_are_linked_and_a_bracketed_one_stays() -> None:
+    lines = _lines_of(
+        _referenced_page(0, "land1. day2 (3)", "1 One.", "2 Two.", "3 Three.")
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("1", "1"), ("2", "2"))
+    assert tuple(note.referenced for note in blocks.notes) == (True, True, False)
+    paragraph = blocks.blocks[0]
+    assert block_text(paragraph).endswith("land1. day2 (3)")
+    assert tuple(span.text for span in paragraph.spans)[1:] == (
+        "1",
+        ". day",
+        "2",
+        " (3)",
+    )
+    assert paragraph.spans[0].text.endswith(" land")
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=0,
+            before=("land1.",),
+            after=("land", "1", "."),
+            reason=ChangeReason.NOTE_MARKER,
+        ),
+        WordChange(
+            page_index=0,
+            before=("day2",),
+            after=("day", "2"),
+            reason=ChangeReason.NOTE_MARKER,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_referenced_number_misread_against_its_marker_is_linked_as_read() -> None:
+    # Numbered per page, the note is note 3 of its page whatever its marker
+    # reads: "land3." links to it and keeps "3".
+    pages = (
+        _referenced_page(0, "now1.", "1 One."),
+        _referenced_page(1, "here1. there2 land3.", "1 One.", "2 Two.", "8 Three."),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert _references(blocks) == (("1", "1"), ("1", "1"), ("2", "2"), ("3", "8"))
+
+
+def test_referenced_sign_alone_is_linked_to_a_note_marked_by_a_sign() -> None:
+    lines = _lines_of(_referenced_page(0, "the king. ^", "* A note."))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("^", "*"),)
+    assert blocks.word_changes == ()
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_referenced_bracketed_reference_with_a_letter_stays_in_its_word() -> None:
+    # "(i)." would be a span with a letter that was a whole word, which the
+    # fidelity check refuses (architecture section 13); "{2)." is linked.
+    lines = _lines_of(
+        _referenced_page(0, "first (i). second {2).", "(1) One.", "(2) Two.")
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("{2)", "(2)"),)
+    assert tuple(note.referenced for note in blocks.notes) == (False, True)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_referenced_page_s_leftover_note_end_is_not_counted() -> None:
+    # Page 1's band starts with the end of a note whose start is on no page
+    # with notes: it has no value, and "(1)" is the page's first note.
+    first = _referenced_page(0, "now1.", "1 One.")
+    body_only = _body_page(1, *_five_full_lines(70, "other"))
+    page = _referenced_page(2, "here1. there2", "1 One.", "2 Two.")
+    band = page.regions[1]
+    leftover = _note_line("the end of a note.", 290, 50, 150)
+    page = replace(
+        page, regions=(page.regions[0], replace(band, lines=(leftover, *band.lines)))
+    )
+    blocks = make_blocks(_lines_of(first, body_only, page), _NO_WORDS, workers=1)
+    assert _references(blocks) == (("1", "1"), ("1", "1"), ("2", "2"))
+    assert tuple(note.referenced for note in blocks.notes) == (True, False, True, True)
+
+
+def test_referenced_note_is_never_linked_to_an_earlier_candidate() -> None:
+    # Notes 1 and 2, candidates "2" then "1": one pair only, note 1 with the
+    # later "1", since a later note is never paired with an earlier
+    # candidate and of equal totals the first note's earlier pair wins.
+    lines = _lines_of(_referenced_page(0, "this2 that1", "1 One.", "2 Two."))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("1", "1"),)
+
+
+@pytest.mark.parametrize(
+    ("values", "references", "pairs"),
+    [
+        ((1, 2), ("x1", "y2"), ((0, 0), (1, 1))),
+        ((1, 2), ("x2", "y1"), ((0, 1),)),
+        ((1,), ("x1", "y1"), ((0, 0),)),
+        ((3,), ("x8",), ((0, 0),)),
+        ((3,), ("x4",), ()),
+        ((None,), ("x.^",), ((0, 0),)),
+        ((1, 2), ("x.^", "y2"), ((0, 0), (1, 1))),
+        ((1, 2), ("x2",), ((1, 0),)),
+    ],
+)
+def test_referenced_alignment_pairs_the_highest_total_in_order(
+    values: tuple[int | None, ...],
+    references: tuple[str, ...],
+    pairs: tuple[tuple[int, int], ...],
+) -> None:
+    candidates = tuple(reference_candidate(word) for word in references)
+    assert all(candidate is not None for candidate in candidates)
+    assert align(values, tuple(c for c in candidates if c is not None)) == pairs
 
 
 def test_make_blocks_with_notes_with_1_worker_and_with_3_gives_the_same_value() -> None:
