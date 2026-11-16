@@ -99,12 +99,15 @@ class JoinedWords:
     """The words of a block's lines, with the hyphens at line ends joined,
     the page index of each word (a joined word's is its first part's), and
     a word change for each join, in the order of the lines, with the
-    position in `words` of the word it gave."""
+    position in `words` of the word it gave, and the positions of the words
+    that start a line after the first, unless a hyphen join made that line
+    one with the line before."""
 
     words: tuple[str, ...]
     pages: tuple[int, ...]
     changes: tuple[WordChange, ...]
     positions: tuple[int, ...]
+    line_starts: tuple[int, ...]
 
 
 def join_lines(
@@ -121,6 +124,7 @@ def join_lines(
     pages: list[int] = []
     changes: list[WordChange] = []
     positions: list[int] = []
+    line_starts: list[int] = []
     passed_over: PageLine | None = None
     for number, line in enumerate(lines):
         texts = line.words
@@ -150,10 +154,18 @@ def join_lines(
             words[-1] = joined.word
             positions.append(len(words) - 1)
             texts = texts[1:]
+        elif words and texts:
+            line_starts.append(len(words))
         if passed_over is not None:
             words.extend(passed_over.words)
             pages.extend(passed_over.page_index for _ in passed_over.words)
             passed_over = None
         words.extend(texts)
         pages.extend(line.page_index for _ in texts)
-    return JoinedWords(tuple(words), tuple(pages), tuple(changes), tuple(positions))
+    return JoinedWords(
+        tuple(words),
+        tuple(pages),
+        tuple(changes),
+        tuple(positions),
+        tuple(line_starts),
+    )

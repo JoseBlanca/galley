@@ -32,7 +32,9 @@ from galley.structure._measures import Edges, is_short, region_edges
 from galley.structure._regions import RegionKind, region_kinds
 from galley.structure._removals import foot_removals, head_removals
 from galley.structure._runs import BodyRun, Label
+from galley.structure._summaries import summary_run
 from galley.structure._survey import BookSurvey
+from galley.structure._verse import verse_runs
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,11 +89,28 @@ def _runs(
     contents_pages: frozenset[int],
 ) -> tuple[BodyRun, ...]:
     """The runs of the body stream that are blocks of their own (spec
-    section 2, step 2.3): none on a page of the printed table of contents."""
+    section 2, step 2.3), in order: the headings, the chapter summary under
+    a heading, and the verse; none on a page of the printed table of
+    contents."""
     if page_index in contents_pages:
         return ()
     band_lines = tuple(line for region in band_regions for line in region)
-    return heading_runs(body, band_lines, survey.body_line_pitch, head)
+    headings = heading_runs(body, band_lines, survey.body_line_pitch, head)
+    # Each heading's summary ends at the next heading at the latest.
+    limits = (*(run.start for run in headings[1:]), len(body))
+    summaries = tuple(
+        summary
+        for number, heading in enumerate(headings)
+        if (summary := summary_run(body, heading.end, limits[number])) is not None
+    )
+    taken = frozenset(
+        number for run in headings + summaries for number in range(run.start, run.end)
+    )
+    return tuple(
+        sorted(
+            headings + summaries + verse_runs(body, taken), key=lambda run: run.start
+        )
+    )
 
 
 def page_parts(
@@ -214,6 +233,22 @@ def _run_at(runs: Sequence[BodyRun], number: int) -> BodyRun | None:
     return next((run for run in runs if run.start <= number < run.end), None)
 
 
+def _continues_verse(
+    current_run: BodyRun | None, run: BodyRun | None, number: int
+) -> bool:
+    """Whether the line at `number` of a page's body stream, in `run`,
+    continues the verse block `current_run` that ended the page before:
+    it is the page's first line and starts a verse run (spec section 16,
+    rule 4)."""
+    return (
+        number == 0
+        and run is not None
+        and run.kind is BlockKind.VERSE
+        and current_run is not None
+        and current_run.kind is BlockKind.VERSE
+    )
+
+
 def _block(lines: Sequence[PlacedLine], run: BodyRun | None) -> BodyBlock:
     piece = Piece(tuple(lines))
     if run is None:
@@ -230,7 +265,8 @@ def body_entries(
     margin notes of the pages whose body ends in it; the margin notes of a
     page with no body stream after the last block so far. Each run of a
     page (`PageParts.runs`) is a block of its own, and the line after it
-    starts a block. A paragraph whose first word has the book's marker
+    starts a block; a verse block that ends a page's body stream goes on
+    into a verse run that starts the next. A paragraph whose first word has the book's marker
     form `form` does not run on into the next page, and no paragraph runs
     on into or out of `section_pages`, the pages of the endnote section
     (spec section 12): the first line of its first page, and the first
@@ -244,7 +280,9 @@ def body_entries(
     for page in pages:
         for number, line in enumerate(page.body):
             run = _run_at(page.runs, number)
-            if run is not None or current_run is not None:
+            if _continues_verse(current_run, run, number):
+                starts = False
+            elif run is not None or current_run is not None:
                 # A run is a block of its own, and so is what follows it.
                 starts = run is None or run.start == number or number == 0
             else:

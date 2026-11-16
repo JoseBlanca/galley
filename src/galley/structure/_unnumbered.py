@@ -20,7 +20,8 @@ class Unnumbered:
     it gave, so that a block's changes are in the order of its words, and
     its note references: for the position of a word, the reference it
     holds and the position of its note among the notes; a heading's level
-    and chapter label."""
+    and chapter label; and the positions of the words that start a printed
+    line after the first, which a verse block keeps (spec section 16)."""
 
     kind: BlockKind
     words: tuple[str, ...]
@@ -30,6 +31,7 @@ class Unnumbered:
     links: frozendict[int, tuple[Reference, int]] = frozendict()
     level: int | None = None
     label: str | None = None
+    line_starts: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +76,7 @@ def joined(
         joined.pages,
         piece_origin(piece),
         tuple(zip(joined.positions, joined.changes, strict=True)),
+        line_starts=frozenset(joined.line_starts),
     )
 
 
@@ -96,7 +99,12 @@ def without_marker(
         if len(block.words) == 1:
             return block, ""
         return replace(
-            block, words=block.words[1:], word_pages=block.word_pages[1:]
+            block,
+            words=block.words[1:],
+            word_pages=block.word_pages[1:],
+            line_starts=frozenset(
+                start - 1 for start in block.line_starts if start > 1
+            ),
         ), marker.marker
     change = WordChange(
         page_index=block.word_pages[0],

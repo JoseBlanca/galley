@@ -5,18 +5,24 @@ changed")."""
 from collections import Counter
 from collections.abc import Sequence
 
-from galley.model import Block, Emphasis, Note, Span, note_places
+from galley.model import Block, BlockKind, Emphasis, Note, Span, note_places
 from galley.structure._unnumbered import Unnumbered, UnnumberedNote, first_page
 
 
 def _spans(unnumbered: Unnumbered, note_ids: Sequence[str]) -> tuple[Span, ...]:
-    """The block's words joined by single spaces, each note reference a span
+    """The block's words joined by single spaces, or in a verse block by a
+    line feed where a printed line starts, each note reference a span
     of its own with the id of its note; the spaces stay with the spans
     around it (spec section 11, "What is changed")."""
     spans: list[Span] = []
     text = ""
+    verse = unnumbered.kind is BlockKind.VERSE
     for position, word in enumerate(unnumbered.words):
-        space = " " if position > 0 else ""
+        # A verse block keeps its printed lines (spec section 16).
+        if verse and position in unnumbered.line_starts:
+            space = "\n"
+        else:
+            space = " " if position > 0 else ""
         link = unnumbered.links.get(position)
         if link is None:
             text += space + word

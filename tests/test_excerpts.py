@@ -634,3 +634,207 @@ def test_heading_blocks_of_the_reference_pages(
         )
         == headings
     )
+
+
+# Chapter summaries and verse (structure spec, sections 15 and 16, rule 4),
+# on the reference pages of section 9, "The second plan".
+
+
+def _blocks_of_kind(blocks: BlocksFile, page: int, kind: BlockKind) -> tuple[str, ...]:
+    """The text of each block of `kind` that starts on `page`."""
+    return tuple(
+        block_text(block)
+        for block in blocks.blocks
+        if block.kind is kind and block.origin[0].page_index == page
+    )
+
+
+def test_chapter_summary_stubbs_51_is_one_block_and_very_few_starts_a_paragraph(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["stubbs_51_56-64"]
+    assert _blocks_of_kind(blocks, 0, BlockKind.CHAPTER_SUMMARY) == (
+        (
+            "Terms ofHenryJs accession — His character — H is early reforms "
+            "His relations with France—War ofToulouse — Summaryofnine years' work."
+        ),
+    )
+    kinds = tuple(
+        (block.kind, block_text(block).split(" ")[0])
+        for block in blocks.blocks
+        if block.origin[0].page_index == 0
+    )
+    # "accession.", the end of the cut-in note beside "Very few…", goes
+    # before that paragraph (section 13).
+    assert kinds[1:5] == (
+        (BlockKind.HEADING, "THE"),
+        (BlockKind.CHAPTER_SUMMARY, "Terms"),
+        (BlockKind.MARGIN_NOTE, "accession."),
+        (BlockKind.PARAGRAPH, "Very"),
+    )
+
+
+@pytest.mark.parametrize(
+    ("page", "summary"),
+    [
+        # Book page 28: the OCR read the summary out of order, missed.
+        (1, ()),
+        # Book page 79: a summary whose last line is centred.
+        (
+            2,
+            (
+                (
+                    "The English Church — SchoolsofClergy — RiseofBecket — Quarrel "
+                    "with the King- Exile—Death."
+                ),
+            ),
+        ),
+        (
+            3,
+            (
+                (
+                    "John's succession — Arthur's claims — Loss of Normandy — Quarrel "
+                    "with the Church — Submission to the Pope—Quarrel with the Barons "
+                    "— The Great Charter and its consequences — Arrival of "
+                    "Lewis—John's death."
+                ),
+            ),
+        ),
+    ],
+)
+def test_chapter_summary_stubbs_summaries_index(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+    page: int,
+    summary: tuple[str, ...],
+) -> None:
+    _, blocks = excerpt_outputs["stubbs_summaries_index"]
+    assert _blocks_of_kind(blocks, page, BlockKind.CHAPTER_SUMMARY) == summary
+
+
+_VERSE_ON_REFERENCE_PAGES = (
+    # Book pages 51 and 52: verse in the middle of each page.
+    (
+        "mariejol_headings_verse",
+        1,
+        (
+            (
+                "Laquelle (Catherine) dé« qtiaiorw ans\nPortoit au b(^ la sagette\n"
+                "La robe et les arcs duisans (convenant)\nAux pocelles de Taygette\n"
+                "ToDjours dés l'aube du jour\nAlloit aux forftts en qneste\n"
+                "Ou de reths tcmt à l'entour\nCemoit le trac d'une beste ;\n"
+                "Ou pressoit les cerfs au cours;\nOu i«r le pendant des roches.\n"
+                "Sans chiens assaUloit les ours\nEt les sanghers aux dents croches '1)4"
+            ),
+        ),
+    ),
+    (
+        "mariejol_headings_verse",
+        2,
+        (
+            (
+                "Quelle dame a la pratique\nDe tant de math^aatiqne?\n"
+                "Quelle princeme «ntend mieux\nDu grand monde la peinture.\n"
+                "Les chemin» de la nature,\nEt la mosiqoe des cieux?"
+            ),
+        ),
+    ),
+    # Book page 229: two verse quotes on one page.
+    (
+        "mariejol_headings_verse",
+        4,
+        (
+            (
+                "Quand nature accomplit le bastiment du monde\n"
+                "Ne voulant poiut ailiuurâ qu'au mesme monde moclre\n"
+                "La conduite de tout qui, au monde, peut estre\n"
+                "Eir ficha dans le Ciel avec clous éterneb\nLa vie et le Destin (i)."
+            ),
+            (
+                "Le hon jeune le vieux surmontera\n"
+                "En champ bolliquc par singuUer duelle :\n"
+                "Dans cage d'or les yeux luy crèvera, '\n"
+                "Deux classes une, puis mourir, mort cruelle.\n(Cent L, qaatraio 35.)"
+            ),
+        ),
+    ),
+    # Haskins' centred Latin verse (209) and English verse (234), whose first
+    # two lines, one of them a word the OCR glued, stay a paragraph.
+    (
+        "haskins_quotes_index",
+        6,
+        (
+            (
+                "O Roma nobilis, orbiset domina,\nCunctarum urbium excellentissima,\n"
+                "Roseo martyrum sanguine rubea,\nAlbiset virginum liliis Candida;\n"
+                "Salutem dicimus tibi per omnia,\nTe benedicimus: salve per secula."
+            ),
+        ),
+    ),
+    (
+        "haskins_quotes_index",
+        7,
+        (
+            (
+                "A sea-side house to the farther South,\nWhere the baked dies drouth ,\n"
+                "And one sharp tree cic—ala 'tis a of cypress — stands."
+            ),
+        ),
+    ),
+    # Known false verse: two broken lines (Mariéjol 212) and tables
+    # (Domesday 47 and 406).
+    (
+        "mariejol_210-219",
+        2,
+        (
+            (
+                "' \\ R ochelle oùs'étaient enfermés cinquante-cinq ministres,ri\n"
+                "inmes échappés au.x massacres et quinze cents déserteurs d'"
+            ),
+        ),
+    ),
+    (
+        "domesday_headings_quotes",
+        6,
+        (
+            (
+                "South -Western Group : 49,155\nMid- Western Group: 33,191\n"
+                "Eastern Group: 72,883"
+            ),
+            (
+                "South- Western Group : 4,038\nMid-Western Group: 3,514\n"
+                "Eastern Group : 7,329"
+            ),
+            (
+                "South- Western Group : 183,842 106,086\n"
+                "Mid- Western Group : 158,245 115,679\n"
+                "Eastern Group : 255,498 182,830"
+            ),
+        ),
+    ),
+    (
+        "domesday_headings_quotes",
+        10,
+        (
+            (
+                "ij. ac. coll. 1. 1. 36\nEdw. Stand, ij. ac.\nij. ac. coll. 1. 2. 2\n"
+                "Edw. Stand, ij. ac.\nij. ac. coll. 1. 2. 2\nEdw. Stand, ij. ac.\n"
+                "ij. ac. coll. 1. 0. 39."
+            ),
+        ),
+    ),
+)
+
+
+@pytest.mark.parametrize(
+    ("excerpt", "page", "verse"),
+    _VERSE_ON_REFERENCE_PAGES,
+    ids=[f"{excerpt}-{page}" for excerpt, page, _ in _VERSE_ON_REFERENCE_PAGES],
+)
+def test_verse_blocks_of_the_reference_pages_keep_their_lines(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+    excerpt: str,
+    page: int,
+    verse: tuple[str, ...],
+) -> None:
+    _, blocks = excerpt_outputs[excerpt]
+    assert _blocks_of_kind(blocks, page, BlockKind.VERSE) == verse

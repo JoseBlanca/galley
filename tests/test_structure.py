@@ -3417,6 +3417,406 @@ def test_reference_in_a_heading_is_linked() -> None:
     assert [span.note_ref for span in heading.spans] == [None, blocks.notes[0].id]
 
 
+# Chapter summaries (structure spec, section 15)
+
+
+def _summary_page(*summary: Line) -> PageLayout:
+    """A page whose heading "CHAPTER III." / "THE EARLY YEARS." is followed
+    by the lines `summary`, 15 pt apart from 167.5 pt, and a paragraph whose
+    first line is not indented."""
+    after = 167.5 + _PITCH_PT * len(summary)
+    return _around(
+        _centred_line("CHAPTER III.", 130),
+        _centred_line("THE EARLY YEARS.", 152.5),
+        *(replace_top(line, 167.5 + _PITCH_PT * n) for n, line in enumerate(summary)),
+        gap_after=after - 152.5,
+    )
+
+
+def replace_top(line: Line, top: float) -> Line:
+    """`line` moved so that its top is at `top`."""
+    shift = top - line.box.top
+    return Line(
+        replace(line.box, top=line.box.top + shift, bottom=line.box.bottom + shift),
+        tuple(
+            replace(
+                word,
+                box=replace(
+                    word.box, top=word.box.top + shift, bottom=word.box.bottom + shift
+                ),
+            )
+            for word in line.words
+        ),
+    )
+
+
+def _hanging(text: str, indent: float, right: float = _RIGHT_PT) -> Line:
+    return _spread(text, _BODY_LEFT_PT + indent, right, 0)
+
+
+_SUMMARY_TEXTS = (
+    "Terms of accession — His character — His early",
+    "reforms — His relations with France — Summary",
+    "of nine years' work.",
+)
+
+
+def test_chapter_summary_of_three_lines_with_a_hanging_indent_is_one_block() -> None:
+    lines = _lines_of(
+        _summary_page(
+            _hanging(_SUMMARY_TEXTS[0], 0),
+            _hanging(_SUMMARY_TEXTS[1], 9),
+            _hanging(_SUMMARY_TEXTS[2], 9, 150),
+        )
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _kinds_and_texts(blocks)[1:] == (
+        ("heading", 1, "CHAPTER III.", "THE EARLY YEARS."),
+        ("chapter_summary", None, None, " ".join(_SUMMARY_TEXTS)),
+        _AFTER,
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+@pytest.mark.parametrize(
+    ("texts", "summary"),
+    [
+        (
+            (
+                "Terms of accession - His character, his early",
+                "reforms - his relations with France, summary",
+                "of nine years' work.",
+            ),
+            True,
+        ),
+        (
+            (
+                "Terms of accession-His character, his early",
+                "reforms - his relations with France, summary",
+                "of nine years' work.",
+            ),
+            False,
+        ),
+    ],
+    ids=["two spaced hyphens", "one spaced hyphen and one glued"],
+)
+def test_chapter_summary_counts_a_spaced_hyphen_as_a_dash(
+    texts: tuple[str, str, str], summary: bool
+) -> None:
+    blocks = make_blocks(
+        _lines_of(
+            _summary_page(
+                _hanging(texts[0], 0), _hanging(texts[1], 9), _hanging(texts[2], 9, 150)
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert (
+        any(block.kind is BlockKind.CHAPTER_SUMMARY for block in blocks.blocks)
+        is summary
+    )
+
+
+def test_chapter_summary_with_one_dash_is_paragraphs() -> None:
+    texts = ("Terms of accession — his character, his early", *_SUMMARY_TEXTS[1:])
+    texts = (texts[0], texts[1].replace(" — ", ", "), texts[2])
+    blocks = make_blocks(
+        _lines_of(
+            _summary_page(
+                _hanging(texts[0], 0), _hanging(texts[1], 9), _hanging(texts[2], 9, 150)
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert not any(block.kind is BlockKind.CHAPTER_SUMMARY for block in blocks.blocks)
+
+
+@pytest.mark.parametrize(
+    ("first_indent", "second_indent", "summary"),
+    [(0, 9, True), (4.9, 9, True), (5, 9, False), (0, 4.9, False)],
+)
+def test_chapter_summary_starts_at_the_left_edge_and_hangs_5_pt(
+    first_indent: float, second_indent: float, summary: bool
+) -> None:
+    blocks = make_blocks(
+        _lines_of(
+            _summary_page(
+                _hanging(_SUMMARY_TEXTS[0], first_indent),
+                _hanging(_SUMMARY_TEXTS[1], second_indent),
+                _hanging(_SUMMARY_TEXTS[2], second_indent, 150),
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert (
+        any(block.kind is BlockKind.CHAPTER_SUMMARY for block in blocks.blocks)
+        is summary
+    )
+
+
+def test_chapter_summary_ends_before_the_first_line_not_indented() -> None:
+    # The second line ends the summary's indent; the third, at the left
+    # edge, is the paragraph's first line.
+    blocks = make_blocks(
+        _lines_of(
+            _summary_page(
+                _hanging("Terms of accession — His character — His", 0),
+                _hanging("early reforms.", 9, 150),
+                _hanging("The paragraph starts here at the edge", 0),
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert _kinds_and_texts(blocks)[2:4] == (
+        (
+            "chapter_summary",
+            None,
+            None,
+            "Terms of accession — His character — His early reforms.",
+        ),
+        (
+            "paragraph",
+            None,
+            None,
+            "The paragraph starts here at the edge "
+            + " ".join(f"after {n} of the page" for n in range(5)),
+        ),
+    )
+
+
+def test_chapter_summary_only_right_after_a_heading() -> None:
+    # The same lines after a paragraph's last line are paragraphs.
+    page = _body_page(
+        0,
+        *(_full(f"before {n} of the page", 70 + _PITCH_PT * n) for n in range(3)),
+        _short("its end.", 115),
+        replace_top(_hanging(_SUMMARY_TEXTS[0], 0), 130),
+        replace_top(_hanging(_SUMMARY_TEXTS[1], 9), 145),
+        replace_top(_hanging(_SUMMARY_TEXTS[2], 9, 150), 160),
+        *(_full(f"after {n} of the page", 175 + _PITCH_PT * n) for n in range(5)),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert not any(block.kind is BlockKind.CHAPTER_SUMMARY for block in blocks.blocks)
+
+
+# Verse (structure spec, section 16, rule 4)
+
+
+def _verse_line(text: str, top: float, inset: float = 40.0, left: float = 0.0) -> Line:
+    """A line inset `inset` pt from both edges of the column, 50 to 300 pt,
+    moved `left` pt to the right."""
+    return _spread(text, _BODY_LEFT_PT + inset + left, _RIGHT_PT - inset, top)
+
+
+_VERSE = (
+    "Quelle dame a la pratique",
+    "De tant de mathematique",
+    "Quelle princesse entend mieux",
+)
+
+
+def _verse_page(*verse: Line) -> PageLayout:
+    return _around(*verse, gap_after=22.5)
+
+
+def test_verse_of_three_lines_inset_on_both_sides_is_one_block_with_line_feeds() -> (
+    None
+):
+    lines = _lines_of(
+        _verse_page(
+            *(_verse_line(text, 122.5 + 15 * n) for n, text in enumerate(_VERSE))
+        )
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _kinds_and_texts(blocks) == (
+        _BEFORE,
+        ("verse", None, None, "\n".join(_VERSE)),
+        _AFTER,
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+@pytest.mark.parametrize(
+    ("inset", "words", "verse"),
+    [(30.0, 4, True), (29.5, 4, False), (40.0, 3, True), (40.0, 2, False)],
+)
+def test_verse_lines_have_3_words_and_are_inset_30_pt(
+    inset: float, words: int, verse: bool
+) -> None:
+    texts = tuple(" ".join(text.split()[:words]) for text in _VERSE)
+    blocks = make_blocks(
+        _lines_of(
+            _verse_page(
+                *(
+                    _verse_line(text, 122.5 + 15 * n, inset)
+                    for n, text in enumerate(texts)
+                )
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert any(block.kind is BlockKind.VERSE for block in blocks.blocks) is verse
+
+
+def test_verse_needs_two_lines() -> None:
+    blocks = make_blocks(
+        _lines_of(_verse_page(_verse_line(_VERSE[0], 122.5))), _NO_WORDS, workers=1
+    )
+    assert not any(block.kind is BlockKind.VERSE for block in blocks.blocks)
+
+
+@pytest.mark.parametrize(("shift", "verse"), [(12.0, True), (12.5, False)])
+def test_verse_needs_more_than_half_its_lines_near_their_median_left(
+    shift: float, verse: bool
+) -> None:
+    # Four lines: two at the median left and two moved right; with the
+    # shift over 12 pt only two of four lie within 12 pt of the median.
+    lines = (
+        _verse_line(_VERSE[0], 122.5, 40, 0),
+        _verse_line(_VERSE[1], 137.5, 40, 0),
+        _verse_line(_VERSE[2], 152.5, 40, 2 * shift),
+        _verse_line(_VERSE[0], 167.5, 40, 2 * shift),
+    )
+    blocks = make_blocks(_lines_of(_verse_page(*lines)), _NO_WORDS, workers=1)
+    assert any(block.kind is BlockKind.VERSE for block in blocks.blocks) is verse
+
+
+@pytest.mark.parametrize(
+    ("lefts", "verse"), [((0, 10, 30, 40), False), ((0, 10, 20, 25), True)]
+)
+def test_verse_needs_more_than_half_not_half(
+    lefts: tuple[float, ...], verse: bool
+) -> None:
+    # (0, 10, 30, 40): median 20, only 10 and 30 within 12 pt, half. (0, 10, 20, 25): median 15, three within 12 pt.
+    lines = tuple(
+        _verse_line(_VERSE[n % 3], 122.5 + 15 * n, 40, left)
+        for n, left in enumerate(lefts)
+    )
+    blocks = make_blocks(_lines_of(_verse_page(*lines)), _NO_WORDS, workers=1)
+    assert any(block.kind is BlockKind.VERSE for block in blocks.blocks) is verse
+
+
+def test_verse_line_must_be_inset_on_the_right_too() -> None:
+    lines = tuple(
+        _spread(text, 90, _RIGHT_PT - 10, 122.5 + 15 * n)
+        for n, text in enumerate(_VERSE)
+    )
+    blocks = make_blocks(_lines_of(_verse_page(*lines)), _NO_WORDS, workers=1)
+    assert not any(block.kind is BlockKind.VERSE for block in blocks.blocks)
+
+
+def test_verse_line_ending_with_a_hyphen_is_joined_to_the_next() -> None:
+    texts = (
+        "Quelle dame a la pra-",
+        "tique de tant de",
+        "Quelle princesse entend mieux",
+    )
+    lines = _lines_of(
+        _verse_page(
+            *(_verse_line(text, 122.5 + 15 * n) for n, text in enumerate(texts))
+        )
+    )
+    blocks = make_blocks(lines, frozenset({"pratique"}), workers=1)
+    assert block_text(blocks.blocks[1]) == (
+        "Quelle dame a la pratique de tant de\nQuelle princesse entend mieux"
+    )
+
+
+def test_verse_heading_line_is_not_part_of_a_run() -> None:
+    # A centred title in capitals of 3 words, inset on both sides, stays a
+    # heading above the verse.
+    lines = _lines_of(
+        _around(
+            _centred_line("THE LAST POEM", 130),
+            *(_verse_line(text, 152.5 + 15 * n) for n, text in enumerate(_VERSE)),
+        )
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert tuple(block.kind.value for block in blocks.blocks) == (
+        "paragraph",
+        "heading",
+        "verse",
+        "paragraph",
+    )
+
+
+def _verse_over_a_break(next_top: tuple[Line, ...]) -> LinesFile:
+    """Page 0 ends with two lines of verse; page 1 starts with the lines
+    `next_top`, then a paragraph."""
+    page_0 = _body_page(
+        0,
+        *(_full(f"zero {n} of the page", 70 + _PITCH_PT * n) for n in range(5)),
+        _verse_line(_VERSE[0], 152.5),
+        _verse_line(_VERSE[1], 167.5),
+    )
+    page_1 = _body_page(
+        1,
+        *next_top,
+        *(_full(f"one {n} of the page", 107.5 + _PITCH_PT * n) for n in range(5)),
+    )
+    return _lines_of(page_0, page_1)
+
+
+def test_verse_block_ending_a_page_goes_on_into_verse_at_the_next_top() -> None:
+    blocks = make_blocks(
+        _verse_over_a_break((_verse_line(_VERSE[2], 70), _verse_line(_VERSE[0], 85))),
+        _NO_WORDS,
+        workers=1,
+    )
+    verse = tuple(block for block in blocks.blocks if block.kind is BlockKind.VERSE)
+    assert len(verse) == 1
+    assert block_text(verse[0]) == "\n".join((*_VERSE, _VERSE[0]))
+    assert tuple(origin.page_index for origin in verse[0].origin) == (0, 1)
+
+
+def test_verse_block_ending_a_page_ends_before_prose_on_the_next() -> None:
+    blocks = make_blocks(_verse_over_a_break(()), _NO_WORDS, workers=1)
+    assert _kinds_and_texts(blocks)[1:] == (
+        ("verse", None, None, "\n".join(_VERSE[:2])),
+        (
+            "paragraph",
+            None,
+            None,
+            " ".join(f"one {n} of the page" for n in range(5)),
+        ),
+    )
+
+
+def test_make_blocks_with_headings_summaries_and_verse_with_1_and_3_workers() -> None:
+    pages = (
+        *_verse_over_a_break(
+            (_verse_line(_VERSE[2], 70), _verse_line(_VERSE[0], 85))
+        ).pages,
+        replace(
+            _summary_page(
+                _hanging(_SUMMARY_TEXTS[0], 0),
+                _hanging(_SUMMARY_TEXTS[1], 9),
+                _hanging(_SUMMARY_TEXTS[2], 9, 150),
+            ),
+            index=2,
+        ),
+        replace(
+            _verse_page(
+                *(_verse_line(t, 122.5 + 15 * n) for n, t in enumerate(_VERSE))
+            ),
+            index=3,
+        ),
+        *(
+            replace(_around(_centred_line("CHAPTER IV.", 130)), index=index)
+            for index in range(4, 8)
+        ),
+    )
+    lines = _lines_of(*pages)
+    assert make_blocks(lines, _NO_WORDS, workers=1) == make_blocks(
+        lines, _NO_WORDS, workers=3
+    )
+
+
 # The fidelity check at the structure boundary
 
 
