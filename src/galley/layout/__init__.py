@@ -3,8 +3,9 @@
 The rules are those of docs/specs/layout.md. `measure_book` takes the
 book's measures over all its pages: the width of the body column, the
 height of a body word, the distance between rows, and the usual left edge
-of the column. `group_lines` groups words into lines by the walking
-skeleton's rule: a word joins the line of the word that started it, its
+of the column; the height and the distance are taken by
+`galley.body_measures`, which structure shares. `group_lines` groups
+words into lines by the walking skeleton's rule: a word joins the line of the word that started it, its
 anchor, when the word's vertical centre lies within the anchor's top and
 bottom. `layout_page` places the body column on the page, takes the
 words outside it as margin regions, the first row set apart at the top as
@@ -20,10 +21,18 @@ from bisect import bisect_left, bisect_right
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
-from itertools import groupby, pairwise
+from itertools import groupby
 from statistics import median
 from typing import Final, assert_never
 
+from galley.body_measures import (
+    COMMONEST_EDGE_PT,
+    body_measures,
+    commonest,
+    group_rows,
+    measured_pages,
+    median_word_height,
+)
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
 from galley.errors import FidelityBoundary
@@ -58,12 +67,6 @@ def _enclosing_box(boxes: tuple[Box, ...]) -> Box:
     )
 
 
-def _line(words: tuple[Word, ...]) -> Line:
-    """The line of `words`, sorted left to right by x0; equal x0 keep their order."""
-    left_to_right = tuple(sorted(words, key=lambda word: word.box.x0))
-    return Line(_enclosing_box(tuple(word.box for word in words)), left_to_right)
-
-
 def group_lines(words: tuple[Word, ...]) -> tuple[Line, ...]:
     """The lines of `words`, top to bottom, each one's words left to right.
 
@@ -72,31 +75,16 @@ def group_lines(words: tuple[Word, ...]) -> tuple[Line, ...]:
     current line when its vertical centre, (top + bottom) / 2 in points,
     lies within the anchor's top and bottom, edges included, and otherwise
     starts the next line as its anchor. A line's box is the smallest box
-    that holds its words. No words give no lines.
+    that holds its words. No words give no lines. These are the rows of
+    `body_measures.group_rows`.
     """
-    rows: list[list[Word]] = []
-    anchor: Word | None = None
-    for word in sorted(words, key=lambda word: (word.box.top, word.box.x0)):
-        centre = (word.box.top + word.box.bottom) / 2
-        if anchor is not None and anchor.box.top <= centre <= anchor.box.bottom:
-            rows[-1].append(word)
-        else:
-            rows.append([word])
-            anchor = word
-    return tuple(_line(tuple(row)) for row in rows)
+    return group_rows(words)
 
 
 # The book's measures (layout spec section 3, "The book's measures").
 
-# Guessed: enough rows on a page for a commonest edge.
-_MEASURED_PAGE_ROWS: Final[int] = 15
-# Guessed, not measured: a book with no page of 15 rows is measured on its
-# pages of 3 rows, the fewest that give a pitch between two rows and a
-# commonest edge of more than one.
-_MEASURED_PAGE_ROWS_FALLBACK: Final[int] = 3
-# Measured: body lines start within 2.2 pt of the edge on 99% of Haskins'
-# lines.
-_COMMONEST_EDGE_PT: Final[float] = 2.0
+# The rows, the commonest edge, the pages measured and the body word
+# height and pitch are body_measures' (architecture section 12).
 # Guessed: a full line is the column width.
 _WIDE_ROW_SHARE: Final[float] = 0.8
 # Guessed, not measured: a page places its column itself when 3 of its rows
@@ -126,37 +114,13 @@ class BookMeasures:
     usual_left_edge: frozendict[int, float]
 
 
-def _commonest(edges: Iterable[float]) -> float | None:
-    """The commonest value of `edges`, in points: each edge rounded to the
-    point, the value with the most edges within `_COMMONEST_EDGE_PT` of it,
-    the smallest on a tie. None for no edges."""
-    rounded = sorted(float(round(edge)) for edge in edges)
-    if not rounded:
-        return None
-    return min(
-        dict.fromkeys(rounded),
-        key=lambda value: (
-            -(
-                bisect_right(rounded, value + _COMMONEST_EDGE_PT)
-                - bisect_left(rounded, value - _COMMONEST_EDGE_PT)
-            ),
-            value,
-        ),
-    )
-
-
-def _row_word_height(row: Line) -> float:
-    """The median height of the words of `row`, in points."""
-    return median(word.box.bottom - word.box.top for word in row.words)
-
-
 def _edge_counts(edges: Iterable[float]) -> dict[float, int]:
     """Each value of `edges`, rounded to the point, with the number of
-    edges within `_COMMONEST_EDGE_PT` of it."""
+    edges within `COMMONEST_EDGE_PT` of it."""
     rounded = sorted(float(round(edge)) for edge in edges)
     return {
-        value: bisect_right(rounded, value + _COMMONEST_EDGE_PT)
-        - bisect_left(rounded, value - _COMMONEST_EDGE_PT)
+        value: bisect_right(rounded, value + COMMONEST_EDGE_PT)
+        - bisect_left(rounded, value - COMMONEST_EDGE_PT)
         for value in dict.fromkeys(rounded)
     }
 
@@ -207,17 +171,13 @@ def _wide_rows_edges(
 
 def _commonest_left_edge(rows: tuple[Line, ...]) -> float:
     """The commonest left side of `rows`, which are not empty."""
-    edge = _commonest(row.box.x0 for row in rows)
-    assert edge is not None, "rows is not empty"
-    return edge
+    return commonest(row.box.x0 for row in rows)
 
 
 def _column_width_of_page(rows: tuple[Line, ...]) -> float:
     """The commonest right side of `rows` minus their commonest left side;
     `rows` is not empty."""
-    right = _commonest(row.box.x1 for row in rows)
-    assert right is not None, "rows is not empty"
-    return right - _commonest_left_edge(rows)
+    return commonest(row.box.x1 for row in rows) - _commonest_left_edge(rows)
 
 
 def _usual_left_edges(
@@ -259,27 +219,18 @@ def measure_book(
     threads; the result does not depend on their number."""
 
     def page_rows(page: PageWords) -> tuple[Line, ...]:
-        return group_lines(page.words)
+        return group_rows(page.words)
 
     rows_by_page = map_pages(page_rows, words.pages, workers)
-    measured = tuple(
-        rows for rows in rows_by_page if len(rows) >= _MEASURED_PAGE_ROWS
-    ) or tuple(
-        rows for rows in rows_by_page if len(rows) >= _MEASURED_PAGE_ROWS_FALLBACK
-    )
-    if not measured:
+    body = body_measures(rows_by_page)
+    if body is None:
         return None
+    measured = measured_pages(rows_by_page)
     column_width = median(_column_width_of_page(rows) for rows in measured)
     return BookMeasures(
         column_width=column_width,
-        body_word_height=median(
-            _row_word_height(row) for rows in measured for row in rows
-        ),
-        body_line_pitch=median(
-            below.box.top - above.box.top
-            for rows in measured
-            for above, below in pairwise(rows)
-        ),
+        body_word_height=body.body_word_height,
+        body_line_pitch=body.body_line_pitch,
         usual_left_edge=_usual_left_edges(
             words.pages, rows_by_page, measured, column_width
         ),
@@ -470,7 +421,7 @@ def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
     """The index in `rows` of the first row of the footnote band (step 4),
     or len(rows) when there is no band."""
     small = tuple(
-        _row_word_height(row) <= _SMALL_ROW_SHARE * measures.body_word_height
+        median_word_height(row.words) <= _SMALL_ROW_SHARE * measures.body_word_height
         for row in rows
     )
     if all(small):
@@ -805,8 +756,8 @@ def run(
     measures = measure_book(words, workers=workers)
     if measures is None:
         _logger.info(
-            "layout: no page has %d rows; every page is laid out as one region",
-            _MEASURED_PAGE_ROWS_FALLBACK,
+            "layout: no page has enough rows to measure the book; "
+            "every page is laid out as one region"
         )
     else:
         _logger.info("layout: the book's measures, in points: %s", measures)

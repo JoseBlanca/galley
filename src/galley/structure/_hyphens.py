@@ -8,12 +8,11 @@ from typing import NamedTuple
 
 from galley.model import ChangeReason, WordChange
 from galley.structure._measures import (
-    APOSTROPHES,
     ASCII_DIGITS,
     is_digit_before_hyphen,
     is_hyphen_first_part,
-    word_key,
 )
+from galley.wordlist import APOSTROPHES, word_key
 
 # Spec section 5: the word list is no evidence for a second part of fewer
 # than 2 letters ("Con-" "1", "na-" "R": junk keys it happens to hold).

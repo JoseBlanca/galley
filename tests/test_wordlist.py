@@ -1,5 +1,7 @@
 """Tests of galley.wordlist: the words of Tesseract's dictionaries
-(architecture section 12; evaluation plan, work package 2).
+(architecture section 12; evaluation plan, work package 2), the key of a
+word (structure spec section 5) and which words count as known (plates
+spec sections 2 and 6).
 
 Every test gives `word_list` a cache folder under its own temporary
 folder, so that none writes to ~/.cache. Under --parallel-threads=8 the
@@ -19,8 +21,10 @@ from galley.errors import ExternalProgramError, InputFileError
 from galley.wordlist import (
     WORD_LIST_TOOLS,
     is_cached,
+    is_known_word,
     missing_tools,
     tessdata_dir_and_languages,
+    word_key,
     word_list,
     words_of_list,
 )
@@ -175,3 +179,62 @@ def test_missing_tools_are_none_once_the_list_is_cached(
     assert missing_tools(Language.EN, cache_dir) == WORD_LIST_TOOLS
     (cache_dir / "eng.txt").write_text("replicate\n", encoding="utf-8")
     assert missing_tools(Language.EN, cache_dir) == ()
+
+
+# word_key (structure spec section 5)
+
+
+def test_word_key_is_lower_case_without_punctuation_at_its_ends() -> None:
+    assert word_key("(Normandy),") == "normandy"
+
+
+def test_word_key_keeps_hyphens_apostrophes_and_inner_punctuation() -> None:
+    assert word_key("\u201cd'in-") == "d'in-"
+    assert word_key("’tis.") == "’tis"
+    assert word_key("57;in") == "57;in"
+
+
+def test_word_key_of_punctuation_alone_is_empty() -> None:
+    assert word_key("—;") == ""
+
+
+# is_known_word (plates spec sections 2 and 6)
+
+
+def test_known_word_in_the_list_in_another_case() -> None:
+    assert is_known_word("Kadesh", frozenset({"kadesh"}))
+
+
+def test_known_word_with_punctuation_around_it() -> None:
+    assert is_known_word("(Kadesh),", frozenset({"kadesh"}))
+
+
+def test_known_word_is_a_number_with_a_bracket_after_it() -> None:
+    assert is_known_word("17]", frozenset())
+
+
+def test_known_word_is_a_number_alone() -> None:
+    assert is_known_word("16", frozenset())
+
+
+def test_known_word_is_not_a_key_with_other_characters_inside() -> None:
+    # The key is "u;l", which the list holds, but ";" is not a letter.
+    assert not is_known_word("^U;L", frozenset({"u;l"}))
+
+
+def test_known_word_has_at_least_2_letters() -> None:
+    assert not is_known_word("a", frozenset({"a"}))
+
+
+def test_known_word_is_not_a_word_absent_from_the_list() -> None:
+    assert not is_known_word("Fir", frozenset({"fire"}))
+
+
+def test_known_word_may_hold_a_hyphen_and_an_apostrophe() -> None:
+    word_list = frozenset({"vice-regent", "d'insignes"})
+    assert is_known_word("Vice-Regent,", word_list)
+    assert is_known_word("d'insignes", word_list)
+
+
+def test_known_word_is_not_a_number_with_a_letter() -> None:
+    assert not is_known_word("17th", frozenset())

@@ -4,17 +4,13 @@ Positions are PDF points, origin at the top left of the page (architecture
 section 7).
 """
 
-import bisect
 import re
-import statistics
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
+from galley.body_measures import commonest
 from galley.model import Box, Line, Region, Word
 
-# layout section 3, measured: body lines start within 2.2 pt of the edge on
-# 99% of Haskins' lines, so the commonest edge counts the edges within 2 pt.
-_COMMONEST_EDGE_PT = 2
 # Spec section 6: a region of fewer lines takes its box's sides as edges.
 _LINES_FOR_COMMONEST_EDGES = 5
 
@@ -24,17 +20,6 @@ _ARABIC_FORM = re.compile(r"([0-9]{1,3})[.,]?")
 _ROMAN_FORM = re.compile(
     r"(?=[ivxlcdm])m{0,3}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})[.,]?"
 )
-
-
-def word_height(word: Word) -> float:
-    """The height of a word's box, in points."""
-    return word.box.bottom - word.box.top
-
-
-def median_word_height(words: Iterable[Word]) -> float:
-    """The median height of `words`, in points; 0 for no word."""
-    heights = tuple(word_height(word) for word in words)
-    return statistics.median(heights) if heights else 0.0
 
 
 def region_words(region: Region) -> tuple[Word, ...]:
@@ -93,22 +78,6 @@ def is_page_number_form(text: str) -> bool:
     return arabic_value(text) is not None or is_roman_form(text)
 
 
-def commonest(edges: Iterable[float]) -> float:
-    """The commonest of `edges` (layout sections 1 and 3): each edge rounded to the
-    point, the value with the most edges within 2 pt of it, the smallest
-    on a tie. `edges` is not empty."""
-    rounded = sorted(round(edge) for edge in edges)
-    best_value = rounded[0]
-    best_count = 0
-    for value in sorted(set(rounded)):
-        count = bisect.bisect_right(
-            rounded, value + _COMMONEST_EDGE_PT
-        ) - bisect.bisect_left(rounded, value - _COMMONEST_EDGE_PT)
-        if count > best_count:
-            best_value, best_count = value, count
-    return float(best_value)
-
-
 @dataclass(frozen=True, slots=True)
 class Edges:
     """The left and right edges of a region or of a page's body column, in
@@ -146,29 +115,6 @@ def region_edges(region: Region) -> Edges:
 def middle(box: Box) -> float:
     """The horizontal middle of a box."""
     return (box.x0 + box.x1) / 2
-
-
-# Spec section 5: the apostrophes a key keeps, and after which a French
-# elision's word is looked up.
-APOSTROPHES = ("'", "’")
-
-
-def _kept_in_key(character: str) -> bool:
-    return character.isalnum() or character == "-" or character in APOSTROPHES
-
-
-def word_key(text: str) -> str:
-    """The key of a word for the hyphen rule (spec section 5): lower case,
-    with the characters that are not letters, digits, hyphens or
-    apostrophes stripped from both ends."""
-    lowered = text.lower()
-    start = 0
-    end = len(lowered)
-    while start < end and not _kept_in_key(lowered[start]):
-        start += 1
-    while end > start and not _kept_in_key(lowered[end - 1]):
-        end -= 1
-    return lowered[start:end]
 
 
 def is_hyphen_first_part(text: str) -> bool:

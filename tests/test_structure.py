@@ -19,7 +19,6 @@ from galley.cli import main
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
 from galley.fidelity import check_stage
-from galley.layout import measure_book
 from galley.model import (
     Block,
     BlockKind,
@@ -46,8 +45,6 @@ from galley.model import (
     WordChange,
     block_text,
     read_blocks,
-    read_lines,
-    read_words,
     write_blocks,
     write_lines,
     write_pages,
@@ -1716,27 +1713,6 @@ def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
     with pytest.raises(FidelityError):
         structure.run(folder, config, workers=1)
     assert not folder.blocks_json.exists()
-
-
-# Structure's measures against layout's, on every excerpt (structure spec,
-# section 2: the same rule, written in both stages)
-
-_EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
-
-
-@pytest.mark.parametrize(
-    "excerpt", sorted(path.stem for path in _EXCERPTS_DIR.glob("*.pdf"))
-)
-def test_structure_measures_the_body_as_layout_does(
-    excerpt: str, excerpt_books: frozendict[str, BookFolder]
-) -> None:
-    # The session's one run of each excerpt (tests/conftest.py).
-    folder = excerpt_books[excerpt]
-    measures = measure_book(read_words(folder.words_json), workers=1)
-    survey = survey_book(read_lines(folder.lines_json), workers=1)
-    assert measures is not None
-    assert survey.body_word_height == measures.body_word_height
-    assert survey.body_line_pitch == measures.body_line_pitch
 
 
 # The two reference pages that an excerpt cannot get right (tests/
