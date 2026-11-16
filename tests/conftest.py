@@ -34,7 +34,8 @@ EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 _EXCERPT_RUNS_AT_ONCE = 6
 
 # The configs of spec section 9, "The end-to-end test", without `pdf`.
-# Kadesh page 9 has no text layer, and its region holds the page number 81.
+# Kadesh's region on page 0 holds the page number 81. Its page 9, without a
+# text layer, is a plate, which analyze takes (plates spec section 6).
 EXCERPT_CONFIGS = frozendict(
     {
         "kadesh_8-17": (
@@ -42,7 +43,6 @@ EXCERPT_CONFIGS = frozendict(
             'authors = ["J. H. Breasted"]\n'
             'language = "en"\n'
             "cover_page = 0\n"
-            "exclude_pages = [9]\n"
             "exclude_regions = [{page = 0, box = [240, 620, 252, 632]}]\n"
         ),
         "gierke_86-93_270-271": (
@@ -112,14 +112,16 @@ EXCERPT_CONFIGS = frozendict(
 # the same pages as in evaluation/books.toml, which test_end_to_end.py
 # checks.
 #
-# exclude_pages: the pages without a text layer, which analyze refuses
-# unless excluded (the evaluation books' as in evaluation/books.toml,
-# Kadesh's and Gierke's as analyze listed them on 15 November 2026), and
-# the pages with one that analyze's plate rule takes wrongly
+# exclude_pages: the pages without a text layer that are not plates, which
+# analyze refuses unless excluded (the evaluation books' as in
+# evaluation/books.toml, Kadesh's and Gierke's as analyze listed them on 15
+# November 2026), and the pages that analyze's plate rule takes wrongly
 # (docs/specs/plates.md, section 2): Kadesh 0, the cover, and 49 and 65,
 # backs of plates; Mariéjol 1 and 2, marbled endpapers, and 457 and 458,
-# an endpaper and the library's card pocket. The plates without a text
-# layer stay excluded until analyze recognises them.
+# an endpaper and the library's card pocket; Mariéjol 0, its cover, has no
+# layer. The plates without a text layer (Kadesh 17, 23, 35, 43, 57 and 69;
+# Stubbs 9, 11, 52 and 54) are not excluded: analyze takes them as plates
+# (16 November 2026).
 #
 # contents_pages: the printed table of contents, found on 16 November 2026
 # by "CONTENTS" or "TABLE DES MATIERES" at the top of the page and checked
@@ -129,10 +131,7 @@ EXCERPT_CONFIGS = frozendict(
 # NOTES", pages 61 to 67, ending before the "LIST OF AUTHORITIES" on 68
 # (read in the text layer on 16 November 2026).
 #
-# plate_pages: Kadesh 23, a faint relief that analyze's rule misses. It is
-# also in exclude_pages, which wins (architecture section 6), until
-# analyze recognises plates without a text layer: before that, analyze
-# refuses the page.
+# plate_pages: Kadesh 23, a faint relief that analyze's rule misses.
 WHOLE_BOOK_CONFIGS = frozendict(
     {
         "normansineuropea00hask": (
@@ -142,7 +141,7 @@ WHOLE_BOOK_CONFIGS = frozendict(
         ),
         "earlyplantagenet01stub": (
             'language = "en"\n'
-            "exclude_pages = [0, 2, 3, 4, 5, 8, 9, 10, 11, 52, 53, 54, 55, "
+            "exclude_pages = [0, 2, 3, 4, 5, 8, 10, 53, 55, "
             "338, 339, 340, 341, 342, 343]\n"
             "contents_pages = [14, 15, 16]\n"
         ),
@@ -159,8 +158,7 @@ WHOLE_BOOK_CONFIGS = frozendict(
         ),
         "battleofkadeshst00breauoft": (
             'language = "en"\n'
-            "exclude_pages = [0, 1, 2, 3, 17, 23, 35, 43, 49, 57, 65, 69, 70, 71, "
-            "72, 73, 75]\n"
+            "exclude_pages = [0, 1, 2, 3, 49, 65, 70, 71, 72, 73, 75]\n"
             "plate_pages = [23]\n"
         ),
         "politicaltheorie00gieruoft": (

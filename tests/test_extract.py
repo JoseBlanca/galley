@@ -44,6 +44,19 @@ GIERKE_WORD_COUNTS = (192, 311, 297, 325, 319, 309, 292, 273, 547, 541)
 
 REGION = Box(10.0, 10.0, 20.0, 20.0)
 
+# The figures of the Kadesh excerpt's plates, pages 8 and 9 (book pages 16
+# and 17): the whole page, at 300 dpi.
+KADESH_PLATE_FIGURE = frozendict(
+    {
+        index: Figure(
+            box=Box(0.0, 0.0, 508.32, 728.16),
+            image=f"images/plate-{index:04d}.png",
+            dpi=300,
+        )
+        for index in (8, 9)
+    }
+)
+
 
 def page(
     kind: PageKind,
@@ -243,7 +256,7 @@ def test_word_counts_per_page_are_those_of_the_text_layer_but_81_and_page_9(
     )
 
 
-def test_pages_have_their_index_their_text_source_and_no_figure(
+def test_pages_have_their_index_their_text_source_and_figures_on_plates_alone(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     kadesh = read_words(excerpt_books[KADESH].words_json)
@@ -253,8 +266,9 @@ def test_pages_have_their_index_their_text_source_and_no_figure(
         (page_words.index, page_words.text_source, page_words.figures)
         for page_words in kadesh.pages
     ) == (
-        *((index, TextSource.TEXT_LAYER, ()) for index in range(9)),
-        (9, TextSource.NONE, ()),
+        *((index, TextSource.TEXT_LAYER, ()) for index in range(8)),
+        (8, TextSource.TEXT_LAYER, (KADESH_PLATE_FIGURE[8],)),
+        (9, TextSource.NONE, (KADESH_PLATE_FIGURE[9],)),
     )
     assert tuple(
         (page_words.index, page_words.text_source, page_words.figures)
@@ -342,9 +356,45 @@ def test_kadesh_cover_is_page_0_at_300_dpi_in_8_bit_grayscale(
 ) -> None:
     with Image.open(excerpt_books[KADESH].cover_png) as cover:
         assert (cover.format, cover.mode, cover.size) == ("PNG", "L", (2118, 3034))
-    assert sorted(excerpt_books[KADESH].images_dir.iterdir()) == [
-        excerpt_books[KADESH].cover_png
-    ]
+
+
+# The plates of the excerpts (plates spec section 6), by page index in the
+# excerpt: Kadesh 16 and 17; Kadesh 64, 65 (the back of plate 64) and 68;
+# Domesday's maps 39 and 40. Each has its image, and nothing else is in
+# images/ but the cover.
+EXCERPT_PLATES = frozendict(
+    {
+        "kadesh_8-17": (8, 9),
+        "kadesh_59-68": (5, 6, 9),
+        "domesday_headings_quotes": (3, 4),
+    }
+)
+
+
+def test_each_excerpt_plate_has_its_whole_page_figure_and_its_image_alone(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    for name, folder in excerpt_books.items():
+        plates = EXCERPT_PLATES.get(name, ())
+        pages = read_pages(folder.pages_json).pages
+        words = read_words(folder.words_json)
+        assert tuple(
+            page_words.index for page_words in words.pages if page_words.figures
+        ) == (plates), name
+        for index in plates:
+            assert words.pages[index].figures == (
+                Figure(
+                    box=Box(0.0, 0.0, pages[index].width_pt, pages[index].height_pt),
+                    image=f"images/plate-{index:04d}.png",
+                    dpi=300,
+                ),
+            ), name
+            with Image.open(folder.root / words.pages[index].figures[0].image) as plate:
+                assert (plate.format, plate.mode) == ("PNG", "L"), name
+        cover = ("cover.png",) if name == KADESH else ()
+        assert sorted(path.name for path in folder.images_dir.iterdir()) == sorted(
+            (*cover, *(f"plate-{index:04d}.png" for index in plates))
+        ), name
 
 
 def test_gierke_without_cover_page_has_an_empty_images_folder(

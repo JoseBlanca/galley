@@ -453,9 +453,13 @@ def _path_with_pandoc_only(tmp_path: Path) -> str:
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
-@pytest.mark.parametrize("command", ["run", "structure"])
-def test_a_command_running_structure_stops_without_tesseract_or_a_cached_word_list(
+@pytest.mark.parametrize(
+    ("command", "first_stage"),
+    [("run", "analyze"), ("analyze", "analyze"), ("structure", "structure")],
+)
+def test_a_command_running_analyze_or_structure_stops_without_tesseract_or_a_cached_word_list(
     command: str,
+    first_stage: str,
     tmp_path: Path,
     excerpt_books: frozendict[str, BookFolder],
     monkeypatch: pytest.MonkeyPatch,
@@ -469,7 +473,7 @@ def test_a_command_running_structure_stops_without_tesseract_or_a_cached_word_li
 
     assert str(raised.value) == (
         "tesseract, combine_tessdata and dawg2wordlist are not installed; "
-        "structure needs them once to extract the word list of eng from "
+        f"{first_stage} needs them once to extract the word list of eng from "
         "Tesseract's data: install them with `brew install tesseract`"
     )
     # No stage ran: each would have deleted its own file first.
@@ -479,7 +483,7 @@ def test_a_command_running_structure_stops_without_tesseract_or_a_cached_word_li
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
-def test_a_command_without_structure_runs_without_tesseract(
+def test_a_command_without_analyze_or_structure_runs_without_tesseract(
     tmp_path: Path,
     excerpt_books: frozendict[str, BookFolder],
     monkeypatch: pytest.MonkeyPatch,
