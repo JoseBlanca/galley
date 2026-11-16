@@ -7,7 +7,6 @@ pages an excerpt cannot get right.
 """
 
 import hashlib
-import json
 from dataclasses import replace
 from pathlib import Path
 
@@ -1721,30 +1720,12 @@ def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
 # whole books, Gierke's page index 270 loses its head line "Notes. 185" as
 # a running head and a page number, and Mariéjol's page index 210 its foot
 # line as a signature mark and the page number "(l93)". The configs are
-# those of the whole_book test of tests/test_layout.py.
-_WHOLE_BOOK_TOML = frozendict(
-    {
-        "politicaltheorie00gieruoft": (
-            'language = "en"\n'
-            "exclude_pages = [0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 289]\n"
-        ),
-        "catherinedemedic00mariuoft": (
-            'language = "fr"\n'
-            "exclude_pages = [0, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456]\n"
-        ),
-    }
-)
+# those of tests/conftest.py, WHOLE_BOOK_CONFIGS.
 
 
-def _blocks_of_whole_book(books_dir: Path, book: str, root: Path) -> BlocksFile:
+def _blocks_of_whole_book(book_toml: str, root: Path) -> BlocksFile:
     folder = BookFolder(root)
-    pdf = books_dir / f"{book}.pdf"
-    folder.book_toml.write_text(
-        f"pdf = {json.dumps(str(pdf))}\n"
-        f"title = {json.dumps(book)}\n"
-        'authors = ["An Author"]\n' + _WHOLE_BOOK_TOML[book],
-        encoding="utf-8",
-    )
+    folder.book_toml.write_text(book_toml, encoding="utf-8")
     for stage in ("analyze", "extract", "layout", "structure"):
         main([stage, str(root)])
     return read_blocks(folder.blocks_json)
@@ -1766,9 +1747,11 @@ def _numbers_on(blocks: BlocksFile, page: int) -> tuple[PageNumber, ...]:
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 def test_whole_book_gierke_270_loses_its_notes_head_and_page_number(
-    books_dir: Path, tmp_path: Path
+    whole_book_toml: frozendict[str, str], tmp_path: Path
 ) -> None:
-    blocks = _blocks_of_whole_book(books_dir, "politicaltheorie00gieruoft", tmp_path)
+    blocks = _blocks_of_whole_book(
+        whole_book_toml["politicaltheorie00gieruoft"], tmp_path
+    )
     assert _removed_on(blocks, 270) == (
         (RemovalReason.RUNNING_HEAD, "Notes."),
         (RemovalReason.PAGE_NUMBER, "185"),
@@ -1782,9 +1765,11 @@ def test_whole_book_gierke_270_loses_its_notes_head_and_page_number(
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 def test_whole_book_mariejol_210_foot_line_gives_page_number_and_signature_mark(
-    books_dir: Path, tmp_path: Path
+    whole_book_toml: frozendict[str, str], tmp_path: Path
 ) -> None:
-    blocks = _blocks_of_whole_book(books_dir, "catherinedemedic00mariuoft", tmp_path)
+    blocks = _blocks_of_whole_book(
+        whole_book_toml["catherinedemedic00mariuoft"], tmp_path
+    )
     assert _removed_on(blocks, 210) == (
         (RemovalReason.RUNNING_HEAD, "L'EXTERMINATION DU PARTI PROTESTANT"),
         (RemovalReason.SIGNATURE_MARK, "UAMiàjoL. CmOl da Médidib 13"),

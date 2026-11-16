@@ -9,7 +9,6 @@ exact regions of the reference pages are tested in tests/test_excerpts.py.
 """
 
 import hashlib
-import json
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
@@ -1383,42 +1382,13 @@ def test_run_that_loses_a_word_raises_and_writes_no_lines_json(
 
 _EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 
-# The pages without a text layer of each whole book, which analyze refuses
-# unless excluded: the evaluation books' as in evaluation/books.toml;
-# Kadesh's and Gierke's as analyze listed them on 15 November 2026. The
-# whole_book test of tests/test_structure.py uses the same configs.
-_EXCLUDED_PAGES = frozendict(
-    {
-        "normansineuropea00hask": (0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279),
-        "earlyplantagenet01stub": (
-            *(0, 2, 3, 4, 5, 8, 9, 10, 11, 52, 53, 54, 55),
-            *(338, 339, 340, 341, 342, 343),
-        ),
-        "domesdaybook00maituoft": (0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557),
-        "catherinedemedic00mariuoft": (0, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456),
-        "battleofkadeshst00breauoft": (
-            *(1, 2, 3, 17, 23, 35, 43, 57, 69, 70, 71, 72, 73, 75),
-        ),
-        "politicaltheorie00gieruoft": (0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 289),
-    }
-)
-_LANGUAGES = frozendict({"catherinedemedic00mariuoft": "fr"})
 
-
-def _layout_of_pdf(pdf: Path, root: Path) -> tuple[WordsFile, LinesFile]:
-    """The words and lines of `pdf`, from analyze, extract and layout run by
-    galley2epub on a book folder at `root`."""
-    excluded = ", ".join(str(page) for page in _EXCLUDED_PAGES.get(pdf.stem, ()))
+def _layout_of_whole_book(book_toml: str, root: Path) -> tuple[WordsFile, LinesFile]:
+    """The words and lines of the book whose `book.toml` is `book_toml`,
+    from analyze, extract and layout run by galley2epub on a book folder at
+    `root`."""
     folder = BookFolder(root)
-    # TOML basic strings take JSON's escapes, so json.dumps quotes any path.
-    folder.book_toml.write_text(
-        f"pdf = {json.dumps(str(pdf))}\n"
-        f"title = {json.dumps(pdf.stem)}\n"
-        'authors = ["An Author"]\n'
-        f"language = {json.dumps(_LANGUAGES.get(pdf.stem, 'en'))}\n"
-        f"exclude_pages = [{excluded}]\n",
-        encoding="utf-8",
-    )
+    folder.book_toml.write_text(book_toml, encoding="utf-8")
     for stage in ("analyze", "extract", "layout"):
         main([stage, str(root)])
     return read_words(folder.words_json), read_lines(folder.lines_json)
@@ -1470,7 +1440,8 @@ def test_layout_of_an_excerpt_keeps_every_word(
     ],
 )
 def test_layout_of_a_whole_book_keeps_every_word(
-    book: str, books_dir: Path, tmp_path: Path
+    book: str, whole_book_toml: frozendict[str, str], tmp_path: Path
 ) -> None:
-    words, lines = _layout_of_pdf(books_dir / f"{book}.pdf", tmp_path)
+    # The configs of the six books are those of tests/conftest.py.
+    words, lines = _layout_of_whole_book(whole_book_toml[book], tmp_path)
     _assert_laid_out_in_regions(words, lines)
