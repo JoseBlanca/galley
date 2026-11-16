@@ -5655,3 +5655,20 @@ def test_figure_block_goes_after_the_margin_notes_of_earlier_pages() -> None:
         BlockKind.FIGURE,
         BlockKind.PARAGRAPH,
     ]
+
+
+def test_plate_page_with_two_figures_is_refused_naming_the_page() -> None:
+    # Plates spec section 3: a plate page has one figure.
+    plate = replace(
+        _plate(1, _spread("THE CAMP", 60, 300, 520)),
+        figures=(
+            Figure(_PLATE_BOX, "images/plate-0001.png", 300),
+            Figure(_PLATE_BOX, "images/plate-0001b.png", 300),
+        ),
+    )
+    with pytest.raises(InputFileError, match="page 1 has 2 figures"):
+        make_blocks(
+            _lines_of(_body_page(0, *_five_full_lines(70, "first")), plate),
+            _NO_WORDS,
+            workers=1,
+        )

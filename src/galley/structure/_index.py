@@ -7,6 +7,7 @@ Positions are PDF points, origin at the top left of the page."""
 import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 
 from galley.body_measures import commonest
 from galley.model import (
@@ -21,6 +22,7 @@ from galley.model import (
 )
 from galley.structure._foot import LinePlace
 from galley.structure._measures import (
+    Edges,
     box_of,
     is_page_number_form,
     letters,
@@ -87,7 +89,7 @@ def _without_page_number(texts: Sequence[str]) -> tuple[str, ...]:
     return tuple(texts[start:])
 
 
-def is_index_title(page: PageLayout, kinds: Sequence[RegionKind]) -> bool:
+def _is_index_title(page: PageLayout, kinds: Sequence[RegionKind]) -> bool:
     """Whether the page's title, without a page number at its start or end,
     starts with the word "index" or "table alphabétique", in any case (spec
     section 17, rule 1)."""
@@ -102,7 +104,7 @@ def is_index_title(page: PageLayout, kinds: Sequence[RegionKind]) -> bool:
 
 
 @dataclass(frozen=True, slots=True)
-class IndexColumns:
+class _IndexColumns:
     """The index columns of a page: the numbers of the regions of the left
     column and of the right, and the gutter, the middle between the left
     column's right edge and the right column's left edge."""
@@ -116,7 +118,9 @@ def _width(region: Region) -> float:
     return region.box.x1 - region.box.x0
 
 
-def index_columns(page: PageLayout, kinds: Sequence[RegionKind]) -> IndexColumns | None:
+def _index_columns(
+    page: PageLayout, kinds: Sequence[RegionKind]
+) -> _IndexColumns | None:
     """The page's two index columns (spec section 17, rule 1): the regions,
     not margin regions nor the head line, each 0.3 to 0.65 of the width
     that the page's regions span, of which one lies left of another; every
@@ -153,23 +157,23 @@ def index_columns(page: PageLayout, kinds: Sequence[RegionKind]) -> IndexColumns
         max(boxes[number].x1 for number in left)
         + min(boxes[number].x0 for number in right)
     ) / 2
-    return IndexColumns(left, right, gutter)
+    return _IndexColumns(left, right, gutter)
 
 
 def index_pages(
     pages: Sequence[PageLayout], kinds: Sequence[Sequence[RegionKind]]
 ) -> frozenset[int]:
     """The page indices of the book's printed indexes (spec section 17, rule
-    1): from a page whose title starts with "index" (`is_index_title`),
+    1): from a page whose title starts with "index" (`_is_index_title`),
     and over the following pages while each page that has words has two
     index columns. `kinds` are the kinds of each page's regions."""
     found: list[int] = []
     in_index = False
     for page, page_kinds in zip(pages, kinds, strict=True):
-        if is_index_title(page, page_kinds):
+        if _is_index_title(page, page_kinds):
             in_index = True
         elif in_index and any(region.lines for region in page.regions):
-            in_index = index_columns(page, page_kinds) is not None
+            in_index = _index_columns(page, page_kinds) is not None
         if in_index:
             found.append(page.index)
     return frozenset(found)
@@ -204,13 +208,26 @@ def _is_cut(region: Region, lines: Sequence[Line], gutter: float) -> bool:
     return uncrossed >= _UNCROSSED_SHARE * len(lines)
 
 
-def _part(lines: Sequence[Line], side: int, gutter: float) -> tuple[Line, ...]:
-    """The left (`side` 0) or right (1) part of each of `lines`, each word
-    going by its middle; lines with no word on that side are left out."""
+class _Column(StrEnum):
+    """The left or the right index column."""
+
+    LEFT = "left"
+    RIGHT = "right"
+
+
+def _side_of(x: float, gutter: float) -> _Column:
+    """The column on the side of the gutter where `x` lies, the right from
+    the gutter on."""
+    return _Column.LEFT if x < gutter else _Column.RIGHT
+
+
+def _part(lines: Sequence[Line], column: _Column, gutter: float) -> tuple[Line, ...]:
+    """The part of each of `lines` in `column`, each word going by its
+    middle; lines with no word on that side are left out."""
     parts = []
     for line in lines:
         words = tuple(
-            word for word in line.words if (middle(word.box) >= gutter) == bool(side)
+            word for word in line.words if _side_of(middle(word.box), gutter) is column
         )
         if words:
             parts.append(Line(words_box(words), words))
@@ -228,7 +245,7 @@ class _Item:
 
 
 @dataclass(frozen=True, slots=True)
-class _Side:
+class _ColumnInput:
     """What goes into one index column: its items, and the lines of the
     margin regions on its side, each placed on its own."""
 
@@ -250,7 +267,7 @@ class IndexPage:
     removals: tuple[Removal, ...]
     lines: tuple[Line, ...]
     starts: frozenset[int]
-    column_edges: tuple[tuple[float, float], ...]
+    column_edges: tuple[Edges, ...]
     taken: frozenset[int]
     removed_lines: frozenset[LinePlace]
     page_numbers: tuple[PageNumber, ...] = ()
@@ -270,14 +287,14 @@ def entry_side(left_sides: Sequence[float]) -> float:
     return usual
 
 
-def column_left_edge(lines: Sequence[Line]) -> tuple[float, float]:
+def _column_left_edge(lines: Sequence[Line]) -> tuple[float, float]:
     """The column's left edge as (x at top 0, points per point of top), a
     straight line through its lines' left sides (spec section 17, rule 3):
     fitted by least squares on the line's top through the left sides within
     3 pt of the entry side (`entry_side`), then again through those within
     3 pt of the first fit. A column of fewer than 5 lines takes its
-    smallest left side; a fit through fewer than 2 tops, the mean of its
-    left sides."""
+    smallest left side, and one of no lines (0, 0); a fit through fewer
+    than 2 tops, the mean of its left sides."""
     if len(lines) < _EDGE_FIT_MIN_LINES:
         return (min(line.box.x0 for line in lines), 0.0) if lines else (0.0, 0.0)
     usual = entry_side(tuple(line.box.x0 for line in lines))
@@ -312,7 +329,7 @@ def _shares_row(line: Line, other: Line) -> bool:
     return other.box.top <= centre <= other.box.bottom
 
 
-def _column(side: _Side) -> tuple[Line, ...]:
+def _column(side: _ColumnInput) -> tuple[Line, ...]:
     """The lines of one index column in reading order (spec section 17,
     rule 2): the items by their tops, and each margin line just before the
     line of its row when it lies left of it, just after when right of it,
@@ -350,9 +367,9 @@ def _column(side: _Side) -> tuple[Line, ...]:
 def _column_items(
     page: PageLayout,
     kinds: Sequence[RegionKind],
-    columns: IndexColumns,
+    columns: _IndexColumns,
     removed: frozenset[LinePlace],
-) -> tuple[tuple[_Side, _Side], frozenset[int]]:
+) -> tuple[frozendict[_Column, _ColumnInput], frozenset[int]]:
     """What goes into the left and the right column of an index page (spec
     section 17, rule 2), and the numbers of the regions taken: each line
     of a column region, the lines of each margin region on its side but
@@ -363,8 +380,8 @@ def _column_items(
     columns_top = min(
         page.regions[number].box.top for number in columns.left | columns.right
     )
-    items: tuple[list[_Item], list[_Item]] = ([], [])
-    margins: tuple[list[Line], list[Line]] = ([], [])
+    items: dict[_Column, list[_Item]] = {column: [] for column in _Column}
+    margins: dict[_Column, list[Line]] = {column: [] for column in _Column}
     taken: set[int] = set()
     for number, (region, kind) in enumerate(zip(page.regions, kinds, strict=True)):
         lines = tuple(
@@ -375,22 +392,23 @@ def _column_items(
         if region is head:
             continue
         if number in columns.left or number in columns.right:
-            side = 0 if number in columns.left else 1
+            side = _Column.LEFT if number in columns.left else _Column.RIGHT
             items[side].extend(_Item(line.box.top, (line,)) for line in lines)
         elif kind is RegionKind.MARGIN and region.box.bottom > columns_top:
-            side = 0 if middle(region.box) < columns.gutter else 1
-            margins[side].extend(lines)
+            margins[_side_of(middle(region.box), columns.gutter)].extend(lines)
         elif _is_cut(region, lines, columns.gutter):
-            for side in (0, 1):
+            for side in _Column:
                 part = _part(lines, side, columns.gutter)
                 if part:
                     items[side].append(_Item(part[0].box.top, part))
         else:
             continue
         taken.add(number)
-    return (
-        _Side(tuple(items[0]), tuple(margins[0])),
-        _Side(tuple(items[1]), tuple(margins[1])),
+    return frozendict(
+        {
+            column: _ColumnInput(tuple(items[column]), tuple(margins[column]))
+            for column in _Column
+        }
     ), frozenset(taken)
 
 
@@ -512,7 +530,7 @@ def index_page(
             key=lambda place: page.regions[place[0]].lines[place[1]].box.top,
         )
     )
-    columns = index_columns(page, kinds)
+    columns = _index_columns(page, kinds)
     if columns is None:
         return IndexPage(
             removals,
@@ -524,7 +542,7 @@ def index_page(
             index_head.page_numbers,
         )
     sides, taken = _column_items(page, kinds, columns, removed | guide_lines)
-    left, right = _column(sides[0]), _column(sides[1])
+    left, right = _column(sides[_Column.LEFT]), _column(sides[_Column.RIGHT])
     if _are_guide_words(left, right):
         removals = tuple(
             sorted(
@@ -541,9 +559,9 @@ def index_page(
         )
         left, right = left[1:], right[1:]
     starts: list[int] = []
-    edges: list[tuple[float, float]] = []
+    edges: list[Edges] = []
     for offset, column in ((0, left), (len(left), right)):
-        edge = column_left_edge(column)
+        edge = _column_left_edge(column)
         starts.extend(
             offset + position
             for position, line in enumerate(column)
@@ -551,7 +569,7 @@ def index_page(
         )
         if column:
             box = box_of(tuple(line.box for line in column))
-            edges.extend((box.x0, box.x1) for _ in column)
+            edges.extend(Edges(box.x0, box.x1) for _ in column)
     return IndexPage(
         removals,
         left + right,

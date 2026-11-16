@@ -45,7 +45,8 @@ h6 .label {
 }
 
 /* An index entry: one line, its turn-overs hanging. A sub-entry, of
-   depth 2, is set in under its entry, and a deeper one further. */
+   depth 2, is set in under its entry; no book prints deeper ones
+   (structure spec section 17, rule 5). */
 .index-entry p {
   margin: 0;
   padding-left: 2em;
@@ -55,10 +56,6 @@ h6 .label {
 
 .index-entry.depth-2 p {
   padding-left: 3em;
-}
-
-.index-entry.depth-3 p {
-  padding-left: 4em;
 }
 
 /* A figure: its image centred within the page, and its caption under it

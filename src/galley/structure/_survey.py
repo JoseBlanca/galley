@@ -71,7 +71,7 @@ class BookSurvey:
     book_words: frozenset[str]
     signature_lines: frozenset[int]
     heads_below_specks: frozenset[int]
-    index_pages: frozenset[int] = frozenset()
+    index_pages: frozenset[int]
 
 
 @dataclass(frozen=True, slots=True)

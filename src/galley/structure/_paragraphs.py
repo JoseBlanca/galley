@@ -228,7 +228,7 @@ def _index_lines(page_index: int, index: IndexPage | None) -> tuple[PlacedLine, 
     if index is None:
         return ()
     return tuple(
-        PlacedLine(page_index, line, Edges(*edges), Edges(*edges))
+        PlacedLine(page_index, line, edges, edges)
         for line, edges in zip(index.lines, index.column_edges, strict=True)
     )
 

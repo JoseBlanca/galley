@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
 from galley.body_measures import rows_of
+from galley.errors import InputFileError
 from galley.model import (
     BlockKind,
     LinesFile,
@@ -131,8 +132,15 @@ def plate_parts(
     caption lines when the row's words are known enough, else each
     removed as `plate_text`. The
     page has no body stream and no side text but its figure.
-    `lower_case_words` is the word list in lower case."""
-    figure, *_ = page.figures
+    `lower_case_words` is the word list in lower case. Raises
+    InputFileError for a page with more than one figure."""
+    if len(page.figures) != 1:
+        message = (
+            f"lines.json: page {page.index} has {len(page.figures)} figures; a "
+            "plate page has one (plates spec section 3)"
+        )
+        raise InputFileError(message)
+    (figure,) = page.figures
     head = head_removals(page, survey)
     topmost = _topmost(page)
     topmost_words = (
