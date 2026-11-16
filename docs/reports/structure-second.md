@@ -357,3 +357,34 @@ page (546) is left out: its 50 rows of 8 pt type pulled the pitch to
 11.5; its case, index page numbers overhanging the right column, is
 left to the whole-book check (structure §9 says so). Page 47, a table
 read as verse, is added.
+
+## Task 7.6: re-reading Gierke's margin notes with Tesseract (a measurement for the owner)
+
+Nothing was built; the script and full notes are outside the repository
+(the session's scratchpad, `gierke-ocr/NOTES.md`). Method: galley's
+layout on the whole Gierke; each page's margin strip cropped from a
+300-dpi render (pypdfium2, one thread) and cut into notes at ink gaps
+over 18 px (160 candidates on pages 86–185); Tesseract 5 `eng`, page
+segmentation mode 6. Thirty notes chosen evenly, read by eye against the
+crop, case and punctuation ignored:
+
+| reading | words right of 139 |
+|---|---|
+| the scan's text layer | 52 (37%) |
+| Tesseract, psm 6 | 133 (96%) |
+| Tesseract, psm 6, image enlarged 2× | 134 (96%) |
+
+On page index 88, the owner's example: the text layer has "Diverse",
+"Unity of ment.", "Medieval Antique- Thought," and nothing for the
+fourth note; Tesseract has "Diverse methods.", "Unity of the move.
+ment,", "Medieval and Antique- Modern Thought." and "Medieval Thought."
+
+Time, on a Mac17,9 (18 cores: 6 performance, 12 efficiency): the render
+0.16 s a page, always in one thread; Tesseract 0.05 s a note (0.08 s a
+page) on one thread, 0.95 s for the 100 pages on 12 threads. The render
+sets the pace: about 50 s for the whole 290-page book.
+
+What it would need: 23% of the candidates were pencil or ink marks, not
+notes, which Tesseract reads as junk ("id i ;"), and junk gets into real
+notes beside a mark; a filter is needed. One crop cut off a word; 10 of
+layout's 157 margin regions fell outside every cut note.

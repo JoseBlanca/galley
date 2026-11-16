@@ -574,7 +574,7 @@ today; the change of task 7.4 has to give it.
   baseline, the whole-book tests, the six EPUBs. Spec: structure §9,
   "Targets measured by `galley-eval run`"; `docs/specs/evaluation.md`
   §9. Needs 7.3 and 7.4. Deliverables 5, 6.
-- [ ] 7.6 The Gierke measurement: Tesseract on the margin regions of
+- [x] 7.6 The Gierke measurement: Tesseract on the margin regions of
   Gierke's pages 86 to 185, cropped from a 300-dpi render, by a script
   kept outside `src/` and not committed; the numbers in the report.
   Spec: architecture §7b and §16 for how Tesseract is called; nothing is
