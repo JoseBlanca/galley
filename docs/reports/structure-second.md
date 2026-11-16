@@ -71,3 +71,39 @@ written, and page 23 stays in `exclude_pages` until task 6.1.
 7. `grep -c contents_pages evaluation/books.toml` gives 4; `-m
    whole_book`: 22 passed in 84.7 s.
 8. Default pytest: 1152 passed in 27.2 s; with 8 threads in 50.7 s.
+
+### Review of work package 1
+
+Four reviewers (spec, tests, fidelity, conventions) on 6d201b1..0040fc3.
+Every finding held; all were fixed (9c2eaca specs, then cb78d74,
+408e5dc, f99eb48, 52d0a9f). What mattered:
+
+- **The fidelity check could let a word hide or be invented** once
+  work package 2 makes reference spans: a one-letter span ("à", "a")
+  passed as a marker and vanished at markdown (Mariéjol has 18,247 block
+  words of that shape); the text of an endnote link was never compared;
+  the reference rules ran only at structure. Decided by the orchestrator,
+  as a stricter check (architecture §13, reversible by reverting
+  9c2eaca and cb78d74): a letter is allowed in a span only with a round
+  bracket ("(t)", "U)"); "&" and dashes are refused; an endnote link's
+  text is counted on both sides; the reference rules run at markdown too.
+- **Tests that could not fail**: a dropped endnote link went unreported
+  by any test; the pitch, median, row-top and 2 pt edge-window rules of
+  `body_measures` and two thresholds survived mutation. Each now has a
+  test that fails when broken.
+- **Conventions**: the word list is lowered in one place (analyze would
+  otherwise have missed 72% of the English list); layout's leftover copy
+  of the edge count and its second name for the row rule are gone; the
+  error for a version-1 `blocks.json` says to rerun structure.
+- **Configs**: Gierke's "Analytical summary" (pages 52–60) and its
+  list of the notes' subjects (61–67) repeat the section headings, so
+  `contents_pages` is now [10, 52–67] (decided by the orchestrator, by
+  the owner's rule that the table of contents lists no chapter twice).
+  A page in both `plate_pages` and `exclude_pages` is excluded
+  (architecture §6).
+
+After the fixes, at 52d0a9f: pytest 1175 passed in 27.0 s; with 8
+threads in 50.4 s; `-m whole_book` 22 passed in 85.3 s; ruff, ty and
+`uv lock --check` pass.
+
+Work package 1 is done.
