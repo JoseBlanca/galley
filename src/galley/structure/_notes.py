@@ -192,10 +192,18 @@ def page_notes(regions: Sequence[Sequence[PlacedLine]]) -> tuple[PageNote, ...]:
     return tuple(notes)
 
 
-def numbered_per_page(pages: Sequence[Sequence[PageNote]]) -> bool:
-    """Whether the book numbers its notes per page (spec section 11, "Its
-    value"): on at least half of the pages with a note whose marker reads
-    as a number, the first such marker reads 1."""
+class Numbering(StrEnum):
+    """How a book numbers its notes (spec section 11, "Its value")."""
+
+    PER_PAGE = "per_page"
+    BY_MARKER = "by_marker"
+
+
+def book_numbering(pages: Sequence[Sequence[PageNote]]) -> Numbering:
+    """How the book numbers its notes (spec section 11, "Its value"), from
+    the notes of each of its pages: per page when, on at least half of the
+    pages with a note whose marker reads as a number, the first such
+    marker reads 1; by marker otherwise."""
     firsts = tuple(
         value
         for notes in pages
@@ -211,11 +219,14 @@ def numbered_per_page(pages: Sequence[Sequence[PageNote]]) -> bool:
         )
         is not None
     )
-    return bool(firsts) and 2 * sum(value == 1 for value in firsts) >= len(firsts)
+    per_page = bool(firsts) and 2 * sum(value == 1 for value in firsts) >= len(firsts)
+    return Numbering.PER_PAGE if per_page else Numbering.BY_MARKER
 
 
 def footnotes(
-    pages: Sequence[Sequence[PageNote]], has_body: Sequence[bool]
+    pages: Sequence[Sequence[PageNote]],
+    has_body: Sequence[bool],
+    numbering: Numbering,
 ) -> tuple[Footnote, ...]:
     """The book's footnotes, from the notes of each page in page order, with
     `has_body` saying for each page whether it has a body stream (spec
@@ -228,9 +239,6 @@ def footnotes(
     the k-th note that starts on a page has the value k, a first note that
     may continue and does not being left uncounted; otherwise its value is
     what its marker reads."""
-    numbering = (
-        _Numbering.PER_PAGE if numbered_per_page(pages) else _Numbering.BY_MARKER
-    )
     joined: list[list[PageNote]] = []
     last_page_with_notes: int | None = None
     for page_number, notes in enumerate(pages):
@@ -252,14 +260,7 @@ def footnotes(
     return tuple(footnote for notes in joined for footnote in _valued(notes, numbering))
 
 
-class _Numbering(StrEnum):
-    """How a book numbers its notes (spec section 11, "Its value")."""
-
-    PER_PAGE = "per_page"
-    BY_MARKER = "by_marker"
-
-
-def _valued(notes: Sequence[PageNote], numbering: _Numbering) -> tuple[Footnote, ...]:
+def _valued(notes: Sequence[PageNote], numbering: Numbering) -> tuple[Footnote, ...]:
     """The footnotes that start on one page, with their values. A first
     note that may continue one of the page before and does not, the end of
     a note that started elsewhere, is not counted and has no value."""
@@ -272,7 +273,7 @@ def _valued(notes: Sequence[PageNote], numbering: _Numbering) -> tuple[Footnote,
             lines=note.lines,
             marker=note.marker,
             value=place
-            if numbering is _Numbering.PER_PAGE
+            if numbering is Numbering.PER_PAGE
             else (note.marker.value if note.marker is not None else None),
         )
         for place, note in enumerate(counted, start=1)

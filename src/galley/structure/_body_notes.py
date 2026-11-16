@@ -87,7 +87,8 @@ def take_body_notes(
 ) -> PageParts:
     """`page` with the notes left at the foot of its body stream taken out
     of it into `body_notes`, when there are such notes; `page` as it is
-    otherwise, and in a book without a marker form."""
+    otherwise, and in a book without a marker form. `body_word_height` is
+    in points."""
     if form is None:
         return page
     start = note_lines_start(page.body, band_notes, form, body_word_height)

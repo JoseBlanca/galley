@@ -139,6 +139,9 @@ class Paragraph:
 
 @dataclass(frozen=True, slots=True)
 class MarginNote:
+    """A margin region of a page, as a piece of one page (spec section 6,
+    "Side text")."""
+
     piece: Piece
 
 
