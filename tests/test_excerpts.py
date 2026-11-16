@@ -473,3 +473,62 @@ def test_endnote_gierke_270_margin_notes_go_inside_their_endnotes(
         BlockKind.MARGIN_NOTE,
         BlockKind.PARAGRAPH,
     )
+
+
+# Margin notes (structure spec, section 13), on the reference pages of
+# section 9, "The second plan".
+
+
+def _margin_notes_before(
+    blocks: BlocksFile, page: int
+) -> tuple[tuple[str, str, list[int]], ...]:
+    """Each margin note of `page` in `blocks`, with the first three words
+    and the pages of the paragraph after it, past other margin notes."""
+    body = blocks.blocks
+    placed = []
+    for position, block in enumerate(body):
+        if block.kind is not BlockKind.MARGIN_NOTE or _pages(block.origin) != [page]:
+            continue
+        after = next(
+            later
+            for later in body[position + 1 :]
+            if later.kind is not BlockKind.MARGIN_NOTE
+        )
+        placed.append(
+            (
+                block_text(block),
+                " ".join(block_text(after).split(" ")[:3]),
+                _pages(after.origin),
+            )
+        )
+    return tuple(placed)
+
+
+def test_margin_note_before_domesday_75_paragraphs_whose_first_lines_it_is_beside(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # Excerpt page 1 (75): each stands beside its paragraph's first line;
+    # "Can the villein be pursued?" (the OCR's "Sn°inhbe pursued?") beside
+    # the page's last line, the first of a paragraph that runs on to page 2.
+    _, blocks = excerpt_outputs[DOMESDAY]
+    assert _margin_notes_before(blocks, 1) == (
+        ("Free land.", "The idea of", [1]),
+        ("dOTQ^tht villein.", "If now we", [1]),
+        ("Sn°inhbe pursued?", "^ ^e free", [1, 2]),
+    )
+
+
+def test_margin_note_beside_the_middle_stubbs_58_goes_before_its_paragraph(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # "His great position in Christendom", excerpt page 3 (58), stands
+    # beside the middle of a paragraph that starts on page 2 (57): it goes
+    # before that paragraph, after page 2's two margin notes beside it.
+    _, blocks = excerpt_outputs["stubbs_51_56-64"]
+    assert _margin_notes_before(blocks, 3) == (
+        ("Hisgreatposi. tion inChristendom.", "Henry II. was", [2, 3]),
+    )
+    assert _margin_notes_before(blocks, 2) == (
+        ("Characterof Henry II.", "Henry II. was", [2, 3]),
+        ("Hisfamily policy.", "Henry II. was", [2, 3]),
+    )

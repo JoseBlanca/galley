@@ -62,6 +62,13 @@
   ],
   "blocks": [
     {
+      "kind": "margin_note",
+      "text": "Diverse",
+      "pages": [
+        2
+      ]
+    },
+    {
       "kind": "paragraph",
       "text": "Then again, in the method of handling this wealth of material the tendencies of the different sciences supplemented each other. The deepest speculative penetration falls to the share of the theologian and philosopher ; the keenest practical appreciation of newly-won ideas falls to the share of politicians with an eye on the question of the hour ; still Jurisprudence, albeit with some hesitation, yielded to the impulses that were thus given. Conversely, it was professional Jurisprudence which by its assiduously detailed work brought the aerial scheme of thought into combination with the actual public life of great and small societies, and by so doing both started a science of Positive Public Law1 and provided the philosopher and the speculative politician with a series of legal concepts serviceable for the construction of a system. Moreover, at this point the other writers adhered as closely as was possible to the Legists, Canonists, and Feudists, and by so doing began to give to their abstractions and their postulates a stable formulated shape and a more solid basis among realities.",
       "pages": [
@@ -69,8 +76,22 @@
       ]
     },
     {
+      "kind": "margin_note",
+      "text": "Unity of ment.",
+      "pages": [
+        2
+      ]
+    },
+    {
       "kind": "paragraph",
       "text": "Thus, notwithstanding the diversity of its sources and its confluents, the Medieval Doctrine of State and Society flowed along one single bed. Within that bed were commotions that shook the world. But all this conflict between opinions, ecclesiastical and secular, absolutistic and democratic, only accelerated the speed of a current which as a whole swept onwards in but one direction.",
+      "pages": [
+        2
+      ]
+    },
+    {
+      "kind": "margin_note",
+      "text": "Medieval Antique- Thought,",
       "pages": [
         2
       ]
@@ -88,27 +109,6 @@
       "pages": [
         2,
         3
-      ]
-    },
-    {
-      "kind": "margin_note",
-      "text": "Diverse",
-      "pages": [
-        2
-      ]
-    },
-    {
-      "kind": "margin_note",
-      "text": "Unity of ment.",
-      "pages": [
-        2
-      ]
-    },
-    {
-      "kind": "margin_note",
-      "text": "Medieval Antique- Thought,",
-      "pages": [
-        2
       ]
     }
   ],

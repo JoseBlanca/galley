@@ -25,6 +25,16 @@
   "word_changes": [
     {
       "before": [
+        "Silmlnage-",
+        "mentofhis"
+      ],
+      "after": [
+        "Silmlnagementofhis"
+      ],
+      "reason": "hyphen_join_guessed"
+    },
+    {
+      "before": [
         "founda-",
         "tion"
       ],
@@ -62,16 +72,6 @@
         "expressive"
       ],
       "reason": "hyphen_join"
-    },
-    {
-      "before": [
-        "Silmlnage-",
-        "mentofhis"
-      ],
-      "after": [
-        "Silmlnagementofhis"
-      ],
-      "reason": "hyphen_join_guessed"
     }
   ]
 }

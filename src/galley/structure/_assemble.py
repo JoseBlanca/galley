@@ -1,8 +1,8 @@
 """The work after the per-page parts (spec section 2, steps 2.5 and 3),
 in page order: the notes left in the body, the paragraphs of the body
 stream, the endnote section, the footnotes, the references linked to
-their notes, the margin notes beside a note's line put inside it, and
-the ids (`_ids`)."""
+their notes, the margin notes placed (`_margins`), and the ids
+(`_ids`)."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
@@ -14,7 +14,18 @@ from galley.structure._endnotes import EndnoteGroup, endnote_groups, endnote_sec
 from galley.structure._ids import numbered
 from galley.structure._lines import Piece, PlacedLine, first_word
 from galley.structure._linking import body_candidates, linked
-from galley.structure._margins import BesideLine, line_beside
+from galley.structure._margins import (
+    BesideLine,
+    InNote,
+    InParagraph,
+    Place,
+    Stays,
+    beside_lines,
+    joined_margin_notes,
+    margin_note_places,
+    placing_order,
+    split_beside_margin_notes,
+)
 from galley.structure._markers import MarkerForm, book_marker_form
 from galley.structure._notes import (
     Footnote,
@@ -162,83 +173,70 @@ def _section_pages(entries: Sequence[Entry]) -> range:
     return range(section.first_page, last + 1)
 
 
-def _beside_lines(
-    entries: Sequence[Entry],
-    in_section: frozenset[int],
-    notes: Sequence[_NoteWithLines],
+def _lines_before_notes(
+    entries: Sequence[Entry], book_footnotes: Sequence[Footnote]
 ) -> frozendict[int, tuple[BesideLine, ...]]:
-    """The lines a margin note may stand beside, by page index: those of
-    the body's paragraphs and of every note's blocks."""
-    body = (
-        BesideLine(line, number == 0, None)
-        for position, entry in enumerate(entries)
-        if isinstance(entry, Paragraph) and position not in in_section
-        for number, line in enumerate(entry.piece.lines)
-    )
-    in_notes = (
-        BesideLine(line, number == 0, (note_position, block_position))
-        for note_position, note in enumerate(notes)
-        for block_position, lines in enumerate(note.block_lines)
-        for number, line in enumerate(lines)
-    )
-    by_page: dict[int, list[BesideLine]] = {}
-    for beside in (*body, *in_notes):
-        by_page.setdefault(beside.line.page_index, []).append(beside)
-    return frozendict({page: tuple(lines) for page, lines in by_page.items()})
-
-
-def _margin_notes_in_notes(
-    entries: Sequence[Entry],
-    in_section: frozenset[int],
-    notes: Sequence[_NoteWithLines],
-    pitch: float,
-) -> frozendict[int, tuple[int, int]]:
-    """For each margin note beside a line of a note (spec section 13, rule
-    5), by its position among the entries: the note's position and that of
-    the note's block that holds the line. `pitch` is the body line pitch,
-    in points."""
-    by_page = _beside_lines(entries, in_section, notes)
-    besides = (
+    """The lines a margin note may stand beside, by page index, before the
+    notes are made: the body's paragraphs, the endnote section's paragraphs
+    as the lines of their endnotes, and the footnotes' lines (spec section
+    13, rules 1 and 3)."""
+    section = endnote_section(entries)
+    groups = endnote_groups(entries, section) if section is not None else ()
+    return beside_lines(
+        entries,
+        frozenset(section.paragraphs if section is not None else ()),
         (
-            position,
-            line_beside(
-                entry.piece.lines[0].line.box.top,
-                by_page.get(entry.piece.lines[0].page_index, ()),
-                pitch,
+            *(
+                tuple(entries[position].piece.lines for position in group.paragraphs)
+                for group in groups
             ),
-        )
-        for position, entry in enumerate(entries)
-        if isinstance(entry, MarginNote)
-    )
-    return frozendict(
-        {
-            position: beside.note_block
-            for position, beside in besides
-            if beside is not None and beside.note_block is not None
-        }
+            *((footnote.lines,) for footnote in book_footnotes),
+        ),
     )
 
 
-def _with_margin_notes_inside(
+def _with_margin_notes_placed(
     body: tuple[Unnumbered, ...],
     notes: tuple[UnnumberedNote, ...],
     kept_positions: Sequence[int],
-    placed: frozendict[int, tuple[int, int]],
+    entries: Sequence[Entry],
+    places: frozendict[int, Place],
 ) -> tuple[tuple[Unnumbered, ...], tuple[UnnumberedNote, ...]]:
-    """The body without the margin notes of `placed`, and the notes with
-    each of them as a block before the block it is beside, after those
-    already placed there. `kept_positions` gives the entry position of
-    each block of `body`."""
-    before_block: dict[tuple[int, int], list[Unnumbered]] = {}
-    for block, entry_position in zip(body, kept_positions, strict=True):
-        if entry_position in placed:
-            before_block.setdefault(placed[entry_position], []).append(block)
+    """The body with each margin note of `places` before its paragraph or
+    where it stands, and the notes with each margin note placed inside one
+    as a block before the block it is beside (spec section 13, rules 4 to
+    6). Several before one paragraph or block go by page and from the top
+    down. `kept_positions` gives the entry position of each block of
+    `body`; `places` holds the place of each margin note by its entry
+    position."""
+    block_of = dict(zip(kept_positions, body, strict=True))
+    before_paragraph: dict[int, list[int]] = {}
+    before_block: dict[tuple[int, int], list[int]] = {}
+    for position, place in places.items():
+        match place:
+            case InParagraph(entry, _):
+                before_paragraph.setdefault(entry, []).append(position)
+            case InNote(note, block):
+                before_block.setdefault((note, block), []).append(position)
+            case Stays():
+                pass
+            case _:
+                assert_never(place)
+
+    def placed_before(positions: Sequence[int]) -> tuple[Unnumbered, ...]:
+        return tuple(block_of[p] for p in placing_order(entries, positions))
+
+    ordered = tuple(
+        block
+        for position in kept_positions
+        if position not in places or isinstance(places[position], Stays)
+        for block in (
+            *placed_before(before_paragraph.get(position, ())),
+            block_of[position],
+        )
+    )
     return (
-        tuple(
-            block
-            for block, entry_position in zip(body, kept_positions, strict=True)
-            if entry_position not in placed
-        ),
+        ordered,
         tuple(
             replace(
                 note,
@@ -246,7 +244,7 @@ def _with_margin_notes_inside(
                     block
                     for number, note_block in enumerate(note.blocks)
                     for block in (
-                        *before_block.get((note_position, number), ()),
+                        *placed_before(before_block.get((note_position, number), ())),
                         note_block,
                     )
                 ),
@@ -267,10 +265,11 @@ def assemble(
     """The work after the per-page parts (spec section 2, steps 2.5 and 3),
     in page order: the notes left at the foot of each page's body taken
     out of it, the paragraphs of the body stream with their hyphens joined,
-    the margin notes after the paragraph in which their page's body ends,
-    the footnotes of the band and of the body with their markers, the
-    endnotes, the references linked to their notes, each margin note beside
-    a note's line inside that note, and the ids. `word_list` is in lower
+    split at the indented lines beside margin notes, the regions of one
+    printed margin note joined, the footnotes of the band and of the body
+    with their markers, the endnotes, the references linked to their
+    notes, each margin note placed before the paragraph whose line it is
+    beside or inside the note whose line it is beside, and the ids. `word_list` is in lower
     case; `body_word_height` and `body_line_pitch` are in points; the
     references to endnotes are taken from the pages after
     `last_contents_page`, -1 for a book without contents pages."""
@@ -287,7 +286,21 @@ def assemble(
     pages = _taken_body_notes(
         parts, band_notes, numbering, form, body_word_height, section_pages
     )
+    book_footnotes = footnotes(
+        tuple(page_notes(page.band_regions, word_list) for page in pages),
+        tuple(bool(page.body) for page in pages),
+        numbering,
+    )
+    # Spec section 2, step 3.2, then section 13, rule 1: the paragraphs are
+    # split beside the margin regions as layout gives them, then the
+    # regions of one printed note are joined.
     entries = body_entries(pages, form, section_pages)
+    entries = split_beside_margin_notes(
+        entries, _lines_before_notes(entries, book_footnotes), body_line_pitch
+    )
+    entries = joined_margin_notes(
+        entries, _lines_before_notes(entries, book_footnotes), body_line_pitch
+    )
     section = endnote_section(entries)
     body = _body(entries, book_words, word_list)
     groups = endnote_groups(entries, section) if section is not None else ()
@@ -299,11 +312,6 @@ def assemble(
             tuple(entries[position].piece.lines for position in group.paragraphs),
         )
         for group in groups
-    )
-    book_footnotes = footnotes(
-        tuple(page_notes(page.band_regions, word_list) for page in pages),
-        tuple(bool(page.body) for page in pages),
-        numbering,
     )
     notes = _in_order(
         endnotes,
@@ -351,12 +359,16 @@ def assemble(
     linked_body, linked_notes = linked(
         kept, tuple(note.note for note in notes), footnote_links + endnote_links
     )
-    placed = _margin_notes_in_notes(entries, in_section, notes, body_line_pitch)
+    places = margin_note_places(
+        entries,
+        beside_lines(entries, in_section, tuple(note.block_lines for note in notes)),
+        body_line_pitch,
+    )
     kept_positions = tuple(
         position for position in range(len(entries)) if position not in in_section
     )
-    linked_body, linked_notes = _with_margin_notes_inside(
-        linked_body, linked_notes, kept_positions, placed
+    linked_body, linked_notes = _with_margin_notes_placed(
+        linked_body, linked_notes, kept_positions, entries, places
     )
     blocks, numbered_notes = numbered(linked_body, linked_notes)
     return Assembled(
