@@ -14,6 +14,7 @@ one run.
 import os
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,14 @@ from galley.book_folder import BookFolder
 from galley.cli import main
 
 EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
+
+# The excerpts' runs go side by side, each with galley's own workers.
+# Measured on 16 November 2026 on an M5 Pro, the eleven excerpts, as the
+# setup time of excerpt_books: 7.5 to 8.1 s one after another, 6.1 to 6.3 s
+# with 2 at once, 4.4 to 4.6 s with 6, 5.2 to 5.4 s with 11. The files
+# written are the same bytes either way, but for book.epub's identifier
+# and date, which differ between any two runs.
+_EXCERPT_RUNS_AT_ONCE = 6
 
 # The configs of spec section 9, "The end-to-end test", without `pdf`.
 # Kadesh page 9 has no text layer, and its region holds the page number 81.
@@ -61,6 +70,36 @@ EXCERPT_CONFIGS = frozendict(
             'title = "Catherine de Médicis"\n'
             'authors = ["Jean H. Mariéjol"]\n'
             'language = "fr"\n'
+        ),
+        # The excerpts of structure spec section 9, "The second plan".
+        "haskins_quotes_index": (
+            'title = "The Normans in European History"\n'
+            'authors = ["Charles Homer Haskins"]\n'
+            'language = "en"\n'
+        ),
+        # Excerpt page 0 is book page index 16, a printed contents page.
+        "stubbs_summaries_index": (
+            'title = "The Early Plantagenets"\n'
+            'authors = ["William Stubbs"]\n'
+            'language = "en"\n'
+            "contents_pages = [0]\n"
+        ),
+        # Excerpt page 0 is book page index 14, a printed contents page.
+        "domesday_headings_quotes": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+            "contents_pages = [0]\n"
+        ),
+        "mariejol_headings_verse": (
+            'title = "Catherine de Médicis"\n'
+            'authors = ["Jean H. Mariéjol"]\n'
+            'language = "fr"\n'
+        ),
+        "kadesh_59-68": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["J. H. Breasted"]\n'
+            'language = "en"\n'
         ),
     }
 )
@@ -106,17 +145,20 @@ def excerpt_books(
     (the configs of spec section 9) and the files `galley2epub run` wrote
     in it, book.epub last (spec section 9, "The end-to-end test").
 
-    Session-scoped: the stages run once, also under --parallel-threads=8.
+    Session-scoped: the stages run once, also under --parallel-threads=8,
+    and the excerpts' runs go side by side in threads.
     A test reads these folders and never writes in them. Skips every test
     that uses it when Pandoc is missing, which markdown and epub need.
     """
     _require_program("pandoc")
-    folders = {}
-    for name, toml in excerpt_book_toml.items():
-        folder = BookFolder(tmp_path_factory.mktemp(name))
-        folder.book_toml.write_text(toml, encoding="utf-8")
-        main(["run", str(folder.root)])
-        folders[name] = folder
+    folders = {
+        name: BookFolder(tmp_path_factory.mktemp(name)) for name in excerpt_book_toml
+    }
+    for name, folder in folders.items():
+        folder.book_toml.write_text(excerpt_book_toml[name], encoding="utf-8")
+    with ThreadPoolExecutor(max_workers=_EXCERPT_RUNS_AT_ONCE) as pool:
+        # list() waits for every run and raises the first run's error.
+        list(pool.map(lambda folder: main(["run", str(folder.root)]), folders.values()))
     return frozendict(folders)
 
 
