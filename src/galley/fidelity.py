@@ -11,6 +11,7 @@ section 5, say which words each side holds.
 import json
 import shutil
 import subprocess
+import unicodedata
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -101,11 +102,14 @@ def _lines_file_words(lines: LinesFile) -> tuple[_PlacedWord, ...]:
 type _BlocksBoundary = Literal[FidelityBoundary.STRUCTURE, FidelityBoundary.MARKDOWN]
 
 
-def _block_words(block: Block, boundary: _BlocksBoundary) -> tuple[_PlacedWord, ...]:
+def _block_words(
+    block: Block, boundary: _BlocksBoundary, endnote_ids: frozenset[str]
+) -> tuple[_PlacedWord, ...]:
     """The words of a block: a heading's label, then its spans split one by
     one. A note reference span is replaced by a space in the block's text,
-    so that it does not glue to the word before, and at the structure
-    boundary counted as a word of its own."""
+    so that it does not glue to the word before, and counted as a word of
+    its own: at the structure boundary every one, at the markdown boundary
+    those to the endnotes of `endnote_ids`, whose links keep their text."""
     place = f"block {block.id} {_pages(block.origin)}"
     label = _placed(block.label, place) if block.label is not None else ()
     text = "".join(
@@ -120,7 +124,12 @@ def _block_words(block: Block, boundary: _BlocksBoundary) -> tuple[_PlacedWord, 
                 for word in _placed(span.text, place)
             )
         case FidelityBoundary.MARKDOWN:
-            references = ()
+            references = tuple(
+                word
+                for span in block.spans
+                if span.note_ref in endnote_ids
+                for word in _placed(span.text, place)
+            )
         case _:
             assert_never(boundary)
     return label + _placed(text, place) + references
@@ -133,14 +142,17 @@ def _blocks_file_words(
     except at the markdown boundary the marker of a referenced footnote,
     which Pandoc replaces with its own number. An endnote is written where
     it was printed, its marker with it, referenced or not."""
+    endnote_ids = _endnote_ids(blocks)
     body = tuple(
-        word for block in blocks.blocks for word in _block_words(block, boundary)
+        word
+        for block in blocks.blocks
+        for word in _block_words(block, boundary, endnote_ids)
     )
     notes = tuple(
         word
         for note in blocks.notes
         for block in note.blocks
-        for word in _block_words(block, boundary)
+        for word in _block_words(block, boundary, endnote_ids)
     )
     match boundary:
         case FidelityBoundary.STRUCTURE:
@@ -202,13 +214,15 @@ def _all_blocks(blocks: BlocksFile) -> tuple[Block, ...]:
     )
 
 
+def _endnote_ids(blocks: BlocksFile) -> frozenset[str]:
+    return frozenset(note.id for note in blocks.notes if note.kind is NoteKind.ENDNOTE)
+
+
 def _note_reference_counts(blocks: BlocksFile) -> tuple[int, int]:
     """The number of note reference spans to footnotes, and to endnotes. A
     span that names no note is counted with the footnotes: Pandoc gives it
     no note, so the counts differ."""
-    endnote_ids = frozenset(
-        note.id for note in blocks.notes if note.kind is NoteKind.ENDNOTE
-    )
+    endnote_ids = _endnote_ids(blocks)
     references = tuple(
         span.note_ref
         for block in _all_blocks(blocks)
@@ -270,22 +284,39 @@ def _check_words(
 
 
 # A marker's shape (architecture section 13): short enough that no word of
-# two letters or more fits in it, long enough for "345" and "(i)".
+# two letters or more fits in it, long enough for "345" and "(12)"; a
+# letter only beside a round bracket, for "(i)", "(t)" and the OCR's "U)"
+# and "(3J"; no "&" ("&c.") and no dash ("—"), which are words.
 _MARKER_MAX_CHARACTERS = 4
 _MARKER_MAX_LETTERS_OR_DIGITS = 3
 _MARKER_MAX_LETTERS = 1
+_MARKER_BRACKETS = frozenset("()")
+_NOT_IN_A_MARKER = frozenset("&")
 
 
 def _has_marker_shape(text: str) -> bool:
     """Whether a note reference span's text has a marker's shape: 1 to 4
-    characters, at most 3 of them letters or digits and at most 1 a letter,
-    and no white space ("8", "(i)", "^", "345", "(t)")."""
+    characters, at most 3 of them letters or digits, no white space, "&" or
+    dash, and a letter only in a span holding a round bracket, then at most
+    one ("8", "^", "345", "(12)", "(i)", "U)")."""
+    letters = sum(character.isalpha() for character in text)
     return (
         0 < len(text) <= _MARKER_MAX_CHARACTERS
-        and not any(character.isspace() for character in text)
+        and not any(
+            character.isspace()
+            or character in _NOT_IN_A_MARKER
+            or unicodedata.category(character) == "Pd"
+            for character in text
+        )
         and sum(character.isalnum() for character in text)
         <= _MARKER_MAX_LETTERS_OR_DIGITS
-        and sum(character.isalpha() for character in text) <= _MARKER_MAX_LETTERS
+        and (
+            letters == 0
+            or (
+                letters <= _MARKER_MAX_LETTERS
+                and any(character in _MARKER_BRACKETS for character in text)
+            )
+        )
     )
 
 
@@ -302,18 +333,57 @@ def _reference_problem(
     if not _has_marker_shape(span_text):
         return (
             f"block {block.id}: the note reference span {span_text!r} does not "
-            "have a marker's shape (at most 4 characters, at most 3 of them "
-            "letters or digits and at most 1 a letter, no white space)"
+            "have a marker's shape (1 to 4 characters, at most 3 letters or "
+            "digits, no white space, '&' or dash, and a letter only beside a "
+            "round bracket)"
         )
     return None
 
 
+def _split_off_words(blocks: BlocksFile) -> Counter[str]:
+    """The words that note_marker word changes split off the words they
+    were glued to, as a multiset: every word of a change's `after` but its
+    first."""
+    return Counter(
+        word
+        for change in blocks.word_changes
+        if change.reason is ChangeReason.NOTE_MARKER
+        for word in change.after[1:]
+    )
+
+
+def _whole_word_problems(blocks: BlocksFile) -> tuple[str, ...]:
+    """The note reference spans with a letter that no note_marker word
+    change split off a word: a span that was a whole word of the lines
+    holds only digits and symbols (architecture section 13), so that "(a)"
+    printed as a word stays a word. Each split-off word accounts for one
+    span."""
+    split_off = _split_off_words(blocks)
+    problems: list[str] = []
+    for block in _all_blocks(blocks):
+        for span in block.spans:
+            if span.note_ref is None or not any(
+                character.isalpha() for character in span.text
+            ):
+                continue
+            if split_off[span.text] > 0:
+                split_off[span.text] -= 1
+            else:
+                problems.append(
+                    f"block {block.id}: the note reference span {span.text!r} "
+                    "holds a letter but was not split off a word by a "
+                    "note_marker word change"
+                )
+    return tuple(problems)
+
+
 def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
-    """The note reference spans that name no note of the file, or whose text
-    does not have a marker's shape. At the markdown boundary a reference span
-    becomes Pandoc's note or a link and its text is not counted, so a word
-    in it would be lost there unseen. The span need not read as its note's
-    marker: the OCR reads the two sides of a superscript differently."""
+    """The note reference spans that name no note of the file, whose text
+    does not have a marker's shape, or that hold a letter without having
+    been split off a word. A word of the book in a reference span would be
+    lost unseen at the markdown boundary, where a span to a footnote becomes
+    Pandoc's note. The span need not read as its note's marker: the OCR
+    reads the two sides of a superscript differently."""
     note_ids = frozenset(note.id for note in blocks.notes)
     problems = (
         _reference_problem(block, span.text, span.note_ref, note_ids)
@@ -321,7 +391,8 @@ def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
         for span in block.spans
         if span.note_ref is not None
     )
-    return tuple(problem for problem in problems if problem is not None)
+    shape_problems = tuple(problem for problem in problems if problem is not None)
+    return shape_problems or _whole_word_problems(blocks)
 
 
 # A hyphen join is two parts of a word split at a line end (glossary).
@@ -405,19 +476,21 @@ def check_stage(
     with each heading's label and each note's marker, plus its removals,
     with each word change undone. markdown: the words of blocks.json, with
     the edits applied, against book.md as `read_markdown` gives it, without
-    note references and the markers of referenced footnotes; the number of
-    references to footnotes against Pandoc's notes, and to endnotes against
-    the links marked as note references. The words are compared as
-    multisets over the whole book, split on white space, nothing
-    normalised.
+    the references to footnotes and the markers of referenced footnotes;
+    the number of references to footnotes against Pandoc's notes, and to
+    endnotes against the links marked as note references, whose text is
+    the reference's. The words are compared as multisets over the whole
+    book, split on white space, nothing normalised.
 
     Raises FidelityError with the missing and invented words, their counts,
-    and the pages or blocks each came from. At the structure boundary it
-    also raises, with no word, when a note reference span names no note or
-    does not have a marker's shape (1 to 4 characters, at most 3 letters or
-    digits, at most 1 letter, no white space), or a word change does more
-    than its reason allows (a hyphen join of two parts, with the hyphen
-    dropped or kept, a marker split off its word).
+    and the pages or blocks each came from. At the structure and markdown
+    boundaries it also raises, with no word, when a note reference span
+    names no note, does not have a marker's shape (1 to 4 characters, at
+    most 3 letters or digits, no white space, "&" or dash, a letter only
+    beside a round bracket), or holds a letter without a note_marker word
+    change that split it off a word; and at the structure boundary when a
+    word change does more than its reason allows (a hyphen join of two
+    parts, with the hyphen dropped or kept, a marker split off its word).
     """
     match stage:
         case FidelityBoundary.LAYOUT:
@@ -444,6 +517,7 @@ def check_stage(
                 isinstance(before, BlocksFile) and isinstance(after, MarkdownWords)
             ):
                 raise _wrong_types(stage, before, after)
+            _check_records(stage, _reference_problems(before))
             _check_words(
                 stage,
                 _blocks_file_words(before, stage),
@@ -473,8 +547,9 @@ _PANDOC_ARGUMENTS = (
 
 class _Boundary(StrEnum):
     """Where a word of Pandoc's JSON ends: at a space or line break or the
-    start or end of a block element, at the start of a note, or at a link
-    marked as a note reference; the last two are also counted."""
+    start or end of a block element, at the start of a note, or at the
+    start of a link marked as a note reference; the last two are also
+    counted."""
 
     BREAK = "break"
     NOTE = "note"
@@ -527,12 +602,17 @@ def _inline_tokens(inline: object, block_id: str | None) -> tuple[_Token, ...]:
             return _inlines_tokens(inlines, block_id)
         case {"t": "Note", "c": list() as blocks}:
             return (_Boundary.NOTE, *_blocks_tokens(blocks, block_id), _Boundary.BREAK)
-        case {"t": "Link", "c": [[_, _, list() as attributes], _, _]} if _is_note_link(
-            attributes
-        ):
-            # The link's text is a reference to an endnote, which the check
-            # does not count (architecture section 13).
-            return (_Boundary.NOTE_LINK,)
+        case {
+            "t": "Link",
+            "c": [[_, _, list() as attributes], list() as inlines, _],
+        } if _is_note_link(attributes):
+            # The link's text is the reference to an endnote, a word of its
+            # own (architecture section 13).
+            return (
+                _Boundary.NOTE_LINK,
+                *_inlines_tokens(inlines, block_id),
+                _Boundary.BREAK,
+            )
         case {"t": str() as element}:
             raise _not_read(element, block_id)
         case _:
@@ -660,9 +740,9 @@ def read_markdown(markdown: str) -> MarkdownWords:
     the id of the innermost div or heading with an id it is in, the number
     of notes, and the number of links marked `epub:type="noteref"`.
 
-    Words are split at spaces and line breaks, at the start and end of
-    every block and note, and at a link marked as a note reference, whose
-    text is no word; emphasis does not split a word. The metadata header,
+    Words are split at spaces and line breaks, and at the start and end of
+    every block, note and link marked as a note reference, whose text is
+    read as its own words; emphasis does not split a word. The metadata header,
     the title and authors, gives no words. Raises
     ExternalProgramError, with Pandoc's standard error, when `pandoc` is
     missing, fails or warns (a note definition no reference uses), runs

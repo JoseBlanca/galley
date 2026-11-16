@@ -617,6 +617,9 @@ def test_unsupported_format_version_names_both_versions(
         READERS[name](path)
     assert f"is format version {unsupported};" in str(caught.value)
     assert f"this galley reads format version {current}" in str(caught.value)
+    assert str(caught.value).endswith(
+        f"; run `galley2epub {WRITING_STAGE[name]}` again"
+    )
 
 
 @pytest.mark.parametrize("version", [0, True])
@@ -1419,4 +1422,25 @@ def test_note_with_a_margin_note_before_its_paragraph_is_read_back(
         BlockKind.MARGIN_NOTE,
         BlockKind.PARAGRAPH,
         BlockKind.PARAGRAPH,
+    )
+
+
+@pytest.mark.parametrize(
+    "json_path",
+    [("blocks", 1, "label"), ("notes", 0, "blocks", 1, "label")],
+    ids=["body", "note"],
+)
+def test_label_on_a_block_that_is_not_a_heading_names_the_file_and_block(
+    tmp_path: Path, json_path: JsonPath
+) -> None:
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _set(tmp_path / "blocks.json", json_path, "CHAPTER IV.")
+
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+
+    block_id = "b-p0003-002" if json_path[0] == "blocks" else "b-p0003-004"
+    assert str(caught.value) == (
+        f"{tmp_path / 'blocks.json'}: block {block_id} is a paragraph and has "
+        "the label 'CHAPTER IV.'; only a heading has a label"
     )

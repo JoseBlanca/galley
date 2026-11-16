@@ -693,9 +693,13 @@ def _decode_dataclass[T](cls: type[T], value: object, json_path: str) -> T:
     )
 
 
-def _decode_file[T](cls: type[T], content: object, current_version: int) -> T:
+def _decode_file[T](
+    cls: type[T], content: object, current_version: int, rerun: str
+) -> T:
     """The value of `cls` in the parsed JSON `content` of a file of format
-    version `current_version`. Raises _FieldError at the first problem."""
+    version `current_version`. Raises _FieldError at the first problem; a
+    format version error ends with `rerun`, what to do to remake the file
+    ("; run `galley2epub structure` again"), empty when nothing does."""
     _check_keys_once(content, "")
     if not isinstance(content, dict):
         problem = f"is not a JSON object but {_found(content)}"
@@ -715,7 +719,7 @@ def _decode_file[T](cls: type[T], content: object, current_version: int) -> T:
     if version != current_version:
         problem = (
             f"is format version {version}; "
-            f"this galley reads format version {current_version}"
+            f"this galley reads format version {current_version}{rerun}"
         )
         raise _FieldError(problem)
     return _decode_dataclass(cls, content, "")
@@ -805,7 +809,9 @@ def _read_json[T](path: Path, cls: type[T], current_version: int, stage: str) ->
         )
         raise InputFileError(message) from err
     try:
-        return _decode_file(cls, content, current_version)
+        return _decode_file(
+            cls, content, current_version, f"; run `galley2epub {stage}` again"
+        )
     except _FieldError as err:
         message = f"{path}: {err}"
         raise InputFileError(message) from err
@@ -847,8 +853,21 @@ def write_blocks(path: Path, blocks: BlocksFile) -> None:
 
 
 def read_blocks(path: Path) -> BlocksFile:
-    """Reads blocks.json as write_blocks wrote it."""
-    return _read_json(path, BlocksFile, BLOCKS_FORMAT_VERSION, "structure")
+    """Reads blocks.json as write_blocks wrote it. Raises InputFileError,
+    naming the file and the block, also when a block that is not a heading
+    has a label."""
+    blocks = _read_json(path, BlocksFile, BLOCKS_FORMAT_VERSION, "structure")
+    for block in (
+        *blocks.blocks,
+        *(block for note in blocks.notes for block in note.blocks),
+    ):
+        if block.label is not None and block.kind is not BlockKind.HEADING:
+            message = (
+                f"{path}: block {block.id} is a {block.kind.value} and has the "
+                f"label {block.label!r}; only a heading has a label"
+            )
+            raise InputFileError(message)
+    return blocks
 
 
 # The hashes.
@@ -976,7 +995,7 @@ def _edit_from_line(path: Path, line_number: int, line: str) -> Edit:
         message = f"{where}: not valid JSON: {err.msg} at column {err.colno}"
         raise EditError(message) from err
     try:
-        return _decode_file(Edit, content, EDITS_FORMAT_VERSION)
+        return _decode_file(Edit, content, EDITS_FORMAT_VERSION, "")
     except _FieldError as err:
         message = f"{where}: {err}"
         raise EditError(message) from err
