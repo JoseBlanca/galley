@@ -859,6 +859,37 @@ def test_hyphen_at_a_line_end_is_joined_inside_a_block_and_recorded() -> None:
     )
 
 
+def test_hyphen_is_joined_across_a_line_holding_only_a_reference_sign() -> None:
+    # Haskins page 71: "fol-", a line "^", "lows:". The hyphen is joined
+    # and the sign goes after the joined word (structure spec, section 5),
+    # where it is linked to its note.
+    body = _region(
+        *_five_full_lines(70, "body")[:4],
+        _full("and the text runs as fol-", 130),
+        _spread("^", 80, 85, 140),
+        _short("lows: an end.", 145),
+    )
+    band = _region(
+        _note_line("* A note on it.", 300, 62, 160),
+        _note_line("and its end.", 300 + _NOTE_PITCH_PT, 50, 120),
+    )
+    lines = _lines_of(PageLayout(0, (body, band), ()))
+    blocks = make_blocks(lines, frozenset({"follows"}), workers=1)
+    paragraph = blocks.blocks[0]
+    assert tuple(span.text for span in paragraph.spans)[1:] == ("^", " an end.")
+    assert paragraph.spans[0].text.endswith(" runs as follows: ")
+    assert (
+        WordChange(
+            page_index=0,
+            before=("fol-", "lows:"),
+            after=("follows:",),
+            reason=ChangeReason.HYPHEN_JOIN,
+        )
+        in blocks.word_changes
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
 def test_line_of_one_word_between_two_hyphens_is_joined_twice() -> None:
     page = PageLayout(0, (_body(70, "the pre-", "anglo-", "saxon age"),), ())
     lines = _lines_of(page)

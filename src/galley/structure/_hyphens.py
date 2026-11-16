@@ -17,6 +17,10 @@ from galley.wordlist import APOSTROPHES, word_key
 # Spec section 5: the word list is no evidence for a second part of fewer
 # than 2 letters ("Con-" "1", "na-" "R": junk keys it happens to hold).
 _WORD_LIST_MIN_LETTERS = 2
+# Spec section 5: a line of one of these signs of a note reference
+# (section 11) between a hyphen and the next line is passed over (Haskins
+# page 71, "fol-" "^" "lows:").
+_LONE_SIGNS = frozenset({("^",), ("*",), ("•",)})
 
 
 class HyphenJoin(NamedTuple):
@@ -109,13 +113,26 @@ def join_lines(
     """The words of `lines`, one block's lines in order, possibly over a
     page break, with the last word of each line joined to the first of the
     next when `join_hyphen` joins them. A change is on the page of its
-    first word. A line of one word between two hyphens is joined twice."""
+    first word. A line of one word between two hyphens is joined twice. A
+    line that holds only a reference sign ("^") after a line ending with a
+    hyphen is passed over, and the sign goes after the word the join gives
+    (spec section 5)."""
     words: list[str] = []
     pages: list[int] = []
     changes: list[WordChange] = []
     positions: list[int] = []
-    for line in lines:
+    passed_over: PageLine | None = None
+    for number, line in enumerate(lines):
         texts = line.words
+        if (
+            passed_over is None
+            and texts in _LONE_SIGNS
+            and words
+            and is_hyphen_first_part(words[-1])
+            and number + 1 < len(lines)
+        ):
+            passed_over = line
+            continue
         joined = (
             join_hyphen(words[-1], texts[0], book_words, word_list)
             if words and texts
@@ -133,6 +150,10 @@ def join_lines(
             words[-1] = joined.word
             positions.append(len(words) - 1)
             texts = texts[1:]
+        if passed_over is not None:
+            words.extend(passed_over.words)
+            pages.extend(passed_over.page_index for _ in passed_over.words)
+            passed_over = None
         words.extend(texts)
         pages.extend(line.page_index for _ in texts)
     return JoinedWords(tuple(words), tuple(pages), tuple(changes), tuple(positions))
