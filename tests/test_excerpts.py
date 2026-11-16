@@ -780,18 +780,10 @@ _VERSE_ON_REFERENCE_PAGES = (
             ),
         ),
     ),
-    # Known false verse: two broken lines (Mariéjol 212) and tables
-    # (Domesday 47 and 406).
-    (
-        "mariejol_210-219",
-        2,
-        (
-            (
-                "' \\ R ochelle oùs'étaient enfermés cinquante-cinq ministres,ri\n"
-                "inmes échappés au.x massacres et quinze cents déserteurs d'"
-            ),
-        ),
-    ),
+    # Two broken lines inset on both sides after "se sou-": no verse (rule
+    # 4 does not start a run after a hyphen).
+    ("mariejol_210-219", 2, ()),
+    # Known false verse: tables (Domesday 47 and 406).
     (
         "domesday_headings_quotes",
         6,

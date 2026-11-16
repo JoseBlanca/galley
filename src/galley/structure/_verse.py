@@ -5,7 +5,7 @@ import statistics
 from collections.abc import Sequence
 
 from galley.model import BlockKind
-from galley.structure._lines import PlacedLine
+from galley.structure._lines import PlacedLine, hyphen_between
 from galley.structure._runs import BodyRun
 
 # Spec section 16, rule 4: a verse line has at least 3 words and is inset at
@@ -43,8 +43,9 @@ def verse_runs(
 ) -> tuple[BodyRun, ...]:
     """The verse blocks of `lines`, a page's body stream (spec section 16,
     rule 4): each longest run of at least 2 consecutive verse lines, none of
-    them at the positions `taken` (a heading's or a summary's), more than
-    half of them starting within 12 pt of the run's median left side."""
+    them at the positions `taken` (a heading's or a summary's), the first
+    not right after a line ending with a hyphen, more than half of them
+    starting within 12 pt of the run's median left side."""
     runs: list[BodyRun] = []
     start: int | None = None
     for number in range(len(lines) + 1):
@@ -52,6 +53,12 @@ def verse_runs(
             number < len(lines)
             and number not in taken
             and _is_verse_line(lines[number])
+            # A run never starts right after a hyphen (spec section 6).
+            and not (
+                start is None
+                and number > 0
+                and hyphen_between(lines[number - 1], lines[number])
+            )
         )
         if is_verse and start is None:
             start = number

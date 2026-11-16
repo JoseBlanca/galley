@@ -3749,6 +3749,22 @@ def test_verse_line_ending_with_a_hyphen_is_joined_to_the_next() -> None:
     )
 
 
+@pytest.mark.parametrize(("ending", "verse"), [("se sou-", False), ("se sou", True)])
+def test_verse_run_does_not_start_after_a_line_ending_with_a_hyphen(
+    ending: str, verse: bool
+) -> None:
+    # Mariéjol page 212: two inset lines after "se sou-" are prose.
+    page = _body_page(
+        0,
+        *(_full(f"before {n} of the page", 70 + _PITCH_PT * n) for n in range(3)),
+        _full(f"and the bourgeois {ending}", 115),
+        *(_verse_line(text, 130 + 15 * n) for n, text in enumerate(_VERSE[:2])),
+        *(_full(f"after {n} of the page", 160 + _PITCH_PT * n) for n in range(5)),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert any(block.kind is BlockKind.VERSE for block in blocks.blocks) is verse
+
+
 def test_verse_heading_line_is_not_part_of_a_run() -> None:
     # A centred title in capitals of 3 words, inset on both sides, stays a
     # heading above the verse.
