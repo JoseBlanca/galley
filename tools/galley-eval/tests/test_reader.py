@@ -366,6 +366,11 @@ def test_quote_after_a_chapter_label_and_its_title_is_a_chapter_summary() -> Non
             '<p class="ph3">STEPHEN AND MATILDA.</p><p>The text.</p>'
             '<div class="blockquot"><p>A quote.</p></div>'
         ),
+        # A quote right after the label, with no title between.
+        (
+            '<div class="chapter"><h2>CHAPTER II.</h2></div>'
+            '<div class="blockquot"><p>A quote.</p></div>'
+        ),
         # Two headings after the label.
         (
             '<div class="chapter"><h2>CHAPTER II.</h2></div>'

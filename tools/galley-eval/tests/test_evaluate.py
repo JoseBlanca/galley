@@ -2,6 +2,8 @@
 reference and galley's side to the differences and scores (spec sections
 5 to 7)."""
 
+import dataclasses
+
 import pytest
 
 from galley.config import Language
@@ -641,12 +643,22 @@ _CHAPTER = ReferenceText(
 )
 
 
-def _chapter(*, label: bool, body_pages: tuple[int, int] = (0, 0)) -> Evaluation:
+def _chapter(
+    *,
+    label: bool,
+    body_pages: tuple[int, int] = (0, 0),
+    label_words: int = 2,
+    quote_held_by: BlockKind = BlockKind.VERSE,
+) -> Evaluation:
+    """Stubbs' chapter III against galley's blocks: one heading, with a
+    label of `label_words` words when `label`, a chapter summary, the
+    prose quote held by a block of kind `quote_held_by`, verse and a
+    paragraph; and a heading among the notes, which is not counted."""
     blocks = (
         _v2_tokens(
             "CHAPTER III. THE EARLY YEARS OF HENRY II.",
             "h",
-            label_words=2 if label else 0,
+            label_words=label_words if label else 0,
         )
         + _v2_tokens("Terms of accession \u2014 His character", "s")
         + _v2_tokens("prose quoted from a chronicle", "q")
@@ -659,10 +671,16 @@ def _chapter(*, label: bool, body_pages: tuple[int, int] = (0, 0)) -> Evaluation
         {
             "h": _body_block(BlockKind.HEADING, label=label),
             "s": _body_block(BlockKind.CHAPTER_SUMMARY),
-            # A verse block on a prose quote is the wrong kind.
-            "q": _body_block(BlockKind.VERSE),
+            "q": _body_block(quote_held_by),
             "v": _body_block(BlockKind.VERSE),
             "p": _body_block(BlockKind.PARAGRAPH),
+            # Only the body's headings are galley's headings.
+            "nh": GalleyBlock(
+                kind=BlockKind.HEADING,
+                stream=GalleyStream.NOTES,
+                note_id="n-p0000-001",
+                first_page=0,
+            ),
         },
     )
     return evaluation_of(_book(body_pages=body_pages), _CHAPTER, side, frozenset())
@@ -672,18 +690,27 @@ def _at_markdown(evaluation: Evaluation) -> OutputScores:
     return evaluation.scorecard.outputs[-1]
 
 
-def test_verse_and_chapter_summary_are_right_only_on_their_own_kind() -> None:
-    scores = _at_markdown(_chapter(label=True))
+@pytest.mark.parametrize(
+    ("held_by", "galley_kind"),
+    [
+        (BlockKind.VERSE, GalleyKind.VERSE),
+        (BlockKind.CHAPTER_SUMMARY, GalleyKind.CHAPTER_SUMMARY),
+    ],
+)
+def test_verse_and_chapter_summary_are_right_only_on_their_own_kind(
+    held_by: BlockKind, galley_kind: GalleyKind
+) -> None:
+    scores = _at_markdown(_chapter(label=True, quote_held_by=held_by))
     assert scores.kinds_right is not None
     # The two headings, the summary, the verse and the paragraph; not the
-    # prose quote held by a verse block.
+    # prose quote held by a verse or a chapter summary block.
     assert scores.kinds_right[Part.BODY] == 5
     assert scores.block_kinds is not None
     pairs = {
         (count.reference, count.galley): count.count
         for count in scores.block_kinds[Part.BODY]
     }
-    assert pairs[ReferenceKind.QUOTE, GalleyKind.VERSE] == 1
+    assert pairs[ReferenceKind.QUOTE, galley_kind] == 1
     assert pairs[ReferenceKind.CHAPTER_SUMMARY, GalleyKind.CHAPTER_SUMMARY] == 1
 
 
@@ -715,6 +742,24 @@ def test_heading_with_no_label_holding_two_reference_headings_misses_a_boundary(
     assert scores.headings.in_heading_blocks == 2
 
 
+@pytest.mark.parametrize(
+    "label_words",
+    [
+        # "CHAPTER" alone in the label: half of the first heading's words.
+        1,
+        # "CHAPTER III. THE EARLY YEARS OF" in the label: most of the second's.
+        6,
+    ],
+)
+def test_label_that_does_not_hold_the_first_heading_alone_misses_the_boundary(
+    label_words: int,
+) -> None:
+    scores = _at_markdown(_chapter(label=True, label_words=label_words))
+    assert scores.paragraph_boundaries is not None
+    body = scores.paragraph_boundaries[Part.BODY]
+    assert (body.reference_boundaries, body.found) == (5, 4)
+
+
 def test_heading_outside_the_body_range_is_not_counted() -> None:
     scores = _at_markdown(_chapter(label=True, body_pages=(1, 1)))
     assert scores.headings == HeadingScores(
@@ -726,11 +771,26 @@ def test_heading_outside_the_body_range_is_not_counted() -> None:
 
 
 def test_body_range_after_the_last_page_of_the_pdf_is_an_error() -> None:
-    with pytest.raises(BooksFileError, match="body_pages = \\[0, 3\\]"):
-        _chapter(label=True, body_pages=(0, 3))
+    # The chapter's PDF has pages 0 and 1, the last blank.
+    _chapter(label=True, body_pages=(0, 1))
+    with pytest.raises(
+        BooksFileError, match="evaluation/books.toml: .* body_pages = \\[0, 2\\]"
+    ):
+        _chapter(label=True, body_pages=(0, 2))
 
 
 # Gierke's "Law1" on page 0 refers to endnote 1, printed on page 10.
+def _endnote_reference(note_text: str) -> ReferenceText:
+    return dataclasses.replace(
+        _ENDNOTE_REFERENCE,
+        notes=(
+            ReferenceNote(
+                "note1", (_reference_block(ReferenceKind.PARAGRAPH, note_text),)
+            ),
+        ),
+    )
+
+
 _ENDNOTE_REFERENCE = ReferenceText(
     blocks=(
         _reference_block(ReferenceKind.PARAGRAPH, "the Law of the land"),
@@ -748,15 +808,21 @@ _ENDNOTE_REFERENCE = ReferenceText(
 )
 
 
-def _endnote_evaluation(*, reference_on_page: int) -> Evaluation:
+def _endnote_evaluation(
+    *,
+    reference_on_page: int,
+    endnote_text: str = "1. See Bracton on this point",
+    note_text: str = "See Bracton on this point",
+) -> Evaluation:
     """galley's endnote on page 10 linked from "Law" on `reference_on_page`,
-    0 where the reference text has it, or 20, where galley put the link
-    by mistake."""
+    0 where the reference text has it, or another page, where galley put
+    the link by mistake."""
+    other_page = reference_on_page if reference_on_page != 0 else 20
     blocks = (
         _v2_tokens("the Law of the land", "b0")
-        + _v2_tokens("another Law in another realm", "b20", page_index=20)
+        + _v2_tokens("another Law in another realm", "b20", page_index=other_page)
         + _v2_tokens(
-            "1. See Bracton on this point",
+            endnote_text,
             "e1",
             page_index=10,
             stream=GalleyStream.NOTES,
@@ -773,7 +839,7 @@ def _endnote_evaluation(*, reference_on_page: int) -> Evaluation:
                 kind=BlockKind.PARAGRAPH,
                 stream=GalleyStream.BODY,
                 note_id=None,
-                first_page=20,
+                first_page=other_page,
             ),
             "e1": GalleyBlock(
                 kind=BlockKind.PARAGRAPH,
@@ -789,7 +855,7 @@ def _endnote_evaluation(*, reference_on_page: int) -> Evaluation:
             ),
         ),
     )
-    return evaluation_of(_book(), _ENDNOTE_REFERENCE, side, frozenset())
+    return evaluation_of(_book(), _endnote_reference(note_text), side, frozenset())
 
 
 def test_endnote_ten_pages_after_its_reference_is_found_with_its_reference_right() -> (
@@ -839,3 +905,51 @@ def test_endnote_linked_ten_pages_from_its_reference_is_missing_with_its_cause()
         for difference in evaluation.differences
         if difference.cause is not None
     } == set(missing + extra_in_endnote)
+
+
+def test_endnote_linked_one_page_from_its_reference_is_found_with_no_cause() -> None:
+    evaluation = _endnote_evaluation(reference_on_page=1)
+    markdown = _at_markdown(evaluation)
+    assert markdown.notes is not None
+    assert markdown.notes.as_note == 1
+    assert all(difference.cause is None for difference in evaluation.differences)
+
+
+def test_endnote_linked_two_pages_from_its_reference_has_the_cause() -> None:
+    evaluation = _endnote_evaluation(reference_on_page=2)
+    markdown = _at_markdown(evaluation)
+    assert markdown.notes is not None
+    assert markdown.notes.missing == 1
+    assert {
+        difference.cause
+        for difference in evaluation.differences
+        if difference.part is Part.NOTES
+    } == {Cause.ENDNOTE_REFERENCE_FAR}
+
+
+@pytest.mark.parametrize(
+    ("note_text", "endnote_text", "cause"),
+    [
+        # Two of the note's five keyed tokens have their key in the
+        # endnote: under half.
+        ("See Bracton on this point", "1. See Glanvill on other matters", None),
+        # Three of five, each "law" of the note counted although the
+        # endnote has it once (spec section 7).
+        (
+            "law law law of Bracton",
+            "1. The law Glanvill wrote",
+            Cause.ENDNOTE_REFERENCE_FAR,
+        ),
+    ],
+)
+def test_endnote_sharing_under_half_of_the_notes_keys_gives_no_cause(
+    note_text: str, endnote_text: str, cause: Cause | None
+) -> None:
+    evaluation = _endnote_evaluation(
+        reference_on_page=20, endnote_text=endnote_text, note_text=note_text
+    )
+    assert {
+        difference.cause
+        for difference in evaluation.differences
+        if difference.state is State.MISSING and difference.part is Part.NOTES
+    } == {cause}
