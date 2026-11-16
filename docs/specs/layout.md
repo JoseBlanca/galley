@@ -324,9 +324,10 @@ is laid out as one region, as the skeleton did.
    2. cut rows whose tops lie within 1.6 body line pitches of the one
       before form a chain. A **shortened** row has no word whose right
       side lies at most L + I − 4 pt: nothing stands in the strip beside
-      it. The chain is trimmed at both ends to its first and last
-      shortened rows; when at least 2 rows remain, it is a **cut-in
-      zone**, from the top of its first row to the bottom of its last.
+      it. A chain of at least 2 cut rows that holds a shortened row is
+      trimmed at both ends to its first and last shortened rows, and is
+      then a **cut-in zone**, from the top of its first row to the
+      bottom of its last, even when one row remains.
       A full body line with a wide space at the inset by chance is a cut
       row too ("of John. The same year Johanna", page 120; "averted open
       war. Henry was", 125); at a chain's end it is trimmed off, and a
@@ -354,7 +355,8 @@ is laid out as one region, as the skeleton did.
    | rule | words moved | aligned to a margin note | aligned to the body | not aligned | share of the aligned that are note words | the reference text's margin-note words found |
    |---|---|---|---|---|---|---|
    | zone from the first to the last cut row (the first form) | 1,977 | 1,070 | 132 | 775 | 0.89 | 1,070 of 1,469 |
-   | zone trimmed to its shortened rows (as written) | 1,314 | 767 | 73 | 474 | 0.91 | 767 of 1,469 |
+   | zone trimmed to its shortened rows, and at least 2 rows left | 1,230 | 701 | 70 | 459 | 0.909 | 701 of 1,469 |
+   | zone trimmed to its shortened rows, one row enough (as written) | 1,314 | 767 | 73 | 474 | 0.913 | 767 of 1,469 (0.52) |
 
    The label is a lower bound on precision: of the 28 words of 3 letters
    or more that the alignment puts in the body, 24 are words of the
@@ -666,7 +668,8 @@ runs the fidelity check and writes lines.json, 2.5 s in all.
   and does not split them; so does a note beside which no line is
   shortened, or whose shortened lines are more than 1.6 pitches apart,
   which is most of the 48% of the notes' words not found (section 3,
-  step 2b); and when the
+  step 2b: 1,314 words moved, 767 aligned to notes, 73 to the body, 474
+  not aligned; precision 0.913, recall 0.52); and when the
   OCR set a note's first letter or word off at the column's edge ("f
   reform" on page 60, "Plan of reform."), the part in the zone moves
   and the rest stays.
@@ -758,6 +761,12 @@ with their boxes, with a `BookMeasures` given in the test:
   2 pt in on the rest gives a left inset of 60, and on pages whose rows
   start 30 pt in as often as 38 pt in gives none.
 
+An excerpt test asserts that `measure_book` gives no cut-in inset on
+either side for the five excerpts other than `stubbs_51_56-64`: the
+nearest is Mariéjol's, 11 rows at 30.3 pt on the left against 9 at 6 to
+12 pt smaller, and 8 rows at 37.4 pt on the right, below the floor of
+10.
+
 **Excerpt tests** on reference pages: the expected output of each is
 the list of its regions, each as the text of its lines (words joined by
 one space) in order, compared exactly; boxes are not compared. The owner
@@ -833,9 +842,10 @@ text of the page); measured on all words by their alignment, it is not
 
 **Open 1. Step 2b below the bar.** The rule as written moves 1,314
 words in Stubbs, of which 767 are aligned to margin notes and 73 to
-the body (0.91; 0.94 once 24 note words the alignment misplaced are
-counted as notes), and 474 are not aligned, mostly single letters of
-spaced-out notes.
+the body (precision 0.913; 0.94 once 24 note words the alignment
+misplaced are counted as notes), and 474 are not aligned, mostly single
+letters of spaced-out notes. It finds 767 of the reference text's 1,469
+margin-note words (0.52).
 
 - (a) **Keep step 2b** as written: about half of the notes' words leave
   the body lines, and at most about 50 body words of Stubbs' 90,100
