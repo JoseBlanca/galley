@@ -43,6 +43,7 @@ from galley.structure._notes import (
 from galley.structure._paragraphs import (
     BodyBlock,
     Entry,
+    IndexLines,
     MarginNote,
     PageParts,
     body_entries,
@@ -232,8 +233,9 @@ def _taken_body_notes(
 ) -> tuple[PageParts, ...]:
     """The pages with the notes left at the foot of their body taken, in a
     book numbered per page, except on the pages of the endnote section
-    (spec section 11, "Notes left in the body") and those of `bibliography`,
-    in a bibliographical note (section 16), and each page's body
+    (spec section 11, "Notes left in the body"), those of `bibliography`,
+    in a bibliographical note (section 16), and those of an index (section
+    17), and each page's body
     notes put before its band regions. `band_notes` are each page's notes
     of its band; `body_word_height` is in points."""
     taken = tuple(
@@ -241,6 +243,7 @@ def _taken_body_notes(
         if numbering is Numbering.PER_PAGE
         and page.index not in section_pages
         and page.index not in bibliography
+        and page.index_lines is IndexLines.NONE
         else page
         for page, notes in zip(parts, band_notes, strict=True)
     )

@@ -60,6 +60,7 @@ from galley.structure import (
     reference_candidate,
     survey_book,
 )
+from galley.structure._index import index_page
 from galley.structure._lines import PlacedLine
 from galley.structure._margins import BesideLine, InParagraph, line_beside
 from galley.structure._markers import MarkerForm, book_marker_form
@@ -72,6 +73,7 @@ from galley.structure._references import (
     pair_score,
     reference_form,
 )
+from galley.structure._regions import region_kinds
 from galley.structure._unnumbered import Unnumbered, without_marker
 
 
@@ -4618,3 +4620,219 @@ def test_whole_book_haskins_quotes_and_bibliographical_notes(
         ("paragraph", [129, 130]),
     )
     assert not any(note.origin[0].page_index == 129 for note in blocks.notes)
+
+
+# Index pages and guide words (structure spec, section 17). An index page
+# has a head line, a left column at 50 pt and a right one at 200 pt, lines
+# 12 pt apart from 80 pt; a first line starts at its column's edge and a
+# continuation line 9 pt in.
+
+_INDEX_LEFT_PT = 50.0
+_INDEX_RIGHT_PT = 200.0
+_INDEX_TOP_PT = 80.0
+_INDEX_PITCH_PT = 12.0
+_INDEX_INDENT_PT = 9.0
+
+
+def _index_column(
+    x0: float,
+    texts: tuple[str, ...],
+    top: float = _INDEX_TOP_PT,
+    skew_pt: float = 0.0,
+) -> Region:
+    """A column region 130 pt wide, as a justified column is, of one line per
+    text; a text starting with ">" is a continuation line, indented 9 pt.
+    The column's left edge drifts right by `skew_pt` from its first line to
+    its last."""
+    last = max(len(texts) - 1, 1)
+    lines = tuple(
+        _line(
+            text.removeprefix(">"),
+            x0
+            + skew_pt * number / last
+            + (_INDEX_INDENT_PT if text.startswith(">") else 0.0),
+            top + _INDEX_PITCH_PT * number,
+        )
+        for number, text in enumerate(texts)
+    )
+    box = _box(tuple(line.box for line in lines))
+    return Region(Box(x0, box.top, max(box.x1, x0 + 130), box.bottom), lines)
+
+
+def _index_page(
+    index: int,
+    head: str,
+    left: tuple[str, ...],
+    right: tuple[str, ...],
+    *others: Region,
+) -> PageLayout:
+    return PageLayout(
+        index,
+        (
+            _region(_line(head, 155, 36)),
+            *others,
+            _index_column(_INDEX_LEFT_PT, left),
+            _index_column(_INDEX_RIGHT_PT, right),
+        ),
+        (),
+    )
+
+
+_LEFT_ENTRIES = (
+    "Abacus, 106.",
+    "Abruzzi, 196, 204.",
+    "Anjou, counts of, 61,",
+    ">85; relations, 61.",
+    "Apulia, 186, 197.",
+)
+_RIGHT_ENTRIES = (
+    "Bari, 189, 197.",
+    "Bayeux, 10, 46,",
+    ">49, 67, 76.",
+    "Becket, 4, 100.",
+    "Bessin, 10, 28.",
+)
+
+
+def _column_lines(page: PageLayout) -> tuple[str, ...]:
+    """The lines of the index page's columns, left then right, as rule 2 of
+    section 17 reads them."""
+    kinds = region_kinds(page, _WORD_HEIGHT_PT, frozenset())
+    return tuple(
+        " ".join(word.text for word in line.words)
+        for line in index_page(page, kinds, frozenset()).lines
+    )
+
+
+def test_index_page_columns_are_read_left_then_right() -> None:
+    page = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    assert _column_lines(page) == (
+        *(text.removeprefix(">") for text in _LEFT_ENTRIES),
+        *(text.removeprefix(">") for text in _RIGHT_ENTRIES),
+    )
+
+
+def test_index_page_columns_leave_the_body_and_the_band() -> None:
+    page = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert block_text(blocks.blocks[0]) == "INDEX"
+    assert blocks.blocks[0].kind is BlockKind.HEADING
+    assert blocks.notes == ()
+    assert "Abacus, 106." in block_text(blocks.blocks[1])
+
+
+def test_guide_words_line_is_removed_as_guide_words() -> None:
+    guide = _region(
+        Line(
+            Box(90, 62, 265, 72),
+            (*_words_at("BUR", 90, 62), *_words_at("CON", 250, 62)),
+        )
+    )
+    page = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES, guide)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _removals_of(0, blocks) == (
+        Removal(
+            page_index=0,
+            box=Box(90, 62, 265, 72),
+            text="BUR CON",
+            reason=RemovalReason.GUIDE_WORDS,
+        ),
+    )
+    assert "BUR" not in " ".join(block_text(block) for block in blocks.blocks)
+    check_stage(FidelityBoundary.STRUCTURE, _lines_of(page), blocks)
+
+
+def test_guide_words_split_into_the_columns_first_lines_are_one_removal() -> None:
+    page = _index_page(0, "INDEX", ("BUR", *_LEFT_ENTRIES), ("CON", *_RIGHT_ENTRIES))
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert [(removal.reason, removal.text) for removal in _removals_of(0, blocks)] == [
+        (RemovalReason.GUIDE_WORDS, "BUR CON")
+    ]
+    assert _column_lines(page)[0] == "Abacus, 106."
+    check_stage(FidelityBoundary.STRUCTURE, _lines_of(page), blocks)
+
+
+def test_guide_words_not_removed_when_the_first_lines_are_not_level_or_not_three_capitals() -> (
+    None
+):
+    lowered = _index_page(0, "INDEX", ("BUR", *_LEFT_ENTRIES), ("Con", *_RIGHT_ENTRIES))
+    assert _removals_of(0, make_blocks(_lines_of(lowered), _NO_WORDS, workers=1)) == ()
+    apart = replace(
+        lowered,
+        regions=(
+            lowered.regions[0],
+            lowered.regions[1],
+            _index_column(_INDEX_RIGHT_PT, ("CON", *_RIGHT_ENTRIES), top=84.0),
+        ),
+    )
+    assert _removals_of(0, make_blocks(_lines_of(apart), _NO_WORDS, workers=1)) == ()
+
+
+def test_gutter_row_read_across_both_columns_is_cut_and_read_with_each() -> None:
+    # Spec section 17, rule 2: layout read the first two rows across the
+    # gutter as one region; each word goes to the column of its middle.
+    across = _region(
+        Line(
+            Box(50, 56, 285, 66),
+            (*_words_at("Caen, 10.", 50, 56), *_words_at("Clermont, 211.", 200, 56)),
+        ),
+        Line(
+            Box(59, 68, 260, 78),
+            (*_words_at("160, 166.", 59, 68), *_words_at("Clovis, 207.", 200, 68)),
+        ),
+    )
+    page = _index_page(0, "INDEX", ("Calabria, 176.",), ("Cluny, 164.",), across)
+    assert _column_lines(page) == (
+        "Caen, 10.",
+        "160, 166.",
+        "Calabria, 176.",
+        "Clermont, 211.",
+        "Clovis, 207.",
+        "Cluny, 164.",
+    )
+
+
+def test_gutter_region_with_a_third_of_its_lines_over_it_keeps_its_kind() -> None:
+    # Spec section 17, rule 2: a note at the foot, one line of two across
+    # the gutter, is not cut.
+    note = _region(
+        # "reader" runs from 163 to 193 pt, over the gutter at 190.
+        _line("This Index may help a reader to pass", 53, 300),
+        _line("Authorities.", 50, 312),
+    )
+    page = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES, note)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert "This Index may help a reader to pass Authorities." in _texts(blocks.blocks)
+    assert "Authorities." not in _column_lines(page)
+
+
+def test_gutter_margin_region_goes_into_its_column_by_its_top() -> None:
+    # Spec section 17, rule 2: a page number that overhangs the right
+    # column follows the line it ends, a line of the same top.
+    overhang = _region(_line("509", 335, _INDEX_TOP_PT + _INDEX_PITCH_PT))
+    page = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES, overhang)
+    assert _column_lines(page)[5:9] == (
+        "Bari, 189, 197.",
+        "Bayeux, 10, 46,",
+        "509",
+        "49, 67, 76.",
+    )
+
+
+def test_index_pages_start_at_a_running_head_index_and_end_without_columns() -> None:
+    before = _page_with_head(0, "THE BOOK")
+    continued = _index_page(1, "252 INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    blank = PageLayout(2, (), ())
+    also = _index_page(3, "253", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    after = PageLayout(
+        4,
+        (_region(_line("ADVERTISEMENTS", 140, 36)), _body(80, *_BODY_TEXTS)),
+        (),
+    )
+    lines = _lines_of(before, continued, blank, also, after)
+    assert survey_book(lines, workers=1).index_pages == frozenset({1, 2, 3})
+
+
+def test_index_pages_none_without_a_title_that_starts_with_index() -> None:
+    page = _index_page(0, "252 CHAPTER", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    assert survey_book(_lines_of(page), workers=1).index_pages == frozenset()

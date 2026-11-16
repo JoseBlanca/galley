@@ -19,6 +19,7 @@ from galley.model import (
     LinesFile,
     NoteKind,
     Origin,
+    RemovalReason,
     block_text,
     read_blocks,
     read_lines,
@@ -939,3 +940,52 @@ def test_quote_none_of_the_notes_left_in_the_body_of_mariejol_210(
 ) -> None:
     _, blocks = excerpt_outputs[MARIEJOL]
     assert set(_kinds_on(blocks, 0)) == {"paragraph"}
+
+
+# Index pages and guide words (structure spec, section 17).
+
+
+def test_index_stubbs_312_to_321_one_guide_words_removal_on_each_page(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["stubbs_summaries_index"]
+    guide_words = tuple(
+        (removal.page_index, removal.text)
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.GUIDE_WORDS
+    )
+    assert guide_words == (
+        (4, "BAL BEC"),
+        (5, "BUR CON"),
+        (6, "HEN HUG"),
+        (7, "MAT ORD"),
+        (8, "PUI ROB"),
+        (9, "WAR YPR"),
+    )
+    assert "heading" in _kinds_on(blocks, 4)[:2]
+    # The columns, small type under the guide words, are no longer a band.
+    assert not any(note.origin[0].page_index >= 4 for note in blocks.notes)
+
+
+def test_index_haskins_266_heading_then_the_columns_no_quote(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["haskins_eval"]
+    kinds = _kinds_on(blocks, 9)
+    assert kinds[0] == "heading"
+    assert "quote" not in kinds
+
+
+def test_index_haskins_267_rows_cut_at_the_gutter(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # Layout read the first four rows across both columns; the cut puts
+    # "Clermont, 211." with the right column, after the left column's last
+    # line, "Greek, in Sicily, 239/., 246.".
+    _, blocks = excerpt_outputs["haskins_quotes_index"]
+    text = " ".join(
+        block_text(block) for block in blocks.blocks if block.origin[0].page_index == 9
+    )
+    assert "Calabria, 176, 198,201-11,222,226, 237, 246." in text
+    assert "Greek, in Sicily, 239/., 246. Clermont, 211. Clovis, 207." in text
+    assert "quote" not in _kinds_on(blocks, 9) + _kinds_on(blocks, 10)

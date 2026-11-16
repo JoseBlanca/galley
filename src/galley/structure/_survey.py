@@ -20,6 +20,7 @@ from galley.structure._heads import (
     is_roman_number,
     without,
 )
+from galley.structure._index import index_pages
 from galley.structure._measures import (
     is_hyphen_first_part,
     is_number_before_word,
@@ -58,7 +59,8 @@ class BookSurvey:
     keys of the words printed whole (spec section 5); `signature_lines`
     the page indices whose lowest line is a signature line (section 4);
     `heads_below_specks` the page indices whose head line is a speck and
-    the line below it a running head (section 3).
+    the line below it a running head (section 3); `index_pages` the page
+    indices of the printed indexes (section 17).
     """
 
     running_heads: frozenset[int]
@@ -69,6 +71,7 @@ class BookSurvey:
     book_words: frozenset[str]
     signature_lines: frozenset[int]
     heads_below_specks: frozenset[int]
+    index_pages: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -336,12 +339,14 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
     )
     head_survey = _head_survey(heads, pitch, workers)
     running_heads = head_survey.running_heads
-    candidates = map_pages(
-        lambda page: signature_candidate(
-            page, region_kinds(page, body_word_height, running_heads)
-        ),
+    kinds = map_pages(
+        lambda page: region_kinds(page, body_word_height, running_heads),
         lines.pages,
         workers,
+    )
+    candidates = tuple(
+        signature_candidate(page, page_kinds)
+        for page, page_kinds in zip(lines.pages, kinds, strict=True)
     )
     return BookSurvey(
         running_heads=running_heads,
@@ -360,4 +365,5 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
             workers,
         ),
         heads_below_specks=head_survey.heads_below_specks,
+        index_pages=index_pages(lines.pages, kinds),
     )
