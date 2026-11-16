@@ -136,3 +136,28 @@ the pop-ups have not been tried on a Kindle.
 
 The default pytest run took 39.5–40.9 s while three streams ran (load
 average 11–12); it is measured again when the machine is idle.
+
+## Stream `layout`: task 3.1 (b1107d0, merged)
+
+layout measures the cut-in inset on each side (`BookMeasures`
+`cut_in_inset_left`, `cut_in_inset_right`) and runs step 2b; the note
+words form margin regions of their own. 18 tests (`-k cut_in`), each
+threshold broken once and a test failing. Of the 11 excerpts only
+`stubbs_51_56-64` gets insets (60.3 and 58.2 pt); the nearest miss is
+`mariejol_headings_verse`, 14 rows at 73.8 pt against 6 beside it.
+
+Whole Stubbs: 1,324 words moved on 216 pages (the spec measured 1,314;
+the 10-word gap was not found), insets 60.3 pt (397 rows) and 59.3 pt
+(362). No other book gets an inset. The inset peak is tried only at the
+insets rows have, which the spec did not say; trying every 0.1 pt gave
+the Mariéjol excerpt a false inset.
+
+Three Stubbs reference pages changed, checked by the orchestrator
+against the excerpt text: page 0, "accession." leaves the body line as
+a margin note; page 9, the notes "Banishment of mercenaries." and
+"Destruction of castles." (OCR "B an i s h m e n t", "Cti°n °£ J^tE.")
+leave the body, and "fifteen, was a still greater boon ; for these,"
+is one line again; pages 4–5, the note "Henry's mismanagement of his
+children." becomes a margin note, joined at its hyphen as a guess
+("Silmlnagementofhis", the OCR's text). They go into the owner's sheet
+of task 7.3.

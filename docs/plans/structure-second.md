@@ -323,7 +323,7 @@ body words of Stubbs move into margin notes. The excerpt is measured on
 its own ten pages, and its insets (60.3 and 58.2 pt) differ a little
 from the book's (60.4 and 59.0).
 
-- [ ] 3.1 The cut-in insets in `measure_book` and step 2b in
+- [x] 3.1 The cut-in insets in `measure_book` and step 2b in
   `layout_page`. Spec: layout §3, "The book's measures" and step 2b;
   §4; §6, "Stubbs' cut-in notes"; §8. Stream `layout`. Deliverables 1,
   2, 5.
