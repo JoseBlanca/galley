@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
+  "changed": "Changed by task 2.1 (structure spec section 11, \"Where a note starts\", rule 4, and \"The marker of a note\"): each note's marker is taken out of its text: \"•\" split off \"•Pa\" (the note to the title's \"*\") and \"'\" off \"'There\", each by a note_marker word change, as signs glued to a capitalised word, and \"i\" and \"a\" as one-character markers of indented notes; the right column, \"'There is, however…\", indented 12 pt against its column, is a note of its own, no longer part of note \"a\". Changed by task 2.3 (structure spec section 11, \"References\"): \"STRATEGY*\" is linked to the note marked \"•\" and \"Greece,1\" to the note marked \"i\", each split off its word by a note_marker word change.",
   "excerpt": "kadesh_8-17",
   "page": 0,
   "book_page_index": 8,
@@ -102,11 +103,11 @@
   ],
   "notes": [
     {
-      "marker": "",
+      "marker": "•",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "•Pa per read before the International Congress of Oriontalists at Hamburg in September, 1902."
+          "text": "Pa per read before the International Congress of Oriontalists at Hamburg in September, 1902."
         }
       ],
       "pages": [
@@ -114,11 +115,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "i",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "i J . KKOHATEK, Antike SchlacMfelder in Griechenland, Berlin, 1903."
+          "text": "J . KKOHATEK, Antike SchlacMfelder in Griechenland, Berlin, 1903."
         }
       ],
       "pages": [
@@ -126,11 +127,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "a",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "a I n Ramses III.'s day the Pnrasat-Philistines are seen fighting by groups of four (CHAMP., Man., 220-220 6i» = ROB., A/on, stor., 127, 128, and MtlLLER, Asien, pp. 365, 316)."
+          "text": "I n Ramses III.'s day the Pnrasat-Philistines are seen fighting by groups of four (CHAMP., Man., 220-220 6i» = ROB., A/on, stor., 127, 128, and MtlLLER, Asien, pp. 365, 316)."
         }
       ],
       "pages": [
@@ -138,11 +139,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "'",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "'There is, however, much material for studying the larger strategic of a series of campaigns designed to effect the conquest of all Syria As I expect to show in a later work, the general plan of the Egyptian kings in such campaigns was first to secure the sea-coast, and then to operate against the interior from this coast as a base, having rapid »nd unbroken water connection with Egypt."
+          "text": "There is, however, much material for studying the larger strategic of a series of campaigns designed to effect the conquest of all Syria As I expect to show in a later work, the general plan of the Egyptian kings in such campaigns was first to secure the sea-coast, and then to operate against the interior from this coast as a base, having rapid »nd unbroken water connection with Egypt."
         }
       ],
       "pages": [
@@ -154,6 +155,36 @@
   "word_changes": [
     {
       "before": [
+        "STRATEGY*"
+      ],
+      "after": [
+        "STRATEGY",
+        "*"
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "Greece,1"
+      ],
+      "after": [
+        "Greece,",
+        "1"
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "•Pa"
+      ],
+      "after": [
+        "•",
+        "Pa"
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
         "Ori-",
         "ontalists"
       ],
@@ -161,6 +192,16 @@
         "Oriontalists"
       ],
       "reason": "hyphen_join_guessed"
+    },
+    {
+      "before": [
+        "'There"
+      ],
+      "after": [
+        "'",
+        "There"
+      ],
+      "reason": "note_marker"
     },
     {
       "before": [

@@ -943,7 +943,7 @@ exactly.
 | `stubbs_51_56-64` | 0 (51) | heading "CHAPTER III. / THE EARLY YEARS OF HENRY II.", level 1, `label` "CHAPTER III."; the 3-line summary, one `chapter_summary`; "Very few epochs…" starts a paragraph; the cut-in note "Importance attached… accession." before its paragraph |
 | `stubbs_51_56-64` | 3 (58) | "His great position in Christendom" (as the OCR reads it) beside the middle of a paragraph, placed before it |
 | `stubbs_51_56-64` | 2 (57), 7 (62), 9 (64) | cut-in notes on the left and right (layout §8), each before its paragraph |
-| `domesday_74-83` | 0 (74) | note 7 with the marker "«"; seven glued references, "pleased1/" to "mercy7.'", linked |
+| `domesday_74-83` | 0 (74) | note 6 with the marker "«", linked from "would6.'"; seven glued references, "pleased1/" to "mercy7.'", linked |
 | `domesday_74-83` | 1 (75) | references "day1.'", "land2.", "land3." linked to notes whose markers read "1", "2", "9"; margin notes beside paragraphs' first lines; "Can the villein be pursued?" beside the page's last line, a paragraph's first line |
 | `domesday_74-83` | 2 (76) | two notes on one line ("1 Dialogus", "2 Dialogus"); note 3 with marker "z" |
 | `domesday_74-83` | 9 (83) | three lines of two notes each; markers "8", "*", "e"; references "12s.2", "30d8" |
@@ -1098,7 +1098,10 @@ Domesday's 41 such words, Mariéjol's 805 and Kadesh's 9. Only Haskins' 42 "^" a
 Each band region is cut into notes, in reading order. A note line starts
 a note when any of these holds:
 
-1. section 6's indent rule starts a block there, as in the first plan;
+1. section 6's indent rule starts a block there, as in the first plan:
+   the line is indented after a short line (section 6, rule 1). A line
+   that section 6 starts only because it, or the line before, is
+   centred starts no note by this rule (owner, 16 November 2026);
 2. its first word has a **note marker's form** (below) and the line is
    indented 5 to 40 pt from the band's left edge, which is the smallest
    left side among the page's note lines within 60 pt of this line, so
@@ -1115,7 +1118,17 @@ a note when any of these holds:
    value is otherwise its place, since by place every marker-shaped
    line, a table's row too, would pass. On a page whose notes are each
    one line long no line is indented against another (Mariéjol's pages
-   221, 310 and 409).
+   221, 310 and 409);
+4. it is the first line of a band region after the page's first, and is
+   indented 5 to 40 pt from the band's left edge of rule 2: the first
+   note of the next column (owner, 16 November 2026). On Kadesh's page 8
+   (excerpt page 0) the right column starts "'There is, however…",
+   indented 12 pt against its column, a note whose marker the OCR glued
+   to its first word.
+
+A line is indented only against other note lines: on a page with one
+note line, the band's left edge is that line's own left side, so the
+line is never indented (owner, 16 November 2026).
 
 **Two notes on one line.** A word inside a note line starts a note when
 it has a note marker's form or is one lower-case letter (Domesday's "e"
@@ -1143,9 +1156,10 @@ punctuation test keeps a row of a table in a note ("40 2 42", Domesday
 page 43) whole.
 
 A band block whose first line starts no note is part of the note before
-it on the same page (the rest of a note in the second column, or a table
-that the indent rule cut into rows), or, when it is the page's first, of
-a note of the page before (below).
+it on the same page (the rest of a note in the second column, whose
+first line is not indented, or a table that the centring rule of
+section 6 cut into rows), or, when it is the page's first, of a note of
+the page before (below).
 
 ### The marker of a note
 
@@ -1167,8 +1181,10 @@ The first word of a note has a **note marker's form** when it is:
 A note started by its indent (rule 1 or 2) whose first word has none of
 these forms still takes it as its marker when it is one character and
 the next word starts with a capital ("«" on Domesday page 74, "z" on
-page 76). Otherwise the note has no marker: `marker` is empty and every
-word stays in its text.
+page 76), and the signs when the word is 1 or 2 of the signs above glued
+to a word that starts with a capital ("'There" on Kadesh page 8: the
+marker is "'" and the text starts with "There"). Otherwise the note has
+no marker: `marker` is empty and every word stays in its text.
 
 The marker is taken out of the note's first block into `marker`, as the
 OCR read it. A glued marker is split off by a `note_marker` word change
@@ -1178,9 +1194,15 @@ and the text starts with "The".
 **Its value.** In a book whose notes are numbered per page, the k-th
 note that starts on a page has the value k, whatever its marker reads:
 the markers are too damaged to count on (Domesday's page 83 reads "1 2 8
-* 8 e 7 8" for notes 1 to 8). A book is numbered per page when, on at
-least half of its pages that have notes, the first note whose marker
-reads as a number reads 1 (Haskins, Domesday and Mariéjol; not Kadesh).
+* 8 e 7 8" for notes 1 to 8). A page's first note that has no marker
+and is not indented, and that does not continue a note of the page
+before (below, "A note that runs over a page break"), is the end of a
+note that started elsewhere, and is not counted and has no value: on
+Mariéjol's page 211 the end of page 210's note 5, which stayed in the
+body, would otherwise make "(t)" note 2 (decided in task 2.3, 16
+November 2026). A book is numbered per page when, on at least half of
+its pages with a note whose marker reads as a number, the first such
+marker reads 1 (Haskins, Domesday and Mariéjol; not Kadesh).
 Otherwise a note's value is what its marker reads, once "i", "l", "I",
 "|", "!" and "J" are read as 1, "o" and "O" as 0, "s" and "S" as 5 and
 "z" and "Z" as 2, and, inside brackets, "a" as 2 and "t" as 1. A sign
@@ -1275,8 +1297,14 @@ reading order:
   "12s.2"), unless the word starts with an abbreviation that a number
   follows in citations and has no other letters: c, p, pp, f, ff, n, nr,
   no, vol, ch, cap, art, l, ll, q, a, t, v, s, d, m, in any case, with or
-  without "." ("p.12", "vol.3"); or punctuation and 1 to 3 digits
-  (Kadesh page 10 reads "14);" and ";13"). In "12s.2" and "30d8"
+  without "." ("p.12", "vol.3"); or punctuation, 1 to 3 digits and
+  only punctuation after (Kadesh page 10 reads ";13"). Punctuation is
+  what Unicode counts as punctuation (its categories P): "," ")" "'"
+  "/", not a currency sign, so "£2" (Domesday page 83, "of this £2 is
+  due") is no candidate. A number with punctuation after it only is no
+  candidate either: Kadesh page 10 prints "(Nos. 1, 2, 13, 14) ;13", and
+  "13," would take note 13 from ";13", which comes after it (decided in
+  task 2.3, 16 November 2026). In "12s.2" and "30d8"
   (Domesday page 83) the "s" and "d" are shillings and pence after a
   number, not the start of the word, so they are candidates;
 - a **bracketed number**: an opening bracket, 1 or 2 digits or letters
@@ -1332,9 +1360,10 @@ gets two or three spans, the reference one with `note_ref` the note's
 id; the spaces stay with the spans around it. A bracketed number or a
 sign that is a word of its own becomes the reference span, with any
 punctuation after it split off the same way ("(i).": "(i)", "."). A
-candidate whose reference would hold two letters ("(li)", read as 11)
-is not linked and stays in its word, since the fidelity check refuses a
-reference span of more than one letter (architecture §13). The note's `referenced` becomes true.
+candidate whose reference would hold a letter ("(i)", "(li)", read as
+1 and 11) is not linked and stays in its word, since the fidelity check
+refuses a reference span with a letter that was a whole word of the
+lines (architecture §13): only digits and signs are linked. The note's `referenced` becomes true.
 
 ### What the rules give
 

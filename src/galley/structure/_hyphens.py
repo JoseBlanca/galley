@@ -93,10 +93,14 @@ class PageLine:
 @dataclass(frozen=True, slots=True)
 class JoinedWords:
     """The words of a block's lines, with the hyphens at line ends joined,
-    and a word change for each join, in the order of the lines."""
+    the page index of each word (a joined word's is its first part's), and
+    a word change for each join, in the order of the lines, with the
+    position in `words` of the word it gave."""
 
     words: tuple[str, ...]
+    pages: tuple[int, ...]
     changes: tuple[WordChange, ...]
+    positions: tuple[int, ...]
 
 
 def join_lines(
@@ -109,6 +113,7 @@ def join_lines(
     words: list[str] = []
     pages: list[int] = []
     changes: list[WordChange] = []
+    positions: list[int] = []
     for line in lines:
         texts = line.words
         joined = (
@@ -126,7 +131,8 @@ def join_lines(
                 )
             )
             words[-1] = joined.word
+            positions.append(len(words) - 1)
             texts = texts[1:]
         words.extend(texts)
         pages.extend(line.page_index for _ in texts)
-    return JoinedWords(tuple(words), tuple(changes))
+    return JoinedWords(tuple(words), tuple(pages), tuple(changes), tuple(positions))

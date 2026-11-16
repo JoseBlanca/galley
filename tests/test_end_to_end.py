@@ -25,7 +25,10 @@ from galley.book_folder import BookFolder
 from galley.cli import main
 from galley.fidelity import read_markdown
 from galley.model import (
+    BlockKind,
     BlocksFile,
+    Note,
+    NoteKind,
     RemovalReason,
     block_text,
     read_blocks,
@@ -188,8 +191,10 @@ def _structure_words(blocks: BlocksFile) -> Counter[str]:
             *blocks.blocks,
             *(b for note in blocks.notes for b in note.blocks),
         )
-        for word in block_text(block).split()
+        for span in block.spans
+        for word in span.text.split()
     )
+    words.update(word for note in blocks.notes for word in note.marker.split())
     words.update(word for removal in blocks.removals for word in removal.text.split())
     words.update(word for change in blocks.word_changes for word in change.before)
     words.subtract(word for change in blocks.word_changes for word in change.after)
@@ -255,8 +260,26 @@ def test_book_md_holds_the_words_of_words_json_less_structures_records_and_no_no
         )
         words.subtract(word for change in blocks.word_changes for word in change.before)
         words.update(word for change in blocks.word_changes for word in change.after)
+        # A referenced footnote's marker and its reference are Pandoc's
+        # number, not words.
+        footnotes = frozenset(
+            note.id for note in blocks.notes if _is_written_as_a_footnote(note)
+        )
+        words.subtract(
+            word
+            for note in blocks.notes
+            if note.id in footnotes
+            for word in note.marker.split()
+        )
+        references = tuple(
+            span
+            for block in (*blocks.blocks, *(b for n in blocks.notes for b in n.blocks))
+            for span in block.spans
+            if span.note_ref in footnotes
+        )
+        words.subtract(word for span in references for word in span.text.split())
         assert Counter(word.text for word in markdown.words) == +words
-        assert markdown.note_count == 0
+        assert markdown.note_count == len(references)
 
 
 # book.epub
@@ -295,16 +318,48 @@ def test_each_block_div_of_the_epub_holds_the_words_of_its_block(
         with zipfile.ZipFile(folder.book_epub) as epub:
             chapter = ElementTree.fromstring(epub.read("EPUB/text/ch001.xhtml"))
         # A note's div holds the divs of its blocks; only block divs count.
+        # Pandoc writes its own number for a reference to a footnote.
         divs = {
-            div.get("id"): "".join(div.itertext()).split()
+            div.get("id"): _text_without_footnote_numbers(div).split()
             for div in chapter.iter(f"{{{_XHTML}}}div")
             if (div.get("id") or "").startswith("b-")
         }
+        footnotes = frozenset(
+            note.id for note in blocks.notes if _is_written_as_a_footnote(note)
+        )
+        # markdown writes the marker of a note written where it was printed
+        # at the start of its first block that is not a margin note.
+        markers = {
+            next(
+                (b for b in note.blocks if b.kind is not BlockKind.MARGIN_NOTE),
+                note.blocks[0],
+            ).id: note.marker.split()
+            for note in blocks.notes
+            if note.id not in footnotes
+        }
         note_blocks = tuple(block for note in blocks.notes for block in note.blocks)
         assert divs == {
-            block.id: block_text(block).split()
+            block.id: markers.get(block.id, [])
+            + "".join(
+                span.text for span in block.spans if span.note_ref not in footnotes
+            ).split()
             for block in (*blocks.blocks, *note_blocks)
         }
+
+
+def _is_written_as_a_footnote(note: Note) -> bool:
+    """Whether markdown writes `note` as a Pandoc footnote at its reference:
+    a referenced footnote."""
+    return note.kind is NoteKind.FOOTNOTE and note.referenced
+
+
+def _text_without_footnote_numbers(element: ElementTree.Element) -> str:
+    """The text of `element` without the numbers of Pandoc's footnote
+    references, links of class "footnote-ref"."""
+    if element.get("class") == "footnote-ref":
+        return element.tail or ""
+    inner = "".join(_text_without_footnote_numbers(child) for child in element)
+    return (element.text or "") + inner + (element.tail or "")
 
 
 def test_only_the_kadesh_epub_has_the_cover_extract_rendered(

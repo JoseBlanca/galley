@@ -12,8 +12,10 @@ from galley.book_folder import BookFolder
 from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage, read_markdown
 from galley.model import (
+    BlockKind,
     BlocksFile,
     LinesFile,
+    NoteKind,
     Origin,
     block_text,
     read_blocks,
@@ -234,3 +236,210 @@ def test_fidelity_check_passes_on_the_excerpt_at_every_boundary(
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
     markdown = read_markdown(folder.book_md.read_text(encoding="utf-8"))
     check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+
+# Notes (structure spec section 11), on the reference pages of section 9,
+# "The second plan", before the owner checks the whole pages.
+
+MARIEJOL = "mariejol_210-219"
+DOMESDAY = "domesday_74-83"
+
+
+def _notes_on(blocks: BlocksFile, page: int) -> tuple[tuple[str, list[int]], ...]:
+    """The marker and the pages of each note that has lines on `page`."""
+    return tuple(
+        (note.marker, _pages(note.origin))
+        for note in blocks.notes
+        if page in _pages(note.origin)
+    )
+
+
+def test_footnote_two_on_one_line_domesday_76_gives_two_notes(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[DOMESDAY]
+    notes = tuple(note for note in blocks.notes if _pages(note.origin) == [2])
+    assert tuple(
+        (note.marker, block_text(note.blocks[0]).split()[0]) for note in notes[:3]
+    ) == (("1", "Dialogus,"), ("2", "Dialogus,"), ("z", "Will."))
+
+
+def test_footnote_run_on_from_mariejol_213_is_one_note_on_214(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[MARIEJOL]
+    assert _notes_on(blocks, 4) == (
+        ("(4)", [3, 4]),
+        ("(t)", [4]),
+        ("(a)", [4]),
+        ("(3J", [4]),
+    )
+
+
+def test_footnote_left_in_the_body_mariejol_210_stays_paragraphs_not_run_on(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # The markers read 1, 2, 3, none, 11, 5: out of order, so the notes stay
+    # in the body, each a paragraph of page 210 alone (structure spec,
+    # sections 11 and 16).
+    _, blocks = excerpt_outputs[MARIEJOL]
+    led = tuple(
+        (block_text(block).split()[0], _pages(block.origin))
+        for block in blocks.blocks
+        if 0 in _pages(block.origin)
+    )[-6:]
+    assert led == (
+        ("(t)", [0]),
+        ("(2)", [0]),
+        ("(3)", [0]),
+        ("U)", [0]),
+        ("li)", [0]),
+        ("(S)", [0]),
+    )
+    assert _notes_on(blocks, 0) == ()
+
+
+def test_footnote_left_in_the_body_mariejol_217_is_taken_as_a_note(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[MARIEJOL]
+    assert _notes_on(blocks, 7)[0] == ("(I)", [7])
+    assert not any(
+        block_text(block).startswith("(I)")
+        for block in blocks.blocks
+        if 7 in _pages(block.origin)
+    )
+
+
+def _references_on(blocks: BlocksFile, page: int) -> tuple[tuple[str, str], ...]:
+    """For each reference in the body blocks that start on `page`: the word
+    it was printed in, rebuilt from the spans around it, and the marker of
+    its note."""
+    markers = {note.id: note.marker for note in blocks.notes}
+    found: list[tuple[str, str]] = []
+    for block in blocks.blocks:
+        if block.origin[0].page_index != page:
+            continue
+        for position, span in enumerate(block.spans):
+            if span.note_ref is None:
+                continue
+            before = block.spans[position - 1].text if position > 0 else ""
+            after = (
+                block.spans[position + 1].text
+                if position + 1 < len(block.spans)
+                else ""
+            )
+            word = (
+                (before.split(" ")[-1] if before else "")
+                + span.text
+                + (after.split(" ")[0] if after else "")
+            )
+            found.append((word, markers[span.note_ref]))
+    return tuple(found)
+
+
+def test_referenced_domesday_74_links_seven_glued_references(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[DOMESDAY]
+    assert _references_on(blocks, 0) == (
+        ("pleased1/", "1"),
+        ("it2.'", "3"),
+        ("free3.", "3"),
+        ("things4.", "4"),
+        ("themselves5.'", "6"),
+        ("would6.'", "«"),
+        ("mercy7.'", "7"),
+    )
+    assert all(note.referenced for note in blocks.notes if _pages(note.origin) == [0])
+
+
+def test_referenced_domesday_75_links_references_to_misread_markers(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[DOMESDAY]
+    assert _references_on(blocks, 1)[:3] == (
+        ("day1.'", "1"),
+        ("land2.", "2"),
+        ("land3.", "9"),
+    )
+
+
+def test_referenced_domesday_83_links_shillings_and_pence_references(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[DOMESDAY]
+    words = tuple(word for word, _ in _references_on(blocks, 8))
+    assert "12s.2" in words
+    assert "30d8" in words
+    assert not any(word.startswith("£") for word in words)
+
+
+def test_referenced_haskins_132_and_133_link_signs(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["haskins_eval"]
+    assert _references_on(blocks, 1) == (("^", "*"), ("protojournalist,^", "*"))
+
+
+def test_referenced_kadesh_10_links_notes_12_to_14_and_leaves_10_and_11(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["kadesh_8-17"]
+    assert ("Kadesh,12", "12") in _references_on(blocks, 1)
+    assert (";13", "13") in _references_on(blocks, 1)
+    assert ("above).'*", "u") in _references_on(blocks, 1)
+    assert tuple(
+        (note.marker, note.referenced)
+        for note in blocks.notes
+        if _pages(note.origin)[0] == 2
+    )[:2] == (("\"'", False), ("11", False))
+
+
+def test_referenced_mariejol_214_leaves_note_1_unreferenced(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[MARIEJOL]
+    assert tuple(
+        (note.marker, note.referenced)
+        for note in blocks.notes
+        if _pages(note.origin) == [4]
+    ) == (("(t)", False), ("(a)", True), ("(3J", True))
+
+
+def test_endnote_gierke_270_and_271_give_endnotes_291_to_302(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # The end of note 290 at the top of page 270 is an endnote without a
+    # marker, not joined to the last paragraph of page 93 (structure spec,
+    # section 12).
+    _, blocks = excerpt_outputs["gierke_86-93_270-271"]
+    endnotes = tuple(note for note in blocks.notes if note.kind is NoteKind.ENDNOTE)
+    assert tuple(note.marker for note in endnotes) == (
+        "",
+        *(f"{n}." for n in range(291, 303)),
+    )
+    assert _pages(endnotes[0].origin) == [8]
+    assert not any(note.referenced for note in endnotes)
+    assert not any(
+        8 in _pages(block.origin)
+        for block in blocks.blocks
+        if block.kind is BlockKind.PARAGRAPH
+    )
+
+
+def test_endnote_gierke_270_margin_notes_go_inside_their_endnotes(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # Each margin note beside an endnote's line is a block of that note,
+    # before its text (structure spec, section 13, rule 5).
+    _, blocks = excerpt_outputs["gierke_86-93_270-271"]
+    assert not any(
+        block.kind is BlockKind.MARGIN_NOTE and _pages(block.origin)[0] in (8, 9)
+        for block in blocks.blocks
+    )
+    note_292 = next(note for note in blocks.notes if note.marker == "292.")
+    assert tuple(block.kind for block in note_292.blocks) == (
+        BlockKind.MARGIN_NOTE,
+        BlockKind.PARAGRAPH,
+    )

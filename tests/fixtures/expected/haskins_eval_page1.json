@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
+  "changed": "Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): the note's marker \"*\" is taken out of its text into `marker`.",
   "excerpt": "haskins_eval",
   "page": 1,
   "book_page_index": 132,
@@ -60,11 +61,11 @@
   ],
   "notes": [
     {
-      "marker": "",
+      "marker": "*",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "* GiraldusCambrensis (RollsSeries), viii, p. 283."
+          "text": "GiraldusCambrensis (RollsSeries), viii, p. 283."
         }
       ],
       "pages": [

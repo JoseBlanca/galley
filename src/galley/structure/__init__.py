@@ -26,15 +26,28 @@ from galley.model import (
     write_blocks,
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
+from galley.structure._assemble import assemble
 from galley.structure._hyphens import HyphenJoin, join_hyphen
-from galley.structure._paragraphs import assemble, page_parts
+from galley.structure._markers import (
+    NoteMarker,
+    Reference,
+    ReferenceForm,
+    note_marker,
+    reference_candidate,
+)
+from galley.structure._paragraphs import page_parts
 from galley.structure._survey import BookSurvey, survey_book
 
 __all__ = [
     "BookSurvey",
     "HyphenJoin",
+    "NoteMarker",
+    "Reference",
+    "ReferenceForm",
     "join_hyphen",
     "make_blocks",
+    "note_marker",
+    "reference_candidate",
     "run",
     "survey_book",
 ]
@@ -54,7 +67,13 @@ def make_blocks(
     language in lower case, as `wordlist.lower_case_word_list` gives it."""
     survey = survey_book(lines, workers=workers)
     pages = map_pages(lambda page: page_parts(page, survey), lines.pages, workers)
-    assembled = assemble(pages, survey.book_words, lower_case_words)
+    assembled = assemble(
+        pages,
+        survey.book_words,
+        lower_case_words,
+        survey.body_word_height,
+        survey.body_line_pitch,
+    )
     return BlocksFile(
         source_pdf_sha256=lines.source_pdf_sha256,
         blocks=assembled.blocks,

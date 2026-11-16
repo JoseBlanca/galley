@@ -28,6 +28,7 @@ from galley.model import (
     Figure,
     Line,
     LinesFile,
+    NoteKind,
     Origin,
     PageInfo,
     PageKind,
@@ -48,7 +49,21 @@ from galley.model import (
     write_lines,
     write_pages,
 )
-from galley.structure import HyphenJoin, join_hyphen, make_blocks, survey_book
+from galley.structure import (
+    HyphenJoin,
+    NoteMarker,
+    Reference,
+    ReferenceForm,
+    join_hyphen,
+    make_blocks,
+    note_marker,
+    reference_candidate,
+    survey_book,
+)
+from galley.structure._lines import PlacedLine
+from galley.structure._margins import BesideLine, line_beside
+from galley.structure._measures import Edges
+from galley.structure._references import align
 
 
 def _word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
@@ -1115,10 +1130,9 @@ def test_side_text_keeps_the_order_of_its_regions_and_lines() -> None:
     )
     blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
     assert _texts(blocks.blocks)[1:] == ("Upper", "Lower")
-    assert tuple(block_text(note.blocks[0]) for note in blocks.notes) == (
-        "1 The first note.",
-        "2 The second note.",
-    )
+    assert tuple(
+        (note.marker, block_text(note.blocks[0])) for note in blocks.notes
+    ) == (("1", "The first note."), ("2", "The second note."))
 
 
 # make_blocks
@@ -1423,13 +1437,13 @@ def test_margin_and_band_follow_the_paragraph_in_which_the_page_ends() -> None:
     assert block_text(blocks.blocks[1]) == "Margin note"
     assert block_text(blocks.blocks[2]) == "Another paragraph"
     (note,) = blocks.notes
-    assert (note.id, note.marker, note.referenced) == ("n-p0000-001", "", False)
+    assert (note.id, note.marker, note.referenced) == ("n-p0000-001", "1", False)
     # Markdown writes the note after the margin note, the last block whose
     # origin includes page 0, so its block is the third to start there.
     assert tuple((block.id, block.kind) for block in note.blocks) == (
         ("b-p0000-003", BlockKind.PARAGRAPH),
     )
-    assert block_text(note.blocks[0]) == "1 A note in small type."
+    assert block_text(note.blocks[0]) == "A note in small type."
     assert note.origin == note.blocks[0].origin
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
@@ -1495,7 +1509,12 @@ def test_band_of_two_columns_is_found_when_its_lines_outnumber_the_body() -> Non
     lines = _lines_of(PageLayout(0, (body, left, right), ()))
     assert survey_book(lines, workers=1).body_word_height == _WORD_HEIGHT_PT
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
-    assert len(blocks.notes) == 2
+    # Markers 0 to 7 rising by one start a note each (structure spec,
+    # section 11, rule 3); the right column, whose first marker reads 0,
+    # is part of note 7.
+    assert tuple(note.marker for note in blocks.notes) == tuple(
+        str(n) for n in range(8)
+    )
     assert all(block.kind is BlockKind.PARAGRAPH for block in blocks.blocks)
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
@@ -1513,10 +1532,12 @@ def test_band_of_five_lines_with_short_last_lines_gives_a_note_each() -> None:
     )
     page = PageLayout(0, (_region(*_five_full_lines(70, "first")), band), ())
     blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
-    assert tuple(block_text(note.blocks[0]) for note in blocks.notes) == (
-        "1 A note in small type that ends.",
-        "2 Another note here ends.",
-        "3 A third one.",
+    assert tuple(
+        (note.marker, block_text(note.blocks[0])) for note in blocks.notes
+    ) == (
+        ("1", "A note in small type that ends."),
+        ("2", "Another note here ends."),
+        ("3", "A third one."),
     )
 
 
@@ -1543,6 +1564,778 @@ def test_make_blocks_with_1_worker_and_with_3_gives_the_same_value() -> None:
         *_numbered_heads(),
     )
     lines = _lines_of(*pages)
+    assert make_blocks(lines, _NO_WORDS, workers=1) == make_blocks(
+        lines, _NO_WORDS, workers=3
+    )
+
+
+# Notes (structure spec, section 11)
+
+
+@pytest.mark.parametrize(
+    ("word", "endnote", "expected"),
+    [
+        ("8", False, NoteMarker("8", "", 8)),
+        ("291.", True, NoteMarker("291.", "", 291)),
+        ("(t)", False, NoteMarker("(t)", "", 1)),
+        ("(a)", False, NoteMarker("(a)", "", 2)),
+        ("U)", False, NoteMarker("U)", "", None)),
+        ("(3J", False, NoteMarker("(3J", "", 3)),
+        ("(4", False, NoteMarker("(4", "", 4)),
+        ("*", False, NoteMarker("*", "", None)),
+        ("13The", False, NoteMarker("13", "The", 13)),
+        ("I39-", True, NoteMarker("I39-", "", 139)),
+        ("!6o.", True, NoteMarker("!6o.", "", 160)),
+        ("I39-", False, None),
+        ("I.", True, None),
+        ("The", False, None),
+        ("1907", False, None),
+        ("(1907)", False, None),
+    ],
+)
+def test_note_marker_gives_the_marker_its_rest_and_value(
+    word: str, endnote: bool, expected: NoteMarker | None
+) -> None:
+    assert note_marker(word, endnote=endnote) == expected
+
+
+_NOTE_HEIGHT_PT = 7.0
+_NOTE_PITCH_PT = 9.0
+
+
+def _note_line(text: str, top: float, x0: float = 50.0, x1: float = 300.0) -> Line:
+    return _spread(text, x0, x1, top, height=_NOTE_HEIGHT_PT)
+
+
+def _placed_line(top: float, *words: tuple[str, float, float]) -> Line:
+    """A note line of the words given with their left and right sides."""
+    placed = tuple(
+        Word(text, Box(x0, top, x1, top + _NOTE_HEIGHT_PT), None)
+        for text, x0, x1 in words
+    )
+    return Line(_box(tuple(word.box for word in placed)), placed)
+
+
+def _page_with_band(index: int, *band: Line) -> PageLayout:
+    """A page of five full body lines from 70 pt and a band of small type
+    with the lines `band`."""
+    return PageLayout(
+        index, (_region(*_five_full_lines(70, "body")), _region(*band)), ()
+    )
+
+
+def _markers_and_texts(blocks: BlocksFile) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        (note.marker, " / ".join(block_text(block) for block in note.blocks))
+        for note in blocks.notes
+    )
+
+
+def test_footnote_markers_are_taken_off_the_notes_of_a_band() -> None:
+    page = _page_with_band(
+        0,
+        _note_line("1 The first note runs", 300, 62),
+        _note_line("on to a second line.", 300 + _NOTE_PITCH_PT, 50, 150),
+        _note_line("2 The second note.", 300 + 2 * _NOTE_PITCH_PT, 62, 160),
+    )
+    lines = _lines_of(page)
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "The first note runs on to a second line."),
+        ("2", "The second note."),
+    )
+    assert all(note.kind is NoteKind.FOOTNOTE for note in blocks.notes)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_footnote_with_a_marker_indented_after_a_full_line_starts_a_note() -> None:
+    # Rule 2: the line after a full one is no start by section 6's indent
+    # rule, but its first word is a marker and it is indented 12 pt.
+    # "7" does not read one more than "1", so rule 3 does not start it.
+    page = _page_with_band(
+        0,
+        _note_line("1 The first note fills its line", 300, 62),
+        _note_line("and the next one.", 300 + _NOTE_PITCH_PT),
+        _note_line("7 The second note.", 300 + 2 * _NOTE_PITCH_PT, 62, 160),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "The first note fills its line and the next one."),
+        ("7", "The second note."),
+    )
+
+
+def test_footnote_marker_reading_one_more_starts_a_note_without_an_indent() -> None:
+    # Rule 3: neither line is indented, and "2" reads one more than "1".
+    page = _page_with_band(
+        0,
+        _note_line("1 The first note fills its line.", 300),
+        _note_line("2 The second note.", 300 + _NOTE_PITCH_PT, 50, 150),
+        _note_line("4 is a number in the second note.", 300 + 2 * _NOTE_PITCH_PT),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "The first note fills its line."),
+        ("2", "The second note. 4 is a number in the second note."),
+    )
+
+
+def test_footnote_of_two_notes_on_one_line_gives_two_notes() -> None:
+    # The second marker is 14 pt after "12 b.", before a capital.
+    line = _placed_line(
+        300,
+        ("1", 50, 55),
+        ("D.", 59, 67),
+        ("B.", 71, 79),
+        ("12", 83, 93),
+        ("b.", 97, 105),
+        ("2", 119, 124),
+        ("Dialogus", 128, 168),
+        ("i.", 172, 178),
+    )
+    lines = _lines_of(_page_with_band(0, line))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (("1", "D. B. 12 b."), ("2", "Dialogus i."))
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+@pytest.mark.parametrize(
+    ("gap", "before", "after", "notes"),
+    [
+        (10.0, "b.", "Dialogus", 2),
+        (9.0, "b.", "Dialogus", 1),
+        (14.0, "b", "Dialogus", 1),
+        (14.0, "b.", "dialogus", 1),
+    ],
+)
+def test_footnote_second_marker_on_a_line_needs_gap_stop_and_capital(
+    gap: float, before: str, after: str, notes: int
+) -> None:
+    line = _placed_line(
+        300,
+        ("1", 50, 55),
+        ("Ibid.", 59, 84),
+        (before, 88, 96),
+        ("e", 96 + gap, 101 + gap),
+        (after, 105 + gap, 145 + gap),
+        ("i.", 149 + gap, 155 + gap),
+    )
+    blocks = make_blocks(_lines_of(_page_with_band(0, line)), _NO_WORDS, workers=1)
+    assert len(blocks.notes) == notes
+
+
+def test_footnote_one_character_marker_is_taken_when_the_note_is_indented() -> None:
+    # "«" is no marker's form, but the note starts by its indent and the
+    # next word starts with a capital (Domesday page 74).
+    page = _page_with_band(
+        0,
+        _note_line("1 The first note.", 300, 62, 160),
+        _note_line("« Domesday Book, ii. 59, and on", 300 + _NOTE_PITCH_PT, 62),
+        _note_line("its second line.", 300 + 2 * _NOTE_PITCH_PT, 50, 160),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "The first note."),
+        ("«", "Domesday Book, ii. 59, and on its second line."),
+    )
+
+
+def test_footnote_glued_marker_is_split_off_its_word() -> None:
+    page = _page_with_band(0, _note_line("13The note glued to its marker.", 300, 62))
+    lines = _lines_of(page)
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (("13", "The note glued to its marker."),)
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=0,
+            before=("13The",),
+            after=("13", "The"),
+            reason=ChangeReason.NOTE_MARKER,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_footnote_column_without_a_marker_is_part_of_the_note_before() -> None:
+    left = _region(
+        _note_line("1 A note that runs on", 300, 62, 170),
+        _note_line("in its column", 300 + _NOTE_PITCH_PT, 50, 170),
+    )
+    right = _region(_note_line("into the next one.", 300, 180, 260))
+    page = PageLayout(0, (_region(*_five_full_lines(70, "body")), left, right), ())
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "A note that runs on in its column into the next one."),
+    )
+
+
+def test_footnote_column_indented_starts_a_note_its_glued_sign_split_off() -> None:
+    # Rule 4 (Kadesh page 8): the right column's first line is indented 12
+    # pt against its column, and its marker is a sign glued to its first
+    # word.
+    left = _region(
+        _note_line("1 A note in the left column", 300, 62, 170),
+        _note_line("that ends here.", 300 + _NOTE_PITCH_PT, 50, 170),
+    )
+    right = _region(
+        _note_line("'There is a note on", 300, 192, 300),
+        _note_line("the right, which ends.", 300 + _NOTE_PITCH_PT, 180, 300),
+    )
+    page = PageLayout(0, (_region(*_five_full_lines(70, "body")), left, right), ())
+    lines = _lines_of(page)
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "A note in the left column that ends here."),
+        ("'", "There is a note on the right, which ends."),
+    )
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=0,
+            before=("'There",),
+            after=("'", "There"),
+            reason=ChangeReason.NOTE_MARKER,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_footnote_alone_on_its_page_is_never_indented() -> None:
+    # One note line: the band's left edge is its own left side.
+    page = _page_with_band(0, _note_line("'Quoted words in small type.", 300, 70, 200))
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (("", "'Quoted words in small type."),)
+
+
+def _note_running_over(gap_pages: tuple[PageLayout, ...]) -> LinesFile:
+    """Page 0's band ends with note 2, which page N's band continues on a
+    line neither indented nor marked, `gap_pages` coming between."""
+    first = _page_with_band(
+        0,
+        _note_line("1 A note.", 300, 62, 120),
+        _note_line("2 A note that runs", 300 + _NOTE_PITCH_PT, 62, 300),
+    )
+    last_index = 1 + len(gap_pages)
+    last = _page_with_band(
+        last_index,
+        _note_line("over the page break.", 300, 50, 160),
+        _note_line("1 The next page's note.", 300 + _NOTE_PITCH_PT, 62, 200),
+    )
+    return _lines_of(first, *gap_pages, last)
+
+
+def test_footnote_running_over_a_blank_page_is_one_note_with_two_origins() -> None:
+    lines = _note_running_over((PageLayout(1, (), ()),))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "A note."),
+        ("2", "A note that runs over the page break."),
+        ("1", "The next page's note."),
+    )
+    running = blocks.notes[1]
+    assert running.id == "n-p0000-002"
+    assert tuple(origin.page_index for origin in running.origin) == (0, 2)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_footnote_after_a_page_of_body_without_notes_does_not_run_on() -> None:
+    lines = _note_running_over((_body_page(1, *_five_full_lines(70, "other")),))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "A note."),
+        ("2", "A note that runs"),
+        ("", "over the page break."),
+        ("1", "The next page's note."),
+    )
+
+
+def test_footnote_first_on_its_page_and_indented_does_not_run_on() -> None:
+    first = _page_with_band(0, _note_line("1 A note that runs", 300, 62, 300))
+    second = _page_with_band(
+        1,
+        _note_line("A quotation in small type, which", 300, 62),
+        _note_line("ends here.", 300 + _NOTE_PITCH_PT, 50, 120),
+    )
+    blocks = make_blocks(_lines_of(first, second), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "A note that runs"),
+        ("", "A quotation in small type, which ends here."),
+    )
+
+
+_SMALL_PT = 8.5  # 0.85 of the body word height, 10 pt
+
+
+def _body_notes_pages(
+    markers: tuple[str, str, str],
+    *,
+    band_on_the_page: bool = False,
+    text_height: float = _WORD_HEIGHT_PT,
+) -> LinesFile:
+    """Page 0: a body and a band note "(1)", which give the book the
+    bracketed marker form, numbered per page. Page 1: five body lines of
+    `text_height` ending short, then three short lines indented 20 pt at
+    0.85 of the body height starting with `markers`. Page 2: a body whose
+    first line is not indented."""
+    band = _region(_note_line("(1) A note in the band.", 300, 62, 200))
+    page_0 = PageLayout(0, (_region(*_five_full_lines(70, "zero")), band), ())
+    text = (
+        *(
+            _spread(f"text {n} of the page", 50, 300, 70 + 15 * n, text_height)
+            for n in range(4)
+        ),
+        _spread("its end.", 50, 150, 130, text_height),
+    )
+    notes = tuple(
+        _spread(
+            f"{marker} Note {marker} in small type.", 70, 200, 145 + 12 * n, _SMALL_PT
+        )
+        for n, marker in enumerate(markers)
+    )
+    regions = (_region(*text, *notes),) + (
+        (_region(_note_line("(1) Another band note.", 300, 62, 200)),)
+        if band_on_the_page
+        else ()
+    )
+    page_1 = PageLayout(1, regions, ())
+    page_2 = _body_page(2, *_five_full_lines(70, "two"))
+    return _lines_of(page_0, page_1, page_2)
+
+
+def _page_1_blocks(blocks: BlocksFile) -> tuple[str, ...]:
+    return tuple(
+        block_text(block) for block in blocks.blocks if block.origin[0].page_index == 1
+    )
+
+
+def test_footnote_left_in_the_body_in_rising_order_is_taken_as_notes() -> None:
+    lines = _body_notes_pages(("(1)", "(2)", "(3)"))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks)[1:] == (
+        ("(1)", "Note (1) in small type."),
+        ("(2)", "Note (2) in small type."),
+        ("(3)", "Note (3) in small type."),
+    )
+    assert tuple(note.origin[0].page_index for note in blocks.notes) == (0, 1, 1, 1)
+    assert _page_1_blocks(blocks) == ()
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_footnote_left_in_the_body_out_of_order_stays_and_does_not_run_on() -> None:
+    blocks = make_blocks(_body_notes_pages(("(1)", "(3)", "(2)")), _NO_WORDS, workers=1)
+    assert len(blocks.notes) == 1
+    page_1 = _page_1_blocks(blocks)
+    assert page_1[-3:] == (
+        "(1) Note (1) in small type.",
+        "(3) Note (3) in small type.",
+        "(2) Note (2) in small type.",
+    )
+    # The marker-led paragraph does not run on; page 2 starts its own.
+    assert block_text(blocks.blocks[-1]).startswith("two 0 of the page")
+
+
+def test_footnote_lines_in_the_body_of_a_page_whose_band_starts_at_1_stay() -> None:
+    blocks = make_blocks(
+        _body_notes_pages(("(1)", "(2)", "(3)"), band_on_the_page=True),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert tuple(note.marker for note in blocks.notes) == ("(1)", "(1)")
+    assert _page_1_blocks(blocks)[-3:] == (
+        "(1) Note (1) in small type.",
+        "(2) Note (2) in small type.",
+        "(3) Note (3) in small type.",
+    )
+
+
+def test_footnote_lines_in_the_body_below_text_as_small_stay() -> None:
+    blocks = make_blocks(
+        _body_notes_pages(("(1)", "(2)", "(3)"), text_height=_SMALL_PT),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert len(blocks.notes) == 1
+    assert _page_1_blocks(blocks) == (
+        "(1) Note (1) in small type.",
+        "(2) Note (2) in small type.",
+        "(3) Note (3) in small type.",
+    )
+
+
+def test_footnote_lines_in_the_body_of_a_book_with_digit_markers_stay() -> None:
+    # The book's band starts its notes with digits, not brackets.
+    pages = _body_notes_pages(("(1)", "(2)", "(3)")).pages
+    band = _region(_note_line("1 A note in the band.", 300, 62, 200))
+    page_0 = replace(pages[0], regions=(pages[0].regions[0], band))
+    blocks = make_blocks(_lines_of(page_0, *pages[1:]), _NO_WORDS, workers=1)
+    assert len(blocks.notes) == 1
+
+
+@pytest.mark.parametrize(
+    ("word", "expected"),
+    [
+        ("land3.", Reference("land", "3", ".", ReferenceForm.GLUED, 3)),
+        ("Kadesh,12", Reference("Kadesh,", "12", "", ReferenceForm.GLUED, 12)),
+        ("causa)27.", Reference("causa)", "27", ".", ReferenceForm.GLUED, 27)),
+        ("12s.2", Reference("12s.", "2", "", ReferenceForm.GLUED, 2)),
+        ("30d8", Reference("30d", "8", "", ReferenceForm.GLUED, 8)),
+        (";13", Reference(";", "13", "", ReferenceForm.GLUED, 13)),
+        ("14);", None),
+        ("13,", None),
+        ("(i).", Reference("", "(i)", ".", ReferenceForm.BRACKETED, 1)),
+        ("{2).", Reference("", "{2)", ".", ReferenceForm.BRACKETED, 2)),
+        ("rulers.^", Reference("rulers.", "^", "", ReferenceForm.SIGN, None)),
+        ("^", Reference("", "^", "", ReferenceForm.SIGN, None)),
+        ("p.12", None),
+        ("pp.3", None),
+        ("vol.3", None),
+        ("1066", None),
+        ("'", None),
+        ("t", None),
+        ("£2", None),
+        ("(1907)", None),
+    ],
+)
+def test_reference_candidate_gives_the_reference_in_a_word(
+    word: str, expected: Reference | None
+) -> None:
+    assert reference_candidate(word) == expected
+
+
+def _referenced_page(
+    index: int, body_words: str, *notes: str, right: float = 300.0
+) -> PageLayout:
+    """A page of five full body lines, the last ending with `body_words`,
+    and a band of `notes`, each on one line indented 12 pt, with a line at
+    the band's left edge after them."""
+    body = (
+        *_five_full_lines(70, "body")[:4],
+        _spread(f"words of the page {body_words}", 50, right, 130),
+    )
+    band = (
+        *(
+            _note_line(text, 300 + _NOTE_PITCH_PT * n, 62, 200)
+            for n, text in enumerate(notes)
+        ),
+        _note_line("and its end.", 300 + _NOTE_PITCH_PT * len(notes), 50, 120),
+    )
+    return PageLayout(index, (_region(*body), _region(*band)), ())
+
+
+def _references(blocks: BlocksFile) -> tuple[tuple[str, str], ...]:
+    """Each reference span's text and the marker of its note."""
+    markers = {note.id: note.marker for note in blocks.notes}
+    return tuple(
+        (span.text, markers[span.note_ref])
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref is not None
+    )
+
+
+def test_referenced_glued_numbers_are_linked_and_a_bracketed_one_stays() -> None:
+    lines = _lines_of(
+        _referenced_page(0, "land1. day2 (3)", "1 One.", "2 Two.", "3 Three.")
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("1", "1"), ("2", "2"))
+    assert tuple(note.referenced for note in blocks.notes) == (True, True, False)
+    paragraph = blocks.blocks[0]
+    assert block_text(paragraph).endswith("land1. day2 (3)")
+    assert tuple(span.text for span in paragraph.spans)[1:] == (
+        "1",
+        ". day",
+        "2",
+        " (3)",
+    )
+    assert paragraph.spans[0].text.endswith(" land")
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=0,
+            before=("land1.",),
+            after=("land", "1", "."),
+            reason=ChangeReason.NOTE_MARKER,
+        ),
+        WordChange(
+            page_index=0,
+            before=("day2",),
+            after=("day", "2"),
+            reason=ChangeReason.NOTE_MARKER,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_referenced_number_misread_against_its_marker_is_linked_as_read() -> None:
+    # Numbered per page, the note is note 3 of its page whatever its marker
+    # reads: "land3." links to it and keeps "3".
+    pages = (
+        _referenced_page(0, "now1.", "1 One."),
+        _referenced_page(1, "here1. there2 land3.", "1 One.", "2 Two.", "8 Three."),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert _references(blocks) == (("1", "1"), ("1", "1"), ("2", "2"), ("3", "8"))
+
+
+def test_referenced_sign_alone_is_linked_to_a_note_marked_by_a_sign() -> None:
+    lines = _lines_of(_referenced_page(0, "the king. ^", "* A note."))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("^", "*"),)
+    assert blocks.word_changes == ()
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_referenced_bracketed_reference_with_a_letter_stays_in_its_word() -> None:
+    # "(i)." would be a span with a letter that was a whole word, which the
+    # fidelity check refuses (architecture section 13); "{2)." is linked.
+    lines = _lines_of(
+        _referenced_page(0, "first (i). second {2).", "(1) One.", "(2) Two.")
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("{2)", "(2)"),)
+    assert tuple(note.referenced for note in blocks.notes) == (False, True)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_referenced_page_s_leftover_note_end_is_not_counted() -> None:
+    # Page 1's band starts with the end of a note whose start is on no page
+    # with notes: it has no value, and "(1)" is the page's first note.
+    first = _referenced_page(0, "now1.", "1 One.")
+    body_only = _body_page(1, *_five_full_lines(70, "other"))
+    page = _referenced_page(2, "here1. there2", "1 One.", "2 Two.")
+    band = page.regions[1]
+    leftover = _note_line("the end of a note.", 290, 50, 150)
+    page = replace(
+        page, regions=(page.regions[0], replace(band, lines=(leftover, *band.lines)))
+    )
+    blocks = make_blocks(_lines_of(first, body_only, page), _NO_WORDS, workers=1)
+    assert _references(blocks) == (("1", "1"), ("1", "1"), ("2", "2"))
+    assert tuple(note.referenced for note in blocks.notes) == (True, False, True, True)
+
+
+def test_referenced_note_is_never_linked_to_an_earlier_candidate() -> None:
+    # Notes 1 and 2, candidates "2" then "1": one pair only, note 1 with the
+    # later "1", since a later note is never paired with an earlier
+    # candidate and of equal totals the first note's earlier pair wins.
+    lines = _lines_of(_referenced_page(0, "this2 that1", "1 One.", "2 Two."))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("1", "1"),)
+
+
+@pytest.mark.parametrize(
+    ("values", "references", "pairs"),
+    [
+        ((1, 2), ("x1", "y2"), ((0, 0), (1, 1))),
+        ((1, 2), ("x2", "y1"), ((0, 1),)),
+        ((1,), ("x1", "y1"), ((0, 0),)),
+        ((3,), ("x8",), ((0, 0),)),
+        ((3,), ("x4",), ()),
+        ((None,), ("x.^",), ((0, 0),)),
+        ((1, 2), ("x.^", "y2"), ((0, 0), (1, 1))),
+        ((1, 2), ("x2",), ((1, 0),)),
+    ],
+)
+def test_referenced_alignment_pairs_the_highest_total_in_order(
+    values: tuple[int | None, ...],
+    references: tuple[str, ...],
+    pairs: tuple[tuple[int, int], ...],
+) -> None:
+    candidates = tuple(reference_candidate(word) for word in references)
+    assert all(candidate is not None for candidate in candidates)
+    assert align(values, tuple(c for c in candidates if c is not None)) == pairs
+
+
+def _endnote_pages(
+    first: int, count: int, *, body_words: str = "the text", between: bool = False
+) -> LinesFile:
+    """Page 0: a paragraph holding `body_words` whose last line is full, so
+    that it would run on. Page 1: the end of a note at its top, then
+    `count` endnotes, "N." from `first`, each an indented line and a short
+    one, with a paragraph without a marker after the first when
+    `between`."""
+    page_0 = _body_page(
+        0,
+        _indented(f"A paragraph with {body_words} in it", 70),
+        *_five_full_lines(85, "body"),
+    )
+    texts = [("the end of a note whose start is", "not here.", False)]
+    for n in range(count):
+        texts.append((f"{first + n}. The note {first + n} which", "ends.", True))
+        if between and n == 0:
+            texts.append(("A second paragraph of", "the note.", True))
+    lines = tuple(
+        line
+        for number, (start, end, indented) in enumerate(texts)
+        for line in (
+            (_indented if indented else _full)(start, 70 + 45 * number),
+            _full("goes on over a full line", 85 + 45 * number),
+            _short(end, 100 + 45 * number),
+        )
+    )
+    return _lines_of(page_0, _body_page(1, *lines))
+
+
+def _endnotes_of(blocks: BlocksFile) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    return tuple(
+        (note.marker, tuple(block_text(block) for block in note.blocks))
+        for note in blocks.notes
+        if note.kind is NoteKind.ENDNOTE
+    )
+
+
+def test_endnote_section_of_12_paragraphs_gives_12_endnotes() -> None:
+    lines = _endnote_pages(291, 12, between=True)
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    endnotes = _endnotes_of(blocks)
+    assert tuple(marker for marker, _ in endnotes) == (
+        "",
+        *(f"{n}." for n in range(291, 303)),
+    )
+    assert endnotes[0] == (
+        "",
+        ("the end of a note whose start is goes on over a full line not here.",),
+    )
+    assert endnotes[1] == (
+        "291.",
+        (
+            "The note 291 which goes on over a full line ends.",
+            "A second paragraph of goes on over a full line the note.",
+        ),
+    )
+    assert not any(note.referenced for note in blocks.notes)
+    # The paragraph of page 0 does not run on into the section.
+    assert tuple(origin.page_index for origin in blocks.blocks[-1].origin) == (0,)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_endnote_run_of_6_paragraphs_gives_no_endnote() -> None:
+    blocks = make_blocks(_endnote_pages(291, 6), _NO_WORDS, workers=1)
+    assert _endnotes_of(blocks) == ()
+    assert block_text(blocks.blocks[-1]) == (
+        "296. The note 296 which goes on over a full line ends."
+    )
+
+
+def test_endnote_damaged_marker_counts_in_the_section() -> None:
+    # The tenth marker, "139.", is read "I39-".
+    lines = _endnote_pages(130, 12)
+    page = lines.pages[1]
+    region = page.regions[0]
+    tenth = region.lines[3 + 3 * 9]
+    damaged = replace(
+        tenth, words=(replace(tenth.words[0], text="I39-"), *tenth.words[1:])
+    )
+    region_lines = tuple(damaged if line is tenth else line for line in region.lines)
+    page = replace(page, regions=(replace(region, lines=region_lines),))
+    blocks = make_blocks(_lines_of(lines.pages[0], page), _NO_WORDS, workers=1)
+    markers = tuple(marker for marker, _ in _endnotes_of(blocks))
+    assert markers[10] == "I39-"
+    assert len(markers) == 13
+
+
+def test_endnote_is_linked_to_a_glued_number_of_the_body_before_it() -> None:
+    lines = _endnote_pages(1, 12, body_words="Law1")
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    (law,) = tuple(
+        (span.text, span.note_ref)
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref is not None
+    )
+    note = next(note for note in blocks.notes if note.id == law[1])
+    assert (law[0], note.kind, note.marker, note.referenced) == (
+        "1",
+        NoteKind.ENDNOTE,
+        "1.",
+        True,
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def _with_margin(lines: LinesFile, page: int, *margins: Line) -> LinesFile:
+    """`lines` with a margin region of each of `margins` on page `page`."""
+    pages = tuple(
+        replace(
+            layout,
+            regions=(*layout.regions, *(_region(margin) for margin in margins)),
+        )
+        if layout.index == page
+        else layout
+        for layout in lines.pages
+    )
+    return _lines_of(*pages)
+
+
+def test_margin_note_inside_an_endnote_beside_its_line_before_its_text() -> None:
+    # Endnote 292's first line is at 160 pt; the margin note's top is 4 pt
+    # lower (structure spec, section 13, rules 2 and 5).
+    lines = _with_margin(
+        _endnote_pages(291, 12), 1, _spread("Natural Law.", 310, 340, 164)
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    note = next(note for note in blocks.notes if note.marker == "292.")
+    assert tuple((block.kind, block_text(block)) for block in note.blocks) == (
+        (BlockKind.MARGIN_NOTE, "Natural Law."),
+        (BlockKind.PARAGRAPH, "The note 292 which goes on over a full line ends."),
+    )
+    assert all(block.kind is not BlockKind.MARGIN_NOTE for block in blocks.blocks)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_margin_note_inside_a_footnote_beside_its_line() -> None:
+    page = _page_with_band(
+        0,
+        _note_line("1 The first note.", 300, 62, 160),
+        _note_line("2 The second note runs", 300 + _NOTE_PITCH_PT, 62),
+        _note_line("on here.", 300 + 2 * _NOTE_PITCH_PT, 50, 120),
+    )
+    lines = _with_margin(_lines_of(page), 0, _spread("Aside", 310, 340, 309))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert tuple(
+        tuple(block.kind for block in note.blocks) for note in blocks.notes
+    ) == ((BlockKind.PARAGRAPH,), (BlockKind.MARGIN_NOTE, BlockKind.PARAGRAPH))
+
+
+def test_margin_note_beside_a_body_line_stays_in_the_body() -> None:
+    page = _page_with_band(0, _note_line("1 A note.", 300, 62, 160))
+    lines = _with_margin(_lines_of(page), 0, _spread("Aside", 310, 340, 85))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert tuple(block.kind for block in blocks.blocks) == (
+        BlockKind.PARAGRAPH,
+        BlockKind.MARGIN_NOTE,
+    )
+    assert tuple(block.kind for block in blocks.notes[0].blocks) == (
+        BlockKind.PARAGRAPH,
+    )
+
+
+def _beside(top: float, *, first: bool) -> BesideLine:
+    line = _spread("a line", 50, 300, top)
+    edges = Edges(50, 300)
+    return BesideLine(PlacedLine(0, line, edges, edges), first, None)
+
+
+def test_beside_a_paragraph_s_first_line_within_half_a_pitch_before_a_nearer_one() -> (
+    None
+):
+    # The margin note's top is 100: the middle line at 101 is nearer, but a
+    # first line at 107 is within 0.5 of a 15 pt pitch.
+    lines = (_beside(101, first=False), _beside(107, first=True))
+    assert line_beside(100, lines, 15.0) == lines[1]
+    assert line_beside(100, (lines[0], _beside(108, first=True)), 15.0) == lines[0]
+
+
+def test_make_blocks_with_notes_with_1_worker_and_with_3_gives_the_same_value() -> None:
+    lines = _lines_of(
+        *_note_running_over((PageLayout(1, (), ()),)).pages,
+        *(
+            _page_with_band(
+                index,
+                _note_line("13The note.", 300, 62, 200),
+                _note_line("14 Another note.", 300 + _NOTE_PITCH_PT, 62, 200),
+            )
+            for index in range(3, 9)
+        ),
+    )
     assert make_blocks(lines, _NO_WORDS, workers=1) == make_blocks(
         lines, _NO_WORDS, workers=3
     )
