@@ -1,17 +1,69 @@
 """The markdown stage: blocks.json to book.md, the Pandoc Markdown the epub
 stage reads and the owner proofreads.
 
-book.md is a metadata header and one fenced div per block, `::: {#b-p0012-003}`,
-whose text has every ASCII punctuation character escaped (walking-skeleton
-spec, section 8). A paragraph's div has no class; a margin note's has the
-class `margin-note` and stands where the block is in blocks.json; a note
-with `referenced` false is a div with its id and the class `note` around
-its blocks' divs, its marker first, after the last block, in the order
-of blocks.json, whose first origin is on the note's first page or an
-earlier one, or first of all (structure spec, sections 6 and 10, option
-b). Headings, quotes, verse, chapter summaries, figures, index entries,
-note references and referenced notes are refused, and so are edits,
-since none can exist before `galley2epub edits-from` is built.
+book.md is a metadata header, then the blocks in the order of blocks.json,
+one after the other with a blank line between. Every ASCII punctuation
+character of the book's text is escaped, so that Pandoc reads it back as
+written (walking-skeleton spec, section 8).
+
+How each kind is written
+------------------------
+
+A kind says what a text is; this stage and the epub stage's style sheet,
+`galley/epub/style.css`, decide how it looks (owner, 15 November 2026).
+Every block keeps its id, so that an edit or a link can name it, and
+every kind but the paragraph has a class of its own, its name with "-"
+for "_", which the style sheet styles:
+
+- `heading`: a Pandoc heading of its level with its id,
+  `## [CHAPTER III\\.]{.label} THE EARLY YEARS {#b-p0040-001}`. The
+  label, when the heading has one, is a span of class `label` before the
+  title, which the style sheet sets on a line of its own; in the table of
+  contents it stays before the title. The heading is not a div, because
+  Pandoc starts a chapter file at each level-1 heading and a div around
+  it would leave its id in the file before.
+- `paragraph`: a fenced div with its id and no class, `::: {#b-p0012-003}`,
+  its text on one line.
+- `quote`, `chapter_summary`, `index_entry`, `margin_note`: a fenced div
+  with its id and the class `quote`, `chapter-summary`, `index-entry` or
+  `margin-note`, its text on one line. A margin note stands where it is in
+  blocks.json, before the paragraph it was printed beside; the style sheet
+  sets it as a small bold line.
+- `verse`: a fenced div of class `verse`, each line of the text a line of
+  the Markdown ended by a hard line break (a backslash), and an empty line
+  of the text, the end of a stanza, a new paragraph in the div. Lines
+  empty or of spaces only are not written.
+- `figure`: a fenced div of class `figure` with its caption as text. Its
+  image is not written: the fidelity check reads no Pandoc image, so a
+  figure block with an image is refused until it reads one.
+
+Notes (structure spec, section 19; architecture sections 9 and 13):
+
+- A footnote with `referenced` true is a Pandoc footnote at its
+  reference, `Greece\\,[^n-p0012-001]`, which the Kindle shows as a
+  pop-up. Its definition follows the block, or the note or list of
+  endnotes, that refers to it, and holds its blocks' divs, indented, its
+  margin notes among them; its marker is not written, since Pandoc
+  numbers its notes. Pandoc cannot put a footnote in a footnote, so a
+  reference to one inside one is refused.
+- A footnote with `referenced` false is a fenced div with its id and the
+  class `note` around its blocks' divs.
+- An endnote, referenced or not, is a fenced div with its id and the
+  class `endnote` around its blocks' divs, and the endnotes that follow
+  each other are one list, a div of class `endnotes` around theirs. A
+  reference to one is a link to it with the reference as printed, marked
+  as a note reference, `Law[1](#n-p0190-001){epub:type="noteref"}`,
+  which Pandoc points into the chapter file of the endnote and a Kindle
+  can show as a pop-up.
+- A note written where it was printed, an unreferenced footnote or an
+  endnote, follows the last block, in the order of blocks.json, whose
+  first origin is on the note's first page or an earlier one, or comes
+  first of all (structure spec, sections 6 and 10, option b). Its marker
+  is first in the text of its first block that is not a margin note, so
+  that a margin note printed beside it stays a line of its own before it.
+
+Edits are refused, since none can exist before `galley2epub edits-from`
+is built.
 """
 
 import bisect
@@ -20,6 +72,7 @@ import json
 import logging
 import re
 import string
+import textwrap
 from collections import Counter
 from typing import assert_never
 
@@ -32,6 +85,8 @@ from galley.model import (
     BlockKind,
     BlocksFile,
     Note,
+    NoteKind,
+    Span,
     block_text,
     read_blocks,
     read_checked_input,
@@ -86,45 +141,127 @@ def _character_problems(where: str, text: str) -> tuple[str, ...]:
     )
 
 
-# The kinds of block written now: in the body, and inside a note.
-_BODY_KINDS = frozenset({BlockKind.PARAGRAPH, BlockKind.MARGIN_NOTE})
-_NOTE_KINDS = frozenset({BlockKind.PARAGRAPH})
+# The kinds of block written inside a note (architecture section 8): its
+# text, and the margin notes printed beside it.
+_NOTE_KINDS = frozenset(
+    {BlockKind.PARAGRAPH, BlockKind.QUOTE, BlockKind.VERSE, BlockKind.MARGIN_NOTE}
+)
+# The levels a Pandoc heading can have.
+_HEADING_LEVELS = range(1, 7)
 
 
-def _block_problems(block: Block, kinds: frozenset[BlockKind]) -> tuple[str, ...]:
-    """Why a block cannot be written; empty when it can."""
+def _references(block: Block) -> tuple[str, ...]:
+    """The ids of the notes a block's reference spans name, in order."""
+    return tuple(span.note_ref for span in block.spans if span.note_ref is not None)
+
+
+def _is_footnote_at_its_reference(note: Note) -> bool:
+    """Whether a note is written as a Pandoc footnote at its reference: a
+    footnote with `referenced` true. Every other note is written where it
+    was printed."""
+    return note.kind is NoteKind.FOOTNOTE and note.referenced
+
+
+def _block_problems(block: Block) -> tuple[str, ...]:
+    """Why a block cannot be written: a figure with an image, or a
+    character XML 1.0 does not allow; empty when it can."""
+    image = (
+        (f"block {block.id} is a figure with the image {block.figure}",)
+        if block.kind is BlockKind.FIGURE and block.figure is not None
+        else ()
+    )
+    label = (
+        _character_problems(f"the label of block {block.id}", block.label)
+        if block.label is not None
+        else ()
+    )
+    return image + _character_problems(f"block {block.id}", block_text(block)) + label
+
+
+def _note_block_problems(
+    note: Note, block: Block, footnote_ids: frozenset[str]
+) -> tuple[str, ...]:
+    """Why a block of `note` cannot be written: a kind a note does not
+    hold, a reference to a footnote inside a footnote, which Pandoc cannot
+    nest, or what _block_problems finds."""
     kind = (
-        (f"block {block.id} is a {block.kind.value}",)
-        if block.kind not in kinds
+        (f"block {block.id} of note {note.id} is a {block.kind.value}",)
+        if block.kind not in _NOTE_KINDS
         else ()
     )
-    reference = (
-        (f"block {block.id} holds a note reference",)
-        if any(span.note_ref is not None for span in block.spans)
+    nested = (
+        tuple(
+            f"block {block.id} of footnote {note.id} refers to footnote {note_id}, "
+            "and Pandoc cannot put a footnote in a footnote"
+            for note_id in _references(block)
+            if note_id in footnote_ids
+        )
+        if _is_footnote_at_its_reference(note)
         else ()
     )
-    return (
-        kind + reference + _character_problems(f"block {block.id}", block_text(block))
-    )
+    return kind + nested + _block_problems(block)
 
 
-def _note_problems(note: Note) -> tuple[str, ...]:
+def _note_problems(note: Note, footnote_ids: frozenset[str]) -> tuple[str, ...]:
     """Why a note cannot be written; empty when it can."""
-    referenced = (f"note {note.id} is referenced",) if note.referenced else ()
     marker = _character_problems(f"the marker of note {note.id}", note.marker)
     blocks = tuple(
         problem
         for block in note.blocks
-        for problem in _block_problems(block, _NOTE_KINDS)
+        for problem in _note_block_problems(note, block, footnote_ids)
     )
-    return referenced + marker + blocks
+    return marker + blocks
+
+
+def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
+    """The references that do not agree with the notes: one that names no
+    note, a note with `referenced` true and no reference or false and one,
+    and a footnote referenced more than once, which Pandoc would print at
+    each reference."""
+    notes = {note.id: note for note in blocks.notes}
+    referring = tuple(
+        (block.id, note_id)
+        for block in _every_block(blocks)
+        for note_id in _references(block)
+    )
+    counts = Counter(note_id for _, note_id in referring)
+    nowhere = tuple(
+        f"block {block_id} refers to {note_id}, which is no note"
+        for block_id, note_id in referring
+        if note_id not in notes
+    )
+    unreferenced = tuple(
+        f"note {note.id} is referenced and no block refers to it"
+        for note in blocks.notes
+        if note.referenced and not counts[note.id]
+    )
+    referenced = tuple(
+        f"note {note.id} is not referenced and a block refers to it"
+        for note in blocks.notes
+        if not note.referenced and counts[note.id]
+    )
+    repeated = tuple(
+        f"footnote {note.id} is referenced {counts[note.id]} times"
+        for note in blocks.notes
+        if note.kind is NoteKind.FOOTNOTE and counts[note.id] > 1
+    )
+    return nowhere + unreferenced + referenced + repeated
+
+
+def _every_block(blocks: BlocksFile) -> tuple[Block, ...]:
+    """The blocks of the body, then those of every note."""
+    return blocks.blocks + tuple(
+        block for note in blocks.notes for block in note.blocks
+    )
 
 
 def _check_well_formed(blocks: BlocksFile) -> None:
     """Raise InputFileError, naming blocks.json, when it is malformed: an
     id given more than once among the blocks, the notes and the notes'
-    blocks (each becomes the id of a div in book.md and the EPUB), or a
-    note without blocks or without origin, which cannot be placed."""
+    blocks (each becomes the id of a div in book.md and the EPUB), a note
+    without blocks or without origin, which cannot be placed, a heading
+    without a level Pandoc has (1 to 6), or references that do not agree
+    with the notes (_reference_problems)."""
     id_counts = Counter(
         (
             *(block.id for block in blocks.blocks),
@@ -143,7 +280,12 @@ def _check_well_formed(blocks: BlocksFile) -> None:
     placeless = tuple(
         f"note {note.id} has no origin" for note in blocks.notes if not note.origin
     )
-    problems = repeated + empty + placeless
+    levelless = tuple(
+        f"heading {block.id} has the level {block.level}"
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING and block.level not in _HEADING_LEVELS
+    )
+    problems = repeated + empty + placeless + levelless + _reference_problems(blocks)
     if problems:
         message = f"blocks.json is malformed: {'; '.join(problems)}"
         raise InputFileError(message)
@@ -151,17 +293,23 @@ def _check_well_formed(blocks: BlocksFile) -> None:
 
 def _check_writable(blocks: BlocksFile) -> None:
     """Raise InputFileError, naming blocks.json, at what markdown does not
-    write yet, rather than write it wrongly: a block that is not a paragraph
-    or a margin note, a note reference, a referenced note, a note block that
-    is not a paragraph, or a character XML 1.0 does not allow."""
+    write, rather than write it wrongly: a figure with an image, a note
+    block that is not a paragraph, quote, verse or margin note, a reference
+    to a footnote inside a referenced footnote, or a character XML 1.0 does
+    not allow."""
+    footnote_ids = frozenset(
+        note.id for note in blocks.notes if _is_footnote_at_its_reference(note)
+    )
     problems = tuple(
+        problem for block in blocks.blocks for problem in _block_problems(block)
+    ) + tuple(
         problem
-        for block in blocks.blocks
-        for problem in _block_problems(block, _BODY_KINDS)
-    ) + tuple(problem for note in blocks.notes for problem in _note_problems(note))
+        for note in blocks.notes
+        for problem in _note_problems(note, footnote_ids)
+    )
     if problems:
         message = (
-            f"blocks.json holds what markdown does not write yet: {'; '.join(problems)}"
+            f"blocks.json holds what markdown does not write: {'; '.join(problems)}"
         )
         raise InputFileError(message)
 
@@ -186,40 +334,181 @@ def _header(config: BookConfig) -> str:
     )
 
 
-def _div_attributes(block: Block) -> str:
-    """The id of a block's div, and its class when it has one."""
-    match block.kind:
-        case BlockKind.MARGIN_NOTE:
-            return f"#{block.id} .margin-note"
+def _class_name(kind: BlockKind) -> str | None:
+    """The class of a block's div, which the style sheet styles; None for
+    a paragraph."""
+    match kind:
+        case BlockKind.PARAGRAPH:
+            return None
         case (
-            BlockKind.PARAGRAPH
-            | BlockKind.HEADING
+            BlockKind.HEADING
             | BlockKind.QUOTE
             | BlockKind.VERSE
             | BlockKind.CHAPTER_SUMMARY
             | BlockKind.FIGURE
+            | BlockKind.MARGIN_NOTE
             | BlockKind.INDEX_ENTRY
         ):
-            return f"#{block.id}"
+            return kind.value.replace("_", "-")
+        case _:
+            assert_never(kind)
+
+
+# White space made a space, as escape_markdown does, but the line feed,
+# which a verse block keeps.
+_PLAIN_WHITE_SPACE_BUT_LINE_FEED = frozendict(
+    {key: value for key, value in _PLAIN_WHITE_SPACE.items() if key != ord("\n")}
+)
+# Pandoc's hard line break: a backslash at the end of a line.
+_HARD_LINE_BREAK = "\\\n"
+
+
+def _span_markdown(
+    span: Span, notes: frozendict[str, Note], white_space: frozendict[int, str]
+) -> str:
+    """A span in Markdown: its text with the white space of `white_space`
+    made a space and every ASCII punctuation escaped; a reference to a
+    footnote written at its reference, Pandoc's `[^n-p0012-001]`; a
+    reference to any other note a link to it with its text, marked as a
+    note reference, `[1](#n-p0190-001){epub:type="noteref"}`."""
+    if span.note_ref is None:
+        return span.text.translate(white_space).translate(_ESCAPED)
+    note = notes[span.note_ref]
+    if _is_footnote_at_its_reference(note):
+        return f"[^{note.id}]"
+    return f'[{escape_markdown(span.text)}](#{note.id}){{epub:type="noteref"}}'
+
+
+def _verse_markdown(block: Block, notes: frozendict[str, Note]) -> str:
+    """A verse block's text with each line ended by a hard line break, and
+    a blank line where the text has an empty line or one of spaces only,
+    the end of a stanza; the spaces at the start and end of each line
+    dropped."""
+    text = "".join(
+        _span_markdown(span, notes, _PLAIN_WHITE_SPACE_BUT_LINE_FEED)
+        for span in block.spans
+    )
+    lines = (line.strip(" ") for line in text.split("\n"))
+    stanzas = tuple(
+        tuple(stanza)
+        for is_line, stanza in itertools.groupby(lines, key=bool)
+        if is_line
+    )
+    return "\n\n".join(_HARD_LINE_BREAK.join(stanza) for stanza in stanzas)
+
+
+def _text_markdown(block: Block, notes: frozendict[str, Note], marker: str) -> str:
+    """A block's text in Markdown, its spans as _span_markdown writes them:
+    on one line, without the spaces at its start and end, or, for verse,
+    line by line; a note's `marker`, when given, first, escaped, with one
+    space after it. An empty marker adds nothing."""
+    match block.kind:
+        case BlockKind.VERSE:
+            text = _verse_markdown(block, notes)
+        case (
+            BlockKind.HEADING
+            | BlockKind.PARAGRAPH
+            | BlockKind.QUOTE
+            | BlockKind.CHAPTER_SUMMARY
+            | BlockKind.FIGURE
+            | BlockKind.MARGIN_NOTE
+            | BlockKind.INDEX_ENTRY
+        ):
+            text = "".join(
+                _span_markdown(span, notes, _PLAIN_WHITE_SPACE) for span in block.spans
+            ).strip(" ")
         case _:
             assert_never(block.kind)
+    return " ".join(part for part in (escape_markdown(marker), text) if part)
 
 
-def _div(block: Block, marker: str = "") -> str:
-    """A block's fenced div, with its text on one line, escaped by
-    escape_markdown; a note's `marker`, when given, is joined before the
-    text with one space and escaped with it. An empty marker adds
-    nothing."""
-    text = escape_markdown(f"{marker} {block_text(block)}")
-    return f"::: {{{_div_attributes(block)}}}\n{text}\n:::\n"
+def _heading(block: Block, notes: frozendict[str, Note]) -> str:
+    """A heading of its level with its id, its label first as a span of
+    class `label`."""
+    if block.level is None:
+        message = f"blocks.json is malformed: heading {block.id} has no level"
+        raise InputFileError(message)
+    label = (
+        f"[{escape_markdown(block.label)}]{{.label}}" if block.label is not None else ""
+    )
+    words = " ".join(part for part in (label, _text_markdown(block, notes, "")) if part)
+    return f"{'#' * block.level} {words} {{#{block.id}}}\n"
 
 
-def _note_div(note: Note) -> str:
-    """A note's fenced div, with its id and the class `note`, around its
-    blocks' divs, the marker at the start of the first."""
-    first, *rest = note.blocks
-    inner = "\n".join((_div(first, note.marker), *(_div(block) for block in rest)))
-    return f":::: {{#{note.id} .note}}\n{inner}::::\n"
+def _div(block: Block, notes: frozendict[str, Note], marker: str = "") -> str:
+    """A block's fenced div with its id and its class, or for a heading a
+    Pandoc heading; `marker` as _text_markdown takes it."""
+    if block.kind is BlockKind.HEADING:
+        return _heading(block, notes)
+    class_name = _class_name(block.kind)
+    attributes = f"#{block.id}" + (f" .{class_name}" if class_name is not None else "")
+    return f"::: {{{attributes}}}\n{_text_markdown(block, notes, marker)}\n:::\n"
+
+
+def _note_blocks(note: Note, notes: frozendict[str, Note], marker: str) -> str:
+    """The divs of a note's blocks, a blank line between each, `marker` at
+    the start of the first that is not a margin note, or of the first when
+    all are."""
+    marked = next(
+        (
+            position
+            for position, block in enumerate(note.blocks)
+            if block.kind is not BlockKind.MARGIN_NOTE
+        ),
+        0,
+    )
+    return "\n".join(
+        _div(block, notes, marker if position == marked else "")
+        for position, block in enumerate(note.blocks)
+    )
+
+
+def _note_div(note: Note, notes: frozendict[str, Note]) -> str:
+    """A note written where it was printed: a fenced div with its id and
+    the class `note` (a footnote) or `endnote`, around its blocks' divs,
+    its marker first."""
+    class_name = "endnote" if note.kind is NoteKind.ENDNOTE else "note"
+    return (
+        f":::: {{#{note.id} .{class_name}}}\n"
+        f"{_note_blocks(note, notes, note.marker)}::::\n"
+    )
+
+
+# The indent of a footnote's blocks under its definition.
+_FOOTNOTE_INDENT = "    "
+
+
+def _footnote_definition(note: Note, notes: frozendict[str, Note]) -> str:
+    """A referenced footnote as a Pandoc footnote definition, its blocks'
+    divs indented under it, without its marker, which Pandoc replaces with
+    its own number."""
+    blocks = textwrap.indent(_note_blocks(note, notes, ""), _FOOTNOTE_INDENT)
+    return f"[^{note.id}]:\n{blocks}"
+
+
+def _with_footnotes(
+    written: str, written_blocks: tuple[Block, ...], notes: frozendict[str, Note]
+) -> tuple[str, ...]:
+    """`written`, then the definitions of the footnotes its blocks refer
+    to, in the order of their references."""
+    return (
+        written,
+        *(
+            _footnote_definition(notes[note_id], notes)
+            for block in written_blocks
+            for note_id in _references(block)
+            if _is_footnote_at_its_reference(notes[note_id])
+        ),
+    )
+
+
+def _printed_notes(group: tuple[Note, ...], notes: frozendict[str, Note]) -> str:
+    """Notes written where they were printed, each a div; a run of
+    endnotes is one list, a div of class `endnotes` around theirs."""
+    if group[0].kind is NoteKind.ENDNOTE:
+        inner = "\n".join(_note_div(note, notes) for note in group)
+        return f"::::: {{.endnotes}}\n{inner}:::::\n"
+    return "\n".join(_note_div(note, notes) for note in group)
 
 
 def _note_positions(
@@ -250,38 +539,74 @@ def _note_positions(
 
 def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     """book.md: the metadata header from the config (title, authors,
-    language), then one fenced div per block with the block's id, in the
-    order of blocks.json, its text escaped by escape_markdown on one line,
-    a blank line between each. A margin note's div also has the class
-    `margin-note`. Each note, all with `referenced` false, is a div with its
-    id and the class `note` around its blocks' divs, the marker first in the
-    first one's text; it follows the last block, in the order of
-    blocks.json, whose first origin is on the note's first page or an
-    earlier one, or comes first of all when there is none. Notes written at
-    the same place keep the order of blocks.json.
+    language), then each block in the order of blocks.json, a blank line
+    between each, as the module's docstring says for each kind: a heading
+    as a Pandoc heading of its level with its id and its label as a span of
+    class `label`; every other block as a fenced div with its id and the
+    class of its kind but a paragraph's, its text escaped by
+    escape_markdown on one line, or, for verse, line by line with hard
+    line breaks.
+
+    A referenced footnote is a Pandoc footnote at its reference, its
+    definition after the block or note that refers to it, holding its
+    blocks' divs, margin notes among them, without its marker. Every other
+    note, an unreferenced footnote or an endnote, is a div with its id and
+    the class `note` or `endnote` around its blocks' divs, its marker first
+    in the first that is not a margin note; it follows the last block, in
+    the order of blocks.json, whose first origin is on the note's first
+    page or an earlier one, or comes first of all when there is none.
+    Notes written at the same place keep the order of blocks.json, and the
+    endnotes among them that follow each other are one list, a div of class
+    `endnotes`. A reference to an endnote is a link to it with the
+    reference's text, marked `epub:type="noteref"`.
 
     The title and each author are escaped by escape_markdown too. Raises
     InputFileError, naming blocks.json, when it is malformed: an id given
-    twice, or a note without blocks or origin. Raises InputFileError, naming
-    blocks.json and the block or note, for what markdown does not write
-    yet: a heading, quote, figure or index entry, a note reference, a
-    referenced note, a note block that is not a paragraph, or a character
-    XML 1.0 does not allow (named as U+FFFE).
+    twice, a note without blocks or origin, a heading without a level from
+    1 to 6, a reference that names no note, a note whose `referenced`
+    disagrees with whether a block refers to it, or a footnote referenced
+    twice. Raises InputFileError, naming blocks.json and the block or note,
+    for what markdown does not write: a figure with an image, a note block
+    that is not a paragraph, quote, verse or margin note, a reference to a
+    footnote inside a referenced footnote, or a character XML 1.0 does not
+    allow (named as U+FFFE).
     """
     _check_well_formed(blocks)
     _check_writable(blocks)
-    positions = _note_positions(blocks.blocks, blocks.notes)
-    note_divs: dict[int, list[str]] = {}
-    for note, position in zip(blocks.notes, positions, strict=True):
-        note_divs.setdefault(position, []).append(_note_div(note))
+    notes = frozendict({note.id: note for note in blocks.notes})
+    printed = tuple(
+        note for note in blocks.notes if not _is_footnote_at_its_reference(note)
+    )
+    printed_at: dict[int, list[Note]] = {}
+    for note, position in zip(
+        printed, _note_positions(blocks.blocks, printed), strict=True
+    ):
+        printed_at.setdefault(position, []).append(note)
 
     def notes_at(position: int) -> tuple[str, ...]:
-        return tuple(note_divs.get(position, ()))
+        groups = (
+            tuple(group)
+            for _, group in itertools.groupby(
+                printed_at.get(position, ()), key=lambda note: note.kind
+            )
+        )
+        return tuple(
+            part
+            for group in groups
+            for part in _with_footnotes(
+                _printed_notes(group, notes),
+                tuple(block for note in group for block in note.blocks),
+                notes,
+            )
+        )
 
     body = tuple(
-        div
+        part
         for position, block in enumerate(blocks.blocks, start=1)
-        for div in (_div(block), *notes_at(position))
+        for part in (
+            *_with_footnotes(_div(block, notes), (block,), notes),
+            *notes_at(position),
+        )
     )
     return "\n".join((_header(config), *notes_at(0), *body))
 
