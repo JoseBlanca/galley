@@ -11,11 +11,11 @@ holds for the whole_book tests: the same as evaluation/books.toml for the
 four books of the evaluation set, and taken by analyze on each book.
 """
 
-import shutil
-import subprocess
 import tomllib
 import zipfile
 from collections import Counter
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -243,43 +243,66 @@ def test_every_page_number_of_blocks_json_is_a_page_number_removed_on_its_page(
 # book.md
 
 
+def _words_of_book_md_and_their_expected_count(
+    folder: BookFolder,
+) -> tuple[Counter[str], Counter[str], int, int]:
+    """The words of a folder's book.md as Pandoc reads them, those of its
+    words.json less structure's records and the footnotes' markers and
+    references, the number of notes Pandoc counts in book.md, and the number
+    of references to a footnote in blocks.json."""
+    markdown = read_markdown(folder.book_md.read_text(encoding="utf-8"))
+    blocks = read_blocks(folder.blocks_json)
+    words = Counter(
+        word.text for page in read_words(folder.words_json).pages for word in page.words
+    )
+    words.subtract(word for removal in blocks.removals for word in removal.text.split())
+    words.subtract(word for change in blocks.word_changes for word in change.before)
+    words.update(word for change in blocks.word_changes for word in change.after)
+    # A referenced footnote's marker and its reference are Pandoc's
+    # number, not words.
+    footnotes = frozenset(
+        note.id for note in blocks.notes if _is_written_as_a_footnote(note)
+    )
+    words.subtract(
+        word
+        for note in blocks.notes
+        if note.id in footnotes
+        for word in note.marker.split()
+    )
+    references = tuple(
+        span
+        for block in (*blocks.blocks, *(b for n in blocks.notes for b in n.blocks))
+        for span in block.spans
+        if span.note_ref in footnotes
+    )
+    words.subtract(word for span in references for word in span.text.split())
+    return (
+        Counter(word.text for word in markdown.words),
+        +words,
+        markdown.note_count,
+        len(references),
+    )
+
+
+# Pandoc reads the excerpts' book.md side by side: 0.9 s one after another
+# on 16 November 2026, most of it Pandoc's.
+_BOOK_MDS_READ_AT_ONCE = 6
+
+
 @pytest.mark.pandoc
 def test_book_md_holds_the_words_of_words_json_less_structures_records_and_no_note(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    for folder in excerpt_books.values():
-        markdown = read_markdown(folder.book_md.read_text(encoding="utf-8"))
-        blocks = read_blocks(folder.blocks_json)
-        words = Counter(
-            word.text
-            for page in read_words(folder.words_json).pages
-            for word in page.words
+    with ThreadPoolExecutor(max_workers=_BOOK_MDS_READ_AT_ONCE) as pool:
+        counts = tuple(
+            pool.map(_words_of_book_md_and_their_expected_count, excerpt_books.values())
         )
-        words.subtract(
-            word for removal in blocks.removals for word in removal.text.split()
-        )
-        words.subtract(word for change in blocks.word_changes for word in change.before)
-        words.update(word for change in blocks.word_changes for word in change.after)
-        # A referenced footnote's marker and its reference are Pandoc's
-        # number, not words.
-        footnotes = frozenset(
-            note.id for note in blocks.notes if _is_written_as_a_footnote(note)
-        )
-        words.subtract(
-            word
-            for note in blocks.notes
-            if note.id in footnotes
-            for word in note.marker.split()
-        )
-        references = tuple(
-            span
-            for block in (*blocks.blocks, *(b for n in blocks.notes for b in n.blocks))
-            for span in block.spans
-            if span.note_ref in footnotes
-        )
-        words.subtract(word for span in references for word in span.text.split())
-        assert Counter(word.text for word in markdown.words) == +words
-        assert markdown.note_count == len(references)
+
+    for name, (words, expected_words, note_count, references) in zip(
+        excerpt_books, counts, strict=True
+    ):
+        assert words == expected_words, name
+        assert note_count == references, name
 
 
 # book.epub
@@ -381,17 +404,10 @@ def test_only_the_kadesh_epub_has_the_cover_extract_rendered(
 # Java starts in about a second; the 8-thread run would start it 8 times.
 @pytest.mark.thread_unsafe
 @pytest.mark.epubcheck
-@pytest.mark.parametrize("name", [KADESH, GIERKE])
-def test_the_excerpt_epub_passes_epubcheck(
-    name: str, excerpt_books: frozendict[str, BookFolder]
+def test_the_excerpt_epubs_of_kadesh_and_gierke_pass_epubcheck(
+    excerpt_books: frozendict[str, BookFolder], check_epubs: Callable[..., None]
 ) -> None:
-    epubcheck = shutil.which("epubcheck")
-    assert epubcheck is not None
-    epub_path: Path = excerpt_books[name].book_epub
-
-    # Not captured, so that pytest shows epubcheck's report on failure;
-    # check=True makes any error a CalledProcessError.
-    subprocess.run([epubcheck, str(epub_path)], check=True, timeout=60)
+    check_epubs(excerpt_books[KADESH].book_epub, excerpt_books[GIERKE].book_epub)
 
 
 # The configs of the six whole books (tests/conftest.py, WHOLE_BOOK_CONFIGS)

@@ -28,6 +28,7 @@ from galley.parallel import DEFAULT_WORKERS
 
 KADESH = "kadesh_8-17"
 GIERKE = "gierke_86-93_270-271"
+HASKINS = "haskins_eval"
 
 
 STAGES = ("analyze", "extract", "layout", "structure", "markdown", "epub")
@@ -238,17 +239,13 @@ def test_a_stage_that_fails_leaves_no_file_of_its_own_or_a_later_stage(
     assert [path.name for path in folder.edits_dir.iterdir()] == ["owner.jsonl"]
 
 
-# Runs analyze and extract on an excerpt in a folder of its own.
+# Runs extract on an excerpt in a folder of its own: Haskins', whose extract
+# takes 0.06 s where Kadesh's analyze and extract took 1 s (16 November 2026).
 @pytest.mark.thread_unsafe
 def test_markdown_after_a_new_extract_names_structure_and_leaves_no_book(
     tmp_path: Path, excerpt_books: frozendict[str, BookFolder]
 ) -> None:
-    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
-    book_toml = folder.book_toml.read_text(encoding="utf-8")
-    folder.book_toml.write_text(
-        re.sub(r"exclude_regions = .*\n", "", book_toml), encoding="utf-8"
-    )
-    main(["analyze", str(folder.root)])
+    folder = _copy_of_run(tmp_path, excerpt_books[HASKINS])
     main(["extract", str(folder.root)])
 
     with pytest.raises(

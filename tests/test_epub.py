@@ -3,8 +3,8 @@
 import hashlib
 import re
 import shutil
-import subprocess
 import zipfile
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -176,21 +176,6 @@ def test_run_without_pandoc_says_it_is_not_installed(
         epub.run(folder, CONFIG)
 
 
-# Java starts in about a second; the 8-thread run would start it 8 times.
-@pytest.mark.thread_unsafe
-@pytest.mark.pandoc
-@pytest.mark.epubcheck
-def test_the_epub_of_a_hand_written_book_md_passes_epubcheck(tmp_path: Path) -> None:
-    folder = _folder_with_book_md(tmp_path)
-    epub.run(folder, CONFIG)
-    epubcheck = shutil.which("epubcheck")
-    assert epubcheck is not None
-
-    # Not captured here, so that pytest shows epubcheck's report on failure;
-    # check=True makes any error a CalledProcessError.
-    subprocess.run([epubcheck, str(folder.book_epub)], check=True, timeout=60)
-
-
 # An EPUB of every kind of block, from a blocks.json made by hand (structure
 # spec section 19).
 
@@ -357,11 +342,8 @@ def _chapters(epub_path: Path) -> str:
         )
 
 
-# Java starts in about a second; the 8-thread run would start it 8 times.
-@pytest.mark.thread_unsafe
 @pytest.mark.pandoc
-@pytest.mark.epubcheck
-def test_the_epub_of_every_kind_and_of_a_footnote_and_endnotes_passes_epubcheck(
+def test_the_epub_of_every_kind_and_of_a_footnote_and_endnotes_has_each_in_its_html(
     tmp_path: Path,
 ) -> None:
     folder, config = _book_of(tmp_path, EVERY_KIND)
@@ -398,8 +380,21 @@ def test_the_epub_of_every_kind_and_of_a_footnote_and_endnotes_passes_epubcheck(
         r'class="margin-note">',
         chapters,
     )
-    epubcheck = shutil.which("epubcheck")
-    assert epubcheck is not None
-    # Not captured here, so that pytest shows epubcheck's report on failure;
-    # check=True makes any error a CalledProcessError.
-    subprocess.run([epubcheck, str(folder.book_epub)], check=True, timeout=60)
+
+
+# Java starts in about a second; the 8-thread run would start it 8 times.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
+@pytest.mark.epubcheck
+def test_the_epubs_of_a_hand_written_book_md_and_of_every_kind_pass_epubcheck(
+    tmp_path: Path, check_epubs: Callable[..., None]
+) -> None:
+    (tmp_path / "hand_written").mkdir()
+    (tmp_path / "every_kind").mkdir()
+    hand_written = _folder_with_book_md(tmp_path / "hand_written")
+    epub.run(hand_written, CONFIG)
+    every_kind, config = _book_of(tmp_path / "every_kind", EVERY_KIND)
+    markdown.run(every_kind, config)
+    epub.run(every_kind, config)
+
+    check_epubs(hand_written.book_epub, every_kind.book_epub)

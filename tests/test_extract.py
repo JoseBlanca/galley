@@ -473,44 +473,53 @@ KADESH_REMOVALS = (
 )
 
 
+@pytest.fixture(scope="module")
+def kadesh_with_two_pages_of_removals(
+    tmp_path_factory: pytest.TempPathFactory, excerpt_pdf: frozendict[str, Path]
+) -> frozendict[int, BookFolder]:
+    """Kadesh folders with TWO_PAGES_OF_REMOVALS, by number of workers, 1 and
+    6, through analyze and extract run with that many workers. Each held a
+    file left by an earlier run in images/, which extract must delete.
+
+    Module-scoped, so that the two tests below read one run of each.
+    """
+    folders = {}
+    for workers in (1, 6):
+        folder = kadesh_folder(
+            tmp_path_factory.mktemp(f"removals_{workers}"),
+            excerpt_pdf[KADESH],
+            TWO_PAGES_OF_REMOVALS,
+        )
+        config = read_config(folder.book_toml)
+        analyze.run(folder, config, workers=workers)
+        folder.images_dir.mkdir()
+        (folder.images_dir / "stale.png").write_bytes(b"not an image")
+        extract.run(folder, config, workers=workers)
+        folders[workers] = folder
+    return frozendict(folders)
+
+
 @pytest.mark.thread_unsafe
 def test_kadesh_with_plate_page_excluded_has_81_and_its_4_words_as_the_removals(
-    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
+    kadesh_with_two_pages_of_removals: frozendict[int, BookFolder],
 ) -> None:
-    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], TWO_PAGES_OF_REMOVALS)
-    config = read_config(folder.book_toml)
-    analyze.run(folder, config)
-    # A file left by an earlier run, which extract must delete.
-    folder.images_dir.mkdir()
-    (folder.images_dir / "stale.png").write_bytes(b"not an image")
-
-    extract.run(folder, config)
-
-    words = read_words(folder.words_json)
-    assert words.pages[8] == PageWords(
-        index=8, text_source=TextSource.NONE, words=(), figures=()
-    )
-    assert words.removals == KADESH_REMOVALS
-    assert list(folder.images_dir.iterdir()) == []
+    for workers, folder in kadesh_with_two_pages_of_removals.items():
+        words = read_words(folder.words_json)
+        assert words.pages[8] == PageWords(
+            index=8, text_source=TextSource.NONE, words=(), figures=()
+        ), workers
+        assert words.removals == KADESH_REMOVALS, workers
+        assert list(folder.images_dir.iterdir()) == [], workers
 
 
 @pytest.mark.thread_unsafe
 def test_kadesh_with_1_worker_and_with_6_gives_the_same_bytes(
-    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
+    kadesh_with_two_pages_of_removals: frozendict[int, BookFolder],
 ) -> None:
-    folders = {}
-    for workers in (1, 6):
-        folder = kadesh_folder(
-            tmp_path / str(workers), excerpt_pdf[KADESH], TWO_PAGES_OF_REMOVALS
-        )
-        config = read_config(folder.book_toml)
-        analyze.run(folder, config, workers=workers)
-        extract.run(folder, config, workers=workers)
-        folders[workers] = folder
+    one, six = (kadesh_with_two_pages_of_removals[workers] for workers in (1, 6))
 
-    assert read_words(folders[1].words_json).removals == KADESH_REMOVALS
-    assert folders[1].pages_json.read_bytes() == folders[6].pages_json.read_bytes()
-    assert folders[1].words_json.read_bytes() == folders[6].words_json.read_bytes()
+    assert one.pages_json.read_bytes() == six.pages_json.read_bytes()
+    assert one.words_json.read_bytes() == six.words_json.read_bytes()
 
 
 @pytest.mark.thread_unsafe
@@ -581,19 +590,36 @@ def _pages_with_plates_8_and_9(kadesh_pages: PagesFile) -> PagesFile:
     )
 
 
-@pytest.mark.thread_unsafe
-def test_kadesh_plates_8_and_9_get_their_images_and_figures_and_8_keeps_its_words(
-    tmp_path: Path,
+@pytest.fixture(scope="module")
+def kadesh_plates_8_and_9(
+    tmp_path_factory: pytest.TempPathFactory,
     excerpt_pdf: frozendict[str, Path],
     excerpt_books: frozendict[str, BookFolder],
-) -> None:
-    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "cover_page = 0\n")
-    write_pages(
-        folder.pages_json,
-        _pages_with_plates_8_and_9(read_pages(excerpt_books[KADESH].pages_json)),
-    )
+) -> frozendict[int, BookFolder]:
+    """Kadesh folders with `cover_page = 0` and pages 8 and 9 plates, by
+    number of workers, 1 and 6, through extract run with that many workers.
 
-    extract.run(folder, read_config(folder.book_toml))
+    Module-scoped, so that the two tests below read one run of each.
+    """
+    pages = _pages_with_plates_8_and_9(read_pages(excerpt_books[KADESH].pages_json))
+    folders = {}
+    for workers in (1, 6):
+        folder = kadesh_folder(
+            tmp_path_factory.mktemp(f"plates_{workers}"),
+            excerpt_pdf[KADESH],
+            "cover_page = 0\n",
+        )
+        write_pages(folder.pages_json, pages)
+        extract.run(folder, read_config(folder.book_toml), workers=workers)
+        folders[workers] = folder
+    return frozendict(folders)
+
+
+@pytest.mark.thread_unsafe
+def test_kadesh_plates_8_and_9_get_their_images_and_figures_and_8_keeps_its_words(
+    kadesh_plates_8_and_9: frozendict[int, BookFolder],
+) -> None:
+    folder = kadesh_plates_8_and_9[6]
 
     words = read_words(folder.words_json)
     assert words.pages[8] == PageWords(
@@ -641,23 +667,15 @@ def test_kadesh_plates_8_and_9_get_their_images_and_figures_and_8_keeps_its_word
 
 @pytest.mark.thread_unsafe
 def test_kadesh_plates_with_1_worker_and_with_6_give_the_same_bytes(
-    tmp_path: Path,
-    excerpt_pdf: frozendict[str, Path],
-    excerpt_books: frozendict[str, BookFolder],
+    kadesh_plates_8_and_9: frozendict[int, BookFolder],
 ) -> None:
-    pages = _pages_with_plates_8_and_9(read_pages(excerpt_books[KADESH].pages_json))
-    folders = {}
-    for workers in (1, 6):
-        folder = kadesh_folder(tmp_path / str(workers), excerpt_pdf[KADESH], "")
-        write_pages(folder.pages_json, pages)
-        extract.run(folder, read_config(folder.book_toml), workers=workers)
-        folders[workers] = folder
+    one, six = (kadesh_plates_8_and_9[workers] for workers in (1, 6))
 
-    assert folders[1].words_json.read_bytes() == folders[6].words_json.read_bytes()
-    for name in ("plate-0008.png", "plate-0009.png"):
-        assert (folders[1].images_dir / name).read_bytes() == (
-            folders[6].images_dir / name
-        ).read_bytes()
+    assert one.words_json.read_bytes() == six.words_json.read_bytes()
+    for name in ("cover.png", "plate-0008.png", "plate-0009.png"):
+        assert (one.images_dir / name).read_bytes() == (
+            six.images_dir / name
+        ).read_bytes(), name
 
 
 @pytest.mark.thread_unsafe

@@ -9,6 +9,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -1655,14 +1656,12 @@ def test_render_markdown_refuses_a_marker_with_a_character_xml_does_not_allow() 
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
 @pytest.mark.epubcheck
-def test_the_epub_of_margin_notes_and_notes_passes_epubcheck(tmp_path: Path) -> None:
+def test_the_epub_of_margin_notes_and_notes_passes_epubcheck(
+    tmp_path: Path, check_epubs: Callable[..., None]
+) -> None:
     folder, config = _book(tmp_path, SIDE_TEXT_ON_TWO_PAGES)
 
     markdown.run(folder, config)
     epub.run(folder, config)
 
-    epubcheck = shutil.which("epubcheck")
-    assert epubcheck is not None
-    # Not captured here, so that pytest shows epubcheck's report on failure;
-    # check=True makes any error a CalledProcessError.
-    subprocess.run([epubcheck, str(folder.book_epub)], check=True, timeout=60)
+    check_epubs(folder.book_epub)

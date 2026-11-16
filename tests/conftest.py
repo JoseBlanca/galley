@@ -15,6 +15,7 @@ import json
 import os
 import shutil
 import subprocess
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -270,6 +271,44 @@ def whole_book_toml(
             for book, toml in whole_book_configs.items()
         }
     )
+
+
+@pytest.fixture(scope="session")
+def check_epubs() -> Callable[..., None]:
+    """A function that runs epubcheck on each EPUB it is given, all at once,
+    and fails naming every EPUB epubcheck rejects, with epubcheck's report.
+
+    epubcheck is Java, which starts in about a second and a half: measured
+    on 16 November 2026 on an M5 Pro, one run took 1.35 s, two at once 1.6 s
+    and five at once 2.5 s. A test with several EPUBs to check passes them
+    in one call. Skips the test when epubcheck is missing.
+    """
+    _require_program("epubcheck")
+    epubcheck = shutil.which("epubcheck")
+    assert epubcheck is not None
+
+    def check(*epubs: Path) -> None:
+        with ThreadPoolExecutor(max_workers=len(epubs)) as pool:
+            runs = tuple(
+                pool.map(
+                    lambda epub: subprocess.run(
+                        [epubcheck, str(epub)],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        timeout=60,
+                    ),
+                    epubs,
+                )
+            )
+        rejected = tuple(
+            f"{epub}:\n{run.stdout}{run.stderr}"
+            for epub, run in zip(epubs, runs, strict=True)
+            if run.returncode != 0
+        )
+        assert rejected == (), "\n".join(rejected)
+
+    return check
 
 
 def _require_program(name: str) -> None:
