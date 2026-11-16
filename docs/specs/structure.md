@@ -956,7 +956,7 @@ exactly.
 | `domesday_74-83` | 9 (83) | three lines of two notes each; markers "8", "*", "e"; references "12s.2", "30d8" |
 | `mariejol_210-219` | 0 (210) | five notes left in the body, missed by section 11's order test (markers read 1, 2, 3, none, 11, 5): each a paragraph of its own, not a quote, and note 5 ("(S) La thèse…") not run on into pages 211 and 212 |
 | `mariejol_210-219` | 7 (217) | a note left in the body, taken as a note |
-| `mariejol_210-219` | 2 (212) | two broken lines inset on both sides: a known false `verse` block |
+| `mariejol_210-219` | 2 (212) | two broken lines inset on both sides after "se sou-": no `verse` block, since the hyphen joins them to the text (rule 4) |
 | `mariejol_210-219` | 4 (214) | a note run on from page 213, one note; markers "(t)", "(a)", "(3J"; "(» i)" not found, so note 1 unreferenced |
 | `mariejol_210-219` | 6 (216) | marker "U)"; note 2 with no reference in the text |
 | `kadesh_8-17` | 0 (8) | the article title, one level-1 heading of three lines with the author's name |
@@ -1904,7 +1904,14 @@ rule here changes a block's kind and no word, so it needs no record.
    words and inset at least 30 pt from both of its region's edges, more
    than half of them starting within 12 pt of the run's median left
    side, is one `verse` block, whatever section 6 would make of it; a
-   heading line is not part of a run. A verse block that is the last
+   heading line is not part of a run, and a run does not start right
+   after a line that ends with a hyphen, which section 6 never lets start
+   a paragraph (Mariéjol page 212: two lines of garbled prose after "se
+   sou-" made a false verse block; decided on 16 November 2026, in the
+   review of work package 4). It costs one real verse block in the six
+   books: Mariéjol page 243's two lines after "et pré-", a line the OCR
+   garbled, whose word "dirent" it read earlier in the same line, so the
+   two lines join the paragraph above. A verse block that is the last
    block of a page's body stream continues on the next page when that
    page's body stream starts with such a run. This was not measured,
    and no excerpt page shows it: Mariéjol's pages 51 and 52, once named
@@ -1959,8 +1966,10 @@ page's median (it fails on Haskins' pages that are all quote).
 - **Tables**: Domesday's tables in small type become quotes, and those
   inset on both sides verse. galley has no table kind; a table read as
   verse keeps its rows on lines of their own.
-- **Broken lines**: on Mariéjol's page 212 (excerpt page 2) two lines
-  the OCR cut short, inset on both sides, become a verse block.
+- **Broken lines**: lines the OCR cut short, inset on both sides, become
+  a verse block unless the line before ends with a hyphen (Mariéjol's
+  page 212, excerpt page 2, now stays prose; pages 121, 156 and 265
+  still give such blocks).
 - **Haskins' "Bibliographical note" sections**, set in small type at
   each chapter's end, would be quotes where layout reads them as body
   (pages 39, 40, 262 to 264) and notes without a marker where it reads
