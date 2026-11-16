@@ -95,6 +95,7 @@ from galley.model import (
     NoteKind,
     Span,
     block_text,
+    has_index_depth,
     note_places,
     read_blocks,
     read_checked_input,
@@ -324,9 +325,8 @@ def _check_well_formed(blocks: BlocksFile) -> None:
     )
     depthless = tuple(
         f"index entry {block.id} has the depth {block.level}"
-        for block in blocks.blocks
-        if block.kind is BlockKind.INDEX_ENTRY
-        and (block.level is None or block.level < 1)
+        for block in _every_block(blocks)
+        if block.kind is BlockKind.INDEX_ENTRY and not has_index_depth(block)
     )
     problems = (
         repeated

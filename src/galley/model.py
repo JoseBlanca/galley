@@ -855,6 +855,12 @@ def write_blocks(path: Path, blocks: BlocksFile) -> None:
     _write_json(path, blocks)
 
 
+def has_index_depth(block: Block) -> bool:
+    """Whether `block`, an index entry, has its depth, a level from 1
+    (architecture section 8)."""
+    return block.level is not None and block.level >= 1
+
+
 def read_blocks(path: Path) -> BlocksFile:
     """Reads blocks.json as write_blocks wrote it. Raises InputFileError,
     naming the file and the block, also when a block that is not a heading
@@ -871,9 +877,7 @@ def read_blocks(path: Path) -> BlocksFile:
                 f"label {block.label!r}; only a heading has a label"
             )
             raise InputFileError(message)
-        if block.kind is BlockKind.INDEX_ENTRY and (
-            block.level is None or block.level < 1
-        ):
+        if block.kind is BlockKind.INDEX_ENTRY and not has_index_depth(block):
             message = (
                 f"{path}: block {block.id} is an index entry with the depth "
                 f"{block.level!r}, not one from 1 (architecture section 8); a "
