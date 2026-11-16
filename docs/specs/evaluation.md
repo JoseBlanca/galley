@@ -322,7 +322,7 @@ one list of selectors for each of these:
 | `note_reference` | an `a` outside the notes whose `href` matches a regular expression | Haskins and Domesday `#Footnote_\d+`; Mariéjol `#footnote\d+`, which leaves out the "(retour)" links to `#footnotetag…`. A link of the same form inside a note is a cross-reference, and its text stays as tokens |
 | `quote` | quotes in prose | `div.blockquot` (Haskins 25, Stubbs 56), `div.quote` (Domesday 13), `p.quote` (Domesday 10) |
 | `verse` | verse | `div.poem` (Mariéjol 10), `div.poetry` (Haskins 4, Domesday 7, each inside a `div.poetry-container` and holding `div.stanza` and `div.verse`), `div.verse` |
-| `summary_after` | headings after which a quote is a chapter summary: an element of the `quote` rule that comes right after such a heading, its sibling with no block between them, is a chapter summary | none; Stubbs `p.ph3`, its chapter titles, which gives its 11 summaries and leaves out the two quotes after headings of its title page |
+| `summary_after` | the elements that open a chapter, its label: an element of the `quote` rule that comes after such an element and the one heading after it, siblings with no other block between them, is a chapter summary | none; Stubbs `div.chapter`, which holds the label ("CHAPTER III."), followed by the title, a `p.ph3`: this gives its 11 summaries, and leaves out the quote after "EPOCHS OF MODERN HISTORY.", a `p.ph3` of its front matter |
 | `index` | the index; each `li` inside is an index entry | `div.index`, `ul.index`, `ul.IX` |
 | `figure` | figures; the caption is the figure's text | `figure`, `div.figcenter` |
 | `table` | tables outside the index | `table` |
@@ -971,8 +971,8 @@ them is a separate function.
     `label` "CHAPTER III." gives the block's first two tokens at blocks
     and at markdown; a `verse` block whose line feeds separate words as
     spaces do, right on the reference's verse and wrong on a prose
-    quote; a `chapter_summary` block right on a quote after a heading of
-    `summary_after`; an endnote whose marker is a token, referenced or
+    quote; a `chapter_summary` block right on a reference chapter
+    summary; an endnote whose marker is a token, referenced or
     not, placed after a margin note inside it, and whose reference's
     text is a token neither at blocks nor at markdown; a referenced
     endnote printed ten pages after its reference, found `as_note` with
