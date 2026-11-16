@@ -947,7 +947,7 @@ exactly.
 | `haskins_eval` | 1 (132) | the reference "^" alone linked to the note whose marker is "*" |
 | `haskins_eval` | 2 (133) | a sign glued to its word, "journalist,^" |
 | `haskins_eval` | 9 (266) | heading "INDEX", level 1; the entries of the left column, then the right, one `index_entry` each, not a quote |
-| `stubbs_51_56-64` | 0 (51) | heading "CHAPTER III. / THE EARLY YEARS OF HENRY II.", level 1, `label` "CHAPTER III."; the 3-line summary, one `chapter_summary`; "Very few epochs…" starts a paragraph; the cut-in note "Importance attached… accession." before its paragraph |
+| `stubbs_51_56-64` | 0 (51) | heading "CHAPTER III. / THE EARLY YEARS OF HENRY II.", level 1, `label` "CHAPTER III."; the 3-line summary, one `chapter_summary`; "Very few epochs…" starts a paragraph; of the cut-in note "Importance attached… accession.", layout takes out only its last line, "accession.", which goes before that paragraph as a margin note; its words "Importance", "attachedby", "contempora-" and "toHenry's" stay in the body lines beside them (layout §3, step 2b) |
 | `stubbs_51_56-64` | 3 (58) | "His great position in Christendom" (as the OCR reads it) beside the middle of a paragraph, placed before it |
 | `stubbs_51_56-64` | 2 (57), 7 (62), 9 (64) | cut-in notes on the left and right (layout §8), each before its paragraph |
 | `domesday_74-83` | 0 (74) | note 6 with the marker "«", linked from "would6.'"; seven glued references, "pleased1/" to "mercy7.'", linked |
@@ -1901,7 +1901,9 @@ rule here changes a block's kind and no word, so it needs no record.
    before or after it is one.
 4. **Verse** (per page, before the paragraphs are made: section 2, step
    2.3). A run of at least 2 consecutive body lines, each of at least 3
-   words and inset at least 30 pt from both of its region's edges, more
+   words and inset at least 30 pt from both of the edges its centring is
+   measured against (section 6, rule 2: its region's, or the page's body
+   column for a line of a region of fewer than 5 lines), more
    than half of them starting within 12 pt of the run's median left
    side, is one `verse` block, whatever section 6 would make of it; a
    heading line is not part of a run, and a run does not start right
