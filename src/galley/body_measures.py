@@ -1,7 +1,8 @@
 """The measures of a book's body text that layout and structure both take.
 
 `group_rows` groups a page's words into rows (layout spec section 1,
-"Row"); `commonest` finds the commonest of a set of edges; and
+"Row"); `edge_counts` counts the edges near each edge and `commonest`
+finds the commonest of a set of edges; and
 `body_measures` gives the book's body word height and body line pitch
 from the rows of its pages (layout spec section 3, "The book's
 measures"). The rules are written here once, so that the two stages
@@ -23,6 +24,7 @@ __all__ = [
     "BodyMeasures",
     "body_measures",
     "commonest",
+    "edge_counts",
     "group_rows",
     "measured_pages",
     "median_word_height",
@@ -87,23 +89,30 @@ def _row(words: tuple[Word, ...]) -> Line:
     )
 
 
+def edge_counts(edges: Iterable[float]) -> frozendict[float, int]:
+    """Each value of `edges` rounded to the point, in increasing order, with
+    the number of edges within 2 pt of it, in points (layout spec section
+    1). No edges give no values."""
+    rounded = sorted(float(round(edge)) for edge in edges)
+    return frozendict(
+        {
+            value: bisect.bisect_right(rounded, value + COMMONEST_EDGE_PT)
+            - bisect.bisect_left(rounded, value - COMMONEST_EDGE_PT)
+            for value in dict.fromkeys(rounded)
+        }
+    )
+
+
 def commonest(edges: Iterable[float]) -> float:
     """The commonest of `edges`, in points (layout spec section 1): each edge
     rounded to the point, the value with the most edges within 2 pt of it,
     the smallest such value on a tie. Raises ValueError for no edges."""
-    rounded = sorted(round(edge) for edge in edges)
-    if not rounded:
+    counts = edge_counts(edges)
+    if not counts:
         msg = "the commonest of no edges is asked for"
         raise ValueError(msg)
-    best_value = rounded[0]
-    best_count = 0
-    for value in sorted(set(rounded)):
-        count = bisect.bisect_right(
-            rounded, value + COMMONEST_EDGE_PT
-        ) - bisect.bisect_left(rounded, value - COMMONEST_EDGE_PT)
-        if count > best_count:
-            best_value, best_count = value, count
-    return float(best_value)
+    # The values are in increasing order, and max keeps the first of a tie.
+    return max(counts, key=lambda value: counts[value])
 
 
 def median_word_height(words: Iterable[Word]) -> float:

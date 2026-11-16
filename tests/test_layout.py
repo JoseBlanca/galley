@@ -21,7 +21,7 @@ from galley.cli import main
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
 from galley.fidelity import check_stage
-from galley.layout import BookMeasures, group_lines, layout_page, measure_book
+from galley.layout import BookMeasures, layout_page, measure_book
 from galley.model import (
     Box,
     Figure,
@@ -55,104 +55,6 @@ def _page(index: int, words: tuple[Word, ...]) -> PageWords:
     return PageWords(
         index=index, text_source=TextSource.TEXT_LAYER, words=words, figures=()
     )
-
-
-# group_lines
-
-
-def test_two_rows_given_shuffled_come_out_as_two_lines_left_to_right() -> None:
-    words = (
-        _word("six", 70, 30, 90, 40),
-        _word("two", 40, 10, 60, 20),
-        _word("four", 10, 30, 30, 40),
-        _word("three", 70, 10, 90, 20),
-        _word("five", 40, 30, 60, 40),
-        _word("one", 10, 10, 30, 20),
-    )
-    lines = group_lines(words)
-    assert _texts(lines) == (("one", "two", "three"), ("four", "five", "six"))
-    assert tuple(line.box for line in lines) == (
-        Box(10, 10, 90, 20),
-        Box(10, 30, 90, 40),
-    )
-
-
-def test_word_two_points_below_with_its_centre_in_the_band_joins_the_line() -> None:
-    words = (_word("anchor", 10, 10, 30, 20), _word("low", 40, 12, 60, 22))
-    lines = group_lines(words)
-    assert _texts(lines) == (("anchor", "low"),)
-    assert lines[0].box == Box(10, 10, 60, 22)
-
-
-def test_word_whose_centre_is_on_the_anchors_bottom_joins_the_line() -> None:
-    # Centre (10 + 30) / 2 = 20.0, the anchor's bottom: edges are included.
-    words = (_word("anchor", 10, 10, 30, 20), _word("edge", 40, 10, 60, 30))
-    assert _texts(group_lines(words)) == (("anchor", "edge"),)
-
-
-def test_word_whose_centre_is_just_below_the_anchors_bottom_starts_a_line() -> None:
-    # Centre (10.02 + 30) / 2 = 20.01, 0.01 pt below the anchor's bottom.
-    words = (_word("anchor", 10, 10, 30, 20), _word("below", 40, 10.02, 60, 30))
-    assert _texts(group_lines(words)) == (("anchor",), ("below",))
-
-
-def test_two_columns_of_two_rows_give_two_lines_across_both_columns() -> None:
-    # The skeleton's known bad reading order (spec sections 2 and 7): a row
-    # runs across both columns. The real layout spec changes this.
-    words = (
-        _word("left-1", 10, 10, 100, 20),
-        _word("left-2", 10, 30, 100, 40),
-        _word("right-1", 200, 10, 300, 20),
-        _word("right-2", 200, 30, 300, 40),
-    )
-    assert _texts(group_lines(words)) == (
-        ("left-1", "right-1"),
-        ("left-2", "right-2"),
-    )
-
-
-def test_words_with_the_same_top_and_x0_keep_their_given_order() -> None:
-    words = (_word("first", 10, 10, 30, 20), _word("second", 10, 10, 30, 20))
-    assert _texts(group_lines(words)) == (("first", "second"),)
-
-
-def test_words_of_a_line_are_sorted_by_x0() -> None:
-    # "right" comes first by top and anchors the band 10-20; "left" has its
-    # centre at 16, joins, and goes before "right" by x0.
-    words = (_word("right", 50, 10, 70, 20), _word("left", 10, 11, 30, 21))
-    lines = group_lines(words)
-    assert _texts(lines) == (("left", "right"),)
-    assert lines[0].box == Box(10, 10, 70, 21)
-
-
-def test_a_line_keeps_the_band_of_its_first_word() -> None:
-    # Each word 4 pt lower than the one before: "b" (centre 9) is in the
-    # band of "a" (0-10), "c" (centre 13) is not, though it is in b's.
-    words = (
-        _word("a", 10, 0, 20, 10),
-        _word("b", 30, 4, 40, 14),
-        _word("c", 50, 8, 60, 18),
-    )
-    lines = group_lines(words)
-    assert _texts(lines) == (("a", "b"), ("c",))
-    assert tuple(line.box for line in lines) == (Box(10, 0, 40, 14), Box(50, 8, 60, 18))
-
-
-def test_words_with_the_same_top_are_taken_by_x0() -> None:
-    # "short" goes first by x0 and anchors the band 10-14; the centre of
-    # "tall", 20, is outside it. Taken in the given order, "tall" would
-    # anchor the band 10-30 and "short" (centre 12) would join it.
-    words = (_word("tall", 50, 10, 60, 30), _word("short", 10, 10, 20, 14))
-    lines = group_lines(words)
-    assert _texts(lines) == (("short",), ("tall",))
-    assert tuple(line.box for line in lines) == (
-        Box(10, 10, 20, 14),
-        Box(50, 10, 60, 30),
-    )
-
-
-def test_no_words_give_no_lines() -> None:
-    assert group_lines(()) == ()
 
 
 # layout_page

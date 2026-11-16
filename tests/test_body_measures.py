@@ -12,6 +12,7 @@ from galley.body_measures import (
     BodyMeasures,
     body_measures,
     commonest,
+    edge_counts,
     group_rows,
     measured_pages,
     median_word_height,
@@ -64,6 +65,68 @@ def test_word_whose_centre_is_below_the_anchors_bottom_starts_a_row() -> None:
     assert _texts(group_rows(words)) == (("anchor",), ("below",))
 
 
+def test_word_two_points_below_with_its_centre_in_the_band_joins_the_row() -> None:
+    words = (_word("anchor", 10, 10, 30, 20), _word("low", 40, 12, 60, 22))
+    rows = group_rows(words)
+    assert _texts(rows) == (("anchor", "low"),)
+    assert rows[0].box == Box(10, 10, 60, 22)
+
+
+def test_two_columns_of_two_rows_give_two_rows_across_both_columns() -> None:
+    # The rule knows no columns: a row runs across both, and layout cuts
+    # the body into columns before it groups rows.
+    words = (
+        _word("left-1", 10, 10, 100, 20),
+        _word("left-2", 10, 30, 100, 40),
+        _word("right-1", 200, 10, 300, 20),
+        _word("right-2", 200, 30, 300, 40),
+    )
+    assert _texts(group_rows(words)) == (
+        ("left-1", "right-1"),
+        ("left-2", "right-2"),
+    )
+
+
+def test_words_with_the_same_top_and_x0_keep_their_given_order() -> None:
+    words = (_word("first", 10, 10, 30, 20), _word("second", 10, 10, 30, 20))
+    assert _texts(group_rows(words)) == (("first", "second"),)
+
+
+def test_words_of_a_row_are_sorted_by_x0() -> None:
+    # "right" comes first by top and anchors the band 10-20; "left" has its
+    # centre at 16, joins, and goes before "right" by x0.
+    words = (_word("right", 50, 10, 70, 20), _word("left", 10, 11, 30, 21))
+    rows = group_rows(words)
+    assert _texts(rows) == (("left", "right"),)
+    assert rows[0].box == Box(10, 10, 70, 21)
+
+
+def test_a_row_keeps_the_band_of_its_first_word() -> None:
+    # Each word 4 pt lower than the one before: "b" (centre 9) is in the
+    # band of "a" (0-10), "c" (centre 13) is not, though it is in b's.
+    words = (
+        _word("a", 10, 0, 20, 10),
+        _word("b", 30, 4, 40, 14),
+        _word("c", 50, 8, 60, 18),
+    )
+    rows = group_rows(words)
+    assert _texts(rows) == (("a", "b"), ("c",))
+    assert tuple(row.box for row in rows) == (Box(10, 0, 40, 14), Box(50, 8, 60, 18))
+
+
+def test_words_with_the_same_top_are_taken_by_x0() -> None:
+    # "short" goes first by x0 and anchors the band 10-14; the centre of
+    # "tall", 20, is outside it. Taken in the given order, "tall" would
+    # anchor the band 10-30 and "short" (centre 12) would join it.
+    words = (_word("tall", 50, 10, 60, 30), _word("short", 10, 10, 20, 14))
+    rows = group_rows(words)
+    assert _texts(rows) == (("short",), ("tall",))
+    assert tuple(row.box for row in rows) == (
+        Box(10, 10, 20, 14),
+        Box(50, 10, 60, 30),
+    )
+
+
 def test_no_words_give_no_rows() -> None:
     assert group_rows(()) == ()
 
@@ -72,9 +135,20 @@ def test_no_words_give_no_rows() -> None:
 
 
 def test_commonest_is_the_value_with_the_most_edges_within_2_pt() -> None:
-    # Rounded: 100, 102, 103, 140, 140. Within 2 pt of 102 are three edges;
-    # of 100, 103 and 140 two each.
-    assert commonest((100.4, 101.6, 103.0, 140.0, 140.2)) == 102.0
+    # Rounded: 100, 102, 103, 104, 140, 140. Within 2 pt of 102 are four
+    # edges, of 103 and 104 three, of 100 and 140 two. Within 1 pt, 103
+    # would win with three.
+    assert commonest((100.4, 101.6, 103.0, 104.0, 140.0, 140.2)) == 102.0
+
+
+def test_edge_counts_give_each_rounded_edge_the_edges_within_2_pt() -> None:
+    assert edge_counts((100.4, 101.6, 103.0, 104.0, 140.0, 140.2)) == frozendict(
+        {100.0: 2, 102.0: 4, 103.0: 3, 104.0: 3, 140.0: 2}
+    )
+
+
+def test_edge_counts_of_no_edges_are_empty() -> None:
+    assert edge_counts(()) == frozendict()
 
 
 def test_commonest_on_a_tie_is_the_smaller_value() -> None:
@@ -90,12 +164,13 @@ def test_commonest_of_no_edges_is_an_error() -> None:
 
 
 def test_median_word_height_is_the_median_of_the_words_heights() -> None:
+    # 8, 9 and 14 pt: the median is 9 pt, the mean 10.33 pt.
     words = (
         _word("short", 0, 0, 10, 8),
-        _word("tall", 0, 0, 10, 12),
-        _word("middle", 0, 0, 10, 10),
+        _word("tall", 0, 0, 10, 14),
+        _word("middle", 0, 0, 10, 9),
     )
-    assert median_word_height(words) == 10.0
+    assert median_word_height(words) == 9.0
 
 
 def test_median_word_height_of_no_words_is_0() -> None:
@@ -152,19 +227,28 @@ def test_body_line_pitch_takes_no_distance_from_one_page_to_the_next() -> None:
 
 
 def test_body_line_pitch_is_measured_from_the_top_of_one_row_to_the_next() -> None:
-    # Each row holds a word 3 pt lower than its anchor; the row's top is the
-    # anchor's, so the pitch stays 12 pt.
+    # Each row holds a word 3 pt lower than its anchor, 0.25 pt taller on
+    # each row: the rows' tops, the anchors', are 12 pt apart, their bottoms
+    # 12.25 pt. The body word height is the median of the rows' medians,
+    # 10 + 7 * 0.125 pt.
     rows = tuple(
         group_rows(
             (
                 _word("anchor", 50, index * 12, 100, index * 12 + 10),
-                _word("lower", 110, index * 12 + 3, 160, index * 12 + 13),
+                _word(
+                    "lower",
+                    110,
+                    index * 12 + 3,
+                    160,
+                    index * 12 + 13 + index * 0.25,
+                ),
             )
         )[0]
         for index in range(15)
     )
+    assert len(rows[14].words) == 2
     assert body_measures((rows,)) == BodyMeasures(
-        body_word_height=10.0, body_line_pitch=12.0
+        body_word_height=10.875, body_line_pitch=12.0
     )
 
 

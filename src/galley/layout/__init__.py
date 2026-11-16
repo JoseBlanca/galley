@@ -4,10 +4,11 @@ The rules are those of docs/specs/layout.md. `measure_book` takes the
 book's measures over all its pages: the width of the body column, the
 height of a body word, the distance between rows, and the usual left edge
 of the column; the height and the distance are taken by
-`galley.body_measures`, which structure shares. `group_lines` groups
-words into lines by the walking skeleton's rule: a word joins the line of the word that started it, its
-anchor, when the word's vertical centre lies within the anchor's top and
-bottom. `layout_page` places the body column on the page, takes the
+`galley.body_measures`, which structure shares, and so are the rows:
+`body_measures.group_rows` groups words into lines by the walking
+skeleton's rule, a word joining the line of the word that started it,
+its anchor, when the word's vertical centre lies within the anchor's top
+and bottom. `layout_page` places the body column on the page, takes the
 words outside it as margin regions, the first row set apart at the top as
 the running-head region and the small rows at the foot as the footnote
 band, cuts the body and the band into two columns where a gutter runs
@@ -17,7 +18,6 @@ measures the book, then lays out its pages in parallel.
 
 import logging
 import math
-from bisect import bisect_left, bisect_right
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -26,9 +26,9 @@ from statistics import median
 from typing import Final, assert_never
 
 from galley.body_measures import (
-    COMMONEST_EDGE_PT,
     body_measures,
     commonest,
+    edge_counts,
     group_rows,
     measured_pages,
     median_word_height,
@@ -52,7 +52,7 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
 
-__all__ = ["BookMeasures", "group_lines", "layout_page", "measure_book", "run"]
+__all__ = ["BookMeasures", "layout_page", "measure_book", "run"]
 
 _logger = logging.getLogger(__name__)
 
@@ -65,20 +65,6 @@ def _enclosing_box(boxes: tuple[Box, ...]) -> Box:
         max(box.x1 for box in boxes),
         max(box.bottom for box in boxes),
     )
-
-
-def group_lines(words: tuple[Word, ...]) -> tuple[Line, ...]:
-    """The lines of `words`, top to bottom, each one's words left to right.
-
-    The words are taken by (top, x0), equal keys in their given order. The
-    first word starts a line and is its anchor; a later word joins the
-    current line when its vertical centre, (top + bottom) / 2 in points,
-    lies within the anchor's top and bottom, edges included, and otherwise
-    starts the next line as its anchor. A line's box is the smallest box
-    that holds its words. No words give no lines. These are the rows of
-    `body_measures.group_rows`.
-    """
-    return group_rows(words)
 
 
 # The book's measures (layout spec section 3, "The book's measures").
@@ -114,24 +100,13 @@ class BookMeasures:
     usual_left_edge: frozendict[int, float]
 
 
-def _edge_counts(edges: Iterable[float]) -> dict[float, int]:
-    """Each value of `edges`, rounded to the point, with the number of
-    edges within `COMMONEST_EDGE_PT` of it."""
-    rounded = sorted(float(round(edge)) for edge in edges)
-    return {
-        value: bisect_right(rounded, value + COMMONEST_EDGE_PT)
-        - bisect_left(rounded, value - COMMONEST_EDGE_PT)
-        for value in dict.fromkeys(rounded)
-    }
-
-
 def _common_edges(edges: Iterable[float]) -> tuple[float, ...]:
     """The common edges of `edges` (layout spec section 3, step 1): the
     commonest value, then the commonest of the values apart from every
     edge found, and so on, while a value has `_COMMON_EDGE_SHARE` of the
     first one's count."""
     by_count = sorted(
-        _edge_counts(edges).items(),
+        edge_counts(edges).items(),
         key=lambda value_count: (-value_count[1], value_count[0]),
     )
     if not by_count:
@@ -222,10 +197,12 @@ def measure_book(
         return group_rows(page.words)
 
     rows_by_page = map_pages(page_rows, words.pages, workers)
-    body = body_measures(rows_by_page)
+    measured = measured_pages(rows_by_page)
+    # The measured pages are their own measured pages: body_measures takes
+    # the same rows from them as from every page.
+    body = body_measures(measured)
     if body is None:
         return None
-    measured = measured_pages(rows_by_page)
     column_width = median(_column_width_of_page(rows) for rows in measured)
     return BookMeasures(
         column_width=column_width,
@@ -271,7 +248,7 @@ def _words_of(rows: tuple[Line, ...]) -> tuple[Word, ...]:
 def _region_of_rows(rows: tuple[Line, ...]) -> Region:
     """The region of the words of `rows`, which are not empty, grouped
     into lines again (step 7)."""
-    return _region(group_lines(_words_of(rows)))
+    return _region(group_rows(_words_of(rows)))
 
 
 def _column_edges(
@@ -320,7 +297,7 @@ def _margin_regions(words: tuple[Word, ...], pitch: float) -> tuple[Region, ...]
     `_MARGIN_REGION_GAP_PITCHES` times `pitch` below the top of the line
     before."""
     groups: list[list[Line]] = []
-    for line in group_lines(words):
+    for line in group_rows(words):
         if (
             groups
             and line.box.top - groups[-1][-1].box.top
@@ -512,14 +489,14 @@ def _cut_run(rows: tuple[Line, ...], middle: float) -> tuple[Region, Region]:
     words = _words_of(rows)
     return (
         _region(
-            group_lines(
+            group_rows(
                 tuple(
                     word for word in words if (word.box.x0 + word.box.x1) / 2 < middle
                 )
             )
         ),
         _region(
-            group_lines(
+            group_rows(
                 tuple(
                     word for word in words if (word.box.x0 + word.box.x1) / 2 >= middle
                 )
@@ -581,7 +558,7 @@ def _column_regions(
     """The regions of the body column's `words`, a drop capital set aside:
     the running-head region and the body's regions, then the band's (steps
     3 to 5 and 7)."""
-    rows = group_lines(words)
+    rows = group_rows(words)
     head_count = _running_head_row_count(rows, measures.body_line_pitch)
     head, rest = rows[:head_count], rows[head_count:]
     band_start = _band_start(rest, measures)
@@ -670,7 +647,7 @@ def _page_regions(
     regions, the margin regions by their top, the left side first, and the
     band's regions."""
     pitch = measures.body_line_pitch
-    left, right = _column_edges(group_lines(words), page_index, measures)
+    left, right = _column_edges(group_rows(words), page_index, measures)
     # Each word goes to one group, also one whose box is inverted (x0 right
     # of x1), which would otherwise lie in both margins.
     outside_left = tuple(
@@ -692,7 +669,7 @@ def _page_regions(
     # margin; compared by identity, since two words may be equal.
     reaching = {
         id(word)
-        for row in group_lines(in_column)
+        for row in group_rows(in_column)
         if (word := _word_reaching_from_left_margin(row, left, outside_left, pitch))
         is not None
     }
@@ -730,7 +707,7 @@ def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout:
     if not page.words:
         return PageLayout(page.index, (), page.figures)
     regions = (
-        (_region(group_lines(page.words)),)
+        (_region(group_rows(page.words)),)
         if measures is None
         else _page_regions(page.words, page.index, measures)
     )
