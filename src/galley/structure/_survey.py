@@ -181,6 +181,13 @@ def _alike_to_any(line_letters: str, others: tuple[str, ...], alike: _Alike) -> 
     return False
 
 
+def alike_to_a_head(line_letters: str, others: tuple[str, ...]) -> bool:
+    """Whether `line_letters`, the letters of a line, are alike to any of
+    `others` by section 3's rule for running heads: at least 4 letters,
+    0.75 alike."""
+    return _alike_to_any(line_letters, others, _HEADS_ALIKE)
+
+
 def _alike_pages(
     page_letters: tuple[tuple[int, str], ...], alike: _Alike, workers: int
 ) -> frozenset[int]:

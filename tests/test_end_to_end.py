@@ -213,16 +213,24 @@ def test_blocks_json_with_its_records_holds_every_word_of_words_json(
         assert _structure_words(blocks).total() == sum(word_counts)
 
 
-def test_the_stray_words_of_the_kadesh_plate_are_in_the_last_block(
+def test_the_stray_words_of_the_kadesh_plate_are_removed_as_plate_text(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    # analyze finds page 8 a text page (4 words, no figure), so structure
-    # cannot tell it is a plate: its words are body words, and as the
-    # first is not indented they run on the paragraph of page 7 (structure
-    # spec, section 6). They are kept, in the last block, on page 8.
-    last = read_blocks(excerpt_books[KADESH].blocks_json).blocks[-1]
-    assert 8 in {origin.page_index for origin in last.origin}
-    assert sorted(block_text(last).split()[-4:]) == sorted([",", "'", "..", "^U;L"])
+    # analyze finds page 8 a plate, and structure removes its two lines of
+    # stray words (structure spec, section 18); the last blocks are the
+    # figure blocks of pages 8 and 9, without text.
+    blocks = read_blocks(excerpt_books[KADESH].blocks_json)
+    assert sorted(
+        removal.text
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.PLATE_TEXT
+    ) == [", ' ..", "^U;L"]
+    assert tuple(
+        (block.kind, block.figure, block_text(block)) for block in blocks.blocks[-2:]
+    ) == (
+        (BlockKind.FIGURE, "images/plate-0008.png", ""),
+        (BlockKind.FIGURE, "images/plate-0009.png", ""),
+    )
 
 
 def test_every_page_number_of_blocks_json_is_a_page_number_removed_on_its_page(
@@ -382,6 +390,34 @@ def test_each_block_div_of_the_epub_holds_the_words_of_its_block(
             ).split()
             for block in (*blocks.blocks, *note_blocks)
         }
+
+
+def test_each_figure_block_div_of_the_epub_holds_one_image(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # The owner's decision: plates go into the EPUB as pictures with their
+    # caption. Pandoc renames the images it packs, so they are counted.
+    figure_counts = {}
+    for name, folder in excerpt_books.items():
+        figures = tuple(
+            block.id
+            for block in read_blocks(folder.blocks_json).blocks
+            if block.kind is BlockKind.FIGURE
+        )
+        figure_counts[name] = len(figures)
+        with zipfile.ZipFile(folder.book_epub) as epub:
+            divs = {
+                div.get("id"): div
+                for chapter in _chapters(epub)
+                for div in chapter.iter(f"{{{_XHTML}}}div")
+            }
+        for block_id in figures:
+            assert len(tuple(divs[block_id].iter(f"{{{_XHTML}}}img"))) == 1, block_id
+    assert {name: count for name, count in figure_counts.items() if count} == {
+        "kadesh_8-17": 2,
+        "kadesh_59-68": 3,
+        "domesday_headings_quotes": 2,
+    }
 
 
 _HEADING_TAGS = frozenset(f"{{{_XHTML}}}h{level}" for level in range(1, 7))

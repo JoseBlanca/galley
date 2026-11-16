@@ -1,0 +1,246 @@
+"""Plates (spec section 18): a plate page's running head, its caption
+lines and its stray words, and the figure block placed as side text of
+its page.
+
+A plate page is a page with a figure (`docs/specs/plates.md`). Its lines
+never reach the body stream: section 3 removes its running head as on any
+page; its topmost line is a running head too when it is alike to the
+topmost line of another plate page or to a running head of the book; of
+the other lines, those with known words are its caption and the rest are
+removed as `plate_text`.
+"""
+
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
+
+from galley.model import (
+    BlockKind,
+    LinesFile,
+    Origin,
+    PageLayout,
+    Removal,
+    RemovalReason,
+)
+from galley.structure._foot import LinePlace, line_at, line_below_head
+from galley.structure._lines import Piece, PlacedLine
+from galley.structure._measures import Edges, letters, words_box, words_text
+from galley.structure._paragraphs import PageFigure, PageParts
+from galley.structure._regions import head_line, region_kinds
+from galley.structure._removals import head_removals
+from galley.structure._survey import BookSurvey, alike_to_a_head
+from galley.structure._unnumbered import Unnumbered, first_page, joined
+from galley.wordlist import is_known_word
+
+# Spec section 18, rule 2: a caption line has at least 2 known words, or
+# at least half of its words known (the second research, 24 lines kept and
+# 26 removed on the 14 plate pages with a text layer of the six books).
+_CAPTION_MIN_KNOWN_WORDS = 2
+_CAPTION_MIN_KNOWN_SHARE = 0.5
+
+
+@dataclass(frozen=True, slots=True)
+class PlateSurvey:
+    """What rule 1 compares a plate's topmost line with: the letters of the
+    topmost line of each plate page, by page index, and the letters of the
+    book's running heads (spec section 3)."""
+
+    topmost_letters: frozendict[int, str]
+    running_head_letters: tuple[str, ...]
+
+
+def _topmost(page: PageLayout) -> LinePlace | None:
+    """The page's line whose top is highest, in any region, the first in
+    layout's order on a tie; None on a page without lines."""
+    places = tuple(
+        (region_number, line_number)
+        for region_number, region in enumerate(page.regions)
+        for line_number in range(len(region.lines))
+    )
+    return min(places, key=lambda place: line_at(page, place).box.top, default=None)
+
+
+def _running_head_letters(page: PageLayout, survey: BookSurvey) -> str | None:
+    """The letters of the line section 3 makes the page's running head,
+    None when it has none."""
+    if page.index in survey.running_heads:
+        head = head_line(page)
+        assert head is not None, "a running head is a head line"
+        return letters(words_text(head.lines[-1].words))
+    if page.index in survey.heads_below_specks:
+        below = line_below_head(page)
+        assert below is not None, "the survey found a line below the speck"
+        return letters(words_text(line_at(page, below).words))
+    return None
+
+
+def plate_survey(lines: LinesFile, survey: BookSurvey) -> PlateSurvey:
+    """The topmost line of each plate page and the book's running heads, as
+    letters (spec section 18, rule 1)."""
+    topmost = {
+        page.index: letters(words_text(line_at(page, place).words))
+        for page in lines.pages
+        if page.figures and (place := _topmost(page)) is not None
+    }
+    heads = {
+        head
+        for page in lines.pages
+        if (head := _running_head_letters(page, survey)) is not None
+    }
+    return PlateSurvey(frozendict(topmost), tuple(sorted(heads)))
+
+
+def _is_caption_line(texts: Sequence[str], lower_case_words: frozenset[str]) -> bool:
+    """Whether a line of a plate whose words are `texts` is a caption line
+    (spec section 18, rule 2)."""
+    known = sum(is_known_word(text, lower_case_words) for text in texts)
+    return known >= _CAPTION_MIN_KNOWN_WORDS or known >= _CAPTION_MIN_KNOWN_SHARE * len(
+        texts
+    )
+
+
+def _line_removal(
+    page_index: int, place: LinePlace, page: PageLayout, reason: RemovalReason
+) -> Removal:
+    words = line_at(page, place).words
+    return Removal(
+        page_index=page_index,
+        box=words_box(words),
+        text=words_text(words),
+        reason=reason,
+    )
+
+
+def _in_rows(lines: Sequence[PlacedLine]) -> tuple[PlacedLine, ...]:
+    """`lines` from the top down in rows, each row from the left (spec
+    section 18, rule 3). The rows are taken as layout takes the rows of
+    words (layout spec section 1, "Row"): by top, then left side, a line
+    joining the row when its vertical centre lies within the top and
+    bottom of the row's first line."""
+    rows: list[list[PlacedLine]] = []
+    for line in sorted(lines, key=lambda line: (line.line.box.top, line.line.box.x0)):
+        box = line.line.box
+        centre = (box.top + box.bottom) / 2
+        if rows and rows[-1][0].line.box.top <= centre <= rows[-1][0].line.box.bottom:
+            rows[-1].append(line)
+        else:
+            rows.append([line])
+    return tuple(
+        line for row in rows for line in sorted(row, key=lambda line: line.line.box.x0)
+    )
+
+
+def plate_parts(
+    page: PageLayout,
+    survey: BookSurvey,
+    plates: PlateSurvey,
+    lower_case_words: frozenset[str],
+) -> PageParts:
+    """The per-page work on a plate page, one with a figure (spec section
+    18): section 3's running head removed; the topmost line removed as a
+    running head when its letters are alike to the topmost line of another
+    plate page or to a running head of the book; each other line a caption
+    line when its words are known enough, else removed as `plate_text`;
+    the caption lines from the top down in rows, each from the left. The
+    page has no body stream and no side text but its figure.
+    `lower_case_words` is the word list in lower case."""
+    figure, *_ = page.figures
+    kinds = region_kinds(page, survey.body_word_height, survey.running_heads)
+    head = head_removals(page, kinds, survey)
+    topmost = _topmost(page)
+    others = tuple(
+        letters_of_page
+        for index, letters_of_page in plates.topmost_letters.items()
+        if index != page.index
+    )
+    rule_1_head = (
+        topmost is not None
+        and topmost not in head.lines
+        and alike_to_a_head(
+            letters(words_text(line_at(page, topmost).words)),
+            (*others, *plates.running_head_letters),
+        )
+    )
+    removed: list[Removal] = list(head.removals)
+    if rule_1_head:
+        assert topmost is not None
+        removed.append(
+            _line_removal(page.index, topmost, page, RemovalReason.RUNNING_HEAD)
+        )
+    caption: list[PlacedLine] = []
+    for region_number, region in enumerate(page.regions):
+        edges = Edges(region.box.x0, region.box.x1)
+        for line_number, line in enumerate(region.lines):
+            place = (region_number, line_number)
+            if place in head.lines or (rule_1_head and place == topmost):
+                continue
+            if _is_caption_line(
+                tuple(word.text for word in line.words), lower_case_words
+            ):
+                caption.append(PlacedLine(page.index, line, edges, edges))
+            else:
+                removed.append(
+                    _line_removal(page.index, place, page, RemovalReason.PLATE_TEXT)
+                )
+    return PageParts(
+        index=page.index,
+        removals=tuple(removed),
+        page_numbers=head.page_numbers,
+        body=(),
+        margin_notes=(),
+        band_regions=(),
+        band_blocks=(),
+        figure=PageFigure(
+            figure.image,
+            figure.box,
+            Piece(_in_rows(caption)),
+        ),
+    )
+
+
+def _figure_block(
+    page_index: int,
+    figure: PageFigure,
+    book_words: frozenset[str],
+    lower_case_words: frozenset[str],
+) -> Unnumbered:
+    """The figure block of a plate page: its caption with its hyphens
+    joined, its image, and its figure's box as its origin."""
+    return replace(
+        joined(figure.caption, BlockKind.FIGURE, book_words, lower_case_words),
+        origin=(Origin(page_index, figure.box),),
+        figure=figure.image,
+    )
+
+
+def with_figures(
+    body: Sequence[Unnumbered],
+    parts: Sequence[PageParts],
+    book_words: frozenset[str],
+    lower_case_words: frozenset[str],
+) -> tuple[Unnumbered, ...]:
+    """The book's body blocks with the figure block of each plate page of
+    `parts` placed as side text of its page (spec sections 6 and 18): after
+    the last block that starts on an earlier page and is neither a margin
+    note nor a figure, the paragraph in which the body before the plate
+    ends, and after the margin notes and figures that follow it and start
+    on the plate's page or earlier; first when no block starts earlier."""
+    result = list(body)
+    for page in parts:
+        if page.figure is None:
+            continue
+        figure = _figure_block(page.index, page.figure, book_words, lower_case_words)
+        position = 0
+        for number, block in enumerate(result):
+            if (
+                block.kind not in {BlockKind.MARGIN_NOTE, BlockKind.FIGURE}
+                and first_page(block.origin) < page.index
+            ):
+                position = number + 1
+        while (
+            position < len(result)
+            and result[position].kind in {BlockKind.MARGIN_NOTE, BlockKind.FIGURE}
+            and first_page(result[position].origin) <= page.index
+        ):
+            position += 1
+        result.insert(position, figure)
+    return tuple(result)
