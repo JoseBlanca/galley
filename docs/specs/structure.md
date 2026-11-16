@@ -1306,7 +1306,10 @@ to ("land", "3", "."), ("rulers.^",) to ("rulers.", "^"), and its block
 gets two or three spans, the reference one with `note_ref` the note's
 id; the spaces stay with the spans around it. A bracketed number or a
 sign that is a word of its own becomes the reference span, with any
-punctuation after it split off the same way ("(i).": "(i)", "."). The note's `referenced` becomes true.
+punctuation after it split off the same way ("(i).": "(i)", "."). A
+candidate whose reference would hold two letters ("(li)", read as 11)
+is not linked and stays in its word, since the fidelity check refuses a
+reference span of more than one letter (architecture §13). The note's `referenced` becomes true.
 
 ### What the rules give
 
