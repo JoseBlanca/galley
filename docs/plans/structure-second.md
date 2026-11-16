@@ -20,7 +20,7 @@ It is built from `docs/specs/structure.md` §11 to §20,
 §13 and §17, settled by the owner on 15 and 16 November 2026. It ends
 with the six books' EPUBs and the evaluation tool's scores against the
 targets of structure §9, "The second plan". Dated 16 November 2026.
-State: under way (approved by the owner on 16 November 2026).
+State: done, 16 November 2026 (approved by the owner on 16 November 2026).
 
 The seven work packages are the breakdown the owner approved in chat on
 16 November 2026. "Structure §11" below is section 11 of
@@ -570,7 +570,7 @@ today; the change of task 7.4 has to give it.
   a heading's label as tokens, and the headings of the body range), a
   commit of its own reviewed by the `spec-reviewer`, then the tool.
   Deliverable 4.
-- [ ] 7.5 The measurement: galley-eval on the four books against the
+- [x] 7.5 The measurement: galley-eval on the four books against the
   baseline, the whole-book tests, the six EPUBs. Spec: structure §9,
   "Targets measured by `galley-eval run`"; `docs/specs/evaluation.md`
   §9. Needs 7.3 and 7.4. Deliverables 5, 6.

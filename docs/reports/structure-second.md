@@ -4,6 +4,102 @@ The work report of the plan `docs/plans/structure-second.md`, written as
 the work goes, for the owner. Started 16 November 2026, on branch
 `plan/structure-second`, made from `spec/structure-2`.
 
+## Summary
+
+**Done.** The plan is finished on branch `plan/structure-second`, which
+also holds the specs it was built from (from `spec/structure-2`). It is
+not merged into `main`; that is the owner's order. 11 of its 12 targets
+are met; Stubbs' index is the one missed.
+
+**What galley does now**, on top of the first plan's regions and
+paragraphs:
+
+- **Footnotes**: the number is split off the word ("liberty7" becomes
+  "liberty" with a pop-up to note 7), linked to its note even where the
+  OCR misread the number, notes that run over a page are joined, and
+  notes left in the body are found. Gierke's notes collected after the
+  chapters are endnotes, reached by pop-ups and listed where printed.
+- **Margin notes** stand just before the paragraph beside them, as a
+  short summary line (the owner's decision); Stubbs' notes cut into the
+  text column are taken out of the body lines.
+- **Headings** with their chapter number kept apart, which gives the
+  EPUB a table of contents; Stubbs' **chapter summaries**; **quotes**;
+  **verse** with its line breaks; Haskins' bibliographical notes as
+  paragraphs.
+- **Index entries**, each sub-entry an entry of its own with its depth,
+  indented in the EPUB; Stubbs' guide words removed.
+- **Plates**: found from a small image of each page, the picture in the
+  EPUB with its caption, the stray OCR words removed with a record.
+
+No word is lost or invented at any stage on the six books; all six
+EPUBs pass epubcheck. The fidelity check is stricter than before: no
+word can hide in a note reference, a link or a picture's description.
+
+**The targets** (this plan's start → now, at blocks):
+
+| score | Haskins | Stubbs | Domesday | Mariéjol |
+|---|---|---|---|---|
+| notes whose reference is right | 0 → 59 of 72 (≥45) | – | 0 → 1,277 of 1,729 (≥1,250) | 0 → 543 of 1,432 (≥350) |
+| margin notes as margin notes | – | 0 → 241 of 467 (≥200) | 514 → 519 of 593 (≥400) | – |
+| reference headings in heading blocks, body pages | 0 → 18 of 18 | 0 → 25 of 26 | 0 → 23 of 23 | 0 → 26 of 26 |
+| index entries, precision / recall | 0.991 / 0.965 (0.90 / 0.90) | **0.829 / 0.789 (0.85 / 0.85), missed** | 0.993 / 0.986 (0.90 / 0.90) | – |
+
+Paragraphs improved on all four books (precision / recall, first plan →
+now): Haskins .84/.86 → .86/.90, Stubbs .72/.72 → .74/.74, Domesday
+.80/.83 → .86/.87, Mariéjol .69/.74 → .73/.75. Stubbs' index misses
+because of its text layer: 94% of its differences come from the words
+as the scan's OCR gives them, before any rule runs.
+
+**Decided by the orchestrator, which the owner may reverse** (each a
+commit of its own; the sections below give the reasons):
+
+- the fidelity check made stricter: a letter in a note reference only
+  inside a bracket; "&" and dashes refused; an endnote link's text and a
+  picture's caption counted;
+- endnote references looked for only after the book's last contents
+  page (Gierke's introduction had taken endnotes 1–7);
+- Gierke's "Analytical summary" and notes list (pages 52–67) named as
+  contents pages, so their headings are not made twice;
+- a Stubbs cut-in word less than 5 pt from a body word stays in the
+  body;
+- a plate's caption judged per printed row;
+- the default test run's budget raised to about a minute (the owner's
+  word, 16 November 2026).
+
+**What is still wrong**:
+
+- Stubbs' index (above); its page 312 is the worst, garbled across the
+  gutter.
+- Gierke's "Law1" (page 88) has no pop-up: endnote 1 is taken by "(1."
+  in the List of Authorities on page 74.
+- OCR text: margin notes misread (Domesday, Gierke), notes the OCR did
+  not read at all ("Medieval Thought." on Gierke page 88), Mariéjol's
+  notes; and references the OCR read with a letter ("(i)" for "(1)")
+  or split ("(" "2).", 54 in Mariéjol) stay unlinked.
+- Domesday's tables come out as verse or with false headings (4 table
+  titles); Gierke's 22 introduction footnotes left in the body come out
+  as quotes.
+- Of the owner's sheet of 67 reference pages, 17 were checked by the
+  owner; the other 50 are not exact tests.
+
+**What is asked of the owner**:
+
+1. **The order to merge** `plan/structure-second` into `main`. It
+   brings the specs of this plan too.
+2. **A look at the EPUBs** in `runs/structure-second/epubs/` of the
+   main checkout, at the places in "For the owner on the Kindle" at the
+   end: Gierke's endnote pop-ups (they were never tried on a Kindle),
+   Domesday around book page 76, Stubbs' chapter III, Mariéjol's verse,
+   Kadesh's plate on page 64; and whether other faint Kadesh plates are
+   covers like page 16.
+3. **Decisions for the next plan**, no hurry:
+   - re-reading small print with Tesseract where the scan is otherwise
+     good (measured on Gierke's margin notes: 96% of words right against
+     37% in the scan's OCR, about 50 s for the book; task 7.6);
+   - how a printed contents page keeps its own structure (the owner's
+     answer on D-14);
+   - re-OCR of Stubbs' index, which is what its target needs.
+
 ## Before the first task
 
 - The tools are in place: `which pandoc tesseract combine_tessdata
@@ -673,3 +769,189 @@ What the owner found:
 
 Checks: pytest 1692 passed in 28.4 s; with 8 threads 49.5 s; `-m
 whole_book` 32 passed.
+
+## The final measurement (task 7.5)
+
+All on an Apple M5 Pro, galley's default of 6 worker threads.
+`uv run galley-eval run` on the four evaluation books took 109 s
+(galley and comparison: Haskins 9.6 + 3.0 s, Stubbs 13.1 + 5.2 s,
+Domesday 27.0 + 11.9 s, Mariéjol 24.4 + 13.6 s). Its files are in
+`runs/evaluation/` of the plan's worktree (git-ignored). The baseline is
+`runs/structure-second-baseline/evaluation/` of the main checkout
+(galley at 9091e32, this plan's start).
+
+### The targets of structure §9, "The second plan"
+
+Scores at blocks; markdown gives the same numbers for every row.
+
+| score | Haskins | Stubbs | Domesday | Mariéjol |
+|---|---|---|---|---|
+| notes whose reference is right: baseline → now (target) | 0 → **59** of 72 (≥45) met | (no notes) | 0 → **1,277** of 1,729 (≥1,250) met | 0 → **543** of 1,432 (≥350) met |
+| margin notes as margin notes | (none) | 0 → **241** of 467 (≥200) met | 514 → **519** of 593 (≥400) met | (none) |
+| reference headings in `heading` blocks, body range | 0 → **18** of 18 (≥17) met | 0 → **25** of 26 (≥24) met | 0 → **23** of 23 (≥20) met | 0 → **26** of 26 (≥24) met |
+| index, paragraph boundaries, precision / recall | 0.17 / 0.00 → **0.991 / 0.965** (0.90 / 0.90) met | 0 / 0 → **0.829 / 0.789** (0.85 / 0.85) **missed** | 1.0 / 0.00 → **0.993 / 0.986** (0.90 / 0.90) met | (no index) |
+
+The plan's table says 1,731 Domesday notes; the tool counts 1,729
+(1,701 as notes, 27 in the body, 1 missing), as the first plan's report
+does. Stubbs' 467 margin notes: 241 as margin notes, 189 in the body,
+37 missing. galley's own heading blocks on the body range: Haskins 18,
+all right; Stubbs 13, all right (each holds a label and a title, two
+reference headings); Domesday 27, 23 right (the other 4 are the known
+table titles); Mariéjol 13, all right.
+
+**11 of 12 targets met. The one missed: Stubbs' index paragraph
+boundaries, 0.829 / 0.789 against 0.85 / 0.85** (754 right of galley's
+910 boundaries; 754 found of the reference's 956).
+
+### Why Stubbs' index target is missed
+
+The cause is the text layer of the index pages (312 to 321), not the
+entry rules. Of the 6,865 differences of Stubbs' index part in
+`runs/evaluation/stubbs/evaluation/differences.jsonl`, 6,467 (94%) are
+attributed to `words`, the text layer as extract reads it, before any
+rule of structure runs:
+
+| stage | state | count |
+|---|---|---|
+| words | extra | 3,989 |
+| words | split | 1,108 |
+| words | missing | 635 |
+| words | glued | 288 |
+| words | changed (letters 275, punctuation 109, case 17, other 11) | 412 |
+| blocks | extra | 347 |
+| lines | all states | 75 |
+| blocks | missing, glued, changed | 10 |
+
+An entry is cut after a word ending in ";" (structure §17). 362
+reference tokens ending in ";" are not matched in galley's output: the
+";" is lost, misread, or the number before it split, so the cut it
+marks is not made, or is made in the wrong gap. Page 312 alone has
+1,830 of the differences, its text layer one letter per word in places,
+and 266 of the 347 extras at blocks: the two garbled regions that cross
+the gutter on too many lines and come out as a note and paragraphs (the
+case reported in work package 5). Three examples:
+
+- page 312, reference "Acre, siege of, 116; the English at, 118;":
+  "116;" is missing and the second "118;" is read "1" "1" "8", so
+  neither ";" is there to cut the sub-entries at;
+- page 315, reference "his crusade, 213; his English policy,": the
+  text layer glues the six words into one, "hiscrusade,213;hisEnglishpolicy,",
+  with the ";" inside a word, so no cut;
+- page 312, block `b-p0312-077`: 73 extra tokens of single letters and
+  digits ("1", "9", "7", ",") in a note made from a garbled region that
+  crosses the gutter.
+
+What fixing it would take, as a proposal for the owner: re-OCR of
+Stubbs' index pages (galley's own OCR is out of this plan), or, smaller
+and partial, splitting a glued token at an inner ";" followed by a word
+in an index entry. The target was set from a research count on
+reference-corrected text; with this text layer it is unlikely without
+re-OCR.
+
+### The first plan's scores, then and now
+
+First plan's final values from `docs/reports/regions-and-paragraphs.md`,
+Summary (body, at blocks; hyphen splits from the structure group of each
+book's `summary.md`, at markdown).
+
+| score | book | first plan's target | first plan's final | now |
+|---|---|---|---|---|
+| paragraph precision / recall | Haskins | 0.75 / 0.75 | 0.84 / 0.86 | 0.859 / 0.898 |
+| | Stubbs | 0.55 / 0.60 | 0.72 / 0.72 | 0.742 / 0.737 |
+| | Domesday | 0.70 / 0.70 | 0.80 / 0.83 | 0.860 / 0.866 |
+| | Mariéjol | 0.55 / 0.60 | 0.69 / 0.74 | 0.730 / 0.752 |
+| extra words | Haskins | ≤1,000 | 684 | 582 |
+| | Stubbs | ≤4,300 | 3,661 | 3,671 |
+| | Domesday | ≤9,900 | 9,666 | 9,640 |
+| | Mariéjol | ≤28,400 | 27,204 | 26,621 |
+| hyphen splits left | Haskins | ≤150 | 1 | 1 |
+| | Stubbs | ≤300 | 10 | 9 |
+| | Domesday | ≤150 | 17 | 17 |
+| | Mariéjol | ≤400 | 25 | 25 |
+| notes as notes | Haskins | 55 of 72 | 65 | 65 |
+| | Domesday | 1,300 of 1,729 | 1,659 | 1,701 |
+| | Mariéjol | 900 of 1,432 | 1,008 | 1,157 |
+| margin notes as margin notes | Stubbs | (none) | 0 of 467 | 241 |
+| | Domesday | 400 of 593 | 514 | 519 |
+
+None fell below the first plan's target. One score is worse than the
+first plan's final value: Stubbs' extra words, 3,661 → 3,671 (+10, still
+under 4,300). It is the net of changes spread over many pages (page 243
+−24, page 147 +21, page 275 +20, page 97 +19, page 43 +17, mostly
+single letters of spaced or broken OCR), where the cut-in notes were
+taken out of the body lines; not traced further. Domesday's notes in the
+body fell from 68 to 27 and Mariéjol's from 385 to 234 (notes left in
+the body, structure §11).
+
+### The six EPUBs
+
+Built from the whole books (`samples/public_domain/` of the main
+checkout) with the configs of `WHOLE_BOOK_CONFIGS` in `tests/conftest.py`,
+each by `galley2epub run` on its folder under
+`runs/structure-second/build/<book>/` of the main checkout (its
+`book.toml` adds the book's real title and author to the config), and
+copied to `runs/structure-second/epubs/<book>.epub`. Time is the wall
+clock of `uv run galley2epub run`, one book at a time, nothing else
+running; EPUBCheck 5.4.0 on each.
+
+| book | PDF pages | EPUB size | time | epubcheck |
+|---|---|---|---|---|
+| haskins | 280 | 177 KB | 9.5 s | 0 fatal / 0 errors / 0 warnings |
+| stubbs | 344 | 2.9 MB | 13.1 s | 0 / 0 / 0 |
+| domesday | 558 | 3.1 MB | 27.0 s | 0 / 0 / 0 |
+| mariejol | 460 | 688 KB | 24.4 s | 0 / 0 / 0 |
+| kadesh | 76 | 8.3 MB | 4.3 s | 0 / 0 / 0 |
+| gierke | 290 | 258 KB | 15.6 s | 0 / 0 / 0 |
+
+The logs warn only of pages analyze takes for plates (Kadesh 14,
+Stubbs 4, Domesday 2), as analyze does for every plate it finds by
+itself.
+
+### The new kinds per book, from `blocks.json`
+
+| kind | Haskins | Stubbs | Domesday | Mariéjol | Kadesh | Gierke |
+|---|---|---|---|---|---|---|
+| headings (level 1 / 2; with a label) | 19 (11 / 8; 8) | 17 (14 / 3; 12) | 31 (7 / 24; 3) | 18 (16 / 2; 11) | 6 (1 / 5; 0) | 16 (5 / 11; 0) |
+| chapter summaries | 0 | 10 | 0 | 1 | 0 | 0 |
+| quotes | 24 | 66 | 61 | 11 | 21 | 22 |
+| verse | 2 | 0 | 17 | 11 | 0 | 2 |
+| index entries (level 1 / sub-entries) | 636 (476 / 160) | 910 (437 / 473) | 802 (802 / 0) | 0 | 0 | 213 (213 / 0) |
+| figures | 0 | 4 | 2 | 0 | 15 | 0 |
+| footnotes linked / unlinked | 62 / 2 | 0 / 5 | 1,488 / 237 | 651 / 490 | 31 / 117 | 1 / 6 |
+| endnotes (linked) | 0 | 0 | 0 | 0 | 0 | 299 (213) |
+| margin notes (in the body / inside notes) | 14 / 1 | 320 / 0 | 596 / 7 | 17 / 6 | 3 / 3 | 302 / 292 |
+| guide words removed | 0 | 10 | 0 | 0 | 0 | 0 |
+| plate text removed | 0 | 0 | 18 | 0 | 2 | 0 |
+
+Domesday's 17 verse blocks include its tables read as verse (known,
+structure §16); Haskins and Mariéjol print no margin notes, so their 14
+and 17 are text read as margin notes, specks among them (removing specks
+is out of this plan; not inspected one by one); Gierke's index
+is the "Index to List of Authorities".
+
+### For the owner on the Kindle
+
+The places the plan lists, in the EPUBs of
+`runs/structure-second/epubs/` of the main checkout. "File" is the
+chapter file inside the EPUB; on the Kindle, go by the heading.
+
+| EPUB | where | what to look at | file |
+|---|---|---|---|
+| gierke.epub | chapter "POLITICAL THEORIES OF THE MIDDLE AGE.", section "I. The Evolution of Political Theory.", about a third in: "…a science of Positive Public Law1 and provided…" (book page 88) | **no pop-up here**: "Law1" is not linked (known since the review of work package 2: endnote 1 is taken by "(1." on page 74, in the List of Authorities, so its pop-up opens from there instead). A working pop-up to try: "…which govern the construction of human communities2" at the start of section "II. Macrocosm and Microcosm." (book page 93), to endnote 2 | text/ch004.xhtml; text/ch005.xhtml |
+| gierke.epub | chapter "NOTES.", the last | the 299 endnotes in one list in the book's order, each with its margin note before its text (endnote 1 "Import-", the OCR's reading of "True Import-") | text/ch006.xhtml |
+| domesday.epub | essay I, section "§ 3. The Villeins.", from "Hereafter we shall show that the English peasants did suffer…" (book page 76), and the pages around it | footnote pop-ups from the references; margin notes as a small bold line before their paragraphs (page 76's reads "Earity of fllght'", the OCR's text) | text/ch004.xhtml, about a sixth in |
+| stubbs.epub | "CHAPTER III. THE EARLY YEARS OF HENRY II." (book page 51) | the heading with its label "CHAPTER III."; the chapter summary under it; the cut-in note's last line "accession." before "Very few epochs…", while its other words stay in the body lines | text/ch006.xhtml, at the start |
+| mariejol.epub | "CHAPITRE II DAUPHINE ET REINE", the verse "Laquelle (Catherine)… / Portoit au b(^ la sagette…" (book page 51) and "Quelle dame a la pratique…" (page 52) | verse with its line breaks, the prose after it a paragraph | text/ch006.xhtml, about a sixth in |
+| kadesh.epub | the plate "PALIMPSEST WALL SHOWING LATER RELIEFS CUT OVER KADESH SERIES…" (page 64), near the end | the plate's picture and its caption. Page 16 is no longer a plate: the owner found it the scan of a cover, and it is excluded | text/ch002.xhtml, about nine tenths in |
+
+### Checks at f6e85fa
+
+| check | last line |
+|---|---|
+| `uv lock --check` | Resolved 21 packages in 4ms |
+| `uv run --locked ruff format --check` | 99 files already formatted |
+| `uv run --locked ruff check` | All checks passed! |
+| `uv run --locked ty check` | All checks passed! |
+| `uv run --locked pytest` | 1692 passed, 32 deselected in 28.52s |
+| `uv run --locked pytest --parallel-threads=8` | 1692 passed, 32 deselected in 49.82s |
+| `uv run --locked pytest -m whole_book` | 32 passed, 1692 deselected in 253.28s (0:04:13) |
