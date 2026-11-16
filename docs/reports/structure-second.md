@@ -640,3 +640,36 @@ a footnote and joined into page 36 across plates 34–35.
 
 Checks at the end: pytest 1673 passed in 28.9 s; with 8 threads 50.3 s;
 `-m whole_book` 32 passed. Work packages 5 and 6 are done.
+
+## Task 7.3: the owner's check of the reference pages (f8babcb spec, edc1386, 3e9fa3f)
+
+The sheet (67 sections, 193 checks, published privately on 16 November
+2026) went to the owner, who checked 17 sections: D-14, D-22, D-30,
+D-39, D-40, D-42, D-47, D-74, D-75, D-76, G-88, G-270, H-41, H-209,
+H-266, K-8, M-51. The answers are exact tests (85 reference tests
+collected, 66 asked). The other 50 sections are not checked by the
+owner and have no new expected file.
+
+What the owner found:
+- **Kadesh page 16 is not a plate** but the scan of a cover, with no
+  picture and no text: excluded in the configs (Kadesh now 15 plates,
+  21 in all). Other faint Kadesh plates may be the same case; the owner
+  will see them in the EPUB.
+- Margin-note texts differ from the print where the OCR misread them
+  (D-22 "Domesday Book and its satellites.", D-74 "The scale of
+  free-holding", D-75's three notes, G-88's missing "Medieval
+  Thought."): recorded as known, for re-OCR.
+- **D-14, the contents page**: the owner reads its own structure —
+  "ESSAY I." a heading, "DOMESDAY BOOK." a lesser one, the "§" lines
+  grouping sections, a paragraph after each. galley makes no headings on
+  contents pages, by the owner's decision of 15 November 2026; how a
+  contents page keeps its own structure is open for the owner.
+- D-47's blocks are three tables; D-42's links from table rows are wrong
+  (known); G-270's first text the owner reads as a normal paragraph
+  (galley gives it as the end of endnote 290, page 269 being outside
+  the excerpt); M-51's footnotes cannot be read at all.
+- G-88: "Law1" is in the page's first paragraph, not its last, as the
+  sheet's question wrongly said.
+
+Checks: pytest 1692 passed in 28.4 s; with 8 threads 49.5 s; `-m
+whole_book` 32 passed.

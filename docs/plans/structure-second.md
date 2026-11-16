@@ -555,7 +555,7 @@ today; the change of task 7.4 has to give it.
   list where `notes` puts them with `epub:type="noteref"` links. Spec:
   structure §19; architecture §9 and §13. Stream `markdown`. Needs 7.1.
   Deliverables 1, 2.
-- [ ] 7.3 The reference pages: a sheet for the owner, one section per
+- [x] 7.3 The reference pages: a sheet for the owner, one section per
   page of structure §9's reference table and layout §8's Stubbs pages,
   with the page image, then layout's regions and structure's output on
   the page; after the owner's answer, the expected outputs under
