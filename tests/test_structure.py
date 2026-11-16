@@ -2182,6 +2182,38 @@ def _endnotes_of(blocks: BlocksFile) -> tuple[tuple[str, tuple[str, ...]], ...]:
     )
 
 
+def _references_to_endnotes(blocks: BlocksFile) -> tuple[tuple[str, str], ...]:
+    """Each reference to a note: its note's marker and the word it was
+    split off."""
+    markers = {note.id: note.marker for note in blocks.notes}
+    return tuple(
+        (markers[span.note_ref], block.spans[position - 1].text.split(" ")[-1])
+        for block in blocks.blocks
+        for position, span in enumerate(block.spans)
+        if span.note_ref is not None
+    )
+
+
+def test_endnote_references_are_taken_after_the_last_contents_page() -> None:
+    # An introduction (page 0) refers to its own notes, before the book's
+    # contents page (1); "Law1" on page 2 is the endnote's reference
+    # (structure spec, section 12, "References").
+    section = _endnote_pages(1, 12, body_words="Law1")
+    introduction = _body_page(0, _indented("An introduction says Maitland1 so", 70))
+    contents = _body_page(1, _indented("Contents of the book", 70))
+    lines = _lines_of(
+        introduction,
+        contents,
+        *(replace(page, index=page.index + 2) for page in section.pages),
+    )
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({1}), workers=1)
+    assert _references_to_endnotes(blocks) == (("1.", "Law"),)
+    without = make_blocks(lines, _NO_WORDS, workers=1)
+    # Without it, the introduction's "Maitland1" takes endnote 1, and "Law1"
+    # goes to endnote 4, a digit the OCR confuses with 1.
+    assert _references_to_endnotes(without) == (("1.", "Maitland"), ("4.", "Law"))
+
+
 def test_endnote_section_of_12_paragraphs_gives_12_endnotes() -> None:
     lines = _endnote_pages(291, 12, between=True)
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
@@ -2491,9 +2523,15 @@ def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
     folder, config = _book(tmp_path)
 
     def make_blocks_losing_a_word(
-        lines: LinesFile, word_list: frozenset[str], *, workers: int
+        lines: LinesFile,
+        word_list: frozenset[str],
+        *,
+        contents_pages: frozenset[int],
+        workers: int,
     ) -> BlocksFile:
-        blocks = make_blocks(lines, word_list, workers=workers)
+        blocks = make_blocks(
+            lines, word_list, contents_pages=contents_pages, workers=workers
+        )
         first = blocks.blocks[0]
         shorter = replace(
             first,

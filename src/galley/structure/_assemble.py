@@ -262,6 +262,7 @@ def assemble(
     word_list: frozenset[str],
     body_word_height: float,
     body_line_pitch: float,
+    last_contents_page: int,
 ) -> Assembled:
     """The work after the per-page parts (spec section 2, steps 2.5 and 3),
     in page order: the notes left at the foot of each page's body taken
@@ -270,7 +271,9 @@ def assemble(
     the footnotes of the band and of the body with their markers, the
     endnotes, the references linked to their notes, each margin note beside
     a note's line inside that note, and the ids. `word_list` is in lower
-    case; `body_word_height` and `body_line_pitch` are in points."""
+    case; `body_word_height` and `body_line_pitch` are in points; the
+    references to endnotes are taken from the pages after
+    `last_contents_page`, -1 for a book without contents pages."""
     form = book_marker_form(
         first_word(piece.lines[0]) for page in parts for piece in page.band_blocks
     )
@@ -340,7 +343,9 @@ def assemble(
         tuple(
             candidate
             for candidate in candidates
-            if candidate.block < before_section and candidate not in footnoted
+            if candidate.block < before_section
+            and candidate.page_index > last_contents_page
+            and candidate not in footnoted
         ),
     )
     linked_body, linked_notes = linked(
