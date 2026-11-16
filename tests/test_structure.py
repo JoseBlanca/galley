@@ -4998,6 +4998,43 @@ def test_gutter_margin_region_goes_into_its_column_by_its_top() -> None:
     )
 
 
+def test_gutter_margin_region_lines_go_each_beside_the_line_of_their_row() -> None:
+    # Spec section 17, rule 2: Domesday 546's page numbers "509" and "519",
+    # one margin region, each follow the line they end; Stubbs 321's letter
+    # initial "W", left of the column, goes before the line it starts.
+    overhang = _region(
+        _line("509", 335, _INDEX_TOP_PT),
+        _line("519", 335, _INDEX_TOP_PT + 2 * _INDEX_PITCH_PT),
+    )
+    initial = _region(_line("W", 35, _INDEX_TOP_PT + 4 * _INDEX_PITCH_PT))
+    page = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES, overhang, initial)
+    assert _column_lines(page) == (
+        "Abacus, 106.",
+        "Abruzzi, 196, 204.",
+        "Anjou, counts of, 61,",
+        "85; relations, 61.",
+        "W",
+        "Apulia, 186, 197.",
+        "Bari, 189, 197.",
+        "509",
+        "Bayeux, 10, 46,",
+        "49, 67, 76.",
+        "519",
+        "Becket, 4, 100.",
+        "Bessin, 10, 28.",
+    )
+
+
+def test_gutter_margin_region_above_the_columns_beside_the_head_stays_out() -> None:
+    # Spec section 17, rule 2: Gierke 84's folio "lxxix", a margin region
+    # beside the head line, does not end the column's last entry.
+    folio = _region(_line("lxxix", 335, 36))
+    page = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES, folio)
+    assert "lxxix" not in _column_lines(page)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert "lxxix" in _texts(blocks.blocks)
+
+
 def test_index_pages_start_at_a_running_head_index_and_end_without_columns() -> None:
     before = _page_with_head(0, "THE BOOK")
     continued = _index_page(1, "252 INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES)

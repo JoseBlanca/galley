@@ -214,17 +214,20 @@ def _part(lines: Sequence[Line], side: int, gutter: float) -> tuple[Line, ...]:
 @dataclass(frozen=True, slots=True)
 class _Item:
     """Lines read together into a column, placed by the top of the first:
-    one line of a column region (`_COLUMN_LINE`), or a margin region or the
-    part of a cut region, as a whole (`_GROUP`), which goes after a column
-    line of the same top (spec section 17, rule 2)."""
+    one line of a column region, or the part of a cut region, as a whole
+    (spec section 17, rule 2)."""
 
     top: float
-    rank: int
     lines: tuple[Line, ...]
 
 
-_COLUMN_LINE = 0
-_GROUP = 1
+@dataclass(frozen=True, slots=True)
+class _Side:
+    """What goes into one index column: its items, and the lines of the
+    margin regions on its side, each placed on its own."""
+
+    items: tuple[_Item, ...]
+    margin_lines: tuple[Line, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,12 +306,46 @@ def _fit(lines: Sequence[Line]) -> tuple[float, float]:
     return intercept, slope
 
 
-def _column(items: Sequence[_Item]) -> tuple[Line, ...]:
-    return tuple(
+def _shares_row(line: Line, other: Line) -> bool:
+    """Whether `line` is in the row of `other`: its vertical centre lies
+    within `other`'s top and bottom (layout spec section 1, "Row")."""
+    centre = (line.box.top + line.box.bottom) / 2
+    return other.box.top <= centre <= other.box.bottom
+
+
+def _column(side: _Side) -> tuple[Line, ...]:
+    """The lines of one index column in reading order (spec section 17,
+    rule 2): the items by their tops, and each margin line just before the
+    line of its row when it lies left of it, just after when right of it,
+    or, in no line's row, before the first line whose top is below its
+    own."""
+    lines = [
         line
-        for item in sorted(items, key=lambda item: (item.top, item.rank))
+        for item in sorted(side.items, key=lambda item: item.top)
         for line in item.lines
-    )
+    ]
+    for margin in sorted(side.margin_lines, key=lambda line: line.box.top):
+        row = next(
+            (
+                number
+                for number, line in enumerate(lines)
+                if line not in side.margin_lines and _shares_row(margin, line)
+            ),
+            None,
+        )
+        if row is not None:
+            position = row if margin.box.x1 <= lines[row].box.x0 else row + 1
+        else:
+            position = next(
+                (
+                    number
+                    for number, line in enumerate(lines)
+                    if line.box.top > margin.box.top
+                ),
+                len(lines),
+            )
+        lines.insert(position, margin)
+    return tuple(lines)
 
 
 def _column_items(
@@ -316,14 +353,19 @@ def _column_items(
     kinds: Sequence[RegionKind],
     columns: IndexColumns,
     removed: frozenset[LinePlace],
-) -> tuple[tuple[tuple[_Item, ...], tuple[_Item, ...]], frozenset[int]]:
-    """The items of the left and of the right column of an index page (spec
-    section 17, rule 2), and the numbers of the regions they take: each
-    line of a column region, each margin region on its side, and the part
-    of each region cut at the gutter on each side. The head line and the
-    lines of `removed` are left out."""
+) -> tuple[tuple[_Side, _Side], frozenset[int]]:
+    """What goes into the left and the right column of an index page (spec
+    section 17, rule 2), and the numbers of the regions taken: each line
+    of a column region, the lines of each margin region on its side but
+    one wholly above every column region, and the part of each region cut
+    at the gutter on each side. The head line and the lines of `removed`
+    are left out."""
     head = head_line(page)
-    sides: tuple[list[_Item], list[_Item]] = ([], [])
+    columns_top = min(
+        page.regions[number].box.top for number in columns.left | columns.right
+    )
+    items: tuple[list[_Item], list[_Item]] = ([], [])
+    margins: tuple[list[Line], list[Line]] = ([], [])
     taken: set[int] = set()
     for number, (region, kind) in enumerate(zip(page.regions, kinds, strict=True)):
         lines = tuple(
@@ -335,22 +377,22 @@ def _column_items(
             continue
         if number in columns.left or number in columns.right:
             side = 0 if number in columns.left else 1
-            sides[side].extend(
-                _Item(line.box.top, _COLUMN_LINE, (line,)) for line in lines
-            )
-        elif kind is RegionKind.MARGIN:
+            items[side].extend(_Item(line.box.top, (line,)) for line in lines)
+        elif kind is RegionKind.MARGIN and region.box.bottom > columns_top:
             side = 0 if middle(region.box) < columns.gutter else 1
-            if lines:
-                sides[side].append(_Item(lines[0].box.top, _GROUP, lines))
+            margins[side].extend(lines)
         elif _is_cut(region, lines, columns.gutter):
             for side in (0, 1):
                 part = _part(lines, side, columns.gutter)
                 if part:
-                    sides[side].append(_Item(part[0].box.top, _GROUP, part))
+                    items[side].append(_Item(part[0].box.top, part))
         else:
             continue
         taken.add(number)
-    return (tuple(sides[0]), tuple(sides[1])), frozenset(taken)
+    return (
+        _Side(tuple(items[0]), tuple(margins[0])),
+        _Side(tuple(items[1]), tuple(margins[1])),
+    ), frozenset(taken)
 
 
 def _are_guide_words(left: Sequence[Line], right: Sequence[Line]) -> bool:
