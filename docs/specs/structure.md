@@ -987,7 +987,7 @@ exactly.
 | `domesday_headings_quotes` | 9 (274) | quotes in smaller type across the column; the footnotes in the band, as notes |
 | `domesday_headings_quotes` | 10 (406) | a table read as verse: known |
 | `mariejol_headings_verse` (new) | 0 (18) | a chapter opening: "CHAPITRE…" and its title, one heading |
-| `mariejol_headings_verse` | 1 (51), 2 (52) | verse over a page break, one `verse` block |
+| `mariejol_headings_verse` | 1 (51), 2 (52) | verse in the middle of each page, one `verse` block on each, the prose after it a paragraph |
 | `mariejol_headings_verse` | 3 (142) | a title that fills the column, taken as a continuation |
 | `mariejol_headings_verse` | 4 (229) | two verse quotes on one page |
 | `mariejol_headings_verse` | 5 (430) | a heading of three lines |
@@ -1896,8 +1896,10 @@ rule here changes a block's kind and no word, so it needs no record.
    side, is one `verse` block, whatever section 6 would make of it; a
    heading line is not part of a run. A verse block that is the last
    block of a page's body stream continues on the next page when that
-   page's body stream starts with such a run (Mariéjol's pages 51 and
-   52); this was not measured, and the reference page checks it.
+   page's body stream starts with such a run. This was not measured,
+   and no excerpt page shows it: Mariéjol's pages 51 and 52, once named
+   for it, each hold their verse in the middle of the page (read in the
+   text layer on 16 November 2026), so a unit test checks it.
 
 ### What they give
 
