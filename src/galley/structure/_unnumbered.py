@@ -106,6 +106,7 @@ def without_marker(
             line_starts=frozenset(
                 start - 1 for start in block.line_starts if start > 1
             ),
+            changes=tuple((position - 1, change) for position, change in block.changes),
         ), marker.marker
     change = WordChange(
         page_index=block.word_pages[0],

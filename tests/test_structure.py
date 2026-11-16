@@ -72,6 +72,7 @@ from galley.structure._references import (
     pair_score,
     reference_form,
 )
+from galley.structure._unnumbered import Unnumbered, without_marker
 
 
 def _word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
@@ -4283,6 +4284,32 @@ def test_chapter_summary_ends_before_the_next_heading() -> None:
         workers=1,
     )
     assert _kinds(blocks)[1:4] == ("heading", "chapter_summary", "heading")
+
+
+def test_note_marker_taken_as_a_whole_word_shifts_the_positions_of_its_changes() -> (
+    None
+):
+    # The block "1 Ali- son wrote" with its join at word 1: once the marker
+    # "1" is dropped, the join is at word 0, as its word is.
+    join = WordChange(
+        page_index=0,
+        before=("Ali-", "son"),
+        after=("Alison",),
+        reason=ChangeReason.HYPHEN_JOIN,
+    )
+    block = Unnumbered(
+        kind=BlockKind.PARAGRAPH,
+        words=("1", "Alison", "wrote"),
+        word_pages=(0, 0, 0),
+        origin=(Origin(0, Box(50, 300, 300, 307)),),
+        changes=((1, join),),
+        line_starts=frozenset({2}),
+    )
+    without, marker = without_marker(block, NoteMarker("1", "", 1))
+    assert marker == "1"
+    assert without.words == ("Alison", "wrote")
+    assert without.changes == ((0, join),)
+    assert without.line_starts == frozenset({1})
 
 
 # The fidelity check at the structure boundary
