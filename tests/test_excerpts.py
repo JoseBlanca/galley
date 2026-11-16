@@ -155,10 +155,13 @@ def _pages(origin: tuple[Origin, ...]) -> list[int]:
 
 
 def _block_fields(block: Block) -> dict[str, Any]:
-    """A block's kind and text, and a heading's level and label."""
+    """A block's kind and text, a heading's level and label, and an index
+    entry's depth."""
     heading = (
         {"level": block.level, "label": block.label}
         if block.kind is BlockKind.HEADING
+        else {"level": block.level}
+        if block.kind is BlockKind.INDEX_ENTRY
         else {}
     )
     return {"kind": block.kind.value, "text": block_text(block)} | heading

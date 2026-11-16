@@ -60,12 +60,17 @@ from galley.structure import (
     reference_candidate,
     survey_book,
 )
+from galley.structure._assemble import _taken_body_notes
 from galley.structure._index import entry_side, index_page
-from galley.structure._lines import PlacedLine
+from galley.structure._index_entries import _index_runs, _IndexRun
+from galley.structure._lines import Piece, PlacedLine
 from galley.structure._linking import body_candidates
 from galley.structure._margins import BesideLine, InParagraph, line_beside
 from galley.structure._markers import MarkerForm, book_marker_form
 from galley.structure._measures import Edges
+from galley.structure._notes import Numbering
+from galley.structure._paragraphs import PageFigure, PageParts
+from galley.structure._plates import plate_survey, with_figures
 from galley.structure._references import (
     Candidate,
     NoteToMatch,
@@ -1450,6 +1455,8 @@ def test_caption_lines_have_two_known_words_or_half_their_words_known() -> None:
         _spread("^X.^ MoulslVl^rf", 60, 300, 300),
         _spread("Fir ^X", 60, 300, 400),
         _spread("Fir </ I", 60, 300, 450),
+        # 2 known words of 5: a caption row by the first test alone.
+        _spread("THE MOUND X;; Q< ^l", 60, 300, 475),
         _spread("17]", 60, 90, 500),
     )
     pages = (_body_page(0, *_five_full_lines(70, "first")), plate)
@@ -1462,7 +1469,9 @@ def test_caption_lines_have_two_known_words_or_half_their_words_known() -> None:
     )
     figure = blocks.blocks[-1]
     assert figure.kind is BlockKind.FIGURE
-    assert block_text(figure) == "THE MODERN MOUND OF KADESH Fir ^X 17]"
+    assert block_text(figure) == (
+        "THE MODERN MOUND OF KADESH Fir ^X THE MOUND X;; Q< ^l 17]"
+    )
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
@@ -4943,18 +4952,15 @@ def test_index_page_columns_leave_the_body_and_the_band() -> None:
 
 
 def test_guide_words_line_is_removed_as_guide_words() -> None:
-    guide = _region(
-        Line(
-            Box(90, 62, 265, 72),
-            (*_words_at("BUR", 90, 62), *_words_at("CON", 250, 62)),
-        )
-    )
-    page = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES, guide)
+    # Spec section 17, rule 2: the line "BUR CON" read as the first line of
+    # the left column, where the test of the columns' first lines, one word
+    # each, cannot find it.
+    page = _index_page(0, "INDEX", ("BUR CON", *_LEFT_ENTRIES), _RIGHT_ENTRIES)
     blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
     assert _removals_of(0, blocks) == (
         Removal(
             page_index=0,
-            box=Box(90, 62, 265, 72),
+            box=Box(50, 80, 85, 90),
             text="BUR CON",
             reason=RemovalReason.GUIDE_WORDS,
         ),
@@ -5162,8 +5168,9 @@ def test_index_entry_hyphens_are_joined_and_page_numbers_kept() -> None:
 
 
 def test_index_entr_skewed_column_edge_does_not_start_entries() -> None:
-    # Spec section 17, rule 3: the column's left edge drifts 5 pt over 20
-    # lines; a first line follows it and a continuation line is 9 pt in.
+    # Spec section 17, rule 3: the column's left edge drifts 12 pt over 20
+    # lines, more than the 5 pt that a straight edge would allow; a first
+    # line follows it and a continuation line is 9 pt in.
     texts = tuple(
         f">cont {number}," if number % 2 else f"Entry {number}," for number in range(20)
     )
@@ -5171,7 +5178,7 @@ def test_index_entr_skewed_column_edge_does_not_start_entries() -> None:
         0,
         (
             _region(_line("INDEX", 155, 36)),
-            _index_column(_INDEX_LEFT_PT, texts, skew_pt=5.0),
+            _index_column(_INDEX_LEFT_PT, texts, skew_pt=12.0),
             _index_column(_INDEX_RIGHT_PT, _RIGHT_ENTRIES),
         ),
         (),
@@ -5300,6 +5307,10 @@ def test_whole_book_stubbs_guide_words_on_each_of_its_ten_index_pages(
         (320, "SPA TRA"),
         (321, "WAR YPR"),
     )
+    # Spec section 17, rule 3: the fitted edge gives 910 entries and
+    # sub-entries; a straight edge at the entry side gave 916 (16 November
+    # 2026), "Baldwin of Redvers, 18" and others cut in two.
+    assert sum(block.kind is BlockKind.INDEX_ENTRY for block in blocks.blocks) == 910
     # Only page 312 keeps notes: two regions across the gutter whose spaced
     # letters lie over it on more than a third of their lines keep their
     # kind, a band (section 17, rule 2).
@@ -5380,3 +5391,267 @@ def test_index_page_head_region_of_index_and_a_page_number_is_removed() -> None:
         for block in blocks.blocks
     )
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+# The rules of sections 17 and 18 that no test held (review T2, T5).
+
+
+def test_index_title_table_alphabetique_and_a_page_number_before_index() -> None:
+    french = _index_page(0, "TABLE ALPHABÉTIQUE", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    assert survey_book(_lines_of(french), workers=1).index_pages == frozenset({0})
+    numbered = _index_page(0, "253 INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    assert survey_book(_lines_of(numbered), workers=1).index_pages == frozenset({0})
+    table = _index_page(0, "TABLE DES MATIÈRES", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    assert survey_book(_lines_of(table), workers=1).index_pages == frozenset()
+
+
+def _two_columns(left_x1: float, right_x0: float, right_x1: float) -> PageLayout:
+    """A page after an index page, its title no index's, with a left column
+    from 50 pt to `left_x1`, a right one from `right_x0` to `right_x1`, and
+    a speck at 440 to 450 pt, so that the regions span 400 pt."""
+    left = _index_column(_INDEX_LEFT_PT, ("Abacus, 106.",))
+    right = _index_column(right_x0, ("Bari, 189.",))
+    return PageLayout(
+        1,
+        (
+            _region(_line("CONTINUED", 155, 36)),
+            replace(left, box=replace(left.box, x1=left_x1)),
+            replace(right, box=replace(right.box, x1=right_x1)),
+            _region(_line("..", 440, 400)),
+        ),
+        (),
+    )
+
+
+@pytest.mark.parametrize(
+    ("left_x1", "right_x0", "right_x1", "columns"),
+    [
+        (150.0, 200.0, 400.0, False),  # left 0.25 of the span
+        (330.0, 330.0, 450.0, False),  # left 0.7
+        (290.0, 290.0, 430.0, True),  # left 0.6, right 0.35
+    ],
+)
+def test_index_columns_are_0_3_to_0_65_of_the_width_the_regions_span(
+    left_x1: float, right_x0: float, right_x1: float, columns: bool
+) -> None:
+    start = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    page = _two_columns(left_x1, right_x0, right_x1)
+    assert (1 in survey_book(_lines_of(start, page), workers=1).index_pages) is columns
+
+
+def test_index_columns_none_when_a_region_lies_both_left_and_right_of_others() -> None:
+    # Three columns side by side: the middle one is both.
+    page = PageLayout(
+        0,
+        (
+            _region(_line("INDEX", 155, 36)),
+            _index_column(20.0, ("Abacus, 106.",), skew_pt=0.0),
+            _index_column(160.0, ("Bari, 189.",)),
+            _index_column(300.0, ("Caen, 10.",)),
+        ),
+        (),
+    )
+    narrow = PageLayout(
+        0,
+        tuple(
+            replace(region, box=replace(region.box, x1=region.box.x0 + 125))
+            if number
+            else region
+            for number, region in enumerate(page.regions)
+        ),
+        (),
+    )
+    assert _column_lines(narrow) == ()
+
+
+@pytest.mark.parametrize("texts", [("BURR", "CON"), ("BU", "CO"), ("Bur", "Con")])
+def test_guide_words_are_two_words_of_three_capitals_only(
+    texts: tuple[str, str],
+) -> None:
+    page = _index_page(
+        0, "INDEX", (texts[0], *_LEFT_ENTRIES), (texts[1], *_RIGHT_ENTRIES)
+    )
+    assert _removals_of(0, make_blocks(_lines_of(page), _NO_WORDS, workers=1)) == ()
+
+
+def test_guide_words_in_the_head_line_are_not_removed() -> None:
+    # The second page of an index, whose head line reads like guide words.
+    start = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    page = _index_page(1, "BUR CON", _LEFT_ENTRIES, _RIGHT_ENTRIES)
+    lines = _lines_of(start, page)
+    assert survey_book(lines, workers=1).index_pages == frozenset({0, 1})
+    assert not any(
+        removal.reason is RemovalReason.GUIDE_WORDS
+        for removal in make_blocks(lines, _NO_WORDS, workers=1).removals
+    )
+
+
+@pytest.mark.parametrize(("crossing", "cut"), [(1, True), (2, False)])
+def test_gutter_region_is_cut_when_two_thirds_of_its_lines_do_not_cross_it(
+    crossing: int, cut: bool
+) -> None:
+    # Spec section 17, rule 2: 3 lines, of which 1 (two thirds uncrossed)
+    # or 2 have a word over the gutter at 190 pt; a word goes by its middle,
+    # so "overs" (180 to 205 pt) goes right.
+    def row(top: float, *, over: bool) -> Line:
+        right = _words_at("overs" if over else "Clovis,", 180 if over else 200, top)
+        words = (*_words_at("Caen, 10.", 50, top), *right)
+        return Line(_box(tuple(word.box for word in words)), words)
+
+    across = _region(
+        *(row(20 + 12 * number, over=number < crossing) for number in range(3))
+    )
+    page = _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES, across)
+    lines = _column_lines(page)
+    assert ("overs" in lines) is cut
+    if cut:
+        assert lines[:3] == ("Caen, 10.", "Caen, 10.", "Caen, 10.")
+
+
+@pytest.mark.parametrize(("indent", "starts"), [(4.0, True), (6.0, False)])
+def test_index_entr_starts_within_5_pt_of_the_edge(indent: float, starts: bool) -> None:
+    left = (*_LEFT_ENTRIES[:2], "Anjou, counts of, 61,")
+    page = _index_page(0, "INDEX", left, _RIGHT_ENTRIES)
+    column = page.regions[1]
+    moved = _line("relations, 61.", _INDEX_LEFT_PT + indent, 116)
+    page = replace(
+        page,
+        regions=(
+            page.regions[0],
+            Region(column.box, (*column.lines, moved)),
+            page.regions[2],
+        ),
+    )
+    entries = _index_entries_of(make_blocks(_lines_of(page), _NO_WORDS, workers=1))
+    assert ("relations, 61." in entries) is starts
+
+
+def _index_parts(index: int, *, index_lines: int = 0, band: int = 0) -> PageParts:
+    line = PlacedLine(
+        index, _line("Abacus, 106.", 50, 80), Edges(50, 180), Edges(50, 180)
+    )
+    return PageParts(
+        index=index,
+        removals=(),
+        page_numbers=(),
+        body=(),
+        margin_notes=(),
+        band_regions=((line,),) if band else (),
+        band_blocks=(),
+        index_lines=(line,) * index_lines,
+    )
+
+
+def test_index_entr_run_goes_on_over_a_blank_page_and_ends_at_a_band_page() -> None:
+    # Spec section 17, rule 1: a page without words does not end an index;
+    # one with only a band does, so the next index page starts another.
+    pages = (
+        _index_parts(0, index_lines=1),
+        _index_parts(1),
+        _index_parts(2, index_lines=1),
+        _index_parts(3, band=1),
+        _index_parts(4, index_lines=1),
+    )
+    assert _index_runs(pages) == (_IndexRun(0, 2), _IndexRun(4, 4))
+
+
+def test_index_entr_page_gives_no_notes_taken_from_its_body() -> None:
+    # Spec section 2, step 2.5: notes left in the body are not taken on an
+    # index page; on another page the same lines are.
+    above = tuple(
+        PlacedLine(
+            0, _line(f"Text line {n}", 50, 80 + 15 * n), Edges(50, 300), Edges(50, 300)
+        )
+        for n in range(3)
+    )
+    note = PlacedLine(
+        0,
+        _line("1 See the rolls.", 50, 140, height=8.0),
+        Edges(50, 300),
+        Edges(50, 300),
+    )
+    page = replace(_index_parts(0), body=(*above, note))
+    taken = _taken_body_notes(
+        (page,),
+        ((),),
+        Numbering.PER_PAGE,
+        MarkerForm.DIGITS,
+        10.0,
+        range(0),
+        frozenset(),
+    )
+    assert taken[0].body == above
+    index = replace(page, index_lines=(note,))
+    kept = _taken_body_notes(
+        (index,),
+        ((),),
+        Numbering.PER_PAGE,
+        MarkerForm.DIGITS,
+        10.0,
+        range(0),
+        frozenset(),
+    )
+    assert kept[0].body == (*above, note)
+
+
+def test_plate_running_head_of_section_3_is_removed_and_rule_1_takes_no_more() -> None:
+    # Spec section 18, rule 1: Kadesh 19 and 24; the line under the head,
+    # alike to the book's running heads, stays a caption line.
+    plate = PageLayout(
+        16,
+        (
+            _region(_line("31 THE BOOK", 50, 36)),
+            _region(_line("THE BOOK", 50, 120), _line("THE CAMP", 50, 500)),
+        ),
+        (Figure(_PLATE_BOX, "images/plate-0016.png", 300),),
+    )
+    blocks = make_blocks(
+        _lines_of(*_numbered_heads(), plate),
+        frozenset({"the", "book", "camp"}),
+        workers=1,
+    )
+    assert _removed(blocks, 16) == (("page_number", "31"), ("running_head", "THE BOOK"))
+    assert blocks.page_numbers[-1] == PageNumber(16, "31", PageNumberPosition.HEAD)
+    assert block_text(blocks.blocks[-1]) == "THE BOOK THE CAMP"
+
+
+def test_plate_survey_takes_a_running_head_below_a_speck() -> None:
+    speck_page = PageLayout(
+        16,
+        (_region(_line("d", 120, 20)), _body(36, "THE BOOKS 31", *_BODY_TEXTS)),
+        (),
+    )
+    lines = _lines_of(*_numbered_heads(), speck_page)
+    survey = survey_book(lines, workers=1)
+    assert survey.heads_below_specks == frozenset({16})
+    assert "thebooks" in plate_survey(lines, survey).running_head_letters
+
+
+def test_figure_block_goes_after_the_margin_notes_of_earlier_pages() -> None:
+    # Spec section 18, rule 3: after the paragraph in which the body before
+    # the plate ends and the margin notes that stay after it.
+    def block(kind: BlockKind, page: int) -> Unnumbered:
+        return Unnumbered(
+            kind=kind,
+            words=("word",),
+            word_pages=(page,),
+            origin=(Origin(page, Box(50, 100, 300, 110)),),
+            changes=(),
+        )
+
+    body = (
+        block(BlockKind.PARAGRAPH, 0),
+        block(BlockKind.MARGIN_NOTE, 0),
+        block(BlockKind.PARAGRAPH, 2),
+    )
+    plate = replace(
+        _index_parts(1),
+        figure=PageFigure("images/plate-0001.png", _PLATE_BOX, Piece(())),
+    )
+    placed = with_figures(body, (plate,), _NO_WORDS, _NO_WORDS)
+    assert [unnumbered.kind for unnumbered in placed] == [
+        BlockKind.PARAGRAPH,
+        BlockKind.MARGIN_NOTE,
+        BlockKind.FIGURE,
+        BlockKind.PARAGRAPH,
+    ]

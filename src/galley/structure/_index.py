@@ -81,14 +81,10 @@ def _title_line(page: PageLayout, kinds: Sequence[RegionKind]) -> Line | None:
 
 
 def _without_page_number(texts: Sequence[str]) -> tuple[str, ...]:
-    """`texts` without a page-number form at their start or at their end."""
+    """`texts` without a page-number form at their start. One at their end
+    does not change what they start with, so it is left."""
     start = 1 if texts and is_page_number_form(texts[0]) else 0
-    end = (
-        len(texts) - 1
-        if len(texts) > start and is_page_number_form(texts[-1])
-        else len(texts)
-    )
-    return tuple(texts[start:end])
+    return tuple(texts[start:])
 
 
 def is_index_title(page: PageLayout, kinds: Sequence[RegionKind]) -> bool:

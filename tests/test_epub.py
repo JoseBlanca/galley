@@ -127,6 +127,7 @@ def test_run_writes_an_epub_with_the_title_language_and_block_ids(
     assert '<div id="b-p0001-001">' in chapter
     assert style_sheet == STYLE_SHEET.read_bytes()
     assert b".margin-note" in style_sheet
+    assert b".index-entry.depth-2 p" in style_sheet
 
 
 def test_run_without_book_md_raises_naming_markdown(tmp_path: Path) -> None:
@@ -356,6 +357,9 @@ def test_the_epub_of_every_kind_and_of_a_footnote_and_endnotes_has_each_in_its_h
     assert '<h1><span class="label">CHAPTER III.</span> THE EARLY YEARS' in chapters
     assert '<div id="b-p0000-002" class="chapter-summary">' in chapters
     assert '<div id="b-p0000-006" class="verse">' in chapters
+    # An index entry's depth is a class, which the style sheet indents.
+    assert '<div id="b-p0002-002" class="index-entry depth-1">' in chapters
+    assert '<div id="b-p0002-005" class="index-entry depth-2">' in chapters
     assert "<p>Mignonne, allons voir<br />\nsi la rose,</p>" in chapters
     # The reference to the endnote, in chapter III, points into the file of
     # the notes, where the endnotes are one list.
