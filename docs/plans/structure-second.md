@@ -209,10 +209,10 @@ them until then.
   copies, and `wordlist.is_known_word` with the word key. Spec:
   architecture §12; layout §3, "The book's measures"; structure §2,
   step 1; plates §2 and §4. Deliverables 4, 5, 8.
-- [ ] 1.3 The five excerpts and their configs. Spec: structure §9, "The
+- [x] 1.3 The five excerpts and their configs. Spec: structure §9, "The
   second plan", the list of new excerpts. Needs 1.1 for
   `contents_pages`. Deliverables 6, 8.
-- [ ] 1.4 The six books' configs in one place, and galley-eval passing
+- [x] 1.4 The six books' configs in one place, and galley-eval passing
   `contents_pages` through. Spec: plates §2, "The configs of the sample
   books"; architecture §6. Needs 1.1. Deliverable 7.
 
