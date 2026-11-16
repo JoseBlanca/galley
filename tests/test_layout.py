@@ -1319,6 +1319,42 @@ def test_cut_in_zone_of_one_shortened_row_takes_a_note_word_1_pt_below_it() -> N
     assert margin == (("accession.",),)
 
 
+@pytest.mark.parametrize(
+    ("his_right", "margin"),
+    [
+        (86, (("Character", "of", "Henry"),)),
+        (85, (("as", "his"), ("Character", "of", "Henry"))),
+    ],
+)
+def test_cut_in_zone_keeps_its_words_within_5_pt_of_a_body_word(
+    his_right: float, margin: tuple[tuple[str, ...], ...]
+) -> None:
+    # A row of its own at 226, inside the zone from row 10 to row 12, reads
+    # "as his issued": "issued" ends past the strip, a body word. "his"
+    # 4 pt short of it stays, and so then does "as", 4 pt short of "his";
+    # 5 pt short, both move (Stubbs' page 33, mirrored).
+    rows = {
+        10: _cut_row(10),
+        11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+        12: _cut_row(12),
+    }
+    sentence = (
+        _word("as", 55, 226, his_right - 20, 234),
+        _word("his", his_right - 16, 226, his_right, 234),
+        _word("issued", 90, 226, 130, 234),
+    )
+    page = _page(
+        0,
+        (
+            *(word for word in _rows(20) if int(word.text[1:]) not in rows),
+            *(word for words in rows.values() for word in words),
+            *sentence,
+        ),
+    )
+    _, *margins = _region_texts(layout_page(page, _CUT_IN_MEASURES))
+    assert tuple(margins) == (margin,)
+
+
 def test_cut_in_zone_keeps_a_word_ending_3_pt_short_of_the_inset() -> None:
     # "Henry", a row of its own inside the zone, ends at 107, 3 pt short of
     # the inset at 110: not 4, so it stays in the body.

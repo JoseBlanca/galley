@@ -817,7 +817,11 @@ def _split_at_column(
 # (with 1, 47 more) and a shortened row, with nothing 4 pt short of the
 # inset (without one, 56 more). A note word's middle lies within 1 pt of
 # its zone. With these, 1,314 words moved: 767 aligned to a margin note of
-# the reference, 73 to the body (this code moves 1,324 there).
+# the reference, 73 to the body (this code moved 1,324 there). A word less
+# than 5 pt from a body word of its row stays, as a word of a sentence does
+# (the body's word spaces are 4.5 pt at the median; "issued as his", page
+# 33): with it 1,318 words move, and 0.940 of those aligned are note words
+# by the evaluation tool of 16 November 2026, 0.936 without it.
 _CUT_ROW_INSET_PT: Final[float] = 3.0
 _CUT_ROW_GAP_PT: Final[float] = 8.0
 _CUT_ROW_SPAN_SHARE: Final[float] = 0.5
@@ -825,6 +829,7 @@ _CUT_IN_CHAIN_PITCHES: Final[float] = 1.6
 _CUT_IN_CHAIN_ROWS: Final[int] = 2
 _CUT_IN_STRIP_PT: Final[float] = 4.0
 _CUT_IN_ZONE_PT: Final[float] = 1.0
+_CUT_IN_BODY_GAP_PT: Final[float] = 5.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -957,7 +962,7 @@ def _cut_in_note_indices(
     zones = _cut_in_zones(
         rows, at, _CUT_ROW_SPAN_SHARE * measures.column_width, measures.body_line_pitch
     )
-    return frozenset(
+    in_zones = frozenset(
         span.index
         for spans in rows
         for span in spans
@@ -969,6 +974,34 @@ def _cut_in_note_indices(
             for top, bottom in zones
         )
     )
+    return frozenset(
+        index for spans in rows for index in _apart_from_body(spans, in_zones)
+    )
+
+
+def _apart_from_body(
+    spans: tuple[_Span, ...], in_zones: frozenset[int]
+) -> frozenset[int]:
+    """The places of the words of a row of `spans` that are in `in_zones`
+    and lie `_CUT_IN_BODY_GAP_PT` or more from every body word of the row
+    (step 2b, rule 3): a word not in `in_zones` is a body word, and so is
+    a word of `in_zones` that lies nearer than that to one."""
+    notes = {span.index for span in spans if span.index in in_zones}
+    while True:
+        body = tuple(span for span in spans if span.index not in notes)
+        near = {
+            span.index
+            for span in spans
+            if span.index in notes
+            and any(
+                max(other.start - span.end, span.start - other.end)
+                < _CUT_IN_BODY_GAP_PT
+                for other in body
+            )
+        }
+        if not near:
+            return frozenset(notes)
+        notes -= near
 
 
 def _page_regions(
