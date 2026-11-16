@@ -43,7 +43,8 @@ the commonest edge, the body word height and body line pitch, move to
 the module `body_measures.py` of the package root (architecture §12),
 which structure uses too, so that the two stages stop keeping a copy
 each (owner, 15 November 2026). The cut-in rule does not reach the bar
-on precision set in section 9, which is the one open point there.
+on precision set in section 9; the owner kept it as written on 16
+November 2026 (section 9).
 
 ## 1. Terms
 
@@ -368,7 +369,8 @@ is laid out as one region, as the skeleton did.
    OCR damage ("Chanceiior."). The reviewer's full lines on pages 96,
    120, 125 and 139 lose no word with the trimmed zone. The rule as
    written does not reach section 9's bar of 95 in 100 on this measure:
-   0.91 by the labels, 0.94 with the 24 words corrected (**Open 1**).
+   0.91 by the labels, 0.94 with the 24 words corrected; the owner kept
+   the rule as written (section 9).
    Each condition was added for a case measured: without a shortened
    row, 56 words found only in the body were moved; with chains of one
    cut row, 47; with chains up to 2.6 pitches, 53 (counted, in the first
@@ -825,7 +827,7 @@ targets (structure §9): paragraph breaks that margin and note text no
 longer cause, notes and margin notes found as such. The table of section
 3 is what layout's rules gave on a prototype; it is not a target.
 
-## 9. Stubbs' cut-in notes: decided, with one open point
+## 9. Stubbs' cut-in notes: decided
 
 How layout finds Stubbs' notes cut into the text column was decided
 twice by the owner. On 15 November 2026, for the first plan, they
@@ -840,26 +842,20 @@ words of 3 letters or more, found by their letters in the note or body
 text of the page); measured on all words by their alignment, it is not
 (section 3, step 2b).
 
-**Open 1. Step 2b below the bar.** The rule as written moves 1,314
-words in Stubbs, of which 767 are aligned to margin notes and 73 to
-the body (precision 0.913; 0.94 once 24 note words the alignment
-misplaced are counted as notes), and 474 are not aligned, mostly single
-letters of spaced-out notes. It finds 767 of the reference text's 1,469
-margin-note words (0.52).
-
-- (a) **Keep step 2b** as written: about half of the notes' words leave
-  the body lines, and at most about 50 body words of Stubbs' 90,100
-  (0.06%) move into margin notes.
-- (b) **Try the render of each page** (option (a) below), at the cost of
-  a render per page and layout reading the PDF, with the same bar, and
-  keep step 2b only if the render does no better.
-- (c) **Leave the cut-in notes in the body lines**, as the first plan
-  does.
-
-Recommended: (a). The body words it moves are a few tens in a book, and
+**Decided: step 2b is kept as written, below the bar** (owner, 16
+November 2026). The rule moves 1,314 words in Stubbs, of which 767 are
+aligned to margin notes and 73 to the body (precision 0.913; 0.94 once
+24 note words the alignment misplaced are counted as notes), and 474
+are not aligned, mostly single letters of spaced-out notes. It finds 767
+of the reference text's 1,469 margin-note words (recall 0.52). The
+owner accepted the precision below the bar of 95 in 100: at most about
+50 body words of Stubbs' 90,100 (0.06%) move into margin notes, and
 every cut-in note left in the body breaks a paragraph a reader reads.
-Meanwhile the implementer builds (a), behind the book's cut-in inset,
-so that (c) is the inset set to none.
+The two other answers weighed were a render of each page (option (a)
+below), at the cost of a render per page and of layout reading the PDF,
+and leaving the cut-in notes in the body lines, as the first plan does.
+The rule runs only on a side where the book has a cut-in inset (section
+3), so a book without one is laid out as before.
 
 What was weighed for the first plan. The text layer does not show the
 note's words reliably. Five rules were tried on Stubbs' words, each
