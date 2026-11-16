@@ -982,10 +982,10 @@ exactly.
 | `domesday_headings_quotes` | 2 (30) | a section heading in lower case mid-page, level 2 |
 | `domesday_headings_quotes` | 3 (39), 4 (40) | maps as plates: strays removed, caption and the binder's note kept |
 | `domesday_headings_quotes` | 5 (42) | a table's title in capitals: a known false heading |
-| `domesday_headings_quotes` | 6 (93) | inset quotes |
-| `domesday_headings_quotes` | 7 (274) | quotes in smaller type across the column |
-| `domesday_headings_quotes` | 8 (406) | a table read as verse: known |
-| `domesday_headings_quotes` | 9 (546) | the first index page: page numbers that overhang the right column |
+| `domesday_headings_quotes` | 6 (47) | a table read as verse: known |
+| `domesday_headings_quotes` | 7 (93) | inset quotes; the footnotes in the band, as notes |
+| `domesday_headings_quotes` | 9 (274) | quotes in smaller type across the column; the footnotes in the band, as notes |
+| `domesday_headings_quotes` | 10 (406) | a table read as verse: known |
 | `mariejol_headings_verse` (new) | 0 (18) | a chapter opening: "CHAPITRE…" and its title, one heading |
 | `mariejol_headings_verse` | 1 (51), 2 (52) | verse over a page break, one `verse` block |
 | `mariejol_headings_verse` | 3 (142) | a title that fills the column, taken as a continuation |
@@ -1003,7 +1003,20 @@ the committed excerpts, every page with a text layer:
 - `stubbs_summaries_index`: Stubbs (`earlyplantagenet01stub`), page
   indices 16, 28, 79, 157, 312, 313, 316, 318, 319 and 321.
 - `domesday_headings_quotes`: Domesday (`domesdaybook00maituoft`), page
-  indices 14, 22, 30, 39, 40, 42, 93, 274, 406 and 546.
+  indices 14, 22, 30, 39, 40, 42, 47, 93, 272, 274 and 406. Its own
+  survey must measure what the whole book's does, or pages 93 and 274
+  lose their footnote band: cut on 16 November 2026 with page 546 in
+  place of 47 and 272, it measured a body word height of 9.0 pt and a
+  pitch of 11.15 pt against the book's 10.0 and 12.13, because the
+  index page, the contents page and the two pages of quotes are mostly
+  in small type, and its notes became paragraphs. Pages 47 and 272 are
+  body pages whose running heads repeat those of 93 and 274, so that
+  every running head of the book's pages is removed on the excerpt too;
+  with them the excerpt measures 10.0 and 12.09 pt and the book's marker
+  form. The first index page (546), whose page numbers overhang the
+  right column, is left to the whole book: its 50 rows of 8 pt type
+  pull the measures down, so that these pages with 546 as well measure
+  a pitch of 11.50 pt, and without 406 a body word height of 9.0.
 - `mariejol_headings_verse`: Mariéjol (`catherinedemedic00mariuoft`),
   page indices 18, 51, 52, 142, 229 and 430.
 - `kadesh_59-68`: Kadesh (the book of `kadesh_8-17`), page indices 59 to
