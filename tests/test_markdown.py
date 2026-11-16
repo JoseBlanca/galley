@@ -1280,6 +1280,39 @@ def test_endnotes_with_a_body_block_between_them_are_two_lists() -> None:
     )
 
 
+def test_a_footnote_and_an_endnote_at_one_place_are_written_apart() -> None:
+    # An unreferenced footnote and an endnote, both printed on page 9, are
+    # written after the page's paragraph; only the endnote is in the
+    # endnotes' list.
+    blocks = _blocks_file(
+        (_block("b-p0009-001", BlockKind.PARAGRAPH, "Text.", 9),),
+        (
+            _note(
+                "n-p0009-001",
+                NoteKind.FOOTNOTE,
+                "*",
+                _block("b-p0009-002", BlockKind.PARAGRAPH, "A footnote.", 9),
+                referenced=False,
+            ),
+            _note(
+                "n-p0009-002",
+                NoteKind.ENDNOTE,
+                "1.",
+                _block("b-p0009-003", BlockKind.PARAGRAPH, "An endnote.", 9),
+                referenced=False,
+            ),
+        ),
+    )
+
+    written = render_markdown(blocks, CONFIG)
+
+    assert written.count("::::: {.endnotes}") == 1
+    endnotes = written[written.index("::::: {.endnotes}") :]
+    assert "b-p0009-003" in endnotes
+    assert "b-p0009-002" not in endnotes
+    assert written.index("b-p0009-002") < written.index("::::: {.endnotes}")
+
+
 @pytest.mark.pandoc
 def test_pandoc_reads_one_footnote_one_noteref_link_and_every_word_in_its_block() -> (
     None

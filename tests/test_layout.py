@@ -332,6 +332,17 @@ def test_cut_in_inset_needs_10_rows_at_its_peak(rows: int, inset: float | None) 
     assert measures.cut_in_inset_left == inset
 
 
+@pytest.mark.parametrize(
+    ("inset", "found"), [(29.9, None), (30.0, 30.0), (100.0, 100.0), (100.1, None)]
+)
+def test_cut_in_inset_is_looked_for_from_30_to_100_pt(
+    inset: float, found: float | None
+) -> None:
+    measures = measure_book(_inset_pages((inset,) * 30))
+    assert measures is not None
+    assert measures.cut_in_inset_left == found
+
+
 def test_cut_in_inset_takes_the_smaller_peak_within_2_pt_and_rounds_to_0_1_pt() -> None:
     # 59.97 rounds to 60.0, 4 tenths from 59.6: both peaks have every row
     # within 2 pt, and the tie goes to the smaller.
@@ -1353,6 +1364,18 @@ def test_cut_in_zone_keeps_its_words_within_5_pt_of_a_body_word(
     )
     _, *margins = _region_texts(layout_page(page, _CUT_IN_MEASURES))
     assert tuple(margins) == (margin,)
+
+
+def test_cut_in_lone_shortened_row_is_no_zone() -> None:
+    # Row 11 is cut and shortened, but rows 10 and 12 are full lines: a
+    # chain of one cut row, so "accession.", a row of its own beside row
+    # 11, stays in the body.
+    top = _row_top(11)
+    rows: dict[int, tuple[Word, ...]] = {
+        11: (*_cut_row(11), _word("accession.", 55, top + 4.5, 100, top + 13))
+    }
+    (body,) = _region_texts(_cut_in_page(rows))
+    assert ("accession.",) in body
 
 
 def test_cut_in_zone_keeps_a_word_ending_3_pt_short_of_the_inset() -> None:
