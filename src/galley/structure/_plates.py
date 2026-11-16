@@ -24,7 +24,13 @@ from galley.model import (
 )
 from galley.structure._foot import LinePlace, line_at, line_below_head
 from galley.structure._lines import Piece, PlacedLine
-from galley.structure._measures import Edges, letters, words_box, words_text
+from galley.structure._measures import (
+    Edges,
+    is_roman_form,
+    letters,
+    words_box,
+    words_text,
+)
 from galley.structure._paragraphs import PageFigure, PageParts
 from galley.structure._regions import head_line, region_kinds
 from galley.structure._removals import head_removals
@@ -41,11 +47,11 @@ _CAPTION_MIN_KNOWN_SHARE = 0.5
 
 @dataclass(frozen=True, slots=True)
 class PlateSurvey:
-    """What rule 1 compares a plate's topmost line with: the letters of the
+    """What rule 1 compares a plate's topmost line with: the words of the
     topmost line of each plate page, by page index, and the letters of the
     book's running heads (spec section 3)."""
 
-    topmost_letters: frozendict[int, str]
+    topmost_words: frozendict[int, tuple[str, ...]]
     running_head_letters: tuple[str, ...]
 
 
@@ -78,7 +84,7 @@ def plate_survey(lines: LinesFile, survey: BookSurvey) -> PlateSurvey:
     """The topmost line of each plate page and the book's running heads, as
     letters (spec section 18, rule 1)."""
     topmost = {
-        page.index: letters(words_text(line_at(page, place).words))
+        page.index: tuple(word.text for word in line_at(page, place).words)
         for page in lines.pages
         if page.figures and (place := _topmost(page)) is not None
     }
@@ -88,6 +94,26 @@ def plate_survey(lines: LinesFile, survey: BookSurvey) -> PlateSurvey:
         if (head := _running_head_letters(page, survey)) is not None
     }
     return PlateSurvey(frozendict(topmost), tuple(sorted(heads)))
+
+
+def _is_numeral(text: str) -> bool:
+    """Whether `text` is a numeral, arabic or roman in either case, with a
+    "." or "," after it ("II", "iv.", "16")."""
+    bare = text.rstrip(".,")
+    return bool(bare) and (bare.isdigit() or is_roman_form(bare.lower()))
+
+
+def _differ_only_in_numerals(words: Sequence[str], other: Sequence[str]) -> bool:
+    """Whether two lines' words differ, but only in numerals, word by word
+    ("PLATE II" and "PLATE III"; spec section 18, rule 1)."""
+    return (
+        len(words) == len(other)
+        and tuple(words) != tuple(other)
+        and all(
+            word == other_word or (_is_numeral(word) and _is_numeral(other_word))
+            for word, other_word in zip(words, other, strict=True)
+        )
+    )
 
 
 def _is_caption_row(texts: Sequence[str], lower_case_words: frozenset[str]) -> bool:
@@ -130,17 +156,22 @@ def plate_parts(
     kinds = region_kinds(page, survey.body_word_height, survey.running_heads)
     head = head_removals(page, kinds, survey)
     topmost = _topmost(page)
-    others = tuple(
-        letters_of_page
-        for index, letters_of_page in plates.topmost_letters.items()
-        if index != page.index
+    topmost_words = (
+        tuple(word.text for word in line_at(page, topmost).words)
+        if topmost is not None
+        else ()
+    )
+    other_plate_letters = tuple(
+        letters(" ".join(words))
+        for index, words in plates.topmost_words.items()
+        if index != page.index and not _differ_only_in_numerals(words, topmost_words)
     )
     rule_1_head = (
         topmost is not None
         and topmost not in head.lines
         and alike_to_a_head(
-            letters(words_text(line_at(page, topmost).words)),
-            (*others, *plates.running_head_letters),
+            letters(" ".join(topmost_words)),
+            (*other_plate_letters, *plates.running_head_letters),
         )
     )
     removed: list[Removal] = list(head.removals)

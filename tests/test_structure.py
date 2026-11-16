@@ -1560,6 +1560,28 @@ def test_plate_topmost_line_alike_to_another_plates_is_a_running_head() -> None:
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+def test_plate_topmost_lines_that_differ_only_in_a_numeral_are_kept() -> None:
+    # Spec section 18, rule 1: plate labels at the top of each plate.
+    known = frozenset({"plate", "battle", "of", "the", "camp", "kadesh"})
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first")),
+        _plate(1, _spread("PLATE II", 60, 300, 50), _spread("THE CAMP", 60, 300, 520)),
+        _plate(
+            2, _spread("PLATE III", 60, 300, 50), _spread("THE BATTLE", 60, 300, 520)
+        ),
+        _plate(3, _spread("PLATE 4", 60, 300, 50), _spread("OF KADESH", 60, 300, 520)),
+        _plate(4, _spread("PLATE 5", 60, 300, 50), _spread("THE CAMP", 60, 300, 520)),
+    )
+    blocks = make_blocks(_lines_of(*pages), known, workers=1)
+    assert all(_removed(blocks, page) == () for page in range(1, 5))
+    assert _texts(blocks.blocks)[1:] == (
+        "PLATE II THE CAMP",
+        "PLATE III THE BATTLE",
+        "PLATE 4 OF KADESH",
+        "PLATE 5 THE CAMP",
+    )
+
+
 def test_plate_topmost_line_alike_to_a_running_head_of_the_book_is_removed() -> None:
     heads = tuple(
         _page_with_head(index, head)
