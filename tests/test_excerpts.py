@@ -1044,16 +1044,24 @@ def test_index_haskins_266_heading_then_one_entry_per_entry_left_column_then_rig
     excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
 ) -> None:
     _, blocks = excerpt_outputs["haskins_eval"]
-    assert _kinds_on(blocks, 9) == ("heading",) + ("index_entry",) * 65
+    assert _kinds_on(blocks, 9) == ("heading",) + ("index_entry",) * 72
     entries = _index_entries_on(blocks, 9)
-    # The left column's first and last entries, then the right column's
-    # first; "Anjou" holds its sub-entry, and its continuation line.
-    assert entries[0] == "Abacus, 106/."
-    assert entries[17] == (
-        "Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100,"
-        " 112, 131, 136/."
+    depths = tuple(
+        block.level
+        for block in blocks.blocks
+        if block.kind is BlockKind.INDEX_ENTRY and block.origin[0].page_index == 9
     )
-    assert entries[33:35] == ("Avranches, 172, 175, 178.", "Avranchin, 28.")
+    # The left column's first entry, "Anjou" and its sub-entry with its
+    # continuation line (section 17, rule 5), and the left column's last
+    # entry before the right column's first.
+    assert entries[0] == "Abacus, 106/."
+    assert entries[18:20] == (
+        "Anjou, counts of, 61, 85;",
+        "relations with Normandy, 61-63, 85, 100, 112, 131, 136/.",
+    )
+    assert depths[18:20] == (1, 2)
+    assert depths.count(2) == 7
+    assert entries[38:40] == ("Avranches, 172, 175, 178.", "Avranchin, 28.")
 
 
 def test_index_haskins_267_calabria_one_entry_and_the_rows_cut_at_the_gutter(
@@ -1064,11 +1072,9 @@ def test_index_haskins_267_calabria_one_entry_and_the_rows_cut_at_the_gutter(
     # column, before "Commerce".
     _, blocks = excerpt_outputs["haskins_quotes_index"]
     entries = _index_entries_on(blocks, 9)
-    assert entries[:2] == (
-        (
-            "Caen, lo/., 71, 133, 139, 143, 153. 160, 166, 172, 184; abbeys, 12,"
-            " 58,160, 163, 171, 174,186-88,213."
-        ),
+    assert entries[:3] == (
+        "Caen, lo/., 71, 133, 139, 143, 153. 160, 166, 172, 184;",
+        "abbeys, 12, 58,160, 163, 171, 174,186-88,213.",
         "Calabria, 176, 198,201-11,222,226, 237, 246.",
     )
     clermont = entries.index("Clermont, 211.")

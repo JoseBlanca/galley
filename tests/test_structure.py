@@ -5033,19 +5033,20 @@ def test_index_entries_one_per_line_at_the_edge_left_column_then_right() -> None
     blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
     assert [block.kind for block in blocks.blocks] == [BlockKind.HEADING] + [
         BlockKind.INDEX_ENTRY
-    ] * 8
+    ] * 9
     assert block_text(blocks.blocks[0]) == "INDEX"
     assert _index_entries_of(blocks) == (
         "Abacus, 106.",
         "Abruzzi, 196, 204.",
-        "Anjou, counts of, 61, 85; relations, 61.",
+        "Anjou, counts of, 61, 85;",
+        "relations, 61.",
         "Apulia, 186, 197.",
         "Bari, 189, 197.",
         "Bayeux, 10, 46, 49, 67, 76.",
         "Becket, 4, 100.",
         "Bessin, 10, 28.",
     )
-    assert all(block.level is None for block in blocks.blocks[1:])
+    assert [block.level for block in blocks.blocks[1:]] == [1, 1, 1, 2, 1, 1, 1, 1, 1]
 
 
 def test_index_entry_continues_over_the_column_and_the_page_with_one_origin_each() -> (
@@ -5064,7 +5065,7 @@ def test_index_entry_continues_over_the_column_and_the_page_with_one_origin_each
     entries = tuple(
         block for block in blocks.blocks if block.kind is BlockKind.INDEX_ENTRY
     )
-    assert block_text(entries[3]) == "Apulia, 186, 197. 197, 202."
+    assert block_text(entries[4]) == "Apulia, 186, 197. 197, 202."
     assert block_text(entries[-3]) == "Calabria, 176, 237, 246."
     assert [origin.page_index for origin in entries[-3].origin] == [0, 1]
     assert _index_entries_of(blocks)[-2:] == ("Caliphs, 196.", "Canne, 199.")
@@ -5078,7 +5079,7 @@ def test_index_entry_hyphens_are_joined_and_page_numbers_kept() -> None:
         _RIGHT_ENTRIES,
     )
     blocks = make_blocks(_lines_of(page), frozenset({"viking"}), workers=1)
-    assert _index_entries_of(blocks)[0] == "Commerce, Norman, 72-81; Viking, 37."
+    assert _index_entries_of(blocks)[:2] == ("Commerce, Norman, 72-81;", "Viking, 37.")
 
 
 def test_index_entr_skewed_column_edge_does_not_start_entries() -> None:
@@ -5107,11 +5108,11 @@ def test_index_entr_column_of_more_continuation_lines_than_first_lines() -> None
     # first lines, more than 5 pt left of it, give the edge.
     left = (
         "John, son of Henry,",
-        ">99; cursed, 109;",
-        ">his reign, 125;",
-        ">loses Normandy, 142;",
+        ">99, cursed, 109,",
+        ">his reign, 125,",
+        ">loses Normandy, 142,",
         ">his death, 160.",
-        "Jews, 112;",
+        "Jews, 112,",
         ">banished, 239.",
     )
     page = _index_page(0, "INDEX", left, _RIGHT_ENTRIES)
@@ -5119,10 +5120,10 @@ def test_index_entr_column_of_more_continuation_lines_than_first_lines() -> None
         :2
     ] == (
         (
-            "John, son of Henry, 99; cursed, 109; his reign, 125; loses Normandy,"
-            " 142; his death, 160."
+            "John, son of Henry, 99, cursed, 109, his reign, 125, loses Normandy,"
+            " 142, his death, 160."
         ),
-        "Jews, 112; banished, 239.",
+        "Jews, 112, banished, 239.",
     )
 
 
@@ -5151,7 +5152,7 @@ def test_index_entr_no_paragraph_runs_on_over_the_index() -> None:
         for block in blocks.blocks
     ] == [
         (BlockKind.PARAGRAPH, [0]),
-        *[(BlockKind.INDEX_ENTRY, [1])] * 8,
+        *[(BlockKind.INDEX_ENTRY, [1])] * 9,
         (BlockKind.PARAGRAPH, [2]),
     ]
 
@@ -5228,3 +5229,28 @@ def test_whole_book_stubbs_guide_words_on_each_of_its_ten_index_pages(
         for note in blocks.notes
         if 312 <= note.origin[0].page_index <= 321
     } == {312}
+
+
+def test_index_entr_sub_entries_cut_after_each_semicolon_inside_a_line() -> None:
+    # Spec section 17, rule 5: "Henry II, ..., 219; empire, 86-90;
+    # character, 92." is an entry and two sub-entries, the second cut in
+    # the middle of a printed line; each part's origin has its own words.
+    left = (
+        "Henry II, king, 49, 219;",
+        ">empire, 86-90; char-",
+        ">acter, 92.",
+        *_LEFT_ENTRIES,
+    )
+    page = _index_page(0, "INDEX", left, _RIGHT_ENTRIES)
+    blocks = make_blocks(_lines_of(page), frozenset({"character"}), workers=1)
+    parts = tuple(
+        (block_text(block), block.level, block.origin[0].box)
+        for block in blocks.blocks
+        if block.kind is BlockKind.INDEX_ENTRY
+    )[:3]
+    assert parts == (
+        ("Henry II, king, 49, 219;", 1, Box(50, 80, 170, 90)),
+        ("empire, 86-90;", 2, Box(59, 92, 129, 102)),
+        ("character, 92.", 2, Box(59, 92, 159, 114)),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, _lines_of(page), blocks)

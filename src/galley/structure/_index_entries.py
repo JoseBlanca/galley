@@ -1,12 +1,12 @@
-"""The entries of a printed index (spec section 17, rules 3 and 4), across
+"""The entries of a printed index (spec section 17, rules 3 to 5), across
 its columns and pages, and their place among the body's blocks (spec
 section 2, step 3.4)."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
-from galley.model import BlockKind
-from galley.structure._lines import Piece, PlacedLine
+from galley.model import BlockKind, Word
+from galley.structure._lines import Piece, PlacedLine, with_words
 from galley.structure._paragraphs import BodyBlock, Entry, PageParts
 
 
@@ -79,9 +79,37 @@ def _entries(pages: Sequence[PageParts]) -> tuple[BodyBlock, ...]:
                 entries.append([])
             entries[-1].append(line)
     return tuple(
-        BodyBlock(piece=Piece(tuple(lines)), kind=BlockKind.INDEX_ENTRY)
+        BodyBlock(
+            piece=Piece(part),
+            kind=BlockKind.INDEX_ENTRY,
+            level=_ENTRY_DEPTH if number == 0 else _SUB_ENTRY_DEPTH,
+        )
         for lines in entries
+        for number, part in enumerate(_printed_parts(lines))
     )
+
+
+# Spec section 17, rule 5: an entry's depth is 1, a sub-entry's 2.
+_ENTRY_DEPTH = 1
+_SUB_ENTRY_DEPTH = 2
+
+
+def _printed_parts(lines: Sequence[PlacedLine]) -> tuple[tuple[PlacedLine, ...], ...]:
+    """The lines of an entry cut after each word that ends with ";", inside
+    a line when the word is (spec section 17, rule 5): the entry, then each
+    sub-entry; none of them empty."""
+    parts: list[list[PlacedLine]] = [[]]
+    for line in lines:
+        words: list[Word] = []
+        for word in line.line.words:
+            words.append(word)
+            if word.text.endswith(";"):
+                parts[-1].append(with_words(line, tuple(words)))
+                parts.append([])
+                words = []
+        if words:
+            parts[-1].append(with_words(line, tuple(words)))
+    return tuple(tuple(part) for part in parts if part)
 
 
 def with_index_entries(

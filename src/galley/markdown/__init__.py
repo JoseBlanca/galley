@@ -26,7 +26,9 @@ for "_", which the style sheet styles:
   its text on one line.
 - `quote`, `chapter_summary`, `index_entry`, `margin_note`: a fenced div
   with its id and the class `quote`, `chapter-summary`, `index-entry` or
-  `margin-note`, its text on one line. A margin note stands where it is in
+  `margin-note`, its text on one line; an index entry's div also has the
+  class of its depth, `depth-1` for an entry and `depth-2` for a
+  sub-entry, which the style sheet sets in. A margin note stands where it is in
   blocks.json, before the paragraph it was printed beside; the style sheet
   sets it as a small bold line.
 - `verse`: a fenced div of class `verse`, each line of the text a line of
@@ -294,8 +296,9 @@ def _check_well_formed(blocks: BlocksFile) -> None:
     id given more than once among the blocks, the notes and the notes'
     blocks (each becomes the id of a div in book.md and the EPUB), a note
     without blocks or without origin, which cannot be placed, a heading
-    without a level Pandoc has (1 to 6), or references that do not agree
-    with the notes (_reference_problems)."""
+    without a level Pandoc has (1 to 6), an index entry without a depth
+    from 1, or references that do not agree with the notes
+    (_reference_problems)."""
     id_counts = Counter(
         (
             *(block.id for block in blocks.blocks),
@@ -319,7 +322,20 @@ def _check_well_formed(blocks: BlocksFile) -> None:
         for block in blocks.blocks
         if block.kind is BlockKind.HEADING and block.level not in _HEADING_LEVELS
     )
-    problems = repeated + empty + placeless + levelless + _reference_problems(blocks)
+    depthless = tuple(
+        f"index entry {block.id} has the depth {block.level}"
+        for block in blocks.blocks
+        if block.kind is BlockKind.INDEX_ENTRY
+        and (block.level is None or block.level < 1)
+    )
+    problems = (
+        repeated
+        + empty
+        + placeless
+        + levelless
+        + depthless
+        + _reference_problems(blocks)
+    )
     if problems:
         message = f"blocks.json is malformed: {'; '.join(problems)}"
         raise InputFileError(message)
@@ -475,6 +491,10 @@ def _div(block: Block, notes: frozendict[str, Note], marker: str = "") -> str:
         return _heading(block, notes)
     class_name = _class_name(block.kind)
     attributes = f"#{block.id}" + (f" .{class_name}" if class_name is not None else "")
+    if block.kind is BlockKind.INDEX_ENTRY:
+        # Structure spec section 19: the entry's depth, which the style
+        # sheet indents; _check_well_formed refuses one without a depth.
+        attributes += f" .depth-{block.level}"
     text = _text_markdown(block, notes, marker)
     if block.kind is BlockKind.FIGURE and block.figure is not None:
         text = f"![{text}]({block.figure})"

@@ -256,7 +256,8 @@ EVERY_KIND = BlocksFile(
         ),
         _block("b-p0001-001", BlockKind.HEADING, "NOTES.", level=1),
         _block("b-p0002-001", BlockKind.HEADING, "INDEX", level=1),
-        _block("b-p0002-002", BlockKind.INDEX_ENTRY, "Aachen, 12, 34-36."),
+        _block("b-p0002-002", BlockKind.INDEX_ENTRY, "Aachen, 12, 34-36.", level=1),
+        _block("b-p0002-005", BlockKind.INDEX_ENTRY, "council at, 36.", level=2),
         replace(
             _block("b-p0002-003", BlockKind.FIGURE, "PLATE I. The battle."),
             figure="images/plate-0002.png",

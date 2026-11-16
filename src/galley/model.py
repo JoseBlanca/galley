@@ -281,7 +281,8 @@ class Block:
     summary, figure, margin note or index entry.
 
     `id` is `b-p<page index, 4 digits>-<n, 3 digits>`; `level` is a
-    heading's, from 1, and None otherwise; `label` is a heading's chapter
+    heading's, from 1, an index entry's depth, 1 for an entry and 2 for a
+    sub-entry, and None otherwise; `label` is a heading's chapter
     label as printed ("CHAPTER III.", "V"), whose title is in the spans,
     and None for a heading without one and for every other kind; `figure`
     is the image path of a figure block; `origin` has one entry per page
@@ -857,7 +858,8 @@ def write_blocks(path: Path, blocks: BlocksFile) -> None:
 def read_blocks(path: Path) -> BlocksFile:
     """Reads blocks.json as write_blocks wrote it. Raises InputFileError,
     naming the file and the block, also when a block that is not a heading
-    has a label."""
+    has a label, an index entry has no depth from 1, or a block that is
+    neither a heading nor an index entry has a level."""
     blocks = _read_json(path, BlocksFile, BLOCKS_FORMAT_VERSION, "structure")
     for block in (
         *blocks.blocks,
@@ -869,7 +871,27 @@ def read_blocks(path: Path) -> BlocksFile:
                 f"label {block.label!r}; only a heading has a label"
             )
             raise InputFileError(message)
+        if block.kind is BlockKind.INDEX_ENTRY and (
+            block.level is None or block.level < 1
+        ):
+            message = (
+                f"{path}: block {block.id} is an index entry with the depth "
+                f"{block.level!r}, not one from 1 (architecture section 8); a "
+                "blocks.json written before index entries had a depth needs "
+                "`galley2epub structure` run again"
+            )
+            raise InputFileError(message)
+        if block.level is not None and block.kind not in _KINDS_WITH_LEVEL:
+            message = (
+                f"{path}: block {block.id} is a {block.kind.value} and has the "
+                f"level {block.level!r}; only a heading and an index entry have one"
+            )
+            raise InputFileError(message)
     return blocks
+
+
+# Architecture section 8: a heading's level, and an index entry's depth.
+_KINDS_WITH_LEVEL = frozenset({BlockKind.HEADING, BlockKind.INDEX_ENTRY})
 
 
 # The hashes.

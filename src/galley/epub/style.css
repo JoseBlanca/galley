@@ -44,12 +44,21 @@ h6 .label {
   font-size: 0.9em;
 }
 
-/* An index entry: one line, its turn-overs hanging. */
+/* An index entry: one line, its turn-overs hanging. A sub-entry, of
+   depth 2, is set in under its entry, and a deeper one further. */
 .index-entry p {
   margin: 0;
   padding-left: 2em;
   text-indent: -2em;
   text-align: left;
+}
+
+.index-entry.depth-2 p {
+  padding-left: 3em;
+}
+
+.index-entry.depth-3 p {
+  padding-left: 4em;
 }
 
 /* A figure: its image centred within the page, and its caption under it

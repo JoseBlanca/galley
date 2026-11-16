@@ -1197,7 +1197,13 @@ EVERY_MEMBER_PAGES = tuple(
 EVERY_MEMBER_BLOCKS = replace(
     BLOCKS,
     blocks=tuple(
-        replace(BLOCKS.blocks[1], id=f"b-p0003-{number:03}", kind=kind)
+        replace(
+            BLOCKS.blocks[1],
+            id=f"b-p0003-{number:03}",
+            kind=kind,
+            # An index entry has its depth (architecture section 8).
+            level=1 if kind is BlockKind.INDEX_ENTRY else None,
+        )
         for number, kind in enumerate(BlockKind, start=1)
     ),
     notes=tuple(
@@ -1443,6 +1449,52 @@ def test_label_on_a_block_that_is_not_a_heading_names_the_file_and_block(
     assert str(caught.value) == (
         f"{tmp_path / 'blocks.json'}: block {block_id} is a paragraph and has "
         "the label 'CHAPTER IV.'; only a heading has a label"
+    )
+
+
+# An index entry's depth (architecture section 8)
+
+
+@pytest.mark.parametrize("depth", [None, 0])
+def test_index_entry_without_a_depth_from_1_names_the_block_and_structure(
+    tmp_path: Path, depth: int | None
+) -> None:
+    write_blocks(tmp_path / "blocks.json", EVERY_MEMBER_BLOCKS)
+    position = list(BlockKind).index(BlockKind.INDEX_ENTRY)
+    _set(tmp_path / "blocks.json", ("blocks", position, "level"), depth)
+
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+
+    assert str(caught.value) == (
+        f"{tmp_path / 'blocks.json'}: block b-p0003-{position + 1:03} is an index "
+        f"entry with the depth {depth!r}, not one from 1 (architecture section 8); "
+        "a blocks.json written before index entries had a depth needs "
+        "`galley2epub structure` run again"
+    )
+
+
+def test_index_entry_of_depth_2_is_read_back_and_a_level_on_a_paragraph_is_refused(
+    tmp_path: Path,
+) -> None:
+    position = list(BlockKind).index(BlockKind.INDEX_ENTRY)
+    deeper = replace(
+        EVERY_MEMBER_BLOCKS,
+        blocks=tuple(
+            replace(block, level=2) if number == position else block
+            for number, block in enumerate(EVERY_MEMBER_BLOCKS.blocks)
+        ),
+    )
+    write_blocks(tmp_path / "blocks.json", deeper)
+    assert read_blocks(tmp_path / "blocks.json") == deeper
+
+    paragraph = list(BlockKind).index(BlockKind.PARAGRAPH)
+    _set(tmp_path / "blocks.json", ("blocks", paragraph, "level"), 1)
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+    assert str(caught.value) == (
+        f"{tmp_path / 'blocks.json'}: block b-p0003-{paragraph + 1:03} is a "
+        "paragraph and has the level 1; only a heading and an index entry have one"
     )
 
 

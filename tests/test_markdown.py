@@ -765,12 +765,11 @@ def test_a_heading_without_a_level_from_1_to_6_is_malformed(level: int | None) -
     [
         (BlockKind.QUOTE, "quote"),
         (BlockKind.CHAPTER_SUMMARY, "chapter-summary"),
-        (BlockKind.INDEX_ENTRY, "index-entry"),
         (BlockKind.FIGURE, "figure"),
         (BlockKind.MARGIN_NOTE, "margin-note"),
     ],
 )
-def test_quote_chapter_summary_index_entry_figure_and_margin_note_have_a_class_of_their_kind(
+def test_quote_chapter_summary_figure_and_margin_note_have_a_class_of_their_kind(
     kind: BlockKind, class_name: str
 ) -> None:
     block = _block("b-p0002-001", kind, "Henry's youth. — His accession.", 2)
@@ -780,6 +779,35 @@ def test_quote_chapter_summary_index_entry_figure_and_margin_note_have_a_class_o
         + f"\n::: {{#b-p0002-001 .{class_name}}}\n"
         + "Henry\\'s youth\\. — His accession\\.\n:::\n"
     )
+
+
+@pytest.mark.parametrize("depth", [1, 2, 3])
+def test_index_entry_has_its_class_and_a_class_of_its_depth(depth: int) -> None:
+    # Structure spec section 19: the depth is written, so that the style
+    # sheet sets a sub-entry in from its entry.
+    entry = replace(
+        _block("b-p0002-001", BlockKind.INDEX_ENTRY, "quoted, 234.", 2), level=depth
+    )
+
+    assert render_markdown(_blocks_file((entry,)), CONFIG) == (
+        HEADER
+        + f"\n::: {{#b-p0002-001 .index-entry .depth-{depth}}}\n"
+        + "quoted\\, 234\\.\n:::\n"
+    )
+
+
+@pytest.mark.parametrize("depth", [None, 0])
+def test_index_entry_without_a_depth_from_1_is_malformed(depth: int | None) -> None:
+    entry = replace(
+        _block("b-p0002-001", BlockKind.INDEX_ENTRY, "Aachen, 12.", 2), level=depth
+    )
+    with pytest.raises(
+        InputFileError,
+        match=(
+            f"blocks.json is malformed: index entry b-p0002-001 has the depth {depth}"
+        ),
+    ):
+        render_markdown(_blocks_file((entry,)), CONFIG)
 
 
 @pytest.mark.parametrize(
@@ -826,7 +854,10 @@ EVERY_KIND = _blocks_file(
             2,
         ),
         _heading("b-p0003-001", 2, None, "INDEX"),
-        _block("b-p0003-002", BlockKind.INDEX_ENTRY, "Aachen, 12, 34-36.", 3),
+        replace(
+            _block("b-p0003-002", BlockKind.INDEX_ENTRY, "Aachen, 12, 34-36.", 3),
+            level=1,
+        ),
         _block("b-p0003-003", BlockKind.FIGURE, "PLATE I. The battle.", 3),
     )
 )

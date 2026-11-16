@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed since that check by task 3.6 (no join after a digit before a letter): \"136-39-\" and \"Bryce,\" are no longer joined. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 4.1 (structure spec section 14, \"Levels\"): \"INDEX\" is a heading of level 1, the first line of a page without a running head, with no label. Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 5.2 (structure spec section 17, rules 3 and 4): the paragraph that held the whole index page is one index_entry block per entry, 65 of them, the left column's then the right's, each with its continuation lines (\"Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100, 112, 131, 136/.\"); \"Brittany, ... 136-39-\" and \"Bryce, James, ...\" are two entries. Checked against the excerpt's text by the task 5.2 session on 16 November 2026, for the orchestrator to check against the page image.",
+  "changed": "Changed since that check by task 3.6 (no join after a digit before a letter): \"136-39-\" and \"Bryce,\" are no longer joined. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 4.1 (structure spec section 14, \"Levels\"): \"INDEX\" is a heading of level 1, the first line of a page without a running head, with no label. Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 5.2 (structure spec section 17, rules 3 and 4): the paragraph that held the whole index page is one index_entry block per entry, 65 of them, the left column's then the right's, each with its continuation lines (\"Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100, 112, 131, 136/.\"); \"Brittany, ... 136-39-\" and \"Bryce, James, ...\" are two entries. Checked against the excerpt's text by the task 5.2 session on 16 November 2026, for the orchestrator to check against the page image. Changed by the owner's decision of 16 November 2026 on sub-entries (structure spec section 17, rule 5): each entry is cut after each word ending in \";\", which gives 7 sub-entries on the page, 72 index_entry blocks in all (\"Anjou, counts of, 61, 85;\" then \"relations with Normandy, 61-63, 85, 100, 112, 131, 136/.\"; \"Bayeux, ..., 172,187;BlackBook, III. See ...\" is not cut, the OCR having glued its \";\" to the next word). Checked against the excerpt's text on 16 November 2026, for the orchestrator to check against the page image.",
   "excerpt": "haskins_eval",
   "page": 9,
   "book_page_index": 266,
@@ -191,7 +191,14 @@
     },
     {
       "kind": "index_entry",
-      "text": "Amari, M., 216, 248; quoted, 234.",
+      "text": "Amari, M., 216, 248;",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "quoted, 234.",
       "pages": [
         9
       ]
@@ -226,7 +233,14 @@
     },
     {
       "kind": "index_entry",
-      "text": "Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100, 112, 131, 136/.",
+      "text": "Anjou, counts of, 61, 85;",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "relations with Normandy, 61-63, 85, 100, 112, 131, 136/.",
       "pages": [
         9
       ]
@@ -247,7 +261,14 @@
     },
     {
       "kind": "index_entry",
-      "text": "Antioch, 212; principality, 214-16.",
+      "text": "Antioch, 212;",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "principality, 214-16.",
       "pages": [
         9
       ]
@@ -275,7 +296,14 @@
     },
     {
       "kind": "index_entry",
-      "text": "Architecture, Norman, 9-12, 102, 186-89; Sicilian, 189, 241-44.",
+      "text": "Architecture, Norman, 9-12, 102, 186-89;",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Sicilian, 189, 241-44.",
       "pages": [
         9
       ]
@@ -324,7 +352,14 @@
     },
     {
       "kind": "index_entry",
-      "text": "Assizes, Anglo-Norman, 94, 100, in/., 161; Sicilian, 230/., 234.",
+      "text": "Assizes, Anglo-Norman, 94, 100, in/., 161;",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Sicilian, 230/., 234.",
       "pages": [
         9
       ]
@@ -408,7 +443,21 @@
     },
     {
       "kind": "index_entry",
-      "text": "Bee, 171, 185; schools, 175 /.; library, 177-80.",
+      "text": "Bee, 171, 185;",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "schools, 175 /.;",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "library, 177-80.",
       "pages": [
         9
       ]
