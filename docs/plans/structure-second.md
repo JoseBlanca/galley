@@ -372,7 +372,7 @@ marker-led blocks of tasks 2.2 and 2.3).
 expected, not fixed. Rule 4 of verse takes Domesday's tables inset on
 both sides.
 
-- [ ] 4.0 Re-cut `domesday_headings_quotes` (added 16 November 2026,
+- [x] 4.0 Re-cut `domesday_headings_quotes` (added 16 November 2026,
   from the review of work packages 2, 3.1, 6.1–6.2 and 7.1–7.2): its
   body height measures 9.0 against the book's 10.0, so its pages have no
   footnote band and its notes come out as paragraphs; choose pages that

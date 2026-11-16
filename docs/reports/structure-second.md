@@ -345,3 +345,15 @@ The fixes run in two worktrees, structure (`fix-s`) and the other stages
 
 After both merges, at the plan's branch: pytest 1418 passed in 27.6 s;
 with 8 threads in 48.6 s; ruff, ty pass.
+
+## Task 4.0 (5569c03 spec, fb90ec9; merged)
+
+`domesday_headings_quotes` is re-cut to 11 pages: book pages 14, 22, 30,
+39, 40, 42, 47, 93, 272, 274, 406. It now measures as the whole book
+does: body height 10.0 (book 10.0, old excerpt 9.0), pitch 12.09
+(12.135), marker form digits (None before); page 93 has 8 band blocks
+and 10 notes, page 274 6 and 7, as on the whole book. The first index
+page (546) is left out: its 50 rows of 8 pt type pulled the pitch to
+11.5; its case, index page numbers overhanging the right column, is
+left to the whole-book check (structure §9 says so). Page 47, a table
+read as verse, is added.
