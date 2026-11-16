@@ -203,3 +203,61 @@ renders), and seven tests of about 1.6–2.2 s each, five of them
 epubcheck runs. Added to the plan: after the `notes` stream merges, the
 run is measured on an idle machine, and if it is over 30 s a task brings
 it back under (before work package 2's review).
+
+## Stream `notes`: work package 2, tasks 2.1 to 2.5 (merged at 19703a4)
+
+Commits: 3505c33 and 81ecd6d (spec), ab4869f (2.1), c30cc61 (2.2),
+1bb0fa8 (2.3), dbfdad7 (2.4), b604dba (2.5). The band is cut into notes
+by structure §11's start rules, markers are taken off, notes over a page
+break are joined, notes left at the foot of the body are taken,
+references are found and linked, Gierke's endnote section is read, and a
+margin note beside a note's line goes inside that note.
+
+Whole books, 16 November 2026:
+
+| book | footnotes linked | joined over a page break | taken from the body |
+|---|---|---|---|
+| Haskins | 63 of 72 | – | – |
+| Domesday | 1,489 of 1,731 | 48 | 42 notes on 15 pages |
+| Mariéjol | 651 of 1,141 | 25 | 147 notes on 44 pages |
+| Kadesh | 31 of 149 | 4 | – |
+| Stubbs | 0 of 163 (its index and lists) | 6 | – |
+
+Gierke: 299 endnotes on pages 186 to 282, 213 linked (the spec's
+prototype linked 205). "Linked" here is the stage's own count; whether
+each link is right is scored in task 7.5.
+
+Decided by the orchestrator during the stream, each written into
+structure §11 before the code (3505c33, 81ecd6d):
+
+- a band line starts a note under rule 1 only when indented after a
+  short line, not when it is only centred; a page's single band line is
+  never indented;
+- the first line of a later column of a band starts a note when it is
+  indented against that column (Kadesh page 8, the right column);
+- a reference candidate has punctuation before its digits or is glued to
+  a word; a bare "13," is not (Kadesh page 10); punctuation means
+  Unicode's punctuation categories, so "£2" is not a reference
+  (Domesday page 83);
+- a page's first note with no marker, not indented and joining no
+  earlier note is not counted in the per-page numbering (Mariéjol page
+  211);
+- a reference that was a whole word with a letter is not linked, as
+  architecture §13 now requires. This leaves Mariéjol's "(i)." (the
+  OCR's "(1).") unlinked.
+
+The stream twice needed files outside its list (`tests/test_end_to_end.py`,
+the structure spec); the orchestrator added them.
+
+Reference pages changed, each with its "changed" sentence, checked by
+the orchestrator against the page image or the excerpt's text: Domesday
+74, 75, 76 and 83 (the eight notes of 83 against the image), Haskins
+132, Kadesh 8 and 10, Mariéjol 214, Gierke 270. They go into the
+owner's sheet of task 7.3.
+
+Open, for the review: Kadesh's marker form comes out as "sign", not the
+digits structure §1 states, and only 31 of its 149 notes are linked,
+against 42 in the spec's research.
+
+After the merge: pytest 1370 passed in 34.2 s at load average 3.3;
+`-m whole_book` 28 passed in 232 s.

@@ -259,22 +259,22 @@ give"); its scores are known only in task 7.5. Kadesh's notes on pages
 9, 11 and 13 to 15 are too damaged to cut, and stay notes without a
 marker (structure §11, "Where the rules fail").
 
-- [ ] 2.1 Where a note starts, its marker and value, two notes on one
+- [x] 2.1 Where a note starts, its marker and value, two notes on one
   line, and a note that runs over a page break; `note_marker`. Spec:
   structure §11, "Where a note starts", "The marker of a note", "A note
   that runs over a page break". Deliverables 1, 3.
-- [ ] 2.2 Notes left in the body (structure §2, step 2.5), and the
+- [x] 2.2 Notes left in the body (structure §2, step 2.5), and the
   marker-led body block that is never run on into the next page and
   that the quote rules of task 4.3 will skip. Spec: structure §11,
   "Notes left in the body"; §16, the paragraph before rule 1. Needs 2.1.
   Deliverables 1, 2.
-- [ ] 2.3 References: the candidates, the book's reference form, the
+- [x] 2.3 References: the candidates, the book's reference form, the
   matching, and the `note_marker` splits; `reference_candidate`. Spec:
   structure §11, "References". Needs 2.1. Deliverables 1 to 3.
-- [ ] 2.4 The endnote section, its notes, and their references matched
+- [x] 2.4 The endnote section, its notes, and their references matched
   over the whole book. Spec: structure §12; §2, steps 1 and 3.1. Needs
   2.3. Deliverables 1, 2.
-- [ ] 2.5 The line a margin note stands beside (structure §13, rule 2),
+- [x] 2.5 The line a margin note stands beside (structure §13, rule 2),
   and a margin note beside a note's line placed inside that note (rule
   5); `make_blocks` and `run` with the steps of structure §2 in their
   order. Spec: structure §13, rules 2 and 5; §2. Needs 2.4.
