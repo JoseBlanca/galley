@@ -340,6 +340,9 @@ def test_the_excerpt_epub_passes_epubcheck(
 
 _BOOKS_TOML = Path(__file__).parents[1] / "evaluation" / "books.toml"
 _PAGE_KEYS = ("exclude_pages", "contents_pages", "plate_pages")
+# The headings a run of contents pages starts with: a table of contents,
+# and Gierke's analytical summary.
+_CONTENTS_HEADINGS = ("CONTENTS", "TABLE DES MATI", "ANALYTICAL SUMMARY")
 
 
 def test_the_evaluation_books_have_the_same_config_in_conftest_and_books_toml(
@@ -378,11 +381,21 @@ def test_analyze_takes_the_whole_book_config_and_its_contents_pages_say_so(
     main(["analyze", str(tmp_path)])
     assert folder.pages_json.exists()
     config = tomllib.loads(whole_book_toml[book])
-    # Each contents page has the word at its top (the comment of
-    # WHOLE_BOOK_CONFIGS).
+    # Each run of contents pages starts at a page with a contents heading at
+    # its top (the comment of WHOLE_BOOK_CONFIGS); the pages after the first
+    # of a run carry a running head, which may be the book's title.
+    contents_pages = config.get("contents_pages", [])
+    run_starts = tuple(
+        page_index
+        for page_index in contents_pages
+        if page_index - 1 not in contents_pages
+    )
     with open_pdf(Path(config["pdf"])) as pdf:
-        for page_index in config.get("contents_pages", []):
+        for page_index in run_starts:
             top = " ".join(
                 word["text"] for word in pdf.pages[page_index].extract_words()[:4]
             ).upper()
-            assert "CONTENTS" in top or "TABLE DES MATI" in top, (page_index, top)
+            assert any(heading in top for heading in _CONTENTS_HEADINGS), (
+                page_index,
+                top,
+            )

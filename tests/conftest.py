@@ -123,11 +123,16 @@ EXCERPT_CONFIGS = frozendict(
 #
 # contents_pages: the printed table of contents, found on 16 November 2026
 # by "CONTENTS" or "TABLE DES MATIERES" at the top of the page and checked
-# by reading each page's text layer. Kadesh has none.
+# by reading each page's text layer. Kadesh has none. Gierke has two more
+# lists of its chapters' parts: the "ANALYTICAL SUMMARY", pages 52 to 60,
+# which centres the ten section headings, and the "SUBJECT MATTER OF THE
+# NOTES", pages 61 to 67, ending before the "LIST OF AUTHORITIES" on 68
+# (read in the text layer on 16 November 2026).
 #
 # plate_pages: Kadesh 23, a faint relief that analyze's rule misses. It is
-# also in exclude_pages, which wins, until analyze recognises plates
-# without a text layer: before that, analyze refuses the page.
+# also in exclude_pages, which wins (architecture section 6), until
+# analyze recognises plates without a text layer: before that, analyze
+# refuses the page.
 WHOLE_BOOK_CONFIGS = frozendict(
     {
         "normansineuropea00hask": (
@@ -161,7 +166,8 @@ WHOLE_BOOK_CONFIGS = frozendict(
         "politicaltheorie00gieruoft": (
             'language = "en"\n'
             "exclude_pages = [0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 289]\n"
-            "contents_pages = [10]\n"
+            "contents_pages = [10, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, "
+            "64, 65, 66, 67]\n"
         ),
     }
 )

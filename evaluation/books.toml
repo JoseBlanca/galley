@@ -8,8 +8,9 @@
 # 2). The contents pages are those of the printed table of contents,
 # found on 16 November 2026 by "CONTENTS" or "TABLE DES MATIERES" at the
 # top of the page and checked by reading each page's text layer. galley-eval
-# writes these keys, and `plate_pages` when a book has it, into the
-# book.toml it gives galley (architecture section 6). `html_sha256` is that of
+# writes `exclude_pages`, `contents_pages` and `plate_pages`, each an empty
+# list when a book has none, into the book.toml it gives galley
+# (architecture section 6). `html_sha256` is that of
 # the HTML file downloaded on 15 November 2026, for which the rules and
 # counts were written. `expected_counts` were counted by hand in the HTML,
 # with a search for each class and href, never by running the reader;

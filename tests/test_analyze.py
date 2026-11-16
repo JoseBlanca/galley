@@ -165,6 +165,17 @@ def test_ocr_verify_and_trust_with_pages_below_the_count_pass(ocr: OcrMode) -> N
     check_config_pages(config, 10)
 
 
+def test_page_in_plate_pages_and_exclude_pages_is_accepted_and_excluded() -> None:
+    # Architecture section 6: exclude_pages wins.
+    config = replace(CONFIG, exclude_pages=(23,), plate_pages=(23,))
+
+    check_config_pages(config, 24)
+    page = classify_page(23, 612.0, 792.0, 40, config)
+
+    assert page.kind is PageKind.EXCLUDED
+    assert page.text_source is TextSource.NONE
+
+
 def test_contents_pages_and_plate_pages_below_the_page_count_pass() -> None:
     config = replace(CONFIG, contents_pages=(14, 15, 16), plate_pages=(23,))
 
