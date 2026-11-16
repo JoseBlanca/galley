@@ -103,5 +103,6 @@ def take_body_notes(
             for run in page.runs
             if run.start < start
         ),
+        block_starts=frozenset(n for n in page.block_starts if n < start),
         body_notes=page.body[start:],
     )

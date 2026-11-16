@@ -3278,8 +3278,9 @@ def test_heading_first_on_a_page_with_a_running_head_is_level_2() -> None:
 def test_heading_centred_over_a_band_on_a_page_of_fewer_than_5_body_lines(
     body_lines: int, heading: bool
 ) -> None:
-    # Haskins' page 129: "BIBLIOGRAPHICAL NOTE" in a region of its own above
-    # a band of small type, so that the body column is the heading itself.
+    # As on Haskins' page 129: a heading in a region of its own above a band
+    # of small type, so that the body column is the heading itself (another
+    # title than "BIBLIOGRAPHICAL NOTE", whose band would be paragraphs).
     # With 4 more short body lines at the left, the heading's region is
     # measured against them, and the band is not looked at.
     short_lines = tuple(
@@ -3296,7 +3297,7 @@ def test_heading_centred_over_a_band_on_a_page_of_fewer_than_5_body_lines(
         )
     )
     regions = (
-        _region(_centred_line("BIBLIOGRAPHICAL NOTE", 65, 120)),
+        _region(_centred_line("NOTE ON THE SOURCES", 65, 120)),
         *((_region(*short_lines),) if short_lines else ()),
         band,
     )
@@ -3305,7 +3306,7 @@ def test_heading_centred_over_a_band_on_a_page_of_fewer_than_5_body_lines(
     assert len(blocks.notes) == 1
     assert tuple(
         block_text(block) for block in blocks.blocks if block.kind is BlockKind.HEADING
-    ) == (("BIBLIOGRAPHICAL NOTE",) if heading else ())
+    ) == (("NOTE ON THE SOURCES",) if heading else ())
 
 
 @pytest.mark.parametrize(
@@ -3787,7 +3788,9 @@ def test_verse_block_ending_a_page_ends_before_prose_on_the_next() -> None:
     )
 
 
-def test_make_blocks_with_headings_summaries_and_verse_with_1_and_3_workers() -> None:
+def test_make_blocks_with_headings_summaries_verse_and_quotes_with_1_and_3_workers() -> (
+    None
+):
     pages = (
         *_verse_over_a_break(
             (_verse_line(_VERSE[2], 70), _verse_line(_VERSE[0], 85))
@@ -3810,11 +3813,339 @@ def test_make_blocks_with_headings_summaries_and_verse_with_1_and_3_workers() ->
             replace(_around(_centred_line("CHAPTER IV.", 130)), index=index)
             for index in range(4, 8)
         ),
+        replace(_quote_page(8, *_quote_lines(115, 8.5)), index=8),
+        *(
+            replace(page, index=page.index + 10)
+            for page in _bibliography_pages("BIBLIOGRAPHICAL NOTE").pages
+        ),
     )
     lines = _lines_of(*pages)
     assert make_blocks(lines, _NO_WORDS, workers=1) == make_blocks(
         lines, _NO_WORDS, workers=3
     )
+
+
+# Quotes (structure spec, section 16, rules 1 to 3). The body's full lines
+# hold 16 characters over 250 pt; a quote's 24 over the same width, 1.5
+# times as dense.
+
+_QUOTE_TEXTS = (
+    "quoted words of smaller type",
+    "and more of them quoted here",
+    "the quotation ends here now",
+)
+
+
+def _quote_lines(
+    top: float,
+    height: float,
+    texts: tuple[str, ...] = _QUOTE_TEXTS,
+    x0: float = _BODY_LEFT_PT,
+    x1: float = _RIGHT_PT,
+) -> tuple[Line, ...]:
+    """Lines of `texts` 15 pt apart from `top`, the first indented 10 pt,
+    the last ending at 210 pt, of words `height` pt high."""
+    last = len(texts) - 1
+    return tuple(
+        _spread(
+            text,
+            x0 + (10 if n == 0 else 0),
+            210 if n == last and x1 == _RIGHT_PT else x1,
+            top + _PITCH_PT * n,
+            height,
+        )
+        for n, text in enumerate(texts)
+    )
+
+
+def _quote_page(index: int, *middle: Line) -> PageLayout:
+    """A paragraph whose last line is short, the lines `middle` from 115 pt,
+    and a paragraph whose first line is indented."""
+    after = 115 + _PITCH_PT * len(middle)
+    return _body_page(
+        index,
+        _full("before 0 of the page", 70),
+        _full("before 1 of the page", 85),
+        _short("its end.", 100),
+        *middle,
+        _indented("after 0 of the page", after),
+        *(_full(f"after {n} of the page", after + _PITCH_PT * n) for n in range(1, 5)),
+    )
+
+
+def _kinds(blocks: BlocksFile) -> tuple[str, ...]:
+    return tuple(block.kind.value for block in blocks.blocks)
+
+
+@pytest.mark.parametrize(
+    ("height", "kind"),
+    [(8.5, "quote"), (9.5, "quote"), (9.6, "paragraph"), (10.0, "paragraph")],
+)
+def test_quote_of_smaller_and_denser_type_across_the_column(
+    height: float, kind: str
+) -> None:
+    # A height ratio of at most 0.95 over the body word height, 10 pt.
+    lines = _lines_of(_quote_page(0, *_quote_lines(115, height)))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _kinds(blocks) == ("paragraph", kind, "paragraph")
+    assert block_text(blocks.blocks[1]) == " ".join(_QUOTE_TEXTS)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+@pytest.mark.parametrize(("x1", "kind"), [(290.0, "quote"), (295.0, "paragraph")])
+def test_quote_by_rule_1_needs_a_density_of_1_04(x1: float, kind: str) -> None:
+    # The body's full lines hold 15 characters over 250 pt (the median). The
+    # quote's lines hold 15 over (x1 - 50) pt, the first a little denser, so their
+    # median density against the book's is 250 / (x1 - 50): 1.042 at 290 pt,
+    # 1.020 at 295.
+    lines = tuple(
+        _spread(f"aside {n} of the page", 60 if n == 1 else 50, x1, 100 + 15 * n, 8.5)
+        for n in range(1, 4)
+    )
+    blocks = make_blocks(_lines_of(_quote_page(0, *lines)), _NO_WORDS, workers=1)
+    assert _kinds(blocks)[1] == kind
+
+
+def test_quote_by_rule_1_needs_two_wide_lines() -> None:
+    # The second and third lines of 4 words are not wide.
+    texts = (_QUOTE_TEXTS[0], "and more quoted here", "the quote ends now")
+    blocks = make_blocks(
+        _lines_of(_quote_page(0, *_quote_lines(115, 8.5, texts))), _NO_WORDS, workers=1
+    )
+    assert _kinds(blocks)[1] == "paragraph"
+
+
+@pytest.mark.parametrize(("inset", "kind"), [(16.0, "quote"), (15.5, "paragraph")])
+def test_quote_inset_by_16_pt_in_smaller_type_by_rule_2(
+    inset: float, kind: str
+) -> None:
+    # Domesday's numbered items: two lines, one wide, inset on the left.
+    lines = (
+        _spread(
+            "(vi) A Devonshire manor of the", _BODY_LEFT_PT + inset, _RIGHT_PT, 115, 8.5
+        ),
+        _spread("king's own land.", _BODY_LEFT_PT + inset, 160, 130, 8.5),
+    )
+    blocks = make_blocks(_lines_of(_quote_page(0, *lines)), _NO_WORDS, workers=1)
+    assert _kinds(blocks)[1] == kind
+
+
+def test_quote_short_block_next_to_a_quote_by_rule_3() -> None:
+    # A quote, then a short line of small type indented after its short last
+    # line: a quote too; the same short line after a paragraph stays one.
+    short = _spread("Thus spoke the poet.", 70, 170, 160, 8.5)
+    blocks = make_blocks(
+        _lines_of(_quote_page(0, *_quote_lines(115, 8.5), short)), _NO_WORDS, workers=1
+    )
+    assert _kinds(blocks) == ("paragraph", "quote", "quote", "paragraph")
+    alone = make_blocks(
+        _lines_of(_quote_page(0, replace_top(short, 115))), _NO_WORDS, workers=1
+    )
+    assert _kinds(alone) == ("paragraph", "paragraph", "paragraph")
+
+
+def test_quote_band_of_small_type_is_still_a_note() -> None:
+    page = PageLayout(
+        0,
+        (
+            _region(*_quote_page(0).regions[0].lines),
+            _region(
+                _note_line("1 A note of small type that runs on", 300),
+                _note_line("and ends.", 309, 50, 100),
+            ),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert len(blocks.notes) == 1
+    assert "quote" not in _kinds(blocks)
+
+
+def test_quote_none_on_a_page_of_contents_pages() -> None:
+    lines = _lines_of(_quote_page(0, *_quote_lines(115, 8.5)))
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    assert "quote" not in _kinds(blocks)
+
+
+@pytest.mark.parametrize(
+    ("markers", "taken"),
+    [(("(1)", "(2)", "(3)"), True), (("(1)", "(3)", "(2)"), False)],
+)
+def test_quote_never_made_of_notes_left_in_the_body(
+    markers: tuple[str, str, str], taken: bool
+) -> None:
+    # Section 16: in order, the small lines are notes; out of order, each
+    # stays a paragraph led by a marker, not a quote, and the last does not
+    # run on into page 2.
+    blocks = make_blocks(_body_notes_pages(markers), _NO_WORDS, workers=1)
+    assert "quote" not in _kinds(blocks)
+    assert (len(blocks.notes) == 4) is taken
+    if not taken:
+        assert block_text(blocks.blocks[-1]).startswith("two 0 of the page")
+
+
+def test_quote_never_made_of_notes_in_the_body_on_a_page_whose_band_starts_at_1() -> (
+    None
+):
+    blocks = make_blocks(
+        _body_notes_pages(("(1)", "(2)", "(3)"), band_on_the_page=True),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert "quote" not in _kinds(blocks)
+
+
+def test_quote_never_made_of_notes_in_the_body_below_text_as_small() -> None:
+    blocks = make_blocks(
+        _body_notes_pages(("(1)", "(2)", "(3)"), text_height=_SMALL_PT),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert tuple(
+        block.kind.value for block in blocks.blocks if block_text(block).startswith("(")
+    ) == ("paragraph", "paragraph", "paragraph")
+
+
+# Haskins' bibliographical notes (structure spec, section 16)
+
+
+def _bibliography_pages(title: str) -> LinesFile:
+    """Page 0: a paragraph, the level-2 heading `title`, and a block of small
+    type that rule 1 would make a quote. Page 1: a paragraph and a band
+    block of small type without a marker. Page 2: a paragraph, the heading
+    "CHAPTER II." and the same two blocks. Page 3: a band note "1 …" so
+    that the book's marker form is digits."""
+
+    def band() -> Region:
+        return _region(
+            _note_line("Sources are listed in the general works on", 300),
+            _note_line("the period.", 309, 50, 100),
+        )
+
+    page_0 = _quote_page(0, _centred_line(title, 122.5, 120), *_quote_lines(145, 8.5))
+    page_1 = PageLayout(1, (_region(*_five_full_lines(70, "one")), band()), ())
+    body_2 = _quote_page(
+        2, _centred_line("CHAPTER II.", 122.5, 60), *_quote_lines(145, 8.5)
+    ).regions[0]
+    # Its first line indented, so that it starts a paragraph.
+    body_2 = _region(_indented("before 0 of the page", 70), *body_2.lines[1:])
+    page_2 = PageLayout(2, (body_2, band()), ())
+    page_3 = PageLayout(
+        3,
+        (
+            _region(*_five_full_lines(70, "three")),
+            _region(_note_line("1 A real note.", 300, 50, 120)),
+        ),
+        (),
+    )
+    return _lines_of(page_0, page_1, page_2, page_3)
+
+
+def test_bibliographical_note_blocks_are_paragraphs_up_to_the_next_heading() -> None:
+    lines = _bibliography_pages("BIBLIOGRAPHICAL NOTE")
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    by_page = tuple(
+        (block.origin[0].page_index, block.kind.value, block_text(block).split(" ")[0])
+        for block in blocks.blocks
+    )
+    # Page 0's small block and page 1's band block are paragraphs, the band
+    # block after page 1's body; after "CHAPTER II." the small block is a
+    # quote and the band block a note.
+    assert by_page == (
+        (0, "paragraph", "before"),
+        (0, "heading", "BIBLIOGRAPHICAL"),
+        (0, "paragraph", "quoted"),
+        (0, "paragraph", "after"),
+        (1, "paragraph", "Sources"),
+        (2, "paragraph", "before"),
+        (2, "heading", "CHAPTER"),
+        (2, "quote", "quoted"),
+        (2, "paragraph", "after"),
+    )
+    # Page 2's band block, not indented and without a marker, is a note.
+    assert tuple(
+        (note.origin[0].page_index, block_text(note.blocks[0]).split(" ")[0])
+        for note in blocks.notes
+    ) == ((2, "Sources"), (3, "A"))
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_bibliographical_note_rule_names_its_title() -> None:
+    blocks = make_blocks(_bibliography_pages("FURTHER READING"), _NO_WORDS, workers=1)
+    assert tuple(
+        (block.origin[0].page_index, block.kind.value)
+        for block in blocks.blocks
+        if block_text(block).startswith("quoted")
+    ) == ((0, "quote"), (2, "quote"))
+    assert not any(block_text(block).startswith("Sources") for block in blocks.blocks)
+
+
+def test_bibliographical_note_heading_of_level_1_heads_none() -> None:
+    # "BIBLIOGRAPHICAL NOTE" first on a page without a running head is
+    # level 1, so its section is not a bibliographical note.
+    page = _body_page(
+        0,
+        _centred_line("BIBLIOGRAPHICAL NOTE", 40, 120),
+        *_quote_page(0, *_quote_lines(115, 8.5)).regions[0].lines,
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _kinds_and_texts(blocks)[0][:2] == ("heading", 1)
+    assert "quote" in _kinds(blocks)
+
+
+def test_bibliographical_note_pages_keep_the_notes_left_in_their_body() -> None:
+    # The heading at the foot of page 0 starts a bibliographical note that
+    # runs to "CHAPTER II." on page 3: page 1's small lines with rising
+    # markers stay paragraphs, and page 0's band note is one too.
+    pages = _body_notes_pages(("(1)", "(2)", "(3)")).pages
+    page_0 = replace(
+        pages[0],
+        regions=(
+            _region(
+                *pages[0].regions[0].lines,
+                _centred_line("BIBLIOGRAPHICAL NOTE", 160, 120),
+            ),
+            pages[0].regions[1],
+        ),
+    )
+    page_3 = PageLayout(
+        3,
+        (
+            _region(
+                _centred_line("CHAPTER II.", 40, 60), *_five_full_lines(70, "three")
+            ),
+            _region(_note_line("(1) A note after the chapter.", 300, 62, 200)),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page_0, *pages[1:], page_3), _NO_WORDS, workers=1)
+    assert tuple(note.origin[0].page_index for note in blocks.notes) == (3,)
+    assert _page_1_blocks(blocks)[-3:] == (
+        "(1) Note (1) in small type.",
+        "(2) Note (2) in small type.",
+        "(3) Note (3) in small type.",
+    )
+
+
+@pytest.mark.parametrize(("first", "kind"), [("(2)", "paragraph"), ("Two", "quote")])
+def test_quote_never_a_block_led_by_the_book_s_marker_form(
+    first: str, kind: str
+) -> None:
+    # Section 16: a body block of small dense type whose first word has the
+    # book's marker form (bracketed, from page 1's band) is a note section
+    # 11 did not take, and stays a paragraph.
+    texts = (f"{first} quoted words of small type", *_QUOTE_TEXTS[1:])
+    page_1 = PageLayout(
+        1,
+        (
+            _region(*_five_full_lines(70, "one")),
+            _region(_note_line("(1) A note in the band.", 300, 62, 200)),
+        ),
+        (),
+    )
+    lines = _lines_of(_quote_page(0, *_quote_lines(115, 8.5, texts)), page_1)
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _kinds(blocks)[1] == kind
 
 
 # The fidelity check at the structure boundary
@@ -4086,3 +4417,39 @@ def test_whole_book_mariejol_210_foot_line_gives_page_number_and_signature_mark(
     assert _numbers_on(blocks, 210) == (
         PageNumber(210, "(l93)", PageNumberPosition.FOOT),
     )
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+def test_whole_book_haskins_quotes_and_bibliographical_notes(
+    whole_book_toml: frozendict[str, str], tmp_path: Path
+) -> None:
+    # Structure spec, section 16: the quotes in smaller type across the
+    # column on page 53, the quote over two page breaks from 71 to 73, and
+    # the band of small type under "BIBLIOGRAPHICAL NOTE" on page 129 as
+    # paragraphs, which the excerpt cannot show (tests/test_excerpts.py).
+    blocks = _blocks_of_whole_book(whole_book_toml["normansineuropea00hask"], tmp_path)
+
+    def kinds_from(page: int) -> tuple[tuple[str, list[int]], ...]:
+        return tuple(
+            (block.kind.value, [origin.page_index for origin in block.origin])
+            for block in blocks.blocks
+            if block.origin[0].page_index == page
+            and block.kind is not BlockKind.MARGIN_NOTE
+        )
+
+    assert kinds_from(53) == (
+        ("quote", [53]),
+        ("quote", [53]),
+        ("quote", [53]),
+        ("paragraph", [53]),
+        ("quote", [53, 54]),
+    )
+    assert kinds_from(71) == (("quote", [71, 72, 73]),)
+    assert kinds_from(129) == (
+        ("heading", [129]),
+        ("paragraph", [129]),
+        ("paragraph", [129, 130]),
+    )
+    assert not any(note.origin[0].page_index == 129 for note in blocks.notes)

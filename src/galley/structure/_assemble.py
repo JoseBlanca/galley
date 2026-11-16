@@ -9,6 +9,11 @@ from dataclasses import dataclass, replace
 from typing import assert_never
 
 from galley.model import Block, BlockKind, Note, NoteKind, WordChange
+from galley.structure._bibliography import (
+    bibliographical_pages,
+    in_bibliographical_notes,
+    with_band_as_body,
+)
 from galley.structure._body_notes import take_body_notes
 from galley.structure._endnotes import EndnoteGroup, endnote_groups, endnote_section
 from galley.structure._ids import numbered
@@ -42,6 +47,7 @@ from galley.structure._paragraphs import (
     PageParts,
     body_entries,
 )
+from galley.structure._quotes import book_density, with_quotes
 from galley.structure._references import NoteToMatch, match_endnotes, match_footnotes
 from galley.structure._runs import Label
 from galley.structure._unnumbered import (
@@ -170,15 +176,19 @@ def _taken_body_notes(
     form: MarkerForm | None,
     body_word_height: float,
     section_pages: range,
+    bibliography: frozenset[int],
 ) -> tuple[PageParts, ...]:
     """The pages with the notes left at the foot of their body taken, in a
     book numbered per page, except on the pages of the endnote section
-    (spec section 11, "Notes left in the body"), and each page's body
+    (spec section 11, "Notes left in the body") and those of `bibliography`,
+    in a bibliographical note (section 16), and each page's body
     notes put before its band regions. `band_notes` are each page's notes
     of its band; `body_word_height` is in points."""
     taken = tuple(
         take_body_notes(page, notes, form, body_word_height)
-        if numbering is Numbering.PER_PAGE and page.index not in section_pages
+        if numbering is Numbering.PER_PAGE
+        and page.index not in section_pages
+        and page.index not in bibliography
         else page
         for page, notes in zip(parts, band_notes, strict=True)
     )
@@ -286,7 +296,7 @@ def assemble(
     word_list: frozenset[str],
     body_word_height: float,
     body_line_pitch: float,
-    last_contents_page: int,
+    contents_pages: frozenset[int],
 ) -> Assembled:
     """The work after the per-page parts (spec section 2, steps 2.5 and 3),
     in page order: the notes left at the foot of each page's body taken
@@ -294,13 +304,24 @@ def assemble(
     split at the indented lines beside margin notes, the regions of one
     printed margin note joined, the footnotes of the band and of the body
     with their markers, the endnotes, the references linked to their
-    notes, each margin note placed before the paragraph whose line it is
-    beside or inside the note whose line it is beside, and the ids. `word_list` is in lower
-    case; `body_word_height` and `body_line_pitch` are in points; the
-    references to endnotes are taken from the pages after
-    `last_contents_page`, -1 for a book without contents pages."""
+    notes, the quotes, each margin note placed before the paragraph whose
+    line it is beside or inside the note whose line it is beside, and the
+    ids. A bibliographical note's band blocks are body paragraphs (spec
+    section 16). `word_list` is in lower case; `body_word_height` and
+    `body_line_pitch` are in points; `contents_pages` are the pages of the
+    printed table of contents, whose lines are never quotes and after the
+    last of which the references to endnotes are taken."""
+    last_contents_page = max(contents_pages, default=-1)
     form = book_marker_form(
         first_word(piece.lines[0]) for page in parts for piece in page.band_blocks
+    )
+    density = book_density(tuple(line for page in parts for line in page.body))
+    # Spec section 16: a bibliographical note's band blocks are paragraphs,
+    # and its pages' notes are not taken from the body.
+    bibliography = bibliographical_pages(parts)
+    parts = tuple(
+        with_band_as_body(page) if page.index in bibliography else page
+        for page in parts
     )
     band_notes = tuple(page_notes(page.band_regions, word_list) for page in parts)
     numbering = book_numbering(band_notes)
@@ -310,7 +331,13 @@ def assemble(
     # so the section's paragraphs are taken from the second.
     section_pages = _section_pages(body_entries(parts, form))
     pages = _taken_body_notes(
-        parts, band_notes, numbering, form, body_word_height, section_pages
+        parts,
+        band_notes,
+        numbering,
+        form,
+        body_word_height,
+        section_pages,
+        bibliography,
     )
     book_footnotes = footnotes(
         tuple(page_notes(page.band_regions, word_list) for page in pages),
@@ -328,9 +355,23 @@ def assemble(
         entries, _lines_before_notes(entries, book_footnotes), body_line_pitch
     )
     section = endnote_section(entries)
+    in_section = frozenset(section.paragraphs if section is not None else ())
+    # Spec section 2, step 3.5: the quotes, among the body's paragraphs.
+    entries = with_quotes(
+        entries,
+        frozenset(
+            position
+            for position, entry in enumerate(entries)
+            if entry.piece.lines[0].page_index not in contents_pages
+        )
+        - in_section
+        - in_bibliographical_notes(entries),
+        form,
+        body_word_height,
+        density,
+    )
     body = _body(entries, book_words, word_list)
     groups = endnote_groups(entries, section) if section is not None else ()
-    in_section = frozenset(section.paragraphs if section is not None else ())
     endnotes = tuple(
         _NoteWithLines(
             _endnote(group, body),

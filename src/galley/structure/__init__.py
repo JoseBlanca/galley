@@ -68,7 +68,7 @@ def make_blocks(
     depend on `workers`. `lower_case_words` is the word list of the book's
     language in lower case, as `wordlist.lower_case_word_list` gives it;
     `contents_pages` the page indices of the printed table of contents
-    (the config's), on which no heading is found (spec section 14) and
+    (the config's), whose lines stay paragraphs (spec section 14) and
     after the last of which the references to endnotes are taken (spec
     section 12)."""
     survey = survey_book(lines, workers=workers)
@@ -81,7 +81,7 @@ def make_blocks(
         lower_case_words,
         survey.body_word_height,
         survey.body_line_pitch,
-        max(contents_pages, default=-1),
+        contents_pages,
     )
     return BlocksFile(
         source_pdf_sha256=lines.source_pdf_sha256,

@@ -43,7 +43,9 @@ class PageParts:
     numbers, the body stream, the margin notes, the lines of each band
     region and the band blocks they make by rules 1 and 2, each of one
     page, whether the page has a figure, the runs of the body stream that
-    are blocks of their own (spec section 2, step 2.3), and the lines taken
+    are blocks of their own (spec section 2, step 2.3), the positions of
+    other lines of the body stream that start a block (a bibliographical
+    note's band blocks, spec section 16), and the lines taken
     from the foot of the body stream as notes (spec section 11, "Notes left
     in the body"), none until they are taken."""
 
@@ -56,6 +58,7 @@ class PageParts:
     band_blocks: tuple[Piece, ...]
     has_figure: bool
     runs: tuple[BodyRun, ...] = ()
+    block_starts: frozenset[int] = frozenset()
     body_notes: tuple[PlacedLine, ...] = ()
 
 
@@ -296,7 +299,12 @@ def body_entries(
                     _marker_led(current, form)
                     or _crosses_section_edge(before, line, section_pages)
                 )
-                starts = plate_break or note_break or starts_paragraph(line, before)
+                starts = (
+                    number in page.block_starts
+                    or plate_break
+                    or note_break
+                    or starts_paragraph(line, before)
+                )
             if starts:
                 if current:
                     entries.append(_block(current, current_run))

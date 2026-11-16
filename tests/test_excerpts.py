@@ -838,3 +838,102 @@ def test_verse_blocks_of_the_reference_pages_keep_their_lines(
 ) -> None:
     _, blocks = excerpt_outputs[excerpt]
     assert _blocks_of_kind(blocks, page, BlockKind.VERSE) == verse
+
+
+# Quotes and Haskins' bibliographical notes (structure spec, section 16), on
+# the reference pages of section 9, "The second plan". Haskins' quotes on
+# book pages 53 and 71 to 73 are checked on the whole book
+# (tests/test_structure.py): in the excerpt the heading of chapter II
+# (book page 41) is missing, so the bibliographical note of page 39 runs
+# on to page 129's and takes them in.
+
+
+def _kinds_on(blocks: BlocksFile, page: int) -> tuple[str, ...]:
+    return tuple(
+        block.kind.value
+        for block in blocks.blocks
+        if block.origin[0].page_index == page
+    )
+
+
+def _note_markers_on(blocks: BlocksFile, page: int) -> tuple[str, ...]:
+    return tuple(
+        note.marker for note in blocks.notes if note.origin[0].page_index == page
+    )
+
+
+def test_bibliographical_note_haskins_39_mid_page_heading_then_paragraphs(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["haskins_quotes_index"]
+    assert _kinds_on(blocks, 0) == ("paragraph", "heading", "paragraph")
+
+
+def test_bibliographical_note_haskins_129_band_of_small_type_is_paragraphs(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["haskins_quotes_index"]
+    assert _kinds_on(blocks, 5) == ("heading", "paragraph", "paragraph")
+    assert _note_markers_on(blocks, 5) == ()
+
+
+def test_quote_domesday_93_inset_quotes_and_its_footnotes_in_the_band(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # The items in 9 pt type set in after "…contrasted with the soke :—" are
+    # quotes, by rule 2; two of them run on into the next line of the text,
+    # which starts at the column's edge, and stay paragraphs (section 16,
+    # "Where they fail").
+    _, blocks = excerpt_outputs["domesday_headings_quotes"]
+    assert _kinds_on(blocks, 7) == (
+        "paragraph",
+        "paragraph",
+        "quote",
+        "paragraph",
+        "quote",
+        "quote",
+        "paragraph",
+        "quote",
+        "paragraph",
+    )
+    assert _note_markers_on(blocks, 7) == (
+        "1",
+        "2",
+        "3",
+        "4",
+        "s",
+        "8",
+        "7",
+        "8",
+        "9",
+        "w",
+    )
+
+
+def test_quote_domesday_274_quotes_across_the_column_and_footnotes_in_the_band(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["domesday_headings_quotes"]
+    assert _kinds_on(blocks, 9) == (
+        "quote",
+        "quote",
+        "quote",
+        "paragraph",
+        "quote",
+        "paragraph",
+    )
+    assert _note_markers_on(blocks, 9) == ("1", "-", "3", "4", "5", "e", "7")
+
+
+def test_quote_none_on_the_domesday_contents_page(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs["domesday_headings_quotes"]
+    assert set(_kinds_on(blocks, 0)) == {"paragraph"}
+
+
+def test_quote_none_of_the_notes_left_in_the_body_of_mariejol_210(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    _, blocks = excerpt_outputs[MARIEJOL]
+    assert set(_kinds_on(blocks, 0)) == {"paragraph"}
