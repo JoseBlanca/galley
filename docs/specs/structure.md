@@ -1098,7 +1098,10 @@ Domesday's 41 such words, Mariéjol's 805 and Kadesh's 9. Only Haskins' 42 "^" a
 Each band region is cut into notes, in reading order. A note line starts
 a note when any of these holds:
 
-1. section 6's indent rule starts a block there, as in the first plan;
+1. section 6's indent rule starts a block there, as in the first plan:
+   the line is indented after a short line (section 6, rule 1). A line
+   that section 6 starts only because it, or the line before, is
+   centred starts no note by this rule (owner, 16 November 2026);
 2. its first word has a **note marker's form** (below) and the line is
    indented 5 to 40 pt from the band's left edge, which is the smallest
    left side among the page's note lines within 60 pt of this line, so
@@ -1115,7 +1118,17 @@ a note when any of these holds:
    value is otherwise its place, since by place every marker-shaped
    line, a table's row too, would pass. On a page whose notes are each
    one line long no line is indented against another (Mariéjol's pages
-   221, 310 and 409).
+   221, 310 and 409);
+4. it is the first line of a band region after the page's first, and is
+   indented 5 to 40 pt from the band's left edge of rule 2: the first
+   note of the next column (owner, 16 November 2026). On Kadesh's page 8
+   (excerpt page 0) the right column starts "'There is, however…",
+   indented 12 pt against its column, a note whose marker the OCR glued
+   to its first word.
+
+A line is indented only against other note lines: on a page with one
+note line, the band's left edge is that line's own left side, so the
+line is never indented (owner, 16 November 2026).
 
 **Two notes on one line.** A word inside a note line starts a note when
 it has a note marker's form or is one lower-case letter (Domesday's "e"
@@ -1143,9 +1156,10 @@ punctuation test keeps a row of a table in a note ("40 2 42", Domesday
 page 43) whole.
 
 A band block whose first line starts no note is part of the note before
-it on the same page (the rest of a note in the second column, or a table
-that the indent rule cut into rows), or, when it is the page's first, of
-a note of the page before (below).
+it on the same page (the rest of a note in the second column, whose
+first line is not indented, or a table that the centring rule of
+section 6 cut into rows), or, when it is the page's first, of a note of
+the page before (below).
 
 ### The marker of a note
 
@@ -1167,8 +1181,10 @@ The first word of a note has a **note marker's form** when it is:
 A note started by its indent (rule 1 or 2) whose first word has none of
 these forms still takes it as its marker when it is one character and
 the next word starts with a capital ("«" on Domesday page 74, "z" on
-page 76). Otherwise the note has no marker: `marker` is empty and every
-word stays in its text.
+page 76), and the signs when the word is 1 or 2 of the signs above glued
+to a word that starts with a capital ("'There" on Kadesh page 8: the
+marker is "'" and the text starts with "There"). Otherwise the note has
+no marker: `marker` is empty and every word stays in its text.
 
 The marker is taken out of the note's first block into `marker`, as the
 OCR read it. A glued marker is split off by a `note_marker` word change
