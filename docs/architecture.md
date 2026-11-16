@@ -577,10 +577,16 @@ lists the words, with the pages they came from where the origins say.
   with a note's `marker` and a heading's `label` counted as words of
   it); markdown, blocks.json
   with the edits applied against `book.md` as Pandoc reads it (`pandoc -f
-  markdown-smart -t json`): a note reference is matched to Pandoc's note
-  element and its marker is not compared as a word, because Pandoc writes
-  its own numbers (section 17); likewise the `marker` of a
-  referenced footnote. An endnote stays where it was printed, so its
+  markdown-smart -t json`): a reference to a footnote is matched to
+  Pandoc's note element and its marker is not compared as a word, because
+  Pandoc writes its own numbers (section 17); likewise the `marker` of a
+  referenced footnote. A reference to an endnote is a link marked as a
+  note reference (section 9), which Pandoc reads as a `Link` element with
+  the attribute `epub:type="noteref"`: its text is not compared as a word
+  either, and the number of such links must equal the number of references
+  to endnotes, as the number of Pandoc's notes must equal the number of
+  references to footnotes. Any other link is an element galley's Markdown
+  does not make, and an error. An endnote stays where it was printed, so its
   `marker` is written there and counted, referenced or not (section 9).
   A heading's `label` is written in `book.md`, in the form the markdown
   spec gives, and counted as words of its block.
