@@ -187,15 +187,17 @@ EVALUATION_EXCERPTS = frozendict(
             ),
             Excerpt(
                 name="domesday_headings_quotes",
-                page_indices=(14, 22, 30, 39, 40, 42, 93, 274, 406, 546),
+                page_indices=(14, 22, 30, 39, 40, 42, 47, 93, 272, 274, 406),
                 covers=(
                     "a printed contents page (page index 14), an essay's label "
                     "3.4 pitches above its title (22), a section heading in "
                     "lower case mid-page (30), maps as plates with a caption "
                     "and the binder's note (39, 40), a table's title in "
-                    "capitals (42), inset quotes (93), quotes in smaller type "
-                    "(274), a table read as verse (406), and the first index "
-                    "page, whose page numbers overhang the right column (546)"
+                    "capitals (42), tables read as verse (47, 406), inset "
+                    "quotes (93) and quotes in smaller type (274) above "
+                    "footnotes; 47 and 272 repeat the running heads of 93 and "
+                    "274 and keep the excerpt's body measures at the book's "
+                    "(structure spec, section 9)"
                 ),
             ),
         ),
