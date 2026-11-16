@@ -4215,6 +4215,76 @@ def test_quote_never_a_block_led_by_the_book_s_marker_form(
     assert _kinds(blocks)[1] == kind
 
 
+# Guards that no fixture of the excerpts reaches (review of work package 4).
+
+
+@pytest.mark.parametrize("label", ["VIII", "XIII.", "Ill"])
+def test_heading_label_of_a_roman_numeral_of_up_to_5_characters(label: str) -> None:
+    # Haskins page 233 prints "VIII" above its title.
+    blocks = make_blocks(
+        _lines_of(
+            _around(
+                _centred_line(label, 130, width=25),
+                _centred_line("THE NORMAN KINGDOM OF SICILY", 143.5, width=160),
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert _kinds_and_texts(blocks)[1] == (
+        "heading",
+        1,
+        label,
+        "THE NORMAN KINGDOM OF SICILY",
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "heading"),
+    [("ABCDEFGhij", True), ("ABCDEFghij", False), ("THE EARLY YEArs", True)],
+)
+def test_heading_line_in_capitals_needs_0_7_of_its_letters_upper_case(
+    text: str, heading: bool
+) -> None:
+    # 1.5 pitches below the line before, so the gap branch does not hold:
+    # 7 of 10 letters upper case is a heading, 6 of 10 is not; 11 of 13,
+    # under the 0.9 a continuation needs, is one.
+    blocks = make_blocks(
+        _lines_of(_around(_centred_line(text, 122.5))), _NO_WORDS, workers=1
+    )
+    assert (_kinds_and_texts(blocks)[1][0] == "heading") is heading
+
+
+def test_margin_note_beside_an_indented_verse_line_keeps_the_verse_whole() -> None:
+    # Only a paragraph is split beside a margin note (section 13, rule 3).
+    body = _around(
+        *(_verse_line(text, 122.5 + 15 * n) for n, text in enumerate(_VERSE))
+    ).regions[0]
+    margin = _region(_spread("Aside", 310, 340, 137.5))
+    blocks = make_blocks(
+        _lines_of(PageLayout(0, (body, margin), ())), _NO_WORDS, workers=1
+    )
+    assert _kinds(blocks) == ("paragraph", "margin_note", "verse", "paragraph")
+    assert block_text(blocks.blocks[2]) == "\n".join(_VERSE)
+
+
+def test_chapter_summary_ends_before_the_next_heading() -> None:
+    # A heading straight after the summary's indented lines is a heading of
+    # its own, not more of the summary, though centred lines are indented.
+    blocks = make_blocks(
+        _lines_of(
+            _summary_page(
+                _hanging(_SUMMARY_TEXTS[0], 0),
+                _hanging(_SUMMARY_TEXTS[1], 9),
+                _centred_line("THE FIRST PART", 0),
+            )
+        ),
+        _NO_WORDS,
+        workers=1,
+    )
+    assert _kinds(blocks)[1:4] == ("heading", "chapter_summary", "heading")
+
+
 # The fidelity check at the structure boundary
 
 
