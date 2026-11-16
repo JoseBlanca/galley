@@ -197,7 +197,9 @@ def page_parts(
         removals=head.removals
         + (index.removals if index is not None else ())
         + foot.removals,
-        page_numbers=head.page_numbers + foot.page_numbers,
+        page_numbers=head.page_numbers
+        + (index.page_numbers if index is not None else ())
+        + foot.page_numbers,
         body=body,
         margin_notes=tuple(
             Piece(lines)

@@ -9,7 +9,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from galley.body_measures import commonest
-from galley.model import Box, Line, Region, Word
+from galley.model import Box, Line, Region, Removal, RemovalReason, Word
 
 # Spec section 6: a region of fewer lines takes its box's sides as edges.
 _LINES_FOR_COMMONEST_EDGES = 5
@@ -43,6 +43,19 @@ def words_box(words: Sequence[Word]) -> Box:
 def words_text(words: Iterable[Word]) -> str:
     """The texts of `words` joined by one space."""
     return " ".join(word.text for word in words)
+
+
+def words_removal(
+    page_index: int, words: Sequence[Word], reason: RemovalReason
+) -> Removal:
+    """One removal of `words`, which are not none, joined by one space, with
+    the smallest box that holds them."""
+    return Removal(
+        page_index=page_index,
+        box=words_box(words),
+        text=words_text(words),
+        reason=reason,
+    )
 
 
 def has_letter_or_digit(text: str) -> bool:

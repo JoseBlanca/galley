@@ -5310,3 +5310,32 @@ def test_index_entr_is_not_searched_for_note_references() -> None:
 
     assert len(body_candidates((block(BlockKind.PARAGRAPH),))) == 1
     assert body_candidates((block(BlockKind.INDEX_ENTRY),)) == ()
+
+
+def test_index_page_head_region_of_index_and_a_page_number_is_removed() -> None:
+    # Spec section 17, rule 2: Domesday 547's head region "Index." over
+    # "522", two lines, is its running head and page number.
+    head = _region(_line("Index.", 200, 20), _line("522", 79, 28))
+    page = PageLayout(
+        0,
+        (
+            head,
+            _index_column(_INDEX_LEFT_PT, _LEFT_ENTRIES),
+            _index_column(_INDEX_RIGHT_PT, _RIGHT_ENTRIES),
+        ),
+        (),
+    )
+    lines = _lines_of(
+        _index_page(0, "INDEX", _LEFT_ENTRIES, _RIGHT_ENTRIES), replace(page, index=1)
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert [(removal.reason, removal.text) for removal in _removals_of(1, blocks)] == [
+        (RemovalReason.RUNNING_HEAD, "Index."),
+        (RemovalReason.PAGE_NUMBER, "522"),
+    ]
+    assert blocks.page_numbers == (PageNumber(1, "522", PageNumberPosition.HEAD),)
+    assert not any(
+        block.origin[0].page_index == 1 and block.kind is not BlockKind.INDEX_ENTRY
+        for block in blocks.blocks
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)

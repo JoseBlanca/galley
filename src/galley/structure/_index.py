@@ -9,7 +9,16 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from galley.body_measures import commonest
-from galley.model import Line, PageLayout, Region, Removal, RemovalReason, Word
+from galley.model import (
+    Line,
+    PageLayout,
+    PageNumber,
+    PageNumberPosition,
+    Region,
+    Removal,
+    RemovalReason,
+    Word,
+)
 from galley.structure._foot import LinePlace
 from galley.structure._measures import (
     box_of,
@@ -17,6 +26,7 @@ from galley.structure._measures import (
     letters,
     middle,
     words_box,
+    words_removal,
     words_text,
 )
 from galley.structure._regions import RegionKind, head_line
@@ -236,9 +246,10 @@ class IndexPage:
     removed; the lines of the left column, then of the right, in reading
     order, and the positions of those that start an entry (rule 3); the
     left and right edge of each line's column; the numbers of the regions
-    read into the columns, which leave the page's other streams; and the
-    lines of guide words removed from regions not read into the columns,
-    as (region number, line number)."""
+    read into the columns, which leave the page's other streams; the
+    lines removed from regions not read into the columns (guide words and
+    a head region of "Index" and a page number), as (region number, line
+    number); and the page number of that head region."""
 
     removals: tuple[Removal, ...]
     lines: tuple[Line, ...]
@@ -246,6 +257,7 @@ class IndexPage:
     column_edges: tuple[tuple[float, float], ...]
     taken: frozenset[int]
     removed_lines: frozenset[LinePlace]
+    page_numbers: tuple[PageNumber, ...] = ()
 
 
 def _guide_words_removal(page_index: int, words: Sequence[Word]) -> Removal:
@@ -409,6 +421,75 @@ def _are_guide_words(left: Sequence[Line], right: Sequence[Line]) -> bool:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _IndexHead:
+    """A head region of an index page that is its running head and page
+    number (spec section 17, rule 2): the removals, its page number and
+    its lines."""
+
+    removals: tuple[Removal, ...]
+    page_numbers: tuple[PageNumber, ...]
+    lines: frozenset[LinePlace]
+
+
+_NO_INDEX_HEAD = _IndexHead((), (), frozenset())
+# Spec section 17, rule 2: the head region has two lines, the word "index"
+# and a page-number form.
+_INDEX_HEAD_LINES = 2
+
+
+def _index_head(page: PageLayout, removed: frozenset[LinePlace]) -> _IndexHead:
+    """The page's first region as its running head and page number when it
+    lies wholly above every other and its lines are only the word "index",
+    in any case, and a page-number form, in either order, one line each
+    (Domesday 547, "Index." over "522")."""
+    if not page.regions:
+        return _NO_INDEX_HEAD
+    first, *others = page.regions
+    places = tuple(
+        (0, number) for number in range(len(first.lines)) if (0, number) not in removed
+    )
+    if len(places) != _INDEX_HEAD_LINES or any(
+        other.box.top < first.box.bottom for other in others
+    ):
+        return _NO_INDEX_HEAD
+    texts = tuple(
+        tuple(word.text for word in first.lines[number].words) for _, number in places
+    )
+    numbers = tuple(
+        position
+        for position, words in enumerate(texts)
+        if len(words) == 1 and is_page_number_form(words[0])
+    )
+    titles = tuple(
+        position
+        for position, words in enumerate(texts)
+        if letters(" ".join(words)) == _INDEX_TITLES[0][0]
+    )
+    if len(numbers) != 1 or len(titles) != 1 or numbers == titles:
+        return _NO_INDEX_HEAD
+    number_line = first.lines[places[numbers[0]][1]]
+    title_line = first.lines[places[titles[0]][1]]
+    removals = tuple(
+        sorted(
+            (
+                words_removal(page.index, title_line.words, RemovalReason.RUNNING_HEAD),
+                words_removal(page.index, number_line.words, RemovalReason.PAGE_NUMBER),
+            ),
+            key=lambda removal: removal.box.top,
+        )
+    )
+    return _IndexHead(
+        removals,
+        (
+            PageNumber(
+                page.index, words_text(number_line.words), PageNumberPosition.HEAD
+            ),
+        ),
+        frozenset(places),
+    )
+
+
 def index_page(
     page: PageLayout,
     kinds: Sequence[RegionKind],
@@ -423,6 +504,8 @@ def index_page(
     they are one guide word each at one height, are removed. A page
     without two index columns gives its guide words alone. The head line is
     left as on any page."""
+    index_head = _index_head(page, removed)
+    removed |= index_head.lines
     head = head_line(page)
     guide_lines = frozenset(
         (number, line_number)
@@ -431,7 +514,7 @@ def index_page(
         for line_number, line in enumerate(region.lines)
         if (number, line_number) not in removed and _is_guide_words_line(line)
     )
-    removals = tuple(
+    removals = index_head.removals + tuple(
         _guide_words_removal(page.index, page.regions[number].lines[line_number].words)
         for number, line_number in sorted(
             guide_lines,
@@ -440,7 +523,15 @@ def index_page(
     )
     columns = index_columns(page, kinds)
     if columns is None:
-        return IndexPage(removals, (), frozenset(), (), frozenset(), guide_lines)
+        return IndexPage(
+            removals,
+            (),
+            frozenset(),
+            (),
+            frozenset(),
+            guide_lines | index_head.lines,
+            index_head.page_numbers,
+        )
     sides, taken = _column_items(page, kinds, columns, removed | guide_lines)
     left, right = _column(sides[0]), _column(sides[1])
     if _are_guide_words(left, right):
@@ -472,5 +563,7 @@ def index_page(
         frozenset(starts),
         tuple(edges),
         frozenset(taken),
-        frozenset(place for place in guide_lines if place[0] not in taken),
+        frozenset(place for place in guide_lines if place[0] not in taken)
+        | index_head.lines,
+        index_head.page_numbers,
     )
