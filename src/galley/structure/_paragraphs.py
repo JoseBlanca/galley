@@ -33,13 +33,14 @@ from galley.structure._survey import BookSurvey
 
 @dataclass(frozen=True, slots=True)
 class PageParts:
-    """What the per-page work gives for one page: the removals and page
+    """What the per-page work gives for one page: its index, the removals and page
     numbers, the body stream, the margin notes, the lines of each band
     region and the band blocks they make by rules 1 and 2, each of one
     page, whether the page has a figure, and the lines taken from the foot
     of the body stream as notes (spec section 11, "Notes left in the
     body"), none until they are taken."""
 
+    index: int
     removals: tuple[Removal, ...]
     page_numbers: tuple[PageNumber, ...]
     body: tuple[PlacedLine, ...]
@@ -109,6 +110,7 @@ def page_parts(page: PageLayout, survey: BookSurvey) -> PageParts:
         lines for kind, lines in regions if kind is RegionKind.BAND and lines
     )
     return PageParts(
+        index=page.index,
         removals=head.removals + foot.removals,
         page_numbers=head.page_numbers + foot.page_numbers,
         body=tuple(
@@ -153,13 +155,16 @@ def _marker_led(lines: Sequence[PlacedLine], form: MarkerForm | None) -> bool:
 
 
 def body_entries(
-    pages: Sequence[PageParts], form: MarkerForm | None = None
+    pages: Sequence[PageParts],
+    form: MarkerForm | None = None,
+    starting_page: int | None = None,
 ) -> tuple[Entry, ...]:
     """The paragraphs of the book's body stream in order, each followed by
     the margin notes of the pages whose body ends in it; the margin notes
     of a page with no body stream after the last block so far. A paragraph
     whose first word has the book's marker form `form` does not run on
-    into the next page."""
+    into the next page, and no paragraph runs on into `starting_page`, the
+    first page of the endnote section (spec section 12)."""
     entries: list[Entry] = []
     current: list[PlacedLine] = []
     pending: list[MarginNote] = []
@@ -173,7 +178,9 @@ def body_entries(
                 and (page.has_figure or page_before_has_figure)
                 and not (before is not None and hyphen_between(before, line))
             )
-            note_break = number == 0 and _marker_led(current, form)
+            note_break = number == 0 and (
+                _marker_led(current, form) or line.page_index == starting_page
+            )
             if plate_break or note_break or starts_paragraph(line, before):
                 if current:
                     entries.append(Paragraph(Piece(tuple(current))))

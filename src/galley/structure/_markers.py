@@ -118,9 +118,7 @@ def note_marker(word: str, *, endnote: bool = False) -> NoteMarker | None:
         return bracketed
     if _SIGNS_FORM.fullmatch(word):
         return NoteMarker(word, "", None)
-    if endnote and _ENDNOTE_FORM.fullmatch(word):
-        return NoteMarker(word, "", read_number(word[:-1]))
-    return None
+    return endnote_marker(word) if endnote else None
 
 
 # Spec section 11: 1 or 2 signs glued to a word that starts with a capital
@@ -136,6 +134,16 @@ def glued_sign_marker(word: str) -> NoteMarker | None:
     if match is None:
         return None
     return NoteMarker(match.group(1), match.group(2), None)
+
+
+def endnote_marker(word: str) -> NoteMarker | None:
+    """The marker of an endnote whose first word is `word`: 1 to 3 digits
+    followed by "." or "-", "I", "l", "!" and "o" counting as digits
+    ("291.", "I39-"), with what it reads; None otherwise (spec section 11,
+    the last form)."""
+    if not _ENDNOTE_FORM.fullmatch(word):
+        return None
+    return NoteMarker(word, "", read_number(word[:-1]))
 
 
 def marker_form(word: str) -> MarkerForm | None:

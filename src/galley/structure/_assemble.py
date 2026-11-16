@@ -23,9 +23,11 @@ from galley.model import (
     WordChange,
 )
 from galley.structure._body_notes import take_body_notes
+from galley.structure._endnotes import EndnoteGroup, endnote_groups, endnote_section
 from galley.structure._hyphens import PageLine, join_lines
 from galley.structure._lines import Piece, first_word
 from galley.structure._markers import (
+    MarkerForm,
     NoteMarker,
     Reference,
     book_marker_form,
@@ -33,8 +35,20 @@ from galley.structure._markers import (
 )
 from galley.structure._measures import box_of
 from galley.structure._notes import Footnote, footnotes, numbered_per_page, page_notes
-from galley.structure._paragraphs import MarginNote, PageParts, Paragraph, body_entries
-from galley.structure._references import Candidate, Link, NoteToMatch, match_footnotes
+from galley.structure._paragraphs import (
+    Entry,
+    MarginNote,
+    PageParts,
+    Paragraph,
+    body_entries,
+)
+from galley.structure._references import (
+    Candidate,
+    Link,
+    NoteToMatch,
+    match_endnotes,
+    match_footnotes,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -361,6 +375,108 @@ def _linked(
     )
 
 
+def _body(
+    entries: Sequence[Entry], book_words: frozenset[str], word_list: frozenset[str]
+) -> tuple[_Unnumbered, ...]:
+    """The body's entries as blocks, with their hyphens joined."""
+    body: list[_Unnumbered] = []
+    for entry in entries:
+        match entry:
+            case Paragraph(piece):
+                kind = BlockKind.PARAGRAPH
+            case MarginNote(piece):
+                kind = BlockKind.MARGIN_NOTE
+            case _:
+                assert_never(entry)
+        body.append(_joined(piece, kind, book_words, word_list))
+    return tuple(body)
+
+
+def _endnote(group: EndnoteGroup, body: Sequence[_Unnumbered]) -> _UnnumberedNote:
+    """An endnote of the paragraphs of `group`, its marker taken off the
+    first (spec section 12)."""
+    first, marker = _without_marker(body[group.paragraphs[0]], group.marker)
+    blocks = (first, *(body[position] for position in group.paragraphs[1:]))
+    return _UnnumberedNote(
+        kind=NoteKind.ENDNOTE,
+        marker=marker,
+        blocks=blocks,
+        origin=_merged_origin(blocks),
+        referenced=False,
+    )
+
+
+def _merged_origin(blocks: Sequence[_Unnumbered]) -> tuple[Origin, ...]:
+    """One origin per page that `blocks` have lines on, with the box that
+    holds their lines there."""
+    by_page: dict[int, list[Origin]] = {}
+    for block in blocks:
+        for origin in block.origin:
+            by_page.setdefault(origin.page_index, []).append(origin)
+    return tuple(
+        Origin(page_index, box_of(tuple(origin.box for origin in origins)))
+        for page_index, origins in by_page.items()
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _Note:
+    """A note before it has its id, with its value (spec section 11, "Its
+    value"; section 12)."""
+
+    note: _UnnumberedNote
+    value: int | None
+
+
+def _in_order(
+    endnotes: Sequence[_Note], footnotes_: Sequence[_Note]
+) -> tuple[_Note, ...]:
+    """The notes by their first page and, on a page, the endnotes, which
+    come from the body, before the footnotes of the band (spec section 7)."""
+    keyed = [
+        (_first_page(note.note.origin), 0, n, note) for n, note in enumerate(endnotes)
+    ]
+    keyed += [
+        (_first_page(note.note.origin), 1, n, note) for n, note in enumerate(footnotes_)
+    ]
+    return tuple(note for *_, note in sorted(keyed, key=lambda item: item[:3]))
+
+
+def _taken_body_notes(
+    parts: Sequence[PageParts],
+    form: MarkerForm | None,
+    body_word_height: float,
+    section_pages: range,
+) -> tuple[PageParts, ...]:
+    """The pages with the notes left at the foot of their body taken, in a
+    book numbered per page, except on the pages of the endnote section
+    (spec section 11, "Notes left in the body"), and each page's body
+    notes put before its band regions."""
+    band_notes = tuple(page_notes(page.band_regions) for page in parts)
+    per_page = numbered_per_page(band_notes)
+    taken = tuple(
+        take_body_notes(page, notes, form, body_word_height)
+        if per_page and page.index not in section_pages
+        else page
+        for page, notes in zip(parts, band_notes, strict=True)
+    )
+    return tuple(
+        page
+        if not page.body_notes
+        else replace(page, band_regions=(page.body_notes, *page.band_regions))
+        for page in taken
+    )
+
+
+def _section_pages(entries: Sequence[Entry]) -> range:
+    """The page indices of the endnote section, empty without one."""
+    section = endnote_section(entries)
+    if section is None:
+        return range(0)
+    last = entries[section.paragraphs[-1]].piece.lines[0].page_index
+    return range(section.first_page, last + 1)
+
+
 def assemble(
     parts: Sequence[PageParts],
     book_words: frozenset[str],
@@ -371,53 +487,67 @@ def assemble(
     in page order: the notes left at the foot of each page's body taken
     out of it, the paragraphs of the body stream with their hyphens joined,
     the margin notes after the paragraph in which their page's body ends,
-    the notes of the band and of the body with their markers, and the ids.
+    the footnotes of the band and of the body with their markers, the
+    endnotes, the references linked to their notes, and the ids.
     `word_list` is in lower case; `body_word_height` is in points."""
     form = book_marker_form(
         first_word(piece.lines[0]) for page in parts for piece in page.band_blocks
     )
-    band_notes = tuple(page_notes(page.band_regions) for page in parts)
-    taken = (
-        tuple(
-            take_body_notes(page, notes, form, body_word_height)
-            for page, notes in zip(parts, band_notes, strict=True)
-        )
-        if numbered_per_page(band_notes)
-        else tuple(parts)
+    section_pages = _section_pages(body_entries(parts, form))
+    pages = _taken_body_notes(parts, form, body_word_height, section_pages)
+    entries = body_entries(pages, form, section_pages.start if section_pages else None)
+    section = endnote_section(entries)
+    body = _body(entries, book_words, word_list)
+    groups = endnote_groups(entries, section) if section is not None else ()
+    in_section = frozenset(section.paragraphs if section is not None else ())
+    endnotes = tuple(
+        _Note(_endnote(group, body), group.marker.value if group.marker else None)
+        for group in groups
     )
-    pages = tuple(
-        page
-        if not page.body_notes
-        else replace(page, band_regions=(page.body_notes, *page.band_regions))
-        for page in taken
-    )
-    body: list[_Unnumbered] = []
-    for entry in body_entries(pages, form):
-        match entry:
-            case Paragraph(piece):
-                kind = BlockKind.PARAGRAPH
-            case MarginNote(piece):
-                kind = BlockKind.MARGIN_NOTE
-            case _:
-                assert_never(entry)
-        body.append(_joined(piece, kind, book_words, word_list))
     book_footnotes = footnotes(
         tuple(page_notes(page.band_regions) for page in pages),
         tuple(bool(page.body) for page in pages),
     )
-    notes = tuple(
-        _footnote(footnote, book_words, word_list) for footnote in book_footnotes
-    )
-    links = match_footnotes(
+    notes = _in_order(
+        endnotes,
         tuple(
-            NoteToMatch(position, _first_page(note.origin), footnote.value)
-            for position, (note, footnote) in enumerate(
-                zip(notes, book_footnotes, strict=True)
-            )
+            _Note(_footnote(footnote, book_words, word_list), footnote.value)
+            for footnote in book_footnotes
         ),
-        _candidates(body),
     )
-    linked_body, linked_notes = _linked(tuple(body), notes, links)
+    kept = tuple(
+        block for position, block in enumerate(body) if position not in in_section
+    )
+    before_section = (
+        sum(1 for position in range(min(in_section)) if position not in in_section)
+        if in_section
+        else len(kept)
+    )
+    candidates = _candidates(kept)
+    footnote_links = match_footnotes(
+        tuple(
+            NoteToMatch(position, _first_page(note.note.origin), note.value)
+            for position, note in enumerate(notes)
+            if note.note.kind is NoteKind.FOOTNOTE
+        ),
+        candidates,
+    )
+    footnoted = frozenset(link.candidate for link in footnote_links)
+    endnote_links = match_endnotes(
+        tuple(
+            NoteToMatch(position, _first_page(note.note.origin), note.value)
+            for position, note in enumerate(notes)
+            if note.note.kind is NoteKind.ENDNOTE
+        ),
+        tuple(
+            candidate
+            for candidate in candidates
+            if candidate.block < before_section and candidate not in footnoted
+        ),
+    )
+    linked_body, linked_notes = _linked(
+        kept, tuple(note.note for note in notes), footnote_links + endnote_links
+    )
     blocks, numbered_notes = _numbered(linked_body, linked_notes)
     return Assembled(
         blocks=blocks,

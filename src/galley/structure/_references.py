@@ -181,3 +181,24 @@ def match_footnotes(
         )
 
     return _per_page(notes, candidates, keep)
+
+
+def match_endnotes(
+    notes: Sequence[NoteToMatch], candidates: Sequence[Candidate]
+) -> tuple[Link, ...]:
+    """The endnotes linked to the glued numbers of the body before the
+    endnote section (spec section 12, "References"): matched once over the
+    whole book, the endnotes with a value in the order of their values,
+    against `candidates` in reading order, by the scores of footnotes."""
+    valued = sorted(
+        (note for note in notes if note.value is not None),
+        key=lambda note: note.value if note.value is not None else 0,
+    )
+    return _matched(
+        valued,
+        tuple(
+            candidate
+            for candidate in candidates
+            if candidate.reference.form is ReferenceForm.GLUED
+        ),
+    )

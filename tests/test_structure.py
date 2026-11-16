@@ -2141,6 +2141,113 @@ def test_referenced_alignment_pairs_the_highest_total_in_order(
     assert align(values, tuple(c for c in candidates if c is not None)) == pairs
 
 
+def _endnote_pages(
+    first: int, count: int, *, body_words: str = "the text", between: bool = False
+) -> LinesFile:
+    """Page 0: a paragraph holding `body_words` whose last line is full, so
+    that it would run on. Page 1: the end of a note at its top, then
+    `count` endnotes, "N." from `first`, each an indented line and a short
+    one, with a paragraph without a marker after the first when
+    `between`."""
+    page_0 = _body_page(
+        0,
+        _indented(f"A paragraph with {body_words} in it", 70),
+        *_five_full_lines(85, "body"),
+    )
+    texts = [("the end of a note whose start is", "not here.", False)]
+    for n in range(count):
+        texts.append((f"{first + n}. The note {first + n} which", "ends.", True))
+        if between and n == 0:
+            texts.append(("A second paragraph of", "the note.", True))
+    lines = tuple(
+        line
+        for number, (start, end, indented) in enumerate(texts)
+        for line in (
+            (_indented if indented else _full)(start, 70 + 45 * number),
+            _full("goes on over a full line", 85 + 45 * number),
+            _short(end, 100 + 45 * number),
+        )
+    )
+    return _lines_of(page_0, _body_page(1, *lines))
+
+
+def _endnotes_of(blocks: BlocksFile) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    return tuple(
+        (note.marker, tuple(block_text(block) for block in note.blocks))
+        for note in blocks.notes
+        if note.kind is NoteKind.ENDNOTE
+    )
+
+
+def test_endnote_section_of_12_paragraphs_gives_12_endnotes() -> None:
+    lines = _endnote_pages(291, 12, between=True)
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    endnotes = _endnotes_of(blocks)
+    assert tuple(marker for marker, _ in endnotes) == (
+        "",
+        *(f"{n}." for n in range(291, 303)),
+    )
+    assert endnotes[0] == (
+        "",
+        ("the end of a note whose start is goes on over a full line not here.",),
+    )
+    assert endnotes[1] == (
+        "291.",
+        (
+            "The note 291 which goes on over a full line ends.",
+            "A second paragraph of goes on over a full line the note.",
+        ),
+    )
+    assert not any(note.referenced for note in blocks.notes)
+    # The paragraph of page 0 does not run on into the section.
+    assert tuple(origin.page_index for origin in blocks.blocks[-1].origin) == (0,)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_endnote_run_of_6_paragraphs_gives_no_endnote() -> None:
+    blocks = make_blocks(_endnote_pages(291, 6), _NO_WORDS, workers=1)
+    assert _endnotes_of(blocks) == ()
+    assert block_text(blocks.blocks[-1]) == (
+        "296. The note 296 which goes on over a full line ends."
+    )
+
+
+def test_endnote_damaged_marker_counts_in_the_section() -> None:
+    # The tenth marker, "139.", is read "I39-".
+    lines = _endnote_pages(130, 12)
+    page = lines.pages[1]
+    region = page.regions[0]
+    tenth = region.lines[3 + 3 * 9]
+    damaged = replace(
+        tenth, words=(replace(tenth.words[0], text="I39-"), *tenth.words[1:])
+    )
+    region_lines = tuple(damaged if line is tenth else line for line in region.lines)
+    page = replace(page, regions=(replace(region, lines=region_lines),))
+    blocks = make_blocks(_lines_of(lines.pages[0], page), _NO_WORDS, workers=1)
+    markers = tuple(marker for marker, _ in _endnotes_of(blocks))
+    assert markers[10] == "I39-"
+    assert len(markers) == 13
+
+
+def test_endnote_is_linked_to_a_glued_number_of_the_body_before_it() -> None:
+    lines = _endnote_pages(1, 12, body_words="Law1")
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    (law,) = tuple(
+        (span.text, span.note_ref)
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref is not None
+    )
+    note = next(note for note in blocks.notes if note.id == law[1])
+    assert (law[0], note.kind, note.marker, note.referenced) == (
+        "1",
+        NoteKind.ENDNOTE,
+        "1.",
+        True,
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
 def test_make_blocks_with_notes_with_1_worker_and_with_3_gives_the_same_value() -> None:
     lines = _lines_of(
         *_note_running_over((PageLayout(1, (), ()),)).pages,

@@ -12,8 +12,10 @@ from galley.book_folder import BookFolder
 from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage, read_markdown
 from galley.model import (
+    BlockKind,
     BlocksFile,
     LinesFile,
+    NoteKind,
     Origin,
     block_text,
     read_blocks,
@@ -403,3 +405,24 @@ def test_referenced_mariejol_214_leaves_note_1_unreferenced(
         for note in blocks.notes
         if _pages(note.origin) == [4]
     ) == (("(t)", False), ("(a)", True), ("(3J", True))
+
+
+def test_endnote_gierke_270_and_271_give_endnotes_291_to_302(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # The end of note 290 at the top of page 270 is an endnote without a
+    # marker, not joined to the last paragraph of page 93 (structure spec,
+    # section 12).
+    _, blocks = excerpt_outputs["gierke_86-93_270-271"]
+    endnotes = tuple(note for note in blocks.notes if note.kind is NoteKind.ENDNOTE)
+    assert tuple(note.marker for note in endnotes) == (
+        "",
+        *(f"{n}." for n in range(291, 303)),
+    )
+    assert _pages(endnotes[0].origin) == [8]
+    assert not any(note.referenced for note in endnotes)
+    assert not any(
+        8 in _pages(block.origin)
+        for block in blocks.blocks
+        if block.kind is BlockKind.PARAGRAPH
+    )
