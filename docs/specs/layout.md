@@ -31,14 +31,23 @@ its text and its box in points, as extract read them from the text
 layer), and writes `lines.json` (each page's regions, each a list of
 lines, each a list of words), in the format of architecture §8,
 unchanged. The **walking skeleton** is galley's first build, every stage
-in its simplest form; its code is what exists now. Stubbs' notes cut into
-the text column are left to the second plan, as the owner decided on 15
-November 2026 (section 9).
+in its simplest form. The first plan's layout is built
+(`src/galley/layout/`).
+
+Revised on 16 November 2026 for the second plan, which changes layout in
+two ways. Stubbs' notes cut into the text column are taken out of the
+body lines by a rule on the text layer (section 3, step 2b), which
+replaces the render of each page that section 9 was to try (owner, 15
+November 2026). And the rules that measure the body text, the row rule,
+the commonest edge, the body word height and body line pitch, move to
+the module `body_measures.py` of the package root (architecture §12),
+which structure uses too, so that the two stages stop keeping a copy
+each (owner, 15 November 2026).
 
 ## 1. Terms
 
-Besides those of the glossary, this spec uses these; the first four are
-added to the glossary.
+Besides those of the glossary, this spec uses these; the first four, and
+the cut-in inset, are in the glossary.
 
 - **Body column**: the rectangle of the page that the main text fills,
   from its **left edge** to its **right edge**. Its width is the same on
@@ -73,6 +82,9 @@ added to the glossary.
   evaluation tool (`docs/specs/evaluation.md`) compares galley's output.
 - **Letter or digit**: a character for which Python's `str.isalnum` is
   true.
+- **Cut-in inset**: how far inside the body column's edge the body lines
+  beside a cut-in note start (on the left) or end (on the right):
+  Stubbs' is about 60 pt on both sides (section 3, step 2b).
 
 The books named here are those of the evaluation set
 (`docs/specs/evaluation.md` §3: Haskins, Stubbs, Domesday, Mariéjol) and
@@ -130,12 +142,20 @@ are built on:
 
 layout first measures three numbers over the whole book, then lays out
 each page on its own, in this order: the body column's position; the
-outer margin notes; the running-head line; the footnote band; columns;
-lines. Each step takes words out of what the later steps see, so a word
-goes to one region only.
+outer margin notes; the cut-in notes; the running-head line; the
+footnote band; columns; lines. Each step takes words out of what the
+later steps see, so a word goes to one region only. The cut-in notes
+need the book's cut-in inset, which is measured on every page's column
+(step 1), so step 1 runs on every page before the rest of the per-page
+work.
 
 ### The book's measures
 
+The row rule, the commonest edge, the choice of the pages to measure and
+the body word height and body line pitch are those of `body_measures.py`
+(architecture §12): `group_rows`, `commonest`, `measured_pages` and
+`body_measures`, which structure calls too. layout keeps the column
+width, the usual left edges and the cut-in insets, which only it uses.
 From the rows of every page with at least 15 rows (the skeleton's rule
 applied to all the page's words):
 
@@ -157,6 +177,24 @@ applied to all the page's words):
   A parity with no such page takes the other parity's; when no page of
   the book has one, both take the median of the measured pages'
   commonest left edges.
+
+- **cut-in inset**, for the left side and for the right, measured after
+  step 1 has placed every page's column: over the rows of the measured
+  pages, made of the words that step 2 leaves in the column, the
+  distance from the column's left edge to a row's left side (on the
+  right, from a row's right side to the right edge), to the point,
+  between 30 and 100 pt, with the most rows within 2 pt of it. The book
+  has cut-in notes on that side when those rows are at least 50 and at
+  least 4 times the rows 6 to 12 pt below that inset, and 4 times those 6
+  to 12 pt above it; otherwise it has no inset on that side. Measured in
+  the second research (structure §1) on the lines of the body regions of
+  the six whole books, each against its region's commonest sides: Stubbs has 399 lines at its peak on the left (59 to 62 pt)
+  and 364 on the right (57 to 61 pt), about 15 times the lines 6 to 12 pt
+  to either side; Domesday, Mariéjol, Gierke and Kadesh have their
+  highest point on the left at 30 to 35 pt (quotations, paragraph
+  indents) with as many lines or more 6 to 12 pt to one side; Haskins
+  has 14 lines at its highest point; no book but Stubbs has a peak on
+  the right. So only Stubbs has cut-in notes, on both sides.
 
 A book with no page of 15 rows is measured on its pages of at least 3
 rows; a book with none of those has no measures, and each of its pages
@@ -249,6 +287,59 @@ is laid out as one region, as the skeleton did.
    regions: a region ends where the next line's top is more than 1.5
    body line pitches below the top of the line before (a guess, so that each printed note is a
    region of its own).
+
+   **2b. Cut-in notes.** Only in a book with a cut-in inset on a side
+   (above), and on that side. Stubbs prints its margin notes inside the
+   body column at its outer side, in small type, and shortens the body
+   lines beside them. The note's own words are hard to tell from the
+   body's (a quarter of the gaps between a note word and the body word
+   beside it are under 5.7 pt, and some are one word with it,
+   "toHenry's"), but the shortened lines are not: they are body lines
+   with nothing beside them. The rows are those of the words left in the
+   column after step 2. On the left, with the left edge L and the inset
+   I:
+
+   1. a row is **cut** when one of its words has its left side within 3
+      pt of L + I, is the row's first word or follows a gap of at least
+      8 pt (the body's word spaces are 8.1 pt at the 95th percentile,
+      section 9), and the row's words from it on span at least half the
+      column width. The last condition keeps out a speck that happens to
+      stand at the inset (";" on Stubbs' page 51);
+   2. cut rows whose tops lie within 1.6 body line pitches of the one
+      before form a chain; a chain of at least 2 cut rows, at least one
+      of which has no word whose right side lies at most L + I − 4 pt (a
+      shortened line), is a **cut-in zone**, from the top of its first
+      row to the bottom of its last. The shortened line keeps out
+      justified lines that have a wide space at the inset by chance
+      (Stubbs' page 31: "England. Whilst the"; "Lewis" at 87 pt on page
+      116);
+   3. a word of a row whose vertical middle lies in a zone, within 1 pt,
+      and whose right side lies at most L + I − 4 pt, is a margin word.
+
+   On the right the same, mirrored: a word's right side within 3 pt of
+   R − I, the gap after it, the words up to it spanning half the column,
+   and note words whose left side lies at least R − I + 4 pt. The margin
+   words of each side are grouped into lines and regions as in step 2,
+   and placed with the outer margin notes; structure makes such a region
+   a margin region, since it overlaps vertically a region wider than
+   itself (structure §2).
+
+   Measured in the second research on Stubbs' body regions of lines.json,
+   with each region's commonest sides as its edges (not on step 1's
+   edges, as written here; the reference pages check the difference):
+   406 zones on 250 pages, 1,949 words moved, of which 1,202 have fewer
+   than 3 letters, nearly all single letters of notes the OCR spaced out
+   ("B an i s h m e n t"). Of the 747 words of 3 letters or more, 597
+   have their letters in the margin notes of their page or the pages next
+   to it in the reference text, 31 only in its body text, and 119 in
+   neither (OCR damage: "Chanceiior.", "pr0motion"). The 31 are an upper
+   bound on the body words moved (about a third of them are damaged note
+   words that also occur in the body, "Hem-"), so at least 716 of the
+   747, 96%, are note words, above section 9's bar of 95 in 100. The
+   letters moved are 59% of the letters of the reference text's notes.
+   Each condition was added for a case measured: without the shortened
+   line, 56 words found only in the body were moved; with chains of one
+   cut row, 47; with chains up to 2.6 pitches, 53.
 3. **Running-head line.** Of the remaining words, grouped into rows,
    take the first row that holds a letter or a digit. It and every row
    above it (specks) form the running-head region when the next row's
@@ -349,6 +440,10 @@ Where the thresholds come from:
 | gutter | 6 pt wide, middle third, 8 open rows in the body, 3 in the band | measured, below |
 | band gutter off the column's middle | 10 pt | measured, below |
 | drop capital | 2.2 times the body word height, within 3 pt of the edge | measured: Haskins' are 2.67 ("IN", page 163) to 4 times |
+| cut-in inset | the most rows within 2 pt, 30 to 100 pt in; 50 rows and 4 times the rows 6 to 12 pt to each side | measured on the six books, "The book's measures" |
+| cut row | within 3 pt of the inset, after 8 pt, spanning half the column | measured on Stubbs, step 2b |
+| cut-in zone | chain within 1.6 pitches, 2 rows, one shortened | measured on Stubbs, step 2b |
+| cut-in note word | 4 pt short of the inset | measured on Stubbs, step 2b |
 
 An earlier form of the column rule, which asked every row of a run to
 be open, was run on the skeleton's rows of whole pages (not on the body
@@ -457,6 +552,8 @@ class BookMeasures:
     body_word_height: float
     body_line_pitch: float
     usual_left_edge: frozendict[int, float]   # by page index parity, 0 and 1
+    cut_in_inset_left: float | None           # None: no cut-in notes on that side
+    cut_in_inset_right: float | None
 
 def run(folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS) -> None: ...
 
@@ -467,9 +564,12 @@ def group_lines(words: tuple[Word, ...]) -> tuple[Line, ...]: ...
 
 `measure_book` gives `None` for a book with no page of 3 rows, and
 `layout_page` with `None` lays the page out as the skeleton did.
-`group_lines` keeps its present rule and signature; `layout_page` takes
+`group_lines` keeps its present rule and signature, and calls
+`body_measures.group_rows`; `layout_page` takes
 a drop capital out of the words before it calls `group_lines`, and puts
-it into the line step 6 names afterwards.
+it into the line step 6 names afterwards. `measure_book` places every
+page's column (step 1) to measure the cut-in insets; `layout_page`
+places it again, which costs one more grouping of rows per page.
 
 `run` is unchanged in what it reads, deletes, checks and writes
 (walking-skeleton spec §7): it reads both files with
@@ -482,7 +582,9 @@ runs the fidelity check before writing, and writes nothing on a
 `measure_book` computes each page's rows and its numbers with
 `map_pages`, in `workers` threads, then takes the medians over the pages
 in page order. Then
-`layout_page` runs on every page with `map_pages`. A page needs nothing
+`layout_page` runs on every page with `map_pages`. The cut-in insets
+add a pass that places every page's column (step 1), also with
+`map_pages`, between the two; its time was not measured. A page needs nothing
 from the others but the book's measures, so the output does not depend
 on the number of workers. The measures pass adds one grouping of rows
 per page. Measured on 15 November 2026 on Domesday's 558 pages, on an
@@ -524,8 +626,15 @@ runs the fidelity check and writes lines.json, 2.5 s in all.
   of a page they are read as a band. Their words keep their place in the
   reading order either way (structure §6).
 - **Plate pages, blank pages**: no words, no region, as now.
-- **Stubbs' cut-in notes**: they stay in the body rows beside them, as
-  now, until the second plan (section 9).
+- **Stubbs' cut-in notes** (step 2b): a note whose words are taken
+  becomes a margin region. A note word glued to a body word
+  ("inChris- tendom.") stays in its body line, since layout moves words
+  and does not split them; so does a note beside which no line is
+  shortened, or whose shortened lines are more than 1.6 pitches apart,
+  which is most of the 41% of the notes' letters not found; and when the
+  OCR set a note's first letter or word off at the column's edge ("f
+  reform" on page 60, "Plan of reform."), the part in the zone moves
+  and the rest stays.
 - **Mariéjol's notes in 9-pt OCR lines**: a fifth of its note words
   (5,735 of 25,784) stay in the body, at the foot of
   their page, because their lines are not small by step 4. A reader of
@@ -550,8 +659,10 @@ runs the fidelity check and writes lines.json, 2.5 s in all.
   other.
 - **A table of contents** (Mariéjol's page 450): titles on the left and
   page numbers on the right, with an empty strip between them over 8
-  rows, are cut into a column of titles and a column of numbers. Reading
-  them as entries is left to structure's second plan.
+  rows, are cut into a column of titles and a column of numbers.
+  structure reads them as two runs of paragraphs and makes no heading of
+  them when the config names the page in `contents_pages` (structure
+  §14); reading them as entries is not planned.
 
 ## 7. Fidelity
 
@@ -598,7 +709,17 @@ with their boxes, with a `BookMeasures` given in the test:
 - `measure_book` on 20 hand-made pages gives the medians, and `None` on
   pages of 2 rows;
 - `run` on a hand-made `words.json` of 8 pages with 1 worker and with 3
-  gives the same bytes.
+  gives the same bytes;
+- cut-in notes, with a cut-in inset of 60 pt on the left: three rows
+  whose body words start 60 pt in, one of them with nothing left of
+  that, and the note words "Character", "of" and "Henry" 5 pt in, give a
+  margin region of those words; the same rows with a word starting at 60
+  pt after a gap of 4 pt, or two such rows 2 pitches apart, give none; a
+  ";" at the inset on a row whose words from it span a quarter of the
+  column is no cut row;
+- `measure_book` on pages whose rows start 60 pt in on 60 rows and 0 to
+  2 pt in on the rest gives a left inset of 60, and on pages whose rows
+  start 30 pt in as often as 38 pt in gives none.
 
 **Excerpt tests** on reference pages: the expected output of each is
 the list of its regions, each as the text of its lines (words joined by
@@ -616,8 +737,10 @@ differ slightly from the whole book's.
 | `haskins_eval` (committed) | 0 (131) | a chapter's first page: chapter number, title, drop capital ("IN") |
 | `haskins_eval` | 1 (132) | footnotes in the band |
 | `haskins_eval` | 9 (266) | the first index page: title, two columns |
-| `stubbs_51_56-64` (new) | 0 (51) | a cut-in note at the left; specks above the head |
-| `stubbs_51_56-64` | 9 (64) | a cut-in note at the right |
+| `stubbs_51_56-64` | 0 (51) | a cut-in note at the left, "Importance attachedby contempora- ries toHenry's accession." taken, "Youth and education of Henry." left in the body; specks above the head |
+| `stubbs_51_56-64` | 2 (57) | two cut-in notes at the left, "Characterof Henry II." and "Hisfamily policy." |
+| `stubbs_51_56-64` | 7 (62) | cut-in notes at the right, "Arrival of successor tep en i°54. ' advUers." taken, the rest of its five notes left |
+| `stubbs_51_56-64` | 9 (64) | cut-in notes at the right, "B an i s h m e n t D f m e r c e n a - nes -" and "Cti°n °£ J^tE." taken |
 | `domesday_74-83` (new) | 2 (76) | an outer margin note on the right, short notes side by side, signature "4—2" |
 | `domesday_74-83` | 0 (74) | an outer margin note on the right, signature "M. 4" |
 | `domesday_74-83` | 1 (75) | outer margin notes on the left; one word of a note, "land.", whose box reaches into the column, goes to its note, "Free land." |
@@ -651,45 +774,44 @@ targets (structure §9): paragraph breaks that margin and note text no
 longer cause, notes and margin notes found as such. The table of section
 3 is what layout's rules gave on a prototype; it is not a target.
 
-## 9. Decided: Stubbs' cut-in notes wait for the second plan
+## 9. Decided: Stubbs' cut-in notes, from the text layer
 
-There are no open points. The one this spec had, how layout finds
-Stubbs' notes cut into the text column, was decided by the owner on 15
-November 2026: option (c) below, so they stay in the body lines beside
-them in the first plan. Option (a) is the one to try in the second
-plan, which places margin notes and may render pages for other uses
-too. What was measured and weighed:
+There are no open points. How layout finds Stubbs' notes cut into the
+text column was decided twice by the owner. On 15 November 2026, for
+the first plan, they stayed in the body lines (option (c) below), and
+option (a), a render of each page, was to be tried in the second plan.
+Later the same day, on the second research, the owner chose instead the
+rule on the text layer of section 3, step 2b, which looks at the
+shortened body lines rather than at the note's words, keeps layout
+reading only `pages.json` and `words.json`, and meets the bar set here:
+at least 95 of every 100 words it moves are note words (96% of the
+words of 3 letters or more, measured). A render is tried only if the
+reference pages show that the rule moves body words the measure missed.
 
-**How layout finds Stubbs' cut-in notes.** The text layer does
-not show them reliably. Five rules were tried on Stubbs' words, each
-against the reference's labels; the best one that takes few body words
-looks for an empty strip at least 6 pt wide, 20 to 100 pt inside the
+What was weighed for the first plan. The text layer does not show the
+note's words reliably. Five rules were tried on Stubbs' words, each
+against the reference's labels; the best one that took few body words
+looked for an empty strip at least 6 pt wide, 20 to 100 pt inside the
 column edge, over at least 2 rows, with a line of only note words among
-them. It finds 139 of Stubbs' 1,521 cut-in note words and takes 75 body
-words; looser forms find up to 798 and take up to 2,166 body words. The
-text layer's boxes are the cause: 25% of the gaps between a cut-in note
-and the body word beside it are under 5.7 pt, where the word spaces of
-the body are 4.5 pt (median) and 8.1 pt (95th percentile), and some note
-words are glued to body words ("toHenry's").
+them. It found 139 of Stubbs' 1,521 cut-in note words and took 75 body
+words; looser forms found up to 798 and took up to 2,166 body words.
+The text layer's boxes are the cause: 25% of the gaps between a cut-in
+note and the body word beside it are under 5.7 pt, where the word
+spaces of the body are 4.5 pt (median) and 8.1 pt (95th percentile), and
+some note words are glued to body words ("toHenry's").
 
-- (a) layout renders each page at 72 dpi with `pdfium.render` and looks
-  for the empty strip in the picture, at the offset the book's pages
-  share (58 to 62 pt in Stubbs). Layout then reads the PDF and the
-  config, which changes architecture §4 and §9, and costs a render per
-  page (about 6 s for Stubbs' 344 pages, a guess). Not measured: the
-  plan's first task would measure it on Stubbs and keep it only if at
-  least 95 of every 100 words it takes are note words.
-- (b) the best text-layer rule above: little gain (a tenth of the notes)
-  for 75 body words moved out of their paragraphs.
-- (c) leave cut-in notes to the second plan, with margin-note placement:
-  they stay in the body lines beside them, as now, and keep breaking
-  Stubbs' paragraphs.
+- (a) render each page at 72 dpi with `pdfium.render` and look for the
+  empty strip in the picture, at the offset the book's pages share (58
+  to 62 pt in Stubbs). Layout would then read the PDF, which changes
+  architecture §4 and §9, at the cost of a render per page. Not
+  measured.
+- (b) the best of those five rules: a tenth of the notes for 75 body
+  words moved out of their paragraphs.
+- (c) leave cut-in notes in the body lines beside them, breaking Stubbs'
+  paragraphs, until the second plan.
 
-The spec recommended (a), with (c) if it failed the bar; the owner
-chose (c), because the cut-in notes are in one of the six books and (a)
-changes what layout reads. Whatever the second plan tries, the bar is
-on precision: a body word moved into a margin note breaks the text a
-reader reads.
+Whatever is tried, the bar is on precision: a body word moved into a
+margin note breaks the text a reader reads.
 
 ## 10. Not in this spec
 
