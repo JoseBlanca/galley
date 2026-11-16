@@ -2247,21 +2247,29 @@ paragraph of pages 15 to 18).
    in any region, whose top is highest, the first in layout's order on
    a tie; the lines it is compared with are the topmost line, so
    found, of each other plate page, and the lines section 3 makes
-   running heads, on every page of the book. When section 3 has
+   running heads, on every page of the book. Two topmost lines whose
+   words differ only in numerals, roman or arabic ("PLATE II" and "PLATE
+   III"), are not alike: a book that prints its plates' labels at their
+   top keeps them as captions. When section 3 has
    already removed the topmost line, rule 1 removes nothing more. A
    line rule 1 removes is one `running_head` removal of the whole line:
    no page number is taken from it. Section 4 does not run on a plate
    page: a number at its foot is a line of the plate, which rule 2
    keeps or removes (Domesday 39's "17]").
-2. **Caption and stray words.** Every other line is a caption line when
-   at least 2 of its words, or at least half of them, are **known
-   words**, by `wordlist.is_known_word`, which analyze uses too
+2. **Caption and stray words.** The other lines are taken in rows, as
+   rule 3 makes them, and every line of a row is a caption line when at
+   least 2 of the row's words, or at least half of them, are **known
+   words**. Taken line by line, a caption's word that the OCR garbled and
+   that layout made a line of its own was lost: Kadesh 48's "LUXOR" (read
+   "l.i v IK") beside "RELIEFS; THE", and the lithographer's credit of
+   Kadesh 56 (orchestrator, 16 November 2026; reversible). A known word
+   is by `wordlist.is_known_word`, which analyze uses too
    (`docs/specs/plates.md` §2): a word whose key (section 5: lower case,
    with what is not a letter, digit, hyphen or apostrophe stripped from
    both ends) has at least 2 letters, is made of letters, apostrophes and
    hyphens, and is in the lower-cased word list; or a number, digits with
-   brackets or punctuation around them ("16", "17]"). Every other line is
-   removed as `plate_text`, one removal per line.
+   brackets or punctuation around them ("16", "17]"). The lines of every
+   other row are removed as `plate_text`, one removal per line.
 3. **The figure block.** The caption lines, from the top down in rows
    and each row from the left, are the text of one `figure` block, whose
    `figure` is the path of the image of the page's figure (a plate page
