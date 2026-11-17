@@ -734,6 +734,34 @@ def test_reading_scoring_the_same_as_the_layer_keeps_the_layer() -> None:
     assert not record.kept
 
 
+def _tie_with_moral(*ocr_words: Word) -> Reread:
+    """The record of a band whose layer reads "Moral" alone, read by
+    Tesseract as `ocr_words`."""
+    page = _page_of((_MORAL,))
+    reading = margin_note_reading(
+        Side.LEFT, _BAND, ocr_words, page_words=page.words, edge=50
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    return record
+
+
+def test_tie_with_more_known_words_in_tesseracts_reading_keeps_it() -> None:
+    # Haskins' index page 267: a tie at 250, Tesseract's reading holding
+    # 321 known words to the layer's 303 (reocr spec, section 3). Here 2
+    # known words and 1 unknown against 1 known word.
+    record = _tie_with_moral(
+        _OCR_MORAL, _ocr("xq", 10, 115, 20, 123), _ocr("lessons.", 22, 115, 40, 123)
+    )
+    assert (record.layer_score, record.ocr_score) == (1, 1)
+    assert record.kept
+
+
+def test_tie_with_as_many_known_words_and_more_words_keeps_the_layer() -> None:
+    record = _tie_with_moral(_OCR_MORAL, _ocr(".", 42, 100, 44, 108))
+    assert (record.layer_score, record.ocr_score) == (1, 1)
+    assert not record.kept
+
+
 def _cut_in_after(layer_word: Word, ocr_line: tuple[Word, ...]) -> tuple[str, ...]:
     """The words of a page holding only `layer_word`, a word layout left in
     the column, once _CROP, read by Tesseract as `ocr_line`, is applied."""

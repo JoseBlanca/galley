@@ -738,6 +738,16 @@ def _record_order(reading: RegionReading) -> tuple[int, float, bool]:
     return (_kind_rank(reading.kind), reading.box.top, reading.side is Side.RIGHT)
 
 
+def _scores_higher(ocr_scores: tuple[int, ...], layer_scores: tuple[int, ...]) -> bool:
+    """Whether Tesseract's reading, scored word by word as `ocr_scores`,
+    wins over the layer's, `layer_scores` (reocr spec, section 3): a
+    higher reading score, or the same with more known words."""
+    ocr_score, layer_score = sum(ocr_scores), sum(layer_scores)
+    return ocr_score > layer_score or (
+        ocr_score == layer_score and ocr_scores.count(1) > layer_scores.count(1)
+    )
+
+
 def _is_sure_single_word(
     ocr_words: tuple[Word, ...],
     ocr_scores: tuple[int, ...],
@@ -794,8 +804,8 @@ def page_rereads(
     (`model.replaced_layer_words`) that an earlier kept region does not
     replace; the others stay in the layer. A region is kept when its
     words of Tesseract's are not empty and score higher than the layer
-    words it replaces, by `reading_score` against `lower_case_words`, and,
-    when it replaces no layer word, hold at least 2 known words, or one
+    words it replaces, by `reading_score` against `lower_case_words`, or
+    the same with more known words, and, when it replaces no layer word, hold at least 2 known words, or one
     known word of 4 letters or more, all its words read at a confidence
     of 80 or more, that no word of `page_words`, the page's text layer,
     may read (`model.may_read`). A
@@ -837,10 +847,11 @@ def page_rereads(
         layer_words = replaced_layer_words(replaceable, ocr_words)
         if not layer_words and not read:
             continue
-        layer_score = reading_score(layer_words, lower_case_words)
+        layer_scores = _word_scores(layer_words, lower_case_words)
+        layer_score = sum(layer_scores)
         ocr_scores = _word_scores(ocr_words, lower_case_words)
         ocr_score = sum(ocr_scores)
-        kept = ocr_score > layer_score and (
+        kept = _scores_higher(ocr_scores, layer_scores) and (
             bool(layer_words)
             or ocr_scores.count(1) >= _OVER_NOTHING_LEAST_KNOWN
             or _is_sure_single_word(ocr_words, ocr_scores, page_words)
