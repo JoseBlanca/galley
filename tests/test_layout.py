@@ -21,7 +21,7 @@ from PIL import Image, ImageDraw
 from galley import layout, wordlist
 from galley.book_folder import BookFolder
 from galley.cli import main
-from galley.config import BookConfig, Language, OcrMode
+from galley.config import BookConfig, Language, OcrMode, read_config
 from galley.errors import (
     ExternalProgramError,
     FidelityBoundary,
@@ -1956,7 +1956,7 @@ def _assert_laid_out_in_regions(words: WordsFile, lines: LinesFile) -> None:
 @pytest.mark.parametrize(
     "excerpt", sorted(path.stem for path in _EXCERPTS_DIR.glob("*.pdf"))
 )
-def test_layout_of_an_excerpt_keeps_every_word(
+def test_layout_of_an_excerpt_with_rereading_keeps_every_word(
     excerpt: str, excerpt_books: frozendict[str, BookFolder]
 ) -> None:
     # The session's one run of each excerpt (tests/conftest.py).
@@ -1995,6 +1995,322 @@ def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(
         for region in page.regions
     ]
     assert regions[2:] == [["Character of", "Henry II."], ["His family", "policy."]]
+
+
+# Re-reading on the excerpts (reocr spec, section 9, "Excerpt tests"). The
+# session's run of each excerpt re-reads with the default config; a test
+# that needs another config, or another number of workers, runs layout
+# again on a copy of the excerpt's pages.json and words.json. An excerpt's
+# book measures come from its own pages. The readings written here are
+# those galley keeps with Tesseract 5.5.4, compared by the session with the
+# page images on 17 November 2026 (where the print differs, a comment says
+# so); the owner's check of every region read waits for task 6.2 of
+# docs/plans/clean-text.md.
+
+
+def _layout_again(
+    folder: BookFolder,
+    root: Path,
+    change: Callable[[BookConfig], BookConfig],
+    workers: int,
+) -> BookFolder:
+    """A book folder at `root` with the book.toml, pages.json and words.json
+    of `folder`, and the lines.json that layout writes there with the
+    config changed by `change`, in `workers` threads."""
+    again = BookFolder(root)
+    for source, copy in (
+        (folder.book_toml, again.book_toml),
+        (folder.pages_json, again.pages_json),
+        (folder.words_json, again.words_json),
+    ):
+        copy.write_bytes(source.read_bytes())
+    layout.run(again, change(read_config(again.book_toml)), workers=workers)
+    return again
+
+
+def _unchanged(config: BookConfig) -> BookConfig:
+    return config
+
+
+def _trusting(config: BookConfig) -> BookConfig:
+    return replace(config, ocr=OcrMode.TRUST)
+
+
+def _reading_footnotes(config: BookConfig) -> BookConfig:
+    return replace(config, reread_footnotes=True)
+
+
+def _kept_readings(lines: LinesFile) -> tuple[tuple[int, RereadKind, str], ...]:
+    return tuple(
+        (
+            reread.page_index,
+            reread.kind,
+            " ".join(word.text for word in reread.ocr_words),
+        )
+        for reread in lines.rereads
+        if reread.kept
+    )
+
+
+def _line_texts(page: PageLayout) -> tuple[tuple[str, ...], ...]:
+    """Each region of `page` as the texts of its lines."""
+    return tuple(
+        tuple(" ".join(word.text for word in line.words) for line in region.lines)
+        for region in page.regions
+    )
+
+
+def _lines_with_boxes(page: PageLayout) -> Counter[tuple[tuple[str, Box], ...]]:
+    return Counter(
+        tuple((word.text, word.box) for word in line.words)
+        for region in page.regions
+        for line in region.lines
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_gierke_88_reads_its_four_margin_notes_the_last_one_the_layer_missed(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Excerpt page 2 is book page index 88. Its fourth note, "Medieval
+    # Thought.", has no word in the layer: Tesseract's reading holds 2
+    # known words and is kept (reocr spec, sections 3 and 8).
+    lines = read_lines(excerpt_books["gierke_86-93_270-271"].lines_json)
+    records = tuple(reread for reread in lines.rereads if reread.page_index == 2)
+    assert (
+        tuple((reread.kind, reread.kept) for reread in records)
+        == ((RereadKind.MARGIN_NOTE, True),) * 4
+    )
+    assert records[-1].layer_words == ()
+    assert _line_texts(lines.pages[2])[2:] == (
+        ("Diverse", "methods."),
+        # Printed "Unity of the move- ment."
+        ("Unity of", "the move.", "ment,"),
+        # Printed "Medieval and Antique- Modern Thought."
+        ("Medieval", "_and", "Antique-", "Modern", "Thought."),
+        ("Medieval", "Thought."),
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_stubbs_excerpt_keeps_tesseract_for_seven_of_its_cut_in_crops(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # The excerpt's pages 1 to 9 are book page indices 56 to 64. The other
+    # crops keep the layer: it read the note as well ("His family policy.",
+    # page 2), or Tesseract's reading scores no higher.
+    lines = read_lines(excerpt_books["stubbs_51_56-64"].lines_json)
+    assert _kept_readings(lines) == tuple(
+        (page, RereadKind.CUT_IN_NOTE, text)
+        for page, text in (
+            (4, "Henry’s mismanage- ment of his children."),
+            (5, "Plan of reform."),
+            (5, "Terms of pacification,"),  # printed "pacification."
+            (6, "Meaning of these terms,"),  # printed "terms."
+            (7, "Arrival of Henry as successor to Stephen, 1154."),
+            (8, "Bishop of Winchester. The Empress."),
+            (9, "Destruction of castles."),
+        )
+    )
+    # The notes as regions, with those whose layer reading stays on the same
+    # pages ("Theobald and Becket.", page 8; "Banishment", page 9).
+    assert tuple(_line_texts(lines.pages[page])[2:] for page in (5, 6, 7, 8, 9)) == (
+        (("Plan of", "reform."), ("Terms of", "pacification,")),
+        (("Meaning of", "these terms,"),),
+        (("Arrival of", "Henry as", "successor", "to Stephen,", "1154."),),
+        (
+            ("Bishop", "of Winchester."),
+            ("The", "Empress."),
+            ("Theobald", "and Becket."),
+        ),
+        (("Banishment",), ("Destruction of", "castles.")),
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+@pytest.mark.xfail(
+    strict=True,
+    reason="the layer's garbled copy 'mentofhis' stays beside Tesseract's "
+    "'ment of his': its text is not theirs and its middle lies under none of "
+    "them (reocr spec, section 4); counted in task 5.4 of the clean-text plan",
+)
+def test_reread_stubbs_59_note_keeps_no_layer_copy_beside_tesseract_reading(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Excerpt page 4, book page index 59: the note printed "Henry's
+    # mismanage- ment of his children."
+    lines = read_lines(excerpt_books["stubbs_51_56-64"].lines_json)
+    assert _line_texts(lines.pages[4])[2] == (
+        "Henry’s",
+        "mismanage-",
+        "ment of his",
+        "children.",
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+def test_reread_stubbs_excerpt_leaves_every_line_without_a_replaced_word_as_trusted(
+    excerpt_books: frozendict[str, BookFolder], tmp_path: Path
+) -> None:
+    # Each line of the run that trusts the layer, less the words that kept
+    # records replaced, is a line of the run that re-reads less Tesseract's
+    # words, in the same order and with the same boxes: the body lines
+    # beside the notes, in rows outside the cut-in zones and right of the
+    # inset alike, are as without re-reading, and a note line keeps the
+    # layer words no record replaced. "advUers.", the layer's reading of
+    # the note "advisers." that layout leaves at the end of a body line
+    # (book page index 62, layout spec section 3, step 2b), stays there.
+    folder = excerpt_books["stubbs_51_56-64"]
+    reread = read_lines(folder.lines_json)
+    trusted = read_lines(_layout_again(folder, tmp_path, _trusting, 1).lines_json)
+    assert len(reread.pages) == len(trusted.pages) == 10
+    for page_reread, page_trusted in zip(reread.pages, trusted.pages, strict=True):
+        kept = tuple(
+            record
+            for record in reread.rereads
+            if record.kept and record.page_index == page_reread.index
+        )
+        replaced = {
+            (word.text, word.box) for record in kept for word in record.layer_words
+        }
+        read = {(word.text, word.box) for record in kept for word in record.ocr_words}
+        layer_lines_reread = Counter(
+            kept_line
+            for line in _lines_with_boxes(page_reread).elements()
+            if (kept_line := tuple(word for word in line if word not in read))
+        )
+        layer_lines_trusted = Counter(
+            kept_line
+            for line in _lines_with_boxes(page_trusted).elements()
+            if (kept_line := tuple(word for word in line if word not in replaced))
+        )
+        assert layer_lines_reread == layer_lines_trusted, page_reread.index
+    assert (
+        "one, to be maintained only by caution ; advUers."
+        in _line_texts(reread.pages[7])[1]
+    )
+    assert sum(len(page.regions) for page in reread.pages) == sum(
+        len(page.regions) for page in trusted.pages
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+def test_reread_stubbs_excerpt_with_1_worker_and_with_6_writes_the_same_bytes(
+    excerpt_books: frozendict[str, BookFolder], tmp_path: Path
+) -> None:
+    folder = excerpt_books["stubbs_51_56-64"]
+    (tmp_path / "one").mkdir()
+    (tmp_path / "six").mkdir()
+    one = _layout_again(folder, tmp_path / "one", _unchanged, 1)
+    six = _layout_again(folder, tmp_path / "six", _unchanged, 6)
+    assert read_lines(one.lines_json).rereads != ()
+    assert one.lines_json.read_bytes() == six.lines_json.read_bytes()
+
+
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+def test_reread_with_ocr_trust_records_nothing_and_lays_out_the_layer(
+    excerpt_books: frozendict[str, BookFolder], tmp_path: Path
+) -> None:
+    folder = excerpt_books["domesday_74-83"]
+    lines = read_lines(_layout_again(folder, tmp_path, _trusting, 6).lines_json)
+    words = read_words(folder.words_json)
+    measures = measure_book(words)
+    assert lines.rereads == ()
+    assert lines.pages == tuple(layout_page(page, measures) for page in words.pages)
+    # The excerpt's own run, with the default `verify`, did re-read.
+    assert read_lines(folder.lines_json).rereads != ()
+
+
+@pytest.mark.tesseract
+def test_reread_stubbs_summaries_index_has_no_small_print_page(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Six of the excerpt's ten pages are index pages, so their small type is
+    # the excerpt's common size (reocr spec, section 9); the index read
+    # whole is tested on the whole book.
+    lines = read_lines(excerpt_books["stubbs_summaries_index"].lines_json)
+    assert lines.rereads == ()
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_domesday_75_and_77_margin_notes_layer_garbled_and_layer_kept(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Excerpt pages 1 and 3, book page indices 75 and 77. The layer read
+    # "Free land." as well as Tesseract did and is kept; it garbled the
+    # others ("dOTQ^tht villein.", "Sn°inhbe pursued?", "The villein
+    # nodal"8 justice.").
+    lines = read_lines(excerpt_books["domesday_74-83"].lines_json)
+    assert tuple(
+        (
+            reread.page_index,
+            reread.kept,
+            " ".join(word.text for word in reread.ocr_words),
+        )
+        for reread in lines.rereads
+        if reread.page_index in {1, 3}
+    ) == (
+        (1, False, "Free land."),
+        (1, True, "The unfree dom of the villein."),  # printed "unfree- dom"
+        (1, True, "Can the villein be pursued ?"),
+        (3, True, "The villein and seig- norial justice."),
+        (3, True, "The villein and nation al justice."),  # printed "nation- al"
+    )
+    assert _line_texts(lines.pages[1])[2:5] == (
+        ("Free land.",),
+        ("The unfree", "dom of the", "villein."),
+        ("Can the", "villein be", "pursued ?"),
+    )
+    assert _line_texts(lines.pages[3])[2:4] == (
+        ("The villein", "and seig-", "norial", "justice."),
+        ("The villein", "and nation", "al justice."),
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_haskins_footnote_band_reads_the_marker_1_where_the_layer_has_a_caret(
+    excerpt_books: frozendict[str, BookFolder], tmp_path: Path
+) -> None:
+    # Excerpt page 5, book page index 136, with `reread_footnotes = true`.
+    folder = excerpt_books["haskins_eval"]
+    lines = read_lines(
+        _layout_again(folder, tmp_path, _reading_footnotes, 6).lines_json
+    )
+    (record,) = (
+        reread
+        for reread in lines.rereads
+        if reread.page_index == 5 and reread.kind is RereadKind.FOOTNOTE_BAND
+    )
+    assert record.kept
+    assert [word.text for word in record.layer_words][:2] == ["^", "Constitutional"]
+    # Printed "1 Constitutional History, i, p. 551."
+    assert _line_texts(lines.pages[5])[-1] == (
+        "1 Constitutional",
+        "History, 1, p. 551.",
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_haskins_excerpt_by_default_reads_only_its_index_page(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Excerpt page 9 is book page index 266, the first page of the index,
+    # a small-print page (reocr spec, section 3, kind 1); no footnote band
+    # is read without `reread_footnotes`.
+    lines = read_lines(excerpt_books["haskins_eval"].lines_json)
+    assert tuple((reread.page_index, reread.kind) for reread in lines.rereads) == (
+        (9, RereadKind.SMALL_PRINT_PAGE),
+    )
 
 
 @pytest.mark.whole_book

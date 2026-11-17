@@ -338,6 +338,36 @@ def check_epubs() -> Callable[..., None]:
     return check
 
 
+# The Tesseract whose readings the excerpt and whole-book tests of
+# re-reading hold as literals (docs/specs/reocr.md, section 9): Homebrew's,
+# with its `eng` data, on 17 November 2026.
+_TESSERACT_OF_THE_LITERALS = "tesseract 5.5.4"
+
+
+@pytest.fixture(scope="session")
+def tesseract_of_the_literals() -> None:
+    """Skips the test, with the reason, when Tesseract is missing or is not
+    the version whose readings the tests of re-reading hold as literals."""
+    _require_program("tesseract")
+    tesseract = shutil.which("tesseract")
+    assert tesseract is not None
+    # Tesseract prints its version on standard output or standard error,
+    # depending on the build; both are read.
+    version = subprocess.run(
+        [tesseract, "--version"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=True,
+        timeout=10,
+    ).stdout.splitlines()[0]
+    if version != _TESSERACT_OF_THE_LITERALS:
+        pytest.skip(
+            f"the readings of this test are those of {_TESSERACT_OF_THE_LITERALS}, "
+            f"not of {version}"
+        )
+
+
 def _require_program(name: str) -> None:
     if shutil.which(name) is None:
         pytest.skip(f"{name} is not installed")
