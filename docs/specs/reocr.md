@@ -249,7 +249,8 @@ The four kinds, each with what is cropped and how it is read:
    ends of its chapters (40, 99, 129, 130, 205, 206, 232, 263, 264, 0.86
    to 1.00), of Mariéjol's bibliography (14–16, 0.93 to 1.00), and
    Domesday's tables 426 and 528 (0.89, 1.00) and Stubbs' publisher's
-   list on page 7 (0.87); the highest other page is Domesday's 428, a
+   list on page 7 (0.87), which is front matter now and not laid out
+   as text (analyze, `docs/specs/front-matter.md`); the highest other page is Domesday's 428, a
    table (0.78), then pages of text with long footnotes, Domesday's 290
    (0.77) and Mariéjol's 211 (0.73); Kadesh's highest is 0.57 and
    Gierke's 0.17. The threshold, 0.85, lies in that gap, which is 0.08
@@ -265,8 +266,8 @@ The four kinds, each with what is cropped and how it is read:
 
    Each page is then kept or not by the reading score. Kept: Stubbs'
    10 index pages; Domesday's 528, 547, 548 and 551; Haskins' 99, 129,
-   205, 206, 264, 266, 268 and 272. Left as the layer: Stubbs' page 7;
-   Domesday's 426 (Tesseract read its figures as junk), 546, 549, 550
+   205, 206, 264, 266, 268 and 272. Left as the layer: Stubbs' page 7
+   (before it became front matter); Domesday's 426 (Tesseract read its figures as junk), 546, 549, 550
    and 552 (scores within 4 of each other, the layer's index being good
    already); Haskins' other eleven, also within 9. An index is so read
    page by page, some pages from Tesseract and some from the layer;
@@ -601,7 +602,7 @@ class Reread:
     layer_score: int
     ocr_score: int
     kept: bool                        # by the rule of section 3
-    dropped_junk_count: int           # Tesseract's junk tokens dropped
+    dropped_junk_count: int = 0       # Tesseract's junk tokens dropped
 ```
 
 A region where both readings are empty, before Tesseract's junk is
@@ -618,7 +619,10 @@ the `layer_words` of each kept `Reread` are words of its page in
 `words.json`; no word of the page is among the `layer_words` of two
 kept records (compared as page, text and box); and each of a kept
 record's `layer_words` is matched to one of its `ocr_words` by rules (a)
-and (b) above (`model.replaced_layer_words`); so that a record cannot name a word the
+to (c) above (`model.replaced_layer_words`); and, by a test that does not
+use that pairing, no Tesseract word of a kept record is the only one of
+the record that may read two of its `layer_words` of different printed
+lines (architecture §13); so that a record cannot name a word the
 layer never had, one another record already replaced, or one that no
 word of Tesseract's reads. Every word of the layer is then either in `lines.json` or in
 exactly one kept record, with its page and box; a record not kept
@@ -812,7 +816,17 @@ the extract change, Stubbs' index error rate was 1.543.
   none of its Tesseract words lies over or reads. A layer word whose
   line lies 10 pt off Tesseract's, of the same text, is replaced; one
   more than 16 pt off is not; a layer word read twice, once over
-  Tesseract's word and once off it, is replaced once.
+  Tesseract's word and once off it, is replaced once. A Tesseract word
+  over a layer word of another text pairs with no other layer word
+  (Domesday page 548); one over the layer words of two printed lines
+  replaces those of the nearer only (Gierke page 63, Stubbs page 318);
+  a layer word glued over two or three Tesseract words ("of,96") is
+  replaced, over four or with a word outside its box not. A later
+  region drops a Tesseract word an earlier kept region read 3 pt below
+  its crop, and replaces no word the earlier one replaced. Tesseract's
+  "|", "¥" and "\\" are dropped and counted, "—" and "§" kept. The
+  fidelity check fails when one Tesseract word is the only reading of
+  two layer words of different lines.
   A layer word 6 pt below Tesseract's of alike letters ("fllght'"
   under "flight.") is replaced; one whose ratio is below 0.6 ("for"
   beside "lord") is not; a number of other digits ("131." beside
