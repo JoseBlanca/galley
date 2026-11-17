@@ -6,7 +6,10 @@ tests/test_excerpts.py; the whole_book tests here check the two reference
 pages an excerpt cannot get right.
 """
 
+import functools
 import hashlib
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
@@ -45,6 +48,7 @@ from galley.model import (
     WordChange,
     block_text,
     read_blocks,
+    read_lines,
     write_blocks,
     write_lines,
     write_pages,
@@ -54,6 +58,7 @@ from galley.structure import (
     NoteMarker,
     Reference,
     ReferenceForm,
+    _survey,
     join_hyphen,
     make_blocks,
     note_marker,
@@ -4892,12 +4897,41 @@ def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
 # those of tests/conftest.py, WHOLE_BOOK_CONFIGS.
 
 
-def _blocks_of_whole_book(book_toml: str, root: Path) -> BlocksFile:
+type WholeBookStructure = Callable[[str], tuple[LinesFile, BlocksFile]]
+
+
+def _structure_of_whole_book(
+    book_toml: str, root: Path
+) -> tuple[LinesFile, BlocksFile]:
     folder = BookFolder(root)
     folder.book_toml.write_text(book_toml, encoding="utf-8")
     for stage in ("analyze", "extract", "layout", "structure"):
         main([stage, str(root)])
-    return read_blocks(folder.blocks_json)
+    return read_lines(folder.lines_json), read_blocks(folder.blocks_json)
+
+
+@pytest.fixture(scope="module")
+def whole_book_structure(
+    whole_book_toml: frozendict[str, str], tmp_path_factory: pytest.TempPathFactory
+) -> WholeBookStructure:
+    """A function that gives lines.json and blocks.json of a whole book, by
+    Internet Archive identifier, made by analyze, extract, layout and
+    structure the first time a test of this module asks for the book and
+    kept for the others, so that the module's whole_book tests run the
+    stages once per book. Books may be asked for from several threads at
+    once."""
+    # The folders are made here, in one thread: pytest's tmp_path_factory
+    # is not thread-safe, and its first mktemp from 6 threads at once
+    # raised ValueError (17 November 2026).
+    roots = frozendict(
+        {book: tmp_path_factory.mktemp(book) for book in whole_book_toml}
+    )
+
+    @functools.cache
+    def structure_of(book: str) -> tuple[LinesFile, BlocksFile]:
+        return _structure_of_whole_book(whole_book_toml[book], roots[book])
+
+    return structure_of
 
 
 def _removed_on(blocks: BlocksFile, page: int) -> tuple[tuple[RemovalReason, str], ...]:
@@ -4913,14 +4947,9 @@ def _numbers_on(blocks: BlocksFile, page: int) -> tuple[PageNumber, ...]:
 
 
 @pytest.fixture(scope="module")
-def gierke_blocks(
-    whole_book_toml: frozendict[str, str], tmp_path_factory: pytest.TempPathFactory
-) -> BlocksFile:
+def gierke_blocks(whole_book_structure: WholeBookStructure) -> BlocksFile:
     """blocks.json of the whole Gierke book, made once for its tests."""
-    return _blocks_of_whole_book(
-        whole_book_toml["politicaltheorie00gieruoft"],
-        tmp_path_factory.mktemp("gierke"),
-    )
+    return whole_book_structure("politicaltheorie00gieruoft")[1]
 
 
 @pytest.mark.whole_book
@@ -4967,11 +4996,9 @@ def test_whole_book_gierke_endnote_section_runs_from_186_to_282(
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 def test_whole_book_mariejol_210_foot_line_gives_page_number_and_signature_mark(
-    whole_book_toml: frozendict[str, str], tmp_path: Path
+    whole_book_structure: WholeBookStructure,
 ) -> None:
-    blocks = _blocks_of_whole_book(
-        whole_book_toml["catherinedemedic00mariuoft"], tmp_path
-    )
+    blocks = whole_book_structure("catherinedemedic00mariuoft")[1]
     assert _removed_on(blocks, 210) == (
         (RemovalReason.RUNNING_HEAD, "L'EXTERMINATION DU PARTI PROTESTANT"),
         (RemovalReason.SIGNATURE_MARK, "UAMiàjoL. CmOl da Médidib 13"),
@@ -4986,14 +5013,14 @@ def test_whole_book_mariejol_210_foot_line_gives_page_number_and_signature_mark(
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 def test_whole_book_haskins_quotes_and_bibliographical_notes(
-    whole_book_toml: frozendict[str, str], tmp_path: Path
+    whole_book_structure: WholeBookStructure,
 ) -> None:
     # Structure spec, section 16: the quotes in smaller type across the
     # column on page 53, the quote over two page breaks from 71 to 73, and
     # the band of small type under "BIBLIOGRAPHICAL NOTE" on page 129 as
     # paragraphs. The excerpt haskins_quotes_index measures its body type
     # smaller than the book's and cannot show the quotes.
-    blocks = _blocks_of_whole_book(whole_book_toml["normansineuropea00hask"], tmp_path)
+    blocks = whole_book_structure("normansineuropea00hask")[1]
 
     def kinds_from(page: int) -> tuple[tuple[str, list[int]], ...]:
         return tuple(
@@ -5017,6 +5044,74 @@ def test_whole_book_haskins_quotes_and_bibliographical_notes(
         ("paragraph", [129, 130]),
     )
     assert not any(note.origin[0].page_index == 129 for note in blocks.notes)
+
+
+# The head of a short section on the six whole books (structure spec,
+# section 3, its last paragraph): the rule takes exactly two head lines,
+# Haskins' page index 13 "vlil PREFACE" and Domesday's "vi Preface.". The
+# pages it takes are those whose head line is a running head with the rule
+# and not without it.
+
+_WHOLE_BOOKS = (
+    "battleofkadeshst00breauoft",
+    "catherinedemedic00mariuoft",
+    "domesdaybook00maituoft",
+    "earlyplantagenet01stub",
+    "normansineuropea00hask",
+    "politicaltheorie00gieruoft",
+)
+
+
+def _no_short_section_head(
+    _page_index: int, _line: Line, _top_letters: frozendict[int, str]
+) -> bool:
+    return False
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+def test_whole_book_short_section_rule_removes_only_the_haskins_and_domesday_heads(
+    whole_book_structure: WholeBookStructure, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The books' runs go side by side, as the excerpts' do (tests/conftest.py).
+    with ThreadPoolExecutor(max_workers=len(_WHOLE_BOOKS)) as pool:
+        outputs = dict(
+            zip(_WHOLE_BOOKS, pool.map(whole_book_structure, _WHOLE_BOOKS), strict=True)
+        )
+    with_rule = {
+        book: survey_book(lines).running_heads for book, (lines, _) in outputs.items()
+    }
+    monkeypatch.setattr(_survey, "_is_short_section_head", _no_short_section_head)
+    without_rule = {
+        book: survey_book(lines).running_heads for book, (lines, _) in outputs.items()
+    }
+
+    assert {
+        book: tuple(sorted(with_rule[book] - without_rule[book]))
+        for book in _WHOLE_BOOKS
+    } == {
+        "battleofkadeshst00breauoft": (),
+        "catherinedemedic00mariuoft": (),
+        "domesdaybook00maituoft": (13,),
+        "earlyplantagenet01stub": (),
+        "normansineuropea00hask": (13,),
+        "politicaltheorie00gieruoft": (),
+    }
+    assert all(without_rule[book] <= with_rule[book] for book in _WHOLE_BOOKS)
+    haskins_blocks = outputs["normansineuropea00hask"][1]
+    domesday_blocks = outputs["domesdaybook00maituoft"][1]
+    assert _removed_on(haskins_blocks, 13) == (
+        (RemovalReason.RUNNING_HEAD, "vlil PREFACE"),
+    )
+    assert _numbers_on(haskins_blocks, 13) == ()
+    assert _removed_on(domesday_blocks, 13) == (
+        (RemovalReason.PAGE_NUMBER, "vi"),
+        (RemovalReason.RUNNING_HEAD, "Preface."),
+    )
+    assert _numbers_on(domesday_blocks, 13) == (
+        PageNumber(13, "vi", PageNumberPosition.HEAD),
+    )
 
 
 # Index pages and guide words (structure spec, section 17). An index page
@@ -5460,9 +5555,9 @@ def test_whole_book_gierke_index_entr_one_per_line_on_its_skewed_pages(
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 def test_whole_book_stubbs_guide_words_on_each_of_its_ten_index_pages(
-    whole_book_toml: frozendict[str, str], tmp_path: Path
+    whole_book_structure: WholeBookStructure,
 ) -> None:
-    blocks = _blocks_of_whole_book(whole_book_toml["earlyplantagenet01stub"], tmp_path)
+    blocks = whole_book_structure("earlyplantagenet01stub")[1]
     assert tuple(
         (removal.page_index, removal.text)
         for removal in blocks.removals

@@ -21,6 +21,8 @@ from galley.model import (
     NoteKind,
     Origin,
     PageKind,
+    PageNumber,
+    PageNumberPosition,
     RemovalReason,
     block_text,
     read_blocks,
@@ -1234,3 +1236,56 @@ def test_front_matter_of_an_excerpt_cut_inside_the_book_is_no_page(
 
     assert not any(page.kind is PageKind.FRONT_MATTER for page in pages)
     assert not any(removal.reason is RemovalReason.FRONT_MATTER for removal in removals)
+
+
+# The head of a short section (structure spec, section 3, its last
+# paragraph): the second page of a preface of two pages, excerpt page 6
+# (book page index 13) of haskins_front and of domesday_front_flow, has a
+# head line like no other page's, whose likeness is to the heading
+# "PREFACE" or "PREFACE." on the page before. Haskins' misread number
+# "vlil" goes with the rest of its line; Domesday's "vi" is a page number.
+
+SHORT_SECTION_HEADS = frozendict(
+    {
+        "haskins_front": (
+            "vlil PREFACE",
+            ((RemovalReason.RUNNING_HEAD, "vlil PREFACE"),),
+            (),
+        ),
+        "domesday_front_flow": (
+            "vi Preface.",
+            (
+                (RemovalReason.PAGE_NUMBER, "vi"),
+                (RemovalReason.RUNNING_HEAD, "Preface."),
+            ),
+            (PageNumber(6, "vi", PageNumberPosition.HEAD),),
+        ),
+    }
+)
+
+
+@pytest.mark.parametrize("name", sorted(SHORT_SECTION_HEADS))
+def test_short_section_head_of_the_preface_page_6_is_a_running_head_removal(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]], name: str
+) -> None:
+    lines, blocks = excerpt_outputs[name]
+    first_line, removals, page_numbers = SHORT_SECTION_HEADS[name]
+    page_lines = [
+        " ".join(word.text for word in line.words)
+        for region in lines.pages[6].regions
+        for line in region.lines
+    ]
+
+    assert page_lines[0] == first_line
+    assert (
+        tuple(
+            (removal.reason, removal.text)
+            for removal in blocks.removals
+            if removal.page_index == 6
+        )
+        == removals
+    )
+    assert (
+        tuple(number for number in blocks.page_numbers if number.page_index == 6)
+        == page_numbers
+    )
