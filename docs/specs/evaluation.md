@@ -27,7 +27,8 @@ never imports it, as epubcheck is only a development tool
 (architecture §16).
 
 Dated 15 November 2026; revised on 17 November 2026 to leave the front
-matter galley drops unscored (section 5, "Pages"), and the same day to
+matter galley drops unscored (section 5, "Pages"), wherever the
+reference prints its words, and the same day to
 score the margin notes' words as a part of their own (section 6), so
 that re-reading small print (`docs/specs/reocr.md`) is measured by the
 tool. It builds on `docs/architecture.md` and
@@ -595,8 +596,35 @@ reference holds Domesday's and Mariéjol's title pages). So an unaligned
 reference token before the first aligned token is not scored when its
 alignment key is the key of a word galley removed as `front_matter`;
 every other token there is scored as usual, so that the lost first words
-of a preface still count as missing. The scorecard gives the number of
-tokens left unscored this way, together with the reference tokens
+of a preface still count as missing.
+
+The reference can also print words of galley's dropped pages after the
+first aligned token: in Stubbs, a word of its title page aligns with
+galley's text, and the publisher's series list that follows in the
+reference ("Epochs of Modern History, edited by…"), printed in the PDF
+on pages galley dropped, was scored as missing on the first pages of the
+text: of the 328 reference tokens missing at words on page indices 14
+and 15, most are this list, and they raised Stubbs' body error rate at
+markdown from 0.056 to 0.059 (galley at fbdc71f, 17 November 2026).
+So, wherever it lies, a window of 4 consecutive reference tokens with non-empty
+alignment keys, all unaligned at words, whose keys are in order the
+keys of 4 consecutive words galley removed as front matter (in the
+order of the removals in `words.json`, empty keys left out on both
+sides), is not scored, with the tokens of empty key between them. An
+aligned token breaks the window. 4 is the shortest window that leaves
+nothing unscored outside the front pages of the four books: with 3,
+"Catherine de Médicis", a title galley dropped, would be left unscored
+3 times in Mariéjol's body; with 2, 80 pairs such as "à la" and "de
+France" in Mariéjol and "of the" in Stubbs. With 4, the tokens left
+unscored as front matter go from 17 to 301 in Stubbs, whose body error
+rate at markdown is back to 0.056, and from 32 to 41 in Haskins, 6 to
+79 in Domesday and 25 to 32 in Mariéjol, words of their title pages
+that come after a first aligned token. The list's words that stay
+missing in Stubbs are words the OCR misread ("i6mo" for "16mo") and
+runs shorter than 4 between them.
+
+The scorecard gives the number of tokens left unscored by these two
+rules, together with the reference tokens
 placed on a page galley dropped as front matter,
 `front_matter_not_scored`, within
 `not_scored`, and the differences list them apart as front matter.
