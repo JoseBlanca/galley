@@ -772,8 +772,9 @@ def _is_sure_single_word(
 ) -> bool:
     """Whether `ocr_words`, Tesseract's reading of a region over no layer
     word, scored word by word as `ocr_scores`, holds one sure single word
-    (reocr spec, section 3): one known word, of 4 letters or more, every
-    word read at a confidence of 80 or more, no word broken at a line end,
+    (reocr spec, section 3): one known word, of 4 letters or more, and
+    beside it only punctuation, every word read at a confidence of 80 or
+    more, no word broken at a line end,
     and no word of `page_words`,
     the page's layer, that may read one of them (`model.may_read`)."""
     if len(ocr_scores) != len(ocr_words):
@@ -784,6 +785,7 @@ def _is_sure_single_word(
     )
     return (
         len(known) == 1
+        and all(score in {0, 1} for score in ocr_scores)
         and sum(character.isalpha() for character in known[0].text)
         >= _SURE_WORD_LEAST_LETTERS
         and all(

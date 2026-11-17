@@ -624,6 +624,25 @@ def test_band_over_no_layer_word_read_as_a_word_broken_at_a_line_end_is_scored()
     assert not record.kept
 
 
+def test_band_over_no_layer_word_with_one_known_word_and_an_unknown_is_not_kept() -> (
+    None
+):
+    # "Coronation qzx", every word at 90: a tie at 0, no sure single word
+    # beside an unknown word (reocr spec, section 3).
+    record = _band_over_nothing("Coronation", "qzx")
+    assert (record.layer_score, record.ocr_score) == (0, 0)
+    assert not record.kept
+    assert _band_over_nothing("Coronation", ".").kept
+
+
+def test_band_over_no_layer_word_tying_at_0_with_2_known_words_is_kept() -> None:
+    # Domesday page 53: "Preedial element in serfage.", 3 known words of 4
+    # here 2 known and 2 unknown, a tie at 0 (reocr spec, section 3).
+    record = _band_over_nothing("xq", "Moral", "lessons.", "qz")
+    assert (record.layer_score, record.ocr_score) == (0, 0)
+    assert record.kept
+
+
 def test_band_over_no_layer_word_read_as_one_known_word_at_79_is_not_kept() -> None:
     assert not _band_over_nothing("Moral", confidences=(79.0,)).kept
 
