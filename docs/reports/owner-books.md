@@ -18,3 +18,11 @@ looked at in task 1.6.
 
 Two surveys ground the specs; their notes are outside the repository
 because they quote the owner's books.
+
+**The baseline**, `uv run galley-eval run` on `main` at 9715a93 (3 min
+41 s), copied to `runs/owner-books-baseline/` of the main checkout. It
+equals Review 3's scores of clean-text: Stubbs' margin notes 291 as
+margin notes (error rate 0.244), Domesday's 579 (0.138), Stubbs' index
+.984 / .963, Domesday's .995 / .998, body error rates .023 / .055 /
+.075 / .310 (Haskins, Stubbs, Domesday, Mariéjol), Domesday's notes
+whose reference is right 1,278.
