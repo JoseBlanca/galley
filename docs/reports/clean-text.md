@@ -368,3 +368,23 @@ because "Ff" is in the word list).
 
 Default run: 2,022 tests in 46.7 s (73.7 s with 8 threads); whole-book
 run 59 tests in 562 s.
+
+## The evaluation's front matter, again
+
+Done (spec fdabd89, code 19c49be), merged. A window of 4 or more
+consecutive missing reference tokens that prints, in order, words
+galley dropped as front matter is left unscored, wherever it lies. On
+Stubbs the series list now counts as front matter (301 tokens unscored,
+against 17), and the body error rate at blocks goes back from 0.059 to
+0.055. The stream's own run (on code with the first version of
+re-reading, so not a clean before and after; in
+`runs/clean-text-eval2-preview/`) also gave a first view of re-reading:
+Stubbs' margin notes as margin notes 246 → 284 of 467 and their error
+rate 0.537 → 0.260; Domesday's 522 → 574 of 593 and 0.583 → 0.161;
+Stubbs' index recall .874 → .963.
+
+## Review 2: work packages 3 and 5, tasks 2.4 and 4.2, review 1's fixes
+
+Four reviewers on f90df04..13140e7. Every finding and its verdict:
+`tmp/review2-findings.md` of the plan's worktree. Being fixed by two
+fixers; reported when merged.
