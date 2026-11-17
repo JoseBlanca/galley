@@ -1673,3 +1673,21 @@ def test_layout_with_a_word_in_two_kept_rereads_fails() -> None:
     assert raised.value.missing == frozendict()
     assert "'iam'" in raised.value.detail
     assert "two kept rereads" in raised.value.detail
+
+
+def test_layout_with_a_kept_reread_replacing_a_word_no_ocr_word_lies_over_fails() -> (
+    None
+):
+    # The record names the body word "Normandy", which no word of
+    # Tesseract's lies over, and the lines lack it: the words alone balance,
+    # so only the record check can find it.
+    reread = _note_reread((*_NOTE_LAYER, _BODY))
+    lines = _note_lines(_NOTE_OCR, (reread,))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict()
+    assert "'Normandy'" in raised.value.detail
+    assert "none of its ocr_words lies over" in raised.value.detail

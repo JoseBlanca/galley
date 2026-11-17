@@ -10,6 +10,7 @@ itself.
 """
 
 import bisect
+import collections
 import dataclasses
 import functools
 import hashlib
@@ -261,6 +262,50 @@ class Reread:
     layer_score: int
     ocr_score: int
     kept: bool
+
+
+# A layer word lies under a word of Tesseract's when its middle lies inside
+# that word's box widened by 1 pt (reocr spec, section 4).
+_UNDER_OCR_WORD_PT = 1.0
+
+
+def is_under_ocr_word(word: Word, ocr_words: Sequence[Word]) -> bool:
+    """Whether the middle of `word`, a word of the text layer, lies inside
+    the box of one of `ocr_words`, Tesseract's, widened by 1 pt on every
+    side: the same printed word, which a kept Reread may replace (reocr
+    spec, section 4). Boxes in points."""
+    x = (word.box.x0 + word.box.x1) / 2
+    y = (word.box.top + word.box.bottom) / 2
+    return any(
+        ocr_word.box.x0 - _UNDER_OCR_WORD_PT
+        <= x
+        <= ocr_word.box.x1 + _UNDER_OCR_WORD_PT
+        and ocr_word.box.top - _UNDER_OCR_WORD_PT
+        <= y
+        <= ocr_word.box.bottom + _UNDER_OCR_WORD_PT
+        for ocr_word in ocr_words
+    )
+
+
+def words_after_rereads(
+    words: tuple[Word, ...], rereads: tuple[Reread, ...]
+) -> tuple[Word, ...]:
+    """The words of a page as lines.json holds them: `words`, the page's
+    words of words.json, less the `layer_words` of each kept record of
+    `rereads`, the page's records, each taken out once, in their order;
+    then the `ocr_words` of each kept record, in the records' order. A
+    record not kept changes nothing (reocr spec, section 4)."""
+    kept = tuple(reread for reread in rereads if reread.kept)
+    replaced = collections.Counter(
+        word for reread in kept for word in reread.layer_words
+    )
+    staying = []
+    for word in words:
+        if replaced[word] > 0:
+            replaced[word] -= 1
+        else:
+            staying.append(word)
+    return (*staying, *(word for reread in kept for word in reread.ocr_words))
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

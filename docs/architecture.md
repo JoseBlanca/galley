@@ -322,10 +322,11 @@ tuple[Reread, ...])`:
 - `Reread`: a region of a page that layout read again with Tesseract
   (`docs/specs/reocr.md` §4): `page_index`, `kind: RereadKind`, `box`
   (the crop, in points), `layer_words` (the words of words.json it
-  replaces), `ocr_words` (Tesseract's), `layer_score` and `ocr_score`
+  replaces, each with its middle under one of its `ocr_words`),
+  `ocr_words` (Tesseract's), `layer_score` and `ocr_score`
   (ints, known words minus unknown words of each reading), and `kept`
   (whether `ocr_words` took the place of `layer_words`: `ocr_score`
-  higher). Every region read is recorded, kept or not, in page order.
+  higher and, where `layer_words` is empty, at least 2 known words). Every region read is recorded, kept or not, in page order.
 - `RereadKind`: `small_print_page` (a page printed wholly in small
   type, read below its running head), `margin_note` (one note of an
   outer margin), `cut_in_note` (one crop of Stubbs' notes cut into the
@@ -658,7 +659,9 @@ lists the words, with the pages they came from where the origins say.
 - The boundaries: layout, words.json against lines.json, with the
   `layer_words` of each kept `Reread` taken out of words.json's side and
   its `ocr_words` added, and each kept record's `layer_words` required
-  to be words of its page in words.json, none in two records; structure,
+  to be words of its page in words.json, none in two records, each with
+  its middle inside the box of one of the record's `ocr_words` widened
+  by 1 pt (`docs/specs/reocr.md` §4); structure,
   lines.json against blocks.json (the text of every body and note block,
   with a note's `marker` and a heading's `label` counted as words of
   it); markdown, blocks.json

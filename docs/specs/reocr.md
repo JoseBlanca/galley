@@ -178,7 +178,14 @@ Four kinds of region are read. For each region read, galley computes the
 reading score of the layer's words that the region replaces (section 4
 says which) and of Tesseract's words, and **keeps Tesseract's words only
 when their score is higher** and they hold at least one word; on a tie,
-or lower, the layer's words stay.
+or lower, the layer's words stay. Where the region replaces no word of
+the layer, a higher score is not enough: Tesseract's words are kept
+only when they hold at least 2 known words (and, as they must score
+above the empty layer's 0, more known words than unknown). Junk read over nothing then stays out ("af", Gierke page
+120, kept before at a score of 1 against 0), and a note the layer did
+not read still comes in ("Medieval Thought.", Gierke page 88, 2 known
+words); a note of one word the layer did not read stays missing (owner,
+17 November 2026).
 The choice is made per region, so that a page where Tesseract reads one
 note worse keeps the layer for that note and loses no word, and a book
 that Tesseract reads worse throughout keeps its layer throughout.
@@ -325,6 +332,11 @@ The four kinds, each with what is cropped and how it is read:
    - a reading with no word left is never kept, so that a note the
      layer read ("Despensers,", page 306) is not replaced by nothing.
 
+   Of the cut-in words and the column words it may replace, a kept crop
+   replaces only those that a word of Tesseract's it keeps lies over
+   (section 4): the note words of a line dropped at the inset stay as
+   the layer read them.
+
    On the whole of Stubbs, with these, the kept crops replaced one word
    that layout had left in the column, "heBarons" on page 226, the OCR's
    reading of the note's "the Barons." that layout's 5 pt guard keeps
@@ -341,7 +353,10 @@ The four kinds, each with what is cropped and how it is read:
    every word inside a kept word's box: on Stubbs it moved 167 words
    out of the column, at least 34 of them body words replaced by
    unrelated text, and dropped note words layout had left in the column
-   ("Estimate of", page 50), which a crop may now replace.
+   ("Estimate of", page 50), which a crop may now replace. These counts
+   were measured before a kept crop replaced only the layer words under
+   its kept Tesseract words (section 4); with that rule it replaces the
+   same words or fewer.
 
    A whole strip down the column's side, with the body lines blanked
    where ink touches the inset, was tried and dropped: it made 2,062
@@ -399,33 +414,47 @@ depend on Tesseract. Then, per page, around layout §3's steps:
    side's margin words, that side's cut-in words, the band), and the
    later steps lay them out as they lay out the layer's.
 
-**The words a region replaces** are:
+**The words a region may replace** are:
 
 - for a small-print page, all its words but those of the running-head
   region;
-- for a note band, that side's margin words whose vertical middle lies
-  within the band's top and bottom, whatever their horizontal place, so
-  that a note word less than 4 pt from the column, outside the strip, is
-  not read twice;
+- for a note band, every word of the page: the strip lies 4 pt outside
+  the body column, so only the margin's words, and the layer's stray
+  letters at the column's edge, lie under Tesseract's words;
 - for a cut-in crop, that side's cut-in words whose vertical middle
   lies within 1 pt of a zone the crop was made from, and the words
   layout left in the column that the crop may replace (section 3, kind
-  3) whose middle lies inside the box of one of Tesseract's kept words
-  widened by 1 pt;
-- for a footnote band, the band's words;
+  3); never a body word;
+- for a footnote band, the band's words.
 
-and, for a note band, also every other word of the page whose middle
-lies inside the box of one of Tesseract's kept words widened by 1 pt:
-the same printed word read twice. The strip lies 4 pt outside the body
-column, so no body word lies in it. A cut-in crop never replaces a body
-word (section 3, kind 3).
+**A region replaces, of these, only the words whose middle lies inside
+the box of one of its kept words of Tesseract's, widened by 1 pt**; the
+others stay in the layer. A printed word that Tesseract did not read,
+or whose reading a filter dropped (a cut-in line at the inset, a word
+over a body word, a word inside an earlier kept crop), keeps the
+layer's reading, so no word is lost. The rule before it replaced every
+word a kept region may replace, and lost such words: in hand-made cases
+of the first code review, a cut-in note's second line "wcnt nortb",
+whose Tesseract line was dropped at the inset, and "Sce Stnbbs" of a
+footnote band, whose Tesseract words lay inside an earlier cut-in crop
+(owner, 17 November 2026). The price, not measured: a printed word is
+read twice when the layer cuts or places it otherwise than Tesseract,
+as a layer word whose middle falls in the gap between two of
+Tesseract's words, or a margin word the layer places more than half
+outside the strip toward the column (its middle more than 1 pt outside
+the Tesseract word read from the part inside), which stays beside
+Tesseract's reading. A margin word wholly outside the strip, which
+Tesseract does not see, stays; the rule before replaced it by its
+vertical place alone and lost it.
 
 **Each word of the layer is replaced by one record at most**: a word
 already among the replaced words of a kept region of its page is not
 counted again by a later one, and a word of Tesseract's whose middle
-lies inside an earlier region's crop on the page is dropped, so that a
-printed word is not read in by two regions. The regions of a page are
-taken in the order of the record below.
+lies inside the crop of an earlier kept region on the page is dropped,
+so that a printed word is not read in by two regions. A region not
+kept drops no word of a later one, whose reading of the same printed
+words may then be kept. The regions of a page are taken in the order of
+the record below.
 
 **Tesseract's words** become `Word`s with the text of the tsv row,
 stripped of spaces; a box in points, the word's pixel box divided by
@@ -457,7 +486,7 @@ class Reread:
     ocr_words: tuple[Word, ...]       # Tesseract's, as above
     layer_score: int
     ocr_score: int
-    kept: bool                        # ocr_score > layer_score
+    kept: bool                        # by the rule of section 3
 ```
 
 A region where both readings are empty is not recorded. `LinesFile`
@@ -470,10 +499,12 @@ footnote band. `lines.json` goes to `format_version` 2.
 `words.json`, minus the `layer_words` of every kept `Reread`, plus their
 `ocr_words`, equal the words of `lines.json` as multisets of strings;
 the `layer_words` of each kept `Reread` are words of its page in
-`words.json`; and no word of the page is among the `layer_words` of two
-kept records (compared as page, text and box), so that a record cannot
-name a word the layer never had, or one another record already
-replaced. Every word of the layer is then either in `lines.json` or in
+`words.json`; no word of the page is among the `layer_words` of two
+kept records (compared as page, text and box); and the middle of each
+of a kept record's `layer_words` lies inside the box of one of its
+`ocr_words` widened by 1 pt; so that a record cannot name a word the
+layer never had, one another record already replaced, or one that no
+word of Tesseract's reads. Every word of the layer is then either in `lines.json` or in
 exactly one kept record, with its page and box; a record not kept
 changes nothing.
 
@@ -518,7 +549,9 @@ def words_of_tsv(tsv: str, *, origin: tuple[float, float], dpi: int) -> tuple[Wo
 
 def reading_score(words: Iterable[Word], lower_case_words: frozenset[str]) -> int: ...
 def is_small_print_page(page: PageWords, measures: BookMeasures) -> bool: ...
-def note_bands(strip: Image.Image) -> tuple[tuple[int, int, int, int], ...]: ...
+def note_bands(strip: Image.Image, *, dpi: int) -> tuple[tuple[int, int, int, int], ...]: ...
+    # ValueError when `dpi` is not OCR_DPI: the band's sizes in pixels
+    # (section 3, kind 2) were measured at 300 dpi.
     # The note bands of a margin strip, as pixel boxes (section 3, kind 2).
 ```
 
@@ -572,7 +605,9 @@ with 12 gave byte-identical records, and Gierke's 762 regions read inside layout
   Stubbs page 83) is kept with the note when the note wins (**Open 2**).
 - **A note the layer did not read at all** ("Medieval Thought.", Gierke
   page 88; "Fall of Bristol.", Stubbs page 308): the region replaces no
-  word, Tesseract's words score above 0, and they are kept.
+  word, Tesseract's words hold 2 known words or more and more known
+  than unknown, and they are kept. Junk read over nothing ("af",
+  Gierke page 120) has fewer, and is not.
 - **A list of numbers in a margin** (Gierke's contents, pages 61–80):
   Tesseract reads the column of page numbers worse, the score keeps the
   layer.
@@ -649,9 +684,12 @@ the extract change, Stubbs' index error rate was 1.543.
   a reading with no word left not kept; two regions whose
   crops overlap, the second taking no word the first replaced; on a
   small-print page, a margin word read with the page and no margin
-  region recorded. The fidelity check passes, and fails when a kept
-  record names a word the page does not have or a word another kept
-  record names.
+  region recorded; a cut-in note line whose Tesseract line is dropped
+  at the inset, and a footnote band's words whose Tesseract words lie
+  inside an earlier kept cut-in crop, kept as the layer read them. The
+  fidelity check passes, and fails when a kept record names a word the
+  page does not have, a word another kept record names, or a word none
+  of its Tesseract words lies over.
 - A config with `reread_footnotes = true`, and one with a string there,
   an error.
 
@@ -748,7 +786,9 @@ and 6 when they are built.
    drop words under 30 as removals with a new reason, `ocr_junk`, which
    the owner can review (the reader loses some real words). Recommended:
    keep every word until a sample of the 120 has been read by eye.
-   Meanwhile: keep every word.
+   Meanwhile: keep every word. Junk read where the layer has no word
+   is a separate case, decided: such a region is kept only with 2 known
+   words or more (section 3).
 3. **The new field of `lines.json`, and layout replacing OCR that
    exists** (architecture §7b and §8, applied here): a shared format
    changes, and layout now replaces existing OCR, which §7b had left to

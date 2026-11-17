@@ -39,7 +39,7 @@ from dataclasses import dataclass
 from statistics import fmean
 
 from galley.config import Language
-from galley.model import PageWords, Reread, TextSource, Word, WordsFile
+from galley.model import PageWords, Reread, TextSource, WordsFile, words_after_rereads
 from galley_eval.align import (
     Alignment,
     GalleyToken,
@@ -220,19 +220,10 @@ def _confidences(page: PageWords, rereads: tuple[Reread, ...]) -> tuple[float, .
     """Tesseract's confidences of the words of `page` as lines.json holds
     them: its words with one, but those a kept re-reading replaced, and
     the words of each kept re-reading of the page."""
-    kept = tuple(
-        reread for reread in rereads if reread.kept and reread.page_index == page.index
+    words = words_after_rereads(
+        page.words,
+        tuple(reread for reread in rereads if reread.page_index == page.index),
     )
-    replaced: Counter[Word] = Counter(
-        word for reread in kept for word in reread.layer_words
-    )
-    words: list[Word] = []
-    for word in page.words:
-        if replaced[word] > 0:
-            replaced[word] -= 1
-        else:
-            words.append(word)
-    words.extend(word for reread in kept for word in reread.ocr_words)
     return tuple(
         word.ocr_confidence for word in words if word.ocr_confidence is not None
     )

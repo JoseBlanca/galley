@@ -1,6 +1,8 @@
 """Tests of galley_eval.page_table: the columns of pages.tsv (spec
 section 8), each on a literal page."""
 
+from dataclasses import replace
+
 import pytest
 
 from galley.config import Language
@@ -193,6 +195,28 @@ def test_ocr_confidence_mean_leaves_out_ocr_words_a_kept_reread_replaced() -> No
     galley = _tokens("the king went")
     words_file = _words_file(galley, TextSource.OCR, 40.0)
     # The first word, read with 40, replaced by a reading of 100.
+    rereads = (_reread(words_file.pages[0].words[:1], (100.0,), kept=True),)
+    (row,) = _rows(reference, galley, words_file, rereads)
+    assert row.ocr_confidence_mean == 60.0
+
+
+def test_ocr_confidence_mean_leaves_out_a_kept_reread_of_another_page() -> None:
+    reference = _reference("the king went")
+    galley = _tokens("the king went")
+    words_file = _words_file(galley, TextSource.OCR, 40.0)
+    # A record of page 1 naming words equal to page 0's.
+    other_page = replace(
+        _reread(words_file.pages[0].words[:1], (100.0,), kept=True), page_index=1
+    )
+    (row,) = _rows(reference, galley, words_file, (other_page,))
+    assert row.ocr_confidence_mean == 40.0
+
+
+def test_ocr_confidence_mean_takes_out_a_word_on_the_page_twice_once() -> None:
+    reference = _reference("the the went")
+    galley = _tokens("the the went")
+    words_file = _words_file(galley, TextSource.OCR, 40.0)
+    # The two "the" are equal words; the record replaces one of them.
     rereads = (_reread(words_file.pages[0].words[:1], (100.0,), kept=True),)
     (row,) = _rows(reference, galley, words_file, rereads)
     assert row.ocr_confidence_mean == 60.0
