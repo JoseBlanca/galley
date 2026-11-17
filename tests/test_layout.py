@@ -9,6 +9,7 @@ exact regions of the reference pages are tested in tests/test_excerpts.py.
 """
 
 import hashlib
+import json
 import math
 from collections import Counter
 from collections.abc import Callable
@@ -2457,6 +2458,87 @@ def test_reread_owner_checked_whole_domesday_75_joins_unfree_dom(
         "The unfreedom of the villein.",
         "Can the villein be pursued ?",
     )
+
+
+# Three index pages transcribed by eye from 400 and 600 dpi renders on 17
+# November 2026, one printed line per line (tests/fixtures/expected/
+# index_*.txt): Haskins' page indices 266 and 267, excerpt page 9 of
+# haskins_eval and of haskins_quotes_index, and Stubbs' 312, which is a
+# small-print page in the whole book only (reocr spec, section 9). The
+# words layout gives on the page, all its regions, are compared with the
+# transcription's as multisets: the words galley misses and the words it
+# has that the page does not print. What galley gets wrong today is the
+# frozen list beside each transcription (index_*.differences.json), which
+# the test compares strictly, so that a change shows, for the better or the
+# worse. The order of the words is not compared.
+
+_EXPECTED_DIR = Path(__file__).parent / "fixtures" / "expected"
+
+
+def _transcribed_words(name: str) -> Counter[str]:
+    """The words of the transcription `name`, without its comment lines and
+    the "[ornament]" it writes for a printed ornament."""
+    text = (_EXPECTED_DIR / f"{name}.txt").read_text(encoding="utf-8")
+    return Counter(
+        word
+        for line in text.splitlines()
+        if not line.startswith("#")
+        for word in line.split()
+        if word != "[ornament]"
+    )
+
+
+def _differences_from_transcription(
+    lines: LinesFile, page_index: int, name: str
+) -> dict[str, dict[str, int]]:
+    printed = _transcribed_words(name)
+    page = next(page for page in lines.pages if page.index == page_index)
+    laid_out = Counter(
+        word.text
+        for region in page.regions
+        for line in region.lines
+        for word in line.words
+    )
+    return {
+        "missing": dict(sorted((printed - laid_out).items())),
+        "extra": dict(sorted((laid_out - printed).items())),
+    }
+
+
+def _frozen_differences(name: str) -> object:
+    return json.loads(
+        (_EXPECTED_DIR / f"{name}.differences.json").read_text(encoding="utf-8")
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+@pytest.mark.parametrize(
+    ("excerpt", "name"),
+    [
+        ("haskins_eval", "index_haskins_266"),
+        ("haskins_quotes_index", "index_haskins_267"),
+    ],
+)
+def test_reread_haskins_index_page_differs_from_its_transcription_as_frozen(
+    excerpt: str, name: str, excerpt_books: frozendict[str, BookFolder]
+) -> None:
+    lines = read_lines(excerpt_books[excerpt].lines_json)
+    assert _differences_from_transcription(lines, 9, name) == _frozen_differences(name)
+
+
+@pytest.mark.whole_book
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_whole_stubbs_index_page_312_differs_from_its_transcription_as_frozen(
+    whole_book_run: Callable[[str], BookFolder],
+) -> None:
+    lines = read_lines(whole_book_run("earlyplantagenet01stub").lines_json)
+    assert _differences_from_transcription(
+        lines, 312, "index_stubbs_312"
+    ) == _frozen_differences("index_stubbs_312")
 
 
 # The whole books (reocr spec, section 9, "Whole-book tests"), from the
