@@ -221,8 +221,13 @@ def test_no_break_space_is_not_put_at_a_line_feed_of_verse_or_a_block_start() ->
 
 # split_at_case
 
-_LOWER_CASE_WORDS = frozenset({"the", "of", "in", "de", "le", "guin", "ab"})
-_BOOK_WORDS = frozenset({"avre", "william", "ab", "guin", "out"})
+_LOWER_CASE_WORDS = frozenset({"the", "of", "in", "de", "le", "guin", "ab", "po", "ji"})
+_BOOK_WORDS = frozenset(
+    {"avre", "william", "ab", "guin", "out", "utique", "ethelbert", "hit"}
+)
+# The book's common inner words: "po" and "ji" are known words of the
+# list but not printed often in the book.
+_COMMON_INNER_WORDS = frozenset({"the", "of", "in", "de", "le", "a", "xy"})
 
 
 @pytest.mark.parametrize(
@@ -236,7 +241,10 @@ _BOOK_WORDS = frozenset({"avre", "william", "ab", "guin", "out"})
 def test_word_glued_at_a_case_change_is_split_when_the_book_prints_the_right_part(
     word: str, parts: tuple[str, str]
 ) -> None:
-    assert split_at_case(word, _LOWER_CASE_WORDS, _BOOK_WORDS) == parts
+    assert (
+        split_at_case(word, _LOWER_CASE_WORDS, _BOOK_WORDS, _COMMON_INNER_WORDS)
+        == parts
+    )
 
 
 @pytest.mark.parametrize(
@@ -253,12 +261,18 @@ def test_word_glued_at_a_case_change_is_split_when_the_book_prints_the_right_par
         ("of-William", _BOOK_WORDS, _LOWER_CASE_WORDS),
         ("ofWilliam's", _BOOK_WORDS, _LOWER_CASE_WORDS),
         ("theavre", _BOOK_WORDS, _LOWER_CASE_WORDS),
+        ("poUtique", _BOOK_WORDS, _LOWER_CASE_WORDS),
+        ("jiEthelbert", _BOOK_WORDS, _LOWER_CASE_WORDS),
+        ("ofUtique", _BOOK_WORDS, _LOWER_CASE_WORDS),
+        ("theHit", _BOOK_WORDS, _LOWER_CASE_WORDS),
     ],
 )
 def test_word_not_glued_at_a_case_change_or_without_evidence_stays(
     word: str, book_words: frozenset[str], lower_case_words: frozenset[str]
 ) -> None:
-    assert split_at_case(word, lower_case_words, book_words) is None
+    assert (
+        split_at_case(word, lower_case_words, book_words, _COMMON_INNER_WORDS) is None
+    )
 
 
 # split_glued_words
@@ -290,7 +304,9 @@ def test_glued_word_in_a_block_is_split_with_its_change() -> None:
         line_starts=frozenset({3}),
     )
 
-    split = split_glued_words(block, _LOWER_CASE_WORDS, _BOOK_WORDS)
+    split = split_glued_words(
+        block, _LOWER_CASE_WORDS, _BOOK_WORDS, _COMMON_INNER_WORDS
+    )
 
     assert split.words == ("William", "came", "of", "William,", "to", "Normandy")
     assert split.word_pages == (4, 4, 4, 4, 5, 5)
@@ -314,4 +330,7 @@ def test_glued_word_in_a_block_is_split_with_its_change() -> None:
 def test_block_without_glued_words_is_unchanged() -> None:
     block = _block(("the", "Avre", "deUver", "LeGuin"))
 
-    assert split_glued_words(block, _LOWER_CASE_WORDS, _BOOK_WORDS) == block
+    assert (
+        split_glued_words(block, _LOWER_CASE_WORDS, _BOOK_WORDS, _COMMON_INNER_WORDS)
+        == block
+    )
