@@ -93,3 +93,16 @@ confirmed by the orchestrator: a note band replaces the margin words
 whose middle lies in its crop (ink and 6 px); a Tesseract word inside an
 earlier region's crop is dropped, kept or not, so no word comes twice; a
 small-print page given other regions is an error.
+
+## Task 4.1: the running head of a two-page section (stream `running-head`)
+
+Done (31707ce), merged. structure takes a head line no other rule took
+as a running head when one end word is number-like and the rest is like
+the topmost line of one of the two pages before. Deliverable 1: 27
+tests; each "kept" case fails when its condition is broken. On the
+excerpts it fires only on the two target lines (excerpt page 6 of
+`haskins_front` and of `domesday_front_flow`); on the whole books the
+whole-book tests run structure on (Haskins, Stubbs, Gierke, Mariéjol),
+only Haskins' "vlil PREFACE". Domesday and Kadesh are checked in task
+4.2. A known limit, read literally from the spec: a speck above the
+heading of the page two before would hide that heading.

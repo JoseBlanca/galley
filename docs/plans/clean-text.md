@@ -370,7 +370,7 @@ two pages, which no other page repeats: "vlil PREFACE" on Haskins' page
 the text layer (structure §3); Haskins has no space characters, so its
 line 13 may come out with other words under the new one.
 
-- [ ] 4.1 The rule, in structure's running-head pass, with the unit
+- [x] 4.1 The rule, in structure's running-head pass, with the unit
   tests. Spec: structure §3, "The head of a short section". Stream
   `running-head`. Deliverable 1.
 - [ ] 4.2 The excerpt and whole-book tests. Spec: structure §3, the
