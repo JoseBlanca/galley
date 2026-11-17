@@ -1,0 +1,58 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "stubbs_heads",
+  "page": 6,
+  "book_page_index": 152,
+  "checks": "a running head whose date the skew sets 4 to 6 pt lower (layout step 3), removed with its misread page number",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "A. d. 1194. Richard Cceur de Lion. 13J"
+      }
+    ],
+    "page_numbers": []
+  },
+  "known": "The page number 131, read \"13J\", is no page-number form and goes with the running head (structure spec section 3). The excerpt measures a cut-in inset of 58.0 pt against the book's 59.0, and the page's cut-in notes differ from the book's (scripts/fetch_samples.py).",
+  "printed": {
+    "book_page_index": 152,
+    "running_head": {
+      "words": [
+        "A.D. 1194.",
+        "Richard Cœur de Lion."
+      ],
+      "page_number": "131",
+      "number_side": "right",
+      "skew": "'A.D. 1194.' at the outer-left end sits visibly lower than '131'"
+    },
+    "above_head": null,
+    "below_head_tall": null,
+    "headings": [],
+    "starts_mid_paragraph": false,
+    "paragraph_starts": [
+      "This is Richard's second and",
+      "From this time all Richard's"
+    ],
+    "ends_mid_paragraph": true,
+    "last_words": "and financial mea-",
+    "margin_notes": [
+      "Richard's second visit to England.",
+      "Government of Hubert Wal-ter."
+    ],
+    "footnotes": [],
+    "quotes_or_verse": [],
+    "spaced_punctuation": [
+      {
+        "word": "politician",
+        "text": "politician ;"
+      },
+      {
+        "word": "implacable",
+        "text": "implacable ;"
+      }
+    ],
+    "case_glued": "'Bishopof Coventry' set tight",
+    "foot": null,
+    "notes": "Page begins with a new paragraph (indented). Small stray mark after 'As' in line 4. Short dashes in right margin."
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "stubbs_heads",
+  "page": 8,
+  "book_page_index": 158,
+  "checks": "a running head whose page number the skew sets 6 pt lower (layout step 3), removed with it",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "a.d. 1199. John: jtf"
+      }
+    ],
+    "page_numbers": []
+  },
+  "known": "The page number 137, read \"jtf\", is no page-number form and goes with the running head. The signature mark \"K\" at the foot is not this work package's.",
+  "printed": {
+    "book_page_index": 158,
+    "running_head": {
+      "words": [
+        "A.D. 1199.",
+        "John."
+      ],
+      "page_number": "137",
+      "number_side": "right",
+      "skew": "'137' sits a little lower than 'A.D. 1199.'"
+    },
+    "above_head": "short horizontal dashes above the head (around the centre, above 'John.') and a small mark at upper left",
+    "below_head_tall": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "John seems to have known",
+      "The difficulties which Hubert had"
+    ],
+    "ends_mid_paragraph": true,
+    "last_words": "the opportunity of",
+    "margin_notes": [
+      "John secures Normandy.",
+      "Parties in England."
+    ],
+    "footnotes": [],
+    "quotes_or_verse": [],
+    "spaced_punctuation": [
+      {
+        "word": "1191",
+        "text": "1191 ;"
+      },
+      {
+        "word": "necessity",
+        "text": "necessity ;"
+      }
+    ],
+    "case_glued": null,
+    "foot": "signature mark 'K' centred below the text",
+    "notes": "A small stroke (accent-like) after 'John.' in the head. Stray marks in margins."
+  }
+}

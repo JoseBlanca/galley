@@ -1,0 +1,70 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "haskins_heads_notes",
+  "page": 6,
+  "book_page_index": 30,
+  "checks": "a running head whose next row holds an em dash boxed tall (layout step 3), removed with its page number; its footnote in the band, as now",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "NORMANDY IN HISTORY"
+      },
+      {
+        "reason": "page_number",
+        "text": "15"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "15",
+        "position": "head"
+      }
+    ],
+    "band_first_line": "1 Roman de Rou (ed. Andresen), ii, lines9139-56.",
+    "notes": [
+      {
+        "marker": "1",
+        "text": "Roman de Rou (ed. Andresen), ii, lines9139-56."
+      }
+    ]
+  },
+  "printed": {
+    "book_page_index": 30,
+    "running_head": {
+      "words": [
+        "NORMANDY",
+        "IN",
+        "HISTORY"
+      ],
+      "page_number": "15",
+      "number_side": "right",
+      "skew": "none visible"
+    },
+    "above_head": null,
+    "below_head_tall": "em dash in first line: 'Normans — brave and valiant'",
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "The contrast is not merely"
+    ],
+    "ends_mid_paragraph": true,
+    "last_words": "own objects; indifferent",
+    "margin_notes": [],
+    "footnotes": [
+      {
+        "marker": "superscript 1",
+        "text": "Roman de Rou (ed. Andresen), II, lines 9139–56.",
+        "italic": "Roman de Rou",
+        "note": "II in small capitals",
+        "reference": "rulers.¹"
+      }
+    ],
+    "quotes_or_verse": [],
+    "spaced_punctuation": [],
+    "case_glued": null,
+    "foot": null,
+    "notes": "Inline quotations with ellipses '. . .'. Faint marks at bottom-left corner.",
+    "footnote_gap": "close: footnote set directly under the last body line, no blank gap (about one body line pitch)"
+  }
+}

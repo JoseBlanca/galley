@@ -1,0 +1,51 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "gierke_intro_heads",
+  "page": 8,
+  "book_page_index": 76,
+  "checks": "a running head removed as now (its page number is not in the text layer)",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "List of Authorities."
+      }
+    ],
+    "page_numbers": []
+  },
+  "printed": {
+    "book_page_index": 76,
+    "running_head": {
+      "words": "List of Authorities.",
+      "page_number": "lxxi",
+      "number_side": "right",
+      "number_position": "inside the text column: flush with the column's right edge (the right end of the head rule and of the body lines), separated from the italic title by space",
+      "rule_below": true
+    },
+    "above_head": "a small vertical mark at the top right",
+    "title_heading": null,
+    "section_headings": [],
+    "entries": {
+      "setting": "Each entry has a hanging number in bold sans-serif figures with a full stop (e.g. '8.'), set flush with the left edge of the column; the entry text is roman (author name in the same plain roman as the rest, not small caps or italic), first line beside the number, turnover lines indented further (hanging indent).",
+      "count_numbered_on_page": 8,
+      "first_entry_first_words": "Johannes Hus (1373—1415).",
+      "last_entry_first_words": "Gregory of Heimburg (d.",
+      "starts_mid_entry": true
+    },
+    "margin_numbers": {
+      "side": "left, hanging (inside the column's left edge, the entry numbers)",
+      "numbers": [
+        "86.",
+        "87.",
+        "88.",
+        "89.",
+        "90.",
+        "91.",
+        "92.",
+        "93."
+      ]
+    },
+    "foot": null,
+    "notes": "Starts mid-entry: 11 lines continue entry 85 (Gerson). '91.' full stop looks like a broken 'L'-shaped mark in the scan ('91L'). Entry 93 continues on next page ('...concerning the affair of Brixen,')."
+  }
+}

@@ -130,6 +130,31 @@ EXCERPT_CONFIGS = frozendict(
             'language = "en"\n'
             "contents_pages = [5]\n"
         ),
+        # The excerpts of structure spec section 26, "Excerpt tests", for
+        # the plan owner-books. Their pages are text pages with a text
+        # layer, and none is a printed contents page: Gierke's list of
+        # authorities (excerpt pages 0 to 11) is a list of books, not of
+        # the book's chapters.
+        "haskins_heads_notes": (
+            'title = "The Normans in European History"\n'
+            'authors = ["Charles Homer Haskins"]\n'
+            'language = "en"\n'
+        ),
+        "stubbs_heads": (
+            'title = "The Early Plantagenets"\n'
+            'authors = ["William Stubbs"]\n'
+            'language = "en"\n'
+        ),
+        "gierke_intro_heads": (
+            'title = "Political Theories of the Middle Age"\n'
+            'authors = ["O. Gierke", "F. W. Maitland"]\n'
+            'language = "en"\n'
+        ),
+        "domesday_rereads": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+        ),
     }
 )
 

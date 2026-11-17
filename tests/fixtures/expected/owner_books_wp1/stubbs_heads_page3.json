@@ -1,0 +1,68 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "stubbs_heads",
+  "page": 3,
+  "book_page_index": 100,
+  "checks": "a running head whose date the skew sets 4 to 6 pt lower (layout step 3), removed with its page number",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "r-1169. Henry II and Thomas Becket"
+      },
+      {
+        "reason": "page_number",
+        "text": "79"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "79",
+        "position": "head"
+      }
+    ]
+  },
+  "known": "The date's \"r-\" is the text layer's reading of a dash; the words of the head are the text layer's, left to right.",
+  "printed": {
+    "book_page_index": 100,
+    "running_head": {
+      "words": [
+        "-1169.",
+        "Henry II. and Thomas Becket."
+      ],
+      "page_number": "79",
+      "number_side": "right",
+      "skew": "page is rotated; left end '-1169.' sits slightly lower than '79'",
+      "left_end_note": "left element printed as a dash-like mark followed by '1169.' (looks like the tail of a date range, e.g. '–1169.'; nothing else visible to its left)"
+    },
+    "above_head": "faint specks/short marks above head (one above 'Henry' area, one far right)",
+    "below_head_tall": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "It would be a tedious"
+    ],
+    "ends_mid_paragraph": true,
+    "last_words": "by a cruel",
+    "margin_notes": [
+      "His exile.",
+      "Henry's"
+    ],
+    "margin_notes_note": "'Henry's' at the foot is the start of a note that continues on the next page.",
+    "footnotes": [],
+    "quotes_or_verse": [],
+    "spaced_punctuation": [
+      {
+        "word": "years",
+        "text": "years ;"
+      },
+      {
+        "word": "him",
+        "text": "him ;"
+      }
+    ],
+    "case_glued": null,
+    "foot": null,
+    "notes": "Text block strongly skewed/curved (lines rise to the right). 'this :—At Pontigny' has colon with space before it? colon appears close to 'this' with a small space; treat as 'this :—' (uncertain)."
+  }
+}

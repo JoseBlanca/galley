@@ -1,0 +1,78 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "domesday_rereads",
+  "page": 10,
+  "book_page_index": 160,
+  "checks": "margin notes read by re-reading (work package 2); the running head and its page number removed as now",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "Manor and Vill."
+      },
+      {
+        "reason": "page_number",
+        "text": "135"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "135",
+        "position": "head"
+      }
+    ]
+  },
+  "printed": {
+    "book_page_index": 160,
+    "running_head": {
+      "words": "Manor and Vill.",
+      "page_number": "135",
+      "number_side": "right"
+    },
+    "above_head": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "What is more, our analysis",
+      "In 1086 there had been"
+    ],
+    "ends_mid_paragraph": true,
+    "last_body_words": "Two centuries afterwards we",
+    "margin_notes": [
+      {
+        "text": "The soke- / man and / seignorial / justice.",
+        "beside": "What is more, our analysis of this Wetherley hundred"
+      },
+      {
+        "text": "Changes / in the / Wetherley / hundred.",
+        "beside": "In 1086 there had been a change"
+      }
+    ],
+    "footnotes": [
+      {
+        "marker": "1",
+        "text": "The history of the earldoms during Edward's reign is exceedingly obscure. See Freeman's elaborate note: Ibid., 555. In particular Cambridgeshire seems to have lain now in one and now in another earldom. Thus it comes about that Cambridgeshire sokemen are commended some to Ælfgar, some to Waltheof, some to Harold, some to Gyrth. Ælfgar, for example, had at one time been earl in East Anglia. Men who had commended themselves to an earl would, unless they 'withdrew themselves,' still be his men though he had ceased to be earl of their county.",
+        "ref_word": "clear"
+      },
+      {
+        "marker": "2",
+        "text": "See above, p. 105. Observe how frequently our record speaks of 'sochemanni homines Algari' and the like. These sokemen are Ælfgar's men; but are not properly his sokemen.",
+        "ref_word": "justice"
+      },
+      {
+        "marker": "3",
+        "text": "Inq. Com. Cant. 110. This is from the Inquisitio Eliensis. Compare p. 83.",
+        "ref_word": "Abbot"
+      },
+      {
+        "marker": "4",
+        "text": "Inq. Com. Cant. 77–8.",
+        "ref_word": "again"
+      }
+    ],
+    "footnote_gap": "visible gap, about one line",
+    "tables_or_lists": [],
+    "foot": null,
+    "notes": "Small specks in left margin near 'what exceptional position' and in right margin beside footnote 3. 'homines' italic in footnote 2."
+  }
+}

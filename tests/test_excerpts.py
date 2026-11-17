@@ -48,6 +48,10 @@ EXPECTED_EXCERPT_PAGES = {
     "haskins_front": 11,
     "domesday_front_flow": 10,
     "gierke_front_flow": 10,
+    "haskins_heads_notes": 13,
+    "stubbs_heads": 18,
+    "gierke_intro_heads": 13,
+    "domesday_rereads": 11,
 }
 
 # The pages of each excerpt, by index in the excerpt, that have no word in
@@ -69,6 +73,10 @@ PAGES_WITHOUT_WORDS = {
     "haskins_front": (),
     "domesday_front_flow": (),
     "gierke_front_flow": (),
+    "haskins_heads_notes": (),
+    "stubbs_heads": (),
+    "gierke_intro_heads": (),
+    "domesday_rereads": (),
 }
 
 
@@ -138,6 +146,15 @@ def test_excerpt_has_its_pages_and_words_on_each_but_its_blank_pages(
 # checks both pages on the whole books. Two more, Domesday 30 and 42, record
 # a footnote of page 30 that the excerpt runs on to page 42, its next text
 # page.
+#
+# tests/fixtures/expected/owner_books_wp1/ holds, for each page of the four
+# excerpts of structure spec section 26 that a case is printed on, what the
+# rules of work package 1 of docs/plans/owner-books.md must give there: the
+# page's removals and page numbers, and where a case needs them its notes,
+# headings, heading lines and first line of the footnote band, with what
+# the page image shows ("printed"), read from the 300-dpi render by the
+# assistant on 17 November 2026. No test reads them yet: the rules do not
+# exist, and task 1.5 of the plan writes the tests.
 
 EXPECTED_DIR = Path(__file__).parent / "fixtures" / "expected"
 REFERENCE_PAGES = tuple(
