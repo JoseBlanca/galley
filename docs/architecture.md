@@ -45,8 +45,10 @@ When a page has no text layer, or a poor one, galley makes its own with
 Tesseract, which gives the same thing: words with boxes, plus a confidence.
 Where the scan is sharp but its text layer poor in small print, the
 margin notes and the pages printed wholly in small type, layout reads
-that print again with Tesseract and keeps, region by region, whichever
-reading has more dictionary words (`docs/specs/reocr.md`).
+that print again with Tesseract and keeps, region by region,
+Tesseract's reading only where it scores higher than the layer's by
+known words minus unknown words; on a tie the layer stays
+(`docs/specs/reocr.md`).
 
 ## 2. The samples
 

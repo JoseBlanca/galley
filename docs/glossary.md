@@ -169,10 +169,12 @@ chapter's or author's name, often with the page number. Not a "header".
 **signature mark**: a small printer's mark at the foot of some pages, "I —
 2", which tells the binder how sheets are folded. Not text of the book.
 
-**small-print page**: a page of 50 words or more of which at least 9
-in 10 lie in layout's footnote band, the small type at the foot: a page
-printed wholly in small type, as an index (Stubbs' and Domesday's) or a
-table. Re-reading reads it whole below its running head.
+**small-print page**: a page of 50 words or more on which at least 85
+in 100 of the body column's rows of two words or more, below the
+running head, are set in small type (their median word height at most
+0.85 of the body's): a page printed wholly in small type, as an index
+or a bibliographical note. Re-reading reads it whole below its running
+head.
 
 **span**: a run of a block's text with one emphasis and, optionally, a
 note reference.
