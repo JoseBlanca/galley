@@ -535,6 +535,28 @@ def test_short_section_rule_keeps_a_title_line_without_a_number_like_word() -> N
     assert _removals_of(8, blocks) == ()
 
 
+def test_short_section_rule_keeps_a_head_whose_end_word_is_not_number_like() -> None:
+    # Without its first word, "THE PREFACE" is the heading of page 4; "THE"
+    # is not number-like, so the line stays.
+    survey = survey_book(_lines_of(*_short_section("THE PREFACE")), workers=1)
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_heading_is_the_topmost_line_not_the_first_region() -> None:
+    # Page 4's heading is in its second region, above the body of the first.
+    heading_page = PageLayout(
+        4,
+        (
+            _body(140.0, *_BODY_TEXTS),
+            _region(_line("PREFACE", _BODY_LEFT_PT, 106.0)),
+        ),
+        (),
+    )
+    pages = (heading_page, _page_with_head(5, "vi Preface."), *_numbered_heads())
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert 5 in survey.running_heads
+
+
 def test_short_section_heading_two_pages_before_with_a_blank_page_between() -> None:
     pages = (
         _page_with_head(3, "PREFACE", head_top=106.0),

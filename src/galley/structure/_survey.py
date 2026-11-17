@@ -354,8 +354,9 @@ def _head_survey(
     short_sections = frozenset(
         page_index
         for page_index, line in near
+        # The speck above a head of below_specks never passes the rule: its
+        # line has fewer than 4 letters, so the rest of it has fewer still.
         if page_index not in running
-        and page_index not in below_specks
         and _is_short_section_head(page_index, line, top_letters)
     )
     return _HeadSurvey(
