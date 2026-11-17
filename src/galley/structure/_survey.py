@@ -78,7 +78,8 @@ class BookSurvey:
     the line below it a running head (section 3); `index_pages` the page
     indices of the printed indexes (section 17); `head_numbers` the arabic
     page number of each page whose running head has one, by page index
-    (section 4, the local offset).
+    (section 4, the local offset); `median_head_top` the median top of the
+    book's head lines, in points, None when it has none (section 3).
     """
 
     running_heads: frozenset[int]
@@ -92,6 +93,7 @@ class BookSurvey:
     heads_below_specks: frozenset[int]
     index_pages: frozenset[int]
     head_numbers: frozendict[int, int]
+    median_head_top: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,6 +255,7 @@ class _HeadSurvey:
     first_arabic_page: int | None
     heads_below_specks: frozenset[int]
     head_numbers: frozendict[int, int]
+    median_top: float | None
 
 
 def _texts(line: Line) -> tuple[str, ...]:
@@ -319,7 +322,7 @@ def _head_survey(
     head lines, (page index, head line, line below it), and `top_letters`,
     the letters of each page's topmost line (spec section 3)."""
     if not heads:
-        return _HeadSurvey(frozenset(), None, None, frozenset(), frozendict())
+        return _HeadSurvey(frozenset(), None, None, frozenset(), frozendict(), None)
     median_top = statistics.median(line.box.top for _, line, _ in heads)
     limit = _HEAD_PITCHES * pitch
     near = tuple(
@@ -417,6 +420,7 @@ def _head_survey(
         first_arabic_page,
         below_specks,
         head_numbers,
+        median_top,
     )
 
 
@@ -517,4 +521,5 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
         heads_below_specks=head_survey.heads_below_specks,
         index_pages=index_pages(lines.pages, kinds),
         head_numbers=head_survey.head_numbers,
+        median_head_top=head_survey.median_top,
     )
