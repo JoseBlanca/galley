@@ -322,11 +322,14 @@ tuple[Reread, ...])`:
 - `Reread`: a region of a page that layout read again with Tesseract
   (`docs/specs/reocr.md` §4): `page_index`, `kind: RereadKind`, `box`
   (the crop, in points), `layer_words` (the words of words.json it
-  replaces, each with its middle under one of its `ocr_words`),
-  `ocr_words` (Tesseract's), `layer_score` and `ocr_score`
-  (ints, known words minus unknown words of each reading), and `kept`
+  replaces, each the same printed word as one of its `ocr_words` by
+  the rules of `docs/specs/reocr.md` §4),
+  `ocr_words` (Tesseract's, without its junk), `layer_score` and `ocr_score`
+  (ints, known words minus unknown words of each reading), `kept`
   (whether `ocr_words` took the place of `layer_words`: `ocr_score`
-  higher and, where `layer_words` is empty, at least 2 known words). Every region read is recorded, kept or not, in page order.
+  higher and, where `layer_words` is empty, at least 2 known words), and
+  `dropped_junk_count` (Tesseract's words of no letter or digit, not
+  punctuation or a printed sign, dropped from `ocr_words`). Every region read is recorded, kept or not, in page order.
 - `RereadKind`: `small_print_page` (a page printed wholly in small
   type, read below its running head), `margin_note` (one note of an
   outer margin), `cut_in_note` (one crop of Stubbs' notes cut into the
