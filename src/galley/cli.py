@@ -172,8 +172,8 @@ def _check_before_any_stage(
     when a stage needs Pandoc and it is not on the PATH (spec section 9);
     when analyze or structure, or layout re-reading small print, needs
     Tesseract's tools to extract the word list; or when layout reads with
-    Tesseract, unless the config's `ocr` is `trust`, and it is not on the
-    PATH."""
+    Tesseract, which it does only when the config's `ocr` is `verify`, and
+    it is not on the PATH."""
     if command == _RUN and config.correct:
         message = (
             f"{folder.book_toml} has correct = true, but the walking skeleton "
@@ -192,11 +192,7 @@ def _check_before_any_stage(
     if needing_word_list:
         _check_word_list_tools(config, needing_word_list[0])
     reading = tuple(stage.name for stage in stages if stage.reads_with_tesseract)
-    if (
-        reading
-        and config.ocr is not OcrMode.TRUST
-        and shutil.which("tesseract") is None
-    ):
+    if reading and config.ocr is OcrMode.VERIFY and shutil.which("tesseract") is None:
         message = (
             f"tesseract is not installed; {reading[0]} reads small print with it "
             f'unless the config has ocr = "trust": install it with '

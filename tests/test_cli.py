@@ -527,20 +527,17 @@ def _cached_word_list(tmp_path: Path) -> Path:
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
-@pytest.mark.parametrize("ocr", ["verify", "redo"])
 @pytest.mark.parametrize("command", ["run", "layout"])
 def test_a_command_running_layout_that_rereads_stops_without_tesseract(
     command: str,
-    ocr: str,
     tmp_path: Path,
     excerpt_books: frozendict[str, BookFolder],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # docs/specs/reocr.md, section 3: layout re-reads small print with
-    # Tesseract unless ocr is "trust", so the command checks for it first.
+    # Tesseract under ocr = "verify", the default, so the command checks
+    # for it first.
     folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
-    with folder.book_toml.open("a", encoding="utf-8") as toml:
-        toml.write(f'ocr = "{ocr}"\n')
     monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
     monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", _cached_word_list(tmp_path))
 
@@ -581,14 +578,18 @@ def test_layout_that_rereads_stops_without_the_tools_of_a_word_list_not_cached(
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
-def test_layout_with_ocr_trust_rereads_nothing_and_runs_without_tesseract(
+@pytest.mark.parametrize("ocr", ["trust", "redo"])
+def test_layout_with_ocr_trust_or_redo_rereads_nothing_and_runs_without_tesseract(
+    ocr: str,
     tmp_path: Path,
     excerpt_books: frozendict[str, BookFolder],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # docs/specs/reocr.md, section 3: under "redo" every page is already
+    # Tesseract's and layout re-reads nothing.
     folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
     with folder.book_toml.open("a", encoding="utf-8") as toml:
-        toml.write('ocr = "trust"\n')
+        toml.write(f'ocr = "{ocr}"\n')
     monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
     monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", tmp_path / "no-cache")
 
