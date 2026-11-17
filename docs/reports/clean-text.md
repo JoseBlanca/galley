@@ -496,3 +496,105 @@ layer boxed 133 pt wide into the body column; pages 101, 112, 120, 148,
 of order ("Reversion 4 J of to power the People."), and some notes
 carry junk or a repeated piece ("lty*", page 95; "Sovereisn-" twice,
 page 128), from the layer where Tesseract's reading was not kept.
+
+## Task 6.4: the owner's answers, and checking by eye
+
+The owner answered 6 of the 15 checks (S-LOST, G-88, D-75, D-77, S-CUT
+with the printed text of 25 margin notes; S-312 and T-74 in a line),
+and asked that the assistant do such checks itself from now on. The
+other checks were done by a subagent reading 300 to 800 dpi renders of
+the scans; its answers and three whole-page transcriptions are in the
+session's scratch folder, and the transcriptions are now in
+`tests/fixtures/expected/index_*.txt`.
+
+What the checks found and what was done:
+
+- **The owner's 25 notes** are exact literals at blocks.json
+  (`tests/test_layout.py -k "reread and owner_checked"`). 8 are strict
+  xfails, each with its reason: Stubbs 51a and 64a (cut-in note lines
+  left in the body), 60b, 61a and Gierke 88b (a final stop read as a
+  comma), 62b ("advisers." lies under a body word), Domesday 75b on the
+  excerpt (the join needs the whole book; a whole-book test holds it),
+  and Domesday 75c ("pursued ?", an open question below).
+- **S-LOST, decided by the owner's answer**: where the layer has no
+  word, one known word of 4 letters or more, read at confidence 80 or
+  more and standing alone, is kept. On Stubbs, Domesday and Gierke it
+  keeps 24 regions, all printed (23 Stubbs note words and Domesday's
+  "Kent."); Gierke's pencil "af" is at 69.
+- **Words broken at a line end in margin notes**, where Tesseract lost
+  the hyphen or read it as "." ("nation al", "move. ment", "posi.
+  tion"): joined when the second part is rare after a line's first
+  word in the book (at most 8 times). 32 joins on the three books, all
+  right. In paragraphs the same rule made 11 wrong joins of 24 ("de
+  facto"), so it is for margin notes only. A new word-change reason,
+  `hyphen_lost`; **blocks.json goes to version 3**, so structure must
+  be run again on older runs.
+- **"_and"**: an underscore at a Tesseract word's end is stripped.
+- **A tie lost printed words** (Haskins index page 267, "10 f." and
+  "164 ff."): a tie now keeps Tesseract's reading when it has more
+  known words. 34 of 423 ties on four whole books change. Page 267's
+  differences from the transcription fell from 89 missing and 59 not
+  printed to 22 and 22 (18 are ranges printed with an en dash).
+- **Index pages S-312 and H-266**: neither reading is clean. On Stubbs
+  312 the layer is right at 12 of the 32 places where they differ and
+  Tesseract at 19; on Haskins 266, 3 and 24. Each page's differences
+  from its transcription are now a frozen list a test compares. Taking
+  the right reading word by word is for the next plan.
+- **The 139 text-layer changes of work package 2**: 86 checked against
+  the scans; all 58 joins and splits checked are right, 6 of 28
+  regroupings wrong. The two that look like reordered words (Mariéjol
+  210 "l'envoyé à", 214 "(i) »") were wrong before the plan too: the
+  OCR set one word's box inside its neighbour's and layout sorts the
+  row by position. A rule to keep the PDF's order there would touch 447
+  word pairs on 249 pages, many where neither order is right, so none
+  was made. Domesday 42 mixes two table rows. Left for later.
+
+## Review 3: task 6.4's changes
+
+Of cd75fcf..0f85025, by four categories. What mattered, all fixed
+(0f85025..7533d23):
+
+- **A printed word lost** (fidelity): the rule that replaces a layer
+  word glued and misread over 2 or 3 Tesseract words replaced
+  Domesday 547's correct "Devonshire," with "a aa". The layer word must
+  now be unknown, and the rule runs after the other pairings, on
+  Tesseract words of the same printed line. It replaces 5 words on the
+  four books, all glued misreadings ("164Jf.;", "Sokeintiie").
+- **A reading over no layer word kept at a score of 0**, against the
+  spec. Kept when it holds 2 known words (Domesday 53 "Preedial element
+  in serfage.", 439 "The caruea a constant.", both printed); the spec
+  now says so. A single sure word must stand alone: this drops
+  Stubbs 234 "Motives de-" and 258 "Edward I.", both printed, a known
+  loss for the next plan (Roman numerals counted as known words would
+  bring back the second).
+- Four rules with no test that failed when broken; a `None` that
+  switched joining on and off; a rule written twice; stale docs.
+
+Scores after the review, against task 6.3's:
+
+| score | 6.3 | now |
+|---|---|---|
+| Stubbs' margin notes as margin notes, of 467 | 284 | 291 (target ≥ 285, met) |
+| Domesday's margin notes as margin notes, of 593 | 571 | 579 |
+| margin notes' error rate, Stubbs / Domesday | 0.259 / 0.161 | 0.244 / 0.138 |
+| Haskins' index error rate | 0.119 | 0.094 |
+| Domesday's index precision / recall | .995 / .998 | .995 / .998 |
+
+Every other score is unchanged. Checks at 7533d23: pytest 2,111 passed
+and 8 xfailed in 47.6 s (75.5 s with 8 threads); whole_book 61 passed
+in 464.4 s; ruff, ty and `uv lock --check` clean.
+
+## For whoever next revises a skill or writes a plan
+
+- A check sheet for the owner cost them time and gave less than a
+  subagent reading the scans at 300 dpi or more. Expected text is now
+  transcribed from the image by the assistant and recorded as such;
+  the owner is asked for decisions only. A sheet that shows only the
+  differences between two readings is hard to check: show the whole
+  text beside the image.
+- The excerpt tests did not catch a crash that only the whole of
+  Domesday raised (a word broken at a line end in a tied reading). A
+  rule change in re-reading should run `-m whole_book` before review.
+- A reviewer's spec numbers that do not reproduce usually mean they
+  were measured before the last rule went in: measure after the last
+  code commit of a task.
