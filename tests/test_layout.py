@@ -38,6 +38,7 @@ from galley.layout import (
     measure_book,
 )
 from galley.model import (
+    BlockKind,
     Box,
     Figure,
     Line,
@@ -52,6 +53,7 @@ from galley.model import (
     TextSource,
     Word,
     WordsFile,
+    read_blocks,
     read_lines,
     read_words,
     words_after_rereads,
@@ -2327,6 +2329,123 @@ def test_reread_haskins_excerpt_by_default_reads_only_its_index_page(
     assert tuple((reread.page_index, reread.kind) for reread in lines.rereads) == (
         (9, RereadKind.SMALL_PRINT_PAGE),
     )
+
+
+# The margin notes the owner checked on the page images on 17 November
+# 2026 (the check sheet of task 6.2 of docs/plans/clean-text.md, checks
+# S-LOST, S-CUT, G-88, D-75 and D-77), each as printed and as the EPUB
+# shows it: the text of a margin-note block of blocks.json, the output of
+# structure, with the hyphens at line ends joined. The owner typed "'"
+# where the books print, and Tesseract reads, "’", and left out two final
+# full stops the page prints ("children.", "movement."); the literals hold
+# the printed forms. A note galley still gets wrong is a strict xfail with
+# the reason.
+
+_CUT_IN_LINES_LEFT_IN_THE_COLUMN = (
+    "layout leaves the note's first lines in the body column (layout spec, "
+    "section 9: its cut-in zones find about half the notes' lines)"
+)
+_FINAL_STOP_READ_AS_COMMA = "Tesseract reads the note's final full stop as a comma"
+
+
+def _owner_note(
+    excerpt: str, page: int, note: str, reason: str | None = None
+) -> object:
+    marks = () if reason is None else (pytest.mark.xfail(strict=True, reason=reason),)
+    return pytest.param(excerpt, page, note, marks=marks, id=f"{excerpt}-{page}-{note}")
+
+
+_STUBBS = "stubbs_51_56-64"  # excerpt page 0 is book page index 51, 1 to 9 are 56 to 64
+_GIERKE = "gierke_86-93_270-271"  # excerpt page 2 is book page index 88
+_DOMESDAY = "domesday_74-83"  # excerpt pages 1 and 3 are book page indices 75 and 77
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+@pytest.mark.parametrize(
+    ("excerpt", "page", "note"),
+    [
+        _owner_note(
+            _STUBBS,
+            0,
+            "Importance attached by contemporaries to Henry’s accession.",
+            _CUT_IN_LINES_LEFT_IN_THE_COLUMN,
+        ),
+        _owner_note(_STUBBS, 2, "Character of Henry II."),
+        _owner_note(_STUBBS, 2, "His family policy."),
+        _owner_note(
+            _STUBBS,
+            3,
+            "His great position in Christendom.",
+            "the layer reads the line-end hyphen of 'posi-' as a full stop",
+        ),
+        _owner_note(_STUBBS, 4, "Henry’s mismanagement of his children."),
+        _owner_note(_STUBBS, 5, "Plan of reform."),
+        _owner_note(_STUBBS, 5, "Terms of pacification.", _FINAL_STOP_READ_AS_COMMA),
+        _owner_note(_STUBBS, 6, "Meaning of these terms.", _FINAL_STOP_READ_AS_COMMA),
+        _owner_note(_STUBBS, 7, "Arrival of Henry as successor to Stephen, 1154."),
+        _owner_note(
+            _STUBBS,
+            7,
+            "Henry’s advisers.",
+            "the crop drops Tesseract's 'advisers.' over the layer's 'advUers.', "
+            "which layout leaves at the end of a body line by its 5 pt guard",
+        ),
+        _owner_note(_STUBBS, 8, "Bishop of Winchester."),
+        _owner_note(_STUBBS, 8, "The Empress."),
+        _owner_note(_STUBBS, 8, "Theobald and Becket."),
+        _owner_note(_STUBBS, 8, "Coronation."),
+        _owner_note(
+            _STUBBS, 9, "Banishment of mercenaries.", _CUT_IN_LINES_LEFT_IN_THE_COLUMN
+        ),
+        _owner_note(_STUBBS, 9, "Destruction of castles."),
+        _owner_note(_GIERKE, 2, "Diverse methods."),
+        _owner_note(
+            _GIERKE,
+            2,
+            "Unity of the movement.",
+            "Tesseract reads the hyphen of 'move-' as a full stop and the final "
+            "full stop as a comma",
+        ),
+        _owner_note(
+            _GIERKE,
+            2,
+            "Medieval and Antique-Modern Thought.",
+            "Tesseract reads 'and' as '_and'",
+        ),
+        _owner_note(_GIERKE, 2, "Medieval Thought."),
+        _owner_note(_DOMESDAY, 1, "Free land."),
+        _owner_note(
+            _DOMESDAY,
+            1,
+            "The unfreedom of the villein.",
+            "Tesseract misses the hyphen of 'unfree-'",
+        ),
+        _owner_note(
+            _DOMESDAY,
+            1,
+            "Can the villein be pursued?",
+            "the page prints a space before '?', which galley keeps as a word",
+        ),
+        _owner_note(_DOMESDAY, 3, "The villein and seignorial justice."),
+        _owner_note(
+            _DOMESDAY,
+            3,
+            "The villein and national justice.",
+            "Tesseract misses the hyphen of 'nation-'",
+        ),
+    ],
+)
+def test_reread_owner_checked_margin_note_is_a_block_of_the_printed_text(
+    excerpt: str, page: int, note: str, excerpt_books: frozendict[str, BookFolder]
+) -> None:
+    blocks = read_blocks(excerpt_books[excerpt].blocks_json)
+    notes = tuple(
+        "".join(span.text for span in block.spans)
+        for block in blocks.blocks
+        if block.kind is BlockKind.MARGIN_NOTE and block.origin[0].page_index == page
+    )
+    assert note in notes, notes
 
 
 # The whole books (reocr spec, section 9, "Whole-book tests"), from the
