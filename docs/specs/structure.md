@@ -31,7 +31,11 @@ look alike in the EPUB still get different kinds, and how each looks is
 decided by the markdown and epub stages (architecture §3). The two
 points left open, how a heading keeps its chapter label and what
 Haskins' bibliographical notes are, the owner decided on 16 November
-2026 (section 20).
+2026 (section 20). Revised on 17 November 2026: section 3 gains the
+running head of a section of two pages, "The head of a short section",
+which the owner asked for with the changes to how the text layer is read
+(`docs/specs/extract.md`) and to the pages before the preface
+(`docs/specs/front-matter.md`).
 
 It builds on `docs/architecture.md` (cited as "architecture §8") and
 `docs/glossary.md`, and on the layout spec, whose terms (body column,
@@ -223,6 +227,45 @@ least 4 and 0.75 alike to those of a running head of another page. It is
 then removed as a running head is, with its page number, and the speck
 above stays as it is (in the text, or as a `stray_mark` when it has no
 letter or digit).
+
+**The head of a short section.** The rules above find a running head by
+its likeness to the heads of other pages, or by a page number the book's
+arabic numbers confirm, and a section of two pages has neither: the
+second page of Haskins' preface keeps "vlil PREFACE" (its page number
+viii misread) and that of Domesday's keeps "vi Preface." in the text.
+Their likeness is to the section's heading on the page before ("PREFACE"
+on Haskins' page 12, "PREFACE." on Domesday's), which sits lower than
+the heads, at 100.8 pt in Haskins against a median head top of 35.7 pt,
+4.3 pitches, and so takes no part in the comparisons above. A head line
+that the rules above do not make a running head is one when:
+
+- its top lies within the 2 pitches of the median head top;
+- its first or last word is **number-like**: 1 to 4 characters, each a
+  digit or one of the letters i, v, x, l, c, d, m in either case, with at
+  most one "." or "," after them ("vi", "vlil", "xiv.", "47"); and
+- the rest of the line, its letters in lower case, at least 4 of them,
+  is at least 0.75 alike, as above, to the letters of the topmost line
+  of one of the two pages before it.
+
+It is then removed as a running head is, below: the number-like word as
+a `page_number`, recorded in `page_numbers`, when it is a page-number
+form ("vi"), and otherwise with the rest of the line ("vlil", as a
+misread number is). Two pages before, not one, so that a blank page or a
+plate between the heading's page and the head does not hide it; a guess,
+since on the six books the heading is always on the page just before.
+The number-like word is required because without it the rule takes the
+first line of a title page that repeats its half-title two pages before
+(Gierke's page 8, "POLITICAL THEORIES", against page 6), a line of the
+book's text. Measured on 17 November 2026 on the six whole books
+(`lines.json` and `blocks.json` of the structure-second build of 16
+November 2026, with a prototype of this rule): it removes exactly two
+lines, Haskins' page 13 "vlil PREFACE" and Domesday's page 13 "vi
+Preface.", and no other in any of the six books; without the
+number-like word it also took Gierke's page 8. The excerpts
+`haskins_front` and `domesday_front_flow` (`docs/specs/front-matter.md`
+§6) hold both pages, whose first line their tests assert is a
+`running_head` removal; on the `whole_book` tests, the new rule's
+removals are exactly these two.
 
 A number alone does not make a running head: a top line that ends with
 a word that is also a roman form ("vi", "mix", "dix", "d", "c.", "i.")
