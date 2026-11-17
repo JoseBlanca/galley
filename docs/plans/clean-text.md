@@ -291,7 +291,7 @@ expected, not fixed.
   worktree, written into the test as literal lists of each book's pages
   that are not `text`. Spec: extract §7, "Whole books". Needs 2.2.
   Stream `text-layer`. Deliverable 5.
-- [ ] 2.4 "¬" (U+00AC) at a line's end is a hyphen like "-" (added
+- [x] 2.4 "¬" (U+00AC) at a line's end is a hyphen like "-" (added
   on 17 November 2026: the owner's two books, Turney and Haynes, mark
   every line-end hyphen with "¬", which leaves 1,020 and 2,219 broken
   words such as "liter¬ ature"). Spec first: structure §5, "Hyphens at
