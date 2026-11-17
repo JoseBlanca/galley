@@ -245,3 +245,21 @@ Done (d1c8727). On `haskins_front` and `domesday_front_flow`, excerpt
 page 6, the running head is removed (Domesday's "vi" recorded as a page
 number); on the six whole books the rule adds exactly page 13 of
 Haskins and of Domesday. The whole-book test runs in 72 to 78 s alone.
+
+## The scores before re-reading
+
+`uv run galley-eval run` at fbdc71f (work packages 1 to 4 and review 1
+merged), in `runs/clean-text-before-reread/` of the main checkout, the
+"before" of reocr §9's targets. Against the run after work package 2:
+the front matter is dropped on the four books, and the tool leaves 32,
+17, 6 and 25 reference tokens unscored as front matter (Haskins,
+Stubbs, Domesday, Mariéjol). Haskins' paragraph precision rises from
+.866 to .885; the other scores move by 0.003 or less, but for Stubbs:
+its body error rate rises from 0.056 to 0.059 and its paragraph recall
+falls from .744 to .733. The cause is the tool, not lost text: 344
+reference tokens of Stubbs' series list ("Epochs of Modern History,
+edited by…"), printed on the front pages galley now drops, count as
+missing, because the tool leaves front matter unscored only before
+galley's first aligned word and a title word aligned first. The tool
+is changed after task 5.2 to leave unscored a run of reference tokens
+that matches a run of dropped front-matter words.
