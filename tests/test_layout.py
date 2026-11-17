@@ -1653,7 +1653,7 @@ def test_cut_in_insets_of_the_excerpts_are_stubbs_only(
         name: (60.3, 58.2) if name == "stubbs_51_56-64" else (None, None)
         for name in excerpt_books
     }
-    assert len(insets) == 11
+    assert len(insets) == 14
 
 
 def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(

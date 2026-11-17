@@ -106,6 +106,27 @@ EXCERPT_CONFIGS = frozendict(
             'authors = ["J. H. Breasted"]\n'
             'language = "en"\n'
         ),
+        # The excerpts of docs/specs/front-matter.md section 6, "Excerpt
+        # tests", which open with the book's front pages. Excerpt page 7 is
+        # Haskins' page index 14, and Gierke's page 5 its page index 10,
+        # each a printed contents page.
+        "haskins_front": (
+            'title = "The Normans in European History"\n'
+            'authors = ["Charles Homer Haskins"]\n'
+            'language = "en"\n'
+            "contents_pages = [7]\n"
+        ),
+        "domesday_front_flow": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+        ),
+        "gierke_front_flow": (
+            'title = "Political Theories of the Middle Age"\n'
+            'authors = ["O. Gierke", "F. W. Maitland"]\n'
+            'language = "en"\n'
+            "contents_pages = [5]\n"
+        ),
     }
 )
 
