@@ -4,24 +4,9 @@ change, in a book not in French, and takes a no-break space before it in
 a French one."""
 
 from dataclasses import replace
-from typing import cast
 
 from galley.model import BlockKind, ChangeReason, WordChange
 from galley.structure._unnumbered import Unnumbered
-
-
-def pending_reason(value: str) -> ChangeReason:
-    """`value`, a word change reason that task 2.1 adds to ChangeReason,
-    typed as the member it compares equal to; a str parameter, since ty
-    rejects a cast of the literal to the enum that lacks it."""
-    return cast("ChangeReason", value)
-
-
-# The word change reason of spec section 23. Task 2.1 adds it to
-# ChangeReason as PUNCTUATION_ATTACHED; until that is merged it is its
-# value, which compares equal to the member, and the merge replaces it
-# with the member (tests/test_structure_words.py fails until then).
-PUNCTUATION_ATTACHED = pending_reason("punctuation_attached")
 
 # Spec section 23: the signs a nineteenth-century printer set apart.
 _SPACED_SIGNS = frozenset("?;:!")
@@ -90,7 +75,7 @@ def attach_spaced_signs(block: Unnumbered) -> Unnumbered:
                 page_index=pages[-1],
                 before=(words[-1], word),
                 after=(attached,),
-                reason=PUNCTUATION_ATTACHED,
+                reason=ChangeReason.PUNCTUATION_ATTACHED,
             )
             attachments.append((len(words) - 1, change))
             words[-1] = attached
