@@ -241,7 +241,7 @@ reason. The four excerpts add four runs to the excerpt fixture,
 the orchestrator cuts the excerpt with the fewest tested pages
 shorter.
 
-- [ ] 1.1 The four excerpts and their configs, each excerpt's body
+- [x] 1.1 The four excerpts and their configs, each excerpt's body
   measures and marker form checked against its whole book's (pages of
   the same book added where they differ), and the expected output of
   each page read from its 300-dpi render by a subagent. Spec: structure
