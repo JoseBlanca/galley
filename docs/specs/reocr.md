@@ -23,8 +23,11 @@ gaps, it assumes. Revised the same day after a review: footnotes are no
 longer re-read as part of a whole page, the pages read whole are those
 printed wholly in small type (the earlier rule, a share of single
 letters, picks no page once the text layer is read in the PDF's order),
-Tesseract's words that repeat a body word are dropped from a margin
-note, and every number was measured again inside layout's own steps.
+no word of a body line is replaced by a note read beside it, and every
+number was measured again inside layout's own steps. Revised again the
+same day after a second review: the small-print page is found by the
+height of its rows, so that every page of an index or of a note set in
+small type is read, and a body word is never replaced.
 
 What it decides, in short: the **layout** stage re-reads four kinds of
 text, each region on its own, and keeps Tesseract's words for a region
@@ -96,9 +99,13 @@ Those of the domain, besides the glossary's:
   hyphen followed by a word starting with a letter, a word broken at a
   line end ("free-" "holding."), counts once, as known when the two
   joined, or each part, are known, otherwise as the joined word.
-- **Small-print page**: a page with at least 50 words in `words.json` of
-  which at least 9 in 10 lie in layout's footnote band: a page printed
-  wholly in small type, such as an index.
+- **Small row**: a row of words whose median word height is at most
+  0.85 of the book's body word height, layout's own test for the rows
+  of a footnote band (layout §3, step 4).
+- **Small-print page**: a page with at least 50 words in `words.json`
+  on which at least 85 in 100 of the body column's rows of two words or
+  more, below the running head, are small rows: a page printed wholly
+  in small type, such as an index or a bibliographical note.
 - **Token error rate**: the evaluation tool's measure of a text
   against the reference (`docs/specs/evaluation.md` §6): the reference's
   words that galley misses, misreads, splits or glues, plus galley's
@@ -140,9 +147,9 @@ from a pencil mark, a tick or the edge of a body line beside the note
 **Stubbs' index** (pages 312–321). With the layer read in the PDF's
 order, as the extract spec now reads it, its token error rate at
 `blocks.json` falls from 1.543 to 0.129 and the precision and recall of
-its entry boundaries are 0.995 and 0.874 (both runs in section 9). Read
-whole by Tesseract, psm 3, the error rate falls further to 0.094 and
-the boundaries are 0.987 and 0.959: the recall gains 0.085.
+its entry boundaries are 0.995 and 0.874. Read whole by Tesseract, psm
+3, the error rate falls further to 0.096 and the boundaries are 0.984
+and 0.955: the recall gains 0.081 (both runs in section 9).
 
 **Footnotes** read better with Tesseract, but their markers, the "1"
 or "*" that starts each note, do not. Tesseract reads a marker together
@@ -170,7 +177,8 @@ page, 0.61 to 0.88 s each on Stubbs' index pages, in one thread.
 Four kinds of region are read. For each region read, galley computes the
 reading score of the layer's words that the region replaces (section 4
 says which) and of Tesseract's words, and **keeps Tesseract's words only
-when their score is higher**; on a tie, or lower, the layer's words stay.
+when their score is higher** and they hold at least one word; on a tie,
+or lower, the layer's words stay.
 The choice is made per region, so that a page where Tesseract reads one
 note worse keeps the layer for that note and loses no word, and a book
 that Tesseract reads worse throughout keeps its layer throughout.
@@ -225,22 +233,37 @@ The four kinds, each with what is cropped and how it is read:
    finds a running head by its words repeating over pages; Stubbs' guide
    words ("BUR CON"), printed under the running head, are read by
    Tesseract with the rest, and structure still removed the guide
-   words of all 10 pages after the re-reading. Small-print
-   pages of the six books: Stubbs' 10 index pages (0.99 to 1.00 of
-   their words in the band), Domesday's 547 and 552 (its index) and 426
-   and 428 (tables of figures), Haskins' 129 (its bibliographical
-   note), Mariéjol's 14 (its bibliography). No other page of the six
-   reaches 0.9; Domesday's 92 has 0.54 and Kadesh's 61 0.47, pages of
-   ordinary text with long footnotes. (Stubbs, Domesday and Haskins on
-   the extract spec's reading; Gierke, Kadesh and Mariéjol, and the two
-   fractions of 92 and 61, on the reading before it, which does not
-   change a word's height.) The score rule
-   took all 10 of Stubbs', Domesday's 547 and Haskins' 129, and left
-   Domesday's 426, 428 and 552 (Tesseract read 428's figures as
-   "HKOoOOrFOOOHKFHrFrF"; 552 scored a tie). The 9 in 10 is set from
-   these fractions: the index pages are at 0.99 and above, a page of text
-   with notes at 0.54 or below; an index page's running head, 3 or 4
-   words outside the band, leaves it above 0.99.
+   words of all 10 pages after the re-reading.
+
+   The share of small rows, by page, separates the pages printed wholly
+   in small type from the rest with a gap: every page of the indexes of
+   Stubbs (312–321, 0.97 to 0.99), Domesday (546–552, 1.00) and Haskins
+   (266–273, 0.98 to 1.00), of Haskins' bibliographical notes at the
+   ends of its chapters (40, 99, 129, 130, 205, 206, 232, 263, 264, 0.86
+   to 1.00), of Mariéjol's bibliography (14–16, 0.93 to 1.00), and
+   Domesday's tables 426 and 528 (0.89, 1.00) and Stubbs' publisher's
+   list on page 7 (0.87); the highest other page is Domesday's 428, a
+   table (0.78), then pages of text with long footnotes, Domesday's 290
+   (0.77) and Mariéjol's 211 (0.73); Kadesh's highest is 0.57 and
+   Gierke's 0.17. The threshold, 0.85, lies in that gap, which is 0.08
+   wide. Rows of one word are left out because a page number or a
+   catchword is one; the running head is left out because it is set in
+   full-size type above an index. Measured on Stubbs, Domesday and
+   Haskins as the extract spec reads the layer, on the others as galley
+   read it at 4542207, which gives the same word heights. An earlier
+   form of this rule, the share of the page's words in layout's
+   footnote band, depended on whether layout found a band on the page:
+   it took Domesday's index pages 547 and 552 and not 546 or 548 to
+   551, and Haskins' 129 and not 130, of the same note.
+
+   Each page is then kept or not by the reading score. Kept: Stubbs'
+   10 index pages; Domesday's 528, 547, 548 and 551; Haskins' 99, 129,
+   205, 206, 264, 266, 268 and 272. Left as the layer: Stubbs' page 7;
+   Domesday's 426 (Tesseract read its figures as junk), 546, 549, 550
+   and 552 (scores within 4 of each other, the layer's index being good
+   already); Haskins' other eleven, also within 9. An index is so read
+   page by page, some pages from Tesseract and some from the layer;
+   each page is the better of the two readings.
 
 2. **Outer margin notes**, on each side of the book that has them: a
    side has them when at least 10% of the book's pages with 50 words or
@@ -268,6 +291,10 @@ The four kinds, each with what is cropped and how it is read:
    rows of the body) above and below, and from 3 pt outside the column's
    edge to 3 pt short of the inset (on the left, with the column's edge
    L and the inset I, from L − 3 to L + I − 3 pt), read with psm 6.
+   The crop never reaches above the lowest word of the running-head
+   region (layout §3, step 3), plus 1 pt: widened by 2.5 pitches, the
+   crops of the first notes of a page took the running head's page
+   number ("45" read "4)", page 66; "102" read "LOa", page 123).
    Zones whose widened crops overlap are read as one crop. The zone
    alone clips notes, since layout trims it to its shortened rows
    ("Importance" without its second line "of Eng-", page 22). Measured
@@ -277,21 +304,44 @@ The four kinds, each with what is cropped and how it is read:
    pitches, 1,113; by 4.5, 1,095.
 
    The widened crop holds pieces of the body lines above and below the
-   note, and Tesseract reads them. Two filters take them out:
+   note, and Tesseract reads them, as words or as junk ("change" read
+   "NE", page 49; "pointed" read "ee", page 83; "How long" read "naar
+   lawrnme", page 306). So a crop distinguishes the column's words it
+   may replace from those it must not: it may replace a word that
+   layout left in the column only when the word's vertical middle lies
+   within 1 pt of a zone the crop was made from and the word ends at
+   least 4 pt short of the inset (on the left, its right side at most
+   L + I − 4), the place of a note word; every other word of the column
+   in the crop is a **body word**, a word of a full body line or of the
+   text beside the note. Then:
    - a line of Tesseract's output (its block, paragraph and line
      numbers) is dropped when one of its words ends within 3 pt of the
      crop's side toward the inset: a body line runs on past it, a note
      line stops 4 pt short of it (layout §3, step 2b);
-   - a word of Tesseract's is dropped when a word of the body, as layout
-     left it, has the same key (`wordlist.word_key`: lower case,
-     punctuation stripped from both ends) and its middle within the
-     Tesseract word's box widened by 1 pt. A body line whose words stop
-     short of the crop's side by chance, "he was an" before the wide
-     space of a justified line on Stubbs' page 57, read by Tesseract
-     into the note "he was an Character of Henry Il." before this
-     filter, is the case; so were "word than" (57), "the circum" (36)
-     and "against his" (50), which the review found. With it, none of
-     the four is in a note.
+   - a word of Tesseract's is dropped when its box overlaps the box of
+     a body word, whatever it reads: it is a reading of the body line,
+     "he was an" before the wide space of a justified line on Stubbs'
+     page 57, or junk read off one ("NE");
+   - a reading with no word left is never kept, so that a note the
+     layer read ("Despensers,", page 306) is not replaced by nothing.
+
+   On the whole of Stubbs, with these, the kept crops replaced one word
+   that layout had left in the column, "heBarons" on page 226, the OCR's
+   reading of the note's "the Barons." that layout's 5 pt guard keeps
+   in the body (layout §3, step 2b, rule 3); every other word they
+   replaced is a word layout had already taken out as a cut-in word. No
+   word of a row outside a cut-in zone, of a running head or of a page
+   number was replaced, and 544 of Tesseract's words were dropped as
+   overlapping body words. The cost: Tesseract's correct reading of a
+   note line whose layer words layout left in the column outside the
+   zone is dropped with the rest, and the layer's garbled copy stays in
+   the body ("epoch closing with his down- fall.", page 311; "Isabeiia",
+   page 307). An earlier form of the second filter dropped a Tesseract
+   word only when a body word had the same key, and the region took
+   every word inside a kept word's box: on Stubbs it moved 167 words
+   out of the column, at least 34 of them body words replaced by
+   unrelated text, and dropped note words layout had left in the column
+   ("Estimate of", page 50), which a crop may now replace.
 
    A whole strip down the column's side, with the body lines blanked
    where ink touches the inset, was tried and dropped: it made 2,062
@@ -337,8 +387,8 @@ The book's measures (layout §3, "The book's measures") are taken from
 the layer's words, before anything is re-read, so that they do not
 depend on Tesseract. Then, per page, around layout §3's steps:
 
-1. **A small-print page** is decided on the layer's words (steps 1 to 4
-   run on them to find the band and the running head), read whole as in
+1. **A small-print page** is decided on the layer's words (steps 1 and
+   3 run on them to find the column's rows and the running head), read whole as in
    section 3, and, when Tesseract's words are kept, laid out from them
    by steps 1 to 6. **No other region of a small-print page is read**,
    kept or not: its margins and band are part of the page read.
@@ -358,17 +408,17 @@ depend on Tesseract. Then, per page, around layout §3's steps:
   that a note word less than 4 pt from the column, outside the strip, is
   not read twice;
 - for a cut-in crop, that side's cut-in words whose vertical middle
-  lies within 1 pt of a zone the crop was made from;
+  lies within 1 pt of a zone the crop was made from, and the words
+  layout left in the column that the crop may replace (section 3, kind
+  3) whose middle lies inside the box of one of Tesseract's kept words
+  widened by 1 pt;
 - for a footnote band, the band's words;
 
-and in every case also every other word of the page whose middle lies
-inside the box of one of Tesseract's kept words widened by 1 pt: the
-same printed word read twice, typically the layer's single letters of a
-note that layout left in the body ("G ca e l og s r u a m p" beside
-"Geographi- cal sum- mary.", Stubbs page 23). The body keeps its words:
-Tesseract's words that repeat a body word were dropped by the second
-filter of section 3, kind 3, so no body word lies inside a kept word's
-box.
+and, for a note band, also every other word of the page whose middle
+lies inside the box of one of Tesseract's kept words widened by 1 pt:
+the same printed word read twice. The strip lies 4 pt outside the body
+column, so no body word lies in it. A cut-in crop never replaces a body
+word (section 3, kind 3).
 
 **Each word of the layer is replaced by one record at most**: a word
 already among the replaced words of a kept region of its page is not
@@ -492,15 +542,17 @@ the extract spec reads it, 6 workers:
 
 | book | pages | regions read | of them kept | layout in all |
 |---|---|---|---|---|
-| Stubbs (cut-in notes, index) | 344 | 391 | 293 | 30.2 s |
-| Domesday (outer margins, small-print pages) | 558 | 626 | 442 | 69.6 s |
-| Domesday with `reread_footnotes` | 558 | 1,090 | 606 | 76.3 s |
+| Stubbs (cut-in notes, small-print pages) | 344 | 365 | 262 | 30.7 s |
+| Domesday (outer margins, small-print pages) | 558 | 630 | 443 | 69.9 s |
+| Domesday with `reread_footnotes` | 558 | 1,095 | 607 | 77.8 s |
 | Gierke (outer margins) | 290 | 762 | 490 | 52.0 s (84.6 s with 1 worker) |
-| Haskins (one small-print page) | 280 | 1 | 1 | 1.6 s |
+| Haskins (small-print pages) | 280 | 17 | 8 | 3.5 s |
+| Haskins with `reread_footnotes` | 280 | 84 | 65 | 11.9 s |
 
-layout without re-reading took 2.5 s on Domesday (layout §5). A book
-with nothing to re-read (Mariéjol without `reread_footnotes`) renders
-nothing. Pages are rendered whole, once each, only when they have a
+Gierke's run had the rules of this spec but the guard against an empty
+reading. layout without re-reading took 2.5 s on Domesday (layout §5).
+Mariéjol, without `reread_footnotes`, renders only its three
+small-print pages, 14 to 16 (not run through layout). Pages are rendered whole, once each, only when they have a
 region; the note bands of a margin are found in the render, so every
 page whose column is placed is rendered in a book with outer margin
 notes.
@@ -555,18 +607,22 @@ Scores at `blocks.json`; markdown gives the same.
 | score | Stubbs before → after | Domesday before → after |
 |---|---|---|
 | body token error rate | 0.066 → 0.059 | 0.082 → 0.077 |
-| margin notes found as margin notes | 245 → 326 of 467 | 522 → 573 of 593 |
-| margin notes missing | 28 → 9 | 41 → 11 |
-| margin-note words right (research script, section 3) | 528 → 1,173 of 1,908 | 1,057 → 2,135 of 2,487 |
-| index entry boundaries, precision / recall | 0.995 / 0.874 → 0.984 / 0.955 | 0.999 / 0.993 → 0.998 / 0.991 |
-| index token error rate | 0.129 → 0.096 | 0.026 → 0.027 |
+| margin notes found as margin notes | 245 → 293 of 467 | 522 → 573 of 593 |
+| margin notes missing | 28 → 7 | 41 → 11 |
+| margin-note words right (research script, section 3) | 528 → 1,073 of 1,908 | 1,057 → 2,135 of 2,487 |
+| index entry boundaries, precision / recall | 0.995 / 0.874 → 0.984 / 0.955 | 0.999 / 0.993 → 0.996 / 0.994 |
+| index token error rate | 0.129 → 0.096 | 0.026 → 0.025 |
 | notes whose reference is right | – | 1,279 → 1,279 |
 
-Neither run sets `reread_footnotes`; the footnote figures of section 2
-are from the same runs with it set. Without the extract spec's reading,
-on the layer as galley read it at 4542207, Stubbs' index went from
-1.543 to 0.094 with re-reading; the change to extract alone takes it to
-0.129.
+Haskins, the same way: index token error rate 0.180 → 0.119, its entry
+boundaries 0.997 / 0.988 before and after, body error rate 0.025 →
+0.024, notes whose reference is right 61 → 61. No run sets
+`reread_footnotes`; the footnote figures of section 2 are from the same
+runs with it set. With the earlier filter of cut-in crops (section 3,
+kind 3), which replaced body words, Stubbs' margin notes found were 326
+and their words right 1,173: the price of replacing no body word is 33
+notes and 100 words. On the layer as galley read it at 4542207, before
+the extract change, Stubbs' index error rate was 1.543.
 
 **Unit tests**, with literal inputs, no PDF and no Tesseract:
 
@@ -578,15 +634,19 @@ on the layer as galley read it at 4542207, Stubbs' index went from
   en of" scores lower (its value written in the test from the word
   list); "Henry’s" counts as known; "‘free-" "holding.’" counts as one
   known word; "." counts as neither.
-- `is_small_print_page` on hand-made pages: 50 words all in the band
-  is; 49 is not; 90 of 100 in the band is, 89 is not.
+- `is_small_print_page` on hand-made pages: 50 words in small rows
+  is; 49 is not; 17 small rows of 20 (0.85) is, 16 is not; a running
+  head of full-size words, and rows of one word, change nothing.
 - `note_bands` on a Pillow image drawn in the test: two blocks of ink 30
   px apart give two bands, 15 px apart one; a block 10 px high, and one
   20 px wide, give none.
 - The replacement on a hand-made page: a margin note of three layer
   words replaced by two Tesseract words, a body word beside it kept,
-  the layer's single letters inside a Tesseract word's box replaced; a
-  Tesseract word "an" over a body word "an" dropped; two regions whose
+  the layer's single letters inside a Tesseract word's box replaced; in
+  a cut-in crop, a Tesseract word over a word of a full body line
+  dropped, whatever it reads ("an" over "an", "NE" over "change"), a
+  layout's column word in a zone row left of the inset replaced, and
+  a reading with no word left not kept; two regions whose
   crops overlap, the second taking no word the first replaced; on a
   small-print page, a margin word read with the page and no margin
   region recorded. The fidelity check passes, and fails when a kept
@@ -605,11 +665,15 @@ skips, saying so, on another version:
 - `gierke_86-93_270-271`, excerpt page 2 (book page 88, the owner's
   page): its four margin notes, the last of which the layer did not
   read ("Medieval Thought.").
-- `stubbs_51_56-64`: every cut-in note of the excerpt, as kept, and the
-  body lines beside them unchanged from the run without re-reading.
+- `stubbs_51_56-64`: every cut-in note of the excerpt, as kept; and
+  every word of the column that is not a cut-in word of layout, in rows
+  outside the zones and right of the inset alike, in the same line as
+  in the run without re-reading. A word layout itself takes into a
+  note ("advUers.", page 62) is a note word in both runs.
 - `stubbs_summaries_index`, excerpt pages 4 to 9 (book pages 312, 313,
   316, 318, 319, 321): each is a small-print page whose Tesseract
-  reading is kept, its running head the layer's; on page 312 the entry
+  reading is kept, its running head the layer's; page 0 (book page 16,
+  the contents) is not one; on page 312 the entry
   "Acre, siege of, 116; the English at, 118;" has both ";" (Tesseract's
   text output of the page has "116 ;" and "118;").
 - `domesday_74-83`: the margin notes of two pages, one of which the
@@ -636,10 +700,13 @@ evaluation books before and after, quoted in its report, with the
 margin-note words scored by the tool (section 10). Targets at blocks,
 set a little below the after column so that the code's details may move
 them: Stubbs' index boundaries at least 0.97 / 0.94; margin notes as
-margin notes at least 315 of 467 on Stubbs and 560 of 593 on Domesday;
+margin notes at least 285 of 467 on Stubbs and 560 of 593 on Domesday;
 body error rate at most 0.062 on Stubbs and 0.080 on Domesday;
-Domesday's notes whose reference is right at least 1,275; and Haskins and Mariéjol unchanged but for Haskins'
-page 129. Gierke has no Gutenberg edition: its margin notes are checked
+Domesday's notes whose reference is right at least 1,275; Haskins'
+index error rate at most 0.13; Mariéjol unchanged but for its
+bibliography, pages 14 to 16; and on Stubbs, no word of the column
+that layout did not take as a cut-in word among the `layer_words` of a
+kept cut-in record, but "heBarons" (page 226). Gierke has no Gutenberg edition: its margin notes are checked
 by eye on the 30 notes of the 16 November measurement, which must stay
 at 130 words right of 139 or more.
 
@@ -704,15 +771,19 @@ and 6 when they are built.
   read them better, but also the note references of the page's body.
 - **Finding more of Stubbs' cut-in notes**: layout's zones find about
   half (layout §9); the re-reading reads what they find. Of the
-  reference's 1,908 margin-note words, 1,173 were right after it.
-- **Mariéjol**: no effort, by the owner's decision. Nothing of it is
-  re-read by default: it has no margin notes (0 and 3 pages with margin
-  words), and its one small-print page, 14, a bibliography in small type, would be read whole and kept: Tesseract's
-reading of it scored 89 against the layer's −28 (French word list, psm
-3, read by a script outside layout). Its highest
-  single-letter shares, on which the first version of this spec chose whole
-  pages, were 0.189 (page 57) and 0.181 (page 347) as galley read the
-  layer at 4542207, and are 0.157 and 0.140 with the extract spec's
+  reference's 1,908 margin-note words, 1,073 were right after it.
+- **Mariéjol**: no effort aimed at it, by the owner's decision, which
+  does not keep the general rules from reaching it. It has no margin
+  notes (0 and 3 pages with 2 known margin words) and no footnote is
+  re-read by default; its bibliography, pages 14 to 16, after the end
+  of its front matter at page 10, is printed in small type (0.93 to
+  1.00 of its rows small), so the three pages are small-print pages and
+  read whole. Tesseract's reading of page 14 scored 89 against the
+  layer's −28 (French word list, psm 3, read by a script outside
+  layout), so it would be kept; 15 and 16 were not read. Its highest
+  single-letter shares, on which the first version of this spec chose
+  whole pages, were 0.189 (page 57) and 0.181 (page 347) as galley read
+  the layer at 4542207, and are 0.157 and 0.140 with the extract spec's
   reading, measured by a script that reads the layer as that spec says;
   Stubbs' index pages, 0.24 to 0.63 before, fall below 0.124 with it,
   which is why that rule was dropped.
