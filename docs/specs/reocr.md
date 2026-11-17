@@ -27,7 +27,11 @@ no word of a body line is replaced by a note read beside it, and every
 number was measured again inside layout's own steps. Revised again the
 same day after a second review: the small-print page is found by the
 height of its rows, so that every page of an index or of a note set in
-small type is read, and a body word is never replaced.
+small type is read, and a body word is never replaced. Revised once
+more the same day for the plan owner-books (`docs/specs/structure.md`
+§21): a Tesseract word pairs with a layer word of its letters rather
+than with a word under it whose letters are unlike (section 4), so that
+a margin note's word is not read twice; no format changes.
 
 What it decides, in short: the **layout** stage re-reads four kinds of
 text, each region on its own, and keeps Tesseract's words for a region
@@ -520,7 +524,15 @@ the others stay in the layer. A layer word is that word when
   below its own, and that no other layer word has matched.
   A Tesseract word is matched in (a) when a layer word lies under it,
   whatever the texts of the two: it reads that printed word, and (b) and
-  (c) pair only the Tesseract words (a) left unmatched. In (b) the pairs
+  (c) pair only the Tesseract words (a) left unmatched. One exception
+  (the plan owner-books, 17 November 2026): when the letters and
+  digits of every layer word that (a) takes under a Tesseract word are
+  **unlike** its own (neither equal nor, for 3 letters or more, alike
+  by (c)'s ratio of 0.6), and a layer word that no other rule matched
+  lies within 16 pt above or below with letters and digits equal to
+  the Tesseract word's, or alike to them by (c), the Tesseract word is
+  paired with that word by (b) or (c), and the words under it are left
+  to the other Tesseract words, and otherwise stay in the layer, below. In (b) the pairs
   of a layer word and a Tesseract word of the same text are taken
   nearest first (the distance of their middles across plus up or down),
   each word in one pair at most; or else
@@ -637,6 +649,32 @@ those 10 copies stay, 7 of Domesday's records and 3 of Gierke's. Of the
 (Domesday pages 22, 112, 215, 286, 319, 390, 528, 548; Gierke 183;
 Stubbs 59) were each a second reading of a printed word that
 Tesseract's reading holds.
+
+**A pairing by letters wins over a word under it whose letters are
+unlike** (the exception in (a) above). The layer often holds, beside a
+margin note's word, both a junk reading of the ink under the word and
+its own reading a few points off: on Domesday's page 26 the layer has
+the junk word `^"i` under Tesseract's "tem," and its own "tem<" beside
+it. Rule (a) paired "tem," with the junk, (b) found "tem," taken, and
+the layer's "tem<" stayed beside Tesseract's word, which was read
+twice: "tem, tem<". Counted by the public-domain survey on the
+clean-text build (17 November 2026), a layer word left within 4 pt of
+a kept record whose letters equal or are alike to those of one of its
+Tesseract words within 16 pt: 35 words on 33 of Domesday's pages (28
+in margin notes), 17 on 15 of Gierke's, 3 on 2 of Stubbs', none in the
+other books; 55 in all. Of them, the layer words under the Tesseract
+word are unlike it for 47 (Domesday 31, Gierke 16): the junk under it,
+or a word of the next line its widened box reached ("vacant" under
+"Empire.", Gierke page 127). With the exception, those 47 are read
+once; the junk word, or the next line's word, stays in the layer's
+reading, so no printed word is lost. Of the 47, 34 are equal letters
+and 13 alike ("scat'" beside Tesseract's "seat-", Domesday page 36),
+which (c) pairs. The other 8 are not fixed: a layer word under the
+Tesseract word that is alike to it too (Stubbs' index, page 315, which
+the layer reads twice, "Eleanor" and "Eleanor,"; Domesday 4; Gierke
+1). The fidelity check, which applies the same pairing
+(`model.replaced_layer_words`), accepts the result, and its second test
+is unchanged.
 
 **Each word of the layer is replaced by one record at most**: a word
 already among the replaced words of a kept region of its page is not
