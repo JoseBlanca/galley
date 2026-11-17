@@ -21,10 +21,10 @@ It is built from `docs/specs/extract.md`, `docs/specs/front-matter.md`,
 `docs/specs/reocr.md`, and the changes they made to
 `docs/architecture.md`, `docs/glossary.md`, `docs/specs/layout.md` and
 `docs/specs/evaluation.md`, all on branch `plan/clean-text` (commits
-d22d250 to 9f012ac). It ends with the evaluation tool's scores on the
+d22d250 to f40bda3). It ends with the evaluation tool's scores on the
 four evaluation books against the last plan's, and the six books' EPUBs
-passing epubcheck. Dated 17 November 2026. State: approved by the owner
-on 17 November 2026.
+passing epubcheck. Dated 17 November 2026. State: under way since 17
+November 2026 (approved by the owner on 17 November 2026).
 
 "Extract §4" below is section 4 of `docs/specs/extract.md`, "front
 matter §2" of `docs/specs/front-matter.md`, "reocr §9" of
@@ -58,7 +58,7 @@ builds:
 | reocr Open 2: Tesseract's junk in a kept region | every word kept | dropping words under confidence 30 as `ocr_junk` changes task 1.1 (a removal reason) and task 5.1 (the replacement) |
 | reocr Open 3: `lines.json` gains `rereads`, and layout replaces OCR that exists | built as reocr §4 says | a refusal removes work package 5 and the `Reread` format of task 1.1; the plan would stop |
 
-Two places where the specs disagree, and how the plan reads them:
+Two parts of the specs that changed while the plan was written:
 
 - Changed reference pages: as extract §7 now says (corrected on 17
   November 2026), this plan commits a changed literal
@@ -67,10 +67,10 @@ Two places where the specs disagree, and how the plan reads them:
   "Changed reference pages" below), lists each change in the report,
   and puts the list on the owner's sheet of task 6.2; a change the
   owner rejects is fixed in task 6.4.
-- reocr §9 expects Haskins and Mariéjol "unchanged but for Haskins'
-  page 129", but reocr §12 says Mariéjol's page 14, its bibliography,
-  is a small-print page whose Tesseract reading is kept (89 against
-  −28). The plan expects both pages to change and no other.
+- Small-print pages: reocr §3 (answered on 17 November 2026) reads
+  whole every index page of Stubbs, Domesday and Haskins, Haskins'
+  chapter bibliographies and Mariéjol's bibliography (pages 14 to 16),
+  each kept or not by its score.
 
 ## What must be in place
 
@@ -420,9 +420,9 @@ is higher than the layer's. Every region read is a `Reread` in
    fidelity check with re-reading on each of the six books, and Stubbs
    with 1 and 6 workers byte for byte; they pass.
 6. In the report, per book: regions read, regions kept, and layout's
-   time with 6 workers, beside reocr §7's table (Stubbs 391 / 293 /
-   30.2 s, Domesday 626 / 442 / 69.6 s, Gierke 762 / 490 / 52.0 s,
-   Haskins 1 / 1 / 1.6 s), with the machine.
+   time with 6 workers, beside reocr §7's table (Stubbs 365 / 262 /
+   30.7 s, Domesday 630 / 443 / 69.9 s, Gierke 762 / 490 / 52.0 s,
+   Haskins 17 / 8 / 3.5 s), with the machine.
 
 **Stands on:** work package 1; for tasks 5.2 to 5.4, work packages 2 to
 4 merged, because the reference pages and the reading scores rest on
@@ -479,11 +479,14 @@ and the six EPUBs are built.
 3. The scores, at blocks, in the report, each with its value in the
    baseline, in `runs/clean-text-before-reread/` and now:
    - reocr §9's targets: Stubbs' index boundaries at least 0.97 / 0.94;
-     margin notes as margin notes at least 315 of 467 on Stubbs and 560
+     margin notes as margin notes at least 285 of 467 on Stubbs and 560
      of 593 on Domesday; body token error rate at most 0.062 on Stubbs
      and 0.080 on Domesday; Domesday's notes whose reference is right
-     at least 1,275; Haskins and Mariéjol as before re-reading but for
-     Haskins' page 129 and Mariéjol's page 14;
+     at least 1,275; Haskins' index error rate at most 0.13; Mariéjol as
+     before re-reading but for its bibliography, pages 14 to 16; on
+     Stubbs, no column word layout did not take as a cut-in word among
+     the replaced words of a kept cut-in record, but "heBarons" (page
+     226);
    - extract §7's expectations, as in deliverable 6 of work package 2;
    - every score of the tables "The targets of structure §9" and "The
      first plan's scores, then and now" of
