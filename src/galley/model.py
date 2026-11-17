@@ -424,33 +424,11 @@ def may_read(word: Word, ocr_word: Word) -> bool:
     )
 
 
-def replaced_layer_words(
+def _pairing(
     layer_words: Sequence[Word], ocr_words: Sequence[Word]
-) -> tuple[Word, ...]:
-    """The words of `layer_words`, the text layer's words a region read
-    again may replace, that a kept Reread with Tesseract's `ocr_words`
-    replaces, in their order: each the same printed word as one of
-    `ocr_words` (reocr spec, section 4).
-
-    A layer word is matched (a) when its middle lies inside the box of
-    one of `ocr_words` widened by 2 pt up and down and 1 pt across, and
-    it is of that word's printed line: the layer words under it taken
-    nearest first, by their middles up or down, each whose box overlaps,
-    up and down, those of all taken before it; or when its letters and
-    digits are those of two or three consecutive `ocr_words` joined, each
-    with its middle inside its box widened by 1 pt, a word the layer
-    glued; or else (b) when its letters and digits, case-folded and not empty, equal
-    those of one of `ocr_words` whose middle lies within 16 pt above or
-    below its own and that no other layer word has matched;
-    or else (c) when it has 3 letters or more and its case-folded letters
-    are alike, by difflib's ratio of 0.6 or more, to those of one of
-    `ocr_words` within 16 pt above or below that (a) and (b) left
-    unmatched. A Tesseract word is matched in (a) by any layer word under
-    it, whatever its text, and by a layer word glued over it; in (b) and (c) the pairs of a layer word and a
-    Tesseract word are taken nearest first, by the distance of their
-    middles across plus up or down, each word in one pair at most. A layer
-    word matched by none stays in the layer. Boxes in points.
-    """
+) -> tuple[tuple[bool, ...], frozenset[int]]:
+    """Which of `layer_words` the rules of `replaced_layer_words` match,
+    and the positions in `ocr_words` of the Tesseract words they match."""
     # (a): a Tesseract word with layer words under it reads the printed
     # words of one line, whatever the texts, and pairs with no other.
     under_line = {
@@ -513,11 +491,53 @@ def replaced_layer_words(
         if not matched[index] and position not in taken:
             matched[index] = True
             taken.add(position)
+    return tuple(matched), frozenset(taken)
+
+
+def replaced_layer_words(
+    layer_words: Sequence[Word], ocr_words: Sequence[Word]
+) -> tuple[Word, ...]:
+    """The words of `layer_words`, the text layer's words a region read
+    again may replace, that a kept Reread with Tesseract's `ocr_words`
+    replaces, in their order: each the same printed word as one of
+    `ocr_words` (reocr spec, section 4).
+
+    A layer word is matched (a) when its middle lies inside the box of
+    one of `ocr_words` widened by 2 pt up and down and 1 pt across, and
+    it is of that word's printed line: the layer words under it taken
+    nearest first, by their middles up or down, each whose box overlaps,
+    up and down, those of all taken before it; or when its letters and
+    digits are those of two or three consecutive `ocr_words` joined, each
+    with its middle inside its box widened by 1 pt, a word the layer
+    glued; or else (b) when its letters and digits, case-folded and not empty, equal
+    those of one of `ocr_words` whose middle lies within 16 pt above or
+    below its own and that no other layer word has matched;
+    or else (c) when it has 3 letters or more and its case-folded letters
+    are alike, by difflib's ratio of 0.6 or more, to those of one of
+    `ocr_words` within 16 pt above or below that (a) and (b) left
+    unmatched. A Tesseract word is matched in (a) by any layer word under
+    it, whatever its text, and by a layer word glued over it; in (b) and (c) the pairs of a layer word and a
+    Tesseract word are taken nearest first, by the distance of their
+    middles across plus up or down, each word in one pair at most. A layer
+    word matched by none stays in the layer. Boxes in points.
+    """
+    matched, _ = _pairing(layer_words, ocr_words)
     return tuple(
         word
         for word, is_matched in zip(layer_words, matched, strict=True)
         if is_matched
     )
+
+
+def matched_ocr_positions(
+    layer_words: Sequence[Word], ocr_words: Sequence[Word]
+) -> frozenset[int]:
+    """The positions in `ocr_words`, Tesseract's, of the words that read a
+    word of `layer_words` by the rules of `replaced_layer_words`: those
+    with a layer word under them or glued over them, and those paired by
+    (b) or (c)."""
+    _, positions = _pairing(layer_words, ocr_words)
+    return positions
 
 
 def words_after_rereads(

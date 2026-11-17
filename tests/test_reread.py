@@ -734,6 +734,44 @@ def test_second_of_two_overlapping_regions_takes_no_word_the_first_replaced() ->
     _check_fidelity(page, (first, second))
 
 
+def _touching_bands() -> tuple[tuple[Word, Word], tuple[Reread, ...]]:
+    """Two note bands that touch: the lower reads again, 3 pt below the
+    upper's crop, the line "lessons" the upper read and kept. The layer
+    words "Moral" and "lesons", and the records."""
+    moral = _word("Moral", 10, 100, 40, 108)
+    lesons = _word("lesons", 10, 121, 40, 129)
+    page = _page_of((moral, lesons))
+    upper = margin_note_reading(
+        Side.LEFT,
+        Box(8, 98, 46, 126),
+        (_ocr("Moral", 10, 100, 40, 108), _ocr("lessons", 10, 121, 40, 129)),
+        page_words=page.words,
+        edge=50,
+    )
+    lower = margin_note_reading(
+        Side.LEFT,
+        Box(8, 124, 46, 160),
+        (_ocr("lessons", 10, 128, 40, 136), _ocr("free", 10, 140, 40, 148)),
+        page_words=page.words,
+        edge=50,
+    )
+    records = page_rereads(7, (upper, lower), _WORD_LIST)
+    _check_fidelity(page, records)
+    return (moral, lesons), records
+
+
+def test_later_region_drops_a_word_an_earlier_kept_region_read() -> None:
+    _, (_, lower) = _touching_bands()
+    assert _texts(lower.ocr_words) == ("free",)
+
+
+def test_later_region_replaces_no_word_an_earlier_kept_region_replaced() -> None:
+    (moral, lesons), (upper, lower) = _touching_bands()
+    assert upper.layer_words == (moral, lesons)
+    assert upper.kept
+    assert lower.layer_words == ()
+
+
 def test_records_of_a_page_are_in_the_order_of_their_kinds_and_tops() -> None:
     def reading(kind: str, side: Side, top: float) -> RegionReading:
         x0 = 8 if side is Side.LEFT else 360

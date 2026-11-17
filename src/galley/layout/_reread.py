@@ -44,6 +44,7 @@ from galley.model import (
     RereadKind,
     Word,
     is_under_ocr_word,
+    matched_ocr_positions,
     replaced_layer_words,
 )
 from galley.ocr import OCR_DPI
@@ -703,6 +704,28 @@ def footnote_band_reading(
 
 # The records of a page
 
+# A later region drops a Tesseract word that an earlier kept region read
+# within 16 pt above or below, as model.replaced_layer_words pairs words of
+# one text (reocr spec, section 4).
+_READ_BEFORE_REACH_PT: Final[float] = 16.0
+
+
+def _folded(text: str) -> str:
+    return "".join(character for character in text if character.isalnum()).casefold()
+
+
+def _read_before(word: Word, earlier: Iterable[Word]) -> bool:
+    """Whether a word of `earlier`, Tesseract's words of the page's earlier
+    kept regions, has the letters and digits of `word`, case-folded and not
+    empty, with its middle within 16 pt above or below `word`'s."""
+    folded = _folded(word.text)
+    return bool(folded) and any(
+        _folded(other.text) == folded
+        and abs(_vertical_middle(other) - _vertical_middle(word))
+        <= _READ_BEFORE_REACH_PT
+        for other in earlier
+    )
+
 
 def _kind_rank(kind: RereadKind) -> int:
     """The place of `kind` among a page's records (reocr spec, section 4)."""
@@ -734,8 +757,11 @@ def page_rereads(
     same top, then the cut-in crops likewise, then the footnote band.
 
     The regions are taken in that order. A word of Tesseract's whose middle
-    lies inside the crop of an earlier kept region is dropped, so that no
-    printed word is read in by two regions. Of the layer words a region
+    lies inside the crop of an earlier kept region is dropped, and so is
+    one that reads no layer word the region may still replace and whose
+    letters and digits are those of a Tesseract word of an earlier kept
+    region within 16 pt above or below, so that no printed word is read in
+    by two regions. Of the layer words a region
     may replace, it replaces those under one of its words of Tesseract's
     (`model.replaced_layer_words`) that an earlier kept region does not
     replace; the others stay in the layer. A region is kept when its
@@ -754,17 +780,23 @@ def page_rereads(
         )
         raise ValueError(msg)
     earlier_crops: list[Box] = []
+    earlier_ocr_words: list[Word] = []
     replaced: list[Word] = []
     records = []
     for reading in ordered:
-        ocr_words = tuple(
+        outside_crops = tuple(
             word
             for word in reading.ocr_words
             if not any(_inside(_middle(word), crop) for crop in earlier_crops)
         )
-        layer_words = replaced_layer_words(
-            _without(reading.layer_words, replaced), ocr_words
+        replaceable = _without(reading.layer_words, replaced)
+        matched = matched_ocr_positions(replaceable, outside_crops)
+        ocr_words = tuple(
+            word
+            for position, word in enumerate(outside_crops)
+            if position in matched or not _read_before(word, earlier_ocr_words)
         )
+        layer_words = replaced_layer_words(replaceable, ocr_words)
         if not layer_words and not ocr_words:
             continue
         layer_score = reading_score(layer_words, lower_case_words)
@@ -776,6 +808,7 @@ def page_rereads(
         if kept:
             replaced.extend(layer_words)
             earlier_crops.append(reading.box)
+            earlier_ocr_words.extend(ocr_words)
         records.append(
             Reread(
                 page_index=page_index,
