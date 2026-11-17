@@ -106,3 +106,59 @@ whole-book tests run structure on (Haskins, Stubbs, Gierke, Mariéjol),
 only Haskins' "vlil PREFACE". Domesday and Kadesh are checked in task
 4.2. A known limit, read literally from the spec: a speck above the
 heading of the page two before would hide that heading.
+
+## Work package 2: reading the text layer
+
+Done (498b5c0, 636e1f4, 8b8ec5d), merged at f90df04. analyze and
+extract read each page's words through `text_layer.layer_words`: the
+characters in the PDF's order and glued words split at gaps. Checked by
+the orchestrator after the merge: all checks pass, 1,849 tests in
+30.7 s (53.9 s with 8 threads), 50 whole-book tests in 266 s. The
+stream's deliverables: 13 unit tests, 6 excerpt tests, 12 whole-book
+tests of the reading and 6 of the page kinds (unchanged on the six
+books), and the word count of each book equal to extract §4's table
+(Haskins 69,028; Stubbs 104,429; Domesday 251,053; Mariéjol 237,920;
+Gierke 112,270; Kadesh 24,188).
+
+**Changed reference pages.** 25 files of `tests/fixtures/expected/`
+changed, with 139 changes of words: 81 joins ("s ome" → "some"), 33
+splits (":—" → ": —") and 25 regroupings ("Ah igh" → "A high"), none of
+another kind. Two block boundaries move with a word change on the page
+next to them (Domesday 30/42, Haskins 209/210). The list, page by page,
+is `docs/reports/clean-text-changed-pages.md`; it goes on the owner's
+sheet (task 6.2).
+
+**Scores** (`uv run galley-eval run` at f90df04, in
+`runs/clean-text-wp2/` of the main checkout), against the baseline; the
+body rates of Stubbs and Domesday are compared with those of task 6.1's
+tool (0.129 and 0.093), since the margin notes left the body there:
+
+| score, at blocks or markdown | Haskins | Stubbs | Domesday | Mariéjol |
+|---|---|---|---|---|
+| body error rate | 0.087 → 0.025 | 0.129 → 0.056 | 0.093 → 0.075 | 0.324 → 0.310 |
+| notes error rate | 0.404 → 0.169 | – | 0.101 → 0.091 | 0.694 → 0.686 |
+| margin notes error rate | – | 0.728 → 0.537 | 0.600 → 0.583 | – |
+| notes whose reference is right | 59 → 61 | – | 1,277 → 1,279 | 543 → 567 |
+| margin notes as margin notes | – | 241 → 245 | 519 → 522 | – |
+| index precision / recall | .991/.965 → .997/.988 | .829/.789 → .995/.874 | .993/.986 → .999/.993 | – |
+| paragraph precision / recall | .859/.898 → .866/.909 | .742/.737 → .743/.744 | .860/.866 → .869/.877 | .730/.752 → .732/.755 |
+
+What got worse: Mariéjol's notes missing 41 → 47 and notes as notes
+1,157 → 1,154; Domesday's unplaced words 3 → 4. Found by the stream and
+decided by the orchestrator:
+
+- Stubbs' index page 312: the letter soup is now words, but its 74
+  entries come out as 34 notes and its guide words "BAL BEC" are no
+  longer removed; the book's index entries fall from 910 to 839 (the
+  scores above count paragraphs, which rose). The page is a small-print
+  page that work package 5 reads whole; it is checked again after it.
+- Kadesh page 8: the note "a In Ramses…" lost its marker "a": once "I n"
+  is "In", "a" reads as the article. A defect of structure's marker
+  rule; fixed with the review's findings.
+- Gierke page 85: "No. 53" lands in the entry "Torquemada", because the
+  scan's OCR laid it over that line (seen on the page image). Not
+  galley's.
+
+`split_glued` takes the larger of the two middle widths as the median;
+with their mean, "A.d." on Stubbs' page 207 is split. extract §4 now
+says so.

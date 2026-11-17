@@ -278,15 +278,15 @@ followed a cut word). Domesday's pages 136 and 481 get words whose
 boxes climb, and layout's rows interleave there (extract §6); that is
 expected, not fixed.
 
-- [ ] 2.1 `Character`, `split_glued` and `layer_words` in
+- [x] 2.1 `Character`, `split_glued` and `layer_words` in
   `text_layer.py`, with the unit tests. Spec: extract §3, §4 and §5;
   §7, first bullet. Stream `text-layer`. Deliverables 1, 2.
-- [ ] 2.2 analyze's measurer and extract reading through `layer_words`;
+- [x] 2.2 analyze's measurer and extract reading through `layer_words`;
   the excerpt tests; the changed reference literals and their list.
   Spec: extract §5, §6 and §7, "Excerpt tests" and "The reference
   pages of the committed excerpts change". Needs 2.1. Stream
   `text-layer`. Deliverables 1, 3, 4.
-- [ ] 2.3 The whole-book tests. The page kinds at 9f012ac come from
+- [x] 2.3 The whole-book tests. The page kinds at 9f012ac come from
   running analyze at that commit on the six books in a scratch
   worktree, written into the test as literal lists of each book's pages
   that are not `text`. Spec: extract §7, "Whole books". Needs 2.2.
