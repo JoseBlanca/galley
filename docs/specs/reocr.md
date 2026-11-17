@@ -442,7 +442,13 @@ the others stay in the layer. A layer word is that word when
   up or down, and those whose boxes overlap that one's up and down. A
   Tesseract word reads one printed line; where the layer's lines lie
   closer than its box widened, a word of the other line under it is
-  left to the rules below; or else
+  left to the rules below. A layer word is also matched in (a) when its
+  letters and digits, case-folded and not empty, equal those of two or
+  three Tesseract words that follow each other in Tesseract's order,
+  joined, each with its middle inside the layer word's box widened by
+  1 pt: a word the layer glued, "of,96" where Tesseract read "of,"
+  "96" (Stubbs' index, page 312; 5 such words on its pages 312 to 321
+  stayed beside Tesseract's two, which read them twice); or else
 - (b) its letters and digits, case-folded and not empty, equal those of
   one of the Tesseract words whose middle lies within 16 pt above or
   below its own, and that no other layer word has matched.
