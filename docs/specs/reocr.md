@@ -437,9 +437,10 @@ the others stay in the layer. A layer word is that word when
 
 - (a) its middle lies inside the box of one of the Tesseract words
   widened by 2 pt up and down and 1 pt across, and it is of that
-  Tesseract word's printed line: of the layer words under a Tesseract
-  word, the one whose middle lies nearest the Tesseract word's middle,
-  up or down, and those whose boxes overlap that one's up and down. A
+  Tesseract word's printed line: the layer words under a Tesseract word
+  are taken nearest first, by the distance of their middles from its
+  middle up or down, and each is of the line when its box overlaps, up
+  and down, the box of every word taken into the line before it. A
   Tesseract word reads one printed line; where the layer's lines lie
   closer than its box widened, a word of the other line under it is
   left to the rules below. A layer word is also matched in (a) when its
@@ -476,7 +477,9 @@ Tesseract's "dominieum,", which (c) then paired with the layer's
 Tesseract word took the layer words of two printed lines that both lay
 under its widened box: "146" for "14. c" and the "14. c" of the line
 below in Gierke's list of page numbers (page 63), "Soca" for "I43" and
-"Normans," on Stubbs' index page 318; the fidelity check (architecture §13) now fails on such
+"Normans," on Stubbs' index page 318 (the layer's stray "k" under it
+overlaps both lines, so a line of the words overlapping the nearest one
+alone still took both); the fidelity check (architecture §13) now fails on such
 a record.
 
 A printed word that Tesseract did not read, or whose reading a filter
