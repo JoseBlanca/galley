@@ -23,7 +23,7 @@ It is built from `docs/specs/extract.md`, `docs/specs/front-matter.md`,
 `docs/specs/evaluation.md`, all on branch `plan/clean-text` (commits
 d22d250 to f40bda3). It ends with the evaluation tool's scores on the
 four evaluation books against the last plan's, and the six books' EPUBs
-passing epubcheck. Dated 17 November 2026. State: under way since 17
+passing epubcheck. Dated 17 November 2026. State: done on 17
 November 2026 (approved by the owner on 17 November 2026).
 
 "Extract §4" below is section 4 of `docs/specs/extract.md`, "front
@@ -534,7 +534,7 @@ and the six EPUBs are built.
   measurement of the plan"; extract §7, "galley-eval before and after";
   `docs/specs/evaluation.md` §9. Needs 6.1 and work package 5.
   Deliverables 3 to 5.
-- [ ] 6.4 The owner's answers: accepted readings as literals, rejected
+- [x] 6.4 The owner's answers: accepted readings as literals, rejected
   changes fixed or sent back to the owner as a question. Needs 6.2.
   Deliverable 6.
 

@@ -3,6 +3,65 @@
 The work of the plan `docs/plans/clean-text.md`, written as it goes, for
 the owner. Started on 17 November 2026 on branch `plan/clean-text`.
 
+## Summary
+
+**The plan is done**, on branch `plan/clean-text` (17 November 2026),
+and waits for the owner's order to merge it into `main`. Every check
+passes at 7533d23: 2,111 tests in 47.6 s, the 61 whole-book tests, and
+the six public-domain books' EPUBs with 0 errors and 0 warnings from
+epubcheck.
+
+**What a reader of the EPUBs now gets**, on the six public-domain books:
+
+- Words the scan's own text cut or glued are mended: "s ome" is
+  "some", "Thisbookrestspartlyupon" is "This book rests partly upon",
+  and "liter¬ ature" is "literature".
+- The pages before the preface (endpapers, title page, copyright) are
+  dropped, each word recorded as dropped. Haskins opens at its preface.
+- The running head of a two-page section is removed ("vlil PREFACE").
+- Margin notes and index pages are read again with Tesseract where it
+  reads better than the scan's text. Errors in margin notes fell from
+  0.54 to 0.24 (Stubbs) and 0.58 to 0.14 (Domesday); Stubbs' index
+  entries are found at .98 precision and .96 recall, from .83 and .79.
+
+Every target of the plan is met except one: Gierke's 30 sampled margin
+notes have 129 of 139 words right, against 130. The scores are in
+"Task 6.3" and "Review 3" below.
+
+**What is still wrong**, for the next plan:
+
+- Lines of Stubbs' notes set into the text column stay in the body
+  (about half are found).
+- Neither reading of an index page is clean; taking the right one
+  word by word would fix most of the rest.
+- Two short printed Stubbs notes are lost ("Motives de-", "Edward I.").
+- Words whose boxes the scan's OCR set one inside the other can come
+  out in the wrong order: two places checked on Mariéjol; up to 447
+  word pairs on 249 pages of the six books could be affected.
+- The owner's own books need headings, running heads with page numbers
+  set apart, notes at the back, and epigraphs.
+
+**Asked of the owner:**
+
+1. The order to merge into `main`.
+2. A look at the EPUBs in `runs/clean-text/epubs/` of the main checkout,
+   named by their Internet Archive ids: `normansineuropea00hask`
+   (Haskins: the preface), `domesdaybook00maituoft` (Domesday: the
+   margin notes around page 76), `earlyplantagenet01stub` (Stubbs: the
+   index).
+3. A decision on the space printed before "?", ";", ":" and "!"
+   ("pursued ?"): (a) leave it; (b) a space that never breaks a line;
+   (c) attach the sign in English books and keep (b) in French ones.
+   Recommended: (c) in the next plan, (b) until then.
+4. blocks.json is now at version 3, so older runs must run the structure
+   step again.
+
+The open points of the specs keep their "meanwhile", unanswered:
+front-matter Open 1 (a `subtitle` key; recommended), reocr Open 1
+(footnotes not re-read by default), Open 2 (Tesseract's junk kept in
+a kept region), Open 3 (layout replacing words of the text layer, as
+built).
+
 ## Before the first task
 
 - **Specs.** `docs/specs/extract.md` and `docs/specs/front-matter.md`
