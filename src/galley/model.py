@@ -412,16 +412,19 @@ def _glued_over(word: Word, ocr_words: Sequence[Word]) -> tuple[int, ...]:
 
 
 def _misread_glued_over(
-    word: Word, ocr_words: Sequence[Word], free: frozenset[int]
+    word: Word, ocr_words: Sequence[Word], taken: frozenset[int]
 ) -> tuple[int, ...]:
-    """The positions in `ocr_words` of the Tesseract words among `free`
-    whose middles lie over `word`, a layer word, widened by 1 pt, when
+    """The positions in `ocr_words` of the Tesseract words not in `taken`
+    whose middles lie inside `word`, a layer word: across within its box
+    widened by 1 pt, up and down within its box. They are returned when
     they are two or three that follow each other in `ocr_words` and
     overlap each other up and down, words of one printed line, whatever
     their texts: the words the layer glued and misread into `word`; ()
     otherwise."""
     positions = tuple(
-        position for position in sorted(free) if _lies_over(ocr_words[position], word)
+        position
+        for position, ocr_word in enumerate(ocr_words)
+        if position not in taken and _middle_inside(ocr_word, word)
     )
     if (
         len(positions) in _GLUED_WORD_COUNTS
@@ -434,6 +437,16 @@ def _misread_glued_over(
     ):
         return positions
     return ()
+
+
+def _middle_inside(ocr_word: Word, word: Word) -> bool:
+    """Whether the middle of `ocr_word` lies inside the box of `word`,
+    widened by 1 pt across only."""
+    x, y = word_middle(ocr_word)
+    return (
+        word.box.x0 - _GLUED_WIDEN_PT <= x <= word.box.x1 + _GLUED_WIDEN_PT
+        and word.box.top <= y <= word.box.bottom
+    )
 
 
 def may_read(word: Word, ocr_word: Word) -> bool:
@@ -476,21 +489,6 @@ def _pairing(
         for index, word in enumerate(layer_words)
         if (positions := _glued_over(word, ocr_words))
     }
-    # (a) also: a layer word lying over two or three Tesseract words with no
-    # layer word under them, whatever the texts: the layer glued and
-    # misread them ("lo/.," over "10" "f.,").
-    free = frozenset(
-        position
-        for position, ocr_word in enumerate(ocr_words)
-        if not any(_is_under(word, ocr_word) for word in layer_words)
-    ) - {position for positions in glued.values() for position in positions}
-    for index, word in enumerate(layer_words):
-        if index in under_line or index in glued or is_known(word.text):
-            continue
-        positions = _misread_glued_over(word, ocr_words, free)
-        if positions:
-            glued[index] = positions
-            free -= frozenset(positions)
     under = tuple(
         index in under_line or index in glued for index in range(len(layer_words))
     )
@@ -542,6 +540,16 @@ def _pairing(
         if not matched[index] and position not in taken:
             matched[index] = True
             taken.add(position)
+    # (d): a layer word not known, over two or three Tesseract words of its
+    # line left free, whatever the texts: the layer glued and misread them
+    # ("lo/.," over "10" "f.,").
+    for index, word in enumerate(layer_words):
+        if matched[index] or is_known(word.text):
+            continue
+        positions = _misread_glued_over(word, ocr_words, frozenset(taken))
+        if positions:
+            matched[index] = True
+            taken.update(positions)
     return tuple(matched), frozenset(taken)
 
 
@@ -563,18 +571,18 @@ def replaced_layer_words(
     up and down, those of all taken before it; or when its letters and
     digits are those of two or three consecutive `ocr_words` joined, each
     with its middle inside its box widened by 1 pt, a word the layer
-    glued; or when `is_known` says its text is not a known word (layout
-    gives `wordlist.is_known_word` with the book's word list), and,
-    whatever the texts, the `ocr_words` with no layer word under
-    them whose middles lie inside its box so widened are two or three
-    consecutive words of one line, a word the layer glued and misread; or
-    else (b) when its letters and digits, case-folded and not empty, equal
+    glued; or else (b) when its letters and digits, case-folded and not empty, equal
     those of one of `ocr_words` whose middle lies within 16 pt above or
     below its own and that no other layer word has matched;
     or else (c) when it has 3 letters or more and its case-folded letters
     are alike, by difflib's ratio of 0.6 or more, to those of one of
     `ocr_words` within 16 pt above or below that (a) and (b) left
-    unmatched. A Tesseract word is matched in (a) by any layer word under
+    unmatched; or else (d) when `is_known` says its text is no known word
+    (layout says so of a word of the book's word list with no mark
+    inside it) and, whatever the texts, the `ocr_words` that (a) to (c)
+    left unmatched whose middles lie inside its box, widened by 1 pt
+    across only, are two or three consecutive words of one line, a word
+    the layer glued and misread. A Tesseract word is matched in (a) by any layer word under
     it, whatever its text, and by a layer word glued over it; in (b) and (c) the pairs of a layer word and a
     Tesseract word are taken nearest first, by the distance of their
     middles across plus up or down, each word in one pair at most. A layer

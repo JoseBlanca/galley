@@ -1931,6 +1931,30 @@ def test_layer_word_over_an_ocr_word_another_layer_word_lies_under_is_not_glued(
     )
 
 
+def test_glued_misreading_takes_no_ocr_word_whose_middle_is_below_its_box() -> None:
+    # Gierke page 103: "Unity" took Tesseract's "Unity" and "within" of the
+    # line below, whose box overlaps it. A Tesseract word's middle must lie
+    # within the layer word's top and bottom (reocr spec, section 4, (d)).
+    misread = Word("Vqzk;w", Box(100.0, 50.0, 140.0, 60.0), None)
+    ocr = (
+        Word("Unity", Box(101.0, 50.0, 118.0, 60.0), 90.0),
+        Word("within", Box(122.0, 57.0, 139.0, 64.6), 90.0),
+    )
+    assert model.replaced_layer_words((misread,), ocr, is_known=_unknown) == ()
+
+
+def test_glued_misreading_takes_only_ocr_words_b_and_c_left_free() -> None:
+    # The layer's "10" a line off pairs with Tesseract's "10" by (b) first;
+    # "lo/.," then lies over "f.," alone and stays.
+    misread = Word("lo/.,", Box(100.0, 50.0, 130.0, 58.0), None)
+    ten = Word("10", Box(100.0, 62.0, 108.0, 70.0), None)
+    ocr = (
+        Word("10", Box(100.5, 50.0, 110.0, 58.0), 90.0),
+        Word("f.,", Box(121.0, 50.0, 129.5, 58.0), 90.0),
+    )
+    assert model.replaced_layer_words((misread, ten), ocr, is_known=_unknown) == (ten,)
+
+
 def test_ocr_words_read_glued_by_the_layer_pair_with_no_other_layer_word() -> None:
     # The layer's "of," a line below may not take Tesseract's "of," that the
     # glued "of,96" holds.
