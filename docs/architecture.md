@@ -667,7 +667,15 @@ lists the words, with the pages they came from where the origins say.
   alike to those of the nearest one within 16 pt that neither rule
   matched (difflib's ratio 0.6 or more: the layer's garbled copy of a
   word Tesseract read) (`model.replaced_layer_words`,
-  `docs/specs/reocr.md` §4); structure,
+  `docs/specs/reocr.md` §4). Because that pairing is layout's own, a
+  second test does not use it: no Tesseract word of a kept record may
+  be the only one of the record that can read two of its `layer_words`
+  of different printed lines, whose boxes do not overlap up and down
+  (a Tesseract word can read a layer word that lies under it, or whose
+  letters and digits it holds, or whose letters are alike to its own,
+  within 16 pt, as the three rules say). One Tesseract word then
+  stands for two printed words, and one of them is lost (Domesday page
+  548, review of 17 November 2026); structure,
   lines.json against blocks.json (the text of every body and note block,
   with a note's `marker` and a heading's `label` counted as words of
   it); markdown, blocks.json
