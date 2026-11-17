@@ -450,7 +450,7 @@ those of 5.5.4 only. The note bands are found in pure Python over a
   words a region replaces, one record at most per word, and the order
   of the records. Spec: reocr §3, §4, §5 and §6; §9, "Unit tests".
   Stream `ocr`. Deliverable 1.
-- [ ] 5.2 layout re-reading: the render function `layout_page` is
+- [x] 5.2 layout re-reading: the render function `layout_page` is
   given, the steps where each region is read, a small-print page laid
   out from Tesseract's words, `rereads` written, `ocr` and
   `reread_footnotes` obeyed; the command's checks before layout; the

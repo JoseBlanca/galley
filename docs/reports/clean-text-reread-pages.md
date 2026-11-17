@@ -204,3 +204,33 @@ Changed: word changes only: the hyphen join on excerpt page 4 now joins Tesserac
   Tesseract's words, the page's first rows are not in the run that step 5
   cuts at the gutter. structure still gives the entries in the order of
   the columns, with the same counts as before (73 entries, 8 of depth 2).
+
+## Changed again by the fix of the words read twice (17 November 2026)
+
+reocr §4 now replaces a layer word (a) under a Tesseract word widened
+2 pt up and down and 1 pt across, or (b) of the same letters and digits
+as the nearest unmatched Tesseract word within 16 pt up or down. More
+layer words are then counted in each region's layer score, so a few
+regions are no longer kept.
+
+- domesday_74-83_page9 (book 83): "The Eng- lish for villanus." — the
+  layer's second "Eng-" is replaced; the block reads "The English for
+  villanus." (was "The English for Engvillanus.").
+- gierke_86-93_270-271_page2 (book 88): "Unity of the move. ment," — the
+  layer's second "of" is replaced.
+- gierke_86-93_270-271_page8 (book 270): small_print_page, now not kept
+  (367 → 348): the page is the layer's again, as before task 5.2, and
+  its doubled lines are gone.
+- haskins_eval_page9 (book 266): "162, 166, 172, 187;" (was "162,
+  162,166, 166,"); "Buchanan, James, 17 f." (was "17/. 17 f.").
+- Named test of haskins_quotes_index page 9 (book 267): small_print_page,
+  now not kept (250 → 250, a tie keeps the layer): "Caen, lo/., 71, ..."
+  as before task 5.2.
+
+Still read twice, matched by neither rule (a garbled copy beside
+Tesseract's reading): "fllght'" beside "flight." (Domesday 76), "lltes'"
+beside "lites." (Domesday 22), and on Gierke 271 the layer's quote marks
+"'" "'" and ":" beside Tesseract's "‘in" and "c." (a punctuation mark
+has no letters for rule (b)).
+- Whole Stubbs: the index gives 935 entries (936 before this fix), page
+  312 to 321 still read whole and kept, guide words unchanged.

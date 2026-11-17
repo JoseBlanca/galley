@@ -263,3 +263,61 @@ missing, because the tool leaves front matter unscored only before
 galley's first aligned word and a title word aligned first. The tool
 is changed after task 5.2 to leave unscored a run of reference tokens
 that matches a run of dropped front-matter words.
+
+## Task 2.4: "¬" as a line-end hyphen (added)
+
+Added on 17 November 2026 after the owner read their own two books
+(Turney, Haynes), whose OCR marks every line-end hyphen with "¬" (U+00AC),
+leaving 1,020 and 2,219 broken words such as "liter¬ ature". Done
+(spec af3de86, code 2d8ba46): "¬" at a line's end is joined exactly like
+"-"; a kept hyphen is written "-". On the two books, by hand and not
+committed: "¬" in `book.md` 1,020 → 0 and 2,219 → 0; 10 sampled joins of
+each right. The public-domain books and excerpts do not change. The
+fidelity check, which accepted only "-" as a joining hyphen, was changed
+with it.
+
+## Task 5.2: re-reading in layout
+
+Done (refactor 85fa7fe; 7133cbd; the read-twice fix: spec 4c3a8de, code
+8b4baef). layout re-reads the four kinds of region of reocr §3 and writes
+a `Reread` record for each; `trust` and `redo` re-read nothing; a
+missing Tesseract stops the command before any work. The review's
+left-overs are done: layout's shared steps live in `layout/_column.py`,
+the column rule and the small-row test are one function each.
+
+**Words read twice.** As first built, the rule of review 1 (replace a
+layer word only under a kept Tesseract word, widened 1 pt) left a word
+read twice in 108 of 435 kept Domesday margin notes and 98 of 428 of
+Gierke's, and doubled whole lines on two excerpt pages: the text layer's
+lines sit a few points off the ink. Decided by the orchestrator and now
+in reocr §4 and architecture §13: a layer word is replaced when its
+middle lies under a Tesseract word widened 2 pt up and down and 1 pt
+across (measured: 95 in 100 Domesday pairs and 92 in 100 Gierke pairs
+lie within 2 pt; 2 pt never reaches the next line; 2 pt across took in
+words Tesseract never read), or when its letters and digits equal those
+of the nearest unmatched Tesseract word within 16 pt up or down (some
+Gierke lines sit 15 pt off). One function, `model.replaced_layer_words`,
+used by layout and the fidelity check. After: 0 of 421 Domesday records
+and 2 of 417 Gierke ones read a word twice ("reignty", 25 pt off, page
+244; "147" in a list of pages, page 63). Left: a garbled layer copy
+stays beside Tesseract's reading when its text differs ("fllght'",
+Domesday page 76; "lltes'", page 22); counted in task 5.4.
+
+Regions read and kept, and layout's time with 6 workers on the Mac17,9:
+
+| book | read / kept | time | reocr §7 |
+|---|---|---|---|
+| Stubbs | 359 / 228 | 29.9 s | 365 / 262, 30.7 s |
+| Domesday | 623 / 425 | 68.5 s | 630 / 443, 69.9 s |
+| Gierke | 758 / 417 | 50.1 s | 762 / 490, 52.0 s |
+| Haskins | 17 / 9 | 4.0 s | 17 / 8, 3.5 s |
+
+(Times are of the first build; the fix did not change the work done.)
+Stubbs' index page 312 now has its guide words removed, and the book
+gives 935 index entries against 839 before re-reading (910 before work
+package 2). The changed reference pages, with layer and Tesseract
+readings: `docs/reports/clean-text-reread-pages.md`. The excerpts take
+their book measures from their own ten pages, so `stubbs_summaries_index`
+has no small-print page; Stubbs' index read whole is held by a
+whole-book test (task 5.4). Default run: 2,006 tests in 40.7 s, of
+which 13.8 s is the excerpt fixture's setup, Tesseract included.
