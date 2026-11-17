@@ -496,7 +496,22 @@ the others stay in the layer. A layer word is that word when
   joined, each with its middle inside the layer word's box widened by
   1 pt: a word the layer glued, "of,96" where Tesseract read "of,"
   "96" (Stubbs' index, page 312; 5 such words on its pages 312 to 321
-  stayed beside Tesseract's two, which read them twice); or else
+  stayed beside Tesseract's two, which read them twice). It is matched
+  in (a) too, whatever the texts, when the Tesseract words whose middles
+  lie inside its box widened by 1 pt, among those with no layer word
+  under them, are two or three that follow each other in Tesseract's
+  order and overlap each other up and down, words of one printed line:
+  a word the layer glued and misread, "lo/.," where Tesseract read "10"
+  "f.," and "164Jf.;" where it read "164" "ff.;" (Haskins' index page
+  267, printed "10 f.," and "164 ff.;"). Without this, keeping
+  Tesseract's reading of that page read the two twice. Measured on whole
+  Stubbs, Domesday, Haskins and Gierke on 17 November 2026, with the
+  rule of a tie of section 3 as before: it replaces 3 more layer words,
+  each the layer's glued misreading of Tesseract's words ("II.,282",
+  Stubbs page 320; "Devonshire,", Domesday page 547; "Godofali" for "God
+  of ail", Gierke page 224). Without the one line, Domesday's
+  "fromdfeam" took Tesseract's "from" "teann-" and the "land." of the
+  line below, and the layer's "land." was read twice (page 475); or else
 - (b) its letters and digits, case-folded and not empty, equal those of
   one of the Tesseract words whose middle lies within 16 pt above or
   below its own, and that no other layer word has matched.
