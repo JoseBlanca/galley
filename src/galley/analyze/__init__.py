@@ -43,7 +43,7 @@ from galley.model import (
     write_pages,
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
-from galley.text_layer import open_pdf
+from galley.text_layer import layer_words, open_pdf
 
 __all__ = [
     "PictureArea",
@@ -160,22 +160,14 @@ def _measurer(
         with closing(pdf.pages[page_index]) as page:
             width_pt = float(page.width)
             height_pt = float(page.height)
-            layer_words = tuple(
-                (
-                    str(layer_word["text"]),
-                    Box(
-                        float(layer_word["x0"]),
-                        float(layer_word["top"]),
-                        float(layer_word["x1"]),
-                        float(layer_word["bottom"]),
-                    ),
-                )
-                for layer_word in page.extract_words()
+            # Extract spec section 5: the words extract writes.
+            page_layer_words = tuple(
+                (layer_word.text, layer_word.box) for layer_word in layer_words(page)
             )
         plate_test = (
             _test_plate(
                 pdfium.render(config.pdf, page_index, PLATE_RENDER_DPI),
-                layer_words,
+                page_layer_words,
                 lower_case_words,
             )
             if _plate_rule_tests(page_index, config)
@@ -184,7 +176,7 @@ def _measurer(
         return _Measurement(
             width_pt=width_pt,
             height_pt=height_pt,
-            layer_word_count=len(layer_words),
+            layer_word_count=len(page_layer_words),
             plate_test=plate_test,
         )
 

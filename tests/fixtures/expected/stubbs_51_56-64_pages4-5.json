@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed since that check by task 3.1 (layout spec section 3, step 2b, Stubbs' cut-in notes): on book page 59 the cut-in note \"Henry's mismanagement of his children.\", which the OCR reads \"Silmlnage- mentofhis children.\" in the zone, leaves the body lines and becomes a margin note, whose lines structure joins at the hyphen as a guessed join, \"Silmlnagementofhis\" (a new word change of the first page). The blocks on both pages are unchanged. Checked against the page image by the task 3.1 session on 16 November 2026, for the orchestrator to check again.",
+  "changed": "Changed since that check by task 3.1 (layout spec section 3, step 2b, Stubbs' cut-in notes): on book page 59 the cut-in note \"Henry's mismanagement of his children.\", which the OCR reads \"Silmlnage- mentofhis children.\" in the zone, leaves the body lines and becomes a margin note, whose lines structure joins at the hyphen as a guessed join, \"Silmlnagementofhis\" (a new word change of the first page). The blocks on both pages are unchanged. Checked against the page image by the task 3.1 session on 16 November 2026, for the orchestrator to check again. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "excerpt": "stubbs_51_56-64",
   "pages": [
     4,
@@ -14,7 +14,7 @@
   "blocks": [
     {
       "kind": "paragraph",
-      "text": "In appearance, we are told, Henry was a tall, stout man, with a short neck, and projecting but very expressive eyes ; he was a careless dresser, a great hunter, a man ofbusiness rather than a model of chivalry ; ca< pable of great exertion, moderate in meat and drink, and anything but extravagant in personal as opposed t<? official expenditure. He was a builder of halls and castles, not very much of churches ; but that may easily be accounted for. We are glad to have him pictured for us even with this scanty amount ofdetail, for he is well worth the trouble of an attempt at least to realize his outwardpresentment. Every one knows Henry VIII. by sight ; it might be as well if we had as definite an impression of Henry II.",
+      "text": "In appearance, we are told, Henry was a tall, stout man, with a short neck, and projecting but very expressive eyes ; he was a careless dresser, a great hunter, a man of business rather than a model of chivalry ; ca< pable of great exertion, moderate in meat and drink, and anything but extravagant in personal as opposed t<? official expenditure. He was a builder of halls and castles, not very much of churches ; but that may easily be accounted for. We are glad to have him pictured for us even with this scanty amount of detail, for he is well worth the trouble of an attempt at least to realize his outward presentment. Every one knows Henry VIII. by sight ; it might be as well if we had as definite an impression of Henry II.",
       "pages": [
         4,
         5

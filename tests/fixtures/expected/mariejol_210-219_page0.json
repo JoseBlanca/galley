@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the orchestrator against the page image on 15 November 2026 (galley at ec2edc4); the owner did not check this page.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "excerpt_only": "What the excerpt gives, not what the whole book gives: the foot line \"... (l93) 13\" stays as the end of the last footnote and no page number is recorded, because the signature rule compares the line with the lowest line of other pages, and the excerpt has no other signature line. On the whole book the line gives the page number \"(l93)\" and a signature mark (the whole_book test of tests/test_structure.py).",
   "excerpt": "mariejol_210-219",
   "page": 0,
@@ -16,36 +17,36 @@
       "esfwgnob et le catholicisme français, il montra « contre s(m natard et cous-",
       "tume tant d'alkgrie qu'il l'a faict plus magnifeste que de toutes les bonnes",
       "advantures et fortunes qui lui vindrent jamais •. Il reçut en audience l'am-",
-      "bassadeur deF rance,- Jean de Vivonne, sieur de Saint -Gouard. et, le voyant",
-      "approcher, t i l s e priât 4 rire » — ce fut peut-être l'unique fois de sa vie en",
+      "bassadeur de France,- Jean de Vivonne, sieur de Saint -Gouard. et, le voyant",
+      "approcher, t il se priât 4 rire » — ce fut peut-être l'unique fois de sa vie en",
       "public — et dit de Charles IX « qu'il n'y avoit roy qui re peut (pût) faire",
       "son compaigam ne an valleur ne an pnidance ». Il ne parvenait pas à",
       "cacher son « grand plaisir », mais, pour n'avoir pas à s'acquitter du ser-",
       "vice qu'on venait de lui remire sans le vouloir, il affectait d'admirer le dé-",
-      "sintéressement des i thaultes entreprises », «tantost louant le ftlz d'avoir tm",
+      "sintéressement de si thaultes entreprises », «tantost louant le ftlz d'avoir tm",
       "telle mère,... puis la mère d[avotr] un tel filz » (2). Catherine triomphait des",
-      "acclamations du peuple et des compliments des princes. « S uis-je, deman-",
-      "dait-elle là 'envoyé du duc d'Albe, aussi mauvaise chrétienne que le pré-",
+      "acclamations du peuple et des compliments des princes. « Suis-je, deman-",
+      "dait-elle l'envoyé à du duc d'Albe, aussi mauvaise chrétienne que le pré-",
       "tendait don Francès de Aiava?... Bêtàm qui non ftterU in nu ficanda-",
       "linUus • (3).",
       "£Ue aurait volontiers laissé croire aux puissances catholiques, afin de",
       "se faire payer très cher, qu'elle préparait depuis longtemps le massacre des",
       "! -. Hais en vérité elle n'avait prémédité que d'assassiner Coligny ;",
       "Cl ; par peur des représailles qu'après l'avoir manqué elle avait",
-      "dtxidéde frapper avec lui les autres chefs du i>arti. « S i l'Amiral était mort",
+      "dtxidéde frapper avec lui les autres chefs du i>arti. « Si l'Amiral était mort",
       "du coup b.ise qu'on lui tira, écrivait le 24 août de Paris le",
       "nonce Sa^ . cardinal C6me, secrétaire d'État de Grégoire XIII, je",
-      "ne me résous pas à croire qu'il se fût fait un si grand carnage » ( 4). « L a mort",
+      "ne me résous pas à croire qu'il se fût fait un si grand carnage » (4). « La mort",
       "de l'Amiral, affirmait l'ambassadeur d'Espagne, a été un acte réfléchi,",
       "ceQe des huguenots k fruit d'une résolution soudaine » (5). La fureur",
       "des soldats et des masses avait encore ajouté au nombre voulu des",
       "victimes (6).",
       "(t) Laden Ramier. L» SmùU-BarthéUmy, Revue do xvt* siècle, t I, p. 332.",
-      "(2) Lettm de Soint-Gonard do 12 et da 19 septembre 1372 : G roéa voo Piinsterer. Arekité»",
+      "(2) Lettm de Soint-Gonard do 12 et da 19 septembre 1372 : Groéa voo Piinsterer. Arekité»",
       "de U wuinm i$ Nm$imt, Premuà^tsériéy SuppUmtnt, 1847, p. 123* eC 127*.",
       "(3) até par La Pcnièce, UÙrts, latrod., t. IV. p. xciv.",
       "U) TbdzMr, AfmmUi tcdmimstici, t. l (1836). p. 329.",
-      "li) Q té par Dacnw, Le Parti du poUHftm, Pari», 1892, p. 173. — Cest atmi l'aris de",
+      "li) Qté par Dacnw, Le Parti du poUHftm, Pari», 1892, p. 173. — Cest atmi l'aris de",
       "Taraimea^ Mèmùéru, éd. Bodboo. p. 434.",
       "(S) La tbéfe da la pcémèdiutioa a été ivpriae par M. Lodea Romier. ce patient azpk>-",
       "lataor dct ard^vas italfannfft (La Sminl^BéirAÀtmy, Lm inhmmttUi dé Roms *t U prhmidikilim",
@@ -71,14 +72,14 @@
     },
     {
       "kind": "paragraph",
-      "text": "Quand Philippi- II apprit l'exccutioQ sanj^ante qui sauvait ks PayvBas esfwgnob et le catholicisme français, il montra « contre s(m natard et coustume tant d'alkgrie qu'il l'a faict plus magnifeste que de toutes les bonnes advantures et fortunes qui lui vindrent jamais •. Il reçut en audience l'ambassadeur deF rance,- Jean de Vivonne, sieur de Saint -Gouard. et, le voyant approcher, t i l s e priât 4 rire » — ce fut peut-être l'unique fois de sa vie en public — et dit de Charles IX « qu'il n'y avoit roy qui re peut (pût) faire son compaigam ne an valleur ne an pnidance ». Il ne parvenait pas à cacher son « grand plaisir », mais, pour n'avoir pas à s'acquitter du service qu'on venait de lui remire sans le vouloir, il affectait d'admirer le désintéressement des i thaultes entreprises », «tantost louant le ftlz d'avoir tm telle mère,... puis la mère d[avotr] un tel filz » (2). Catherine triomphait des acclamations du peuple et des compliments des princes. « S uis-je, demandait-elle là 'envoyé du duc d'Albe, aussi mauvaise chrétienne que le prétendait don Francès de Aiava?... Bêtàm qui non ftterU in nu ficandalinUus • (3).",
+      "text": "Quand Philippi- II apprit l'exccutioQ sanj^ante qui sauvait ks PayvBas esfwgnob et le catholicisme français, il montra « contre s(m natard et coustume tant d'alkgrie qu'il l'a faict plus magnifeste que de toutes les bonnes advantures et fortunes qui lui vindrent jamais •. Il reçut en audience l'ambassadeur de France,- Jean de Vivonne, sieur de Saint -Gouard. et, le voyant approcher, t il se priât 4 rire » — ce fut peut-être l'unique fois de sa vie en public — et dit de Charles IX « qu'il n'y avoit roy qui re peut (pût) faire son compaigam ne an valleur ne an pnidance ». Il ne parvenait pas à cacher son « grand plaisir », mais, pour n'avoir pas à s'acquitter du service qu'on venait de lui remire sans le vouloir, il affectait d'admirer le désintéressement de si thaultes entreprises », «tantost louant le ftlz d'avoir tm telle mère,... puis la mère d[avotr] un tel filz » (2). Catherine triomphait des acclamations du peuple et des compliments des princes. « Suis-je, demandait-elle l'envoyé à du duc d'Albe, aussi mauvaise chrétienne que le prétendait don Francès de Aiava?... Bêtàm qui non ftterU in nu ficandalinUus • (3).",
       "pages": [
         0
       ]
     },
     {
       "kind": "paragraph",
-      "text": "£Ue aurait volontiers laissé croire aux puissances catholiques, afin de se faire payer très cher, qu'elle préparait depuis longtemps le massacre des ! -. Hais en vérité elle n'avait prémédité que d'assassiner Coligny ; Cl ; par peur des représailles qu'après l'avoir manqué elle avait dtxidéde frapper avec lui les autres chefs du i>arti. « S i l'Amiral était mort du coup b.ise qu'on lui tira, écrivait le 24 août de Paris le nonce Sa^ . cardinal C6me, secrétaire d'État de Grégoire XIII, je ne me résous pas à croire qu'il se fût fait un si grand carnage » ( 4). « L a mort de l'Amiral, affirmait l'ambassadeur d'Espagne, a été un acte réfléchi, ceQe des huguenots k fruit d'une résolution soudaine » (5). La fureur des soldats et des masses avait encore ajouté au nombre voulu des victimes (6).",
+      "text": "£Ue aurait volontiers laissé croire aux puissances catholiques, afin de se faire payer très cher, qu'elle préparait depuis longtemps le massacre des ! -. Hais en vérité elle n'avait prémédité que d'assassiner Coligny ; Cl ; par peur des représailles qu'après l'avoir manqué elle avait dtxidéde frapper avec lui les autres chefs du i>arti. « Si l'Amiral était mort du coup b.ise qu'on lui tira, écrivait le 24 août de Paris le nonce Sa^ . cardinal C6me, secrétaire d'État de Grégoire XIII, je ne me résous pas à croire qu'il se fût fait un si grand carnage » (4). « La mort de l'Amiral, affirmait l'ambassadeur d'Espagne, a été un acte réfléchi, ceQe des huguenots k fruit d'une résolution soudaine » (5). La fureur des soldats et des masses avait encore ajouté au nombre voulu des victimes (6).",
       "pages": [
         0
       ]
@@ -92,7 +93,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "(2) Lettm de Soint-Gonard do 12 et da 19 septembre 1372 : G roéa voo Piinsterer. Arekité» de U wuinm i$ Nm$imt, Premuà^tsériéy SuppUmtnt, 1847, p. 123* eC 127*.",
+      "text": "(2) Lettm de Soint-Gonard do 12 et da 19 septembre 1372 : Groéa voo Piinsterer. Arekité» de U wuinm i$ Nm$imt, Premuà^tsériéy SuppUmtnt, 1847, p. 123* eC 127*.",
       "pages": [
         0
       ]
@@ -113,7 +114,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "li) Q té par Dacnw, Le Parti du poUHftm, Pari», 1892, p. 173. — Cest atmi l'aris de Taraimea^ Mèmùéru, éd. Bodboo. p. 434.",
+      "text": "li) Qté par Dacnw, Le Parti du poUHftm, Pari», 1892, p. 173. — Cest atmi l'aris de Taraimea^ Mèmùéru, éd. Bodboo. p. 434.",
       "pages": [
         0
       ]

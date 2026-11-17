@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "known": "The margin note reads \"Domesday Book and its satellites.\" (the owner); the text layer's OCR gives \"Domesday its sateilltes'\", which galley keeps.",
   "excerpt": "domesday_headings_quotes",
   "page": 1,
@@ -14,10 +15,10 @@
       "AT midwinter in the year 1085 William the Conqueror wore",
       "his crown at Gloucester and there he had deep speech with his",
       "wise men. The outcome of that speech was the mission through-",
-      "out all England of barons/ ' l egates ' o r 'justices ' c harged with",
+      "out all England of barons/ ' legates ' or 'justices ' charged with",
       "the duty of collecting from the verdicts of the shires, the",
       "hundreds and the vills a descriptio of his new realm. The out-",
-      "come of t hat mission was the descriptio preserved for us in two",
+      "come of that mission was the descriptio preserved for us in two",
       "manuscript volumes, which within a century after their making",
       "had already acquired the name of Domesday Book. The second",
       "of those volumes, sometimes known as Little Domesday, deals",
@@ -69,7 +70,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "AT midwinter in the year 1085 William the Conqueror wore his crown at Gloucester and there he had deep speech with his wise men. The outcome of that speech was the mission throughout all England of barons/ ' l egates ' o r 'justices ' c harged with the duty of collecting from the verdicts of the shires, the hundreds and the vills a descriptio of his new realm. The outcome of t hat mission was the descriptio preserved for us in two manuscript volumes, which within a century after their making had already acquired the name of Domesday Book. The second of those volumes, sometimes known as Little Domesday, deals with but three counties, namely Essex, Norfolk and Suffolk, while the first volume comprehends the rest of England. Along with these we must place certain other documents that are closely connected with the grand inquest. We have in the so-called Inquisitio Comitatus Cantabrigiae, a copy, an imperiect copy, of the verdicts delivered by the Cambridgeshire jurors, and this, as we shall hereafter see, is a document of the highest value, even though in some details it is not always very trustworthy1. We have in the so-called Inquisitio Eliensis an account of the estates of the Abbey of Ely in Cambridgeshire, Suffolk and other counties, an account which has as its ultimate source the verdicts of the juries and which contains some intermixed; the time when they will grow into an organic whole is but beginning.",
+      "text": "AT midwinter in the year 1085 William the Conqueror wore his crown at Gloucester and there he had deep speech with his wise men. The outcome of that speech was the mission throughout all England of barons/ ' legates ' or 'justices ' charged with the duty of collecting from the verdicts of the shires, the hundreds and the vills a descriptio of his new realm. The outcome of that mission was the descriptio preserved for us in two manuscript volumes, which within a century after their making had already acquired the name of Domesday Book. The second of those volumes, sometimes known as Little Domesday, deals with but three counties, namely Essex, Norfolk and Suffolk, while the first volume comprehends the rest of England. Along with these we must place certain other documents that are closely connected with the grand inquest. We have in the so-called Inquisitio Comitatus Cantabrigiae, a copy, an imperiect copy, of the verdicts delivered by the Cambridgeshire jurors, and this, as we shall hereafter see, is a document of the highest value, even though in some details it is not always very trustworthy1. We have in the so-called Inquisitio Eliensis an account of the estates of the Abbey of Ely in Cambridgeshire, Suffolk and other counties, an account which has as its ultimate source the verdicts of the juries and which contains some intermixed; the time when they will grow into an organic whole is but beginning.",
       "pages": [
         1,
         2

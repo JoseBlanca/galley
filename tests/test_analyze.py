@@ -690,30 +690,198 @@ def test_the_whole_book_plates_are_21_of_them_15_of_kadesh() -> None:
     assert len(WHOLE_BOOK_PLATES["battleofkadeshst00breauoft"]) == 15
 
 
+@pytest.fixture(scope="module")
+def whole_book_pages(
+    tmp_path_factory: pytest.TempPathFactory, whole_book_toml: frozendict[str, str]
+) -> frozendict[str, tuple[PageInfo, ...]]:
+    """The pages of each whole book as analyze finds them with the configs of
+    tests/conftest.py, by Internet Archive identifier: one run of analyze
+    per book for every test of the module."""
+    pages = {}
+    for book in sorted(whole_book_toml):
+        folder = BookFolder(tmp_path_factory.mktemp(book))
+        folder.book_toml.write_text(whole_book_toml[book], encoding="utf-8")
+        analyze.run(folder, read_config(folder.book_toml))
+        pages[book] = read_pages(folder.pages_json).pages
+    return frozendict(pages)
+
+
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 @pytest.mark.parametrize("book", sorted(WHOLE_BOOK_PLATES))
 def test_analyze_takes_the_plates_of_each_whole_book_and_no_other_page(
-    book: str, whole_book_toml: frozendict[str, str], tmp_path: Path
+    book: str,
+    whole_book_toml: frozendict[str, str],
+    whole_book_pages: frozendict[str, tuple[PageInfo, ...]],
 ) -> None:
-    folder = BookFolder(tmp_path)
-    folder.book_toml.write_text(whole_book_toml[book], encoding="utf-8")
-    config = read_config(folder.book_toml)
     # The plates without a text layer are not excluded.
     assert not set(tomllib.loads(whole_book_toml[book]).get("exclude_pages", [])) & {
         index
         for index, text_source in WHOLE_BOOK_PLATES[book]
         if text_source is TextSource.NONE
     }
-
-    analyze.run(folder, config)
-
     assert (
         tuple(
             (page.index, page.text_source)
-            for page in read_pages(folder.pages_json).pages
+            for page in whole_book_pages[book]
             if page.kind is PageKind.PLATE
         )
         == WHOLE_BOOK_PLATES[book]
     )
+
+
+# Extract spec section 7, "Whole books": the page count of each whole book
+# and its pages that are not text, with their kinds, as analyze gave them
+# at commit 9f012ac, before it read the text layer through
+# text_layer.layer_words (run on 17 November 2026 with the configs of
+# tests/conftest.py). The words analyze reads now change no page's kind.
+WHOLE_BOOK_PAGE_KINDS_AT_9F012AC = frozendict(
+    {
+        "battleofkadeshst00breauoft": (
+            76,
+            (
+                (0, PageKind.EXCLUDED),
+                (1, PageKind.EXCLUDED),
+                (2, PageKind.EXCLUDED),
+                (3, PageKind.EXCLUDED),
+                (16, PageKind.EXCLUDED),
+                (17, PageKind.PLATE),
+                (19, PageKind.PLATE),
+                (22, PageKind.PLATE),
+                (23, PageKind.PLATE),
+                (24, PageKind.PLATE),
+                (34, PageKind.PLATE),
+                (35, PageKind.PLATE),
+                (42, PageKind.PLATE),
+                (43, PageKind.PLATE),
+                (48, PageKind.PLATE),
+                (49, PageKind.EXCLUDED),
+                (56, PageKind.PLATE),
+                (57, PageKind.PLATE),
+                (64, PageKind.PLATE),
+                (65, PageKind.EXCLUDED),
+                (68, PageKind.PLATE),
+                (69, PageKind.PLATE),
+                (70, PageKind.EXCLUDED),
+                (71, PageKind.EXCLUDED),
+                (72, PageKind.EXCLUDED),
+                (73, PageKind.EXCLUDED),
+                (75, PageKind.EXCLUDED),
+            ),
+        ),
+        "catherinedemedic00mariuoft": (
+            460,
+            (
+                (0, PageKind.EXCLUDED),
+                (1, PageKind.EXCLUDED),
+                (2, PageKind.EXCLUDED),
+                (3, PageKind.EXCLUDED),
+                (4, PageKind.EXCLUDED),
+                (5, PageKind.EXCLUDED),
+                (17, PageKind.EXCLUDED),
+                (449, PageKind.EXCLUDED),
+                (451, PageKind.EXCLUDED),
+                (453, PageKind.EXCLUDED),
+                (454, PageKind.EXCLUDED),
+                (455, PageKind.EXCLUDED),
+                (456, PageKind.EXCLUDED),
+                (457, PageKind.EXCLUDED),
+                (458, PageKind.EXCLUDED),
+            ),
+        ),
+        "domesdaybook00maituoft": (
+            558,
+            (
+                (0, PageKind.EXCLUDED),
+                (1, PageKind.EXCLUDED),
+                (2, PageKind.EXCLUDED),
+                (3, PageKind.EXCLUDED),
+                (5, PageKind.EXCLUDED),
+                (6, PageKind.EXCLUDED),
+                (7, PageKind.EXCLUDED),
+                (38, PageKind.EXCLUDED),
+                (39, PageKind.PLATE),
+                (40, PageKind.PLATE),
+                (41, PageKind.EXCLUDED),
+                (554, PageKind.EXCLUDED),
+                (555, PageKind.EXCLUDED),
+                (557, PageKind.EXCLUDED),
+            ),
+        ),
+        "earlyplantagenet01stub": (
+            344,
+            (
+                (0, PageKind.EXCLUDED),
+                (2, PageKind.EXCLUDED),
+                (3, PageKind.EXCLUDED),
+                (4, PageKind.EXCLUDED),
+                (5, PageKind.EXCLUDED),
+                (8, PageKind.EXCLUDED),
+                (9, PageKind.PLATE),
+                (10, PageKind.EXCLUDED),
+                (11, PageKind.PLATE),
+                (52, PageKind.PLATE),
+                (53, PageKind.EXCLUDED),
+                (54, PageKind.PLATE),
+                (55, PageKind.EXCLUDED),
+                (338, PageKind.EXCLUDED),
+                (339, PageKind.EXCLUDED),
+                (340, PageKind.EXCLUDED),
+                (341, PageKind.EXCLUDED),
+                (342, PageKind.EXCLUDED),
+                (343, PageKind.EXCLUDED),
+            ),
+        ),
+        "normansineuropea00hask": (
+            280,
+            (
+                (0, PageKind.EXCLUDED),
+                (3, PageKind.EXCLUDED),
+                (4, PageKind.EXCLUDED),
+                (5, PageKind.EXCLUDED),
+                (7, PageKind.EXCLUDED),
+                (11, PageKind.EXCLUDED),
+                (15, PageKind.EXCLUDED),
+                (265, PageKind.EXCLUDED),
+                (274, PageKind.EXCLUDED),
+                (276, PageKind.EXCLUDED),
+                (279, PageKind.EXCLUDED),
+            ),
+        ),
+        "politicaltheorie00gieruoft": (
+            290,
+            (
+                (0, PageKind.EXCLUDED),
+                (2, PageKind.EXCLUDED),
+                (3, PageKind.EXCLUDED),
+                (4, PageKind.EXCLUDED),
+                (5, PageKind.EXCLUDED),
+                (51, PageKind.EXCLUDED),
+                (283, PageKind.EXCLUDED),
+                (284, PageKind.EXCLUDED),
+                (285, PageKind.EXCLUDED),
+                (286, PageKind.EXCLUDED),
+                (287, PageKind.EXCLUDED),
+                (288, PageKind.EXCLUDED),
+                (289, PageKind.EXCLUDED),
+            ),
+        ),
+    }
+)
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.parametrize("book", sorted(WHOLE_BOOK_PAGE_KINDS_AT_9F012AC))
+def test_page_kinds_of_each_whole_book_are_those_before_the_text_flow(
+    book: str, whole_book_pages: frozendict[str, tuple[PageInfo, ...]]
+) -> None:
+    pages = whole_book_pages[book]
+    assert (
+        len(pages),
+        tuple(
+            (page.index, page.kind) for page in pages if page.kind is not PageKind.TEXT
+        ),
+    ) == WHOLE_BOOK_PAGE_KINDS_AT_9F012AC[book]

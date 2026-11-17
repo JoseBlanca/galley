@@ -39,7 +39,7 @@ from galley.model import (
     write_words,
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
-from galley.text_layer import open_pdf
+from galley.text_layer import layer_words, open_pdf
 
 __all__ = ["page_words", "plate_image", "run"]
 
@@ -120,13 +120,13 @@ def _page_reader(
         unread = page.kind is PageKind.BLANK or (
             page.kind is PageKind.PLATE and page.text_source is TextSource.NONE
         )
-        layer_words = () if unread else _layer_words(pdf, page.index)
+        page_layer_words = () if unread else _layer_words(pdf, page.index)
         if page.kind is PageKind.PLATE:
             _save_png(
                 pdfium.render(pdf_path, page.index, _PLATE_DPI),
                 book_root / plate_image(page.index),
             )
-        return page_words(page, layer_words)
+        return page_words(page, page_layer_words)
 
     return read_page
 
@@ -139,22 +139,10 @@ def plate_image(page_index: int) -> str:
 
 
 def _layer_words(pdf: pdfplumber.PDF, page_index: int) -> tuple[Word, ...]:
-    """The words of the page's text layer, as extract_words() gives them
-    with its default options, in its order."""
+    """The words of the page's text layer, as `text_layer.layer_words`
+    reads them (extract spec section 5)."""
     with closing(pdf.pages[page_index]) as pdf_page:
-        return tuple(
-            Word(
-                layer_word["text"],
-                Box(
-                    float(layer_word["x0"]),
-                    float(layer_word["top"]),
-                    float(layer_word["x1"]),
-                    float(layer_word["bottom"]),
-                ),
-                None,
-            )
-            for layer_word in pdf_page.extract_words()
-        )
+        return layer_words(pdf_page)
 
 
 def _save_cover(pdf: Path, cover_page: int, cover_png: Path) -> None:

@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "known": "The last blocks of the page (\"{!• iryuiiiu…\", \"I '> ua« chaste…\", \"i4i Uat…\") are footnotes in OCR that cannot be read; galley leaves them paragraphs. The owner: \"cannot be read at all, the scan is too bad.\"",
   "excerpt": "mariejol_headings_verse",
   "page": 1,
@@ -33,7 +34,7 @@
       "l'arçon {2). Elle pouvait ainsi counr du même train que les hommes et It-s",
       "suivre partout. François I«, ^^rand chasseur, appréciait fort cette enragée",
       "chevaucbeuse. que les chutes ne décourageaient^ pa> '•'' n- '^-nonça qu'a",
-      "soixante ans à ce plaisir dangereux ( ) ).",
+      "soixante ans à ce plaisir dangereux ( )).",
       "Su vive mtelligence. à déi;'.ut de ses habitudes de coi. e. iiu ren-",
       "dait iaciie de s adapter aux goût» lettrés de cette Cour. L... ^\\^i très bien",
       "appri^v k Irançais (]ue d'ailleurs e!!e écrivit toujours en une orthographe",
@@ -44,7 +45,7 @@
       ", a ». Ce II ia elle",
       "(Il <J utrfs d, h'OHiiirU. «d. BI«ncb«iii«ia. t. II. p i8t",
       "{!• iryuiiiu: Hr.ir.t 'lut rapporte que Cathorioe «vait açipht ê oiaal«r «a antMoof do !«",
-      "Ju ; 4 ,<.- : I A in*. UrnuUoc de Daoemack, c'«lt>èKttr« «pré* M v«niM co huac^",
+      "Ju ; 4 ,<.- : I Ain*. UrnuUoc de Daoemack, c'«lt>èKttr« «pré* M v«niM co huac^",
       "i.:. 1.4I1..",
       "I '> ua« chaste ao oacl. U haqtteoAe qu «Ut moatail t'«fl»b«Uâ « M pcédptu",
       "iaa. nw m t« tatl était tréa ba» Rll« fut désutooaA» «1 M bitwa «a cMà érmt.",
@@ -60,7 +61,7 @@
   "blocks": [
     {
       "kind": "paragraph",
-      "text": "De la descendance légitime de Côme l'Ancien, il n e restait que trois mâles, Catherine, déjà grande ûlie. a dû suivre de chasses. Autrement on ne s'ex« pliquerait pa5 qu'aussitôt arrivée en France, elk ait montré l'ardeur dont parle Ronsard, peut-être avec quelque exagération poétique :",
+      "text": "De la descendance légitime de Côme l'Ancien, il ne restait que trois mâles, Catherine, déjà grande ûlie. a dû suivre de chasses. Autrement on ne s'ex« pliquerait pa5 qu'aussitôt arrivée en France, elk ait montré l'ardeur dont parle Ronsard, peut-être avec quelque exagération poétique :",
       "pages": [
         0,
         1
@@ -75,7 +76,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "Elle abandonna la • sambue i. sorte de selle en lonme de fauteuil où \\<^ danie> étaient a&bises de côté, les pieds appuyés sur une planchette maL< iie pouvaient aller qu'à l'amble, et clk introduisit l'image, qu'elle avait déjà peut-être pratiqué en Italie, de monter à cheval comme les amazones d'anjourd'bui, le pied gauche à l'étriei et la ïambe iroite fixée à la coroe de l'arçon {2). Elle pouvait ainsi counr du même train que les hommes et It-s suivre partout. François I«, ^^rand chasseur, appréciait fort cette enragée chevaucbeuse. que les chutes ne décourageaient^ pa> '•'' n- '^-nonça qu'a soixante ans à ce plaisir dangereux ( ) ).",
+      "text": "Elle abandonna la • sambue i. sorte de selle en lonme de fauteuil où \\<^ danie> étaient a&bises de côté, les pieds appuyés sur une planchette maL< iie pouvaient aller qu'à l'amble, et clk introduisit l'image, qu'elle avait déjà peut-être pratiqué en Italie, de monter à cheval comme les amazones d'anjourd'bui, le pied gauche à l'étriei et la ïambe iroite fixée à la coroe de l'arçon {2). Elle pouvait ainsi counr du même train que les hommes et It-s suivre partout. François I«, ^^rand chasseur, appréciait fort cette enragée chevaucbeuse. que les chutes ne décourageaient^ pa> '•'' n- '^-nonça qu'a soixante ans à ce plaisir dangereux ( )).",
       "pages": [
         1
       ]
@@ -96,7 +97,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "{!• iryuiiiu: Hr.ir.t 'lut rapporte que Cathorioe «vait açipht ê oiaal«r «a antMoof do !« Ju ; 4 ,<.- : I A in*. UrnuUoc de Daoemack, c'«lt>èKttr« «pré* M v«niM co huac^ i.:. 1.4I1..",
+      "text": "{!• iryuiiiu: Hr.ir.t 'lut rapporte que Cathorioe «vait açipht ê oiaal«r «a antMoof do !« Ju ; 4 ,<.- : I Ain*. UrnuUoc de Daoemack, c'«lt>èKttr« «pré* M v«niM co huac^ i.:. 1.4I1..",
       "pages": [
         1
       ]
@@ -110,7 +111,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "i4i Uat ^«ukr Iota, «ila aiuait c«t* uaa pbnae tatiae, snato c «st «b> vacsai de Bvca^Mk DAUPHINE ET REINE ignor&t le latin {i). Elle savait du grec En 1544. l'ambassadeur de C^e, Bemardino de Médias, boo kttré et l'un des fondât* l'Acadânie Florentine, écrivait qu'elle possédait œtte langue « à stuj it homme t (cAtf /« shi^re ogni uomo). Même en admettant que ce omipatriote de la Datiphine. qui était ans» s<hi arrière-petit-cousin à la mode de Bretagne, ait un peu exagéré, il d oit y avoir dans cet éloge une part de vérité. Av litelle commencé .Vétudiir le grec en Italie? Bemardino ne U''dit pas. Elle a bit'iï pu '\"-^ ndre en France où elle était depuis dix ans. Il est probable qu'elle . aiaitre notre ^^rarn! helléniste li^ès (2).",
+      "text": "i4i Uat ^«ukr Iota, «ila aiuait c«t* uaa pbnae tatiae, snato c «st «b> vacsai de Bvca^Mk DAUPHINE ET REINE ignor&t le latin {i). Elle savait du grec En 1544. l'ambassadeur de C^e, Bemardino de Médias, boo kttré et l'un des fondât* l'Acadânie Florentine, écrivait qu'elle possédait œtte langue « à stuj it homme t (cAtf /« shi^re ogni uomo). Même en admettant que ce omipatriote de la Datiphine. qui était ans» s<hi arrière-petit-cousin à la mode de Bretagne, ait un peu exagéré, il doit y avoir dans cet éloge une part de vérité. Av litelle commencé .Vétudiir le grec en Italie? Bemardino ne U''dit pas. Elle a bit'iï pu '\"-^ ndre en France où elle était depuis dix ans. Il est probable qu'elle . aiaitre notre ^^rarn! helléniste li^ès (2).",
       "pages": [
         1,
         2

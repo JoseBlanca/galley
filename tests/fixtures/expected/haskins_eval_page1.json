@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): the note's marker \"*\" is taken out of its text into `marker`.",
+  "changed": "Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): the note's marker \"*\" is taken out of its text into `marker`. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "excerpt": "haskins_eval",
   "page": 1,
   "book_page_index": 132,
@@ -38,7 +38,7 @@
       "blasphemous closing in order to furnish inexhaustible"
     ],
     [
-      "* GiraldusCambrensis (RollsSeries), viii, p. 283."
+      "* Giraldus Cambrensis (Rolls Series), viii, p. 283."
     ]
   ],
   "blocks": [
@@ -52,7 +52,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "Strikingly dramatic both in its public and private aspects, the end of Henry II offers material fit for a Greek tragedy, and we may, if we choose, imagine an yEschylus or a Sophocles painting the rapidity of his rise, the hybris of his splendor, and the crushing nemesis of his fall. Even the Promethean touch is not lacking in the withdrawal of Henry's unconquered soul from God, as he looked back in flight at the burning city of Le Mans: \"My God, since to crown my confusion and increase my disgrace, thou hast taken from me so vilely the town which on earth I have loved best, where I was born and bred, and where my father lies buried and the body of St. Julian too, I will have my revenge on thee also; I will of a surety withdraw from thee that thing that thou lovest best in me.\" ^ Henry's life needs no blasphemous closing in order to furnish inexhaustible material for moralizing, and in a period like the Middle Ages, given over as none other to moral lessons, it served to point many a tale of the crimes and fate of evil-doers. That vain and entertaining Welshman, Gerald de Barri, or Giraldus Cambrensis, in whom a recent writer thinks he has discovered the protojournalist,^ found in Henry's career the basis for a considerable book devoted to the Instruction of Princes. But whereas the ways of the gods are dark and unsearchable to the Greek tragedians, they have no mystery for Gerald. Henry's punishment was due to his violations of religion, first in his marriage with Eleanor, the divorced wife of his feudal lord Louis VII, second in his quarrel with Archbishop Becket and the oppression of the church which followed, and third and worst of all, in his failure to take part in a crusade. The hammer of the church, Henry was born for destruction. The modern world is more cautious in the matter of explaining the inexplicable, and morepronetoseek human causes when they can be found, yet the collapse of the Plantagenet empire is not the hardest of the historian's problems. Something he will ascribe to larger forces of development, something he can hardly fail to attribute to the character of Henry's sons and to his policy in dealing with them.",
+      "text": "Strikingly dramatic both in its public and private aspects, the end of Henry II offers material fit for a Greek tragedy, and we may, if we choose, imagine an yEschylus or a Sophocles painting the rapidity of his rise, the hybris of his splendor, and the crushing nemesis of his fall. Even the Promethean touch is not lacking in the withdrawal of Henry's unconquered soul from God, as he looked back in flight at the burning city of Le Mans: \"My God, since to crown my confusion and increase my disgrace, thou hast taken from me so vilely the town which on earth I have loved best, where I was born and bred, and where my father lies buried and the body of St. Julian too, I will have my revenge on thee also; I will of a surety withdraw from thee that thing that thou lovest best in me.\" ^ Henry's life needs no blasphemous closing in order to furnish inexhaustible material for moralizing, and in a period like the Middle Ages, given over as none other to moral lessons, it served to point many a tale of the crimes and fate of evil-doers. That vain and entertaining Welshman, Gerald de Barri, or Giraldus Cambrensis, in whom a recent writer thinks he has discovered the protojournalist,^ found in Henry's career the basis for a considerable book devoted to the Instruction of Princes. But whereas the ways of the gods are dark and unsearchable to the Greek tragedians, they have no mystery for Gerald. Henry's punishment was due to his violations of religion, first in his marriage with Eleanor, the divorced wife of his feudal lord Louis VII, second in his quarrel with Archbishop Becket and the oppression of the church which followed, and third and worst of all, in his failure to take part in a crusade. The hammer of the church, Henry was born for destruction. The modern world is more cautious in the matter of explaining the inexplicable, and more prone to seek human causes when they can be found, yet the collapse of the Plantagenet empire is not the hardest of the historian's problems. Something he will ascribe to larger forces of development, something he can hardly fail to attribute to the character of Henry's sons and to his policy in dealing with them.",
       "pages": [
         1,
         2
@@ -65,7 +65,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "GiraldusCambrensis (RollsSeries), viii, p. 283."
+          "text": "Giraldus Cambrensis (Rolls Series), viii, p. 283."
         }
       ],
       "pages": [

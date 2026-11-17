@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "excerpt_only": "What the excerpt gives, not what the whole book gives: footnote 3 runs on to the next text page of the excerpt, page 42, and ends with the words of a table's head there; on the whole book its continuation, if any, is on page 31.",
   "excerpt": "domesday_headings_quotes",
   "page": 2,
@@ -25,11 +26,11 @@
       "intelligible and should then be able to watch the process",
       "whereby simple ideas were smothered under subtleties and",
       "technicalities. But it is not so. Simplicity is the outcome of",
-      "technical subtlety ; i t is the goal not the starting point. As we",
-      "go backwards the familiar outlines become blurred ; t he ideas",
+      "technical subtlety ; it is the goal not the starting point. As we",
+      "go backwards the familiar outlines become blurred ; the ideas",
       "become fluid, and instead of the simple we find the indefinite.",
       "But difficult though our task may be, we must turn to it.",
-      "§ 1 . Plan of the Survey.",
+      "§ 1. Plan of the Survey.",
       "England was already mapped out into counties, hundreds or",
       "wapentakes and vills. Trithings or ridings appear in Yorkshire",
       "and Lincolnshire, lathes in Kent, rapes in Sussex, while leets",
@@ -41,7 +42,7 @@
       "have been large2, we may still say that as a general rule the",
       "political geography of England was already stereotyped. And",
       "we see that already there are many curious anomalies, 'de-",
-      "tached portions ' o f counties, discrete hundreds, places that are",
+      "tached portions ' of counties, discrete hundreds, places that are",
       "extra-hundredal3, places that for one purpose are in one county"
     ],
     [
@@ -54,17 +55,17 @@
       "The geo-"
     ],
     [
-      "1 D. B. ii. 109 b : ' H undret de Grenehou 14 letis.' Ib. 212 b : ' H undret et",
+      "1 D. B. ii. 109 b : ' Hundret de Grenehou 14 letis.' Ib. 212 b : ' Hundret et",
       "Dim. de Clakelosa de 10 leitis.' Bound, Feudal England, 101.",
       "2 Some of them are mentioned by Ellis, Introduction, i. 34-9.",
-      "3 D. B. i. 184 b : ' H aec terra non geldat nee consuetudinem dat nee in",
-      "aliquo hundredo iacet ' ; i . 157 ' H aec terra nunquatn geldavit nee alicui"
+      "3 D. B. i. 184 b : ' Haec terra non geldat nee consuetudinem dat nee in",
+      "aliquo hundredo iacet ' ; i. 157 ' Haec terra nunquatn geldavit nee alicui"
     ]
   ],
   "blocks": [
     {
       "kind": "paragraph",
-      "text": "AT midwinter in the year 1085 William the Conqueror wore his crown at Gloucester and there he had deep speech with his wise men. The outcome of that speech was the mission throughout all England of barons/ ' l egates ' o r 'justices ' c harged with the duty of collecting from the verdicts of the shires, the hundreds and the vills a descriptio of his new realm. The outcome of t hat mission was the descriptio preserved for us in two manuscript volumes, which within a century after their making had already acquired the name of Domesday Book. The second of those volumes, sometimes known as Little Domesday, deals with but three counties, namely Essex, Norfolk and Suffolk, while the first volume comprehends the rest of England. Along with these we must place certain other documents that are closely connected with the grand inquest. We have in the so-called Inquisitio Comitatus Cantabrigiae, a copy, an imperiect copy, of the verdicts delivered by the Cambridgeshire jurors, and this, as we shall hereafter see, is a document of the highest value, even though in some details it is not always very trustworthy1. We have in the so-called Inquisitio Eliensis an account of the estates of the Abbey of Ely in Cambridgeshire, Suffolk and other counties, an account which has as its ultimate source the verdicts of the juries and which contains some intermixed; the time when they will grow into an organic whole is but beginning.",
+      "text": "AT midwinter in the year 1085 William the Conqueror wore his crown at Gloucester and there he had deep speech with his wise men. The outcome of that speech was the mission throughout all England of barons/ ' legates ' or 'justices ' charged with the duty of collecting from the verdicts of the shires, the hundreds and the vills a descriptio of his new realm. The outcome of that mission was the descriptio preserved for us in two manuscript volumes, which within a century after their making had already acquired the name of Domesday Book. The second of those volumes, sometimes known as Little Domesday, deals with but three counties, namely Essex, Norfolk and Suffolk, while the first volume comprehends the rest of England. Along with these we must place certain other documents that are closely connected with the grand inquest. We have in the so-called Inquisitio Comitatus Cantabrigiae, a copy, an imperiect copy, of the verdicts delivered by the Cambridgeshire jurors, and this, as we shall hereafter see, is a document of the highest value, even though in some details it is not always very trustworthy1. We have in the so-called Inquisitio Eliensis an account of the estates of the Abbey of Ely in Cambridgeshire, Suffolk and other counties, an account which has as its ultimate source the verdicts of the juries and which contains some intermixed; the time when they will grow into an organic whole is but beginning.",
       "pages": [
         1,
         2
@@ -79,14 +80,14 @@
     },
     {
       "kind": "paragraph",
-      "text": "To this we must add that, unless we have mistaken the general drift of legal history, the law implied in Domesday Book ought to be for us very difficult law, far more difficult than the law of the thirteenth century, for the thirteenth century is nearer to us than is the eleventh. The grown man will find it easier to think the thoughts of the school-boy than to think the thoughts of the baby. And yet the doctrine that our remote forefathers being simple folk had simple law dies hard. Too often we allow ourselves to suppose that, could we but get back to the beginning, we should find that all was intelligible and should then be able to watch the process whereby simple ideas were smothered under subtleties and technicalities. But it is not so. Simplicity is the outcome of technical subtlety ; i t is the goal not the starting point. As we go backwards the familiar outlines become blurred ; t he ideas become fluid, and instead of the simple we find the indefinite. But difficult though our task may be, we must turn to it.",
+      "text": "To this we must add that, unless we have mistaken the general drift of legal history, the law implied in Domesday Book ought to be for us very difficult law, far more difficult than the law of the thirteenth century, for the thirteenth century is nearer to us than is the eleventh. The grown man will find it easier to think the thoughts of the school-boy than to think the thoughts of the baby. And yet the doctrine that our remote forefathers being simple folk had simple law dies hard. Too often we allow ourselves to suppose that, could we but get back to the beginning, we should find that all was intelligible and should then be able to watch the process whereby simple ideas were smothered under subtleties and technicalities. But it is not so. Simplicity is the outcome of technical subtlety ; it is the goal not the starting point. As we go backwards the familiar outlines become blurred ; the ideas become fluid, and instead of the simple we find the indefinite. But difficult though our task may be, we must turn to it.",
       "pages": [
         2
       ]
     },
     {
       "kind": "heading",
-      "text": "§ 1 . Plan of the Survey.",
+      "text": "§ 1. Plan of the Survey.",
       "level": 2,
       "label": null,
       "pages": [
@@ -102,7 +103,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "England was already mapped out into counties, hundreds or wapentakes and vills. Trithings or ridings appear in Yorkshire and Lincolnshire, lathes in Kent, rapes in Sussex, while leets appear, at least sporadically, in Norfolk1. These provincial peculiarities we must pass by, nor will we pause to comment at any length on the changes in the boundaries of counties and of hundreds that have taken place since the date of the survey. Though these changes have been many and some few of them have been large2, we may still say that as a general rule the political geography of England was already stereotyped. And we see that already there are many curious anomalies, 'detached portions ' o f counties, discrete hundreds, places that are extra-hundredal3, places that for one purpose are in one county",
+      "text": "England was already mapped out into counties, hundreds or wapentakes and vills. Trithings or ridings appear in Yorkshire and Lincolnshire, lathes in Kent, rapes in Sussex, while leets appear, at least sporadically, in Norfolk1. These provincial peculiarities we must pass by, nor will we pause to comment at any length on the changes in the boundaries of counties and of hundreds that have taken place since the date of the survey. Though these changes have been many and some few of them have been large2, we may still say that as a general rule the political geography of England was already stereotyped. And we see that already there are many curious anomalies, 'detached portions ' of counties, discrete hundreds, places that are extra-hundredal3, places that for one purpose are in one county",
       "pages": [
         2
       ]
@@ -114,7 +115,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "D. B. ii. 109 b : ' H undret de Grenehou 14 letis.' Ib. 212 b : ' H undret et Dim. de Clakelosa de 10 leitis.' Bound, Feudal England, 101."
+          "text": "D. B. ii. 109 b : ' Hundret de Grenehou 14 letis.' Ib. 212 b : ' Hundret et Dim. de Clakelosa de 10 leitis.' Bound, Feudal England, 101."
         }
       ],
       "pages": [
@@ -138,7 +139,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "D. B. i. 184 b : ' H aec terra non geldat nee consuetudinem dat nee in aliquo hundredo iacet ' ; i . 157 ' H aec terra nunquatn geldavit nee alicui Non-servile Servi To1t9a l"
+          "text": "D. B. i. 184 b : ' Haec terra non geldat nee consuetudinem dat nee in aliquo hundredo iacet ' ; i. 157 ' Haec terra nunquatn geldavit nee alicui Non-servile Servi Total 19 population 19 0"
         }
       ],
       "pages": [
