@@ -111,12 +111,12 @@ def join_lost_hyphen(
     hyphen between them or read it as a full stop (`hyphen_lost`), or None
     (spec section 5): "move." "ment," gives "movement,".
 
-    `first` ends with a letter, or a letter and one ".", and has 2 letters
-    or more without the stop; `second` starts with a lower-case letter and
-    its key is not among `common_inner_words`, the keys printed after the
-    first word of a line more than 8 times in the book; and the joined
-    word's key is among `book_words` or, when `second` has 2 letters or
-    more, in `word_list`, which is in lower case.
+    `first` ends with a letter, or a letter and one ".", and has
+    `_LOST_HYPHEN_MIN_LETTERS` letters or more without the stop; `second`
+    starts with a lower-case letter and its key is not among
+    `common_inner_words` (`BookSurvey.common_inner_words`, the words
+    printed whole); and the joined word is known (`_is_joined_word`)
+    against `book_words` and `word_list`, which is in lower case.
     """
     stem = first.removesuffix(".")
     if not (

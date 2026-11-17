@@ -70,8 +70,8 @@ class BookSurvey:
     `first_arabic_page` the first page index whose running head has one;
     `body_word_height` and `body_line_pitch` in points; `book_words` the
     keys of the words printed whole (spec section 5); `common_inner_words`
-    the keys printed after the first word of a line more than 8 times, no
-    fragment of a word (section 5); `signature_lines`
+    the keys printed after the first word of a line more than
+    `_INNER_WORD_MOST_TIMES` times, no fragment of a word (section 5); `signature_lines`
     the page indices whose lowest line is a signature line (section 4);
     `heads_below_specks` the page indices whose head line is a speck and
     the line below it a running head (section 3); `index_pages` the page

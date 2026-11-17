@@ -780,11 +780,11 @@ def _is_sure_single_word(
 ) -> bool:
     """Whether `ocr_words`, Tesseract's reading of a region over no layer
     word, scored word by word as `ocr_scores`, holds one sure single word
-    (reocr spec, section 3): one known word, of 4 letters or more, and
-    beside it only punctuation, every word read at a confidence of 80 or
-    more, no word broken at a line end,
-    and no word of `page_words`,
-    the page's layer, that may read one of them (`model.may_read`)."""
+    (reocr spec, section 3): one known word, of `_SURE_WORD_LEAST_LETTERS`
+    letters or more, and beside it only punctuation, every word read at a
+    confidence of `_SURE_WORD_LEAST_CONFIDENCE` or more, no word broken at
+    a line end, and no word of `page_words`, the page's layer, that may
+    read one of them (`model.may_read`)."""
     if any(
         _is_broken_pair(_normalized(first.text), _normalized(second.text))
         for first, second in itertools.pairwise(ocr_words)
@@ -840,10 +840,10 @@ def page_rereads(
     replace; the others stay in the layer. A region is kept when its
     words of Tesseract's are not empty and score higher than the layer
     words it replaces, by `reading_score` against `lower_case_words`, or
-    the same with more known words, and, when it replaces no layer word, hold at least 2 known words, or one
-    known word of 4 letters or more, all its words read at a confidence
-    of 80 or more, that no word of `page_words`, the page's text layer,
-    may read (`model.may_read`). A
+    the same with more known words, and, when it replaces no layer word,
+    hold `_OVER_NOTHING_LEAST_KNOWN` known words or more, or a sure single
+    word (`_is_sure_single_word`, against `page_words`, the page's text
+    layer). A
     region where both readings are empty, before the junk is dropped, is
     not recorded. ValueError when
     a small-print page comes with another region: no other region of such
