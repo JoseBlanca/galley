@@ -23,7 +23,7 @@ import re
 import threading
 import types
 import typing
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -307,12 +307,13 @@ _ALIKE_LEAST_LETTERS = 3
 _ALIKE_LEAST_RATIO = 0.6
 
 
-def _middle(word: Word) -> tuple[float, float]:
+def word_middle(word: Word) -> tuple[float, float]:
+    """The middle of `word`'s box, (across, down) in points."""
     return (word.box.x0 + word.box.x1) / 2, (word.box.top + word.box.bottom) / 2
 
 
 def _is_under(word: Word, ocr_word: Word) -> bool:
-    x, y = _middle(word)
+    x, y = word_middle(word)
     return (
         ocr_word.box.x0 - _UNDER_OCR_WORD_ACROSS_PT
         <= x
@@ -330,7 +331,7 @@ def is_under_ocr_word(word: Word, ocr_words: Sequence[Word]) -> bool:
     return any(_is_under(word, ocr_word) for ocr_word in ocr_words)
 
 
-def _folded(text: str) -> str:
+def folded_letters_and_digits(text: str) -> str:
     """The letters and digits of `text`, case-folded."""
     return "".join(character for character in text if character.isalnum()).casefold()
 
@@ -364,10 +365,10 @@ def _under_line(layer_words: Sequence[Word], ocr_word: Word) -> tuple[int, ...]:
     are of its printed line: taken nearest first, by the distance of their
     middles from its middle up or down, each whose box overlaps, up and
     down, those of every word taken before it."""
-    ocr_middle = _middle(ocr_word)[1]
+    ocr_middle = word_middle(ocr_word)[1]
     under = sorted(
         (index for index, word in enumerate(layer_words) if _is_under(word, ocr_word)),
-        key=lambda index: (abs(_middle(layer_words[index])[1] - ocr_middle), index),
+        key=lambda index: (abs(word_middle(layer_words[index])[1] - ocr_middle), index),
     )
     line: list[int] = []
     for index in under:
@@ -382,7 +383,7 @@ def _under_line(layer_words: Sequence[Word], ocr_word: Word) -> tuple[int, ...]:
 def _lies_over(ocr_word: Word, word: Word) -> bool:
     """Whether the middle of `ocr_word` lies inside the box of `word`
     widened by 1 pt."""
-    x, y = _middle(ocr_word)
+    x, y = word_middle(ocr_word)
     return (
         word.box.x0 - _GLUED_WIDEN_PT <= x <= word.box.x1 + _GLUED_WIDEN_PT
         and word.box.top - _GLUED_WIDEN_PT <= y <= word.box.bottom + _GLUED_WIDEN_PT
@@ -395,14 +396,15 @@ def _glued_over(word: Word, ocr_words: Sequence[Word]) -> tuple[int, ...]:
     letters and digits, joined, are those of `word`: the words the layer
     glued into `word`. The first such group, of two words before three;
     () when there is none."""
-    folded = _folded(word.text)
+    folded = folded_letters_and_digits(word.text)
     if not folded:
         return ()
     for count in _GLUED_WORD_COUNTS:
         for start in range(len(ocr_words) - count + 1):
             group = ocr_words[start : start + count]
             if all(_lies_over(ocr_word, word) for ocr_word in group) and (
-                "".join(_folded(ocr_word.text) for ocr_word in group) == folded
+                "".join(folded_letters_and_digits(ocr_word.text) for ocr_word in group)
+                == folded
             ):
                 return tuple(range(start, start + count))
     return ()
@@ -417,10 +419,12 @@ def may_read(word: Word, ocr_word: Word) -> bool:
     `word` of 3 letters or more. Boxes in points."""
     if _is_under(word, ocr_word):
         return True
-    if abs(_middle(ocr_word)[1] - _middle(word)[1]) > _SAME_TEXT_REACH_PT:
+    if abs(word_middle(ocr_word)[1] - word_middle(word)[1]) > _SAME_TEXT_REACH_PT:
         return False
     return (
-        bool(_folded(word.text)) and _folded(word.text) == _folded(ocr_word.text)
+        bool(folded_letters_and_digits(word.text))
+        and folded_letters_and_digits(word.text)
+        == folded_letters_and_digits(ocr_word.text)
     ) or (
         _letter_count(word.text) >= _ALIKE_LEAST_LETTERS
         and _are_alike(word.text, ocr_word.text)
@@ -456,17 +460,18 @@ def _pairing(
     # nearest first, each word in one pair at most.
     pairs = sorted(
         (
-            abs(_middle(ocr_word)[0] - _middle(word)[0])
-            + abs(_middle(ocr_word)[1] - _middle(word)[1]),
+            abs(word_middle(ocr_word)[0] - word_middle(word)[0])
+            + abs(word_middle(ocr_word)[1] - word_middle(word)[1]),
             index,
             position,
         )
         for index, word in enumerate(layer_words)
-        if not under[index] and _folded(word.text)
+        if not under[index] and folded_letters_and_digits(word.text)
         for position, ocr_word in enumerate(ocr_words)
         if position not in taken
-        and _folded(ocr_word.text) == _folded(word.text)
-        and abs(_middle(ocr_word)[1] - _middle(word)[1]) <= _SAME_TEXT_REACH_PT
+        and folded_letters_and_digits(ocr_word.text)
+        == folded_letters_and_digits(word.text)
+        and abs(word_middle(ocr_word)[1] - word_middle(word)[1]) <= _SAME_TEXT_REACH_PT
     )
     matched = list(under)
     for _, index, position in pairs:
@@ -478,8 +483,8 @@ def _pairing(
     # pair at most.
     alike_pairs = sorted(
         (
-            abs(_middle(ocr_word)[0] - _middle(word)[0])
-            + abs(_middle(ocr_word)[1] - _middle(word)[1]),
+            abs(word_middle(ocr_word)[0] - word_middle(word)[0])
+            + abs(word_middle(ocr_word)[1] - word_middle(word)[1]),
             index,
             position,
         )
@@ -487,7 +492,7 @@ def _pairing(
         if not matched[index] and _letter_count(word.text) >= _ALIKE_LEAST_LETTERS
         for position, ocr_word in enumerate(ocr_words)
         if position not in taken
-        and abs(_middle(ocr_word)[1] - _middle(word)[1]) <= _SAME_TEXT_REACH_PT
+        and abs(word_middle(ocr_word)[1] - word_middle(word)[1]) <= _SAME_TEXT_REACH_PT
         and _are_alike(word.text, ocr_word.text)
     )
     for _, index, position in alike_pairs:
@@ -543,6 +548,25 @@ def matched_ocr_positions(
     return positions
 
 
+def take_out_once(
+    groups: tuple[tuple[Word, ...], ...], taken: Iterable[Word]
+) -> tuple[tuple[Word, ...], ...]:
+    """`groups` of words less the words of `taken`, each word of `taken`
+    taken out once, from the first group that holds it, the others in
+    their order."""
+    left = collections.Counter(taken)
+    result = []
+    for group in groups:
+        kept = []
+        for word in group:
+            if left[word] > 0:
+                left[word] -= 1
+            else:
+                kept.append(word)
+        result.append(tuple(kept))
+    return tuple(result)
+
+
 def words_after_rereads(
     words: tuple[Word, ...], rereads: tuple[Reread, ...]
 ) -> tuple[Word, ...]:
@@ -552,15 +576,9 @@ def words_after_rereads(
     then the `ocr_words` of each kept record, in the records' order. A
     record not kept changes nothing (reocr spec, section 4)."""
     kept = tuple(reread for reread in rereads if reread.kept)
-    replaced = collections.Counter(
-        word for reread in kept for word in reread.layer_words
+    (staying,) = take_out_once(
+        (words,), (word for reread in kept for word in reread.layer_words)
     )
-    staying = []
-    for word in words:
-        if replaced[word] > 0:
-            replaced[word] -= 1
-        else:
-            staying.append(word)
     return (*staying, *(word for reread in kept for word in reread.ocr_words))
 
 

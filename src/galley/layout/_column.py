@@ -4,9 +4,10 @@ both the laying out of a page and the re-reading of its small print take
 
 `BookMeasures` holds the numbers measured over the whole book.
 `split_at_column` places the body column (step 1) and takes the outer
-margin words out of it (step 2); `cut_in_zones` and `cut_in_note_indices`
-find the notes cut into the column beside its shortened lines (step 2b),
-and `without_cut_in_notes` takes them out; `running_head_row_count` finds
+margin words out of it (step 2); `without_cut_in_notes` finds the notes
+cut into the column beside its shortened lines and takes them out (step
+2b), and `in_cut_in_zone` and `ends_short_of_inset` are its test of the
+place of a cut-in note's word, which re-reading shares; `running_head_row_count` finds
 the running-head region (step 3); `is_small_row` is the test of a row of
 small type that the footnote band (step 4) and the small-print page
 share. Positions are PDF points from the page's top left.
@@ -21,13 +22,12 @@ from galley.body_measures import edge_counts, group_rows, median_word_height
 from galley.model import Line, Word
 
 __all__ = [
-    "SMALL_ROW_SHARE",
     "BookMeasures",
     "ColumnSplit",
     "ColumnWords",
     "Side",
-    "cut_in_note_indices",
-    "cut_in_zones",
+    "ends_short_of_inset",
+    "in_cut_in_zone",
     "is_small_row",
     "running_head_row_count",
     "split_at_column",
@@ -198,7 +198,7 @@ def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
 # Measured: the median height of a line's words over the book's is at
 # most 0.85 for 57 of Haskins' 57 lines of notes and 8 of its 6,144 lines
 # of body (layout spec section 2).
-SMALL_ROW_SHARE: Final[float] = 0.85
+_SMALL_ROW_SHARE: Final[float] = 0.85
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -441,13 +441,8 @@ def _cut_in(
         word.index
         for row in rows
         for word in row
-        if word.end <= at - _CUT_IN_STRIP_PT
-        and any(
-            top - _CUT_IN_ZONE_PT
-            <= (word.top + word.bottom) / 2
-            <= bottom + _CUT_IN_ZONE_PT
-            for top, bottom in zones
-        )
+        if ends_short_of_inset(column[word.index], side, edge, inset)
+        and in_cut_in_zone(column[word.index], zones)
     )
     return _CutIn(
         zones=zones,
@@ -457,25 +452,28 @@ def _cut_in(
     )
 
 
-def cut_in_zones(
-    column: tuple[Word, ...], side: Side, edge: float, measures: BookMeasures
-) -> tuple[tuple[float, float], ...]:
-    """The cut-in zones of the column's words `column` at `side`, whose
-    column edge is `edge` in points on the page, each (top, bottom) in
-    points, top to bottom (step 2b, rule 2). Empty when the book has no
-    inset on that side."""
-    return _cut_in(column, side, edge, measures).zones
+def in_cut_in_zone(word: Word, zones: tuple[tuple[float, float], ...]) -> bool:
+    """Whether the vertical middle of `word` lies in one of `zones`, the
+    cut-in zones of a side, each (top, bottom) in points, give or take
+    `_CUT_IN_ZONE_PT` (step 2b, rule 3)."""
+    middle = (word.box.top + word.box.bottom) / 2
+    return any(
+        top - _CUT_IN_ZONE_PT <= middle <= bottom + _CUT_IN_ZONE_PT
+        for top, bottom in zones
+    )
 
 
-def cut_in_note_indices(
-    column: tuple[Word, ...], side: Side, edge: float, measures: BookMeasures
-) -> frozenset[int]:
-    """The places among `column`'s words of the words of the notes cut into
-    the column at `side` (step 2b, rule 3): their middle in a cut-in zone,
-    give or take `_CUT_IN_ZONE_PT`, and ending `_CUT_IN_STRIP_PT` or more
-    short of the inset. `edge` is the column's edge on that side, in
-    points on the page. Empty when the book has no inset on that side."""
-    return _cut_in(column, side, edge, measures).note_indices
+def ends_short_of_inset(word: Word, side: Side, edge: float, inset: float) -> bool:
+    """Whether `word` ends `_CUT_IN_STRIP_PT` or more short of the cut-in
+    `inset` of `side`, whose column edge is `edge`, in points: the place of
+    a cut-in note's word (step 2b, rule 3)."""
+    match side:
+        case Side.LEFT:
+            return word.box.x1 <= edge + inset - _CUT_IN_STRIP_PT
+        case Side.RIGHT:
+            return word.box.x0 >= edge - inset + _CUT_IN_STRIP_PT
+        case _:
+            assert_never(side)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -511,8 +509,8 @@ def without_cut_in_notes(split: ColumnSplit, measures: BookMeasures) -> ColumnWo
 
 def is_small_row(row: Line, measures: BookMeasures) -> bool:
     """Whether `row` is a row of small type: the median height of its words
-    is at most `SMALL_ROW_SHARE` of the body word height (step 4)."""
-    return median_word_height(row.words) <= SMALL_ROW_SHARE * measures.body_word_height
+    is at most `_SMALL_ROW_SHARE` of the body word height (step 4)."""
+    return median_word_height(row.words) <= _SMALL_ROW_SHARE * measures.body_word_height
 
 
 def _apart_from_body(

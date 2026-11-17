@@ -34,6 +34,7 @@ from galley.model import (
     WordsFile,
     may_read,
     replaced_layer_words,
+    take_out_once,
 )
 
 
@@ -137,14 +138,11 @@ def _unmatched(reread: Reread) -> tuple[Word, ...]:
     """The `layer_words` of `reread` that `replaced_layer_words` does not
     match to one of its `ocr_words`, each as many times as it is
     unmatched."""
-    matched = Counter(replaced_layer_words(reread.layer_words, reread.ocr_words))
-    unmatched = []
-    for word in reread.layer_words:
-        if matched[word] > 0:
-            matched[word] -= 1
-        else:
-            unmatched.append(word)
-    return tuple(unmatched)
+    (unmatched,) = take_out_once(
+        (reread.layer_words,),
+        replaced_layer_words(reread.layer_words, reread.ocr_words),
+    )
+    return unmatched
 
 
 def _share_a_line(first: Word, second: Word) -> bool:

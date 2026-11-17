@@ -29,8 +29,7 @@ book, then lays out its pages in parallel, re-reading unless the config's
 import bisect
 import logging
 import math
-from collections import Counter
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from itertools import groupby
@@ -96,12 +95,12 @@ from galley.model import (
     WordsFile,
     read_checked_input,
     read_words,
+    take_out_once,
     words_after_rereads,
     write_lines,
 )
 from galley.ocr import OCR_DPI, point_box, read_image_lines
 from galley.parallel import DEFAULT_WORKERS, map_pages
-from galley.pdfium import POINTS_PER_INCH
 
 __all__ = [
     "BookMeasures",
@@ -692,6 +691,16 @@ def _page_parts(
     )
 
 
+def _drop_capital_indices(parts: _PageParts, measures: BookMeasures) -> frozenset[int]:
+    """The places among the column's words of `parts` of its drop
+    capitals."""
+    return frozenset(
+        index
+        for index, word in enumerate(parts.column)
+        if _is_drop_capital(word, parts.left, measures)
+    )
+
+
 def _regions_of_parts(parts: _PageParts, measures: BookMeasures) -> tuple[Region, ...]:
     """The regions of a page whose words are placed as `parts`, in reading
     order (layout spec section 3): the running-head region, the body's
@@ -700,11 +709,7 @@ def _regions_of_parts(parts: _PageParts, measures: BookMeasures) -> tuple[Region
     pitch = measures.body_line_pitch
     upper, band = _column_regions_with_drop_capitals(
         parts.column,
-        frozenset(
-            index
-            for index, word in enumerate(parts.column)
-            if _is_drop_capital(word, parts.left, measures)
-        ),
+        _drop_capital_indices(parts, measures),
         parts.left,
         measures,
         parts.band,
@@ -806,17 +811,30 @@ def _read_crop(
     """Tesseract's lines of the crop `pixels` of `image`, a page rendered at
     `OCR_DPI`, cut to the image's edges; no line when nothing is left of
     the crop."""
+    clamped = _inside_image(pixels, image)
+    if clamped is None:
+        return ()
+    origin = point_box(clamped, origin=(0.0, 0.0), dpi=OCR_DPI)
+    return read(image.crop(clamped), origin=(origin.x0, origin.top), psm=psm)
+
+
+def _inside_image(
+    pixels: tuple[int, int, int, int], image: Image.Image
+) -> tuple[int, int, int, int] | None:
+    """The crop box `pixels` cut to the edges of `image`; None when nothing
+    of it is left."""
     width, height = image.size
     left, top = max(0, pixels[0]), max(0, pixels[1])
     right, bottom = min(width, pixels[2]), min(height, pixels[3])
     if right <= left or bottom <= top:
-        return ()
-    scale = POINTS_PER_INCH / OCR_DPI
-    return read(
-        image.crop((left, top, right, bottom)),
-        origin=(left * scale, top * scale),
-        psm=psm,
-    )
+        return None
+    return left, top, right, bottom
+
+
+def _page_size(image: Image.Image) -> Box:
+    """The page of `image`, rendered whole at `OCR_DPI`, in points."""
+    width, height = image.size
+    return point_box((0, 0, width, height), origin=(0.0, 0.0), dpi=OCR_DPI)
 
 
 def _head_words(column: tuple[Word, ...], measures: BookMeasures) -> tuple[Word, ...]:
@@ -832,11 +850,7 @@ def _layer_band_words(parts: _PageParts, measures: BookMeasures) -> tuple[Word, 
     words of `parts`, in the order of its rows."""
     _, band = _column_regions_with_drop_capitals(
         parts.column,
-        frozenset(
-            index
-            for index, word in enumerate(parts.column)
-            if _is_drop_capital(word, parts.left, measures)
-        ),
+        _drop_capital_indices(parts, measures),
         parts.left,
         measures,
         None,
@@ -855,7 +869,7 @@ def _margin_readings(
     column = (*parts.column, *parts.left_cut_in, *parts.right_cut_in)
     if not column:
         return ()
-    page_width = image.size[0] * POINTS_PER_INCH / OCR_DPI
+    page_width = _page_size(image).x1
     readings = []
     for side in sorted(rereading.margin_note_sides):
         strip = margin_strip(
@@ -866,14 +880,11 @@ def _margin_readings(
             lowest=max(word.box.bottom for word in page.words),
             page_width=page_width,
         )
-        strip_pixels = pixel_box(strip, OCR_DPI)
-        width, height = image.size
-        strip_left, strip_top = max(0, strip_pixels[0]), max(0, strip_pixels[1])
-        strip_right = min(width, strip_pixels[2])
-        strip_bottom = min(height, strip_pixels[3])
-        if strip_right <= strip_left or strip_bottom <= strip_top:
+        clamped = _inside_image(pixel_box(strip, OCR_DPI), image)
+        if clamped is None:
             continue
-        strip_image = image.crop((strip_left, strip_top, strip_right, strip_bottom))
+        strip_left, strip_top = clamped[0], clamped[1]
+        strip_image = image.crop(clamped)
         for band in note_bands(strip_image, dpi=OCR_DPI):
             band_pixels = (
                 strip_left + band[0],
@@ -995,10 +1006,12 @@ def _read_regions(
     ):
         return ()
     image = rereading.render(page.index)
-    width_pt, height_pt = (size * POINTS_PER_INCH / OCR_DPI for size in image.size)
     if small_print:
+        page_size = _page_size(image)
         crop = small_print_crop(
-            page_width=width_pt, page_height=height_pt, head_bottom=head_bottom
+            page_width=page_size.x1,
+            page_height=page_size.bottom,
+            head_bottom=head_bottom,
         )
         return (
             small_print_reading(
@@ -1036,24 +1049,6 @@ def _read_regions(
     )
 
 
-def _take_out(
-    groups: tuple[tuple[Word, ...], ...], taken: Iterable[Word]
-) -> tuple[tuple[Word, ...], ...]:
-    """`groups` of a page's words less the words of `taken`, each taken out
-    once, from the first group that holds it."""
-    left = Counter(taken)
-    result = []
-    for group in groups:
-        kept = []
-        for word in group:
-            if left[word] > 0:
-                left[word] -= 1
-            else:
-                kept.append(word)
-        result.append(tuple(kept))
-    return tuple(result)
-
-
 def _side_of(record: Reread, parts: _PageParts) -> Side:
     """The side of the column a margin note band or a cut-in crop lies at:
     that of its crop's middle."""
@@ -1086,8 +1081,8 @@ def _parts_after_rereads(
         if any(record.kind is RereadKind.FOOTNOTE_BAND for record in kept)
         else ()
     )
-    (column,) = _take_out((parts.column,), layer_band)
-    left_margin, right_margin, left_cut_in, right_cut_in, column, band = _take_out(
+    (column,) = take_out_once((parts.column,), layer_band)
+    left_margin, right_margin, left_cut_in, right_cut_in, column, band = take_out_once(
         (
             parts.left_margin,
             parts.right_margin,

@@ -20,7 +20,6 @@ except where a name or a docstring says pixels.
 """
 
 import math
-from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Final, assert_never
@@ -33,6 +32,8 @@ from galley.layout._column import (
     BookMeasures,
     ColumnSplit,
     Side,
+    ends_short_of_inset,
+    in_cut_in_zone,
     is_small_row,
     running_head_row_count,
     split_at_column,
@@ -44,9 +45,12 @@ from galley.model import (
     Reread,
     RereadKind,
     Word,
+    folded_letters_and_digits,
     is_under_ocr_word,
     matched_ocr_positions,
     replaced_layer_words,
+    take_out_once,
+    word_middle,
 )
 from galley.ocr import OCR_DPI
 from galley.pdfium import POINTS_PER_INCH
@@ -137,11 +141,9 @@ _BAND_REACH_PT: Final[float] = 12.0
 _INTO_MARGIN_PT: Final[float] = 2.0
 
 # The filters of a cut-in crop (reocr spec, section 3, kind 3), measured
-# on Stubbs: a note word ends 4 pt short of the inset (layout spec,
-# section 3, step 2b) and lies within 1 pt of its zone; a body line runs on
-# to within 3 pt of the crop's side toward the inset.
-_CUT_IN_ZONE_PT: Final[float] = 1.0
-_CUT_IN_NOTE_SHORT_PT: Final[float] = 4.0
+# on Stubbs: a body line runs on to within 3 pt of the crop's side toward
+# the inset; a note word's place is layout's (_column.in_cut_in_zone and
+# _column.ends_short_of_inset).
 _CUT_IN_LINE_AT_INSET_PT: Final[float] = 3.0
 
 
@@ -503,14 +505,6 @@ class RegionReading:
     layer_words: tuple[Word, ...]
 
 
-def _middle(word: Word) -> tuple[float, float]:
-    return (word.box.x0 + word.box.x1) / 2, (word.box.top + word.box.bottom) / 2
-
-
-def _vertical_middle(word: Word) -> float:
-    return (word.box.top + word.box.bottom) / 2
-
-
 def _inside(point: tuple[float, float], box: Box) -> bool:
     x, y = point
     return box.x0 <= x <= box.x1 and box.top <= y <= box.bottom
@@ -523,18 +517,6 @@ def _overlap(first: Box, second: Box) -> bool:
         and first.top < second.bottom
         and second.top < first.bottom
     )
-
-
-def _without(words: tuple[Word, ...], taken: Iterable[Word]) -> tuple[Word, ...]:
-    """`words` less those of `taken`, each taken once, in their order."""
-    left = Counter(taken)
-    kept = []
-    for word in words:
-        if left[word] > 0:
-            left[word] -= 1
-        else:
-            kept.append(word)
-    return tuple(kept)
 
 
 def small_print_reading(
@@ -553,7 +535,7 @@ def small_print_reading(
         side=None,
         box=box,
         ocr_words=ocr_words,
-        layer_words=_without(page_words, head_words),
+        layer_words=take_out_once((page_words,), head_words)[0],
     )
 
 
@@ -598,30 +580,10 @@ def margin_note_reading(
             word
             for word in in_margin
             if box.top - _BAND_REACH_PT
-            <= _vertical_middle(word)
+            <= word_middle(word)[1]
             <= box.bottom + _BAND_REACH_PT
         ),
     )
-
-
-def _in_zone(word: Word, zones: tuple[tuple[float, float], ...]) -> bool:
-    middle = _vertical_middle(word)
-    return any(
-        top - _CUT_IN_ZONE_PT <= middle <= bottom + _CUT_IN_ZONE_PT
-        for top, bottom in zones
-    )
-
-
-def _short_of_inset(word: Word, side: Side, edge: float, inset: float) -> bool:
-    """Whether `word` ends 4 pt or more short of the cut-in inset on
-    `side`, the place of a note word."""
-    match side:
-        case Side.LEFT:
-            return word.box.x1 <= edge + inset - _CUT_IN_NOTE_SHORT_PT
-        case Side.RIGHT:
-            return word.box.x0 >= edge - inset + _CUT_IN_NOTE_SHORT_PT
-        case _:
-            assert_never(side)
 
 
 def _reaches_inset_side(word: Word, side: Side, crop: Box) -> bool:
@@ -664,11 +626,12 @@ def cut_in_reading(
     replaceable = tuple(
         word
         for word in column_words
-        if _in_zone(word, crop.zones) and _short_of_inset(word, side, edge, inset)
+        if in_cut_in_zone(word, crop.zones)
+        and ends_short_of_inset(word, side, edge, inset)
     )
     body = tuple(
         word
-        for word in _without(column_words, replaceable)
+        for word in take_out_once((column_words,), replaceable)[0]
         if _overlap(word.box, crop.box)
     )
     ocr_words = tuple(
@@ -684,7 +647,7 @@ def cut_in_reading(
         box=crop.box,
         ocr_words=ocr_words,
         layer_words=(
-            *(word for word in cut_in_words if _in_zone(word, crop.zones)),
+            *(word for word in cut_in_words if in_cut_in_zone(word, crop.zones)),
             *replaceable,
         ),
     )
@@ -725,19 +688,14 @@ def _is_junk(text: str) -> bool:
 _READ_BEFORE_REACH_PT: Final[float] = 16.0
 
 
-def _folded(text: str) -> str:
-    return "".join(character for character in text if character.isalnum()).casefold()
-
-
 def _read_before(word: Word, earlier: Iterable[Word]) -> bool:
     """Whether a word of `earlier`, Tesseract's words of the page's earlier
     kept regions, has the letters and digits of `word`, case-folded and not
     empty, with its middle within 16 pt above or below `word`'s."""
-    folded = _folded(word.text)
+    folded = folded_letters_and_digits(word.text)
     return bool(folded) and any(
-        _folded(other.text) == folded
-        and abs(_vertical_middle(other) - _vertical_middle(word))
-        <= _READ_BEFORE_REACH_PT
+        folded_letters_and_digits(other.text) == folded
+        and abs(word_middle(other)[1] - word_middle(word)[1]) <= _READ_BEFORE_REACH_PT
         for other in earlier
     )
 
@@ -805,10 +763,10 @@ def page_rereads(
         read = tuple(
             word
             for word in reading.ocr_words
-            if not any(_inside(_middle(word), crop) for crop in earlier_crops)
+            if not any(_inside(word_middle(word), crop) for crop in earlier_crops)
         )
         outside_crops = tuple(word for word in read if not _is_junk(word.text))
-        replaceable = _without(reading.layer_words, replaced)
+        replaceable = take_out_once((reading.layer_words,), replaced)[0]
         matched = matched_ocr_positions(replaceable, outside_crops)
         ocr_words = tuple(
             word
