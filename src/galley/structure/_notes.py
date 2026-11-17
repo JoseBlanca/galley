@@ -38,8 +38,9 @@ _COLUMN_PT = 60.0
 # and before a word starting with a capital or a digit.
 _LINE_MARKER_MAX_CHARACTERS = 2
 # Spec section 11, "The marker of a note": one-letter words, which are no
-# marker before a known word ("A Treatise", "I have").
-_ONE_LETTER_WORDS = frozenset({"A", "I", "a"})
+# marker before a known word ("A Treatise", "I have"). A lower-case "a"
+# before a capital is a marker: a note's text starts a sentence.
+_ONE_LETTER_WORDS = frozenset({"A", "I"})
 _LINE_MARKER_GAP_PT = 10.0
 _ENDS_BEFORE_A_NOTE = (".", "'", "’", ":", ";", ")")
 
@@ -85,8 +86,8 @@ def _indent_marker(
 ) -> NoteMarker | None:
     """The marker of a note started by its indent whose first word has no
     marker's form: the word, when it is one character and the next word
-    starts with a capital ("«", "z"), unless it is the word "A", "I" or
-    "a" and the next word is known in `lower_case_words` ("A Treatise");
+    starts with a capital ("«", "z"), unless it is the word "A" or "I"
+    and the next word is known in `lower_case_words` ("A Treatise");
     the signs, when the word is 1 or 2 signs glued to a word that starts
     with a capital ("'There"); None otherwise (spec section 11, "The
     marker of a note")."""
