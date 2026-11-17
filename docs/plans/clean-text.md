@@ -60,8 +60,8 @@ builds:
 
 Two places where the specs disagree, and how the plan reads them:
 
-- extract §7 has the owner check each changed reference page before
-  its new literal is committed. This plan commits a changed literal
+- Changed reference pages: as extract §7 now says (corrected on 17
+  November 2026), this plan commits a changed literal
   when every change on it is shown, by a script, to be a join of
   pieces, a split at a gap, or the same characters regrouped (section
   "Changed reference pages" below), lists each change in the report,
