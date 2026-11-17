@@ -568,6 +568,19 @@ text after a footnote re-read, because Tesseract's lines of small type
 are as tall as the body's words. No word of Tesseract's is dropped for
 a low confidence (**Open 2**).
 
+**Tesseract's junk is dropped**: before a region is scored and its
+words paired, a Tesseract word with no letter or digit is dropped
+unless each of its characters is ordinary punctuation or a sign the
+books print: . , ; : ! ? ' " ‘ ’ “ ” ( ) [ ] - – — § & £ $ % * † ‡ ¶ /.
+The record counts the words dropped. Tesseract reads a pencil curve or
+a stain beside a note as such tokens, and in a kept region they went
+into the book: in the kept records of whole Stubbs, Domesday and Gierke
+(17 November 2026), 7, 3 and 24 tokens, "|" four times on Gierke page
+248, "¥" and "\\" on page 127 (a pencil curve), "©", "@", "~", "_", "¢".
+The other tokens with no letter or digit in those records, 100, 20 and
+35, are punctuation and stay. A tall "|" also lay over layer words of several lines
+(Gierke page 132).
+
 **The record.** Every region read is a `Reread` in `lines.json`, whether
 its words were kept or not (a change to a shared format, **Open 3**):
 
@@ -588,9 +601,11 @@ class Reread:
     layer_score: int
     ocr_score: int
     kept: bool                        # by the rule of section 3
+    dropped_junk_count: int           # Tesseract's junk tokens dropped
 ```
 
-A region where both readings are empty is not recorded. `LinesFile`
+A region where both readings are empty, before Tesseract's junk is
+dropped, is not recorded. `LinesFile`
 gains `rereads: tuple[Reread, ...]`, in page order and, within a page,
 small-print page first, then margin bands top to bottom with the left
 side first at the same top, then cut-in crops likewise, then the
@@ -704,8 +719,10 @@ with 12 gave byte-identical records, and Gierke's 762 regions read inside layout
 - **A pencil mark, a tick, a stain in the margin** is a band (7 of 30 of
   Gierke's sample were). Tesseract reads it as short junk ("id i ;"),
   the layer has nothing there, the score is negative, and the layer's
-  nothing is kept. Junk beside a real note ("~" after "The Hilde-",
-  Stubbs page 83) is kept with the note when the note wins (**Open 2**).
+  nothing is kept. Junk of no letter or digit is dropped, beside a real
+  note ("~" after "The Hilde-", Stubbs page 83) or alone; junk of
+  letters ("id i") is kept with the note when the note wins (**Open
+  2**).
 - **A note the layer did not read at all** ("Medieval Thought.", Gierke
   page 88; "Fall of Bristol.", Stubbs page 308): the region replaces no
   word, Tesseract's words hold 2 known words or more and more known
