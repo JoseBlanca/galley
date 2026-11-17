@@ -616,15 +616,15 @@ def test_truncated_file_names_the_line_and_column(tmp_path: Path, name: str) -> 
 
 
 # For each file, a format_version this galley does not read, and the one it
-# reads. Every file is at 2: blocks.json since the second plan of
-# structure, the others since the plan clean-text; the old version 1 is the
-# case the owner meets (architecture section 8).
+# reads: pages.json, words.json and lines.json at 2 since the plan
+# clean-text, blocks.json at 3 since its word change reason hyphen_lost;
+# the version before is the case the owner meets (architecture section 8).
 UNSUPPORTED_VERSION: frozendict[str, tuple[int, int]] = frozendict(
     {
         "pages.json": (1, 2),
         "words.json": (1, 2),
         "lines.json": (1, 2),
-        "blocks.json": (1, 2),
+        "blocks.json": (2, 3),
     }
 )
 
@@ -1287,9 +1287,9 @@ def _blocks_json(tmp_path: Path, blocks: BlocksFile) -> dict[str, Any]:
     return json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
 
 
-def test_blocks_json_is_format_version_2() -> None:
-    assert model.BLOCKS_FORMAT_VERSION == 2
-    assert BLOCKS.format_version == 2
+def test_blocks_json_is_format_version_3() -> None:
+    assert model.BLOCKS_FORMAT_VERSION == 3
+    assert BLOCKS.format_version == 3
 
 
 def test_heading_label_is_written_after_level_and_read_back(tmp_path: Path) -> None:

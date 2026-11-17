@@ -37,7 +37,7 @@ PAGES_FORMAT_VERSION = 2
 WORDS_FORMAT_VERSION = 2
 LINES_FORMAT_VERSION = 2
 # 2 since the second plan of structure, 16 November 2026 (architecture section 8).
-BLOCKS_FORMAT_VERSION = 2
+BLOCKS_FORMAT_VERSION = 3
 EDITS_FORMAT_VERSION = 1
 
 
