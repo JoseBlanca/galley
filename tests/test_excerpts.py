@@ -533,13 +533,15 @@ def test_margin_note_before_domesday_75_paragraphs_whose_first_lines_it_is_besid
     excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
 ) -> None:
     # Excerpt page 1 (75): each stands beside its paragraph's first line;
-    # "Can the villein be pursued?" (the OCR's "Sn°inhbe pursued?") beside
-    # the page's last line, the first of a paragraph that runs on to page 2.
+    # "Can the villein be pursued?" beside the page's last line, the first
+    # of a paragraph that runs on to page 2. The second and third notes are
+    # Tesseract's readings, kept over the layer's "dOTQ^tht villein." and
+    # "Sn°inhbe pursued?" (reocr spec, section 3, kind 2).
     _, blocks = excerpt_outputs[DOMESDAY]
     assert _margin_notes_before(blocks, 1) == (
         ("Free land.", "The idea of", [1]),
-        ("dOTQ^tht villein.", "If now we", [1]),
-        ("Sn°inhbe pursued?", "^ ^e free", [1, 2]),
+        ("The unfree dom of the villein.", "If now we", [1]),
+        ("Can the villein be pursued ?", "^ ^e free", [1, 2]),
     )
 
 
@@ -1082,15 +1084,17 @@ def test_index_haskins_266_heading_then_one_entry_per_entry_left_column_then_rig
     )
     # The left column's first entry, "Anjou" and its sub-entry with its
     # continuation line (section 17, rule 5), and the left column's last
-    # entry before the right column's first.
-    assert entries[0] == "Abacus, 106/."
+    # entry before the right column's first. The page is a small-print page
+    # whose Tesseract reading is kept (reocr spec, section 3, kind 1): "f."
+    # for the layer's "/.", and "28," for "28.".
+    assert entries[0] == "Abacus, 106 f."
     assert entries[18:20] == (
         "Anjou, counts of, 61, 85;",
-        "relations with Normandy, 61-63, 85, 100, 112, 131, 136/.",
+        "relations with Normandy, 61-63, 85, 100, 112, 131, 136 f.",
     )
     assert depths[18:20] == (1, 2)
     assert depths.count(2) == 8
-    assert entries[38:40] == ("Avranches, 172, 175, 178.", "Avranchin, 28.")
+    assert entries[38:40] == ("Avranches, 172, 175, 178.", "Avranchin, 28,")
 
 
 def test_index_haskins_267_calabria_one_entry_and_the_rows_cut_at_the_gutter(
@@ -1098,20 +1102,23 @@ def test_index_haskins_267_calabria_one_entry_and_the_rows_cut_at_the_gutter(
 ) -> None:
     # Layout read the first four rows across both columns; the gutter cut
     # puts "Clermont, 211." and the three entries after it in the right
-    # column, before "Commerce".
+    # column, before "Commerce". The page is a small-print page whose
+    # Tesseract reading is kept (reocr spec, section 3, kind 1); the layer's
+    # "lo/.," lies under no word of Tesseract's and stays beside its "10
+    # f.," (section 4).
     _, blocks = excerpt_outputs["haskins_quotes_index"]
     entries = _index_entries_on(blocks, 9)
     assert entries[:3] == (
-        "Caen, lo/., 71, 133, 139, 143, 153. 160, 166, 172, 184;",
-        "abbeys, 12, 58,160, 163, 171, 174,186-88,213.",
-        "Calabria, 176, 198,201-11,222,226, 237, 246.",
+        "Caen, 10 lo/., f., 71, 133, 139, 143, 153, 160, 166, 172, 184;",
+        "abbeys, 12, 58, 160, 163, 171, 174, 186-88, 213.",
+        "Calabria, 176, 198, 201-11, 222, 226, 237, 246.",
     )
     clermont = entries.index("Clermont, 211.")
     assert entries[clermont : clermont + 4] == (
         "Clermont, 211.",
         "Clovis, 207.",
         "Cluny, 164.",
-        "Colombieres, 116.",
+        "Colombiéres, 116.",
     )
     assert entries[clermont + 4].startswith("Commerce, Norman, 4, 73, 81,")
     assert "quote" not in _kinds_on(blocks, 9) + _kinds_on(blocks, 10)

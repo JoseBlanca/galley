@@ -16,6 +16,7 @@ from galley.body_measures import group_rows
 from galley.errors import FidelityBoundary, FidelityError
 from galley.fidelity import check_stage
 from galley.layout import BookMeasures, Side
+from galley.layout._column import ColumnSplit
 from galley.layout._reread import (
     CutInCrop,
     RegionReading,
@@ -25,6 +26,7 @@ from galley.layout._reread import (
     footnote_band_reading,
     is_small_print_page,
     margin_note_reading,
+    margin_note_sides,
     margin_strip,
     note_bands,
     page_rereads,
@@ -1003,3 +1005,50 @@ def test_fidelity_check_fails_on_two_kept_records_naming_one_word() -> None:
     twice = replace(record, ocr_words=())
     with pytest.raises(FidelityError, match="two kept rereads"):
         _check_fidelity(_MARGIN_PAGE, (record, twice))
+
+
+# margin_note_sides (reocr spec, section 3, kind 2)
+
+
+def _split(left_margin: tuple[str, ...]) -> ColumnSplit:
+    """A page's words placed by a column at 50 to 250 pt, with `left_margin`
+    as its left margin words and none on the right."""
+    return ColumnSplit(
+        left=50.0,
+        right=250.0,
+        left_margin=tuple(
+            Word(text, Box(10, 100 + 10 * row, 40, 108 + 10 * row), None)
+            for row, text in enumerate(left_margin)
+        ),
+        right_margin=(),
+        column=(),
+    )
+
+
+def test_side_with_2_known_margin_words_on_10_of_100_pages_has_margin_notes() -> None:
+    pages = (
+        *((50, _split(("Stephen", "Blois"))),) * 10,
+        *((50, _split(())),) * 90,
+    )
+    assert margin_note_sides(pages, _WORD_LIST) == frozenset({Side.LEFT})
+
+
+def test_side_with_2_known_margin_words_on_9_of_100_pages_has_none() -> None:
+    pages = (*((50, _split(("Stephen", "Blois"))),) * 9, *((50, _split(())),) * 91)
+    assert margin_note_sides(pages, _WORD_LIST) == frozenset()
+
+
+def test_margin_with_1_known_word_and_1_unknown_counts_no_page() -> None:
+    pages = ((50, _split(("Stephen", "xqz"))),)
+    assert margin_note_sides(pages, _WORD_LIST) == frozenset()
+
+
+def test_pages_of_fewer_than_50_words_are_not_counted() -> None:
+    pages = (
+        (50, _split(("Stephen", "Blois"))),
+        *((49, _split(())),) * 20,
+    )
+    assert margin_note_sides(pages, _WORD_LIST) == frozenset({Side.LEFT})
+    assert margin_note_sides(((49, _split(("Stephen", "Blois"))),), _WORD_LIST) == (
+        frozenset()
+    )

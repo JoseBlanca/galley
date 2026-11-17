@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
   "excerpt_only": "What the excerpt gives, not what the whole book gives: footnote 3, \"D. B. i. 184 b…\", belongs to page 30, and the excerpt runs it on to this page, the next text page it holds.",
   "known": "The table's title \"ARMINGFORD HUNDRED.\" is a false heading of level 2, and the table's rows come out as notes and paragraphs (structure spec section 9). The owner: the links from \"1\" and \"2\" to table rows are wrong, and part of a note comes from a previous page: the text at the foot \"-worth, -wick, -thorpe…\" is the end of a note of page 41, likely, which galley glues to the table's last row \"Croydon 0\". The margin note reads \"Size of the vill.\" (the OCR gives \"Size of the\").",
   "excerpt": "domesday_headings_quotes",
@@ -40,7 +40,8 @@
       "ARMINGFORD HUNDRED."
     ],
     [
-      "Size of the"
+      "Size of the",
+      "vill."
     ],
     [
       "•"
@@ -71,7 +72,7 @@
   "blocks": [
     {
       "kind": "margin_note",
-      "text": "Size of the",
+      "text": "Size of the vill.",
       "pages": [
         5
       ]

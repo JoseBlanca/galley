@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
   "excerpt_only": "What the excerpt gives, not what the whole book gives: footnote 3 runs on to the next text page of the excerpt, page 42, and ends with the words of a table's head there; on the whole book its continuation, if any, is on page 31.",
   "excerpt": "domesday_headings_quotes",
   "page": 2,
@@ -46,13 +46,14 @@
       "extra-hundredal3, places that for one purpose are in one county"
     ],
     [
-      "Legal ideas"
-    ],
-    [
+      "Legal ideas",
+      "of cent. xi.",
       "°"
     ],
     [
-      "The geo-"
+      "The geo-",
+      "graphical",
+      "basis."
     ],
     [
       "1 D. B. ii. 109 b : ' Hundret de Grenehou 14 letis.' Ib. 212 b : ' Hundret et",
@@ -73,7 +74,7 @@
     },
     {
       "kind": "margin_note",
-      "text": "Legal ideas °",
+      "text": "Legal ideas of cent. xi. °",
       "pages": [
         2
       ]
@@ -96,7 +97,7 @@
     },
     {
       "kind": "margin_note",
-      "text": "The geo-",
+      "text": "The geographical basis.",
       "pages": [
         2
       ]
@@ -155,6 +156,16 @@
     }
   ],
   "word_changes": [
+    {
+      "before": [
+        "geo-",
+        "graphical"
+      ],
+      "after": [
+        "geographical"
+      ],
+      "reason": "hyphen_join"
+    },
     {
       "before": [
         "Norfolk1."

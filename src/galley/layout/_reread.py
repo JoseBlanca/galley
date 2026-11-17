@@ -30,6 +30,7 @@ from PIL import Image
 from galley.body_measures import group_rows
 from galley.layout._column import (
     BookMeasures,
+    ColumnSplit,
     Side,
     is_small_row,
     running_head_row_count,
@@ -52,6 +53,7 @@ __all__ = [
     "footnote_band_reading",
     "is_small_print_page",
     "margin_note_reading",
+    "margin_note_sides",
     "margin_strip",
     "note_bands",
     "page_rereads",
@@ -79,6 +81,15 @@ _HYPHEN: Final[str] = "-"
 _SMALL_PRINT_LEAST_WORDS: Final[int] = 50
 _SMALL_PRINT_ROWS_PER_100: Final[int] = 85
 _COUNTED_ROW_LEAST_WORDS: Final[int] = 2
+
+# A side of a book has outer margin notes when at least 10 in 100 of its
+# pages of 50 words or more have at least 2 known words among that side's
+# margin words (reocr spec, section 3, kind 2): measured, Gierke 97 and 88
+# of 271 pages, Domesday 154 and 165 of 538; Stubbs at most 1, Mariéjol 3,
+# Haskins and Kadesh 0.
+_MARGIN_SIDE_LEAST_WORDS: Final[int] = 50
+_MARGIN_SIDE_LEAST_KNOWN: Final[int] = 2
+_MARGIN_SIDE_PAGES_PER_100: Final[int] = 10
 
 # A region over no layer word is kept only with this many known words of
 # Tesseract's (reocr spec, section 3): "af", read over nothing on Gierke
@@ -219,6 +230,41 @@ def is_small_print_page(page: PageWords, measures: BookMeasures) -> bool:
     )
     small = sum(is_small_row(row, measures) for row in counted)
     return bool(counted) and small * 100 >= _SMALL_PRINT_ROWS_PER_100 * len(counted)
+
+
+# The sides with outer margin notes
+
+
+def margin_note_sides(
+    pages: Iterable[tuple[int, ColumnSplit]], lower_case_words: frozenset[str]
+) -> frozenset[Side]:
+    """The sides of a book whose outer margins hold notes (reocr spec,
+    section 3, kind 2), from `pages`, each page's word count and its words
+    placed by its body column (layout steps 1 and 2): a side has them when
+    at least 10 in 100 of the pages of 50 words or more have at least 2
+    known words, by `lower_case_words`, among that side's margin words."""
+    counted = tuple(
+        split for count, split in pages if count >= _MARGIN_SIDE_LEAST_WORDS
+    )
+
+    def has_notes(margin_words: Iterable[tuple[Word, ...]]) -> bool:
+        with_notes = sum(
+            sum(is_known_word(word.text, lower_case_words) for word in words)
+            >= _MARGIN_SIDE_LEAST_KNOWN
+            for words in margin_words
+        )
+        return bool(counted) and (
+            with_notes * 100 >= _MARGIN_SIDE_PAGES_PER_100 * len(counted)
+        )
+
+    return frozenset(
+        side
+        for side, margin_words in (
+            (Side.LEFT, tuple(split.left_margin for split in counted)),
+            (Side.RIGHT, tuple(split.right_margin for split in counted)),
+        )
+        if has_notes(margin_words)
+    )
 
 
 # Pixels and points

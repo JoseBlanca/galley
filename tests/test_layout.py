@@ -11,18 +11,33 @@ exact regions of the reference pages are tested in tests/test_excerpts.py.
 import hashlib
 import math
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from PIL import Image, ImageDraw
 
-from galley import layout
+from galley import layout, wordlist
 from galley.book_folder import BookFolder
 from galley.cli import main
-from galley.config import BookConfig, Language
-from galley.errors import FidelityBoundary, FidelityError, InputFileError
+from galley.config import BookConfig, Language, OcrMode
+from galley.errors import (
+    ExternalProgramError,
+    FidelityBoundary,
+    FidelityError,
+    InputFileError,
+)
 from galley.fidelity import check_stage
-from galley.layout import BookMeasures, layout_page, measure_book
+from galley.layout import (
+    BookMeasures,
+    ReadLines,
+    Rereading,
+    Side,
+    layout_page,
+    layout_page_with_rereads,
+    measure_book,
+)
 from galley.model import (
     Box,
     Figure,
@@ -33,15 +48,19 @@ from galley.model import (
     PageLayout,
     PagesFile,
     PageWords,
+    Reread,
+    RereadKind,
     TextSource,
     Word,
     WordsFile,
     read_lines,
     read_words,
+    words_after_rereads,
     write_lines,
     write_pages,
     write_words,
 )
+from galley.ocr import OCR_DPI
 
 
 def _word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
@@ -1448,6 +1467,304 @@ def test_fidelity_check_fails_when_a_word_is_dropped_from_a_line() -> None:
     assert raised.value.invented == frozendict()
 
 
+# layout_page_with_rereads: re-reading small print (docs/specs/reocr.md,
+# sections 3 and 4). The page is rendered as a white image with ink drawn
+# where a test needs it, and Tesseract's words are written in the test, as
+# a reader that gives them whatever crop it is given: no PDF, no Tesseract.
+
+# A page of 500 by 700 pt at 300 dpi.
+_PAGE_PIXELS = (round(500 * OCR_DPI / 72), round(700 * OCR_DPI / 72))
+
+
+def _render_with_ink(*ink: Box) -> Callable[[int], Image.Image]:
+    """A render of every page: white, black in each box of `ink`."""
+
+    def render(_: int) -> Image.Image:
+        image = Image.new("L", _PAGE_PIXELS, 255)
+        draw = ImageDraw.Draw(image)
+        for box in ink:
+            draw.rectangle(
+                tuple(
+                    round(value * OCR_DPI / 72)
+                    for value in (box.x0, box.top, box.x1, box.bottom)
+                ),
+                fill=0,
+            )
+        return image
+
+    return render
+
+
+def _no_render(page_index: int) -> Image.Image:
+    msg = f"page {page_index} was rendered, and no region of it is to be read"
+    raise AssertionError(msg)
+
+
+def _reader(*lines: tuple[Word, ...]) -> ReadLines:
+    """Tesseract standing in: `lines` for every crop read."""
+
+    def read(
+        image: Image.Image, *, origin: tuple[float, float], psm: int
+    ) -> tuple[tuple[Word, ...], ...]:
+        del image, origin, psm
+        return lines
+
+    return read
+
+
+def _no_reader(
+    image: Image.Image, *, origin: tuple[float, float], psm: int
+) -> tuple[tuple[Word, ...], ...]:
+    del image, origin
+    msg = f"Tesseract was run with psm {psm}, and no region is to be read"
+    raise AssertionError(msg)
+
+
+def _rereading(
+    read_lines: ReadLines,
+    *,
+    render: Callable[[int], Image.Image] = _no_render,
+    words: frozenset[str] = frozenset(),
+    margin_note_sides: frozenset[Side] = frozenset(),
+    footnote_bands: bool = False,
+) -> Rereading:
+    return Rereading(
+        render=render,
+        read_lines=read_lines,
+        lower_case_words=words,
+        margin_note_sides=margin_note_sides,
+        footnote_bands=footnote_bands,
+    )
+
+
+def _ocr_word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
+    return Word(text, Box(x0, top, x1, bottom), 90.0)
+
+
+def _assert_fidelity(
+    page: PageWords, result: tuple[PageLayout, tuple[Reread, ...]]
+) -> None:
+    layout_of_page, records = result
+    lines = LinesFile(
+        source_pdf_sha256="0" * 64, pages=(layout_of_page,), rereads=records
+    )
+    check_stage(FidelityBoundary.LAYOUT, _words_file((page,)), lines)
+
+
+# A left margin note the layer garbles, beside row 3, and Tesseract's
+# reading of it, over the layer's words.
+_GARBLED_NOTE = (_word("Mor", 10, 136, 25, 144), _word("al", 27, 136, 45, 144))
+_NOTE_INK = Box(10, 136, 45, 144)
+_MORAL_LESSONS = (
+    _ocr_word("Moral", 9, 135, 30, 145),
+    _ocr_word("lessons.", 31, 135, 46, 145),
+)
+
+
+def test_reread_margin_note_kept_puts_tesseract_words_in_its_margin_region() -> None:
+    page = _page(0, (*_rows(20), *_GARBLED_NOTE))
+    result = layout_page_with_rereads(
+        page,
+        _MEASURES,
+        _rereading(
+            _reader(_MORAL_LESSONS),
+            render=_render_with_ink(_NOTE_INK),
+            words=frozenset({"moral", "lessons"}),
+            margin_note_sides=frozenset({Side.LEFT}),
+        ),
+    )
+    layout_of_page, (record,) = result
+    assert _region_texts(layout_of_page)[1:] == ((("Moral", "lessons."),),)
+    assert len(_region_texts(layout_of_page)[0]) == 20
+    assert (record.kind, record.kept) == (RereadKind.MARGIN_NOTE, True)
+    assert (record.layer_words, record.ocr_words) == (_GARBLED_NOTE, _MORAL_LESSONS)
+    assert (record.layer_score, record.ocr_score) == (-2, 2)
+    _assert_fidelity(page, result)
+
+
+def test_reread_margin_note_scoring_lower_keeps_the_layer_layout() -> None:
+    page = _page(0, (*_rows(20), *_GARBLED_NOTE))
+    layout_of_page, (record,) = layout_page_with_rereads(
+        page,
+        _MEASURES,
+        _rereading(
+            _reader((_ocr_word("Mxq", 9, 135, 46, 145),)),
+            render=_render_with_ink(_NOTE_INK),
+            words=frozenset({"mor", "al"}),
+            margin_note_sides=frozenset({Side.LEFT}),
+        ),
+    )
+    assert layout_of_page == layout_page(page, _MEASURES)
+    assert record.kept is False
+
+
+def test_reread_margin_of_a_side_without_notes_is_not_read() -> None:
+    page = _page(0, (*_rows(20), *_GARBLED_NOTE))
+    assert layout_page_with_rereads(
+        page,
+        _MEASURES,
+        _rereading(
+            _no_reader,
+            margin_note_sides=frozenset({Side.RIGHT}),
+            render=_render_with_ink(_NOTE_INK),
+        ),
+    ) == (layout_page(page, _MEASURES), ())
+
+
+def test_reread_page_with_no_region_to_read_is_not_rendered() -> None:
+    page = _page(0, (*_rows(20), *_GARBLED_NOTE))
+    assert layout_page_with_rereads(page, _MEASURES, _rereading(_no_reader)) == (
+        layout_page(page, _MEASURES),
+        (),
+    )
+
+
+def test_reread_page_of_tesseract_words_is_not_read() -> None:
+    page = replace(_page(0, (*_rows(20), *_GARBLED_NOTE)), text_source=TextSource.OCR)
+    assert layout_page_with_rereads(
+        page,
+        _MEASURES,
+        _rereading(_no_reader, margin_note_sides=frozenset({Side.LEFT})),
+    ) == (layout_page(page, _MEASURES), ())
+
+
+def _small_print_rows(layer: str) -> tuple[Word, ...]:
+    """12 rows of 5 words of small type, 0.7 of the body word height, 10
+    pt apart from top 110: the text layer's when `layer` is "x", each word
+    "x" and its row and place, else Tesseract's, each a page number, 100
+    plus ten times its row plus its place."""
+    return tuple(
+        Word(
+            f"x{row}{place}" if layer == "x" else str(100 + 10 * row + place),
+            Box(
+                50 + place * 40,
+                110 + row * 10,
+                85 + place * 40,
+                110 + row * 10 + _SMALL_HEIGHT,
+            ),
+            None if layer == "x" else 90.0,
+        )
+        for row in range(12)
+        for place in range(5)
+    )
+
+
+def test_reread_small_print_page_kept_is_laid_out_from_tesseract_words() -> None:
+    head = _word("Head", 120, 82, 180, 90)
+    page = _page(0, (head, *_small_print_rows("x"), *_GARBLED_NOTE))
+    result = layout_page_with_rereads(
+        page,
+        _MEASURES,
+        _rereading(
+            _reader(_small_print_rows("ocr")),
+            render=_render_with_ink(_NOTE_INK),
+            # Read whole, the page's margin and band are no regions of their
+            # own: a second region would raise.
+            margin_note_sides=frozenset({Side.LEFT}),
+            footnote_bands=True,
+        ),
+    )
+    layout_of_page, (record,) = result
+    assert (record.kind, record.kept) == (RereadKind.SMALL_PRINT_PAGE, True)
+    assert record.box.top == 91.0
+    regions = _region_texts(layout_of_page)
+    assert regions[0] == (("Head",),)
+    assert regions[1] == tuple(
+        tuple(str(100 + 10 * row + place) for place in range(5)) for row in range(12)
+    )
+    # The margin note lies under no word of Tesseract's: the layer's stays.
+    assert regions[2:] == ((("Mor", "al"),),)
+    _assert_fidelity(page, result)
+
+
+_CUT_IN_NOTE = (("Charcter", 55, 80), ("of", 82, 88), ("Hnry", 90, 102))
+
+
+def test_reread_cut_in_note_kept_puts_tesseract_words_in_its_margin_region() -> None:
+    rows = {
+        10: _cut_row(10),
+        11: (*_note_words(11, _CUT_IN_NOTE), *_cut_row(11)),
+        12: _cut_row(12),
+    }
+    full = tuple(word for word in _rows(20) if int(word.text[1:]) not in rows)
+    page = _page(0, (*full, *(word for words in rows.values() for word in words)))
+    top = _row_top(11)
+    read = tuple(
+        _ocr_word(text, x0, top, x1, top + 8) for text, x0, x1 in _CHARACTER_OF_HENRY
+    )
+    result = layout_page_with_rereads(
+        page,
+        _CUT_IN_MEASURES,
+        _rereading(
+            _reader(read),
+            render=_render_with_ink(),
+            words=frozenset({"character", "of", "henry"}),
+        ),
+    )
+    layout_of_page, (record,) = result
+    assert (record.kind, record.kept) == (RereadKind.CUT_IN_NOTE, True)
+    assert record.box == Box(47, _row_top(10) - 30, 107, _row_top(12) + 8 + 30)
+    body, margin = _region_texts(layout_of_page)
+    assert body[10:13] == (("d10", "e10"), ("d11", "e11"), ("d12", "e12"))
+    assert margin == (("Character", "of", "Henry"),)
+    _assert_fidelity(page, result)
+
+
+def _page_with_band() -> PageWords:
+    return _page(0, (*_rows(20), *_small_rows(3, _LAST_BODY_TOP + 1.5 * _PITCH)))
+
+
+def test_reread_footnote_band_kept_takes_the_band_place() -> None:
+    page = _page_with_band()
+    read = tuple(
+        replace(word, text=text, ocr_confidence=90.0)
+        for word, text in zip(
+            _small_rows(3, _LAST_BODY_TOP + 1.5 * _PITCH),
+            ("First", "second", "third."),
+            strict=True,
+        )
+    )
+    result = layout_page_with_rereads(
+        page,
+        _MEASURES,
+        _rereading(
+            _reader(read),
+            render=_render_with_ink(),
+            words=frozenset({"first", "second", "third"}),
+            footnote_bands=True,
+        ),
+    )
+    layout_of_page, (record,) = result
+    assert (record.kind, record.kept) == (RereadKind.FOOTNOTE_BAND, True)
+    body, band = _region_texts(layout_of_page)
+    assert len(body) == 20
+    assert band == (("First",), ("second",), ("third.",))
+    _assert_fidelity(page, result)
+
+
+def test_reread_footnote_band_is_not_read_unless_asked() -> None:
+    page = _page_with_band()
+    assert layout_page_with_rereads(page, _MEASURES, _rereading(_no_reader)) == (
+        layout_page(page, _MEASURES),
+        (),
+    )
+
+
+@pytest.mark.thread_unsafe
+def test_run_with_ocr_verify_rereads_and_with_trust_needs_no_word_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The pages of `_book` have no region to read: layout reads the word
+    # list for the margins' notes, renders nothing and records nothing.
+    folder, config = _book(tmp_path)
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", tmp_path / "no-cache")
+    monkeypatch.setenv("PATH", "")
+    with pytest.raises(ExternalProgramError, match="tesseract"):
+        layout.run(folder, config, workers=1)
+    layout.run(folder, replace(config, ocr=OcrMode.TRUST), workers=1)
+    assert read_lines(folder.lines_json).rereads == ()
+
+
 # run, on a book folder of its own
 
 
@@ -1612,20 +1929,27 @@ def _layout_of_whole_book(book_toml: str, root: Path) -> tuple[WordsFile, LinesF
 
 def _assert_laid_out_in_regions(words: WordsFile, lines: LinesFile) -> None:
     """The fidelity check passes; each page's words, with their boxes, are
-    those of the same page in words.json, since layout never moves a word
-    to another page; and some page has more than one region: the book was
-    measured and its pages cut."""
+    those of the same page in words.json after the page's kept re-readings
+    (reocr spec, section 4), since layout never moves a word to another
+    page; and some page has more than one region: the book was measured
+    and its pages cut."""
     check_stage(FidelityBoundary.LAYOUT, words, lines)
     assert tuple(page.index for page in lines.pages) == tuple(
         page.index for page in words.pages
     )
     for page_lines, page_words in zip(lines.pages, words.pages, strict=True):
+        page_rereads = tuple(
+            reread for reread in lines.rereads if reread.page_index == page_words.index
+        )
         assert Counter(
             (word.text, word.box)
             for region in page_lines.regions
             for line in region.lines
             for word in line.words
-        ) == Counter((word.text, word.box) for word in page_words.words)
+        ) == Counter(
+            (word.text, word.box)
+            for word in words_after_rereads(page_words.words, page_rereads)
+        )
     assert any(len(page.regions) > 1 for page in lines.pages)
 
 

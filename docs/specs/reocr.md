@@ -555,9 +555,11 @@ def note_bands(strip: Image.Image, *, dpi: int) -> tuple[tuple[int, int, int, in
     # The note bands of a margin strip, as pixel boxes (section 3, kind 2).
 ```
 
-`layout_page` takes the page's render through a function it is given,
-so that its tests can pass a fixed image and no PDF; `run` gives it one
-that calls `pdfium.render` at 300 dpi. `run` keeps its signature
+`layout_page_with_rereads`, which lays out a page as `layout_page` does
+and also gives the records of the regions it read (layout §4), takes
+the page's render and Tesseract through the functions it is given, so
+that its tests can pass a fixed image and no PDF; `run` gives it a
+render by `pdfium.render` at 300 dpi. `run` keeps its signature
 (architecture §9). The new config key, in `config.py` and architecture
 §6, is `reread_footnotes`, a bool, `false` by default.
 

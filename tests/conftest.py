@@ -240,9 +240,11 @@ def excerpt_books(
     Session-scoped: the stages run once, also under --parallel-threads=8,
     and the excerpts' runs go side by side in threads.
     A test reads these folders and never writes in them. Skips every test
-    that uses it when Pandoc is missing, which markdown and epub need.
+    that uses it when Pandoc is missing, which markdown and epub need, or
+    Tesseract, with which layout re-reads small print (docs/specs/reocr.md).
     """
     _require_program("pandoc")
+    _require_program("tesseract")
     folders = {
         name: BookFolder(tmp_path_factory.mktemp(name)) for name in excerpt_book_toml
     }

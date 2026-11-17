@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4), and again, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed since that check by task 2.5: on book page 75 \"land.\" leaves the body line for the margin note \"Free land.\", so the last paragraph of page 74 ends at \"privilege.\" on 75. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"Where a note starts\" and \"The marker of a note\"): each note's marker is taken out of its text into `marker`; the first band line holds two notes, \"1\" and \"3\" (note 2 misread), cut at the second marker; note 6's marker \"«\" is taken as a one-character marker of an indented note. Changed by task 2.3 (structure spec section 11, \"References\" and \"What is changed\"): the seven references \"pleased1/\", \"it2.'\", \"free3.\", \"things4.\", \"themselves5.'\", \"would6.'\" and \"mercy7.'\" are linked to the page's notes 1 to 7, each split off its word by a note_marker word change; the block text is unchanged. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed since that check by task 2.5: on book page 75 \"land.\" leaves the body line for the margin note \"Free land.\", so the last paragraph of page 74 ends at \"privilege.\" on 75. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"Where a note starts\" and \"The marker of a note\"): each note's marker is taken out of its text into `marker`; the first band line holds two notes, \"1\" and \"3\" (note 2 misread), cut at the second marker; note 6's marker \"«\" is taken as a one-character marker of an indented note. Changed by task 2.3 (structure spec section 11, \"References\" and \"What is changed\"): the seven references \"pleased1/\", \"it2.'\", \"free3.\", \"things4.\", \"themselves5.'\", \"would6.'\" and \"mercy7.'\" are linked to the page's notes 1 to 7, each split off its word by a note_marker word change; the block text is unchanged. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
   "known": "The margin note reads \"The scale of free-holding\" (the owner); the text layer's OCR gives \"The scale holding.\", which galley keeps.",
   "excerpt": "domesday_74-83",
   "page": 0,
@@ -43,9 +43,8 @@
       "land, he with all his land shall be in the king's mercy7.' The"
     ],
     [
-      "The scale"
-    ],
-    [
+      "The scale",
+      "of free-",
       "holding."
     ],
     [
@@ -75,7 +74,7 @@
     },
     {
       "kind": "margin_note",
-      "text": "The scale holding.",
+      "text": "The scale of freeholding.",
       "pages": [
         0
       ]
@@ -233,6 +232,16 @@
         "."
       ],
       "reason": "note_marker"
+    },
+    {
+      "before": [
+        "free-",
+        "holding."
+      ],
+      "after": [
+        "freeholding."
+      ],
+      "reason": "hyphen_join_guessed"
     },
     {
       "before": [

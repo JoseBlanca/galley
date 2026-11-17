@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed since that check by task 3.1 (layout spec section 3, step 2b, Stubbs' cut-in notes): the cut-in notes at the right \"B an i s h m e n t\" and \"Cti°n °£ J^tE.\" (\"Banishment of mercenaries.\" and \"Destruction of castles.\" in print) leave the body lines and become margin regions and margin_note blocks after the body. With them gone, \"was\" and \"boon\" join their body line again, which reads \"fifteen, was a still greater boon ; for these,\", and the paragraph \"The demolition of the castles\" is no longer broken there. Checked against the page image by the task 3.1 session on 16 November 2026, for the orchestrator to check again. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed since that check by task 3.1 (layout spec section 3, step 2b, Stubbs' cut-in notes): the cut-in notes at the right \"B an i s h m e n t\" and \"Cti°n °£ J^tE.\" (\"Banishment of mercenaries.\" and \"Destruction of castles.\" in print) leave the body lines and become margin regions and margin_note blocks after the body. With them gone, \"was\" and \"boon\" join their body line again, which reads \"fifteen, was a still greater boon ; for these,\", and the paragraph \"The demolition of the castles\" is no longer broken there. Checked against the page image by the task 3.1 session on 16 November 2026, for the orchestrator to check again. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
   "excerpt": "stubbs_51_56-64",
   "page": 9,
   "book_page_index": 64,
@@ -51,8 +51,8 @@
       "Banishment"
     ],
     [
-      "Cti°n °£",
-      "J^tE."
+      "Destruction of",
+      "castles."
     ]
   ],
   "blocks": [
@@ -80,7 +80,7 @@
     },
     {
       "kind": "margin_note",
-      "text": "Cti°n °£ J^tE.",
+      "text": "Destruction of castles.",
       "pages": [
         9
       ]

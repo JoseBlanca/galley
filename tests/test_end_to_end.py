@@ -30,10 +30,12 @@ from galley.model import (
     Note,
     NoteKind,
     RemovalReason,
+    Word,
     block_text,
     read_blocks,
     read_lines,
     read_words,
+    words_after_rereads,
 )
 from galley.text_layer import open_pdf
 
@@ -88,30 +90,43 @@ def test_every_file_of_the_book_folder_but_edits_is_written(
 # lines.json
 
 
+def _laid_out_words(folder: BookFolder) -> tuple[tuple[Word, ...], ...]:
+    """The words of each page of a folder's words.json after the page's
+    kept re-readings of lines.json: the words layout lays out (reocr spec,
+    section 4)."""
+    lines = read_lines(folder.lines_json)
+    return tuple(
+        words_after_rereads(
+            page.words,
+            tuple(
+                reread for reread in lines.rereads if reread.page_index == page.index
+            ),
+        )
+        for page in read_words(folder.words_json).pages
+    )
+
+
 def test_every_word_of_a_page_is_in_one_line_of_that_page(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    # Layout spec section 7: layout regroups words and removes none.
+    # Layout spec section 7: layout regroups words and removes none; a kept
+    # re-reading replaces its layer words by Tesseract's (reocr spec,
+    # section 4).
     for name, word_counts in WORD_COUNTS.items():
         lines = read_lines(excerpt_books[name].lines_json)
         words = read_words(excerpt_books[name].words_json)
         assert tuple(page.index for page in lines.pages) == tuple(
             page.index for page in words.pages
         )
-        for page_lines, page_words in zip(lines.pages, words.pages, strict=True):
+        assert tuple(len(page.words) for page in words.pages) == word_counts
+        laid_out = _laid_out_words(excerpt_books[name])
+        for page_lines, page_words in zip(lines.pages, laid_out, strict=True):
             assert Counter(
                 word.text
                 for region in page_lines.regions
                 for line in region.lines
                 for word in line.words
-            ) == Counter(word.text for word in page_words.words)
-        assert (
-            tuple(
-                sum(len(line.words) for region in page.regions for line in region.lines)
-                for page in lines.pages
-            )
-            == word_counts
-        )
+            ) == Counter(word.text for word in page_words)
 
 
 def test_every_page_has_regions_but_kadesh_pages_8_and_9_without_words(
@@ -205,13 +220,12 @@ def _structure_words(blocks: BlocksFile) -> Counter[str]:
 def test_blocks_json_with_its_records_holds_every_word_of_words_json(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    for name, word_counts in WORD_COUNTS.items():
+    for name in WORD_COUNTS:
         blocks = read_blocks(excerpt_books[name].blocks_json)
-        words = read_words(excerpt_books[name].words_json)
+        laid_out = _laid_out_words(excerpt_books[name])
         assert _structure_words(blocks) == Counter(
-            word.text for page in words.pages for word in page.words
+            word.text for page in laid_out for word in page
         )
-        assert _structure_words(blocks).total() == sum(word_counts)
 
 
 def test_the_kadesh_excerpt_ends_with_the_figure_of_plate_9_without_text(
@@ -259,9 +273,7 @@ def _words_of_book_md_and_their_expected_count(
     of references to a footnote in blocks.json."""
     markdown = read_markdown(folder.book_md.read_text(encoding="utf-8"))
     blocks = read_blocks(folder.blocks_json)
-    words = Counter(
-        word.text for page in read_words(folder.words_json).pages for word in page.words
-    )
+    words = Counter(word.text for page in _laid_out_words(folder) for word in page)
     words.subtract(word for removal in blocks.removals for word in removal.text.split())
     words.subtract(word for change in blocks.word_changes for word in change.before)
     words.update(word for change in blocks.word_changes for word in change.after)

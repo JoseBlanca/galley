@@ -3,9 +3,10 @@ every stage, and a stage's name runs that stage alone (spec section 9).
 
 The command reads `book.toml` from the folder and calls each stage's `run`.
 Before any stage, it refuses `correct = true` under `run` and checks that
-Pandoc is installed when a stage it runs needs it, and Tesseract when
-analyze or structure runs and the word list of the book's language is not
-cached.
+Pandoc is installed when a stage it runs needs it; Tesseract's tools when
+analyze or structure runs, or layout re-reads small print, and the word
+list of the book's language is not cached; and Tesseract when layout runs
+and the config's `ocr` is not `trust`.
 Errors propagate to `main`, which logs them and raises them again
 (architecture section 14).
 """
@@ -21,7 +22,7 @@ from typing import Protocol
 
 from galley import analyze, epub, extract, layout, markdown, structure, wordlist
 from galley.book_folder import BookFolder
-from galley.config import BookConfig, read_config, tesseract_language
+from galley.config import BookConfig, OcrMode, read_config, tesseract_language
 from galley.errors import ConfigError, ExternalProgramError
 from galley.parallel import DEFAULT_WORKERS
 
@@ -42,14 +43,18 @@ class _StageRun(Protocol):
 @dataclass(frozen=True, slots=True, kw_only=True)
 class _Stage:
     """A stage the command runs: its subcommand, its help, its `run`,
-    whether it calls Pandoc, and whether it needs the word list of the
-    book's language, which Tesseract's tools extract the first time."""
+    whether it calls Pandoc, whether it needs the word list of the book's
+    language, which Tesseract's tools extract the first time, and whether
+    it reads with Tesseract unless the config's `ocr` is `trust`, as layout
+    re-reads small print (docs/specs/reocr.md, section 3), needing the
+    word list too when `ocr` is `verify`."""
 
     name: str
     help: str
     run: _StageRun
     needs_pandoc: bool
     needs_word_list: bool
+    reads_with_tesseract: bool
 
 
 # The stages in the order `run` calls them. The correct stage and
@@ -62,6 +67,7 @@ _STAGES: tuple[_Stage, ...] = (
         run=analyze.run,
         needs_pandoc=False,
         needs_word_list=True,
+        reads_with_tesseract=False,
     ),
     _Stage(
         name="extract",
@@ -69,6 +75,7 @@ _STAGES: tuple[_Stage, ...] = (
         run=extract.run,
         needs_pandoc=False,
         needs_word_list=False,
+        reads_with_tesseract=False,
     ),
     _Stage(
         name="layout",
@@ -76,6 +83,7 @@ _STAGES: tuple[_Stage, ...] = (
         run=layout.run,
         needs_pandoc=False,
         needs_word_list=False,
+        reads_with_tesseract=True,
     ),
     _Stage(
         name="structure",
@@ -83,6 +91,7 @@ _STAGES: tuple[_Stage, ...] = (
         run=structure.run,
         needs_pandoc=False,
         needs_word_list=True,
+        reads_with_tesseract=False,
     ),
     _Stage(
         name="markdown",
@@ -90,6 +99,7 @@ _STAGES: tuple[_Stage, ...] = (
         run=markdown.run,
         needs_pandoc=True,
         needs_word_list=False,
+        reads_with_tesseract=False,
     ),
     _Stage(
         name="epub",
@@ -97,6 +107,7 @@ _STAGES: tuple[_Stage, ...] = (
         run=epub.run,
         needs_pandoc=True,
         needs_word_list=False,
+        reads_with_tesseract=False,
     ),
 )
 
@@ -158,9 +169,11 @@ def _check_before_any_stage(
     command: str, stages: tuple[_Stage, ...], folder: BookFolder, config: BookConfig
 ) -> None:
     """ConfigError for `correct = true` under run, then ExternalProgramError
-    when a stage needs Pandoc and it is not on the PATH (spec section 9),
-    or analyze or structure needs Tesseract's tools to extract the word
-    list."""
+    when a stage needs Pandoc and it is not on the PATH (spec section 9);
+    when analyze or structure, or layout re-reading small print, needs
+    Tesseract's tools to extract the word list; or when layout reads with
+    Tesseract, unless the config's `ocr` is `trust`, and it is not on the
+    PATH."""
     if command == _RUN and config.correct:
         message = (
             f"{folder.book_toml} has correct = true, but the walking skeleton "
@@ -170,9 +183,26 @@ def _check_before_any_stage(
     if any(stage.needs_pandoc for stage in stages) and shutil.which("pandoc") is None:
         message = "pandoc is not installed; install it with `brew install pandoc`"
         raise ExternalProgramError(message)
-    needing_word_list = tuple(stage.name for stage in stages if stage.needs_word_list)
+    needing_word_list = tuple(
+        stage.name
+        for stage in stages
+        if stage.needs_word_list
+        or (stage.reads_with_tesseract and config.ocr is OcrMode.VERIFY)
+    )
     if needing_word_list:
         _check_word_list_tools(config, needing_word_list[0])
+    reading = tuple(stage.name for stage in stages if stage.reads_with_tesseract)
+    if (
+        reading
+        and config.ocr is not OcrMode.TRUST
+        and shutil.which("tesseract") is None
+    ):
+        message = (
+            f"tesseract is not installed; {reading[0]} reads small print with it "
+            f'unless the config has ocr = "trust": install it with '
+            "`brew install tesseract`"
+        )
+        raise ExternalProgramError(message)
 
 
 def _check_word_list_tools(config: BookConfig, first_stage: str) -> None:

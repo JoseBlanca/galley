@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4), and again, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed since that check by task 2.5 (a margin word at the start of a body line goes to its margin note): on book page 89 \"Antique-\" leaves the body line, so \"None the less\" starts a paragraph and the paragraph of page 88 ends on 89 at \"bold innovator.\" Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed since that check by task 2.5 (a margin word at the start of a body line goes to its margin note): on book page 89 \"Antique-\" leaves the body line, so \"None the less\" starts a paragraph and the paragraph of page 88 ends on 89 at \"bold innovator.\" Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
   "known": "The owner: there is an additional margin note, \"Medieval Thought.\", beside the page's last line, which galley does not give; the text layer has no words for it. \"Law1\", which the owner did not find in the page's last paragraph, is in its first, \"Then again, in the method…\", on its fourteenth line, \"Public Law¹\" in print (checked against the page image by the task 7.3 session on 16 November 2026).",
   "excerpt": "gierke_86-93_270-271",
   "page": 2,
@@ -49,22 +49,30 @@
       "I — 2"
     ],
     [
-      "Diverse"
+      "Diverse",
+      "methods."
     ],
     [
       "Unity of",
-      "ment."
+      "the move. of",
+      "ment,"
     ],
     [
       "Medieval",
+      "_and",
       "Antique-",
-      "Thought,"
+      "Modern",
+      "Thought."
+    ],
+    [
+      "Medieval",
+      "Thought."
     ]
   ],
   "blocks": [
     {
       "kind": "margin_note",
-      "text": "Diverse",
+      "text": "Diverse methods.",
       "pages": [
         2
       ]
@@ -78,7 +86,7 @@
     },
     {
       "kind": "margin_note",
-      "text": "Unity of ment.",
+      "text": "Unity of the move. of ment,",
       "pages": [
         2
       ]
@@ -92,7 +100,7 @@
     },
     {
       "kind": "margin_note",
-      "text": "Medieval Antique- Thought,",
+      "text": "Medieval _and Antique-Modern Thought.",
       "pages": [
         2
       ]
@@ -100,6 +108,13 @@
     {
       "kind": "paragraph",
       "text": "Beneath this movement, however, there was an internal contest, which in the history of ideas was of more importance than all the external differences between partizans : namely, the contest between Properly Medieval and 'Antique-Modern' Thought.",
+      "pages": [
+        2
+      ]
+    },
+    {
+      "kind": "margin_note",
+      "text": "Medieval Thought.",
       "pages": [
         2
       ]
@@ -134,6 +149,16 @@
         "Moreover,"
       ],
       "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "Antique-",
+        "Modern"
+      ],
+      "after": [
+        "Antique-Modern"
+      ],
+      "reason": "hyphen_kept"
     },
     {
       "before": [

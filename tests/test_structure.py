@@ -5532,7 +5532,10 @@ def test_whole_book_gierke_index_entr_one_per_line_on_its_skewed_pages(
     # below the OCR laid over "Torquemada No. 97" on page 85: in the PDF's
     # order (extract spec section 3) its words are whole but in that entry,
     # "Torquemada No. 53 No. 97", where the default options mixed them
-    # ("TorNqou.e m 5 a 3 d a No. 97").
+    # ("TorNqou.e m 5 a 3 d a No. 97"). Its last word, "iuris]", printed in
+    # the right margin, is a note band that layout re-reads (reocr spec,
+    # section 3, kind 2): Tesseract's "rsi iuris]" is kept and becomes a
+    # paragraph of its own, so the entry ends at "universi".
     entries = tuple(
         block_text(block)
         for block in gierke_blocks.blocks
@@ -5547,7 +5550,7 @@ def test_whole_book_gierke_index_entr_one_per_line_on_its_skewed_pages(
     assert len(entries) == 213
     assert [entry for entry in entries if entry.count("No") != 1] == [
         "Torquemada No. 53 No. 97",
-        "Tr. U. J. [tractatus universi iuris]",
+        "Tr. U. J. [tractatus universi",
     ]
 
 
@@ -5563,9 +5566,11 @@ def test_whole_book_stubbs_guide_words_on_each_of_its_ten_index_pages(
         for removal in blocks.removals
         if removal.reason is RemovalReason.GUIDE_WORDS
     ) == (
-        # Known, not yet fixed: page 312's letter soup of the default options
-        # is words in the PDF's order (extract spec section 3), and "BAL BEC"
-        # stays a paragraph (see below).
+        # The ten index pages are small-print pages read whole by Tesseract
+        # and kept (reocr spec, section 3, kind 1): page 312's guide words
+        # are found too, where the layer's spaced letters left "BAL BEC" a
+        # paragraph.
+        (312, "BAL BEC"),
         (313, "BUR CON"),
         (314, "EDM EDW"),
         (315, "FRA HAR"),
@@ -5578,19 +5583,12 @@ def test_whole_book_stubbs_guide_words_on_each_of_its_ten_index_pages(
     )
     # Spec section 17, rule 3: the fitted edge gives 910 entries and
     # sub-entries; a straight edge at the entry side gave 916 (16 November
-    # 2026), "Baldwin of Redvers, 18" and others cut in two. Known, not yet
-    # fixed: with the words in the PDF's order, page 312's 74 entries are 34
-    # notes and none an entry, and 839 are left (pages 313 to 321 give 0 to
-    # 4 entries more or fewer each, as their words change).
-    assert sum(block.kind is BlockKind.INDEX_ENTRY for block in blocks.blocks) == 839
-    # Only page 312 keeps notes: two regions across the gutter whose spaced
-    # letters lie over it on more than a third of their lines keep their
-    # kind, a band (section 17, rule 2).
-    assert {
-        note.origin[0].page_index
-        for note in blocks.notes
-        if 312 <= note.origin[0].page_index <= 321
-    } == {312}
+    # 2026), "Baldwin of Redvers, 18" and others cut in two. With the words
+    # in the PDF's order, page 312's 74 entries were 34 notes and 839
+    # entries were left; with the pages read by Tesseract (17 November
+    # 2026), 936, and no note on the index pages.
+    assert sum(block.kind is BlockKind.INDEX_ENTRY for block in blocks.blocks) == 936
+    assert not any(312 <= note.origin[0].page_index <= 321 for note in blocks.notes)
 
 
 def test_index_entr_sub_entries_cut_after_each_semicolon_inside_a_line() -> None:

@@ -15,19 +15,32 @@ outside it, and the words of the notes set into it beside its shortened
 lines, as margin regions, the first row set apart at the top as the
 running-head region and the small rows at the foot as the footnote band,
 cuts the body and the band into two columns where a gutter runs down them,
-and puts a drop capital first in the line beside it. `run` measures the
-book, then lays out its pages in parallel.
+and puts a drop capital first in the line beside it.
+`layout_page_with_rereads` does the same and re-reads the page's small
+print with Tesseract where it reads better than the text layer
+(docs/specs/reocr.md): a page printed wholly in small type, the note
+bands of the outer margins, the crops of the cut-in notes and, when the
+config asks, the footnote band; the steps they share with the laying out
+are in `_column`, the crops and choices in `_reread`. `run` measures the
+book, then lays out its pages in parallel, re-reading unless the config's
+`ocr` is `trust` or `redo`.
 """
 
 import bisect
 import logging
 import math
-from dataclasses import replace
+from collections import Counter
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from itertools import groupby
+from pathlib import Path
 from statistics import median
-from typing import Final, assert_never
+from typing import Final, Protocol, assert_never
 
+from PIL import Image
+
+from galley import pdfium, wordlist
 from galley.body_measures import (
     body_measures,
     commonest,
@@ -36,7 +49,7 @@ from galley.body_measures import (
     measured_pages,
 )
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
-from galley.config import BookConfig
+from galley.config import BookConfig, OcrMode, tesseract_language
 from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage
 from galley.layout._column import (
@@ -49,22 +62,60 @@ from galley.layout._column import (
     wide_rows_edges,
     without_cut_in_notes,
 )
+from galley.layout._reread import (
+    NOTE_PSM,
+    SMALL_PRINT_PSM,
+    RegionReading,
+    cut_in_crops,
+    cut_in_reading,
+    footnote_band_crop,
+    footnote_band_reading,
+    is_small_print_page,
+    margin_note_reading,
+    margin_note_sides,
+    margin_strip,
+    note_bands,
+    page_rereads,
+    pixel_box,
+    reading_score,
+    small_print_crop,
+    small_print_reading,
+)
 from galley.model import (
     Box,
     Line,
     LinesFile,
+    PageKind,
     PageLayout,
     PageWords,
     Region,
+    Reread,
+    RereadKind,
+    TextSource,
     Word,
     WordsFile,
     read_checked_input,
     read_words,
+    words_after_rereads,
     write_lines,
 )
+from galley.ocr import OCR_DPI, point_box, read_image_lines
 from galley.parallel import DEFAULT_WORKERS, map_pages
+from galley.pdfium import POINTS_PER_INCH
 
-__all__ = ["BookMeasures", "layout_page", "measure_book", "run"]
+__all__ = [
+    "BookMeasures",
+    "ReadLines",
+    "Rereading",
+    "Side",
+    "is_small_print_page",
+    "layout_page",
+    "layout_page_with_rereads",
+    "measure_book",
+    "note_bands",
+    "reading_score",
+    "run",
+]
 
 _logger = logging.getLogger(__name__)
 
@@ -502,22 +553,31 @@ def _column_cut_regions(
 
 
 def _column_regions(
-    words: tuple[Word, ...], left: float, measures: BookMeasures
+    words: tuple[Word, ...],
+    left: float,
+    measures: BookMeasures,
+    band: tuple[Word, ...] | None,
 ) -> tuple[tuple[Region, ...], tuple[Region, ...]]:
     """The regions of the body column's `words`, a drop capital set aside:
     the running-head region and the body's regions, then the band's (steps
-    3 to 5 and 7)."""
+    3 to 5 and 7). With `band`, the words of a footnote band re-read with
+    Tesseract, step 4 does not look for the band in `words`: `band` is
+    the band, and the rows of `words` below the running head the body."""
     rows = group_rows(words)
     head_count = running_head_row_count(rows, measures.body_line_pitch)
     head, rest = rows[:head_count], rows[head_count:]
-    band_start = _band_start(rest, measures)
+    if band is None:
+        band_start = _band_start(rest, measures)
+        body_rows, band_rows = rest[:band_start], rest[band_start:]
+    else:
+        body_rows, band_rows = rest, group_rows(band)
     width = measures.column_width
     return (
         (
             *((_region_of_rows(head),) if head else ()),
-            *_column_cut_regions(rest[:band_start], left, width, _Part.BODY),
+            *_column_cut_regions(body_rows, left, width, _Part.BODY),
         ),
-        _column_cut_regions(rest[band_start:], left, width, _Part.BAND),
+        _column_cut_regions(band_rows, left, width, _Part.BAND),
     )
 
 
@@ -564,16 +624,19 @@ def _column_regions_with_drop_capitals(
     set_aside: frozenset[int],
     left: float,
     measures: BookMeasures,
+    band: tuple[Word, ...] | None,
 ) -> tuple[tuple[Region, ...], tuple[Region, ...]]:
-    """`_column_regions` of `words` without the drop capitals at the
-    indices `set_aside`, each then placed in the line beside it. A capital
-    with no line beside it is laid out again as a word of the body."""
-    upper, band = _column_regions(
+    """`_column_regions` of `words` and `band` without the drop capitals at
+    the indices `set_aside` of `words`, each then placed in the line beside
+    it. A capital with no line beside it is laid out again as a word of the
+    body."""
+    upper, band_regions = _column_regions(
         tuple(word for index, word in enumerate(words) if index not in set_aside),
         left,
         measures,
+        band,
     )
-    regions = (*upper, *band)
+    regions = (*upper, *band_regions)
     unplaced = set()
     for index in sorted(set_aside):
         placed = _with_drop_capital(regions, words[index])
@@ -583,39 +646,76 @@ def _column_regions_with_drop_capitals(
             regions = placed
     if unplaced:
         return _column_regions_with_drop_capitals(
-            words, set_aside - unplaced, left, measures
+            words, set_aside - unplaced, left, measures, band
         )
     return regions[: len(upper)], regions[len(upper) :]
 
 
-def _page_regions(
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _PageParts:
+    """A page's words as steps 1, 2 and 2b place them, in points: the body
+    column's `left` and `right` edges; each side's outer margin words and
+    cut-in words; `column`, the words left in the column, which steps 3 to
+    7 lay out; each side's cut-in zones, (top, bottom); and `band`, the
+    words of a footnote band re-read with Tesseract, or None when step 4
+    finds the band among `column`."""
+
+    left: float
+    right: float
+    left_margin: tuple[Word, ...]
+    right_margin: tuple[Word, ...]
+    left_cut_in: tuple[Word, ...]
+    right_cut_in: tuple[Word, ...]
+    column: tuple[Word, ...]
+    left_zones: tuple[tuple[float, float], ...]
+    right_zones: tuple[tuple[float, float], ...]
+    band: tuple[Word, ...] | None
+
+
+def _page_parts(
     words: tuple[Word, ...], page_index: int, measures: BookMeasures
-) -> tuple[Region, ...]:
-    """The regions of a page of `words`, which are not empty, in reading
+) -> _PageParts:
+    """The parts of a page of `words` (steps 1, 2 and 2b)."""
+    split = split_at_column(words, page_index, measures)
+    column_words = without_cut_in_notes(split, measures)
+    return _PageParts(
+        left=split.left,
+        right=split.right,
+        left_margin=split.left_margin,
+        right_margin=split.right_margin,
+        left_cut_in=column_words.left_cut_in,
+        right_cut_in=column_words.right_cut_in,
+        column=column_words.column,
+        left_zones=column_words.left_zones,
+        right_zones=column_words.right_zones,
+        band=None,
+    )
+
+
+def _regions_of_parts(parts: _PageParts, measures: BookMeasures) -> tuple[Region, ...]:
+    """The regions of a page whose words are placed as `parts`, in reading
     order (layout spec section 3): the running-head region, the body's
     regions, the margin regions by their top, the left side first, and the
     band's regions."""
     pitch = measures.body_line_pitch
-    split = split_at_column(words, page_index, measures)
-    column_words = without_cut_in_notes(split, measures)
-    column = column_words.column
     upper, band = _column_regions_with_drop_capitals(
-        column,
+        parts.column,
         frozenset(
             index
-            for index, word in enumerate(column)
-            if _is_drop_capital(word, split.left, measures)
+            for index, word in enumerate(parts.column)
+            if _is_drop_capital(word, parts.left, measures)
         ),
-        split.left,
+        parts.left,
         measures,
+        parts.band,
     )
     # The cut-in notes' words are grouped apart from the outer margin notes
     # of their side, and their regions placed among them by their top.
     margin_words = (
-        (Side.LEFT, split.left_margin),
-        (Side.LEFT, column_words.left_cut_in),
-        (Side.RIGHT, split.right_margin),
-        (Side.RIGHT, column_words.right_cut_in),
+        (Side.LEFT, parts.left_margin),
+        (Side.LEFT, parts.left_cut_in),
+        (Side.RIGHT, parts.right_margin),
+        (Side.RIGHT, parts.right_cut_in),
     )
     margins = sorted(
         (
@@ -632,12 +732,21 @@ def _page_regions(
     return (*upper, *(region for _, region in margins), *band)
 
 
+def _page_regions(
+    words: tuple[Word, ...], page_index: int, measures: BookMeasures
+) -> tuple[Region, ...]:
+    """The regions of a page of `words`, which are not empty, in reading
+    order (layout spec section 3)."""
+    return _regions_of_parts(_page_parts(words, page_index, measures), measures)
+
+
 def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout:
     """The layout of one page: its regions in reading order, each its words
     grouped into lines, and its figures, copied from `page` (layout spec
     section 3). A page with no words has no region. With no `measures`,
     the page is one region holding the lines of all its words, as the
-    walking skeleton laid it out."""
+    walking skeleton laid it out. Nothing is re-read
+    (`layout_page_with_rereads` re-reads)."""
     if not page.words:
         return PageLayout(page.index, (), page.figures)
     regions = (
@@ -648,20 +757,465 @@ def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout:
     return PageLayout(page.index, regions, page.figures)
 
 
+# Re-reading small print (docs/specs/reocr.md, sections 3 and 4).
+
+
+class ReadLines(Protocol):
+    """Tesseract run on an image: its words grouped by its lines, with
+    boxes in points on the page, as `ocr.read_image_lines` gives them."""
+
+    def __call__(
+        self, image: Image.Image, *, origin: tuple[float, float], psm: int
+    ) -> tuple[tuple[Word, ...], ...]:
+        """The words of `image`, a crop of a page rendered at `OCR_DPI`
+        whose top left lies at `origin`, (left, top) in points on the page,
+        read with page segmentation mode `psm`."""
+        ...
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Rereading:
+    """What layout needs to re-read a page's small print with Tesseract
+    (reocr spec, sections 3, 4 and 6).
+
+    `render` gives the page of a page index rendered whole at `OCR_DPI`, a
+    grayscale Pillow image; `read_lines` runs Tesseract on a crop of it.
+    `lower_case_words` is the word list of the book's language in lower
+    case, for the reading scores. `margin_note_sides` are the sides of the
+    book whose outer margins hold notes (`margin_note_sides` of the book's
+    pages), and `footnote_bands` whether each page's footnote band is read
+    too (the config's `reread_footnotes`).
+    """
+
+    render: Callable[[int], Image.Image]
+    read_lines: ReadLines
+    lower_case_words: frozenset[str]
+    margin_note_sides: frozenset[Side]
+    footnote_bands: bool
+
+
+def _words_of_lines(lines: tuple[tuple[Word, ...], ...]) -> tuple[Word, ...]:
+    return tuple(word for line in lines for word in line)
+
+
+def _read_crop(
+    image: Image.Image, pixels: tuple[int, int, int, int], psm: int, read: ReadLines
+) -> tuple[tuple[Word, ...], ...]:
+    """Tesseract's lines of the crop `pixels` of `image`, a page rendered at
+    `OCR_DPI`, cut to the image's edges; no line when nothing is left of
+    the crop."""
+    width, height = image.size
+    left, top = max(0, pixels[0]), max(0, pixels[1])
+    right, bottom = min(width, pixels[2]), min(height, pixels[3])
+    if right <= left or bottom <= top:
+        return ()
+    scale = POINTS_PER_INCH / OCR_DPI
+    return read(
+        image.crop((left, top, right, bottom)),
+        origin=(left * scale, top * scale),
+        psm=psm,
+    )
+
+
+def _head_words(column: tuple[Word, ...], measures: BookMeasures) -> tuple[Word, ...]:
+    """The words of the running-head region of a column of `column`'s words
+    (step 3)."""
+    rows = group_rows(column)
+    head_count = running_head_row_count(rows, measures.body_line_pitch)
+    return _words_of(rows[:head_count])
+
+
+def _layer_band_words(parts: _PageParts, measures: BookMeasures) -> tuple[Word, ...]:
+    """The words of the footnote band that step 4 finds among the column's
+    words of `parts`, in the order of its rows."""
+    _, band = _column_regions_with_drop_capitals(
+        parts.column,
+        frozenset(
+            index
+            for index, word in enumerate(parts.column)
+            if _is_drop_capital(word, parts.left, measures)
+        ),
+        parts.left,
+        measures,
+        None,
+    )
+    return tuple(word for region in band for word in _words_of(region.lines))
+
+
+def _margin_readings(
+    page: PageWords,
+    parts: _PageParts,
+    image: Image.Image,
+    rereading: Rereading,
+) -> tuple[RegionReading, ...]:
+    """The note bands of the outer margins of `page` on the book's sides
+    with margin notes, each read (reocr spec, section 3, kind 2)."""
+    column = (*parts.column, *parts.left_cut_in, *parts.right_cut_in)
+    if not column:
+        return ()
+    page_width = image.size[0] * POINTS_PER_INCH / OCR_DPI
+    readings = []
+    for side in sorted(rereading.margin_note_sides):
+        strip = margin_strip(
+            side,
+            left=parts.left,
+            right=parts.right,
+            column_top=min(word.box.top for word in column),
+            lowest=max(word.box.bottom for word in page.words),
+            page_width=page_width,
+        )
+        strip_pixels = pixel_box(strip, OCR_DPI)
+        width, height = image.size
+        strip_left, strip_top = max(0, strip_pixels[0]), max(0, strip_pixels[1])
+        strip_right = min(width, strip_pixels[2])
+        strip_bottom = min(height, strip_pixels[3])
+        if strip_right <= strip_left or strip_bottom <= strip_top:
+            continue
+        strip_image = image.crop((strip_left, strip_top, strip_right, strip_bottom))
+        for band in note_bands(strip_image, dpi=OCR_DPI):
+            band_pixels = (
+                strip_left + band[0],
+                strip_top + band[1],
+                strip_left + band[2],
+                strip_top + band[3],
+            )
+            readings.append(
+                margin_note_reading(
+                    side,
+                    point_box(band_pixels, origin=(0.0, 0.0), dpi=OCR_DPI),
+                    _words_of_lines(
+                        _read_crop(image, band_pixels, NOTE_PSM, rereading.read_lines)
+                    ),
+                    page_words=page.words,
+                )
+            )
+    return tuple(readings)
+
+
+def _cut_in_readings(
+    parts: _PageParts,
+    measures: BookMeasures,
+    image: Image.Image,
+    rereading: Rereading,
+    head_bottom: float | None,
+) -> tuple[RegionReading, ...]:
+    """The crops of the notes cut into the column of a page placed as
+    `parts`, each read (reocr spec, section 3, kind 3)."""
+    readings = []
+    for side, zones, edge, inset, cut_in_words in (
+        (
+            Side.LEFT,
+            parts.left_zones,
+            parts.left,
+            measures.cut_in_inset_left,
+            parts.left_cut_in,
+        ),
+        (
+            Side.RIGHT,
+            parts.right_zones,
+            parts.right,
+            measures.cut_in_inset_right,
+            parts.right_cut_in,
+        ),
+    ):
+        if inset is None or not zones:
+            continue
+        for crop in cut_in_crops(
+            zones,
+            side,
+            edge=edge,
+            inset=inset,
+            pitch=measures.body_line_pitch,
+            head_bottom=head_bottom,
+        ):
+            readings.append(
+                cut_in_reading(
+                    side,
+                    crop,
+                    _read_crop(
+                        image,
+                        pixel_box(crop.box, OCR_DPI),
+                        NOTE_PSM,
+                        rereading.read_lines,
+                    ),
+                    edge=edge,
+                    inset=inset,
+                    cut_in_words=cut_in_words,
+                    column_words=parts.column,
+                )
+            )
+    return tuple(readings)
+
+
+def _page_readings(
+    page: PageWords,
+    parts: _PageParts,
+    measures: BookMeasures,
+    rereading: Rereading,
+) -> tuple[RegionReading, ...]:
+    """The regions of `page` read with Tesseract (reocr spec, sections 3
+    and 4): the whole page below its running head when it is a small-print
+    page, and then no other region; else the note bands of its outer
+    margins, the crops of its cut-in notes and, when `rereading` asks, its
+    footnote band. The page is rendered once, and only when it has a
+    region to read."""
+    head = _head_words(parts.column, measures)
+    head_bottom = max((word.box.bottom for word in head), default=None)
+    small_print = is_small_print_page(page, measures)
+    band = (
+        _layer_band_words(parts, measures)
+        if rereading.footnote_bands and not small_print
+        else ()
+    )
+    if not (
+        small_print
+        or rereading.margin_note_sides
+        or parts.left_zones
+        or parts.right_zones
+        or band
+    ):
+        return ()
+    image = rereading.render(page.index)
+    width_pt, height_pt = (size * POINTS_PER_INCH / OCR_DPI for size in image.size)
+    if small_print:
+        crop = small_print_crop(
+            page_width=width_pt, page_height=height_pt, head_bottom=head_bottom
+        )
+        return (
+            small_print_reading(
+                crop,
+                _words_of_lines(
+                    _read_crop(
+                        image,
+                        pixel_box(crop, OCR_DPI),
+                        SMALL_PRINT_PSM,
+                        rereading.read_lines,
+                    )
+                ),
+                page_words=page.words,
+                head_words=head,
+            ),
+        )
+    footnote = ()
+    if band:
+        crop = footnote_band_crop(band, left=parts.left, right=parts.right)
+        footnote = (
+            footnote_band_reading(
+                crop,
+                _words_of_lines(
+                    _read_crop(
+                        image, pixel_box(crop, OCR_DPI), NOTE_PSM, rereading.read_lines
+                    )
+                ),
+                band_words=band,
+            ),
+        )
+    return (
+        *_margin_readings(page, parts, image, rereading),
+        *_cut_in_readings(parts, measures, image, rereading, head_bottom),
+        *footnote,
+    )
+
+
+def _take_out(
+    groups: tuple[tuple[Word, ...], ...], taken: Iterable[Word]
+) -> tuple[tuple[Word, ...], ...]:
+    """`groups` of a page's words less the words of `taken`, each taken out
+    once, from the first group that holds it."""
+    left = Counter(taken)
+    result = []
+    for group in groups:
+        kept = []
+        for word in group:
+            if left[word] > 0:
+                left[word] -= 1
+            else:
+                kept.append(word)
+        result.append(tuple(kept))
+    return tuple(result)
+
+
+def _side_of(record: Reread, parts: _PageParts) -> Side:
+    """The side of the column a margin note band or a cut-in crop lies at:
+    that of its crop's middle."""
+    middle = (record.box.x0 + record.box.x1) / 2
+    return Side.LEFT if middle < (parts.left + parts.right) / 2 else Side.RIGHT
+
+
+def _ocr_words_of(
+    kept: tuple[Reread, ...], kind: RereadKind, side: Side | None, parts: _PageParts
+) -> tuple[Word, ...]:
+    return tuple(
+        word
+        for record in kept
+        if record.kind is kind and (side is None or _side_of(record, parts) is side)
+        for word in record.ocr_words
+    )
+
+
+def _parts_after_rereads(
+    parts: _PageParts, kept: tuple[Reread, ...], measures: BookMeasures
+) -> _PageParts:
+    """The parts of a page with the kept records `kept` of its regions read
+    again (reocr spec, section 4): each record's layer words taken out of
+    the part that holds them, and its Tesseract words put into the part of
+    its kind, the side's margin words, the side's cut-in words or the
+    band, which the later steps lay out as they lay out the layer's."""
+    band_read = _ocr_words_of(kept, RereadKind.FOOTNOTE_BAND, None, parts)
+    layer_band = (
+        _layer_band_words(parts, measures)
+        if any(record.kind is RereadKind.FOOTNOTE_BAND for record in kept)
+        else ()
+    )
+    (column,) = _take_out((parts.column,), layer_band)
+    left_margin, right_margin, left_cut_in, right_cut_in, column, band = _take_out(
+        (
+            parts.left_margin,
+            parts.right_margin,
+            parts.left_cut_in,
+            parts.right_cut_in,
+            column,
+            layer_band,
+        ),
+        (word for record in kept for word in record.layer_words),
+    )
+    return replace(
+        parts,
+        left_margin=(
+            *left_margin,
+            *_ocr_words_of(kept, RereadKind.MARGIN_NOTE, Side.LEFT, parts),
+        ),
+        right_margin=(
+            *right_margin,
+            *_ocr_words_of(kept, RereadKind.MARGIN_NOTE, Side.RIGHT, parts),
+        ),
+        left_cut_in=(
+            *left_cut_in,
+            *_ocr_words_of(kept, RereadKind.CUT_IN_NOTE, Side.LEFT, parts),
+        ),
+        right_cut_in=(
+            *right_cut_in,
+            *_ocr_words_of(kept, RereadKind.CUT_IN_NOTE, Side.RIGHT, parts),
+        ),
+        column=column,
+        band=(*band, *band_read) if layer_band else None,
+    )
+
+
+def layout_page_with_rereads(
+    page: PageWords, measures: BookMeasures | None, rereading: Rereading | None
+) -> tuple[PageLayout, tuple[Reread, ...]]:
+    """The layout of one page, as `layout_page` gives it, with its small
+    print re-read with Tesseract (reocr spec, sections 3 and 4), and the
+    records of the regions read, in their order.
+
+    Nothing is read, and the layout is `layout_page`'s, when `rereading`
+    or `measures` is None, or the page's words are not the text layer's.
+    Each region is found on the layer's words, read, and kept or not by
+    `page_rereads`. A small-print page whose reading is kept is laid out
+    from its words after the record (`model.words_after_rereads`), by
+    steps 1 to 7; on another page, each kept region's Tesseract words go
+    into the part the replaced words were in, and the later steps lay
+    them out.
+    """
+    if (
+        rereading is None
+        or measures is None
+        or not page.words
+        or page.text_source is not TextSource.TEXT_LAYER
+    ):
+        return layout_page(page, measures), ()
+    parts = _page_parts(page.words, page.index, measures)
+    records = page_rereads(
+        page.index,
+        _page_readings(page, parts, measures, rereading),
+        rereading.lower_case_words,
+    )
+    kept = tuple(record for record in records if record.kept)
+    if not kept:
+        return layout_page(page, measures), records
+    if kept[0].kind is RereadKind.SMALL_PRINT_PAGE:
+        regions = _page_regions(
+            words_after_rereads(page.words, kept), page.index, measures
+        )
+    else:
+        regions = _regions_of_parts(
+            _parts_after_rereads(parts, kept, measures), measures
+        )
+    return PageLayout(page.index, regions, page.figures), records
+
+
+def _rendered_image(pdf: Path, page_index: int) -> Image.Image:
+    """Page `page_index` of `pdf` rendered at `OCR_DPI` by the PDFium
+    thread, as a grayscale Pillow image."""
+    rendered = pdfium.render(pdf, page_index, OCR_DPI)
+    return Image.frombytes(
+        "L", (rendered.width_px, rendered.height_px), rendered.pixels
+    )
+
+
+def _rereading(
+    config: BookConfig,
+    words: WordsFile,
+    measures: BookMeasures | None,
+    workers: int,
+) -> Rereading | None:
+    """What layout needs to re-read the small print of the book of `words`;
+    None when the config's `ocr` is not `verify` (reocr spec, section 3) or
+    the book has no measures."""
+    if config.ocr is not OcrMode.VERIFY or measures is None:
+        return None
+    lower_case_words = wordlist.lower_case_word_list(
+        config.language, wordlist.DEFAULT_CACHE_DIR
+    )
+    language = tesseract_language(config.language)
+
+    def split(page: PageWords) -> tuple[int, ColumnSplit]:
+        return len(page.words), split_at_column(page.words, page.index, measures)
+
+    def render(page_index: int) -> Image.Image:
+        return _rendered_image(config.pdf, page_index)
+
+    def read_lines(
+        image: Image.Image, *, origin: tuple[float, float], psm: int
+    ) -> tuple[tuple[Word, ...], ...]:
+        return read_image_lines(
+            image, origin=origin, dpi=OCR_DPI, psm=psm, language=language
+        )
+
+    return Rereading(
+        render=render,
+        read_lines=read_lines,
+        lower_case_words=lower_case_words,
+        margin_note_sides=margin_note_sides(
+            map_pages(
+                split, tuple(page for page in words.pages if page.words), workers
+            ),
+            lower_case_words,
+        ),
+        footnote_bands=config.reread_footnotes,
+    )
+
+
 def run(
     folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS
 ) -> None:
-    """Reads pages.json and words.json from `folder`, measures the book and
-    lays out every page in `workers` threads, and writes lines.json.
+    """Reads pages.json and words.json from `folder`, measures the book,
+    lays out every page in `workers` threads, re-reading its small print
+    with Tesseract unless the config's `ocr` is `trust` or `redo`, and
+    writes lines.json with the records of the regions read.
 
-    lines.json and every later stage's file (blocks.json, book.md,
-    book.epub) are deleted first. pages.json must have been made from
-    `config.pdf` and words.json from the same PDF, or InputFileError names
-    the stage to run again. When the words of lines.json are not those of
-    words.json, FidelityError is raised and nothing is written.
+    Only text pages whose words are the text layer's are re-read (reocr
+    spec, section 3); a render is made in the one PDFium thread, and
+    Tesseract runs in the worker threads. lines.json and every later
+    stage's file (blocks.json, book.md, book.epub) are deleted first.
+    pages.json must have been made from `config.pdf` and words.json from
+    the same PDF, or InputFileError names the stage to run again. When the
+    words of lines.json are not those of words.json after the kept
+    records, FidelityError is raised and nothing is written.
     """
     delete_stage_outputs(folder, Stage.LAYOUT)
-    _, words = read_checked_input(
+    pages, words = read_checked_input(
         folder.pages_json, config.pdf, folder.words_json, read_words
     )
     measures = measure_book(words, workers=workers)
@@ -672,23 +1226,38 @@ def run(
         )
     else:
         _logger.info("layout: the book's measures, in points: %s", measures)
+    rereading = _rereading(config, words, measures, workers)
+    if rereading is not None:
+        _logger.info(
+            "layout: re-reading small print; outer margin notes on the sides %s",
+            ", ".join(sorted(rereading.margin_note_sides)) or "none",
+        )
+    readable = frozenset(
+        page.index
+        for page in pages.pages
+        if page.kind is PageKind.TEXT and page.text_source is TextSource.TEXT_LAYER
+    )
 
-    def lay_out(page: PageWords) -> PageLayout:
-        return layout_page(page, measures)
+    def lay_out(page: PageWords) -> tuple[PageLayout, tuple[Reread, ...]]:
+        return layout_page_with_rereads(
+            page, measures, rereading if page.index in readable else None
+        )
 
+    laid_out = map_pages(lay_out, words.pages, workers)
     lines = LinesFile(
         source_pdf_sha256=words.source_pdf_sha256,
-        pages=map_pages(lay_out, words.pages, workers),
-        # Nothing is re-read yet: the reocr spec's re-reading comes with
-        # work package 5 of the plan clean-text.
-        rereads=(),
+        pages=tuple(page for page, _ in laid_out),
+        rereads=tuple(record for _, records in laid_out for record in records),
     )
     check_stage(FidelityBoundary.LAYOUT, words, lines)
     write_lines(folder.lines_json, lines)
     _logger.info(
-        "layout: %d pages, %d regions, %d lines written to %s",
+        "layout: %d pages, %d regions, %d lines written to %s; "
+        "%d regions re-read, %d of them kept",
         len(lines.pages),
         sum(len(page.regions) for page in lines.pages),
         sum(len(region.lines) for page in lines.pages for region in page.regions),
         folder.lines_json,
+        len(lines.rereads),
+        sum(record.kept for record in lines.rereads),
     )
