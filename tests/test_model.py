@@ -1868,6 +1868,15 @@ def test_layer_word_of_letters_less_alike_than_0_6_stays() -> None:
     )
 
 
+def test_layer_word_of_3_letters_alike_is_replaced_and_one_of_2_stays() -> None:
+    # "tbe" and "the" have a ratio of 0.67, "th" and "the" of 0.8; rule (c)
+    # takes words of 3 letters or more.
+    three = (_layer("tbe", 10, 110),)
+    assert model.replaced_layer_words(three, (_tesseract("the", 10, 100),)) == three
+    two = (_layer("th", 10, 110),)
+    assert model.replaced_layer_words(two, (_tesseract("the", 10, 100),)) == ()
+
+
 def test_layer_number_of_other_digits_beside_an_ocr_number_stays() -> None:
     # A list number Tesseract did not read (Gierke page 79).
     layer = (_layer("131.", 10, 114),)
