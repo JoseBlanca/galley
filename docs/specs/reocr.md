@@ -443,7 +443,14 @@ the others stay in the layer. A layer word is that word when
   A Tesseract word is matched in (a) by a layer word of its text under
   it; in (b) the pairs of a layer word and a Tesseract word of the same
   text are taken nearest first (the distance of their middles across
-  plus up or down), each word in one pair at most.
+  plus up or down), each word in one pair at most; or else
+- (c) it has 3 letters or more, and its letters, case-folded, are alike
+  to those of one of the Tesseract words whose middle lies within 16 pt
+  above or below its own and that (a) and (b) left unmatched: difflib's
+  `SequenceMatcher` ratio of the two strings of letters is 0.6 or more.
+  The pairs are taken nearest first, as in (b), each word in one pair at
+  most. A word of fewer than 3 letters, a number among them, needs (a)
+  or (b).
 
 A printed word that Tesseract did not read, or whose reading a filter
 dropped (a cut-in line at the inset, a word over a body word, a word
@@ -480,6 +487,28 @@ hand-made cases of the first code review, a cut-in note's second line
 "wcnt nortb", whose Tesseract line was dropped at the inset, and "Sce
 Stnbbs" of a footnote band, whose Tesseract words lay inside an earlier
 cut-in crop (owner, 17 November 2026).
+
+Rule (c) takes the layer's garbled copies of a word Tesseract read:
+the layer reads a note line a few points off the ink and spells it
+otherwise ("fllght'" for "flight.", Domesday page 76; "mentofhis" for
+"ment of his", Stubbs page 59). Without it, counting a kept margin-note
+record when a layer word of 3 letters and digits or more that it left
+lies in its band (within 12 pt, and within 2 pt of its crop across) and
+has a ratio of 0.6 or more to one of its Tesseract words within 16 pt,
+38 of Domesday's 421 kept records and 15 of Gierke's 417 left one (17
+November 2026); with it, none of Domesday's and 2 of Gierke's, both
+numbers ("131." beside "130.", a list number Tesseract did not read, page
+79; "147", page 63). The threshold was set on those 53 words and on the
+pairs below it: from 0.5 to 0.6 lie 10 more copies ("sey'" for
+"Chertsey.", Domesday page 517; "chy'" for "Monarchy.", Gierke page 115)
+but also 4 body words at the column's edge that are no copy ("for"
+beside "lord", Domesday page 310; "its" beside "isms.", Gierke page
+114; "their" beside "Ethics.", page 270; "has", Domesday page 120);
+those 10 copies stay, 7 of Domesday's records and 3 of Gierke's. Of the
+58 words (c) replaces on the four books, 10 checked on the page images
+(Domesday pages 22, 112, 215, 286, 319, 390, 528, 548; Gierke 183;
+Stubbs 59) were each a second reading of a printed word that
+Tesseract's reading holds.
 
 **Each word of the layer is replaced by one record at most**: a word
 already among the replaced words of a kept region of its page is not
@@ -729,6 +758,11 @@ the extract change, Stubbs' index error rate was 1.543.
   line lies 10 pt off Tesseract's, of the same text, is replaced; one
   more than 16 pt off is not; a layer word read twice, once over
   Tesseract's word and once off it, is replaced once.
+  A layer word 6 pt below Tesseract's of alike letters ("fllght'"
+  under "flight.") is replaced; one whose ratio is below 0.6 ("for"
+  beside "lord") is not; a number of other digits ("131." beside
+  "130.") is not; two alike layer words and one Tesseract word: the
+  nearer is replaced.
 - A config with `reread_footnotes = true`, and one with a string there,
   an error.
 
@@ -753,8 +787,10 @@ skips, saying so, on another version:
 - `stubbs_51_56-64`: every cut-in note of the excerpt, as kept; and
   every word of the column that is not a cut-in word of layout, in rows
   outside the zones and right of the inset alike, in the same line as
-  in the run without re-reading. A word layout itself takes into a
-  note ("advUers.", page 62) is a note word in both runs.
+  in the run without re-reading. "advUers.", the layer's reading of
+  the note "advisers." (page 62), ends a body line in both runs, kept in
+  the body by layout's 5 pt guard (layout §3, step 2b), and the crop
+  that reads the note's "Henry's" there is not kept.
 - `stubbs_summaries_index`: no page is a small-print page in the
   excerpt (see above); its index pages are tested on the whole book.
 - `domesday_74-83`: the margin notes of two pages, one of which the

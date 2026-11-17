@@ -663,8 +663,11 @@ lists the words, with the pages they came from where the origins say.
   printed word as one of the record's `ocr_words`: its middle inside the
   box of one of them widened by 2 pt up and down and 1 pt across, or its letters and digits equal to
   those of the nearest one within 16 pt above or below that no other
-  layer word matched (`model.replaced_layer_words`, `docs/specs/reocr.md`
-  §4); structure,
+  layer word matched, or, for a word of 3 letters or more, its letters
+  alike to those of the nearest one within 16 pt that neither rule
+  matched (difflib's ratio 0.6 or more: the layer's garbled copy of a
+  word Tesseract read) (`model.replaced_layer_words`,
+  `docs/specs/reocr.md` §4); structure,
   lines.json against blocks.json (the text of every body and note block,
   with a note's `marker` and a heading's `label` counted as words of
   it); markdown, blocks.json
