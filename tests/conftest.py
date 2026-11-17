@@ -289,6 +289,15 @@ def excerpt_books(
 
 
 @pytest.fixture(scope="session")
+def samples_dir() -> Path:
+    """The samples folder, where the owner's own PDFs sit, for whole_book
+    tests: GALLEY_SAMPLES, or samples/ of the main checkout. It does not
+    skip; a test that needs a PDF in it skips when the PDF is absent."""
+    env = os.environ.get("GALLEY_SAMPLES")
+    return Path(env) if env is not None and env != "" else _main_checkout_samples()
+
+
+@pytest.fixture(scope="session")
 def books_dir() -> Path:
     """The directory of the whole public-domain books, for whole_book tests.
 
