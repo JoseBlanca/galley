@@ -422,7 +422,10 @@ page_numbers)`:
   joined word. `hyphen_join_guessed`: the same, when neither holds it
   (structure §5), recorded so that the guessed joins can be reviewed.
   `hyphen_kept`: ("Anglo-", "Saxon") becomes ("Anglo-Saxon",), a
-  compound the book prints with its hyphen. `note_marker`: ("Greece,1",)
+  compound the book prints with its hyphen. `hyphen_lost`: ("move.",
+  "ment,") becomes ("movement,",), two parts of a word in a margin note
+  whose line-end hyphen the OCR dropped or read as "." (structure §5).
+  `note_marker`: ("Greece,1",)
   becomes ("Greece,", "1"), the "1" going to the note reference. A spec
   adds a reason when it needs one.
 - `PageNumber`: `page_index`, `text`, `position: head | foot`.

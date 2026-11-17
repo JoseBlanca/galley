@@ -540,6 +540,53 @@ first join's word as its first word ("pre-" "Anglo-" then "preAnglo-"
 "Saxon"), and the fidelity check, which undoes every change, still
 balances.
 
+**A hyphen lost in a margin note.** In a margin note the OCR often
+drops the line-end hyphen or reads it as a full stop, and the two parts
+of the word stay apart in the EPUB: "nation" "al" and "unfree" "dom"
+(Domesday pages 77 and 75), "move." "ment," (Gierke page 88) and
+"posi." "tion" (Stubbs page 58), all four checked by the owner on the
+page images on 17 November 2026. Within a margin-note block, the last
+word of a line that does not end with a hyphen is joined with the first
+word of the next line when all of these hold:
+
+- the first word ends with a letter, or with a letter and one full stop
+  (the hyphen read "."), and has 2 letters or more without the stop;
+- the second word starts with a lower-case letter;
+- the joined word, the first without its stop followed by the second,
+  has a key in the word list (with 2 letters or more in the second
+  word, as for `hyphen_join`) or among the book's own words;
+- the second word is a fragment: its key is printed after the first
+  word of a line of `lines.json` at most 8 times in the whole book. A
+  word printed whole is printed inside lines too; "ment", "tion" and
+  "dom" are not.
+
+The join is a `WordChange` of the reason `hyphen_lost`, whose `before`
+is the two words as the OCR has them and `after` the joined word, on
+the page of the first: ("move.", "ment,") becomes ("movement,",). The
+full stop the join drops is in `before`, so the fidelity check, which
+undoes every change, finds it; and it checks that the change does no
+more: the first word, less one final ".", followed by the second, is
+the joined word. Tried after `join_hyphen`, which a line ending with a
+hyphen goes to.
+
+Measured on 17 November 2026 on the lines of whole Stubbs, Domesday and
+Gierke (galley at 89ed733), counting every pair of lines in a block
+whose joined word is in the word list or among the book's own words.
+The word list holds fragments and joins ("ment", "tion", "al", "dom",
+and "ofthe"), so it cannot tell a fragment; the count of the second
+word inside lines does. In margin notes the right joins have a second
+word printed inside lines 0 to 5 times ("al" 5, "nation" "al", Domesday
+page 77) and 9 times ("length" "wise.", page 409); the first wrong one
+11 ("is" "defined", Gierke page 196), then "de" "facto." (12) and the
+common words ("of" "the", 7,130), each 2 printed words. With 8, the
+rule makes 32 joins in margin notes (Domesday 20, Gierke 11, Stubbs 1),
+all right by the list in `tmp/broken-word-joins.md` of the plan's
+worktree (not committed), and loses "lengthwise". In paragraphs and
+quotes the same rule would make 24 joins, of which 11 join two printed
+words ("de" "facto", "in" "spite", "stand" "alone", "well" "known",
+"an" "ally"), since a body line ends with a whole word far more often
+than a note's short line does; so the rule is for margin notes only.
+
 ## 6. Paragraphs, side text and the order of the blocks
 
 **Paragraphs.** In the body stream, a line starts a new paragraph when:
@@ -665,7 +712,7 @@ and a joined word in place of its two parts.
 | `blocks` | `paragraph` blocks, and `margin_note` blocks (section 10); `level` and `figure` `None` | `heading` blocks with `level` 1 or 2 and their chapter label in `label` (section 14); `chapter_summary` (15); `quote` and `verse` (16); `index_entry` (17); `figure` blocks with their image (18); margin notes placed before their paragraph (13) |
 | `notes` | one note per block of a band region, `referenced` false, `marker` empty (section 10) | the notes cut and marked by section 11, each with its `kind` (`footnote`, or `endnote` by section 12), `referenced` true when its reference was found, and margin notes among its blocks (13) |
 | `removals` | the running heads, page numbers, signature marks and stray marks | the guide words of an index (`guide_words`, 17); a plate's running head and stray words (`running_head`, `plate_text`, 18) |
-| `word_changes` | the hyphen joins, of the three reasons of section 5 | the `note_marker` splits of section 11 |
+| `word_changes` | the hyphen joins, of the four reasons of section 5 | the `note_marker` splits of section 11 |
 | `page_numbers` | the head and foot page numbers removed | |
 
 The lists are in a fixed order, so that the file does not depend on the
