@@ -17,7 +17,6 @@ import pytest
 
 from galley import structure, wordlist
 from galley.book_folder import BookFolder
-from galley.cli import main
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
 from galley.fidelity import check_stage
@@ -42,6 +41,7 @@ from galley.model import (
     Region,
     Removal,
     RemovalReason,
+    RereadKind,
     Span,
     TextSource,
     Word,
@@ -49,6 +49,7 @@ from galley.model import (
     block_text,
     read_blocks,
     read_lines,
+    read_words,
     write_blocks,
     write_lines,
     write_pages,
@@ -5067,36 +5068,20 @@ def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
 type WholeBookStructure = Callable[[str], tuple[LinesFile, BlocksFile]]
 
 
-def _structure_of_whole_book(
-    book_toml: str, root: Path
-) -> tuple[LinesFile, BlocksFile]:
-    folder = BookFolder(root)
-    folder.book_toml.write_text(book_toml, encoding="utf-8")
-    for stage in ("analyze", "extract", "layout", "structure"):
-        main([stage, str(root)])
-    return read_lines(folder.lines_json), read_blocks(folder.blocks_json)
-
-
 @pytest.fixture(scope="module")
 def whole_book_structure(
-    whole_book_toml: frozendict[str, str], tmp_path_factory: pytest.TempPathFactory
+    whole_book_run: Callable[[str], BookFolder],
 ) -> WholeBookStructure:
     """A function that gives lines.json and blocks.json of a whole book, by
-    Internet Archive identifier, made by analyze, extract, layout and
-    structure the first time a test of this module asks for the book and
-    kept for the others, so that the module's whole_book tests run the
-    stages once per book. Books may be asked for from several threads at
-    once."""
-    # The folders are made here, in one thread: pytest's tmp_path_factory
-    # is not thread-safe, and its first mktemp from 6 threads at once
-    # raised ValueError (17 November 2026).
-    roots = frozendict(
-        {book: tmp_path_factory.mktemp(book) for book in whole_book_toml}
-    )
+    Internet Archive identifier, from the session's run of the book
+    (tests/conftest.py), read the first time a test of this module asks
+    for the book and kept for the others. Books may be asked for from
+    several threads at once."""
 
     @functools.cache
     def structure_of(book: str) -> tuple[LinesFile, BlocksFile]:
-        return _structure_of_whole_book(whole_book_toml[book], roots[book])
+        folder = whole_book_run(book)
+        return read_lines(folder.lines_json), read_blocks(folder.blocks_json)
 
     return structure_of
 
@@ -5757,6 +5742,65 @@ def test_whole_book_stubbs_guide_words_on_each_of_its_ten_index_pages(
     # it is replaced too (reocr spec, section 4); no note on the index pages.
     assert sum(block.kind is BlockKind.INDEX_ENTRY for block in blocks.blocks) == 935
     assert not any(312 <= note.origin[0].page_index <= 321 for note in blocks.notes)
+
+
+@pytest.mark.whole_book
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_whole_stubbs_index_pages_312_to_321_are_read_whole_and_kept(
+    whole_book_run: Callable[[str], BookFolder],
+    whole_book_structure: WholeBookStructure,
+) -> None:
+    # Reocr spec, section 3, kind 1, and section 9, "Whole-book tests": the
+    # ten index pages are small-print pages of the whole book, read whole
+    # below their running heads and kept. The running head keeps the
+    # layer's words. Page 312's entry "Acre, siege of, 116; the English at,
+    # 118;" has both ";" (Tesseract read "116 ;"), and structure cuts it in
+    # two after the first. Its guide words, and the book's 935 index
+    # entries, are tested above (test_whole_book_stubbs_guide_words_on_
+    # each_of_its_ten_index_pages).
+    words = read_words(whole_book_run("earlyplantagenet01stub").words_json)
+    lines, blocks = whole_book_structure("earlyplantagenet01stub")
+    index_records = tuple(
+        record for record in lines.rereads if 312 <= record.page_index <= 321
+    )
+    assert tuple(
+        (record.page_index, record.kind, record.kept) for record in index_records
+    ) == tuple((page, RereadKind.SMALL_PRINT_PAGE, True) for page in range(312, 322))
+    for record in index_records:
+        head = tuple(
+            word
+            for word in words.pages[record.page_index].words
+            if word.box.bottom <= record.box.top
+        )
+        laid_out = {
+            word
+            for region in lines.pages[record.page_index].regions
+            for line in region.lines
+            for word in line.words
+        }
+        assert "index." in {word.text.casefold() for word in head}, record.page_index
+        assert not set(head) & set(record.layer_words), record.page_index
+        assert set(head) <= laid_out, record.page_index
+    assert any(
+        "Acre, siege of, 116 ; the English"
+        in " ".join(word.text for word in line.words)
+        for region in lines.pages[312].regions
+        for line in region.lines
+    )
+    entries = tuple(
+        block_text(block)
+        for block in blocks.blocks
+        if block.kind is BlockKind.INDEX_ENTRY and block.origin[0].page_index == 312
+    )
+    acre = next(
+        position
+        for position, entry in enumerate(entries)
+        if entry.endswith("Acre, siege of, 116 ;")
+    )
+    assert entries[acre + 1] == "the English at, 118;"
 
 
 def test_index_entr_sub_entries_cut_after_each_semicolon_inside_a_line() -> None:

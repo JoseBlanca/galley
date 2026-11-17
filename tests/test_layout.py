@@ -20,7 +20,6 @@ from PIL import Image, ImageDraw
 
 from galley import layout, wordlist
 from galley.book_folder import BookFolder
-from galley.cli import main
 from galley.config import BookConfig, Language, OcrMode, read_config
 from galley.errors import (
     ExternalProgramError,
@@ -1916,17 +1915,6 @@ def test_run_that_loses_a_word_raises_and_writes_no_lines_json(
 _EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 
 
-def _layout_of_whole_book(book_toml: str, root: Path) -> tuple[WordsFile, LinesFile]:
-    """The words and lines of the book whose `book.toml` is `book_toml`,
-    from analyze, extract and layout run by galley2epub on a book folder at
-    `root`."""
-    folder = BookFolder(root)
-    folder.book_toml.write_text(book_toml, encoding="utf-8")
-    for stage in ("analyze", "extract", "layout"):
-        main([stage, str(root)])
-    return read_words(folder.words_json), read_lines(folder.lines_json)
-
-
 def _assert_laid_out_in_regions(words: WordsFile, lines: LinesFile) -> None:
     """The fidelity check passes; each page's words, with their boxes, are
     those of the same page in words.json after the page's kept re-readings
@@ -2313,7 +2301,13 @@ def test_reread_haskins_excerpt_by_default_reads_only_its_index_page(
     )
 
 
+# The whole books (reocr spec, section 9, "Whole-book tests"), from the
+# session's run of each (tests/conftest.py), whose layout re-reads with 6
+# workers.
+
+
 @pytest.mark.whole_book
+@pytest.mark.tesseract
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 @pytest.mark.parametrize(
@@ -2327,9 +2321,25 @@ def test_reread_haskins_excerpt_by_default_reads_only_its_index_page(
         "politicaltheorie00gieruoft",
     ],
 )
-def test_layout_of_a_whole_book_keeps_every_word(
-    book: str, whole_book_toml: frozendict[str, str], tmp_path: Path
+def test_layout_of_a_whole_book_with_rereading_keeps_every_word(
+    book: str, whole_book_run: Callable[[str], BookFolder]
 ) -> None:
     # The configs of the six books are those of tests/conftest.py.
-    words, lines = _layout_of_whole_book(whole_book_toml[book], tmp_path)
-    _assert_laid_out_in_regions(words, lines)
+    folder = whole_book_run(book)
+    _assert_laid_out_in_regions(
+        read_words(folder.words_json), read_lines(folder.lines_json)
+    )
+
+
+@pytest.mark.whole_book
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+def test_reread_whole_stubbs_with_1_worker_and_with_6_writes_the_same_bytes(
+    whole_book_run: Callable[[str], BookFolder], tmp_path: Path
+) -> None:
+    # The session's run laid Stubbs out with 6 workers; this one takes 1.
+    folder = whole_book_run("earlyplantagenet01stub")
+    one = _layout_again(folder, tmp_path, _unchanged, 1)
+    assert len(read_lines(one.lines_json).rereads) > 300
+    assert one.lines_json.read_bytes() == folder.lines_json.read_bytes()

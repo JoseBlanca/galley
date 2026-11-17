@@ -8,9 +8,11 @@ common git directory. `scripts/fetch_samples.py` downloads them.
 
 `excerpt_books` runs `galley2epub run` once per session on a book folder
 for each excerpt, so that the excerpt tests of every stage read the files of
-one run.
+one run; `whole_book_run` does the same for the whole books, up to
+structure, the first time a test asks for a book.
 """
 
+import functools
 import json
 import os
 import shutil
@@ -298,6 +300,45 @@ def whole_book_toml(
             for book, toml in whole_book_configs.items()
         }
     )
+
+
+# The workers of layout in the whole-book runs: the number of reocr spec
+# section 7's timings and of its test that 1 worker and 6 give the same
+# bytes, whatever the machine's default.
+_WHOLE_BOOK_LAYOUT_WORKERS = 6
+
+
+@pytest.fixture(scope="session")
+def whole_book_run(
+    whole_book_toml: frozendict[str, str], tmp_path_factory: pytest.TempPathFactory
+) -> Callable[[str], BookFolder]:
+    """A function that gives the book folder of a whole book, by Internet
+    Archive identifier, with the files analyze, extract, layout (with 6
+    workers) and structure wrote in it, run the
+    first time a test asks for the book and kept for the session, so that
+    every stage's whole_book tests share one run per book: layout re-reads
+    Domesday and Gierke for about a minute each. Books may be asked for
+    from several threads at once. A test reads these folders and never
+    writes in them."""
+    # The folders are made here, in one thread: pytest's tmp_path_factory
+    # is not thread-safe, and its first mktemp from 6 threads at once
+    # raised ValueError (17 November 2026).
+    roots = frozendict(
+        {book: tmp_path_factory.mktemp(book) for book in whole_book_toml}
+    )
+
+    @functools.cache
+    def run(book: str) -> BookFolder:
+        folder = BookFolder(roots[book])
+        folder.book_toml.write_text(whole_book_toml[book], encoding="utf-8")
+        root = str(folder.root)
+        main(["analyze", root])
+        main(["extract", root])
+        main(["layout", "--workers", str(_WHOLE_BOOK_LAYOUT_WORKERS), root])
+        main(["structure", root])
+        return folder
+
+    return run
 
 
 @pytest.fixture(scope="session")
