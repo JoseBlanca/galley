@@ -498,8 +498,9 @@ the others stay in the layer. A layer word is that word when
   joined, each with its middle inside the layer word's box widened by
   1 pt: a word the layer glued, "of,96" where Tesseract read "of,"
   "96" (Stubbs' index, page 312; 5 such words on its pages 312 to 321
-  stayed beside Tesseract's two, which read them twice). It is matched
-  in (a) too, whatever the texts, when the Tesseract words whose middles
+  stayed beside Tesseract's two, which read them twice). A layer word
+  that is not a known word is matched in (a) too, whatever the texts,
+  when the Tesseract words whose middles
   lie inside its box widened by 1 pt, among those with no layer word
   under them, are two or three that follow each other in Tesseract's
   order and overlap each other up and down, words of one printed line:
@@ -508,10 +509,19 @@ the others stay in the layer. A layer word is that word when
   267, printed "10 f.," and "164 ff.;"). Without this, keeping
   Tesseract's reading of that page read the two twice. Measured on whole
   Stubbs, Domesday, Haskins and Gierke on 17 November 2026, with the
-  rule of a tie of section 3 as before: it replaces 3 more layer words,
-  each the layer's glued misreading of Tesseract's words ("II.,282",
-  Stubbs page 320; "Devonshire,", Domesday page 547; "Godofali" for "God
-  of ail", Gierke page 224). Without the one line, Domesday's
+  rule of a tie of section 3 as before, it replaced 3 more layer words:
+  "II.,282" (Stubbs page 320) and "Godofali" for "God of ail" (Gierke
+  page 224), the layer's glued misreadings of Tesseract's words, and
+  "Devonshire," (Domesday page 547), printed so, which Tesseract read as
+  the junk "a" and "aa" (confidences 28 and 27): a printed word lost.
+  Hence the layer word must not be a known word as printed: a known
+  word (section 1) that holds nothing but letters, digits, apostrophes
+  and hyphens once the marks . , ; : ! ? ( ) and quotation marks are
+  stripped from its ends. The layer's misreadings are not ("lo/.,",
+  whose key "lo" is in the word list, keeps its "/"; "164Jf.;",
+  "II.,282", "Godofali"), and a printed word the layer read rightly
+  mostly is. The fidelity check, which has no word list, takes every
+  layer word as unknown, and so accepts every match layout makes. Without the one line, Domesday's
   "fromdfeam" took Tesseract's "from" "teann-" and the "land." of the
   line below, and the layer's "land." was read twice (page 475); or else
 - (b) its letters and digits, case-folded and not empty, equal those of
