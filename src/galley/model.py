@@ -254,7 +254,8 @@ class Reread:
     lines.json in place of `layer_words`; otherwise the record changes
     nothing. `dropped_junk_count` is the number of Tesseract's words of no
     letter or digit, not punctuation or a sign the books print, dropped
-    before `ocr_words` (reocr spec, section 4).
+    before `ocr_words`, and of its words stripped of an underscore at
+    either end ("_and" is "and" in `ocr_words`; reocr spec, section 4).
     """
 
     page_index: int

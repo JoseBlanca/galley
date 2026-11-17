@@ -21,7 +21,7 @@ except where a name or a docstring says pixels.
 
 import math
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final, assert_never
 
 from PIL import Image
@@ -685,6 +685,16 @@ def footnote_band_reading(
 _PRINTED_SIGNS: Final[frozenset[str]] = frozenset(".,;:!?'\"‘’“”()[]-–—§&£$%*†‡¶/")
 
 
+# An underscore at either end of a Tesseract word is junk glued to it
+# (reocr spec, section 4): "_and" on Gierke page 88; no book prints one.
+_GLUED_JUNK: Final[str] = "_"
+
+
+def _without_glued_junk(word: Word) -> Word:
+    """`word`, Tesseract's, without the underscores at its ends."""
+    return replace(word, text=word.text.strip(_GLUED_JUNK))
+
+
 def _is_junk(text: str) -> bool:
     """Whether `text`, a word of Tesseract's, is junk: it has no letter or
     digit and a character that is not punctuation or a printed sign."""
@@ -771,7 +781,9 @@ def page_rereads(
     same top, then the cut-in crops likewise, then the footnote band.
 
     Tesseract's junk, a word of no letter or digit that is not punctuation
-    or a printed sign, is dropped first and counted in the record. The
+    or a printed sign, is dropped first and counted in the record, and so
+    are the underscores at the ends of a word, each word stripped counted
+    once. The
     regions are taken in that order. A word of Tesseract's whose middle
     lies inside the crop of an earlier kept region is dropped, and so is
     one that reads no layer word the region may still replace and whose
@@ -809,7 +821,12 @@ def page_rereads(
             for word in reading.ocr_words
             if not any(_inside(word_middle(word), crop) for crop in earlier_crops)
         )
-        outside_crops = tuple(word for word in read if not _is_junk(word.text))
+        not_junk = tuple(word for word in read if not _is_junk(word.text))
+        outside_crops = tuple(_without_glued_junk(word) for word in not_junk)
+        stripped_count = sum(
+            word.text != stripped.text
+            for word, stripped in zip(not_junk, outside_crops, strict=True)
+        )
         replaceable = take_out_once((reading.layer_words,), replaced)[0]
         matched = matched_ocr_positions(replaceable, outside_crops)
         ocr_words = tuple(
@@ -842,7 +859,7 @@ def page_rereads(
                 layer_score=layer_score,
                 ocr_score=ocr_score,
                 kept=kept,
-                dropped_junk_count=len(read) - len(outside_crops),
+                dropped_junk_count=len(read) - len(not_junk) + stripped_count,
             )
         )
     return tuple(records)

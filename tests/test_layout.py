@@ -2100,7 +2100,7 @@ def test_reread_gierke_88_reads_its_four_margin_notes_the_last_one_the_layer_mis
         # Printed "Unity of the move- ment."
         ("Unity of", "the move.", "ment,"),
         # Printed "Medieval and Antique- Modern Thought."
-        ("Medieval", "_and", "Antique-", "Modern", "Thought."),
+        ("Medieval", "and", "Antique-", "Modern", "Thought."),
         ("Medieval", "Thought."),
     )
 
@@ -2403,12 +2403,8 @@ _DOMESDAY = "domesday_74-83"  # excerpt pages 1 and 3 are book page indices 75 a
             "Unity of the movement.",
             _FINAL_STOP_READ_AS_COMMA,
         ),
-        _owner_note(
-            _GIERKE,
-            2,
-            "Medieval and Antique-Modern Thought.",
-            "Tesseract reads 'and' as '_and'",
-        ),
+        # Tesseract reads "and" as "_and" (reocr spec, section 4).
+        _owner_note(_GIERKE, 2, "Medieval and Antique-Modern Thought."),
         _owner_note(_GIERKE, 2, "Medieval Thought."),
         _owner_note(_DOMESDAY, 1, "Free land."),
         _owner_note(

@@ -520,6 +520,27 @@ def test_tesseract_junk_of_no_letter_or_digit_is_dropped_and_counted() -> None:
     assert record.kept
 
 
+def test_underscore_at_the_ends_of_a_tesseract_word_is_stripped_and_counted() -> None:
+    # Gierke page 88: "and" read "_and"; no book prints an underscore. "__"
+    # alone is junk, dropped and counted as before.
+    reading = margin_note_reading(
+        Side.LEFT,
+        _BAND,
+        (
+            _ocr("_Moral_", 10, 100, 49, 108),
+            _ocr("__", 42, 110, 46, 114),
+            _ocr("_lessons.", 10, 115, 40, 123),
+        ),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST, page_words=())
+    assert _texts(record.ocr_words) == ("Moral", "lessons.")
+    assert record.ocr_words[0].box == Box(10, 100, 49, 108)
+    assert record.dropped_junk_count == 3
+    assert record.kept
+
+
 def test_region_of_tesseract_junk_alone_over_no_layer_word_is_recorded() -> None:
     reading = margin_note_reading(
         Side.LEFT,
