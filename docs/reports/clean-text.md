@@ -386,5 +386,48 @@ Stubbs' index recall .874 → .963.
 ## Review 2: work packages 3 and 5, tasks 2.4 and 4.2, review 1's fixes
 
 Four reviewers on f90df04..13140e7. Every finding and its verdict:
-`tmp/review2-findings.md` of the plan's worktree. Being fixed by two
-fixers; reported when merged.
+`tmp/review2-findings.md` of the plan's worktree. What mattered, and
+is fixed:
+
+- **One Tesseract word stood for two layer words of different lines**
+  (spec and fidelity reviewers, independently): on Domesday's index page
+  548, "Dominium, 224" lost "Domini" and gained a "3", and the fidelity
+  check passed, since it used layout's own pairing. Now a Tesseract word
+  with any layer word under it is taken, and stands for layer words of
+  one printed line only (nearest first); the fidelity check has a test
+  of its own, not using layout's pairing, that a Tesseract word stands
+  for one printed line. Looking at the 1 Domesday and 1 Gierke pair left
+  more than 4 pt apart downward on the page images: neither is a word of
+  another line.
+- **A glued layer word kept beside Tesseract's two words** ("battle of,
+  of,96 96", Stubbs' index): such a word is now replaced; 5 on Stubbs →
+  0.
+- **Tesseract's junk kept as characters** ("|", "¥", "©" from pencil
+  marks): a token with no letter or digit is dropped unless it is
+  punctuation or a printed sign; in kept records Stubbs 7 → 0, Domesday
+  4 → 0, Gierke 24 → 0. Each record counts the tokens it dropped, a new
+  field `dropped_junk_count` of `Reread` (0 by default; `lines.json`
+  stays at version 2, since the field only adds).
+- **A later region could keep again a word an earlier one had read**:
+  dropped now; no case on the three books.
+- **Smaller**: the command asked for Tesseract under `ocr = "redo"`,
+  in which layout reads nothing; a Tesseract failure named neither page
+  nor PDF; front matter warned on 9 of the 11 excerpts though it dropped
+  nothing; untested guards of the front-matter rule and of re-reading;
+  the line-end hyphens defined three times, one copy without "¬" (now
+  `hyphens.py`); rules written twice in layout; dead code; layout's
+  `__init__.py`, 1,264 lines, split into `_page.py` and `_rereading.py`
+  (325 left, output byte-identical); the whole-book fixture made safe
+  from two threads and shared by the extract tests (whole-book run 657 →
+  584 s on a loaded machine).
+
+Not taken: counting words under 3 letters and digits as neither known
+nor unknown, proposed for Gierke's page 79 ("130." read "130. Ff"): it
+would stop keeping Stubbs' index page 317 and cost 4, 2.4 and 10 in 100
+of the kept margin records of Stubbs, Domesday and Gierke, beyond the 2
+in 100 set beforehand. Gierke's page 79 keeps that junk; noted as known.
+
+After the fixes, regions read and kept: Stubbs 359 / 228, Domesday 623
+/ 428, Gierke 758 / 418. Stubbs' index gives 934 entries. All checks
+pass at ee4c824: 2,043 tests in 46.9 s (74.3 s with 8 threads), 59
+whole-book tests in 463.6 s.
