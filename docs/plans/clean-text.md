@@ -212,13 +212,13 @@ six at once; work package 5 then adds Tesseract to every run. The
 front excerpts hold endpapers and labels: a page without a text layer
 among them needs `exclude_pages` in its config, as analyze refuses it.
 
-- [ ] 1.1 The format changes in `model.py` (layout writing an empty
+- [x] 1.1 The format changes in `model.py` (layout writing an empty
   `rereads`), the config keys in `config.py`, the layout boundary in
   `fidelity.py`, and the evaluation tool's fixtures at the new
   versions, with their tests. Spec: architecture §6, §8 and §13; front
   matter §3; reocr §4, "The record" and "The fidelity check", and §6,
   the config key. Deliverables 1 to 3, 5. A commit of its own, first.
-- [ ] 1.2 The three excerpts and their configs. Spec: front matter §6,
+- [x] 1.2 The three excerpts and their configs. Spec: front matter §6,
   "Excerpt tests"; extract §7, "Excerpt tests". Deliverables 4, 5.
 
 ## 2. Reading the text layer

@@ -34,3 +34,26 @@ the owner. Started on 17 November 2026 on branch `plan/clean-text`.
   headings 18, 25, 23, 26).
 - **Open points** of the specs, put to the owner in chat on 17
   November 2026, unanswered so far; the plan builds their meanwhiles.
+
+## Work package 1: foundations
+
+Done as planned. Task 1.1 (79cb64b): `pages.json`, `words.json` and
+`lines.json` at version 2, the page kind and removal reason
+`front_matter`, the `Reread` record (layout writes none yet), the
+config keys `front_matter_end` and `reread_footnotes`, and the fidelity
+check at layout that swaps a kept record's words. It also added
+extract's case for a `front_matter` page (each word a removal), which
+the type checker required once the page kind existed; analyze makes no
+such page until work package 3. Task 1.2 (36e0e79): the excerpts
+`haskins_front` (11 pages, 314 KB), `domesday_front_flow` (10, 487 KB)
+and `gierke_front_flow` (10, 919 KB); every page has a text layer.
+
+Checked by the orchestrator at the merge: deliverable 1's command passes
+and lists 13 tests; deliverable 2, 8; deliverable 3, 6; deliverable 4
+prints nothing; the evaluation tool's 346 tests pass; the default run
+1,731 passed in 30.6 s, with 8 threads 53.7 s; `-m whole_book` 32
+passed (task 1.1's run, 254.8 s). The excerpt fixture's setup went from
+about 4.5 s to 6.0 s.
+
+Review: this package is reviewed together with work package 2, which
+first reads what it defines.
