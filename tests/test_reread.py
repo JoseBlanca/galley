@@ -47,6 +47,7 @@ from galley.model import (
     WordsFile,
     words_after_rereads,
 )
+from galley.ocr import OCR_DPI
 
 # The words the tests' word list holds, in lower case, as
 # wordlist.lower_case_word_list gives them. It holds "bl" and "en", as the
@@ -270,45 +271,52 @@ def _strip(*blocks: tuple[int, int, int, int]) -> Image.Image:
 
 
 def test_blocks_of_ink_30_px_apart_are_two_bands_cropped_to_ink_plus_6_px() -> None:
-    bands = note_bands(_strip((10, 10, 60, 30), (20, 60, 90, 80)))
+    bands = note_bands(_strip((10, 10, 60, 30), (20, 60, 90, 80)), dpi=OCR_DPI)
     assert bands == ((4, 4, 66, 36), (14, 54, 96, 86))
 
 
 def test_blocks_of_ink_15_px_apart_are_one_band() -> None:
-    assert note_bands(_strip((10, 10, 60, 30), (20, 45, 90, 65))) == ((4, 4, 96, 71),)
+    assert note_bands(_strip((10, 10, 60, 30), (20, 45, 90, 65)), dpi=OCR_DPI) == (
+        (4, 4, 96, 71),
+    )
 
 
 def test_block_10_px_high_is_no_band() -> None:
-    assert note_bands(_strip((10, 10, 60, 20))) == ()
+    assert note_bands(_strip((10, 10, 60, 20)), dpi=OCR_DPI) == ()
 
 
 def test_block_20_px_wide_is_no_band() -> None:
-    assert note_bands(_strip((10, 10, 30, 30))) == ()
+    assert note_bands(_strip((10, 10, 30, 30)), dpi=OCR_DPI) == ()
 
 
 def test_band_of_fewer_than_150_ink_pixels_is_no_band() -> None:
     # Two vertical lines 40 px apart, 2 px wide and 30 px high: 120 pixels,
     # 42 px wide and 30 high.
-    assert note_bands(_strip((10, 10, 12, 40), (50, 10, 52, 40))) == ()
+    assert note_bands(_strip((10, 10, 12, 40), (50, 10, 52, 40)), dpi=OCR_DPI) == ()
 
 
 def test_rows_of_one_ink_pixel_are_not_inked() -> None:
     # A line 1 px wide joins nothing: the two blocks stay two bands.
     image = _strip((10, 10, 60, 30), (10, 60, 60, 80), (80, 30, 81, 60))
-    assert note_bands(image) == ((4, 4, 66, 36), (4, 54, 66, 86))
+    assert note_bands(image, dpi=OCR_DPI) == ((4, 4, 66, 36), (4, 54, 66, 86))
 
 
 def test_light_grey_is_not_ink() -> None:
     image = Image.new("L", (100, 300), 255)
     ImageDraw.Draw(image).rectangle((10, 10, 59, 29), fill=140)
-    assert note_bands(image) == ()
+    assert note_bands(image, dpi=OCR_DPI) == ()
 
 
 def test_band_crop_stays_inside_the_strip() -> None:
-    assert note_bands(_strip((0, 0, 100, 20))) == ((0, 0, 100, 26),)
+    assert note_bands(_strip((0, 0, 100, 20)), dpi=OCR_DPI) == ((0, 0, 100, 26),)
 
 
 # The crops
+
+
+def test_note_bands_of_a_strip_not_at_300_dpi_raise() -> None:
+    with pytest.raises(ValueError, match="150 dpi"):
+        note_bands(_strip((10, 10, 60, 30)), dpi=150)
 
 
 def test_pixel_box_holds_the_points_box_at_the_dpi() -> None:

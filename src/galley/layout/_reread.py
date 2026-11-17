@@ -37,6 +37,7 @@ from galley.layout import (
     _split_at_column,
 )
 from galley.model import Box, PageWords, Reread, RereadKind, Word, is_under_ocr_word
+from galley.ocr import OCR_DPI
 from galley.wordlist import is_known_word
 
 __all__ = [
@@ -302,10 +303,13 @@ def margin_strip(
             assert_never(side)
 
 
-def note_bands(strip: Image.Image) -> tuple[tuple[int, int, int, int], ...]:
-    """The note bands of `strip`, a margin strip rendered at 300 dpi, top to
+def note_bands(
+    strip: Image.Image, *, dpi: int
+) -> tuple[tuple[int, int, int, int], ...]:
+    """The note bands of `strip`, a margin strip rendered at `dpi`, top to
     bottom, each as a Pillow crop box in pixels of `strip` (reocr spec,
-    section 3, kind 2).
+    section 3, kind 2). ValueError when `dpi` is not `ocr.OCR_DPI`, 300,
+    at which the sizes below were measured.
 
     A pixel is ink when darker than 140 of 255; a pixel row with more than
     one ink pixel is inked; inked rows apart by at most 18 blank rows are
@@ -314,6 +318,12 @@ def note_bands(strip: Image.Image) -> tuple[tuple[int, int, int, int], ...]:
     is left out. Each band is cropped to its ink plus 6 px, inside the
     strip.
     """
+    if dpi != OCR_DPI:
+        msg = (
+            f"a margin strip rendered at {dpi} dpi: note bands are found at "
+            f"{OCR_DPI} dpi, at which their sizes in pixels were measured"
+        )
+        raise ValueError(msg)
     mask = strip.convert("L").point(lambda value: _INK if value < _INK_BELOW else 0)
     width, height = mask.size
     pixels = mask.tobytes()
