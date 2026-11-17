@@ -376,25 +376,7 @@ def _owner_books_wp1_page(
     }
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        pytest.param(
-            name,
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason=(
-                    "the tall branch takes lines of Domesday's page 136, set "
-                    "mostly in small type, for headings (structure spec "
-                    'section 14, "Where it fails"); task 1.6 looks at them'
-                ),
-            ),
-        )
-        if name == "domesday_rereads_page4"
-        else name
-        for name in OWNER_BOOKS_WP1_PAGES
-    ],
-)
+@pytest.mark.parametrize("name", OWNER_BOOKS_WP1_PAGES)
 def test_owner_books_wp1_page_gives_its_removals_numbers_headings_and_notes(
     excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]], name: str
 ) -> None:

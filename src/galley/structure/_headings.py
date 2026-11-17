@@ -50,6 +50,11 @@ _FLUSH_LEFT_GAP_ENDS = (".", ",", ";", ":", "?", "!")
 # 1.3 pitches.
 _TALL_LINE_SHARE = 1.2
 _TALL_GAP_ABOVE_MIN_PITCHES = 1.3
+# Spec section 14: a page with more than 6 lines that tall has none, its
+# median being that of smaller type (Domesday's pages 136 and 419 and
+# Gierke's 50 have 13 to 18; pages with headings in the eight books at
+# most 4; any limit from 4 to 10 gives the same, 17 November 2026).
+_TALL_LINES_MAX = 6
 # Spec section 14, "a continuation": at most 2.6 pitches below the heading
 # line before it; when not centred, at least 0.9 of its letters upper case
 # and a gap below of at least 1.5 pitches (Mariéjol's title that fills the
@@ -291,7 +296,8 @@ def _heading_line_numbers(
 ) -> frozenset[int]:
     """The positions in `lines`, a page's body stream, of its heading lines
     (spec section 14, "The rule"): the lines rules 1 to 4 take, the tall
-    lines, each centred chapter label whose next line they take, and each
+    lines, none on a page with more than `_TALL_LINES_MAX` lines that tall,
+    each centred chapter label whose next line they take, and each
     continuation of a line they take. `pitch` is the body line pitch;
     `side_edges` the sides of the page's body and band lines when its body
     holds fewer than 5 lines, else None; `kept_head` the head line section
@@ -301,8 +307,13 @@ def _heading_line_numbers(
         for number in range(len(lines))
         if _is_heading_line(lines, number, pitch, side_edges, kept_head)
     }
-    if lines:
-        median_height = statistics.median(_line_height(line) for line in lines)
+    median_height = (
+        statistics.median(_line_height(line) for line in lines) if lines else 0.0
+    )
+    tall_lines = sum(
+        _line_height(line) >= _TALL_LINE_SHARE * median_height for line in lines
+    )
+    if lines and tall_lines <= _TALL_LINES_MAX:
         # In order, so that a tall line below a tall heading line follows a
         # heading line.
         for number in range(len(lines)):
