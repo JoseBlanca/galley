@@ -21,6 +21,7 @@ from galley.layout._reread import (
     CutInCrop,
     RegionReading,
     _is_known_as_printed,
+    _is_sure_single_word,
     cut_in_crops,
     cut_in_reading,
     footnote_band_crop,
@@ -1283,3 +1284,14 @@ def test_pages_of_fewer_than_50_words_are_not_counted() -> None:
 def test_layer_word_known_as_printed_has_no_mark_inside(text: str, known: bool) -> None:
     words = frozenset({"devonshire", "moral", "lo"})
     assert _is_known_as_printed(text, words) is known
+
+
+def test_reading_with_a_word_broken_at_a_line_end_has_no_sure_single_word() -> None:
+    # "Next" known, "pre-" "cariun." a broken word scored once (unknown here).
+    words = (
+        _ocr("Next", 10, 100, 30, 108),
+        _ocr("pre-", 10, 110, 30, 118),
+        _ocr("cariun.", 10, 120, 40, 128),
+    )
+    assert not _is_sure_single_word(words, (1, -1), ())
+    assert _is_sure_single_word(words[:1], (1,), ())

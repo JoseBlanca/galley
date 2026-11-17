@@ -19,6 +19,7 @@ layer word replaced by one record at most, in the order of the records
 except where a name or a docstring says pixels.
 """
 
+import itertools
 import math
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
@@ -777,8 +778,10 @@ def _is_sure_single_word(
     more, no word broken at a line end,
     and no word of `page_words`,
     the page's layer, that may read one of them (`model.may_read`)."""
-    if len(ocr_scores) != len(ocr_words):
-        # A word broken at a line end, two words scored as one.
+    if any(
+        _is_broken_pair(_normalized(first.text), _normalized(second.text))
+        for first, second in itertools.pairwise(ocr_words)
+    ):
         return False
     known = tuple(
         word for word, score in zip(ocr_words, ocr_scores, strict=True) if score == 1
