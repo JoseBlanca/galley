@@ -1007,7 +1007,7 @@ _TITLE_REFERENCE = ReferenceText(
 )
 
 
-def _front_matter_evaluation() -> Evaluation:
+def _front_matter_evaluation(reference: ReferenceText = _TITLE_REFERENCE) -> Evaluation:
     words = _galley("The queen came to Paris in 1533", 1)
     blocks = _galley("The queen came to Paris in 1533", 1, "b1")
     side = dataclasses.replace(
@@ -1029,7 +1029,7 @@ def _front_matter_evaluation() -> Evaluation:
             removals=_front_matter_removals(0, "CATHERINE DE MEDICIS 1920"),
         ),
     )
-    return evaluation_of(_book(body_pages=(1, 1)), _TITLE_REFERENCE, side, frozenset())
+    return evaluation_of(_book(body_pages=(1, 1)), reference, side, frozenset())
 
 
 def test_reference_title_page_galley_dropped_as_front_matter_is_not_scored() -> None:
@@ -1054,6 +1054,52 @@ def test_front_matter_tokens_are_listed_apart_as_front_matter() -> None:
         (("MÉDICIS",), Apart.FRONT_MATTER),
         (("Preface",), None),
     )
+
+
+def test_token_after_the_first_aligned_one_with_a_front_matter_key_is_scored() -> None:
+    # "1920", the date of the title page galley dropped, closes the preface
+    # here, after the first aligned token, and galley lost it.
+    (title, preface) = _TITLE_REFERENCE.blocks
+    reference = dataclasses.replace(
+        _TITLE_REFERENCE,
+        blocks=(
+            title,
+            ReferenceBlock(
+                ReferenceKind.PARAGRAPH,
+                (*preface.tokens, ReferenceToken("1920", marked_correction=False)),
+            ),
+        ),
+    )
+    evaluation = _front_matter_evaluation(reference)
+    assert evaluation.scorecard.front_matter_not_scored == 3
+    body = evaluation.scorecard.outputs[0].text[Part.BODY]
+    assert (body.reference_tokens, body.missing) == (9, 2)
+
+
+def test_reference_tokens_placed_on_a_front_matter_page_are_front_matter() -> None:
+    # As _book_differences, with page 1, "epsilon zcta eta", dropped as
+    # front matter and page 2 not excluded: the anchor of printed page 6
+    # places "epsilon", "zeta", "eta" and "theta" on page 1. Three
+    # misreadings are mended, so that half of the reference still aligns.
+    mended = {"alpba": "alpha", "lbid.": "Ibid.", "fortv": "forty"}
+    side = _book_side()
+    side = dataclasses.replace(
+        side,
+        words=tuple(
+            dataclasses.replace(token, text=mended.get(token.text, token.text))
+            for token in side.words
+            if token.page_index != 1
+        ),
+        words_file=dataclasses.replace(
+            side.words_file,
+            pages=tuple(page for page in side.words_file.pages if page.index != 1),
+            removals=_front_matter_removals(1, "SECOND TITLE"),
+        ),
+    )
+    evaluation = evaluation_of(
+        _book(not_in_reference=(4,)), _BOOK_REFERENCE, side, frozenset()
+    )
+    assert evaluation.scorecard.front_matter_not_scored == 4
 
 
 def test_front_matter_page_between_anchors_makes_a_token_unplaced() -> None:
@@ -1114,12 +1160,13 @@ _MARGIN_REFERENCE = ReferenceText(
 )
 
 
-def test_margin_notes_part_holds_the_margin_notes_words_apart_from_the_body() -> None:
+def _margin_side() -> GalleySide:
+    """galley's side of _MARGIN_REFERENCE: the margin note misread "Normam"."""
     words = _galley("Normam barons. The barons held their lands", 0)
     blocks = _galley(
         "Normam barons.", 0, "m1", stream=GalleyStream.MARGIN_NOTES
     ) + _galley("The barons held their lands", 0, "b1")
-    side = dataclasses.replace(
+    return dataclasses.replace(
         _side(words, blocks, blocks),
         galley_blocks=frozendict(
             {
@@ -1134,7 +1181,10 @@ def test_margin_notes_part_holds_the_margin_notes_words_apart_from_the_body() ->
             }
         ),
     )
-    evaluation = evaluation_of(_book(), _MARGIN_REFERENCE, side, frozenset())
+
+
+def test_margin_notes_part_holds_the_margin_notes_words_apart_from_the_body() -> None:
+    evaluation = evaluation_of(_book(), _MARGIN_REFERENCE, _margin_side(), frozenset())
     markdown = evaluation.scorecard.outputs[-1]
     margin = markdown.text[Part.MARGIN_NOTES]
     body = markdown.text[Part.BODY]
@@ -1153,3 +1203,13 @@ def test_margin_notes_part_holds_the_margin_notes_words_apart_from_the_body() ->
         if difference.reference == ("Norman",)
     )
     assert normam.part is Part.MARGIN_NOTES
+
+
+def test_margin_notes_part_has_no_paragraph_boundaries() -> None:
+    # A boundary between the margin note and the body is the body's; the
+    # margin notes, like the notes, get no boundary scores of their own.
+    evaluation = evaluation_of(_book(), _MARGIN_REFERENCE, _margin_side(), frozenset())
+    boundaries = evaluation.scorecard.outputs[-1].paragraph_boundaries
+    assert boundaries is not None
+    assert Part.MARGIN_NOTES not in boundaries
+    assert Part.NOTES not in boundaries
