@@ -347,6 +347,49 @@ def _are_alike(layer_text: str, ocr_text: str) -> bool:
     )
 
 
+def _overlap_up_and_down(first: Word, second: Word) -> bool:
+    return first.box.top < second.box.bottom and second.box.top < first.box.bottom
+
+
+def _under_line(layer_words: Sequence[Word], ocr_word: Word) -> tuple[int, ...]:
+    """The positions in `layer_words` of the words under `ocr_word` that
+    are of its printed line: taken nearest first, by the distance of their
+    middles from its middle up or down, each whose box overlaps, up and
+    down, those of every word taken before it."""
+    ocr_middle = _middle(ocr_word)[1]
+    under = sorted(
+        (index for index, word in enumerate(layer_words) if _is_under(word, ocr_word)),
+        key=lambda index: (abs(_middle(layer_words[index])[1] - ocr_middle), index),
+    )
+    line: list[int] = []
+    for index in under:
+        if all(
+            _overlap_up_and_down(layer_words[index], layer_words[other])
+            for other in line
+        ):
+            line.append(index)
+    return tuple(sorted(line))
+
+
+def may_read(word: Word, ocr_word: Word) -> bool:
+    """Whether `ocr_word`, Tesseract's, may be a reading of the printed
+    word that `word`, a word of the text layer, reads, by one of the rules
+    of `replaced_layer_words` taken alone, whatever other words match:
+    `word` lies under it, or, within 16 pt above or below, its letters and
+    digits are those of `word`, or its letters are alike to those of a
+    `word` of 3 letters or more. Boxes in points."""
+    if _is_under(word, ocr_word):
+        return True
+    if abs(_middle(ocr_word)[1] - _middle(word)[1]) > _SAME_TEXT_REACH_PT:
+        return False
+    return (
+        bool(_folded(word.text)) and _folded(word.text) == _folded(ocr_word.text)
+    ) or (
+        _letter_count(word.text) >= _ALIKE_LEAST_LETTERS
+        and _are_alike(word.text, ocr_word.text)
+    )
+
+
 def replaced_layer_words(
     layer_words: Sequence[Word], ocr_words: Sequence[Word]
 ) -> tuple[Word, ...]:
@@ -356,7 +399,10 @@ def replaced_layer_words(
     `ocr_words` (reocr spec, section 4).
 
     A layer word is matched (a) when its middle lies inside the box of
-    one of `ocr_words` widened by 2 pt up and down and 1 pt across; or
+    one of `ocr_words` widened by 2 pt up and down and 1 pt across, and
+    it is of that word's printed line: of the layer words under it, the
+    one whose middle lies nearest its middle, up or down, and those whose
+    boxes overlap that one's up and down; or
     else (b) when its letters and digits, case-folded and not empty, equal
     those of one of `ocr_words` whose middle lies within 16 pt above or
     below its own and that no other layer word has matched;
@@ -369,15 +415,16 @@ def replaced_layer_words(
     middles across plus up or down, each word in one pair at most. A layer
     word matched by none stays in the layer. Boxes in points.
     """
-    under = tuple(is_under_ocr_word(word, ocr_words) for word in layer_words)
-    # (a): a Tesseract word with a layer word under it reads that printed
-    # word, whatever the two texts, and pairs with no other.
+    # (a): a Tesseract word with layer words under it reads the printed
+    # words of one line, whatever the texts, and pairs with no other.
+    under_line = {
+        index for ocr_word in ocr_words for index in _under_line(layer_words, ocr_word)
+    }
+    under = tuple(index in under_line for index in range(len(layer_words)))
     taken = {
         position
-        for word, is_under in zip(layer_words, under, strict=True)
-        if is_under
         for position, ocr_word in enumerate(ocr_words)
-        if _is_under(word, ocr_word)
+        if any(_is_under(word, ocr_word) for word in layer_words)
     }
     # (b): the pairs of a layer word and a Tesseract word of its text, the
     # nearest first, each word in one pair at most.

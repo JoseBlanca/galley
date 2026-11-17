@@ -417,13 +417,13 @@ def _check_fidelity(page: PageWords, rereads: tuple[Reread, ...]) -> None:
     )
 
 
-# A margin note of three layer words on the left of a column whose left
-# edge is 50 pt; two single letters of the layer just inside the column,
-# under Tesseract's "Moral"; a body word beside the note; a margin word
-# below the band.
+# A margin note of two lines on the left of a column whose left edge is
+# 50 pt, "Moral" and a word the layer split in two, "les-" "sons"; two
+# single letters of the layer just inside the column, under Tesseract's
+# "Moral"; a body word beside the note; a margin word below the band.
 _MORAL = _word("Moral", 10, 100, 40, 108)
-_LES = _word("les-", 10, 110, 30, 118)
-_SONS = _word("sons", 10, 120, 30, 128)
+_LES = _word("les-", 10, 115, 24, 123)
+_SONS = _word("sons", 26, 115, 40, 123)
 _LETTER_O = _word("o", 48.5, 101, 49.5, 107)
 _LETTER_A = _word("a", 48.2, 102, 49, 106)
 _BODY_THE = _word("The", 60, 110, 80, 118)

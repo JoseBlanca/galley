@@ -1754,3 +1754,53 @@ def test_layout_with_a_kept_reread_replacing_a_word_off_its_box_by_its_text_pass
     lines = _note_lines((*_NOTE_OCR, normandy), (reread,))
 
     check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+
+def test_layout_with_one_ocr_word_the_only_reading_of_two_lines_words_fails() -> None:
+    # Domesday page 548: Tesseract read "3" for "Dominium, 224" and
+    # "dominieum," over the layer's "dominicum," one line down; a record
+    # that replaces the layer's "Domini" too has "dominieum," stand for two
+    # printed words, and one is lost.
+    domini = Word("Domini", Box(10.0, 92.0, 30.0, 100.0), None)
+    dominicum = Word("dominicum,", Box(10.0, 101.0, 30.0, 109.0), None)
+    ocr = (
+        Word("3", Box(60.0, 92.0, 66.0, 100.0), 40.0),
+        Word("dominieum,", Box(10.0, 101.0, 30.0, 109.0), 80.0),
+    )
+    words = WordsFile(
+        source_pdf_sha256=_SHA,
+        pages=(
+            PageWords(
+                index=0,
+                text_source=TextSource.TEXT_LAYER,
+                words=(domini, dominicum),
+                figures=(),
+            ),
+        ),
+        removals=(),
+    )
+    reread = Reread(
+        page_index=0,
+        kind=RereadKind.SMALL_PRINT_PAGE,
+        box=Box(0.0, 90.0, 100.0, 110.0),
+        layer_words=(domini, dominicum),
+        ocr_words=ocr,
+        layer_score=-2,
+        ocr_score=0,
+        kept=True,
+    )
+    lines = LinesFile(
+        source_pdf_sha256=_SHA,
+        pages=(
+            PageLayout(
+                index=0, regions=(Region(_BOX, (Line(_BOX, ocr),)),), figures=()
+            ),
+        ),
+        rereads=(reread,),
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, words, lines)
+
+    assert "'dominieum,'" in raised.value.detail
+    assert "the only ocr word that can read 'Domini'" in raised.value.detail

@@ -1774,6 +1774,35 @@ def test_ocr_word_over_a_layer_word_of_another_text_pairs_with_no_other() -> Non
     assert model.replaced_layer_words((domini, dominicum), ocr) == (dominicum,)
 
 
+def test_ocr_word_over_two_layer_lines_replaces_the_words_of_the_nearer() -> None:
+    # Gierke page 63: Tesseract's "146" lies between two of the layer's
+    # lines "14. c", 8.2 pt apart, and both lie under its widened box.
+    first = (
+        Word("14.", Box(324.0, 379.7, 329.9, 386.7), None),
+        Word("c", Box(332.6, 379.7, 334.7, 386.7), None),
+    )
+    second = (
+        Word("14.", Box(323.4, 387.9, 329.5, 394.9), None),
+        Word("c", Box(332.4, 387.9, 334.4, 394.9), None),
+    )
+    ocr = (Word("146", Box(324.5, 382.8, 336.2, 390.5), 60.0),)
+    assert model.replaced_layer_words((*first, *second), ocr) == first
+
+
+def test_ocr_word_over_two_layer_lines_and_a_word_overlapping_both_takes_one() -> None:
+    # Stubbs' index, page 318: Tesseract's "Soca" for "Normans," lies over
+    # the layer's "I43" of the line above too, and over a stray "k" whose
+    # box overlaps both lines; "I43" stays.
+    stray = Word("k", Box(157.6, 437.6, 161.0, 443.3), None)
+    above = Word("I43", Box(165.3, 433.4, 175.9, 439.3), None)
+    normans = Word("Normans,", Box(157.6, 439.8, 191.9, 446.9), None)
+    ocr = (Word("Soca", Box(157.7, 434.6, 177.6, 445.9), 50.0),)
+    assert model.replaced_layer_words((stray, above, normans), ocr) == (
+        stray,
+        normans,
+    )
+
+
 def test_layer_word_without_a_letter_or_digit_is_matched_only_under_a_word() -> None:
     layer = (_layer("—", 10, 110),)
     assert model.replaced_layer_words(layer, (_tesseract("—", 10, 100),)) == ()
