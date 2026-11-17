@@ -1428,6 +1428,7 @@ def test_fidelity_check_passes_on_layout_pages() -> None:
     lines = LinesFile(
         source_pdf_sha256="0" * 64,
         pages=tuple(layout_page(p, _MEASURES) for p in pages),
+        rereads=(),
     )
     check_stage(FidelityBoundary.LAYOUT, _words_file(pages), lines)
 
@@ -1438,7 +1439,7 @@ def test_fidelity_check_fails_when_a_word_is_dropped_from_a_line() -> None:
     first_line = region.lines[0]
     dropped = replace(first_line, words=first_line.words[:1])
     page = replace(page, regions=(replace(region, lines=(dropped, *region.lines[1:])),))
-    lines = LinesFile(source_pdf_sha256="0" * 64, pages=(page,))
+    lines = LinesFile(source_pdf_sha256="0" * 64, pages=(page,), rereads=())
     with pytest.raises(FidelityError) as raised:
         check_stage(
             FidelityBoundary.LAYOUT, _words_file((_page(0, _PAGE_WORDS),)), lines
@@ -1551,7 +1552,9 @@ def test_run_with_a_config_of_another_pdf_names_analyze(tmp_path: Path) -> None:
 @pytest.mark.thread_unsafe
 def test_run_with_a_pages_json_of_another_pdf_names_analyze(tmp_path: Path) -> None:
     folder, config = _book(tmp_path)
-    write_lines(folder.lines_json, LinesFile(source_pdf_sha256="0" * 64, pages=()))
+    write_lines(
+        folder.lines_json, LinesFile(source_pdf_sha256="0" * 64, pages=(), rereads=())
+    )
     stale = folder.pages_json.read_text(encoding="utf-8").replace(
         hashlib.sha256(_PDF_BYTES).hexdigest(), "f" * 64
     )

@@ -180,7 +180,8 @@ def page_words(
     A text page, and a plate page with a text layer, keep every word but
     those whose centre is inside one of its `exclude_regions`, edges
     included, which are removals with the reason `excluded_region`. Every
-    word of an excluded page is a removal with the reason `excluded_page`.
+    word of an excluded page is a removal with the reason `excluded_page`,
+    and of a front-matter page one with the reason `front_matter`.
     A blank page has neither. A plate page has one figure, the whole page,
     at 300 dpi, whose image is `plate_image(page.index)`; no other page
     has one. Raises ValueError for a page read by OCR, which extract
@@ -213,6 +214,14 @@ def page_words(
             kept = ()
             removals = tuple(
                 _removal(page, layer_word, RemovalReason.EXCLUDED_PAGE)
+                for layer_word in layer_words
+            )
+        case PageKind.FRONT_MATTER:
+            # Front-matter spec, section 3: every word a removal, as on an
+            # excluded page.
+            kept = ()
+            removals = tuple(
+                _removal(page, layer_word, RemovalReason.FRONT_MATTER)
                 for layer_word in layer_words
             )
         case PageKind.BLANK:

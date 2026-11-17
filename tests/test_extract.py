@@ -169,6 +169,28 @@ def test_excluded_page_with_three_words_gives_three_removals_and_no_words() -> N
     )
 
 
+def test_front_matter_page_gives_a_front_matter_removal_per_word_and_no_words() -> None:
+    # Front-matter spec, section 3: the words of a title page.
+    front = page(PageKind.FRONT_MATTER, TextSource.NONE)
+    words = (
+        word("THE", Box(150.0, 200.0, 180.0, 216.0)),
+        word("NORMANS", Box(185.0, 200.0, 260.0, 216.0)),
+    )
+
+    assert page_words(front, words) == (
+        PageWords(index=4, text_source=TextSource.NONE, words=(), figures=()),
+        tuple(
+            Removal(
+                page_index=4,
+                box=layer_word.box,
+                text=layer_word.text,
+                reason=RemovalReason.FRONT_MATTER,
+            )
+            for layer_word in words
+        ),
+    )
+
+
 def test_blank_page_has_no_words_and_no_removals() -> None:
     assert page_words(page(PageKind.BLANK, TextSource.NONE), ()) == (
         PageWords(index=4, text_source=TextSource.NONE, words=(), figures=()),

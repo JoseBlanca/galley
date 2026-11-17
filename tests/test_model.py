@@ -40,6 +40,8 @@ from galley.model import (
     Region,
     Removal,
     RemovalReason,
+    Reread,
+    RereadKind,
     SampledPage,
     Span,
     TextSource,
@@ -176,6 +178,24 @@ LINES = LinesFile(
                     dpi=300,
                 ),
             ),
+        ),
+    ),
+    rereads=(
+        Reread(
+            page_index=0,
+            kind=RereadKind.MARGIN_NOTE,
+            box=Box(10.0, 80.0, 46.5, 96.0),
+            layer_words=(
+                Word(text="Ra-", box=Box(12.0, 82.0, 30.0, 90.0), ocr_confidence=None),
+            ),
+            ocr_words=(
+                Word(
+                    text="Rameses", box=Box(12.0, 82.5, 44.0, 90.5), ocr_confidence=88.0
+                ),
+            ),
+            layer_score=-1,
+            ocr_score=1,
+            kept=True,
         ),
     ),
 )
@@ -324,7 +344,7 @@ def test_pages_json_is_written_in_field_order_with_indent_one(tmp_path: Path) ->
     path = tmp_path / "pages.json"
     write_pages(path, PAGES)
     text = path.read_text(encoding="utf-8")
-    assert text.startswith('{\n "format_version": 1,\n "source_pdf_sha256": "aaaa')
+    assert text.startswith('{\n "format_version": 2,\n "source_pdf_sha256": "aaaa')
     assert text.endswith("}\n")
     assert list(json.loads(text)) == [
         "format_version",
@@ -564,6 +584,7 @@ SOME_ENUM: frozendict[str, JsonPath] = frozendict(
     {
         "pages.json": ("pages", 0, "kind"),
         "words.json": ("pages", 1, "text_source"),
+        "lines.json": ("rereads", 0, "kind"),
         "blocks.json": ("blocks", 0, "kind"),
     }
 )
@@ -594,13 +615,14 @@ def test_truncated_file_names_the_line_and_column(tmp_path: Path, name: str) -> 
 
 
 # For each file, a format_version this galley does not read, and the one it
-# reads. blocks.json is at 2 since the second plan of structure; its old
-# version 1 is the case the owner meets (architecture section 8).
+# reads. Every file is at 2: blocks.json since the second plan of
+# structure, the others since the plan clean-text; the old version 1 is the
+# case the owner meets (architecture section 8).
 UNSUPPORTED_VERSION: frozendict[str, tuple[int, int]] = frozendict(
     {
-        "pages.json": (2, 1),
-        "words.json": (2, 1),
-        "lines.json": (2, 1),
+        "pages.json": (1, 2),
+        "words.json": (1, 2),
+        "lines.json": (1, 2),
         "blocks.json": (1, 2),
     }
 )
@@ -626,7 +648,7 @@ def test_unsupported_format_version_names_both_versions(
 def test_format_version_0_or_true_is_an_error(tmp_path: Path, version: object) -> None:
     path = _written(tmp_path, "pages.json")
     _set(path, ("format_version",), version)
-    with pytest.raises(InputFileError, match="format version 1"):
+    with pytest.raises(InputFileError, match="format version 2"):
         read_pages(path)
 
 
@@ -1008,7 +1030,7 @@ def test_top_level_key_given_twice_is_an_error(tmp_path: Path) -> None:
     path = _written(tmp_path, "lines.json")
     text = path.read_text(encoding="utf-8")
     text = text.replace(
-        '"format_version": 1,', '"format_version": 1,\n "format_version": 1,', 1
+        '"format_version": 2,', '"format_version": 2,\n "format_version": 2,', 1
     )
     path.write_text(text, encoding="utf-8")
     with pytest.raises(InputFileError, match="format_version") as caught:
@@ -1132,17 +1154,19 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             Emphasis,
             ChangeReason,
             PageNumberPosition,
+            RereadKind,
             Language,
             OcrMode,
         )
     }
     assert values == {
-        "PageKind": ["blank", "text", "plate", "excluded"],
+        "PageKind": ["blank", "text", "plate", "excluded", "front_matter"],
         "TextSource": ["text_layer", "ocr", "none"],
         "OcrVerdict": ["layer_kept", "layer_doubtful"],
         "RemovalReason": [
             "excluded_page",
             "excluded_region",
+            "front_matter",
             "running_head",
             "page_number",
             "signature_mark",
@@ -1169,6 +1193,12 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "hyphen_kept",
         ],
         "PageNumberPosition": ["head", "foot"],
+        "RereadKind": [
+            "small_print_page",
+            "margin_note",
+            "cut_in_note",
+            "footnote_band",
+        ],
         "Language": ["en", "es", "fr", "de", "it"],
         "OcrMode": ["verify", "trust", "redo"],
     }
@@ -1522,3 +1552,145 @@ def test_note_places_counts_the_blocks_written_before_each_note(
     places: tuple[int, ...],
 ) -> None:
     assert model.note_places(block_pages, note_pages) == places
+
+
+# The plan clean-text: the front matter (front-matter spec, section 3) and
+# the re-reading of small print (reocr spec, section 4, "The record").
+
+
+def test_pages_words_and_lines_json_are_format_version_2() -> None:
+    assert (
+        model.PAGES_FORMAT_VERSION,
+        model.WORDS_FORMAT_VERSION,
+        model.LINES_FORMAT_VERSION,
+    ) == (2, 2, 2)
+    assert (PAGES.format_version, WORDS.format_version, LINES.format_version) == (
+        2,
+        2,
+        2,
+    )
+
+
+def test_front_matter_page_is_written_as_its_kind_and_read_back(
+    tmp_path: Path,
+) -> None:
+    front_page = replace(
+        PAGES.pages[0],
+        kind=PageKind.FRONT_MATTER,
+        text_source=TextSource.NONE,
+        text_layer_score=0.4,
+    )
+    pages = replace(PAGES, pages=(front_page,))
+    write_pages(tmp_path / "pages.json", pages)
+
+    content = json.loads((tmp_path / "pages.json").read_text(encoding="utf-8"))
+    assert content["pages"][0]["kind"] == "front_matter"
+    assert content["pages"][0]["text_source"] == "none"
+    assert read_pages(tmp_path / "pages.json") == pages
+
+
+def test_front_matter_removal_is_written_as_its_reason_and_read_back(
+    tmp_path: Path,
+) -> None:
+    # A word of a title page, dropped with the front matter.
+    title_word = Removal(
+        page_index=0,
+        box=Box(150.0, 200.0, 230.0, 216.0),
+        text="NORMANS",
+        reason=RemovalReason.FRONT_MATTER,
+    )
+    words = replace(WORDS, removals=(title_word,))
+    write_words(tmp_path / "words.json", words)
+
+    content = json.loads((tmp_path / "words.json").read_text(encoding="utf-8"))
+    assert content["removals"][0]["reason"] == "front_matter"
+    assert read_words(tmp_path / "words.json").removals == (title_word,)
+
+
+@pytest.mark.parametrize("name", ["pages.json", "words.json", "lines.json"])
+def test_front_matter_or_reread_file_of_version_1_names_the_stage_to_run_again(
+    tmp_path: Path, name: str
+) -> None:
+    path = _written(tmp_path, name)
+    _set(path, ("format_version",), 1)
+
+    with pytest.raises(InputFileError) as caught:
+        READERS[name](path)
+
+    assert str(caught.value) == (
+        f"{path}: is format version 1; this galley reads format version 2; "
+        f"run `galley2epub {WRITING_STAGE[name]}` again"
+    )
+
+
+def test_reread_is_written_with_its_fields_in_order_and_read_back(
+    tmp_path: Path,
+) -> None:
+    write_lines(tmp_path / "lines.json", LINES)
+
+    content = json.loads((tmp_path / "lines.json").read_text(encoding="utf-8"))
+    assert list(content) == ["format_version", "source_pdf_sha256", "pages", "rereads"]
+    assert content["rereads"] == [
+        {
+            "page_index": 0,
+            "kind": "margin_note",
+            "box": [10.0, 80.0, 46.5, 96.0],
+            "layer_words": [
+                {"text": "Ra-", "box": [12.0, 82.0, 30.0, 90.0], "ocr_confidence": None}
+            ],
+            "ocr_words": [
+                {
+                    "text": "Rameses",
+                    "box": [12.0, 82.5, 44.0, 90.5],
+                    "ocr_confidence": 88.0,
+                }
+            ],
+            "layer_score": -1,
+            "ocr_score": 1,
+            "kept": True,
+        }
+    ]
+    assert read_lines(tmp_path / "lines.json") == LINES
+
+
+def test_reread_of_every_kind_kept_or_not_is_read_back_equal(tmp_path: Path) -> None:
+    rereads = tuple(
+        replace(LINES.rereads[0], kind=kind, kept=kept)
+        for kind in RereadKind
+        for kept in (True, False)
+    )
+    lines = replace(LINES, rereads=rereads)
+    write_lines(tmp_path / "lines.json", lines)
+
+    assert read_lines(tmp_path / "lines.json") == lines
+
+
+def test_lines_json_with_no_reread_is_written_as_an_empty_list(tmp_path: Path) -> None:
+    lines = replace(LINES, rereads=())
+    write_lines(tmp_path / "lines.json", lines)
+
+    content = json.loads((tmp_path / "lines.json").read_text(encoding="utf-8"))
+    assert content["rereads"] == []
+    assert read_lines(tmp_path / "lines.json") == lines
+
+
+def test_lines_json_without_its_rereads_field_names_it(tmp_path: Path) -> None:
+    path = _written(tmp_path, "lines.json")
+    _delete(path, ("rereads",))
+
+    with pytest.raises(InputFileError, match=re.escape("rereads: missing")):
+        read_lines(path)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("kept", 1), ("layer_score", 1.5), ("ocr_score", True), ("ocr_words", "x")],
+)
+def test_reread_field_of_the_wrong_type_names_its_path(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    path = _written(tmp_path, "lines.json")
+    _set(path, ("rereads", 0, field), value)
+
+    with pytest.raises(InputFileError, match=re.escape(f"rereads[0].{field}")):
+        read_lines(path)

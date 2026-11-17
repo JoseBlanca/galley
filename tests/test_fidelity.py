@@ -34,6 +34,8 @@ from galley.model import (
     Region,
     Removal,
     RemovalReason,
+    Reread,
+    RereadKind,
     Span,
     TextSource,
     Word,
@@ -86,6 +88,7 @@ def _lines_file(pages: tuple[tuple[str, ...], ...]) -> LinesFile:
             )
             for index, lines in enumerate(pages)
         ),
+        rereads=(),
     )
 
 
@@ -741,6 +744,7 @@ def test_structure_word_holding_white_space_splits_the_same_on_both_sides(
                 figures=(),
             ),
         ),
+        rereads=(),
     )
     blocks = _blocks_file((_block("b-p0000-001", (0,), (_span(text),)),))
 
@@ -1530,3 +1534,142 @@ def test_read_markdown_without_pandoc_raises(
 
     with pytest.raises(ExternalProgramError, match="pandoc"):
         read_markdown("Text.\n")
+
+
+# The layout boundary with re-read regions (reocr spec, section 4, "The
+# fidelity check"). A page with a body word and a margin note of three
+# layer words, which Tesseract reads as two.
+
+_BODY = Word("Normandy", Box(100.0, 50.0, 160.0, 60.0), None)
+_NOTE_LAYER = (
+    Word("Wil-", Box(20.0, 50.0, 30.0, 58.0), None),
+    Word("1", Box(31.0, 50.0, 33.0, 58.0), None),
+    Word("iam", Box(34.0, 50.0, 44.0, 58.0), None),
+)
+_NOTE_OCR = (
+    Word("William", Box(20.0, 50.0, 44.0, 58.0), 91.0),
+    Word("I.", Box(20.0, 59.0, 26.0, 67.0), 88.0),
+)
+_NOTE_WORDS = WordsFile(
+    source_pdf_sha256=_SHA,
+    pages=(
+        PageWords(
+            index=0,
+            text_source=TextSource.TEXT_LAYER,
+            words=(_BODY, *_NOTE_LAYER),
+            figures=(),
+        ),
+        PageWords(
+            index=1,
+            text_source=TextSource.TEXT_LAYER,
+            words=(Word("Rouen", _BOX, None),),
+            figures=(),
+        ),
+    ),
+    removals=(),
+)
+
+
+def _note_reread(
+    layer_words: tuple[Word, ...] = _NOTE_LAYER,
+    *,
+    page_index: int = 0,
+    kept: bool = True,
+) -> Reread:
+    return Reread(
+        page_index=page_index,
+        kind=RereadKind.MARGIN_NOTE,
+        box=Box(18.0, 48.0, 46.0, 69.0),
+        layer_words=layer_words,
+        ocr_words=_NOTE_OCR,
+        layer_score=-1,
+        ocr_score=2,
+        kept=kept,
+    )
+
+
+def _note_lines(page_0: tuple[Word, ...], rereads: tuple[Reread, ...]) -> LinesFile:
+    """lines.json of _NOTE_WORDS: page 0 with `page_0` in one line, page 1
+    as words.json has it."""
+    return LinesFile(
+        source_pdf_sha256=_SHA,
+        pages=(
+            PageLayout(
+                index=0, regions=(Region(_BOX, (Line(_BOX, page_0),)),), figures=()
+            ),
+            PageLayout(
+                index=1,
+                regions=(Region(_BOX, (Line(_BOX, (Word("Rouen", _BOX, None),)),)),),
+                figures=(),
+            ),
+        ),
+        rereads=rereads,
+    )
+
+
+def test_layout_with_a_kept_reread_swaps_its_layer_words_for_its_ocr_words() -> None:
+    lines = _note_lines((_BODY, *_NOTE_OCR), (_note_reread(),))
+
+    check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+
+def test_layout_with_a_kept_reread_whose_ocr_words_are_missing_fails() -> None:
+    lines = _note_lines((_BODY,), (_note_reread(),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+    assert raised.value.missing == frozendict({"I.": 1, "William": 1})
+    assert raised.value.invented == frozendict()
+
+
+def test_layout_with_a_reread_not_kept_changes_nothing() -> None:
+    lines = _note_lines((_BODY, *_NOTE_LAYER), (_note_reread(kept=False),))
+
+    check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+
+def test_layout_with_a_reread_not_kept_whose_ocr_words_are_in_the_lines_fails() -> None:
+    lines = _note_lines((_BODY, *_NOTE_OCR), (_note_reread(kept=False),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+    assert raised.value.missing == frozendict({"1": 1, "Wil-": 1, "iam": 1})
+    assert raised.value.invented == frozendict({"I.": 1, "William": 1})
+
+
+def test_layout_with_a_kept_reread_naming_a_word_its_page_does_not_have_fails() -> None:
+    # "Wil-" at another place, and "Rouen", which is page 1's.
+    elsewhere = replace(_NOTE_LAYER[0], box=Box(20.0, 70.0, 30.0, 78.0))
+    for layer_words, page_index in (
+        ((elsewhere, *_NOTE_LAYER[1:]), 0),
+        (_NOTE_LAYER, 1),
+    ):
+        reread = _note_reread(layer_words, page_index=page_index)
+        lines = _note_lines((_BODY, *_NOTE_OCR), (reread,))
+
+        with pytest.raises(FidelityError) as raised:
+            check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+        assert raised.value.missing == frozendict()
+        assert raised.value.invented == frozendict()
+        assert f"page {page_index} does not have" in raised.value.detail
+
+
+def test_layout_with_a_word_in_two_kept_rereads_fails() -> None:
+    # The second record names "iam" again and reads it as "iam": the words
+    # alone balance, so only the record check can find it.
+    second = replace(
+        _note_reread((_NOTE_LAYER[2],)),
+        kind=RereadKind.CUT_IN_NOTE,
+        ocr_words=(Word("iam", Box(34.0, 50.0, 44.0, 58.0), 70.0),),
+    )
+    lines = _note_lines((_BODY, *_NOTE_OCR), (_note_reread(), second))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+    assert raised.value.missing == frozendict()
+    assert "'iam'" in raised.value.detail
+    assert "two kept rereads" in raised.value.detail

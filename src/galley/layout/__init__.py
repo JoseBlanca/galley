@@ -1097,6 +1097,9 @@ def run(
     lines = LinesFile(
         source_pdf_sha256=words.source_pdf_sha256,
         pages=map_pages(lay_out, words.pages, workers),
+        # Nothing is re-read yet: the reocr spec's re-reading comes with
+        # work package 5 of the plan clean-text.
+        rereads=(),
     )
     check_stage(FidelityBoundary.LAYOUT, words, lines)
     write_lines(folder.lines_json, lines)

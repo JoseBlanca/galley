@@ -22,10 +22,12 @@ from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
 from galley.model import (
     Block,
     BlocksFile,
+    Box,
     ChangeReason,
     LinesFile,
     NoteKind,
     Origin,
+    Reread,
     WordChange,
     WordsFile,
 )
@@ -97,6 +99,62 @@ def _lines_file_words(lines: LinesFile) -> tuple[_PlacedWord, ...]:
         for word in line.words
         for placed in _placed(word.text, f"page {page.index}")
     )
+
+
+def _kept_rereads(lines: LinesFile) -> tuple[Reread, ...]:
+    return tuple(reread for reread in lines.rereads if reread.kept)
+
+
+def _reread_layer_words(lines: LinesFile) -> tuple[_PlacedWord, ...]:
+    """The words of words.json that kept re-readings replaced."""
+    return tuple(
+        placed
+        for reread in _kept_rereads(lines)
+        for word in reread.layer_words
+        for placed in _placed(word.text, f"page {reread.page_index}")
+    )
+
+
+def _reread_ocr_words(lines: LinesFile) -> tuple[_PlacedWord, ...]:
+    """Tesseract's words that kept re-readings put in their place."""
+    return tuple(
+        placed
+        for reread in _kept_rereads(lines)
+        for word in reread.ocr_words
+        for placed in _placed(word.text, f"page {reread.page_index}")
+    )
+
+
+def _box_text(box: Box) -> str:
+    return f"({box.x0}, {box.top}, {box.x1}, {box.bottom})"
+
+
+def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
+    """What is wrong with the kept re-readings of lines.json: a word of
+    their `layer_words` that its page of words.json does not have, or one
+    that more kept records name than the page has, compared as page, text
+    and box (reocr spec, section 4)."""
+    on_pages = Counter(
+        (page.index, word.text, word.box) for page in words.pages for word in page.words
+    )
+    named = Counter(
+        (reread.page_index, word.text, word.box)
+        for reread in _kept_rereads(lines)
+        for word in reread.layer_words
+    )
+    problems: list[str] = []
+    for (page_index, text, box), count in named.items():
+        where = f"{text!r} at {_box_text(box)}"
+        if on_pages[page_index, text, box] == 0:
+            problems.append(
+                f"a kept reread names {where}, a word page {page_index} does not have"
+            )
+        elif count > on_pages[page_index, text, box]:
+            problems.append(
+                f"{where} on page {page_index} is among the layer words of two "
+                "kept rereads"
+            )
+    return tuple(problems)
 
 
 type _BlocksBoundary = Literal[FidelityBoundary.STRUCTURE, FidelityBoundary.MARKDOWN]
@@ -471,7 +529,9 @@ def check_stage(
 ) -> None:
     """Check that no word was lost or invented at one stage boundary.
 
-    layout: the words of words.json against those of lines.json. structure:
+    layout: the words of words.json, less the layer words of every kept
+    re-reading of lines.json and with its Tesseract words added, against
+    the words of lines.json's lines. structure:
     the words of lines.json against those of blocks.json's blocks and notes,
     with each heading's label and each note's marker, plus its removals,
     with each word change undone. markdown: the words of blocks.json, with
@@ -483,7 +543,10 @@ def check_stage(
     book, split on white space, nothing normalised.
 
     Raises FidelityError with the missing and invented words, their counts,
-    and the pages or blocks each came from. At the structure and markdown
+    and the pages or blocks each came from. At the layout boundary it also
+    raises, with no word, when a kept re-reading names a layer word that
+    its page of words.json does not have (page, text and box), or one that
+    another kept re-reading names too. At the structure and markdown
     boundaries it also raises, with no word, when a note reference span
     names no note, does not have a marker's shape (1 to 4 characters, at
     most 3 letters or digits, no white space, "&" or dash, a letter only
@@ -496,8 +559,13 @@ def check_stage(
         case FidelityBoundary.LAYOUT:
             if not (isinstance(before, WordsFile) and isinstance(after, LinesFile)):
                 raise _wrong_types(stage, before, after)
+            _check_records(stage, _reread_problems(before, after))
             _check_words(
-                stage, _words_file_words(before), _lines_file_words(after), (), ""
+                stage,
+                _words_file_words(before),
+                _lines_file_words(after) + _reread_layer_words(after),
+                _reread_ocr_words(after),
+                "",
             )
         case FidelityBoundary.STRUCTURE:
             if not (isinstance(before, LinesFile) and isinstance(after, BlocksFile)):

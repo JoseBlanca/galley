@@ -195,7 +195,7 @@ _HEADS_WITHOUT_NUMBERS = (
 
 
 def _lines_of(*pages: PageLayout) -> LinesFile:
-    return LinesFile(source_pdf_sha256=_HASH, pages=pages)
+    return LinesFile(source_pdf_sha256=_HASH, pages=pages, rereads=())
 
 
 def _numbered_heads() -> tuple[PageLayout, ...]:
@@ -1200,6 +1200,7 @@ _LINES = LinesFile(
         PageLayout(1, (), ()),
         PageLayout(2, (replace(_REGION, lines=(_SECOND_LINE,)),), ()),
     ),
+    rereads=(),
 )
 
 

@@ -28,9 +28,12 @@ from pathlib import Path
 
 from galley.errors import EditError, InputFileError
 
-PAGES_FORMAT_VERSION = 1
-WORDS_FORMAT_VERSION = 1
-LINES_FORMAT_VERSION = 1
+# 2 since the plan clean-text, 17 November 2026: the front matter in
+# pages.json and words.json, the re-read regions in lines.json
+# (architecture section 8).
+PAGES_FORMAT_VERSION = 2
+WORDS_FORMAT_VERSION = 2
+LINES_FORMAT_VERSION = 2
 # 2 since the second plan of structure, 16 November 2026 (architecture section 8).
 BLOCKS_FORMAT_VERSION = 2
 EDITS_FORMAT_VERSION = 1
@@ -52,21 +55,24 @@ class Box:
 
 class PageKind(StrEnum):
     """What a page is, as analyze finds it: blank, text, a plate (mostly a
-    picture), or excluded by the config."""
+    picture), excluded by the config, or front matter: a page before the
+    book's text that would otherwise be a text page (front-matter spec)."""
 
     BLANK = "blank"
     TEXT = "text"
     PLATE = "plate"  # mostly a picture
     EXCLUDED = "excluded"
+    FRONT_MATTER = "front_matter"  # before the front-matter end, dropped
 
 
 class TextSource(StrEnum):
     """Where a page's words come from: the book's own text layer, galley's
-    OCR, or none (blank and excluded pages)."""
+    OCR, or none (blank, excluded and front-matter pages, and plates without
+    a text layer)."""
 
     TEXT_LAYER = "text_layer"
     OCR = "ocr"
-    NONE = "none"  # blank and excluded pages
+    NONE = "none"  # blank, excluded and front-matter pages
 
 
 class OcrVerdict(StrEnum):
@@ -165,6 +171,7 @@ class RemovalReason(StrEnum):
 
     EXCLUDED_PAGE = "excluded_page"
     EXCLUDED_REGION = "excluded_region"
+    FRONT_MATTER = "front_matter"  # a word of a page before the book's text
     RUNNING_HEAD = "running_head"
     PAGE_NUMBER = "page_number"
     SIGNATURE_MARK = "signature_mark"
@@ -186,7 +193,7 @@ class Removal:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class WordsFile:
     """words.json, written by extract. `removals` holds the words of
-    excluded pages and regions, one per word."""
+    excluded pages and regions and of front-matter pages, one per word."""
 
     format_version: int = WORDS_FORMAT_VERSION
     source_pdf_sha256: str
@@ -223,14 +230,51 @@ class PageLayout:
     figures: tuple[Figure, ...]
 
 
+class RereadKind(StrEnum):
+    """What region of a page layout read again with Tesseract (reocr spec,
+    section 3)."""
+
+    SMALL_PRINT_PAGE = "small_print_page"  # read whole below its running head
+    MARGIN_NOTE = "margin_note"  # one note band of an outer margin
+    CUT_IN_NOTE = "cut_in_note"  # one crop of notes cut into the column
+    FOOTNOTE_BAND = "footnote_band"  # one page's footnote band
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Reread:
+    """A region of a page that layout read again with Tesseract, recorded
+    whether its reading was kept or not (reocr spec, section 4).
+
+    `box` is the crop, in points. `layer_words` are the words of words.json
+    the reading would replace, `ocr_words` Tesseract's, with boxes in points
+    and their confidence. `layer_score` and `ocr_score` are each reading's
+    known words minus its unknown words. When `kept`, `ocr_words` stand in
+    lines.json in place of `layer_words`; otherwise the record changes
+    nothing.
+    """
+
+    page_index: int
+    kind: RereadKind
+    box: Box
+    layer_words: tuple[Word, ...]
+    ocr_words: tuple[Word, ...]
+    layer_score: int
+    ocr_score: int
+    kept: bool
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class LinesFile:
     """lines.json, written by layout. Every word of words.json is in exactly
-    one line."""
+    one line or among the `layer_words` of exactly one kept Reread, and
+    every word of a line is a word of words.json or among the `ocr_words`
+    of a kept Reread. `rereads` lists every region read again, in page
+    order."""
 
     format_version: int = LINES_FORMAT_VERSION
     source_pdf_sha256: str
     pages: tuple[PageLayout, ...]
+    rereads: tuple[Reread, ...]
 
 
 # blocks.json
