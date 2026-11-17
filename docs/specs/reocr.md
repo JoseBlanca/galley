@@ -436,7 +436,13 @@ word as one of its kept Tesseract words** (`model.replaced_layer_words`);
 the others stay in the layer. A layer word is that word when
 
 - (a) its middle lies inside the box of one of the Tesseract words
-  widened by 2 pt up and down and 1 pt across; or else
+  widened by 2 pt up and down and 1 pt across, and it is of that
+  Tesseract word's printed line: of the layer words under a Tesseract
+  word, the one whose middle lies nearest the Tesseract word's middle,
+  up or down, and those whose boxes overlap that one's up and down. A
+  Tesseract word reads one printed line; where the layer's lines lie
+  closer than its box widened, a word of the other line under it is
+  left to the rules below; or else
 - (b) its letters and digits, case-folded and not empty, equal those of
   one of the Tesseract words whose middle lies within 16 pt above or
   below its own, and that no other layer word has matched.
@@ -460,7 +466,12 @@ words: on Domesday page 548 the layer's "dominicum," lay under
 Tesseract's "dominieum,", which (c) then paired with the layer's
 "Domini" of the line above, where Tesseract had read only "3" for
 "Dominium, 224"; "Domini" was lost and "dominieum," read in for both
-(review of 17 November 2026).
+(review of 17 November 2026). Likewise, without the line of (a), one
+Tesseract word took the layer words of two printed lines that both lay
+under its widened box: "146" for "14. c" and the "14. c" of the line
+below in Gierke's list of page numbers (page 63), "Soca" for "I43" and
+"Normans," on Stubbs' index page 318; the fidelity check (architecture §13) now fails on such
+a record.
 
 A printed word that Tesseract did not read, or whose reading a filter
 dropped (a cut-in line at the inset, a word over a body word, a word
