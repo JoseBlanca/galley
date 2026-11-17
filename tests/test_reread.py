@@ -70,6 +70,7 @@ _WORD_LIST = frozenset(
         "next",
         "history",
         "index",
+        "coronation",
     }
 )
 
@@ -447,7 +448,7 @@ def _margin_rereads() -> tuple[Reread, ...]:
         page_words=_MARGIN_PAGE.words,
         edge=50,
     )
-    return page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST)
+    return page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST, page_words=())
 
 
 def test_margin_note_replaces_its_words_and_the_letters_under_tesseract_words() -> None:
@@ -479,7 +480,7 @@ def test_margin_note_reading_scoring_lower_keeps_the_layer() -> None:
         page_words=_MARGIN_PAGE.words,
         edge=50,
     )
-    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
     assert not record.kept
     assert words_after_rereads(_MARGIN_PAGE.words, (record,)) == _MARGIN_PAGE.words
 
@@ -492,7 +493,7 @@ def test_band_with_no_layer_word_and_no_reading_is_not_recorded() -> None:
         page_words=_MARGIN_PAGE.words,
         edge=50,
     )
-    assert page_rereads(7, (reading,), _WORD_LIST) == ()
+    assert page_rereads(7, (reading,), _WORD_LIST, page_words=()) == ()
 
 
 def test_tesseract_junk_of_no_letter_or_digit_is_dropped_and_counted() -> None:
@@ -513,7 +514,7 @@ def test_tesseract_junk_of_no_letter_or_digit_is_dropped_and_counted() -> None:
         page_words=_MARGIN_PAGE.words,
         edge=50,
     )
-    (record,) = page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST)
+    (record,) = page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST, page_words=())
     assert _texts(record.ocr_words) == ("Moral", "lessons.", "—", "§")
     assert record.dropped_junk_count == 3
     assert record.kept
@@ -527,7 +528,7 @@ def test_region_of_tesseract_junk_alone_over_no_layer_word_is_recorded() -> None
         page_words=_MARGIN_PAGE.words,
         edge=50,
     )
-    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
     assert (record.ocr_words, record.layer_words) == ((), ())
     assert record.dropped_junk_count == 2
     assert not record.kept
@@ -541,33 +542,79 @@ def test_note_the_layer_did_not_read_is_kept() -> None:
         page_words=_MARGIN_PAGE.words,
         edge=50,
     )
-    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
     assert record.layer_words == ()
     assert record.kept
 
 
-def _band_over_nothing(*texts: str) -> Reread:
+def _band_over_nothing(
+    *texts: str,
+    confidences: tuple[float, ...] = (),
+    page_words: tuple[Word, ...] = (),
+) -> Reread:
     """The record of a note band where the layer has no word, read by
-    Tesseract as `texts` on one row."""
+    Tesseract as `texts` on one row, at `confidences` in order (90 for
+    each word past their end), on a page of `_MARGIN_PAGE`'s words and
+    `page_words`."""
+    words = (*_MARGIN_PAGE.words, *page_words)
     reading = margin_note_reading(
         Side.LEFT,
         Box(8, 400, 46, 420),
         tuple(
-            _ocr(text, 10 + 12 * index, 402, 20 + 12 * index, 410)
+            Word(
+                text,
+                Box(10 + 12 * index, 402, 20 + 12 * index, 410),
+                confidences[index] if index < len(confidences) else 90.0,
+            )
             for index, text in enumerate(texts)
         ),
         page_words=_MARGIN_PAGE.words,
         edge=50,
     )
-    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=words)
     return record
 
 
-def test_band_over_no_layer_word_read_as_one_known_word_is_not_kept() -> None:
-    # Gierke page 120: "af" over nothing, score 1 against 0.
+def test_band_over_no_layer_word_read_as_one_known_word_of_3_letters_is_not_kept() -> (
+    None
+):
+    # Gierke page 120: "af" over nothing, score 1 against 0. A word of
+    # fewer than 4 letters is no sure single word (reocr spec, section 3).
     record = _band_over_nothing("the")
     assert (record.layer_score, record.ocr_score) == (0, 1)
     assert not record.kept
+
+
+def test_band_over_no_layer_word_read_as_one_sure_word_is_kept() -> None:
+    # Stubbs page 63: "Coronation." over nothing at a confidence of 97; a
+    # word of 4 letters at 80 is enough.
+    assert _band_over_nothing("Coronation.", confidences=(97.0,)).kept
+    assert _band_over_nothing("Next", confidences=(80.0,)).kept
+
+
+def test_band_over_no_layer_word_read_as_one_known_word_at_79_is_not_kept() -> None:
+    assert not _band_over_nothing("Moral", confidences=(79.0,)).kept
+
+
+def test_band_over_no_layer_word_with_a_second_word_under_80_is_not_kept() -> None:
+    assert _band_over_nothing("Moral", ".", confidences=(90.0, 80.0)).kept
+    assert not _band_over_nothing("Moral", ".", confidences=(90.0, 79.0)).kept
+
+
+def test_band_over_no_layer_word_read_as_one_word_a_layer_word_may_read_is_not_kept() -> (
+    None
+):
+    # Stubbs page 181: the note's "Lewis." beside the body's "Lewis", which
+    # could then be read twice. A layer word of the same letters 10 pt
+    # below the Tesseract word may read it (model.may_read); 20 pt below,
+    # it may not.
+    assert _band_over_nothing("Lessons.").kept
+    assert not _band_over_nothing(
+        "Lessons.", page_words=(_word("lessons", 120, 412, 150, 420),)
+    ).kept
+    assert _band_over_nothing(
+        "Lessons.", page_words=(_word("lessons", 120, 422, 150, 430),)
+    ).kept
 
 
 def test_band_over_no_layer_word_with_2_known_words_and_1_unknown_is_kept() -> None:
@@ -615,7 +662,7 @@ def _cut_in_rereads() -> tuple[Reread, ...]:
         cut_in_words=(_TANCE,),
         column_words=(_CHANGE, _HE_BARONS, _BESIDE, _BODY_AN),
     )
-    return page_rereads(_CUT_IN_PAGE.index, (reading,), _WORD_LIST)
+    return page_rereads(_CUT_IN_PAGE.index, (reading,), _WORD_LIST, page_words=())
 
 
 def test_cut_in_crop_drops_tesseract_words_over_body_words_and_lines_at_the_inset() -> (
@@ -653,7 +700,7 @@ def test_cut_in_reading_with_no_word_left_replaces_nothing() -> None:
         cut_in_words=(note,),
         column_words=(_CHANGE, _BODY_AN),
     )
-    assert page_rereads(7, (reading,), _WORD_LIST) == ()
+    assert page_rereads(7, (reading,), _WORD_LIST, page_words=()) == ()
 
 
 def test_reading_scoring_the_same_as_the_layer_keeps_the_layer() -> None:
@@ -661,7 +708,7 @@ def test_reading_scoring_the_same_as_the_layer_keeps_the_layer() -> None:
     reading = margin_note_reading(
         Side.LEFT, _BAND, (_OCR_MORAL,), page_words=page.words, edge=50
     )
-    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
     assert (record.layer_score, record.ocr_score) == (1, 1)
     assert not record.kept
 
@@ -678,7 +725,7 @@ def _cut_in_after(layer_word: Word, ocr_line: tuple[Word, ...]) -> tuple[str, ..
         cut_in_words=(),
         column_words=(layer_word,),
     )
-    rereads = page_rereads(7, (reading,), _WORD_LIST)
+    rereads = page_rereads(7, (reading,), _WORD_LIST, page_words=())
     return _texts(words_after_rereads((layer_word,), rereads))
 
 
@@ -740,7 +787,7 @@ def test_cut_in_crop_at_the_right_side_mirrors_the_left() -> None:
         cut_in_words=(),
         column_words=(note, body),
     )
-    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
     assert _texts(record.ocr_words) == ("the", "Barons.")
     assert record.layer_words == (note,)
     assert record.kept
@@ -769,7 +816,7 @@ def test_second_of_two_overlapping_regions_takes_no_word_the_first_replaced() ->
         edge=50,
     )
     # Given in either order, the upper band is taken first.
-    first, second = page_rereads(7, (lower, upper), _WORD_LIST)
+    first, second = page_rereads(7, (lower, upper), _WORD_LIST, page_words=())
     assert first.layer_words == (moral, lesons)
     assert first.kept
     assert second.layer_words == (following,)
@@ -798,7 +845,7 @@ def _touching_bands() -> tuple[tuple[Word, Word], tuple[Reread, ...]]:
         page_words=page.words,
         edge=50,
     )
-    records = page_rereads(7, (upper, lower), _WORD_LIST)
+    records = page_rereads(7, (upper, lower), _WORD_LIST, page_words=())
     _check_fidelity(page, records)
     return (moral, lesons), records
 
@@ -845,7 +892,7 @@ def test_records_of_a_page_are_in_the_order_of_their_kinds_and_tops() -> None:
         reading("margin", Side.LEFT, 100),
     )
     # No crop overlaps another, so every region is recorded.
-    records = page_rereads(7, readings, _WORD_LIST)
+    records = page_rereads(7, readings, _WORD_LIST, page_words=())
     assert tuple(
         (record.kind, record.box.top, record.box.x0) for record in records
     ) == (
@@ -877,7 +924,7 @@ def test_small_print_page_replaces_every_word_but_its_running_head() -> None:
         page_words=page.words,
         head_words=(head,),
     )
-    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
     assert record.kind is RereadKind.SMALL_PRINT_PAGE
     assert record.layer_words == (margin, *entries)
     assert record.kept
@@ -891,7 +938,7 @@ def test_small_print_page_with_another_region_raises() -> None:
     )
     margin = margin_note_reading(Side.LEFT, _BAND, (), page_words=page.words, edge=50)
     with pytest.raises(ValueError, match="small-print page"):
-        page_rereads(7, (whole, margin), _WORD_LIST)
+        page_rereads(7, (whole, margin), _WORD_LIST, page_words=())
 
 
 def test_footnote_band_replaces_the_band_words() -> None:
@@ -902,7 +949,7 @@ def test_footnote_band_replaces_the_band_words() -> None:
         (_ocr("1", 50, 500, 55, 507), _ocr("Ibid.", 58, 500, 80, 507)),
         band_words=band,
     )
-    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
     assert record.kind is RereadKind.FOOTNOTE_BAND
     assert record.layer_words == band
     # "1" is a number, so known; "^" is neither; "Ibid." is not in the list.
@@ -970,7 +1017,7 @@ def test_cut_in_note_line_dropped_at_the_inset_keeps_the_layer_words() -> None:
         cut_in_words=notes,
         column_words=body,
     )
-    (record,) = page_rereads(5, (reading,), _REVIEW_WORD_LIST)
+    (record,) = page_rereads(5, (reading,), _REVIEW_WORD_LIST, page_words=())
     assert record.kept
     assert _texts(record.layer_words) == ("Tbe", "kinq")
     assert _texts(record.ocr_words) == ("The", "king")
@@ -1032,7 +1079,7 @@ def test_band_words_inside_an_earlier_kept_crop_keep_the_layer_words() -> None:
     # Tesseract's "See" and "Stubbs" of the band: they are dropped, and
     # the layer's "Sce Stnbbs" stay.
     page, readings = _note_and_band("note")
-    cut_in, footnotes = page_rereads(5, readings, _REVIEW_WORD_LIST)
+    cut_in, footnotes = page_rereads(5, readings, _REVIEW_WORD_LIST, page_words=())
     assert cut_in.kept
     assert footnotes.kept
     assert _texts(footnotes.layer_words) == ("Pagc", "hist.")
@@ -1048,7 +1095,7 @@ def test_band_words_inside_an_earlier_crop_not_kept_are_read_by_the_band() -> No
     # Tesseract reads the note "nxta", unknown as the layer's "nota": a
     # tie, so the crop is not kept and drops nothing from the band.
     page, readings = _note_and_band("nxta")
-    cut_in, footnotes = page_rereads(5, readings, _REVIEW_WORD_LIST)
+    cut_in, footnotes = page_rereads(5, readings, _REVIEW_WORD_LIST, page_words=())
     assert not cut_in.kept
     assert footnotes.kept
     assert _texts(footnotes.layer_words) == ("Sce", "Stnbbs", "Pagc", "hist.")
@@ -1070,7 +1117,7 @@ def test_margin_word_outside_the_strip_with_no_tesseract_word_over_it_stays() ->
         page_words=page.words,
         edge=50,
     )
-    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
     assert record.layer_words == (garbled,)
     assert record.kept
     after = words_after_rereads(page.words, (record,))

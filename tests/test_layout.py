@@ -2105,12 +2105,14 @@ def test_reread_gierke_88_reads_its_four_margin_notes_the_last_one_the_layer_mis
 
 @pytest.mark.tesseract
 @pytest.mark.usefixtures("tesseract_of_the_literals")
-def test_reread_stubbs_excerpt_keeps_tesseract_for_seven_of_its_cut_in_crops(
+def test_reread_stubbs_excerpt_keeps_tesseract_for_nine_of_its_cut_in_crops(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     # The excerpt's pages 1 to 9 are book page indices 56 to 64. The other
     # crops keep the layer: it read the note as well ("His family policy.",
-    # page 2), or Tesseract's reading scores no higher.
+    # page 2), or Tesseract's reading scores no higher. "Henry’s" (page 7)
+    # and "Coronation." (page 8) are sure single words over no layer word
+    # (reocr spec, section 3).
     lines = read_lines(excerpt_books["stubbs_51_56-64"].lines_json)
     assert _kept_readings(lines) == tuple(
         (page, RereadKind.CUT_IN_NOTE, text)
@@ -2120,7 +2122,9 @@ def test_reread_stubbs_excerpt_keeps_tesseract_for_seven_of_its_cut_in_crops(
             (5, "Terms of pacification,"),  # printed "pacification."
             (6, "Meaning of these terms,"),  # printed "terms."
             (7, "Arrival of Henry as successor to Stephen, 1154."),
+            (7, "Henry’s"),  # printed "Henry's advisers."
             (8, "Bishop of Winchester. The Empress."),
+            (8, "Coronation."),
             (9, "Destruction of castles."),
         )
     )
@@ -2129,11 +2133,15 @@ def test_reread_stubbs_excerpt_keeps_tesseract_for_seven_of_its_cut_in_crops(
     assert tuple(_line_texts(lines.pages[page])[2:] for page in (5, 6, 7, 8, 9)) == (
         (("Plan of", "reform."), ("Terms of", "pacification,")),
         (("Meaning of", "these terms,"),),
-        (("Arrival of", "Henry as", "successor", "to Stephen,", "1154."),),
+        (
+            ("Arrival of", "Henry as", "successor", "to Stephen,", "1154."),
+            ("Henry’s",),
+        ),
         (
             ("Bishop", "of Winchester."),
             ("The", "Empress."),
             ("Theobald", "and Becket."),
+            ("Coronation.",),
         ),
         (("Banishment",), ("Destruction of", "castles.")),
     )
@@ -2199,7 +2207,9 @@ def test_reread_stubbs_excerpt_leaves_every_line_without_a_replaced_word_as_trus
         "one, to be maintained only by caution ; advUers."
         in _line_texts(reread.pages[7])[1]
     )
-    assert sum(len(page.regions) for page in reread.pages) == sum(
+    # Two more regions: the notes "Henry’s" and "Coronation.", which the
+    # layer did not read (pages 7 and 8).
+    assert sum(len(page.regions) for page in reread.pages) == 2 + sum(
         len(page.regions) for page in trusted.pages
     )
 

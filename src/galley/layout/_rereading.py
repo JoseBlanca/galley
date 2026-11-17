@@ -450,6 +450,7 @@ def layout_page_with_rereads(
         page.index,
         _page_readings(page, parts, measures, rereading),
         rereading.lower_case_words,
+        page_words=page.words,
     )
     kept = tuple(record for record in records if record.kept)
     if not kept:

@@ -48,6 +48,7 @@ from galley.model import (
     folded_letters_and_digits,
     is_under_ocr_word,
     matched_ocr_positions,
+    may_read,
     replaced_layer_words,
     take_out_once,
     word_middle,
@@ -108,6 +109,14 @@ _MARGIN_SIDE_PAGES_PER_100: Final[int] = 10
 # Tesseract's (reocr spec, section 3): "af", read over nothing on Gierke
 # page 120, is one; "Medieval Thought.", on page 88, two.
 _OVER_NOTHING_LEAST_KNOWN: Final[int] = 2
+# Or with one sure single word (reocr spec, section 3): 4 letters or more,
+# every word read at a confidence of 80 or more. Measured on whole Stubbs,
+# Domesday and Gierke on 17 November 2026: every such word at 80 or more
+# with no layer word that may read it is a printed note word ("Coronation."
+# 97, Stubbs page 63; the lowest "enemies." 81, page 95); "af" is 69, and
+# the page numbers and table heads at 88 to 97 have fewer letters.
+_SURE_WORD_LEAST_LETTERS: Final[int] = 4
+_SURE_WORD_LEAST_CONFIDENCE: Final[float] = 80.0
 
 # The crops (reocr spec, section 3). Measured on Stubbs and Domesday, or set
 # so that a crop holds its words with a little white around them.
@@ -719,10 +728,42 @@ def _record_order(reading: RegionReading) -> tuple[int, float, bool]:
     return (_kind_rank(reading.kind), reading.box.top, reading.side is Side.RIGHT)
 
 
+def _is_sure_single_word(
+    ocr_words: tuple[Word, ...],
+    ocr_scores: tuple[int, ...],
+    page_words: tuple[Word, ...],
+) -> bool:
+    """Whether `ocr_words`, Tesseract's reading of a region over no layer
+    word, scored word by word as `ocr_scores`, holds one sure single word
+    (reocr spec, section 3): one known word, of 4 letters or more, every
+    word read at a confidence of 80 or more, and no word of `page_words`,
+    the page's layer, that may read one of them (`model.may_read`)."""
+    known = tuple(
+        word for word, score in zip(ocr_words, ocr_scores, strict=True) if score == 1
+    )
+    return (
+        len(known) == 1
+        and sum(character.isalpha() for character in known[0].text)
+        >= _SURE_WORD_LEAST_LETTERS
+        and all(
+            word.ocr_confidence is not None
+            and word.ocr_confidence >= _SURE_WORD_LEAST_CONFIDENCE
+            for word in ocr_words
+        )
+        and not any(
+            may_read(layer_word, ocr_word)
+            for layer_word in page_words
+            for ocr_word in ocr_words
+        )
+    )
+
+
 def page_rereads(
     page_index: int,
     readings: tuple[RegionReading, ...],
     lower_case_words: frozenset[str],
+    *,
+    page_words: tuple[Word, ...],
 ) -> tuple[Reread, ...]:
     """The records of the regions of page `page_index` read again, in the
     order of the records (reocr spec, section 4): a small-print page; else
@@ -742,7 +783,10 @@ def page_rereads(
     replace; the others stay in the layer. A region is kept when its
     words of Tesseract's are not empty and score higher than the layer
     words it replaces, by `reading_score` against `lower_case_words`, and,
-    when it replaces no layer word, hold at least 2 known words. A
+    when it replaces no layer word, hold at least 2 known words, or one
+    known word of 4 letters or more, all its words read at a confidence
+    of 80 or more, that no word of `page_words`, the page's text layer,
+    may read (`model.may_read`). A
     region where both readings are empty, before the junk is dropped, is
     not recorded. ValueError when
     a small-print page comes with another region: no other region of such
@@ -780,7 +824,9 @@ def page_rereads(
         ocr_scores = _word_scores(ocr_words, lower_case_words)
         ocr_score = sum(ocr_scores)
         kept = ocr_score > layer_score and (
-            bool(layer_words) or ocr_scores.count(1) >= _OVER_NOTHING_LEAST_KNOWN
+            bool(layer_words)
+            or ocr_scores.count(1) >= _OVER_NOTHING_LEAST_KNOWN
+            or _is_sure_single_word(ocr_words, ocr_scores, page_words)
         )
         if kept:
             replaced.extend(layer_words)
