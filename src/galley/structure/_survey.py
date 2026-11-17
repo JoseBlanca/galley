@@ -19,6 +19,7 @@ from galley.structure._heads import (
     is_confirmed,
     is_number_like,
     is_roman_number,
+    starts_with_chapter_label_word,
     without,
 )
 from galley.structure._index import index_pages
@@ -75,7 +76,9 @@ class BookSurvey:
     the page indices whose lowest line is a signature line (section 4);
     `heads_below_specks` the page indices whose head line is a speck and
     the line below it a running head (section 3); `index_pages` the page
-    indices of the printed indexes (section 17).
+    indices of the printed indexes (section 17); `head_numbers` the arabic
+    page number of each page whose running head has one, by page index
+    (section 4, the local offset).
     """
 
     running_heads: frozenset[int]
@@ -88,6 +91,7 @@ class BookSurvey:
     signature_lines: frozenset[int]
     heads_below_specks: frozenset[int]
     index_pages: frozenset[int]
+    head_numbers: frozendict[int, int]
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,9 +144,10 @@ def _page_measures(page: PageLayout) -> _PageMeasures:
         )
     )
     return _PageMeasures(
-        head=head.lines[-1] if head is not None else None,
+        head=head.line if head is not None else None,
         below_head=line_at(page, below)
-        if head is not None and (below := line_below_head(page)) is not None
+        if head is not None
+        and (below := line_below_head(page, head.region_numbers)) is not None
         else None,
         line_heights=tuple(
             median_word_height(line.words)
@@ -240,12 +245,14 @@ def _alike_pages(
 
 @dataclass(frozen=True, slots=True)
 class _HeadSurvey:
-    """What the survey finds of the head lines (spec section 3)."""
+    """What the survey finds of the head lines (spec section 3), and the
+    arabic page number of each running head that has one (section 4)."""
 
     running_heads: frozenset[int]
     offset: int | None
     first_arabic_page: int | None
     heads_below_specks: frozenset[int]
+    head_numbers: frozendict[int, int]
 
 
 def _texts(line: Line) -> tuple[str, ...]:
@@ -312,7 +319,7 @@ def _head_survey(
     head lines, (page index, head line, line below it), and `top_letters`,
     the letters of each page's topmost line (spec section 3)."""
     if not heads:
-        return _HeadSurvey(frozenset(), None, None, frozenset())
+        return _HeadSurvey(frozenset(), None, None, frozenset(), frozendict())
     median_top = statistics.median(line.box.top for _, line, _ in heads)
     limit = _HEAD_PITCHES * pitch
     near = tuple(
@@ -355,7 +362,13 @@ def _head_survey(
         _HEADS_ALIKE,
         workers,
     )
-    running = alike_whole | confirmed | alike_without_number
+    # A chapter label is never a running head, whatever the rules find.
+    labels = frozenset(
+        page_index
+        for page_index, line, _ in heads
+        if starts_with_chapter_label_word(_texts(line))
+    )
+    running = (alike_whole | confirmed | alike_without_number) - labels
     running_letters = tuple(
         sorted({_line_letters(line) for page, line in near if page in running})
     )
@@ -366,6 +379,7 @@ def _head_survey(
         and below is not None
         and len(_line_letters(line)) < _HEAD_MIN_LETTERS
         and below.box.top - median_top <= limit
+        and not starts_with_chapter_label_word(_texts(below))
         and _alike_to_any(_line_letters(below), running_letters, _HEADS_ALIKE)
     )
     short_sections = frozenset(
@@ -374,10 +388,55 @@ def _head_survey(
         # The speck above a head of below_specks never passes the rule: its
         # line has fewer than 4 letters, so the rest of it has fewer still.
         if page_index not in running
+        and page_index not in labels
         and _is_short_section_head(page_index, line, top_letters)
     )
+    # The line removed as each page's running head: its head line, or the
+    # line below a speck.
+    removed_heads = tuple(
+        (page_index, line)
+        for page_index, line, _ in heads
+        if page_index in running | short_sections
+    ) + tuple(
+        (page_index, below)
+        for page_index, _, below in heads
+        if page_index in below_specks and below is not None
+    )
+    head_numbers = frozendict(
+        {
+            page_index: value
+            for page_index, line in removed_heads
+            if (number := head_page_number(page_index, line, first_arabic_page, offset))
+            is not None
+            and (value := arabic_number(number)) is not None
+        }
+    )
     return _HeadSurvey(
-        running | short_sections, offset, first_arabic_page, below_specks
+        running | short_sections,
+        offset,
+        first_arabic_page,
+        below_specks,
+        head_numbers,
+    )
+
+
+def head_page_number(
+    page_index: int, line: Line, first_arabic_page: int | None, offset: int | None
+) -> EndNumber | None:
+    """A running head's page number, or None (spec section 3): a
+    page-number form at the start or end of its `line`, a run of digit
+    words joined, a roman one only before `first_arabic_page`; of two, the
+    one `offset` puts within 2 of the page index, else the first."""
+    candidates = number_candidates(page_index, line, first_arabic_page)
+    if not candidates:
+        return None
+    return next(
+        (
+            candidate
+            for candidate in candidates
+            if is_confirmed(page_index, arabic_number(candidate), offset)
+        ),
+        candidates[0],
     )
 
 
@@ -457,4 +516,5 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
         ),
         heads_below_specks=head_survey.heads_below_specks,
         index_pages=index_pages(lines.pages, kinds),
+        head_numbers=head_survey.head_numbers,
     )

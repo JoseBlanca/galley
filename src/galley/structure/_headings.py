@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from enum import StrEnum
 
 from galley.model import BlockKind
+from galley.structure._heads import CHAPTER_LABEL_WORDS
 from galley.structure._lines import PlacedLine, is_centred
 from galley.structure._measures import Edges
 from galley.structure._runs import CHAPTER_LEVEL, SECTION_LEVEL, BodyRun, LabelLine
@@ -45,10 +46,6 @@ _CONTINUATION_GAP_BELOW_MIN_PITCHES = 1.5
 _JOIN_MAX_PITCHES = 2.6
 _JOIN_AFTER_LABEL_MAX_PITCHES = 4.0
 
-# Spec section 14, "Terms": the words that start a chapter label.
-_LABEL_WORDS = frozenset(
-    {"chapter", "chapitre", "essay", "part", "partie", "book", "livre"}
-)
 # Spec section 14: a roman numeral alone as the OCR reads one, 1 to 5 of
 # "IVXLCl1" with an optional ".", ("II", "Ill" for III).
 _OCR_ROMAN_LABEL = re.compile(r"[IVXLCl1]{1,5}\.?")
@@ -90,7 +87,7 @@ def _starts_with_label_word(line: PlacedLine) -> bool:
     """Whether the line's first word, without the punctuation after it, is
     one of the label words, in any case."""
     texts = _texts(line)
-    return bool(texts) and texts[0].rstrip(".,:;").lower() in _LABEL_WORDS
+    return bool(texts) and texts[0].rstrip(".,:;").lower() in CHAPTER_LABEL_WORDS
 
 
 def _has_long_word(texts: Sequence[str]) -> bool:

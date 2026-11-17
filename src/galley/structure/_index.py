@@ -71,7 +71,7 @@ def _title_line(page: PageLayout, kinds: Sequence[RegionKind]) -> Line | None:
     first line of its first body region; None without either."""
     head = head_line(page)
     if head is not None:
-        return head.lines[-1]
+        return head.line
     return next(
         (
             region.lines[0]
@@ -137,7 +137,7 @@ def _index_columns(
         number
         for number, (region, kind) in enumerate(zip(page.regions, kinds, strict=True))
         if kind is not RegionKind.MARGIN
-        and region is not head
+        and (head is None or number not in head.region_numbers)
         and _COLUMN_SHARE_MIN * span <= _width(region) <= _COLUMN_SHARE_MAX * span
     )
     boxes = {number: page.regions[number].box for number in candidates}
@@ -389,7 +389,7 @@ def _column_items(
             for line_number, line in enumerate(region.lines)
             if (number, line_number) not in removed
         )
-        if region is head:
+        if head is not None and number in head.region_numbers:
             continue
         if number in columns.left or number in columns.right:
             side = _Column.LEFT if number in columns.left else _Column.RIGHT
@@ -515,7 +515,7 @@ def index_page(
     guide_lines = frozenset(
         (number, line_number)
         for number, region in enumerate(page.regions)
-        if region is not head
+        if head is None or number not in head.region_numbers
         for line_number, line in enumerate(region.lines)
         if (number, line_number) not in removed and _is_guide_words_line(line)
     )
