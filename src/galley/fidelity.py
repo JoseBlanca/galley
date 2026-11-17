@@ -19,6 +19,7 @@ from enum import StrEnum
 from typing import Literal, assert_never, overload
 
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
+from galley.hyphens import LINE_END_HYPHENS
 from galley.model import (
     Block,
     BlocksFile,
@@ -518,9 +519,6 @@ def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
 
 # A hyphen join is two parts of a word split at a line end (glossary).
 _HYPHEN_JOIN_PARTS = 2
-# The hyphens at a line's end (structure spec section 5): the ASCII
-# hyphen-minus and the not sign "¬" of the OCR of two of the owner's books.
-_LINE_END_HYPHENS = frozenset({"-", "\N{NOT SIGN}"})
 
 
 def _change_follows_its_reason(change: WordChange) -> bool:
@@ -538,13 +536,13 @@ def _change_follows_its_reason(change: WordChange) -> bool:
         case ChangeReason.HYPHEN_JOIN | ChangeReason.HYPHEN_JOIN_GUESSED:
             return (
                 len(change.before) == _HYPHEN_JOIN_PARTS
-                and change.before[0][-1:] in _LINE_END_HYPHENS
+                and change.before[0][-1:] in LINE_END_HYPHENS
                 and change.before[0][:-1] + change.before[1] == joined_after
             )
         case ChangeReason.HYPHEN_KEPT:
             return (
                 len(change.before) == _HYPHEN_JOIN_PARTS
-                and change.before[0][-1:] in _LINE_END_HYPHENS
+                and change.before[0][-1:] in LINE_END_HYPHENS
                 and change.before[0][:-1] + "-" + change.before[1] == joined_after
             )
         case _:

@@ -124,6 +124,11 @@ def test_reading_score_counts_a_broken_word_known_when_joined() -> None:
     assert reading_score(_layer("bar-", "ons"), _WORD_LIST) == 1
 
 
+def test_reading_score_counts_a_word_broken_with_a_not_sign_once() -> None:
+    # "¬" marks every line-end hyphen in the OCR of two of the owner's books.
+    assert reading_score(_layer("bar\N{NOT SIGN}", "ons"), _WORD_LIST) == 1
+
+
 def test_reading_score_does_not_take_a_dash_alone_as_the_first_part_of_a_word() -> None:
     # Taken as "free-" broken at a line end, "-" would join it into "free-",
     # unknown, and leave "holding" alone: 0 instead of 1.

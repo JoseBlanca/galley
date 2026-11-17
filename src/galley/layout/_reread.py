@@ -28,6 +28,7 @@ from typing import Final, assert_never
 from PIL import Image
 
 from galley.body_measures import group_rows
+from galley.hyphens import LINE_END_HYPHENS
 from galley.layout._column import (
     BookMeasures,
     ColumnSplit,
@@ -83,7 +84,6 @@ NOTE_PSM: Final[int] = 6
 # Stubbs and Domesday, section 3.
 _QUOTATION_MARKS: Final[str] = "‘’“”\"'"
 _CURLY_APOSTROPHE: Final[str] = "’"
-_HYPHEN: Final[str] = "-"
 
 # The small-print page (reocr spec, section 3, kind 1): measured on the six
 # books; the share lies in a gap from 0.78 to 0.86.
@@ -172,7 +172,7 @@ def _broken_word_score(
     """The score of a word broken at a line end, `first` ending in a
     hyphen: 1 when each part is known, otherwise the score of the joined
     word, 1 when it is known."""
-    stem = first.removesuffix(_HYPHEN)
+    stem = first[:-1]
     if is_known_word(stem, lower_case_words) and is_known_word(
         second, lower_case_words
     ):
@@ -182,7 +182,9 @@ def _broken_word_score(
 
 def _is_broken_pair(first: str, second: str) -> bool:
     return (
-        first.endswith(_HYPHEN) and _has_letter_or_digit(first) and second[:1].isalpha()
+        first[-1:] in LINE_END_HYPHENS
+        and _has_letter_or_digit(first)
+        and second[:1].isalpha()
     )
 
 

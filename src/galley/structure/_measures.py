@@ -9,6 +9,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from galley.body_measures import commonest
+from galley.hyphens import LINE_END_HYPHENS
 from galley.model import Box, Line, Region, Removal, RemovalReason, Word
 
 # Spec section 6: a region of fewer lines takes its box's sides as edges.
@@ -128,12 +129,6 @@ def region_edges(region: Region) -> Edges:
 def middle(box: Box) -> float:
     """The horizontal middle of a box."""
     return (box.x0 + box.x1) / 2
-
-
-# Spec section 5: the hyphens at a line's end, the ASCII hyphen-minus and
-# the not sign "¬" (U+00AC), with which the OCR of two of the owner's books
-# marks every line-end hyphen.
-LINE_END_HYPHENS = frozenset({"-", "\N{NOT SIGN}"})
 
 
 def is_hyphen_first_part(text: str) -> bool:
