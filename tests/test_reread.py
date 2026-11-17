@@ -33,7 +33,6 @@ from galley.layout._reread import (
     reading_score,
     small_print_crop,
     small_print_reading,
-    words_after_rereads,
 )
 from galley.model import (
     Box,
@@ -46,6 +45,7 @@ from galley.model import (
     TextSource,
     Word,
     WordsFile,
+    words_after_rereads,
 )
 
 # The words the tests' word list holds, in lower case, as

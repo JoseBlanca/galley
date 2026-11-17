@@ -58,7 +58,6 @@ __all__ = [
     "reading_score",
     "small_print_crop",
     "small_print_reading",
-    "words_after_rereads",
 ]
 
 # Tesseract's page segmentation modes (reocr spec, section 3): a
@@ -718,16 +717,3 @@ def page_rereads(
             )
         )
     return tuple(records)
-
-
-def words_after_rereads(
-    words: tuple[Word, ...], rereads: tuple[Reread, ...]
-) -> tuple[Word, ...]:
-    """A page's `words` with its kept `rereads` applied: the layer words of
-    each kept record taken out, in their order, then the words of
-    Tesseract's of each kept record, in the records' order."""
-    kept = tuple(reread for reread in rereads if reread.kept)
-    return (
-        *_without(words, (word for reread in kept for word in reread.layer_words)),
-        *(word for reread in kept for word in reread.ocr_words),
-    )

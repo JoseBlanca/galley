@@ -1719,3 +1719,33 @@ def test_layer_word_is_under_an_ocr_word_whose_box_widened_by_1_pt_holds_its_mid
     layer_word = Word("Moial", Box(x - 2, y - 2, x + 2, y + 2), None)
     ocr_word = Word("Moral", Box(10.0, 10.0, 20.0, 20.0), 90.0)
     assert model.is_under_ocr_word(layer_word, (ocr_word,)) is under
+
+
+def _rereads_record(
+    layer_words: tuple[Word, ...], ocr_words: tuple[Word, ...], *, kept: bool
+) -> Reread:
+    return Reread(
+        page_index=0,
+        kind=RereadKind.MARGIN_NOTE,
+        box=Box(0.0, 0.0, 50.0, 50.0),
+        layer_words=layer_words,
+        ocr_words=ocr_words,
+        layer_score=0,
+        ocr_score=1,
+        kept=kept,
+    )
+
+
+def test_words_after_rereads_swap_each_kept_records_layer_words_once() -> None:
+    # "of" is on the page twice, at the same place, and one is replaced.
+    of = Word("of", Box(10.0, 10.0, 20.0, 20.0), None)
+    moial = Word("Moial", Box(30.0, 10.0, 40.0, 20.0), None)
+    body = Word("The", Box(100.0, 10.0, 120.0, 20.0), None)
+    kept = _rereads_record(
+        (moial, of), (Word("Moral", Box(30.0, 10.0, 40.0, 20.0), 90.0),), kept=True
+    )
+    not_kept = _rereads_record(
+        (body,), (Word("Tbe", Box(100.0, 10.0, 120.0, 20.0), 40.0),), kept=False
+    )
+    after = model.words_after_rereads((body, of, moial, of), (kept, not_kept))
+    assert tuple(word.text for word in after) == ("The", "of", "Moral")

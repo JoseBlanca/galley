@@ -10,6 +10,7 @@ itself.
 """
 
 import bisect
+import collections
 import dataclasses
 import functools
 import hashlib
@@ -284,6 +285,27 @@ def is_under_ocr_word(word: Word, ocr_words: Sequence[Word]) -> bool:
         <= ocr_word.box.bottom + _UNDER_OCR_WORD_PT
         for ocr_word in ocr_words
     )
+
+
+def words_after_rereads(
+    words: tuple[Word, ...], rereads: tuple[Reread, ...]
+) -> tuple[Word, ...]:
+    """The words of a page as lines.json holds them: `words`, the page's
+    words of words.json, less the `layer_words` of each kept record of
+    `rereads`, the page's records, each taken out once, in their order;
+    then the `ocr_words` of each kept record, in the records' order. A
+    record not kept changes nothing (reocr spec, section 4)."""
+    kept = tuple(reread for reread in rereads if reread.kept)
+    replaced = collections.Counter(
+        word for reread in kept for word in reread.layer_words
+    )
+    staying = []
+    for word in words:
+        if replaced[word] > 0:
+            replaced[word] -= 1
+        else:
+            staying.append(word)
+    return (*staying, *(word for reread in kept for word in reread.ocr_words))
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
