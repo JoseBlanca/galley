@@ -89,6 +89,7 @@ from galley.structure._references import (
 )
 from galley.structure._regions import region_kinds
 from galley.structure._unnumbered import Unnumbered, without_marker
+from galley.wordlist import word_key
 
 
 def _word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
@@ -2020,6 +2021,14 @@ def test_join_lost_hyphen_does_not_join(first: str, second: str) -> None:
         join_lost_hyphen(first, second, _NO_WORDS, _LOST_WORD_LIST, frozenset({"the"}))
         is None
     )
+
+
+@pytest.mark.parametrize("first", ["AD1066", "(nation)", "nation)."])
+def test_join_lost_hyphen_needs_a_letter_before_the_break(first: str) -> None:
+    # A first word ending in a digit or a closing mark is no part of a word
+    # broken at a line end, though the book prints the joined form.
+    book_words = frozenset({word_key(first.removesuffix(".") + "al")})
+    assert join_lost_hyphen(first, "al", book_words, _NO_WORDS, frozenset()) is None
 
 
 def test_join_lost_hyphen_takes_the_word_list_only_for_2_letters_or_more() -> None:
