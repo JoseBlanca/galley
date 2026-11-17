@@ -8,13 +8,16 @@ common git directory. `scripts/fetch_samples.py` downloads them.
 
 `excerpt_books` runs `galley2epub run` once per session on a book folder
 for each excerpt, so that the excerpt tests of every stage read the files of
-one run.
+one run; `whole_book_run` does the same for the whole books, up to
+structure, the first time a test asks for a book.
 """
 
+import functools
 import json
 import os
 import shutil
 import subprocess
+import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -105,6 +108,27 @@ EXCERPT_CONFIGS = frozendict(
             'title = "The Battle of Kadesh"\n'
             'authors = ["J. H. Breasted"]\n'
             'language = "en"\n'
+        ),
+        # The excerpts of docs/specs/front-matter.md section 6, "Excerpt
+        # tests", which open with the book's front pages. Excerpt page 7 is
+        # Haskins' page index 14, and Gierke's page 5 its page index 10,
+        # each a printed contents page.
+        "haskins_front": (
+            'title = "The Normans in European History"\n'
+            'authors = ["Charles Homer Haskins"]\n'
+            'language = "en"\n'
+            "contents_pages = [7]\n"
+        ),
+        "domesday_front_flow": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+        ),
+        "gierke_front_flow": (
+            'title = "Political Theories of the Middle Age"\n'
+            'authors = ["O. Gierke", "F. W. Maitland"]\n'
+            'language = "en"\n'
+            "contents_pages = [5]\n"
         ),
     }
 )
@@ -219,9 +243,11 @@ def excerpt_books(
     Session-scoped: the stages run once, also under --parallel-threads=8,
     and the excerpts' runs go side by side in threads.
     A test reads these folders and never writes in them. Skips every test
-    that uses it when Pandoc is missing, which markdown and epub need.
+    that uses it when Pandoc is missing, which markdown and epub need, or
+    Tesseract, with which layout re-reads small print (docs/specs/reocr.md).
     """
     _require_program("pandoc")
+    _require_program("tesseract")
     folders = {
         name: BookFolder(tmp_path_factory.mktemp(name)) for name in excerpt_book_toml
     }
@@ -277,6 +303,54 @@ def whole_book_toml(
     )
 
 
+# The workers of layout in the whole-book runs: the number of reocr spec
+# section 7's timings and of its test that 1 worker and 6 give the same
+# bytes, whatever the machine's default.
+_WHOLE_BOOK_LAYOUT_WORKERS = 6
+
+
+@pytest.fixture(scope="session")
+def whole_book_run(
+    whole_book_toml: frozendict[str, str], tmp_path_factory: pytest.TempPathFactory
+) -> Callable[[str], BookFolder]:
+    """A function that gives the book folder of a whole book, by Internet
+    Archive identifier, with the files analyze, extract, layout (with 6
+    workers) and structure wrote in it, run the
+    first time a test asks for the book and kept for the session, so that
+    every stage's whole_book tests share one run per book: layout re-reads
+    Domesday and Gierke for about a minute each. Books may be asked for
+    from several threads at once: a book's run holds that book's lock, so
+    a second thread asking for it waits for the first run and gets its
+    folder, and different books run side by side. A test reads these
+    folders and never writes in them."""
+    # The folders are made here, in one thread: pytest's tmp_path_factory
+    # is not thread-safe, and its first mktemp from 6 threads at once
+    # raised ValueError (17 November 2026).
+    roots = frozendict(
+        {book: tmp_path_factory.mktemp(book) for book in whole_book_toml}
+    )
+    # functools.cache alone lets two threads that miss the cache at once
+    # both run the book, writing the same folder.
+    locks = frozendict({book: threading.Lock() for book in whole_book_toml})
+
+    def run(book: str) -> BookFolder:
+        with locks[book]:
+            return run_once(book)
+
+    @functools.cache
+    def run_once(book: str) -> BookFolder:
+        folder = BookFolder(roots[book])
+        folder.book_toml.write_text(whole_book_toml[book], encoding="utf-8")
+        root = str(folder.root)
+        main(["analyze", root])
+        main(["extract", root])
+        main(["layout", "--workers", str(_WHOLE_BOOK_LAYOUT_WORKERS), root])
+        main(["structure", root])
+        return folder
+
+    return run
+
+
 @pytest.fixture(scope="session")
 def check_epubs() -> Callable[..., None]:
     """A function that runs epubcheck on each EPUB it is given, all at once,
@@ -313,6 +387,36 @@ def check_epubs() -> Callable[..., None]:
         assert rejected == (), "\n".join(rejected)
 
     return check
+
+
+# The Tesseract whose readings the excerpt and whole-book tests of
+# re-reading hold as literals (docs/specs/reocr.md, section 9): Homebrew's,
+# with its `eng` data, on 17 November 2026.
+_TESSERACT_OF_THE_LITERALS = "tesseract 5.5.4"
+
+
+@pytest.fixture(scope="session")
+def tesseract_of_the_literals() -> None:
+    """Skips the test, with the reason, when Tesseract is missing or is not
+    the version whose readings the tests of re-reading hold as literals."""
+    _require_program("tesseract")
+    tesseract = shutil.which("tesseract")
+    assert tesseract is not None
+    # Tesseract prints its version on standard output or standard error,
+    # depending on the build; both are read.
+    version = subprocess.run(
+        [tesseract, "--version"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=True,
+        timeout=10,
+    ).stdout.splitlines()[0]
+    if version != _TESSERACT_OF_THE_LITERALS:
+        pytest.skip(
+            f"the readings of this test are those of {_TESSERACT_OF_THE_LITERALS}, "
+            f"not of {version}"
+        )
 
 
 def _require_program(name: str) -> None:

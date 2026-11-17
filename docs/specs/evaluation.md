@@ -26,7 +26,12 @@ The tool is for development only. It reads galley's files and galley
 never imports it, as epubcheck is only a development tool
 (architecture §16).
 
-Dated 15 November 2026. It builds on `docs/architecture.md` and
+Dated 15 November 2026; revised on 17 November 2026 to leave the front
+matter galley drops unscored (section 5, "Pages"), wherever the
+reference prints its words, and the same day to
+score the margin notes' words as a part of their own (section 6), so
+that re-reading small print (`docs/specs/reocr.md`) is measured by the
+tool. It builds on `docs/architecture.md` and
 `docs/glossary.md`; "architecture §8" is a section of that document,
 "section 6" a section of this spec. No code of the tool exists. galley
 exists as the walking skeleton (`docs/specs/walking-skeleton.md`), whose
@@ -581,6 +586,49 @@ The scorecard counts them, and `summary.md` lists them.
 A difference on a page in `exclude_pages` or `not_in_reference` is
 listed apart and not scored.
 
+**Front matter.** A page that galley's `pages.json` makes `front_matter`
+(`docs/specs/front-matter.md`, 17 November 2026) is treated as a page
+of `exclude_pages`, here and in the rule for unplaced tokens above. The
+reference's own front pages, its title page and the like, come before
+the first token aligned to galley: the rule above would give them the
+page of galley's first page and count them as missing there (the
+reference holds Domesday's and Mariéjol's title pages). So an unaligned
+reference token before the first aligned token is not scored when its
+alignment key is the key of a word galley removed as `front_matter`;
+every other token there is scored as usual, so that the lost first words
+of a preface still count as missing.
+
+The reference can also print words of galley's dropped pages after the
+first aligned token: in Stubbs, a word of its title page aligns with
+galley's text, and the publisher's series list that follows in the
+reference ("Epochs of Modern History, edited by…"), printed in the PDF
+on pages galley dropped, was scored as missing on the first pages of the
+text: of the 328 reference tokens missing at words on page indices 14
+and 15, most are this list, and they raised Stubbs' body error rate at
+markdown from 0.056 to 0.059 (galley at fbdc71f, 17 November 2026).
+So, wherever it lies, a window of 4 consecutive reference tokens with non-empty
+alignment keys, all unaligned at words, whose keys are in order the
+keys of 4 consecutive words galley removed as front matter (in the
+order of the removals in `words.json`, empty keys left out on both
+sides), is not scored, with the tokens of empty key between them. An
+aligned token breaks the window. 4 is the shortest window that leaves
+nothing unscored outside the front pages of the four books: with 3,
+"Catherine de Médicis", a title galley dropped, would be left unscored
+3 times in Mariéjol's body; with 2, 80 pairs such as "à la" and "de
+France" in Mariéjol and "of the" in Stubbs. With 4, the tokens left
+unscored as front matter go from 17 to 301 in Stubbs, whose body error
+rate at markdown is back to 0.056, and from 32 to 41 in Haskins, 6 to
+79 in Domesday and 25 to 32 in Mariéjol, words of their title pages
+that come after a first aligned token. The list's words that stay
+missing in Stubbs are words the OCR misread ("i6mo" for "16mo") and
+runs shorter than 4 between them.
+
+The scorecard gives the number of tokens left unscored by these two
+rules, together with the reference tokens
+placed on a page galley dropped as front matter,
+`front_matter_not_scored`, within
+`not_scored`, and the differences list them apart as front matter.
+
 ### Differences
 
 Each reference token, and each galley token, ends in one of these states:
@@ -700,9 +748,12 @@ markdown.
 
 The scores are computed for each of the four outputs and written to the
 scorecard. Each is given for every part apart: the body, the notes, the
-index, tables, and figure captions. The index and tables are apart
+index, tables, figure captions and margin notes. The index and tables are apart
 because a scrambled text layer there (section 2) would otherwise drown
-the body's score.
+the body's score; the margin notes, because their 1,908 words in Stubbs
+and 2,487 in Domesday are too few to move the body's score when
+re-reading changes them (`docs/specs/reocr.md` §9). A margin note
+inside a note is of the margin notes' part too.
 
 A reference token has the part of its block. An extra galley token has
 the part of its page: the part that holds most of the reference tokens
@@ -888,8 +939,10 @@ Computed from galley's words alone, the candidates:
   (English `a`, `i`, `o`; French `a`, `à`, `y`).
 - `inner_symbol_share`: the share of tokens with a character that is
   neither a letter nor a hyphen between two letters, as `t*e`.
-- `ocr_confidence_mean`: the mean of Tesseract's confidences, on pages
-  galley read with OCR; empty otherwise.
+- `ocr_confidence_mean`: the mean of Tesseract's confidences over the
+  page's words that have one: on pages galley read with OCR, and on
+  the words layout re-read (`docs/specs/reocr.md`); empty when none
+  has one.
 
 And, for context: `page_index`, `printed_page`, `text_source`, `part`,
 and the page's token count.

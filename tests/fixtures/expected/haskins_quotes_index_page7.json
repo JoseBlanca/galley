@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "excerpt": "haskins_quotes_index",
   "page": 7,
   "book_page_index": 209,
@@ -11,7 +12,7 @@
     [
       "It needed no pious invention to prove that Charlemagne",
       "had been in Rome and had received the imperial crown",
-      "as he knelt in St. Peter's, and men told how in theirown",
+      "as he knelt in St. Peter's, and men told how in their own",
       "time the great king Canute had betaken himself thither",
       "with staff and scrip and many horses laden with gold",
       "and silver. Already the number of strangers in Rome",
@@ -20,10 +21,10 @@
       "might call them — ; and as the processions wound into",
       "sight of the Eternal City, they burst into its praise in",
       "that wonderful pilgrim's chorus: —",
-      "O Roma nobilis, orbiset domina,",
+      "O Roma nobilis, orbis et domina,",
       "Cunctarum urbium excellentissima,",
       "Roseo martyrum sanguine rubea,",
-      "Albiset virginum liliis Candida;",
+      "Albis et virginum liliis Candida;",
       "Salutem dicimus tibi per omnia,",
       "Te benedicimus: salve per secula.",
       "Jerusalem was most precious of all, by reason both of",
@@ -43,7 +44,7 @@
   "blocks": [
     {
       "kind": "paragraph",
-      "text": "The best general accountsof constitutional and legal mattersare those of Stubbs, Constitutional History of England, 1 (last edition, Oxford, 1903),corrected by various special studies of J. H. Round,to be found chiefly in his Feudal England (London, 1895; reprinted, 1909) and Commune of London (Westminster, 1899); and by Pollock and Maitland,HistoryofEnglishLaw(secondedition, London, 1898). Theresultsof recentinvestigationareincorporatedin thestudiesand notes appended to the French translation of Stubbs by Petit-Dutaillis (Paris, 1907); this supplementary material is translated into English by W. E. Rhodes (Manchester, 1911). There are admirable studiesof the chanceryinL. Delisle, RecueildesactesdeHenriIIconcernant les provinces franqaisesetles affaires de France, introduction (Paris, 1909); andoftheexchequerinR.L. Poole, TheExchequerinthe TwelfthCentury(Oxford, 1912). SeealsoHubertHall, CourtLifeunder the Plantagenets (London, 1890; reprinted, 1902). For the more distinctivelyNormansideofthegovernmentseeHaskins, \"TheGovern- It needed no pious invention to prove that Charlemagne had been in Rome and had received the imperial crown as he knelt in St. Peter's, and men told how in theirown time the great king Canute had betaken himself thither with staff and scrip and many horses laden with gold and silver. Already the number of strangers in Rome was so great that guide-books were compiled indicating its principal sights and marvels — \"seeing Rome,\" we might call them — ; and as the processions wound into sight of the Eternal City, they burst into its praise in that wonderful pilgrim's chorus: —",
+      "text": "The best general accounts of constitutional and legal matters are those of Stubbs, Constitutional History of England, 1 (last edition, Oxford, 1903), corrected by various special studies of J. H. Round, to be found chiefly in his Feudal England (London, 1895; reprinted, 1909) and Commune of London (Westminster, 1899); and by Pollock and Maitland, History of English Law (second edition, London, 1898). The results of recent investigation are incorporated in the studies and notes appended to the French translation of Stubbs by Petit-Dutaillis (Paris, 1907); this supplementary material is translated into English by W. E. Rhodes (Manchester, 1911). There are admirable studies of the chancery in L. Delisle, Recueil des actes de Henri II concernant les provinces franqaises et les affaires de France, introduction (Paris, 1909); and of the exchequer in R. L. Poole, The Exchequer in the Twelfth Century (Oxford, 1912). See also Hubert Hall, Court Life under the Plantagenets (London, 1890; reprinted, 1902). For the more distinctively Norman side of the government see Haskins, \"The Govern- It needed no pious invention to prove that Charlemagne had been in Rome and had received the imperial crown as he knelt in St. Peter's, and men told how in their own time the great king Canute had betaken himself thither with staff and scrip and many horses laden with gold and silver. Already the number of strangers in Rome was so great that guide-books were compiled indicating its principal sights and marvels — \"seeing Rome,\" we might call them — ; and as the processions wound into sight of the Eternal City, they burst into its praise in that wonderful pilgrim's chorus: —",
       "pages": [
         6,
         7
@@ -51,14 +52,14 @@
     },
     {
       "kind": "verse",
-      "text": "O Roma nobilis, orbiset domina,\nCunctarum urbium excellentissima,\nRoseo martyrum sanguine rubea,\nAlbiset virginum liliis Candida;\nSalutem dicimus tibi per omnia,\nTe benedicimus: salve per secula.",
+      "text": "O Roma nobilis, orbis et domina,\nCunctarum urbium excellentissima,\nRoseo martyrum sanguine rubea,\nAlbis et virginum liliis Candida;\nSalutem dicimus tibi per omnia,\nTe benedicimus: salve per secula.",
       "pages": [
         7
       ]
     },
     {
       "kind": "paragraph",
-      "text": "Jerusalem was most precious of all, by reason both of its sacred associations and of the difficulty of the journey. No Charlemagne was needed to justify resort to the Holy Sepulchre, where the mother of the great emperor Constantine had built the first shrine; but the great Charles had a hostel constructed there for Prankish pilgrims, and soon legend makes him, too, follow the road to Constantinople and Jerusalem, as we are reminded in the great Charlemagne window at Chartres. There were manuals for the pilgrim to Jerusalem also, but these were chiefly occupied with how to reach the heavenly city, though one of them contents itself THE NORMAN KINGDOM OF SICILY 219 Goethe to the glowing orange-groves of Palermo. And it is not alone the poet whose soul responds to A castle, precipice-encurled, Inagashofthewind-grievedApennine; or",
+      "text": "Jerusalem was most precious of all, by reason both of its sacred associations and of the difficulty of the journey. No Charlemagne was needed to justify resort to the Holy Sepulchre, where the mother of the great emperor Constantine had built the first shrine; but the great Charles had a hostel constructed there for Prankish pilgrims, and soon legend makes him, too, follow the road to Constantinople and Jerusalem, as we are reminded in the great Charlemagne window at Chartres. There were manuals for the pilgrim to Jerusalem also, but these were chiefly occupied with how to reach the heavenly city, though one of them contents itself THE NORMAN KINGDOM OF SICILY 219 Goethe to the glowing orange-groves of Palermo. And it is not alone the poet whose soul responds to",
       "pages": [
         7,
         8

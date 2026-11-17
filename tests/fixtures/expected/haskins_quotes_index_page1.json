@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "excerpt": "haskins_quotes_index",
   "page": 1,
   "book_page_index": 41,
@@ -13,7 +14,7 @@
       "liantly commemorated by the millenary of",
       "1911, the grant of Normandy to Rollo and his northern",
       "followers in the year 911. The history of Normandy, of",
-      "course, began longbeforethatyear. Thelandwas there,",
+      "course, began long before that year. The land was there,",
       "and likewise in large measure the people, that is to say,",
       "probably the greater part of the elements which went",
       "to make the population of the country at a later day;",
@@ -28,7 +29,7 @@
       "something else, whereas later Normandy was a separate",
       "entity with a life and a history of its own. And the",
       "dividing line must be drawn when the Northmen first",
-      "established themselves permanentlyin theland andgave",
+      "established themselves permanently in the land and gave",
       "it a new name and a new history.",
       "It must be said that the date 911, like most exact"
     ]
@@ -45,14 +46,14 @@
     },
     {
       "kind": "paragraph",
-      "text": "THE central fact of Norman history and the starting-point for its study is the event so brilliantly commemorated by the millenary of 1911, the grant of Normandy to Rollo and his northern followers in the year 911. The history of Normandy, of course, began longbeforethatyear. Thelandwas there, and likewise in large measure the people, that is to say, probably the greater part of the elements which went to make the population of the country at a later day; and the history of the region can be traced back several centuries. But after all, neither the Celtic civitates nor the Roman province of Lugdunensis Secunda nor the ecclesiastical province of Rouen which took its place nor the northwestern pagi of the Prankish empire were Normandy. They lacked the name — that is obvious; they lacked also individuality of character, which is more. They were a part, and not a distinctive part, of something else, whereas later Normandy was a separate entity with a life and a history of its own. And the dividing line must be drawn when the Northmen first established themselves permanentlyin theland andgave it a new name and a new history.",
+      "text": "THE central fact of Norman history and the starting-point for its study is the event so brilliantly commemorated by the millenary of 1911, the grant of Normandy to Rollo and his northern followers in the year 911. The history of Normandy, of course, began long before that year. The land was there, and likewise in large measure the people, that is to say, probably the greater part of the elements which went to make the population of the country at a later day; and the history of the region can be traced back several centuries. But after all, neither the Celtic civitates nor the Roman province of Lugdunensis Secunda nor the ecclesiastical province of Rouen which took its place nor the northwestern pagi of the Prankish empire were Normandy. They lacked the name — that is obvious; they lacked also individuality of character, which is more. They were a part, and not a distinctive part, of something else, whereas later Normandy was a separate entity with a life and a history of its own. And the dividing line must be drawn when the Northmen first established themselves permanently in the land and gave it a new name and a new history.",
       "pages": [
         1
       ]
     },
     {
       "kind": "paragraph",
-      "text": "It must be said that the date 911, like most exact and silk, pleasingandvariegated, both scarlet and green, and all sorts of cloth in like manner.\" \"How,\" asks theValkyrie in the Lay ofthe Raven, \"does the generous Prince Harold deal with the men of featsof renown that guard his land?\" The Raven answers: —",
+      "text": "It must be said that the date 911, like most exact and silk, pleasing and variegated, both scarlet and green, and all sorts of cloth in like manner.\" \"How,\" asks the Valkyrie in the Lay of the Raven, \"does the generous Prince Harold deal with the men of feats of renown that guard his land?\" The Raven answers: —",
       "pages": [
         1,
         2

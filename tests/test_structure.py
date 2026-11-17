@@ -6,7 +6,10 @@ tests/test_excerpts.py; the whole_book tests here check the two reference
 pages an excerpt cannot get right.
 """
 
+import functools
 import hashlib
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
@@ -14,7 +17,6 @@ import pytest
 
 from galley import structure, wordlist
 from galley.book_folder import BookFolder
-from galley.cli import main
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
 from galley.fidelity import check_stage
@@ -39,12 +41,15 @@ from galley.model import (
     Region,
     Removal,
     RemovalReason,
+    RereadKind,
     Span,
     TextSource,
     Word,
     WordChange,
     block_text,
     read_blocks,
+    read_lines,
+    read_words,
     write_blocks,
     write_lines,
     write_pages,
@@ -54,13 +59,16 @@ from galley.structure import (
     NoteMarker,
     Reference,
     ReferenceForm,
+    _survey,
     join_hyphen,
+    join_lost_hyphen,
     make_blocks,
     note_marker,
     reference_candidate,
     survey_book,
 )
 from galley.structure._assemble import _taken_body_notes
+from galley.structure._heads import is_number_like
 from galley.structure._index import entry_side, index_page
 from galley.structure._index_entries import _index_runs, _IndexRun
 from galley.structure._lines import Piece, PlacedLine
@@ -81,6 +89,7 @@ from galley.structure._references import (
 )
 from galley.structure._regions import region_kinds
 from galley.structure._unnumbered import Unnumbered, without_marker
+from galley.wordlist import word_key
 
 
 def _word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
@@ -195,7 +204,7 @@ _HEADS_WITHOUT_NUMBERS = (
 
 
 def _lines_of(*pages: PageLayout) -> LinesFile:
-    return LinesFile(source_pdf_sha256=_HASH, pages=pages)
+    return LinesFile(source_pdf_sha256=_HASH, pages=pages, rereads=())
 
 
 def _numbered_heads() -> tuple[PageLayout, ...]:
@@ -459,6 +468,154 @@ def test_running_head_below_a_speck_is_removed_and_the_speck_stays() -> None:
     ) == (("THE BOOK", RemovalReason.RUNNING_HEAD), ("31", RemovalReason.PAGE_NUMBER))
     assert blocks.page_numbers[-1] == PageNumber(16, "31", PageNumberPosition.HEAD)
     assert "d the first line of the body" in block_text(blocks.blocks[-1])
+
+
+# The head of a short section (spec section 3): a section of two pages, its
+# heading on page 4 at 106 pt, 4.7 pitches below the median head top of 36
+# pt, and its one running head on page 5; pages 10 to 15 print 25 to 30, so
+# the first arabic head number is on page 10 and a roman one before it is a
+# page-number form.
+
+
+def _short_section(
+    head: str, head_top: float = 36.0, heading: str = "PREFACE"
+) -> tuple[PageLayout, ...]:
+    return (
+        _page_with_head(4, heading, head_top=106.0),
+        _page_with_head(5, head, head_top=head_top),
+        *_numbered_heads(),
+    )
+
+
+def _removed_texts(blocks: BlocksFile, page_index: int) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        (removal.text, removal.reason) for removal in _removals_of(page_index, blocks)
+    )
+
+
+@pytest.mark.parametrize(
+    "text", ["vi", "vlil", "xiv.", "47", "XIV,", "i", "MDCL", "c."]
+)
+def test_number_like_word_is_recognised(text: str) -> None:
+    assert is_number_like(text)
+
+
+@pytest.mark.parametrize(
+    "text", ["", "vlili", "xiv..", "vi.,", "Pre", "ab", "v.i", "(vi)", "12345"]
+)
+def test_word_that_is_not_number_like_is_refused(text: str) -> None:
+    assert not is_number_like(text)
+
+
+def test_short_section_head_with_a_misread_number_is_removed_with_its_line() -> None:
+    blocks = make_blocks(
+        _lines_of(*_short_section("vlil PREFACE")), _NO_WORDS, workers=1
+    )
+    assert _removed_texts(blocks, 5) == (("vlil PREFACE", RemovalReason.RUNNING_HEAD),)
+    assert all(number.page_index != 5 for number in blocks.page_numbers)
+
+
+def test_short_section_head_with_a_roman_page_number_records_it() -> None:
+    blocks = make_blocks(
+        _lines_of(*_short_section("vi Preface.")), _NO_WORDS, workers=1
+    )
+    assert _removed_texts(blocks, 5) == (
+        ("vi", RemovalReason.PAGE_NUMBER),
+        ("Preface.", RemovalReason.RUNNING_HEAD),
+    )
+    assert blocks.page_numbers[0] == PageNumber(5, "vi", PageNumberPosition.HEAD)
+
+
+def test_short_section_head_with_its_number_last_is_a_running_head() -> None:
+    survey = survey_book(_lines_of(*_short_section("PREFACE vlil")), workers=1)
+    assert 5 in survey.running_heads
+
+
+def test_short_section_rule_keeps_a_title_line_without_a_number_like_word() -> None:
+    # Gierke's page 8 repeats the half-title of page 6 at the top of the page.
+    pages = (
+        _page_with_head(6, "POLITICAL THEORIES", head_top=106.0),
+        PageLayout(7, (), ()),
+        _page_with_head(8, "POLITICAL THEORIES"),
+        *_numbered_heads(),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert _removals_of(8, blocks) == ()
+
+
+def test_short_section_rule_keeps_a_head_whose_end_word_is_not_number_like() -> None:
+    # Without its first word, "THE PREFACE" is the heading of page 4; "THE"
+    # is not number-like, so the line stays.
+    survey = survey_book(_lines_of(*_short_section("THE PREFACE")), workers=1)
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_heading_is_the_topmost_line_not_the_first_region() -> None:
+    # Page 4's heading is in its second region, above the body of the first.
+    heading_page = PageLayout(
+        4,
+        (
+            _body(140.0, *_BODY_TEXTS),
+            _region(_line("PREFACE", _BODY_LEFT_PT, 106.0)),
+        ),
+        (),
+    )
+    pages = (heading_page, _page_with_head(5, "vi Preface."), *_numbered_heads())
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert 5 in survey.running_heads
+
+
+def test_short_section_heading_two_pages_before_with_a_blank_page_between() -> None:
+    pages = (
+        _page_with_head(3, "PREFACE", head_top=106.0),
+        PageLayout(4, (), ()),
+        _page_with_head(5, "vi Preface."),
+        *_numbered_heads(),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert 5 in survey.running_heads
+
+
+def test_short_section_heading_three_pages_before_is_not_compared() -> None:
+    pages = (
+        _page_with_head(2, "PREFACE", head_top=106.0),
+        PageLayout(3, (), ()),
+        PageLayout(4, (), ()),
+        _page_with_head(5, "vi Preface."),
+        *_numbered_heads(),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_head_with_fewer_than_4_letters_stays() -> None:
+    survey = survey_book(
+        _lines_of(*_short_section("vi Pre.", heading="PRE")), workers=1
+    )
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_head_less_than_0_75_alike_to_the_heading_stays() -> None:
+    # "preface" against "prefatory": 0.625 alike.
+    survey = survey_book(
+        _lines_of(*_short_section("vi Preface.", heading="PREFATORY")), workers=1
+    )
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_head_more_than_2_pitches_below_the_median_stays() -> None:
+    # 31 pt below the median head top of 36 pt, against 2 pitches of 15 pt.
+    survey = survey_book(
+        _lines_of(*_short_section("vi Preface.", head_top=67.0)), workers=1
+    )
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_head_exactly_2_pitches_below_the_median_is_removed() -> None:
+    survey = survey_book(
+        _lines_of(*_short_section("vi Preface.", head_top=66.0)), workers=1
+    )
+    assert 5 in survey.running_heads
 
 
 # Page numbers at the foot and signature marks, on a column from x 25 to
@@ -919,6 +1076,173 @@ def test_line_of_one_word_between_two_hyphens_is_joined_twice() -> None:
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+# "¬" at a line's end, the hyphen of the owner's OCR (spec section 5)
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "book_words", "word_list", "expected"),
+    [
+        (
+            "liter¬",
+            "ature",
+            frozenset(),
+            frozenset({"literature"}),
+            HyphenJoin("literature", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "proto¬",
+            "journalist",
+            frozenset({"proto-journalist"}),
+            frozenset(),
+            HyphenJoin("proto-journalist", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "Bal¬",
+            "hazar",
+            frozenset(),
+            frozenset(),
+            HyphenJoin("Balhazar", ChangeReason.HYPHEN_JOIN_GUESSED),
+        ),
+        (
+            "1830¬",
+            "40",
+            frozenset(),
+            frozenset(),
+            HyphenJoin("1830-40", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "half¬",
+            "Danish",
+            frozenset({"half-danish"}),
+            frozenset(),
+            HyphenJoin("half-Danish", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "d'in¬",
+            "signes",
+            frozenset(),
+            frozenset({"insignes"}),
+            HyphenJoin("d'insignes", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "tro¬",
+            "d",
+            frozenset(),
+            frozenset({"trod"}),
+            HyphenJoin("trod", ChangeReason.HYPHEN_JOIN_GUESSED),
+        ),
+    ],
+    ids=[
+        "word list",
+        "book's compound",
+        "guessed",
+        "a range of years",
+        "capital with the book's compound",
+        "after the apostrophe",
+        "one letter, word list",
+    ],
+)
+def test_join_hyphen_takes_a_not_sign_as_a_hyphen_and_keeps_it_as_hyphen_minus(
+    first: str,
+    second: str,
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    expected: HyphenJoin,
+) -> None:
+    assert join_hyphen(first, second, book_words, word_list) == expected
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("¬", "and"),
+        ("liter¬", "(1)"),
+        ("136-39¬", "Bryce,"),
+        ("half¬", "Danish"),
+        ("liter¬a", "ture"),
+        ("liter~", "ature"),
+    ],
+    ids=[
+        "not sign alone",
+        "bracket after",
+        "number before a word",
+        "capital without evidence",
+        "not sign inside the word",
+        "tilde",
+    ],
+)
+def test_join_hyphen_with_a_not_sign_does_not_join(first: str, second: str) -> None:
+    known = frozenset({"and", "136-39bryce", "halfdanish", "literature"})
+    assert join_hyphen(first, second, known, known) is None
+
+
+def test_not_sign_at_a_line_end_is_joined_and_recorded_with_the_layer_words() -> None:
+    page = PageLayout(
+        3,
+        (_body(70, "the liter¬", "ature of the Anglo¬", "Saxon age, 1830¬", "40"),),
+        (),
+    )
+    lines = _lines_of(page)
+    blocks = make_blocks(lines, frozenset({"literature"}), workers=1)
+    assert block_text(blocks.blocks[0]) == (
+        "the literature of the Anglo¬ Saxon age, 1830-40"
+    )
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=3,
+            before=("liter¬", "ature"),
+            after=("literature",),
+            reason=ChangeReason.HYPHEN_JOIN,
+        ),
+        WordChange(
+            page_index=3,
+            before=("1830¬", "40"),
+            after=("1830-40",),
+            reason=ChangeReason.HYPHEN_KEPT,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_not_sign_inside_a_line_is_left_as_text() -> None:
+    page = PageLayout(0, (_body(70, "a ¬ sign and a¬b", "here"),), ())
+    blocks = make_blocks(_lines_of(page), frozenset({"a¬bhere"}), workers=1)
+    assert block_text(blocks.blocks[0]) == "a ¬ sign and a¬b here"
+    assert blocks.word_changes == ()
+
+
+def test_survey_book_words_leave_out_the_parts_of_a_word_broken_with_a_not_sign() -> (
+    None
+):
+    page = PageLayout(
+        0, (_body(70, "Of the liter¬", "ature, 136¬", "Bryce, 1066¬", "1087 here"),), ()
+    )
+    assert survey_book(_lines_of(page), workers=1).book_words == frozenset(
+        {"of", "the", "136", "bryce", "here"}
+    )
+
+
+def test_indented_line_after_a_not_sign_does_not_start_a_paragraph() -> None:
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _full("Alpha beta gamma delta", 70),
+                _short("the work of liter¬", 85),
+                _indented("ature here and there", 100),
+                _short("Britain, 136-39¬", 115),
+                _indented("Bryce, James, 12", 130),
+            ),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), frozenset({"literature"}), workers=1)
+    assert _texts(blocks.blocks) == (
+        "Alpha beta gamma delta the work of literature here and there Britain, 136-39¬",
+        "Bryce, James, 12",
+    )
+
+
 # Cases the review of work package 3 found untested
 
 
@@ -1200,6 +1524,7 @@ _LINES = LinesFile(
         PageLayout(1, (), ()),
         PageLayout(2, (replace(_REGION, lines=(_SECOND_LINE,)),), ()),
     ),
+    rereads=(),
 )
 
 
@@ -1656,6 +1981,140 @@ def test_figure_block_of_a_plate_before_any_body_comes_first() -> None:
     assert blocks.blocks[0].kind is BlockKind.FIGURE
 
 
+# A hyphen lost in a margin note (spec section 5)
+
+_LOST_WORD_LIST = frozenset({"national", "movement", "inspite", "ofthe", "apiece"})
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "book_words", "joined"),
+    [
+        # Domesday page 77, Gierke page 88, Domesday page 75.
+        ("nation", "al", frozenset(), "national"),
+        ("move.", "ment,", frozenset(), "movement,"),
+        ("unfree", "dom", frozenset({"unfreedom"}), "unfreedom"),
+    ],
+)
+def test_join_lost_hyphen_joins_a_fragment_into_a_known_word(
+    first: str, second: str, book_words: frozenset[str], joined: str
+) -> None:
+    assert join_lost_hyphen(
+        first, second, book_words, _LOST_WORD_LIST, frozenset({"the"})
+    ) == HyphenJoin(joined, ChangeReason.HYPHEN_LOST)
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("of", "the"),  # "the" is printed inside lines more than 8 times
+        ("a", "piece"),  # a first part of 1 letter
+        ("nation", "Al"),  # a capital
+        ("nation-", "al"),  # a hyphen: join_hyphen's
+        ("nation,", "al"),  # a comma is no misread hyphen
+        ("nation..", "al"),  # one full stop only
+        ("unfree", "dom"),  # "unfreedom" is not known here
+        ("nation", "al,x"),  # "nationalx" is not known
+    ],
+)
+def test_join_lost_hyphen_does_not_join(first: str, second: str) -> None:
+    assert (
+        join_lost_hyphen(first, second, _NO_WORDS, _LOST_WORD_LIST, frozenset({"the"}))
+        is None
+    )
+
+
+@pytest.mark.parametrize("first", ["AD1066", "(nation)", "nation)."])
+def test_join_lost_hyphen_needs_a_letter_before_the_break(first: str) -> None:
+    # A first word ending in a digit or a closing mark is no part of a word
+    # broken at a line end, though the book prints the joined form.
+    book_words = frozenset({word_key(first.removesuffix(".") + "al")})
+    assert join_lost_hyphen(first, "al", book_words, _NO_WORDS, frozenset()) is None
+
+
+def test_join_lost_hyphen_takes_the_word_list_only_for_2_letters_or_more() -> None:
+    # As for hyphen_join: "posi." "t" is not looked up in the word list.
+    assert (
+        join_lost_hyphen("posi.", "t", _NO_WORDS, frozenset({"posit"}), frozenset())
+        is None
+    )
+    assert join_lost_hyphen(
+        "posi.", "t", frozenset({"posit"}), _NO_WORDS, frozenset()
+    ) == HyphenJoin("posit", ChangeReason.HYPHEN_LOST)
+
+
+def test_survey_common_inner_words_are_printed_after_a_lines_first_word_9_times() -> (
+    None
+):
+    # "the" after the first word of 8 lines, and first in 9 more: not
+    # common; after the first word of a 9th line, common.
+    eight = PageLayout(0, (_body(70, *(("of the",) * 8), *(("the end",) * 9)),), ())
+    assert survey_book(_lines_of(eight), workers=1).common_inner_words == frozenset(
+        {"end"}
+    )
+    nine = PageLayout(1, (_body(70, "of the"),), ())
+    assert survey_book(
+        _lines_of(eight, nine), workers=1
+    ).common_inner_words == frozenset({"the", "end"})
+
+
+def _lost_hyphen_pages() -> tuple[PageLayout, ...]:
+    """Page 0: a body of five full lines, two ending with a word the next
+    line goes on with ("in" "spite", "of" "the"), and two margin notes,
+    "The villein and nation al justice." and "Unity of the move. ment,".
+    "the" is printed after the first word of a line 9 times, so "of"
+    "the" is not joined into "ofthe", which the word list holds."""
+    margin = _region(
+        _spread("The villein", 310, 340, 85),
+        _spread("and nation", 310, 340, 97),
+        _spread("al justice.", 310, 340, 109),
+    )
+    second = _region(
+        _spread("Unity of", 310, 340, 160),
+        _spread("the move.", 310, 340, 172),
+        _spread("ment,", 310, 340, 184),
+    )
+    body = _region(
+        _full("first of the page and the in", 70),
+        _full("spite of the page went on of", 85),
+        _full("the page and so of the end of the", 100),
+        _full("page of the page and of the page", 115),
+        _full("the end of the page for the all.", 130),
+    )
+    return (PageLayout(0, (body, margin, second), ()),)
+
+
+def test_margin_note_joins_a_word_whose_hyphen_was_lost_and_the_body_does_not() -> None:
+    lines = _lines_of(*_lost_hyphen_pages())
+    blocks = make_blocks(lines, _LOST_WORD_LIST, workers=1)
+    assert tuple((block.kind, block_text(block)) for block in blocks.blocks) == (
+        (BlockKind.MARGIN_NOTE, "The villein and national justice."),
+        (BlockKind.MARGIN_NOTE, "Unity of the movement,"),
+        (
+            BlockKind.PARAGRAPH,
+            (
+                "first of the page and the in spite of the page went on of the page "
+                "and so of the end of the page of the page and of the page the end of "
+                "the page for the all."
+            ),
+        ),
+    )
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=0,
+            before=("nation", "al"),
+            after=("national",),
+            reason=ChangeReason.HYPHEN_LOST,
+        ),
+        WordChange(
+            page_index=0,
+            before=("move.", "ment,"),
+            after=("movement,",),
+            reason=ChangeReason.HYPHEN_LOST,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
 def _side_text_pages() -> tuple[PageLayout, ...]:
     """Page 0: a body whose last paragraph runs on to page 1, a margin note
     right of the body, and a band of small type below it; page 1: the
@@ -2020,6 +2479,22 @@ def test_footnote_a_word_a_or_i_before_a_known_word_is_no_marker(
     blocks = make_blocks(_lines_of(page), word_list, workers=1)
     marker, text = _markers_and_texts(blocks)[1]
     assert (marker, text.removesuffix(" its second line.")) == expected
+
+
+def test_footnote_lower_case_a_before_a_known_word_is_the_marker() -> None:
+    # Kadesh page 8: a superscript 2 read as "a", before "In", a known word
+    # (structure spec, section 11, "The marker of a note").
+    page = _page_with_band(
+        0,
+        _note_line("1 The first note.", 300, 62, 160),
+        _note_line("a In Ramses III.'s day the", 300 + _NOTE_PITCH_PT, 62),
+        _note_line("its second line.", 300 + 2 * _NOTE_PITCH_PT, 50, 160),
+    )
+    blocks = make_blocks(_lines_of(page), frozenset({"in"}), workers=1)
+    assert _markers_and_texts(blocks)[1] == (
+        "a",
+        "In Ramses III.'s day the its second line.",
+    )
 
 
 def test_footnote_glued_marker_is_split_off_its_word() -> None:
@@ -4726,12 +5201,25 @@ def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
 # those of tests/conftest.py, WHOLE_BOOK_CONFIGS.
 
 
-def _blocks_of_whole_book(book_toml: str, root: Path) -> BlocksFile:
-    folder = BookFolder(root)
-    folder.book_toml.write_text(book_toml, encoding="utf-8")
-    for stage in ("analyze", "extract", "layout", "structure"):
-        main([stage, str(root)])
-    return read_blocks(folder.blocks_json)
+type WholeBookStructure = Callable[[str], tuple[LinesFile, BlocksFile]]
+
+
+@pytest.fixture(scope="module")
+def whole_book_structure(
+    whole_book_run: Callable[[str], BookFolder],
+) -> WholeBookStructure:
+    """A function that gives lines.json and blocks.json of a whole book, by
+    Internet Archive identifier, from the session's run of the book
+    (tests/conftest.py), read the first time a test of this module asks
+    for the book and kept for the others. Books may be asked for from
+    several threads at once."""
+
+    @functools.cache
+    def structure_of(book: str) -> tuple[LinesFile, BlocksFile]:
+        folder = whole_book_run(book)
+        return read_lines(folder.lines_json), read_blocks(folder.blocks_json)
+
+    return structure_of
 
 
 def _removed_on(blocks: BlocksFile, page: int) -> tuple[tuple[RemovalReason, str], ...]:
@@ -4747,14 +5235,9 @@ def _numbers_on(blocks: BlocksFile, page: int) -> tuple[PageNumber, ...]:
 
 
 @pytest.fixture(scope="module")
-def gierke_blocks(
-    whole_book_toml: frozendict[str, str], tmp_path_factory: pytest.TempPathFactory
-) -> BlocksFile:
+def gierke_blocks(whole_book_structure: WholeBookStructure) -> BlocksFile:
     """blocks.json of the whole Gierke book, made once for its tests."""
-    return _blocks_of_whole_book(
-        whole_book_toml["politicaltheorie00gieruoft"],
-        tmp_path_factory.mktemp("gierke"),
-    )
+    return whole_book_structure("politicaltheorie00gieruoft")[1]
 
 
 @pytest.mark.whole_book
@@ -4801,11 +5284,9 @@ def test_whole_book_gierke_endnote_section_runs_from_186_to_282(
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 def test_whole_book_mariejol_210_foot_line_gives_page_number_and_signature_mark(
-    whole_book_toml: frozendict[str, str], tmp_path: Path
+    whole_book_structure: WholeBookStructure,
 ) -> None:
-    blocks = _blocks_of_whole_book(
-        whole_book_toml["catherinedemedic00mariuoft"], tmp_path
-    )
+    blocks = whole_book_structure("catherinedemedic00mariuoft")[1]
     assert _removed_on(blocks, 210) == (
         (RemovalReason.RUNNING_HEAD, "L'EXTERMINATION DU PARTI PROTESTANT"),
         (RemovalReason.SIGNATURE_MARK, "UAMiàjoL. CmOl da Médidib 13"),
@@ -4820,14 +5301,14 @@ def test_whole_book_mariejol_210_foot_line_gives_page_number_and_signature_mark(
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 def test_whole_book_haskins_quotes_and_bibliographical_notes(
-    whole_book_toml: frozendict[str, str], tmp_path: Path
+    whole_book_structure: WholeBookStructure,
 ) -> None:
     # Structure spec, section 16: the quotes in smaller type across the
     # column on page 53, the quote over two page breaks from 71 to 73, and
     # the band of small type under "BIBLIOGRAPHICAL NOTE" on page 129 as
     # paragraphs. The excerpt haskins_quotes_index measures its body type
     # smaller than the book's and cannot show the quotes.
-    blocks = _blocks_of_whole_book(whole_book_toml["normansineuropea00hask"], tmp_path)
+    blocks = whole_book_structure("normansineuropea00hask")[1]
 
     def kinds_from(page: int) -> tuple[tuple[str, list[int]], ...]:
         return tuple(
@@ -4851,6 +5332,74 @@ def test_whole_book_haskins_quotes_and_bibliographical_notes(
         ("paragraph", [129, 130]),
     )
     assert not any(note.origin[0].page_index == 129 for note in blocks.notes)
+
+
+# The head of a short section on the six whole books (structure spec,
+# section 3, its last paragraph): the rule takes exactly two head lines,
+# Haskins' page index 13 "vlil PREFACE" and Domesday's "vi Preface.". The
+# pages it takes are those whose head line is a running head with the rule
+# and not without it.
+
+_WHOLE_BOOKS = (
+    "battleofkadeshst00breauoft",
+    "catherinedemedic00mariuoft",
+    "domesdaybook00maituoft",
+    "earlyplantagenet01stub",
+    "normansineuropea00hask",
+    "politicaltheorie00gieruoft",
+)
+
+
+def _no_short_section_head(
+    _page_index: int, _line: Line, _top_letters: frozendict[int, str]
+) -> bool:
+    return False
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+def test_whole_book_short_section_rule_removes_only_the_haskins_and_domesday_heads(
+    whole_book_structure: WholeBookStructure, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The books' runs go side by side, as the excerpts' do (tests/conftest.py).
+    with ThreadPoolExecutor(max_workers=len(_WHOLE_BOOKS)) as pool:
+        outputs = dict(
+            zip(_WHOLE_BOOKS, pool.map(whole_book_structure, _WHOLE_BOOKS), strict=True)
+        )
+    with_rule = {
+        book: survey_book(lines).running_heads for book, (lines, _) in outputs.items()
+    }
+    monkeypatch.setattr(_survey, "_is_short_section_head", _no_short_section_head)
+    without_rule = {
+        book: survey_book(lines).running_heads for book, (lines, _) in outputs.items()
+    }
+
+    assert {
+        book: tuple(sorted(with_rule[book] - without_rule[book]))
+        for book in _WHOLE_BOOKS
+    } == {
+        "battleofkadeshst00breauoft": (),
+        "catherinedemedic00mariuoft": (),
+        "domesdaybook00maituoft": (13,),
+        "earlyplantagenet01stub": (),
+        "normansineuropea00hask": (13,),
+        "politicaltheorie00gieruoft": (),
+    }
+    assert all(without_rule[book] <= with_rule[book] for book in _WHOLE_BOOKS)
+    haskins_blocks = outputs["normansineuropea00hask"][1]
+    domesday_blocks = outputs["domesdaybook00maituoft"][1]
+    assert _removed_on(haskins_blocks, 13) == (
+        (RemovalReason.RUNNING_HEAD, "vlil PREFACE"),
+    )
+    assert _numbers_on(haskins_blocks, 13) == ()
+    assert _removed_on(domesday_blocks, 13) == (
+        (RemovalReason.PAGE_NUMBER, "vi"),
+        (RemovalReason.RUNNING_HEAD, "Preface."),
+    )
+    assert _numbers_on(domesday_blocks, 13) == (
+        PageNumber(13, "vi", PageNumberPosition.HEAD),
+    )
 
 
 # Index pages and guide words (structure spec, section 17). An index page
@@ -5267,7 +5816,14 @@ def test_whole_book_gierke_index_entr_one_per_line_on_its_skewed_pages(
     # Structure spec section 17: Gierke's index of authorities, pages 83 to
     # 85, has one line per entry ("Accursius No. 105"); page 84 drifts from
     # 42 to 47 pt. Every entry holds one "No" but "Tr. U. J. [tractatus
-    # universi iuris]", printed without one.
+    # universi iuris]", printed without one, whose "No. 53" on the line
+    # below the OCR laid over "Torquemada No. 97" on page 85: in the PDF's
+    # order (extract spec section 3) its words are whole but in that entry,
+    # "Torquemada No. 53 No. 97", where the default options mixed them
+    # ("TorNqou.e m 5 a 3 d a No. 97"). Its last word, "iuris]", printed in
+    # the right margin, is a note band that layout re-reads (reocr spec,
+    # section 3, kind 2): Tesseract's "rsi iuris]" is kept and becomes a
+    # paragraph of its own, so the entry ends at "universi".
     entries = tuple(
         block_text(block)
         for block in gierke_blocks.blocks
@@ -5281,7 +5837,8 @@ def test_whole_book_gierke_index_entr_one_per_line_on_its_skewed_pages(
     } == {83, 84, 85}
     assert len(entries) == 213
     assert [entry for entry in entries if entry.count("No") != 1] == [
-        "Tr. U. J. [tractatus universi iuris]"
+        "Torquemada No. 53 No. 97",
+        "Tr. U. J. [tractatus universi",
     ]
 
 
@@ -5289,14 +5846,18 @@ def test_whole_book_gierke_index_entr_one_per_line_on_its_skewed_pages(
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 def test_whole_book_stubbs_guide_words_on_each_of_its_ten_index_pages(
-    whole_book_toml: frozendict[str, str], tmp_path: Path
+    whole_book_structure: WholeBookStructure,
 ) -> None:
-    blocks = _blocks_of_whole_book(whole_book_toml["earlyplantagenet01stub"], tmp_path)
+    blocks = whole_book_structure("earlyplantagenet01stub")[1]
     assert tuple(
         (removal.page_index, removal.text)
         for removal in blocks.removals
         if removal.reason is RemovalReason.GUIDE_WORDS
     ) == (
+        # The ten index pages are small-print pages read whole by Tesseract
+        # and kept (reocr spec, section 3, kind 1): page 312's guide words
+        # are found too, where the layer's spaced letters left "BAL BEC" a
+        # paragraph.
         (312, "BAL BEC"),
         (313, "BUR CON"),
         (314, "EDM EDW"),
@@ -5310,16 +5871,74 @@ def test_whole_book_stubbs_guide_words_on_each_of_its_ten_index_pages(
     )
     # Spec section 17, rule 3: the fitted edge gives 910 entries and
     # sub-entries; a straight edge at the entry side gave 916 (16 November
-    # 2026), "Baldwin of Redvers, 18" and others cut in two.
-    assert sum(block.kind is BlockKind.INDEX_ENTRY for block in blocks.blocks) == 910
-    # Only page 312 keeps notes: two regions across the gutter whose spaced
-    # letters lie over it on more than a third of their lines keep their
-    # kind, a band (section 17, rule 2).
-    assert {
-        note.origin[0].page_index
-        for note in blocks.notes
-        if 312 <= note.origin[0].page_index <= 321
-    } == {312}
+    # 2026), "Baldwin of Redvers, 18" and others cut in two. With the words
+    # in the PDF's order, page 312's 74 entries were 34 notes and 839
+    # entries were left; with the pages read by Tesseract (17 November
+    # 2026), 936, and 935 once a layer word read off Tesseract's reading of
+    # it is replaced too (reocr spec, section 4); 934 once Tesseract's junk
+    # is dropped, "~" having started a line of its own before "171 : his
+    # death, 177" (page 317); no note on the index pages.
+    assert sum(block.kind is BlockKind.INDEX_ENTRY for block in blocks.blocks) == 934
+    assert not any(312 <= note.origin[0].page_index <= 321 for note in blocks.notes)
+
+
+@pytest.mark.whole_book
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_whole_stubbs_index_pages_312_to_321_are_read_whole_and_kept(
+    whole_book_run: Callable[[str], BookFolder],
+    whole_book_structure: WholeBookStructure,
+) -> None:
+    # Reocr spec, section 3, kind 1, and section 9, "Whole-book tests": the
+    # ten index pages are small-print pages of the whole book, read whole
+    # below their running heads and kept. The running head keeps the
+    # layer's words. Page 312's entry "Acre, siege of, 116; the English at,
+    # 118;" has both ";" (Tesseract read "116 ;"), and structure cuts it in
+    # two after the first. Its guide words, and the book's 935 index
+    # entries, are tested above (test_whole_book_stubbs_guide_words_on_
+    # each_of_its_ten_index_pages).
+    words = read_words(whole_book_run("earlyplantagenet01stub").words_json)
+    lines, blocks = whole_book_structure("earlyplantagenet01stub")
+    index_records = tuple(
+        record for record in lines.rereads if 312 <= record.page_index <= 321
+    )
+    assert tuple(
+        (record.page_index, record.kind, record.kept) for record in index_records
+    ) == tuple((page, RereadKind.SMALL_PRINT_PAGE, True) for page in range(312, 322))
+    for record in index_records:
+        head = tuple(
+            word
+            for word in words.pages[record.page_index].words
+            if word.box.bottom <= record.box.top
+        )
+        laid_out = {
+            word
+            for region in lines.pages[record.page_index].regions
+            for line in region.lines
+            for word in line.words
+        }
+        assert "index." in {word.text.casefold() for word in head}, record.page_index
+        assert not set(head) & set(record.layer_words), record.page_index
+        assert set(head) <= laid_out, record.page_index
+    assert any(
+        "Acre, siege of, 116 ; the English"
+        in " ".join(word.text for word in line.words)
+        for region in lines.pages[312].regions
+        for line in region.lines
+    )
+    entries = tuple(
+        block_text(block)
+        for block in blocks.blocks
+        if block.kind is BlockKind.INDEX_ENTRY and block.origin[0].page_index == 312
+    )
+    acre = next(
+        position
+        for position, entry in enumerate(entries)
+        if entry.endswith("Acre, siege of, 116 ;")
+    )
+    assert entries[acre + 1] == "the English at, 118;"
 
 
 def test_index_entr_sub_entries_cut_after_each_semicolon_inside_a_line() -> None:

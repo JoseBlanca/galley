@@ -8,6 +8,7 @@ that the 8-thread run does it once.
 """
 
 import shutil
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -38,9 +39,14 @@ from galley.model import (
 KADESH = "kadesh_8-17"
 GIERKE = "gierke_86-93_270-271"
 
-# Spec section 2: the words of extract_words() per page, pdfplumber 0.11.10.
-KADESH_WORD_COUNTS = (584, 641, 671, 904, 822, 764, 909, 822, 4, 0)
-GIERKE_WORD_COUNTS = (192, 311, 297, 325, 319, 309, 292, 273, 547, 541)
+# The words of text_layer.layer_words per page (extract spec sections 3 and
+# 4), pdfplumber 0.11.10. With extract_words() and its default options,
+# Kadesh's were (584, 641, 671, 904, 822, 764, 909, 822, 4, 0) and Gierke's
+# (192, 311, 297, 325, 319, 309, 292, 273, 547, 541). Both text layers have
+# space characters, so no word is split; the differences are the pieces of
+# cut words joined and overlaid words pulled apart (spec section 3).
+KADESH_WORD_COUNTS = (582, 639, 668, 854, 818, 733, 832, 816, 4, 0)
+GIERKE_WORD_COUNTS = (192, 311, 297, 323, 318, 306, 290, 272, 537, 534)
 
 REGION = Box(10.0, 10.0, 20.0, 20.0)
 
@@ -169,6 +175,28 @@ def test_excluded_page_with_three_words_gives_three_removals_and_no_words() -> N
     )
 
 
+def test_front_matter_page_gives_a_front_matter_removal_per_word_and_no_words() -> None:
+    # Front-matter spec, section 3: the words of a title page.
+    front = page(PageKind.FRONT_MATTER, TextSource.NONE)
+    words = (
+        word("THE", Box(150.0, 200.0, 180.0, 216.0)),
+        word("NORMANS", Box(185.0, 200.0, 260.0, 216.0)),
+    )
+
+    assert page_words(front, words) == (
+        PageWords(index=4, text_source=TextSource.NONE, words=(), figures=()),
+        tuple(
+            Removal(
+                page_index=4,
+                box=layer_word.box,
+                text=layer_word.text,
+                reason=RemovalReason.FRONT_MATTER,
+            )
+            for layer_word in words
+        ),
+    )
+
+
 def test_blank_page_has_no_words_and_no_removals() -> None:
     assert page_words(page(PageKind.BLANK, TextSource.NONE), ()) == (
         PageWords(index=4, text_source=TextSource.NONE, words=(), figures=()),
@@ -251,7 +279,7 @@ def test_word_counts_per_page_are_those_of_the_text_layer_but_81_and_pages_8_9(
 
     # Page 8 is excluded; page 9 has no text layer.
     assert tuple(len(page_words.words) for page_words in kadesh.pages) == (
-        583,
+        581,
         *KADESH_WORD_COUNTS[1:8],
         0,
         0,
@@ -345,6 +373,73 @@ def test_kadesh_cover_is_page_0_at_300_dpi_in_8_bit_grayscale(
 ) -> None:
     with Image.open(excerpt_books[KADESH].cover_png) as cover:
         assert (cover.format, cover.mode, cover.size) == ("PNG", "L", (2118, 3034))
+
+
+# The pages of the excerpts that carry the two rules of extract spec
+# sections 3 and 4, by page index in the excerpt: Domesday's pages 23, 24
+# and 200 are domesday_front_flow's 7, 8 and 9; Gierke's 13 and 100 are
+# gierke_front_flow's 8 and 9; Haskins' 12 is haskins_front's 5. With the
+# default options of extract_words(), each piece below was a word of its
+# page ("s ome", "i t", "W L i o n n c d h o e n s ter", "' T he", "to h im").
+PIECES_OF_CUT_WORDS = (
+    ("domesday_front_flow", 7, ("s", "ome")),
+    ("domesday_front_flow", 8, ("i", "t")),
+    ("domesday_front_flow", 9, ("W", "L", "ter")),
+    ("gierke_front_flow", 8, ("T",)),
+    ("gierke_front_flow", 9, ("h", "im")),
+)
+
+
+@pytest.mark.parametrize(
+    ("excerpt", "page", "pieces"),
+    PIECES_OF_CUT_WORDS,
+    ids=[f"{excerpt}-{page}" for excerpt, page, _ in PIECES_OF_CUT_WORDS],
+)
+def test_words_of_a_page_in_the_pdfs_order_leave_no_piece_of_a_cut_word(
+    excerpt_books: frozendict[str, BookFolder],
+    excerpt: str,
+    page: int,
+    pieces: tuple[str, ...],
+) -> None:
+    words = read_words(excerpt_books[excerpt].words_json)
+    texts = {word.text for word in words.pages[page].words}
+    assert texts.isdisjoint(pieces)
+
+
+# Haskins' page 12, the first page of the preface, as the page image reads:
+# its text layer has no space character, and "of these", "as well", "the
+# omission of many" and "This book rests partly upon the writings of the
+# various" were glued words before the split of extract spec section 4. The
+# words in order, one space between two.
+HASKINS_12_WORDS = (
+    "PREFACE THE eight lectures which are here published were delivered "
+    "before the Lowell Institute in February, 1915, and at the University "
+    "of Cali- fornia the following July, and it has seemed best to print "
+    "them in the form in which they were prepared for a general audience. "
+    "Their purpose is not so much to furnish an outline of the annals of "
+    "Norman history as to place the Normans in relation to their time and "
+    "to indicate the larger features of their work as founders and "
+    "organizers of states and contributors to European culture. "
+    "Biographical and narrative detail has accord- ingly been subordinated "
+    "in the effort to give a general view of Norman achievement in France, "
+    "in England, and in Italy. Various aspects of Norman history have been "
+    "treated with considerable fullness by historians, but, so far as I am "
+    "aware, no connected account of the whole subject has yet been "
+    "attempted from this point of view. This fact, it is hoped, may justify "
+    "the publication of these lectures, as well as explain the omission of "
+    "many topics which would naturally be treated in an extended narrative. "
+    "This book rests partly upon the writings of the various scholars "
+    "enumerated in the bibliographical note at the"
+)
+
+
+def test_haskins_front_page_12_gives_its_words_exactly(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    words = read_words(excerpt_books["haskins_front"].words_json)
+    # No word of the text layer holds a space, so the joined text compares
+    # the words one by one.
+    assert " ".join(word.text for word in words.pages[5].words) == HASKINS_12_WORDS
 
 
 # The plates of the excerpts (plates spec section 6), by page index in the
@@ -697,3 +792,43 @@ def test_extract_on_pages_json_with_an_ocr_page_names_it_and_analyze(
         "cannot read yet; run `galley2epub analyze` again"
     )
     assert not folder.words_json.exists()
+
+
+# The whole books (front-matter spec sections 4 and 6): the pages of each
+# book that are front matter, by Internet Archive identifier, and the number
+# of their words, each a front_matter removal.
+WHOLE_BOOK_FRONT_MATTER_REMOVALS = frozendict(
+    {
+        "normansineuropea00hask": ((1, 2, 6, 8, 9, 10), 108),
+        "earlyplantagenet01stub": ((1, 6, 7, 12, 13), 370),
+        "domesdaybook00maituoft": ((4, 8, 9, 10, 11), 99),
+        "catherinedemedic00mariuoft": ((6, 7, 8, 9), 95),
+        "politicaltheorie00gieruoft": ((1, 6, 7, 8, 9), 100),
+        "battleofkadeshst00breauoft": ((4, 5, 6, 7), 91),
+    }
+)
+
+
+# words.json comes from the session's run of the book (tests/conftest.py),
+# which layout's whole_book tests share; the run re-reads with Tesseract.
+@pytest.mark.whole_book
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize("book", sorted(WHOLE_BOOK_FRONT_MATTER_REMOVALS))
+def test_front_matter_removals_of_each_whole_book_are_the_words_of_its_front_pages(
+    book: str, whole_book_run: Callable[[str], BookFolder]
+) -> None:
+    words = read_words(whole_book_run(book).words_json)
+    removals = tuple(
+        removal
+        for removal in words.removals
+        if removal.reason is RemovalReason.FRONT_MATTER
+    )
+    front_matter, word_count = WHOLE_BOOK_FRONT_MATTER_REMOVALS[book]
+
+    assert (
+        tuple(sorted({removal.page_index for removal in removals})),
+        len(removals),
+    ) == (front_matter, word_count)
+    assert all(not words.pages[index].words for index in front_matter)

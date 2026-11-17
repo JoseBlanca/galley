@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the orchestrator against the page image on 15 November 2026 (galley at ec2edc4); checked by the owner against the page image, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed since that check by task 2.5: \"land.\" leaves the body line for the margin note, which reads \"Free land.\", and \"The idea of freedom\" starts a paragraph. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): each note's marker, \"1\", \"2\", \"9\", is taken out of its text into `marker`. Changed by task 2.3 (structure spec section 11, \"References\"): \"day1.'\", \"land2.\" and \"land3.\" are linked to the notes whose markers read \"1\", \"2\" and \"9\", each split off its word by a note_marker word change.",
+  "changed": "Changed since that check by task 2.5: \"land.\" leaves the body line for the margin note, which reads \"Free land.\", and \"The idea of freedom\" starts a paragraph. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): each note's marker, \"1\", \"2\", \"9\", is taken out of its text into `marker`. Changed by task 2.3 (structure spec section 11, \"References\"): \"day1.'\", \"land2.\" and \"land3.\" are linked to the notes whose markers read \"1\", \"2\" and \"9\", each split off its word by a note_marker word change. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
   "known": "The margin notes read \"Free land.\", \"The unfreedom of the Villein.\" and \"Can the villein be pursued?\" (the owner); galley keeps the text layer's OCR of the last two, \"dOTQ^tht villein.\" and \"Sn°inhbe pursued?\".",
   "excerpt": "domesday_74-83",
   "page": 1,
@@ -13,16 +13,16 @@
     [
       "free man is the freer if he has soke and sake, if he has juris-",
       "diction over other men. Exceptional privileges, immunities",
-      "from common burdens, are already regarded as ' l iberties.' This",
+      "from common burdens, are already regarded as ' liberties.' This",
       "is no new thing; often enough when the Anglo-Saxon land",
       "books speak of freedom they mean privilege.",
       "The idea of freedom is equally vague and elastic if, instead",
       "of applying it to men, we apply it to land or the tenure of land.",
-      "Two bordarii are now holding a small plot ; ' t hey themselves",
+      "Two bordarii are now holding a small plot ; ' they themselves",
       "held it freely in King Edward's day1.' Here no doubt there",
       "has been a fall ; but how deep a fall we can not be sure. To",
       "say that a man's land is free may imply far more freedom than",
-      "freehold tenure implies in later times ; i t may imply that the",
+      "freehold tenure implies in later times ; it may imply that the",
       "bond between him and his lord, if indeed he has a lord, is of a",
       "purely personal character and hardly gives the lord any hold",
       "over the land2. But this is not all. Perfect freedom is not",
@@ -32,7 +32,7 @@
       "even from the danegeld; it is highly privileged land3. Let",
       "us remember that at the present day, though the definition of",
       "free land or freehold land has long ago been fixed, we still speak",
-      "as though free land might become freer if it were ' f ree of land-",
+      "as though free land might become freer if it were ' free of land-",
       "tax and tithe rent-charge.'",
       "If now we return to the villanus and deny that he is liber",
       "homo and deny also that he is holding freely, we shall be saying",
@@ -45,24 +45,26 @@
       "Free land."
     ],
     [
-      "dOTQ^tht",
+      "The unfree",
+      "dom of the",
       "villein."
     ],
     [
-      "Sn°inhbe",
-      "pursued?"
+      "Can the",
+      "villein be",
+      "pursued ?"
     ],
     [
       "1 D. B. i. 84 b.",
-      "2 D . B. ii. 213 : ' H anc terrain calumpniatur esse liberam Vlchitel homo",
+      "2 D. B. ii. 213 : ' Hanc terrain calumpniatur esse liberam Vlchitel homo",
       "Hermeri, quocunque modo iudicetur, vel bello vel iudicio, et alius est praesto",
       "probare eo modo quod iacuit ad ecclesiam [S. Adeldredae] die quo rex Edwardus",
       "obiit. Set totus hundretus testatur earn fuisse T. R. E. ad S. Adeldredam.'",
-      "9 S ee in particular the survey of Gloucestershire; D. B. i. 165 b: 'Hoc",
+      "9 See in particular the survey of Gloucestershire; D. B. i. 165 b: 'Hoc",
       "manerium quietum est a geldo et ab omni forensi servitio praeter aecclesiae ' ;",
-      "Ibid. ' H aec terra libera fuit et quieta ab omni geldo et regali servitio ' ; 170,",
-      "4 U na hida et dimidia libera a geldo.' When after reading these passages we",
-      "come upon the following (167 b), ' I sdem W. tenet Tatinton: Ulgar tenuit de",
+      "Ibid. ' Haec terra libera fuit et quieta ab omni geldo et regali servitio ' ; 170,",
+      "4 Una hida et dimidia libera a geldo.' When after reading these passages we",
+      "come upon the following (167 b), ' Isdem W. tenet Tatinton: Ulgar tenuit de",
       "rege Edwardo: haec terra libera est,' and when we observe that the land is not",
       "hidated, we shall probably infer that 'This land is free' means 'This land is",
       "exempt from geld, and (perhaps) from all other royal service.'"
@@ -71,7 +73,7 @@
   "blocks": [
     {
       "kind": "paragraph",
-      "text": "Comparisons may be instituted between the freedom of one free man and that of another :— ' F ive thegns held this land of Earl Edwin and could go with their land whither they would, and below them they had four soldiers, who were as free as themselves5.' Ah igh degree of liberty is marked when we are told that, ' T he said men were so free that they could sell their land with soke and sake wherever they would6.' But there are yet higher degrees of liberty. Of Worcestershire it is written, ' W hen the king goes upon a military expedition, if anyone who is summoned stays at home, then if he is so free a man that he has his sake and soke and can go whither he pleases with his land, he with all his land shall be in the king's mercy7.' The free man is the freer if he has soke and sake, if he has jurisdiction over other men. Exceptional privileges, immunities from common burdens, are already regarded as ' l iberties.' This is no new thing; often enough when the Anglo-Saxon land books speak of freedom they mean privilege.",
+      "text": "Comparisons may be instituted between the freedom of one free man and that of another : — ' Five thegns held this land of Earl Edwin and could go with their land whither they would, and below them they had four soldiers, who were as free as themselves5.' A high degree of liberty is marked when we are told that, ' The said men were so free that they could sell their land with soke and sake wherever they would6.' But there are yet higher degrees of liberty. Of Worcestershire it is written, ' When the king goes upon a military expedition, if anyone who is summoned stays at home, then if he is so free a man that he has his sake and soke and can go whither he pleases with his land, he with all his land shall be in the king's mercy7.' The free man is the freer if he has soke and sake, if he has jurisdiction over other men. Exceptional privileges, immunities from common burdens, are already regarded as ' liberties.' This is no new thing; often enough when the Anglo-Saxon land books speak of freedom they mean privilege.",
       "pages": [
         0,
         1
@@ -86,14 +88,14 @@
     },
     {
       "kind": "paragraph",
-      "text": "The idea of freedom is equally vague and elastic if, instead of applying it to men, we apply it to land or the tenure of land. Two bordarii are now holding a small plot ; ' t hey themselves held it freely in King Edward's day1.' Here no doubt there has been a fall ; but how deep a fall we can not be sure. To say that a man's land is free may imply far more freedom than freehold tenure implies in later times ; i t may imply that the bond between him and his lord, if indeed he has a lord, is of a purely personal character and hardly gives the lord any hold over the land2. But this is not all. Perfect freedom is not attained so long as the land owes any single duty to the state. Often enough — but exactly how often it were no easy task to tell — the libera terra of our record is land that has been exempted even from the danegeld; it is highly privileged land3. Let us remember that at the present day, though the definition of free land or freehold land has long ago been fixed, we still speak as though free land might become freer if it were ' f ree of landtax and tithe rent-charge.'",
+      "text": "The idea of freedom is equally vague and elastic if, instead of applying it to men, we apply it to land or the tenure of land. Two bordarii are now holding a small plot ; ' they themselves held it freely in King Edward's day1.' Here no doubt there has been a fall ; but how deep a fall we can not be sure. To say that a man's land is free may imply far more freedom than freehold tenure implies in later times ; it may imply that the bond between him and his lord, if indeed he has a lord, is of a purely personal character and hardly gives the lord any hold over the land2. But this is not all. Perfect freedom is not attained so long as the land owes any single duty to the state. Often enough — but exactly how often it were no easy task to tell — the libera terra of our record is land that has been exempted even from the danegeld; it is highly privileged land3. Let us remember that at the present day, though the definition of free land or freehold land has long ago been fixed, we still speak as though free land might become freer if it were ' free of landtax and tithe rent-charge.'",
       "pages": [
         1
       ]
     },
     {
       "kind": "margin_note",
-      "text": "dOTQ^tht villein.",
+      "text": "The unfree dom of the villein.",
       "pages": [
         1
       ]
@@ -107,14 +109,14 @@
     },
     {
       "kind": "margin_note",
-      "text": "Sn°inhbe pursued?",
+      "text": "Can the villein be pursued ?",
       "pages": [
         1
       ]
     },
     {
       "kind": "paragraph",
-      "text": "^ ^e free to (lu*fc k\"8 loi%d and his land, or can he be pursued and captured ? No one word can be obtained in answer to this question. We can only say that in Henry II.'s day the ordinary peasant was regarded by the royal officials as ascriptitius ; the land that he occupied was said to be part of his lord's demesne ; his chattels were his lord's1. But then this was conceived to be, at least in some degree, the result of the Norman Conquest and subsequent rebellions of the peasantry2. To this we may add that in one of our sets of Leges, the French Leis of William the Conqueror, there are certain clauses which would be of great importance could we suppose that they had an authoritative origin, and which in any case are remarkable enough. The nativus who flies from the land on which he is born, let none retain him or his chattels ; if the lords will not send back these men to their land the king's officers are to do it3. On the other hand, the tillers of the soil are not to be worked beyond their proper rent ; their lord may not remove them from their land so long as they perform their right services4. Whether or no we suppose that in the writer's opinion the ordinary peasant was a nativus (of nativi Domesday Book has nothing to say) we still have law more favourable to the peasant than was the common law of Bracton's age :— a tiller who does his accustomed service is not to be ejected ; h e is no tenant at will.",
+      "text": "^ ^e free to (lu*fc k\"8 loi%d and his land, or can he be pursued and captured ? No one word can be obtained in answer to this question. We can only say that in Henry II.'s day the ordinary peasant was regarded by the royal officials as ascriptitius ; the land that he occupied was said to be part of his lord's demesne ; his chattels were his lord's1. But then this was conceived to be, at least in some degree, the result of the Norman Conquest and subsequent rebellions of the peasantry2. To this we may add that in one of our sets of Leges, the French Leis of William the Conqueror, there are certain clauses which would be of great importance could we suppose that they had an authoritative origin, and which in any case are remarkable enough. The nativus who flies from the land on which he is born, let none retain him or his chattels ; if the lords will not send back these men to their land the king's officers are to do it3. On the other hand, the tillers of the soil are not to be worked beyond their proper rent ; their lord may not remove them from their land so long as they perform their right services4. Whether or no we suppose that in the writer's opinion the ordinary peasant was a nativus (of nativi Domesday Book has nothing to say) we still have law more favourable to the peasant than was the common law of Bracton's age : — a tiller who does his accustomed service is not to be ejected ; he is no tenant at will.",
       "pages": [
         1,
         2
@@ -139,7 +141,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "D . B. ii. 213 : ' H anc terrain calumpniatur esse liberam Vlchitel homo Hermeri, quocunque modo iudicetur, vel bello vel iudicio, et alius est praesto probare eo modo quod iacuit ad ecclesiam [S. Adeldredae] die quo rex Edwardus obiit. Set totus hundretus testatur earn fuisse T. R. E. ad S. Adeldredam.'"
+          "text": "D. B. ii. 213 : ' Hanc terrain calumpniatur esse liberam Vlchitel homo Hermeri, quocunque modo iudicetur, vel bello vel iudicio, et alius est praesto probare eo modo quod iacuit ad ecclesiam [S. Adeldredae] die quo rex Edwardus obiit. Set totus hundretus testatur earn fuisse T. R. E. ad S. Adeldredam.'"
         }
       ],
       "pages": [
@@ -151,7 +153,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "S ee in particular the survey of Gloucestershire; D. B. i. 165 b: 'Hoc manerium quietum est a geldo et ab omni forensi servitio praeter aecclesiae ' ; Ibid. ' H aec terra libera fuit et quieta ab omni geldo et regali servitio ' ; 170, 4 U na hida et dimidia libera a geldo.' When after reading these passages we come upon the following (167 b), ' I sdem W. tenet Tatinton: Ulgar tenuit de rege Edwardo: haec terra libera est,' and when we observe that the land is not hidated, we shall probably infer that 'This land is free' means 'This land is exempt from geld, and (perhaps) from all other royal service.'"
+          "text": "See in particular the survey of Gloucestershire; D. B. i. 165 b: 'Hoc manerium quietum est a geldo et ab omni forensi servitio praeter aecclesiae ' ; Ibid. ' Haec terra libera fuit et quieta ab omni geldo et regali servitio ' ; 170, 4 Una hida et dimidia libera a geldo.' When after reading these passages we come upon the following (167 b), ' Isdem W. tenet Tatinton: Ulgar tenuit de rege Edwardo: haec terra libera est,' and when we observe that the land is not hidated, we shall probably infer that 'This land is free' means 'This land is exempt from geld, and (perhaps) from all other royal service.'"
         }
       ],
       "pages": [

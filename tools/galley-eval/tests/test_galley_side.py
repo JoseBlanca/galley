@@ -1,6 +1,7 @@
 """Tests of galley_eval.galley_side: the tokens of galley's four stage
 outputs (spec section 5, "galley's tokens")."""
 
+import dataclasses
 from collections.abc import Callable
 from pathlib import Path
 
@@ -25,6 +26,8 @@ from galley.model import (
     PageLayout,
     PageWords,
     Region,
+    Reread,
+    RereadKind,
     Span,
     TextSource,
     Word,
@@ -79,6 +82,7 @@ _LINES = LinesFile(
         _page_lines(0, "THE HEAD", "We must repli-", "7"),
         _page_lines(1, "OTHER HEAD", "cate it here.", "8"),
     ),
+    rereads=(),
 )
 
 
@@ -223,6 +227,7 @@ def test_a_word_with_the_text_of_an_edge_word_elsewhere_is_not_flagged() -> None
     lines = LinesFile(
         source_pdf_sha256=_SHA,
         pages=(_page_lines(0, "HEAD", "the HEAD of it", "9"),),
+        rereads=(),
     )
     flagged = tuple(
         token.text
@@ -247,6 +252,7 @@ def test_a_word_with_a_space_is_split_into_two_tokens() -> None:
                 (),
             ),
         ),
+        rereads=(),
     )
     assert tuple(token.text for token in lines_tokens(lines)) == ("10", "000")
     assert tuple(token.text for token in words_tokens(_words_file(lines), lines)) == (
@@ -380,6 +386,30 @@ def test_read_galley_side_reads_the_four_files_of_a_folder(tmp_path: Path) -> No
     assert side.galley_blocks["b-p0001-002"].note_id == "n-p0001-001"
 
 
+@pytest.mark.pandoc
+def test_read_galley_side_keeps_the_rereads_of_lines_json(tmp_path: Path) -> None:
+    # A region of page 0 read again and not kept: it changes no word.
+    reread = Reread(
+        page_index=0,
+        kind=RereadKind.FOOTNOTE_BAND,
+        box=Box(0.0, 20.0, 100.0, 30.0),
+        layer_words=(_word("7", 20.0),),
+        ocr_words=(Word("?", Box(0.0, 20.0, 5.0, 30.0), 12.0),),
+        layer_score=0,
+        ocr_score=-1,
+        kept=False,
+    )
+    lines = dataclasses.replace(_LINES, rereads=(reread,))
+    folder = BookFolder(tmp_path)
+    write_words(folder.words_json, _words_file(lines))
+    write_lines(folder.lines_json, lines)
+    write_blocks(folder.blocks_json, _BLOCKS)
+    folder.book_md.write_text(
+        "::: {#b-p0000-001}\nWe must replicate it here.\n:::\n", encoding="utf-8"
+    )
+    assert read_galley_side(folder).rereads == (reread,)
+
+
 # The page edge skips lines of marks
 
 
@@ -390,6 +420,7 @@ def test_a_line_of_marks_above_the_running_head_does_not_take_its_flag() -> None
         pages=(
             _page_lines(0, "!", "NORMANDY IN HISTORY 13", "the text", "more text", ";"),
         ),
+        rereads=(),
     )
     flagged = tuple(token.text for token in lines_tokens(lines) if token.edge_of_page)
     assert flagged == ("!", "NORMANDY", "IN", "HISTORY", "13", "more", "text", ";")
@@ -402,7 +433,9 @@ def test_a_line_of_marks_above_the_running_head_does_not_take_its_flag() -> None
 
 
 def test_a_page_of_marks_only_is_all_on_the_edge() -> None:
-    lines = LinesFile(source_pdf_sha256=_SHA, pages=(_page_lines(0, "!", "* ;"),))
+    lines = LinesFile(
+        source_pdf_sha256=_SHA, pages=(_page_lines(0, "!", "* ;"),), rereads=()
+    )
     assert all(token.edge_of_page for token in lines_tokens(lines))
 
 
@@ -463,6 +496,7 @@ def test_token_with_no_word_in_lines_takes_the_page_of_the_word_before() -> None
     lines = LinesFile(
         source_pdf_sha256=_SHA,
         pages=(_page_lines(0, "alpha beta"), _page_lines(1, "gamma delta")),
+        rereads=(),
     )
     blocks = BlocksFile(
         source_pdf_sha256=_SHA,
@@ -549,6 +583,7 @@ def _heading(block_id: str, label: str | None, title: str) -> Block:
 _HEADING_LINES = LinesFile(
     source_pdf_sha256=_SHA,
     pages=(_page_lines(0, "CHAPTER III.", "THE EARLY YEARS", "Very few epochs"),),
+    rereads=(),
 )
 
 
@@ -598,6 +633,7 @@ def test_verse_block_line_feeds_separate_its_words(tmp_path: Path) -> None:
     lines = LinesFile(
         source_pdf_sha256=_SHA,
         pages=(_page_lines(0, "O Roma nobilis,", "orbis et domina"),),
+        rereads=(),
     )
     blocks = _hand_made(
         tmp_path,
@@ -628,6 +664,7 @@ def test_chapter_summary_block_is_a_body_block_of_its_kind(tmp_path: Path) -> No
     lines = LinesFile(
         source_pdf_sha256=_SHA,
         pages=(_page_lines(0, "Terms of accession \u2014 His character"),),
+        rereads=(),
     )
     blocks = _hand_made(
         tmp_path,
@@ -656,6 +693,7 @@ _ENDNOTE_LINES = LinesFile(
         _page_lines(0, "the Law1 of the land"),
         _page_lines(10, "Lex.", "1. See Bracton.", "2. And Glanvill."),
     ),
+    rereads=(),
 )
 
 
@@ -860,6 +898,7 @@ def _footnote(
 _PAGE_OF_NOTES = LinesFile(
     source_pdf_sha256=_SHA,
     pages=(_page_lines(0, "the text2 here", "(1) A stray note.", "(2) Glanvill."),),
+    rereads=(),
 )
 
 
@@ -934,6 +973,7 @@ _EVERY_NOTE_LINES = LinesFile(
         ),
         _page_lines(10, "Lex.", "1. See Bracton.", "2. And more."),
     ),
+    rereads=(),
 )
 
 

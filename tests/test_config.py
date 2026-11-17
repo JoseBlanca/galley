@@ -61,6 +61,8 @@ def test_config_with_every_key_is_read_into_its_values(
             "cover_page": "1",
             "plate_pages": "[5, 2]",
             "contents_pages": "[0, 1]",
+            "front_matter_end": "2",
+            "reread_footnotes": "true",
         },
     )
 
@@ -79,6 +81,8 @@ def test_config_with_every_key_is_read_into_its_values(
         cover_page=1,
         plate_pages=(5, 2),
         contents_pages=(0, 1),
+        front_matter_end=2,
+        reread_footnotes=True,
     )
 
 
@@ -100,6 +104,8 @@ def test_config_with_only_the_required_keys_has_the_defaults(
         cover_page=None,
         plate_pages=(),
         contents_pages=(),
+        front_matter_end=None,
+        reread_footnotes=False,
     )
 
 
@@ -116,6 +122,26 @@ def test_contents_pages_and_plate_pages_keep_the_order_of_the_config(
 
     assert config.contents_pages == (16, 14, 15)
     assert config.plate_pages == (23,)
+
+
+def test_front_matter_end_of_0_keeps_every_page_and_is_not_the_default(
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
+) -> None:
+    # 0 keeps every page; without the key analyze finds the end
+    # (architecture section 6).
+    keys = _required_keys(excerpt_pdf[KADESH]) | {"front_matter_end": "0"}
+    config = read_config(_write_config(tmp_path, keys))
+
+    assert config.front_matter_end == 0
+
+
+def test_reread_footnotes_false_is_read_as_false(
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path]
+) -> None:
+    keys = _required_keys(excerpt_pdf[KADESH]) | {"reread_footnotes": "false"}
+    config = read_config(_write_config(tmp_path, keys))
+
+    assert config.reread_footnotes is False
 
 
 def test_relative_pdf_is_resolved_against_the_folder_of_the_config(
@@ -233,6 +259,11 @@ def test_region_without_its_box_is_an_error(
         ("plate_pages", "23", "plate_pages"),
         ("contents_pages", '["14"]', "contents_pages[0]"),
         ("contents_pages", "{page = 14}", "contents_pages"),
+        ("front_matter_end", '"7"', "front_matter_end"),
+        ("front_matter_end", "7.0", "front_matter_end"),
+        ("front_matter_end", "true", "front_matter_end"),
+        ("reread_footnotes", '"true"', "reread_footnotes"),
+        ("reread_footnotes", "1", "reread_footnotes"),
         ("exclude_regions", '"x"', "exclude_regions"),
         ("exclude_regions", "[3]", "exclude_regions[0]"),
         (
@@ -278,6 +309,7 @@ def test_ocr_that_is_not_one_of_its_values_is_an_error(
         ("cover_page", "-1", "cover_page"),
         ("plate_pages", "[-23]", "plate_pages[0]"),
         ("contents_pages", "[14, 15, -16]", "contents_pages[2]"),
+        ("front_matter_end", "-1", "front_matter_end"),
         (
             "exclude_regions",
             "[{page = -2, box = [1, 2, 3, 4]}]",

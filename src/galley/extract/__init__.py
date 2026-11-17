@@ -3,9 +3,10 @@ skeleton spec section 6, plates spec section 3).
 
 extract reads the words of each text page, and of each plate page that
 has a text layer, from the PDF's text layer with pdfplumber, one document
-per worker thread. The words of an excluded page, and those whose centre
-falls in a region the config excludes, become removals, so that no word
-is dropped without a record. A plate page is rendered whole at 300 dpi
+per worker thread. The words of an excluded page, of a front-matter page
+(front-matter spec section 3), and those whose centre falls in a region
+the config excludes, become removals, so that no word is dropped without
+a record. A plate page is rendered whole at 300 dpi
 into `images/plate-<page index, 4 digits>.png`, and the page gets one
 figure, the whole page. The cover is rendered as `images/cover.png`.
 """
@@ -39,7 +40,7 @@ from galley.model import (
     write_words,
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
-from galley.text_layer import open_pdf
+from galley.text_layer import layer_words, open_pdf
 
 __all__ = ["page_words", "plate_image", "run"]
 
@@ -120,13 +121,13 @@ def _page_reader(
         unread = page.kind is PageKind.BLANK or (
             page.kind is PageKind.PLATE and page.text_source is TextSource.NONE
         )
-        layer_words = () if unread else _layer_words(pdf, page.index)
+        page_layer_words = () if unread else _layer_words(pdf, page.index)
         if page.kind is PageKind.PLATE:
             _save_png(
                 pdfium.render(pdf_path, page.index, _PLATE_DPI),
                 book_root / plate_image(page.index),
             )
-        return page_words(page, layer_words)
+        return page_words(page, page_layer_words)
 
     return read_page
 
@@ -139,22 +140,10 @@ def plate_image(page_index: int) -> str:
 
 
 def _layer_words(pdf: pdfplumber.PDF, page_index: int) -> tuple[Word, ...]:
-    """The words of the page's text layer, as extract_words() gives them
-    with its default options, in its order."""
+    """The words of the page's text layer, as `text_layer.layer_words`
+    reads them (extract spec section 5)."""
     with closing(pdf.pages[page_index]) as pdf_page:
-        return tuple(
-            Word(
-                layer_word["text"],
-                Box(
-                    float(layer_word["x0"]),
-                    float(layer_word["top"]),
-                    float(layer_word["x1"]),
-                    float(layer_word["bottom"]),
-                ),
-                None,
-            )
-            for layer_word in pdf_page.extract_words()
-        )
+        return layer_words(pdf_page)
 
 
 def _save_cover(pdf: Path, cover_page: int, cover_png: Path) -> None:
@@ -180,7 +169,8 @@ def page_words(
     A text page, and a plate page with a text layer, keep every word but
     those whose centre is inside one of its `exclude_regions`, edges
     included, which are removals with the reason `excluded_region`. Every
-    word of an excluded page is a removal with the reason `excluded_page`.
+    word of an excluded page is a removal with the reason `excluded_page`,
+    and of a front-matter page one with the reason `front_matter`.
     A blank page has neither. A plate page has one figure, the whole page,
     at 300 dpi, whose image is `plate_image(page.index)`; no other page
     has one. Raises ValueError for a page read by OCR, which extract
@@ -213,6 +203,14 @@ def page_words(
             kept = ()
             removals = tuple(
                 _removal(page, layer_word, RemovalReason.EXCLUDED_PAGE)
+                for layer_word in layer_words
+            )
+        case PageKind.FRONT_MATTER:
+            # Front-matter spec, section 3: every word a removal, as on an
+            # excluded page.
+            kept = ()
+            removals = tuple(
+                _removal(page, layer_word, RemovalReason.FRONT_MATTER)
                 for layer_word in layer_words
             )
         case PageKind.BLANK:

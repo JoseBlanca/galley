@@ -46,6 +46,16 @@ each (owner, 15 November 2026). The cut-in rule does not reach the bar
 on precision set in section 9; the owner kept it as written on 16
 November 2026 (section 9).
 
+Revised on 17 November 2026: layout also re-reads small print with
+Tesseract where it reads better than the text layer
+(`docs/specs/reocr.md`). It then reads the PDF, through
+`pdfium.render`, and the config, besides `pages.json` and `words.json`;
+the re-reading comes in after steps 2, 2b and 4 of section 3, a page
+printed wholly in small type is read whole after the book's measures,
+and every region read is recorded in `lines.json`, whose format goes to
+version 2. That spec gives the rules, the record and the fidelity rule;
+this one points to it where they meet.
+
 ## 1. Terms
 
 Besides those of the glossary, this spec uses these; the first four, and
@@ -485,6 +495,63 @@ before the right at the same top; the band regions in the same order as
 the body's. A page with no word has no region; the figures are copied
 from `words.json`, as now.
 
+### Re-reading small print
+
+Where the text layer reads small print poorly and the scan is sharp,
+layout reads that print again with Tesseract, the OCR program, at 300
+dpi, and keeps Tesseract's words for a region only when their **reading
+score**, the count of their known words (in the word list of the book's
+language) less their unknown words, is higher than that of the layer's
+words they replace, region by region (`reading_score`,
+`docs/specs/reocr.md` §1 and §3).
+The rules of what is read, how each region is cropped, which layer
+words a reading replaces and the record of each region read are
+reocr's (§3 and §4); here is where they come into the steps above.
+
+It is done only when the config's `ocr` is `verify`, the default (with
+`trust` or `redo` nothing is read), and only on text pages whose words
+are the text layer's (`pages.json` gives the page's kind and its text
+source: the page is read only when its text source is `text_layer`,
+not `ocr` or `none`). The book's measures are taken from the layer's words, before
+anything is read. Then, over the whole book, layout finds the sides
+whose outer margins hold notes: a side has them when at least 10 in 100
+of the book's pages with 50 words or more have at least 2 known words
+among that side's margin words of step 2 (Gierke and Domesday have both
+sides, the other four books neither).
+
+Per page, steps 1, 2 and 2b run on the layer's words, and then:
+
+- **A small-print page**, printed wholly in small type such as a page
+  of an index (`is_small_print_page`: at least 50 words, and at least 85
+  in 100 of the column's rows of two words or more, below the running
+  head of step 3, small rows as step 4 counts them), is read whole below
+  its running-head region. When Tesseract's words are kept, the page's
+  words become the layer's words less those the reading replaces, plus
+  Tesseract's (`model.words_after_rereads`), and steps 1 to 7 lay them
+  out again; the running-head region keeps the layer's words. No other region of such
+  a page is read.
+- On any other page, the regions are read where the steps have found
+  their words: after step 2, the note bands of each side with margin
+  notes, found by rows of ink in the side's margin strip of the render
+  (`note_bands`); after step 2b, the crops around the cut-in zones;
+  after step 4, when the config has `reread_footnotes = true`, the
+  footnote band. The steps sort a page's words into groups: each side's
+  margin words (step 2), each side's cut-in words (step 2b), the words
+  left in the column, and among them the footnote band's (step 4). Each
+  kept region's layer words are taken out of the group that holds them,
+  and Tesseract's words put into the group of the region's kind: that
+  side's margin words for a note band, that side's cut-in words for a
+  cut-in crop, the footnote band's for the band. The later steps lay them out as they lay out the
+  layer's, except that a band read by Tesseract is not looked for again
+  by step 4: it is the band, and the rows above it the body.
+
+A page is rendered once, in the one PDFium thread, and only when it has
+a region to read: it is a small-print page, the book has a side with
+margin notes, the page has a cut-in zone, or its footnote band is to be
+read. Every region read is a record in `lines.json`, kept or not
+(`Reread`, architecture §8), in page order and, within a page, in the
+order reocr §4 gives.
+
 Where the thresholds come from:
 
 | threshold | value | from |
@@ -624,7 +691,53 @@ def run(folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKER
 
 def measure_book(words: WordsFile, *, workers: int = DEFAULT_WORKERS) -> BookMeasures | None: ...
 def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout: ...
+
+class Side(StrEnum):
+    """The side of the body column a margin note stands at."""
+    LEFT = "left"
+    RIGHT = "right"
+
+class ReadLines(Protocol):
+    """Tesseract run on a crop of a page rendered at 300 dpi, whose top
+    left lies at `origin` on the page, in points: its words grouped by its
+    lines, with boxes in points on the page (`ocr.read_image_lines`)."""
+    def __call__(self, image: Image.Image, *, origin: tuple[float, float],
+                 psm: int) -> tuple[tuple[Word, ...], ...]: ...
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Rereading:
+    """What layout needs to re-read a page's small print."""
+    render: Callable[[int], Image.Image]   # a page index -> the page at 300 dpi, grayscale
+    read_lines: ReadLines
+    lower_case_words: frozenset[str]       # the word list of the book's language, in lower case
+    margin_note_sides: frozenset[Side]     # the sides whose outer margins hold notes
+    footnote_bands: bool                   # the config's reread_footnotes: the footnote band is read too
+
+def layout_page_with_rereads(page: PageWords, measures: BookMeasures | None,
+                             rereading: Rereading | None
+                             ) -> tuple[PageLayout, tuple[Reread, ...]]: ...
+
+def reading_score(words: Iterable[Word], lower_case_words: frozenset[str]) -> int: ...
+def is_small_print_page(page: PageWords, measures: BookMeasures) -> bool: ...
+def note_bands(strip: Image.Image, *, dpi: int) -> tuple[tuple[int, int, int, int], ...]: ...
 ```
+
+`layout_page_with_rereads` lays the page out as `layout_page` does,
+with its small print re-read as section 3 says, and gives the records
+of the regions it read; with `rereading` None, with `measures` None, or
+on a page whose words are not the text layer's, it reads nothing and
+gives `layout_page`'s layout and no record. It takes the page's render
+and Tesseract through `rereading`, so that its tests pass a drawn image
+and Tesseract's words written by hand, with no PDF and no Tesseract;
+`run` gives it a render by `pdfium.render` at 300 dpi and a reader by
+`ocr.read_image_lines` in the book's language. `reading_score` is the
+reading score of section 3; `is_small_print_page` decides a small-print
+page on the layer's words; `note_bands` finds the note bands of a
+margin strip rendered at 300 dpi, as pixel boxes, and raises ValueError
+at any other resolution. The other steps of re-reading, the crops and
+the choice of each region, are in the private module
+`layout/_reread.py`, and steps 1 to 3, which both use, in
+`layout/_column.py`.
 
 `measure_book` gives `None` for a book with no page of 3 rows, and
 `layout_page` with `None` lays the page out as the skeleton did.
@@ -636,11 +749,16 @@ it into the line step 6 names afterwards. `measure_book` places every
 page's column (step 1) to measure the cut-in insets; `layout_page`
 places it again, which costs one more grouping of rows per page.
 
-`run` is unchanged in what it reads, deletes, checks and writes
-(walking-skeleton spec §7): it reads both files with
-`read_checked_input`, deletes `lines.json` and every later file first,
-runs the fidelity check before writing, and writes nothing on a
-`FidelityError`.
+`run` reads both files with `read_checked_input`, deletes `lines.json`
+and every later file first, runs the fidelity check before writing, and
+writes nothing on a `FidelityError` (walking-skeleton spec §7). Since
+re-reading it also reads the config's `ocr`, `reread_footnotes` and
+language, the word list of that language and the PDF, and writes each
+region read into `lines.json`'s `rereads`. The command checks, before
+any stage runs, that Tesseract is installed when layout runs and `ocr`
+is not `trust`, and that Tesseract's word-list tools (`combine_tessdata`
+and `dawg2wordlist`) are, when the word list is not cached and `ocr` is
+`verify`, as it checks for Pandoc (walking-skeleton spec §9).
 
 ## 5. How it runs in parallel
 
@@ -657,6 +775,14 @@ Apple M5 Pro with 6 workers (1 worker in brackets): the measures pass
 takes 0.07 s (0.17 s) and the layout of the pages 0.19 s (0.62 s);
 reading words.json takes 1.1 s, and `galley2epub layout`, which also
 runs the fidelity check and writes lines.json, 2.5 s in all.
+
+With re-reading, a page with a region to read asks the PDFium thread
+for its render and runs Tesseract in its worker, one subprocess per
+region; since the renders are made one at a time, their sum is the
+least the stage can take. Measured on 17 November 2026 on the same
+machine with 6 workers, `galley2epub layout` on the whole book, against
+2.5 s for Domesday without re-reading (above): Stubbs 29.9 s (359 regions read, 228 kept), Domesday
+68.5 s (623, 441), Gierke 50.1 s (758, 428), Haskins 4.0 s (17, 9).
 
 ## 6. The cases
 
@@ -736,8 +862,10 @@ runs the fidelity check and writes lines.json, 2.5 s in all.
 
 ## 7. Fidelity
 
-Every word of `words.json` is in exactly one line of `lines.json`
-(architecture §8 and §13); layout removes nothing. The check runs in
+Every word of `words.json` is in exactly one line of `lines.json`, or is
+among the replaced words of exactly one kept record of re-reading
+(architecture §8 and §13, `docs/specs/reocr.md` §4); layout removes
+nothing. The check runs in
 `run`, as now. Each step of section 3 moves a word from what is left to
 one region; a test asserts, on every reference page, that the words of
 the regions are those of the page.
@@ -923,3 +1051,6 @@ margin note breaks the text a reader reads.
 - Figures inside text pages, tables as tables, the order of notes inside
   a band: later.
 - OCR of pages without a text layer: analyze and extract.
+- The rules of re-reading small print with Tesseract, the crops, the
+  filters of a cut-in crop, the words a reading replaces and the
+  record: `docs/specs/reocr.md`; section 3 says where they come in.

@@ -4,7 +4,8 @@ block's lines."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import NamedTuple
+from enum import StrEnum
+from typing import NamedTuple, assert_never
 
 from galley.model import ChangeReason, WordChange
 from galley.structure._measures import (
@@ -17,6 +18,10 @@ from galley.wordlist import APOSTROPHES, word_key
 # Spec section 5: the word list is no evidence for a second part of fewer
 # than 2 letters ("Con-" "1", "na-" "R": junk keys it happens to hold).
 _WORD_LIST_MIN_LETTERS = 2
+# Spec section 5: the first part of a word whose hyphen was lost has 2
+# letters or more ("im" "munist.", Domesday page 311), so that "a" "piece"
+# is not joined.
+_LOST_HYPHEN_MIN_LETTERS = 2
 # Spec section 5: a line of one of these signs of a note reference
 # (section 11) between a hyphen and the next line is passed over (Haskins
 # page 71, "fol-" "^" "lows:").
@@ -24,8 +29,8 @@ _LONE_SIGNS = frozenset({("^",), ("*",), ("•",)})
 
 
 class HyphenJoin(NamedTuple):
-    """The word two parts make, and why: `hyphen_join`, `hyphen_join_guessed`
-    or `hyphen_kept`."""
+    """The word two parts make, and why: `hyphen_join`, `hyphen_join_guessed`,
+    `hyphen_kept`, or `hyphen_lost` in a margin note."""
 
     word: str
     reason: ChangeReason
@@ -36,18 +41,31 @@ def _after_last_apostrophe(key: str) -> str:
     return key[cut + 1 :]
 
 
+def _is_joined_word(
+    key: str, second: str, book_words: frozenset[str], word_list: frozenset[str]
+) -> bool:
+    """Whether `key`, the key of a word joined from two parts, is among
+    `book_words`, or in `word_list` when `second`, the second part, has
+    `_WORD_LIST_MIN_LETTERS` letters or more (spec section 5)."""
+    return key in book_words or (
+        sum(character.isalpha() for character in second) >= _WORD_LIST_MIN_LETTERS
+        and key in word_list
+    )
+
+
 def join_hyphen(
     first: str, second: str, book_words: frozenset[str], word_list: frozenset[str]
 ) -> HyphenJoin | None:
     """The word made of `first`, the last word of a line, and `second`, the
     first word of the next, or None when they are not joined (spec section
-    5): `first` must end with "-" after a letter or digit and `second`
+    5): `first` must end with "-" or "¬" after a letter or digit and `second`
     start with a letter or digit, and with an ASCII digit after an ASCII
     digit, in which case the hyphen is always kept (`hyphen_kept`): "235-"
     "37-" gives "235-37-". After a
     lower-case letter, a `second` that starts with a capital is joined
     only when the book prints the hyphenated word (`hyphen_kept`), and
-    else not at all.
+    else not at all. A kept hyphen is "-", whichever `first` ends with:
+    "1830¬" "40" gives "1830-40".
 
     The hyphen is kept (`hyphen_kept`) when the hyphenated word is among
     `book_words`, the keys of the words the book prints whole, and the
@@ -63,8 +81,8 @@ def join_hyphen(
     if is_digit_before_hyphen(first):
         if second[0] not in ASCII_DIGITS:
             return None
-        return HyphenJoin(first + second, ChangeReason.HYPHEN_KEPT)
-    hyphenated = first + second
+        return HyphenJoin(first[:-1] + "-" + second, ChangeReason.HYPHEN_KEPT)
+    hyphenated = first[:-1] + "-" + second
     joined = first[:-1] + second
     if first[-2].islower() and second[0].isupper():
         if word_key(hyphenated) in book_words:
@@ -76,14 +94,52 @@ def join_hyphen(
     keys = (joined_key,)
     if any(apostrophe in first for apostrophe in APOSTROPHES):
         keys = (joined_key, _after_last_apostrophe(joined_key))
-    word_list_counts = (
-        sum(character.isalpha() for character in second) >= _WORD_LIST_MIN_LETTERS
-    )
-    if any(
-        key in book_words or (word_list_counts and key in word_list) for key in keys
-    ):
+    if any(_is_joined_word(key, second, book_words, word_list) for key in keys):
         return HyphenJoin(joined, ChangeReason.HYPHEN_JOIN)
     return HyphenJoin(joined, ChangeReason.HYPHEN_JOIN_GUESSED)
+
+
+def join_lost_hyphen(
+    first: str,
+    second: str,
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    common_inner_words: frozenset[str],
+) -> HyphenJoin | None:
+    """The word made of `first`, the last word of a line of a margin note,
+    and `second`, the first word of the next, when the OCR lost the
+    hyphen between them or read it as a full stop (`hyphen_lost`), or None
+    (spec section 5): "move." "ment," gives "movement,".
+
+    `first` ends with a letter, or a letter and one ".", and has
+    `_LOST_HYPHEN_MIN_LETTERS` letters or more without the stop; `second`
+    starts with a lower-case letter and its key is not among
+    `common_inner_words` (`BookSurvey.common_inner_words`, the words
+    printed whole); and the joined word is known (`_is_joined_word`)
+    against `book_words` and `word_list`, which is in lower case.
+    """
+    stem = first.removesuffix(".")
+    if not (
+        stem[-1:].isalpha()
+        and sum(character.isalpha() for character in stem) >= _LOST_HYPHEN_MIN_LETTERS
+        and second[:1].isalpha()
+        and second[0].islower()
+        and word_key(second) not in common_inner_words
+    ):
+        return None
+    joined = stem + second
+    key = word_key(joined)
+    if _is_joined_word(key, second, book_words, word_list):
+        return HyphenJoin(joined, ChangeReason.HYPHEN_LOST)
+    return None
+
+
+class LostHyphens(StrEnum):
+    """Whether a block's line ends whose hyphen the OCR lost are joined
+    (`join_lost_hyphen`): in a margin note only (spec section 5)."""
+
+    JOINED = "joined"
+    NOT_JOINED = "not_joined"
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +171,9 @@ def join_lines(
     book_words: frozenset[str],
     word_list: frozenset[str],
     unjoined: frozenset[int] = frozenset(),
+    *,
+    lost_hyphens: LostHyphens,
+    common_inner_words: frozenset[str],
 ) -> JoinedWords:
     """The words of `lines`, one block's lines in order, possibly over a
     page break, with the last word of each line joined to the first of the
@@ -123,7 +182,10 @@ def join_lines(
     line that holds only a reference sign ("^") after a line ending with a
     hyphen is passed over, and the sign goes after the word the join gives
     (spec section 5). A line whose position is in `unjoined` is never
-    joined to the line before."""
+    joined to the line before. With `lost_hyphens` JOINED, as in a margin
+    note, a line whose last word `join_hyphen` does not join is joined by
+    `join_lost_hyphen`, against `common_inner_words`, when it gives a
+    word; with NOT_JOINED, `common_inner_words` is not used."""
     words: list[str] = []
     pages: list[int] = []
     changes: list[WordChange] = []
@@ -141,11 +203,22 @@ def join_lines(
         ):
             passed_over = line
             continue
+        joinable = bool(words) and bool(texts) and number not in unjoined
         joined = (
             join_hyphen(words[-1], texts[0], book_words, word_list)
-            if words and texts and number not in unjoined
+            if joinable
             else None
         )
+        if joined is None and joinable:
+            match lost_hyphens:
+                case LostHyphens.JOINED:
+                    joined = join_lost_hyphen(
+                        words[-1], texts[0], book_words, word_list, common_inner_words
+                    )
+                case LostHyphens.NOT_JOINED:
+                    pass
+                case _:
+                    assert_never(lost_hyphens)
         if joined is not None:
             changes.append(
                 WordChange(

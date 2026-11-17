@@ -74,6 +74,7 @@ from galley.model import (
     Note,
     NoteKind,
     PageLayout,
+    Reread,
     Word,
     WordsFile,
     read_blocks,
@@ -126,8 +127,9 @@ class GalleyNoteReference:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class GalleySide:
     """galley's files of one book, as the comparison uses them: the tokens
-    of each stage output, the blocks by id, the note references, and
-    `words.json` itself, for the page table."""
+    of each stage output, the blocks by id, the note references,
+    `words.json` itself, for its removals and the page table, and the
+    regions layout read again, from `lines.json`, for the page table."""
 
     words: tuple[GalleyToken, ...]
     lines: tuple[GalleyToken, ...]
@@ -136,6 +138,7 @@ class GalleySide:
     galley_blocks: frozendict[str, GalleyBlock]
     note_references: tuple[GalleyNoteReference, ...]
     words_file: WordsFile
+    rereads: tuple[Reread, ...] = ()
 
 
 def read_galley_side(folder: BookFolder) -> GalleySide:
@@ -166,6 +169,7 @@ def read_galley_side(folder: BookFolder) -> GalleySide:
         galley_blocks=galley_blocks(blocks),
         note_references=references,
         words_file=words,
+        rereads=lines.rereads,
     )
 
 

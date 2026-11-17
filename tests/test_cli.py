@@ -24,6 +24,7 @@ from galley.book_folder import BookFolder
 from galley.cli import main
 from galley.config import BookConfig
 from galley.errors import ConfigError, ExternalProgramError, InputFileError
+from galley.model import read_lines
 from galley.parallel import DEFAULT_WORKERS
 
 KADESH = "kadesh_8-17"
@@ -512,3 +513,87 @@ def test_structure_runs_without_tesseract_when_the_word_list_is_cached(
     main(["structure", str(folder.root)])
 
     assert _names(folder) == _files_up_to("structure")
+
+
+def _cached_word_list(tmp_path: Path) -> Path:
+    """A word list's cache folder holding a stand-in English list, so that
+    no stage needs Tesseract's tools to extract it."""
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    (cache_dir / "eng.txt").write_text("the\nbattle\n", encoding="utf-8")
+    return cache_dir
+
+
+# Changes PATH and the word list's cache folder for the whole process.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
+@pytest.mark.parametrize("command", ["run", "layout"])
+def test_a_command_running_layout_that_rereads_stops_without_tesseract(
+    command: str,
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # docs/specs/reocr.md, section 3: layout re-reads small print with
+    # Tesseract under ocr = "verify", the default, so the command checks
+    # for it first.
+    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
+    monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", _cached_word_list(tmp_path))
+
+    with pytest.raises(ExternalProgramError) as raised:
+        main([command, str(folder.root)])
+
+    assert str(raised.value) == (
+        "tesseract is not installed; layout reads small print with it unless "
+        'the config has ocr = "trust": install it with `brew install tesseract`'
+    )
+    # No stage ran: each would have deleted its own file first.
+    assert _names(folder) == _files_up_to("epub")
+
+
+# Changes PATH and the word list's cache folder for the whole process.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
+def test_layout_that_rereads_stops_without_the_tools_of_a_word_list_not_cached(
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
+    monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", tmp_path / "no-cache")
+
+    with pytest.raises(ExternalProgramError) as raised:
+        main(["layout", str(folder.root)])
+
+    assert str(raised.value) == (
+        "tesseract, combine_tessdata and dawg2wordlist are not installed; "
+        "layout needs them once to extract the word list of eng from "
+        "Tesseract's data: install them with `brew install tesseract`"
+    )
+    assert _names(folder) == _files_up_to("epub")
+
+
+# Changes PATH and the word list's cache folder for the whole process.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
+@pytest.mark.parametrize("ocr", ["trust", "redo"])
+def test_layout_with_ocr_trust_or_redo_rereads_nothing_and_runs_without_tesseract(
+    ocr: str,
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # docs/specs/reocr.md, section 3: under "redo" every page is already
+    # Tesseract's and layout re-reads nothing.
+    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
+    with folder.book_toml.open("a", encoding="utf-8") as toml:
+        toml.write(f'ocr = "{ocr}"\n')
+    monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", tmp_path / "no-cache")
+
+    main(["layout", str(folder.root)])
+
+    assert _names(folder) == _files_up_to("layout")
+    assert read_lines(folder.lines_json).rereads == ()

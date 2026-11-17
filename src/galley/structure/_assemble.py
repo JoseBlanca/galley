@@ -63,6 +63,7 @@ from galley.structure._unnumbered import (
     changes_in_order,
     first_page,
     joined,
+    joined_margin_note,
     merged_origin,
     piece_origin,
     without_marker,
@@ -96,16 +97,22 @@ class Assembled:
 
 
 def _body(
-    entries: Sequence[Entry], book_words: frozenset[str], word_list: frozenset[str]
+    entries: Sequence[Entry],
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    common_inner_words: frozenset[str],
 ) -> tuple[Unnumbered, ...]:
-    """The body's entries as blocks, with their hyphens joined."""
+    """The body's entries as blocks, with their hyphens joined, and in a
+    margin note the words whose hyphen was lost (spec section 5)."""
     body: list[Unnumbered] = []
     for entry in entries:
         match entry:
             case BodyBlock():
                 body.append(_body_block(entry, book_words, word_list))
             case MarginNote(piece):
-                body.append(joined(piece, BlockKind.MARGIN_NOTE, book_words, word_list))
+                body.append(
+                    joined_margin_note(piece, book_words, word_list, common_inner_words)
+                )
             case _:
                 assert_never(entry)
     return tuple(body)
@@ -397,6 +404,7 @@ def assemble(
     parts: Sequence[PageParts],
     book_words: frozenset[str],
     word_list: frozenset[str],
+    common_inner_words: frozenset[str],
     body_word_height: float,
     body_line_pitch: float,
     contents_pages: frozenset[int],
@@ -478,7 +486,7 @@ def assemble(
         body_word_height,
         density,
     )
-    body = _body(entries, book_words, word_list)
+    body = _body(entries, book_words, word_list, common_inner_words)
     blocks_of = {entry.piece: block for entry, block in zip(entries, body, strict=True)}
     notes = tuple(_note(source, blocks_of, book_words, word_list) for source in sources)
     kept_positions = tuple(

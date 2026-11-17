@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "known": "The caption starts with the stray words \"•'••'\"\"' rAr\", kept because half their words count as known words (structure spec section 18).",
   "excerpt": "domesday_headings_quotes",
   "page": 3,
@@ -10,7 +11,8 @@
       "r/_- • C r <> w",
       "# /• />// l-w f I I fi<",
       "Fir I </",
-      "I•n k \\ «^ ^O/ ^^m*^or S fio?pewn^iu.i i",
+      "•n \\ « ^/ ^m*^r fiopewniu.ii",
+      "Ik^O^oS?^",
       "r"
     ],
     [
@@ -59,7 +61,11 @@
     },
     {
       "reason": "plate_text",
-      "text": "I•n k \\ «^ ^O/ ^^m*^or S fio?pewn^iu.i i"
+      "text": "•n \\ « ^/ ^m*^r fiopewniu.ii"
+    },
+    {
+      "reason": "plate_text",
+      "text": "Ik^O^oS?^"
     },
     {
       "reason": "plate_text",

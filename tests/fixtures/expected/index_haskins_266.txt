@@ -1,0 +1,93 @@
+# Book: C. H. Haskins, The Normans in European History (normansineuropea00hask)
+# PDF: samples/public_domain/normansineuropea00hask.pdf, page index 266
+#      (also tests/fixtures/pdf/haskins_eval.pdf, excerpt page 9)
+# Read from 400 and 600 dpi renders. One printed line per line, left column then right column.
+# Figures are old-style in print; written as digits. "f." is printed in italic, as are
+# "Bailli" and "Black Book". Page ranges are printed with an en dash (–).
+# The apostrophe in "Edmund’s" is curly in print.
+
+INDEX
+
+Abacus, 106 f.
+Abruzzi, 196, 204, 222 f.
+Adams, Henry, quoted, 12, 22, 188 f.
+Adelaide, countess, 210.
+Adelard of Bath, 177, 179, 238.
+Africa, 196 f., 222, 232.
+Aimé of Monte Cassino, 13, 200 f.
+Alençon, 63, 178.
+Alexander II, Pope, 74, 79, 165, 175.
+Alfred, king, 34.
+Alphonso VIII, king, 90.
+Amalfi, 197 f., 204, 213, 232.
+Amari, M., 216, 248; quoted, 234.
+Anacletus II, Pope, 210.
+Andeli, 134.
+Angers, 61–63.
+Angoulême, 160.
+Anjou, counts of, 61, 85; relations
+with Normandy, 61–63, 85, 100,
+112, 131, 136 f.
+Anna Comnena, quoted, 201.
+Anselm, 175–78.
+Antioch, 212; principality, 214–16.
+Apulia, 186, 197–211, 222 f., 228,
+238, 246.
+Aquitaine, 87 f., 90, 100, 120 f., 136.
+Arabic elements in Sicilian state,
+226–30, 235, 238–44.
+Architecture, Norman, 9–12, 102,
+186–89; Sicilian, 189, 241–44.
+Archives, Norman, 9, 66 f., 105, 178.
+Argentan, 10, 71, 133, 139, 153.
+Arlette, mother of William the
+Conqueror, 53, 166.
+Arnulf of Chocques, patriarch, 212.
+Arnulf, bishop of Lisieux, 167.
+Arthur, duke of Brittany, 136–39.
+Assizes, Anglo-Norman, 94, 100,
+111 f., 161; Sicilian, 230 f., 234.
+Aversa, 200, 204, 206.
+Avranches, 172, 175, 178.
+
+Avranchin, 28.
+Avre, 7.
+
+Bailli, 103, 145.
+Barfleur, 132, 160.
+Bari, 189, 197, 202, 232, 241.
+Baudri of Bourgueil, 76.
+Bayeux, 10, 46, 49, 67, 76, 150 f.,
+162, 166, 172, 187; Black Book, 111.
+See Odo, Turold, Richard, Philip
+d'Harcourt.
+Bayeux Tapestry, 76 f., 80, 84, 151,
+167.
+Bayonne, 161.
+Bec, 171, 185; schools, 175 f.; li-
+brary, 177–80.
+Becket, 4, 100, 118, 168.
+Bellême, 154.
+Benevento, 198, 203.
+Benoît de Sainte-More, 184.
+Bertaux, E., quoted, 197, 241.
+Bessin, 10, 28.
+Bibliographical notes, 24 f., 51, 83 f.,
+114 f., 147, 189–91, 216 f., 247–49.
+Bisignano, 201.
+Bocage, 10.
+Boccaccio, 246.
+Bocherville, Saint-Georges de, 169,
+187.
+Bohemond I, prince of Antioch, 207,
+213–16.
+Böhmer, H., quoted, 165.
+Bonneval, 154.
+Bordeaux, 88.
+Boutmy, E., quoted, 101.
+Breteuil, 154, 160.
+Brittany, 6–8, 10, 57, 61, 75, 88,
+136–39.
+Bryce, James, Viscount, quoted, 43.
+Buchanan, James, 17 f.
+Bury St. Edmund’s, 173.

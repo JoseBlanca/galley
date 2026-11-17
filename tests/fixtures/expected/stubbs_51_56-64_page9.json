@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed since that check by task 3.1 (layout spec section 3, step 2b, Stubbs' cut-in notes): the cut-in notes at the right \"B an i s h m e n t\" and \"Cti°n °£ J^tE.\" (\"Banishment of mercenaries.\" and \"Destruction of castles.\" in print) leave the body lines and become margin regions and margin_note blocks after the body. With them gone, \"was\" and \"boon\" join their body line again, which reads \"fifteen, was a still greater boon ; for these,\", and the paragraph \"The demolition of the castles\" is no longer broken there. Checked against the page image by the task 3.1 session on 16 November 2026, for the orchestrator to check again.",
+  "changed": "Changed since that check by task 3.1 (layout spec section 3, step 2b, Stubbs' cut-in notes): the cut-in notes at the right \"B an i s h m e n t\" and \"Cti°n °£ J^tE.\" (\"Banishment of mercenaries.\" and \"Destruction of castles.\" in print) leave the body lines and become margin regions and margin_note blocks after the body. With them gone, \"was\" and \"boon\" join their body line again, which reads \"fifteen, was a still greater boon ; for these,\", and the paragraph \"The demolition of the castles\" is no longer broken there. Checked against the page image by the task 3.1 session on 16 November 2026, for the orchestrator to check again. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
   "excerpt": "stubbs_51_56-64",
   "page": 9,
   "book_page_index": 64,
@@ -12,31 +12,31 @@
     [
       "the Conqueror, Henry I., and Stephen had renewed.",
       "Nor, when crowned, did he lose a moment : he issued a",
-      "charter, as Stephen haddone, at his coronation, confirm-",
+      "charter, as Stephen had done, at his coronation, confirm-",
       "ing his grandfather's laws. The same week he held a",
       "great court and council at Eermondsey. At once he re-",
       "established the Exchequer, recalling to the head of it",
       "Bishop Nigel of Ely, whom Stephen had displaced in",
-      "1 a n d s e t ti n° g at w o rk a t on c e w i t h th e",
-      "1 ^4 0, ' ,",
-      "b u s i n e s s of t h e r e ve nu e . F r om t h i.s c o u rt a t D f m e r c e n a -",
+      "1140, and setting ° at work at once with the",
+      "^ ' ,",
+      "business of the revenue. From this . court at Df mercena-",
       "nes",
       "Bermondsey went forth the decree that the -",
       "Flemish and other foreign mercenaries should leave the",
-      "kingdom atonce,and that the castlesbuiltunder Stephen",
-      "shouldbe thrown down. Themercenaries fled forthwith.",
+      "kingdom at once, and that the castles built under Stephen",
+      "should be thrown down. The mercenaries fled forthwith.",
       "Their presence was perhaps the most offensive of all",
       "insults to the national pride, and the late reign had",
       "taught Normans and Englishmen that they had now a",
-      "common nationality in suffering, ifnot in conquest. By",
+      "common nationality in suffering, if not in conquest. By",
       "this article of the agreement Henry faithfully stood.",
       "Although he fought all his foreign wars with mercena-",
       "ries, he never but once — and that in the greatest emer-",
       "gency, and to repel foreign mercenaries brought against",
-      "him by the rebellious earls in 1174 — introduced anysuch",
+      "him by the rebellious earls in 1174 — introduced any such",
       "force into England. Even Richard employed in the",
       "kingdom no more foreigners than formed his ordinary",
-      "surroundings, and it isnotuntil John's reign that we find",
+      "surroundings, and it is not until John's reign that we find",
       "the country again oppressed and insulted by hired",
       "foreign soldiery.",
       "The demolition of the castles, which one contempo-",
@@ -48,24 +48,17 @@
       "war, but have continued to afford to their owners a"
     ],
     [
-      "B an i s h m e n t"
+      "Banishment"
     ],
     [
-      "Cti°n °£",
-      "J^tE."
+      "Destruction of",
+      "castles."
     ]
   ],
   "blocks": [
     {
-      "kind": "margin_note",
-      "text": "B an i s h m e n t",
-      "pages": [
-        9
-      ]
-    },
-    {
       "kind": "paragraph",
-      "text": "All this done, Henry appeared at Westminster on the 19th of December, and was there crowned with the ceremonies observed at his grandfather's coronation, now more than half a century past, and bound himselfby the same ancient and solemn promises which Ethelred had made to Dunstan, and which the Conqueror, Henry I., and Stephen had renewed. Nor, when crowned, did he lose a moment : he issued a charter, as Stephen haddone, at his coronation, confirming his grandfather's laws. The same week he held a great court and council at Eermondsey. At once he reestablished the Exchequer, recalling to the head of it Bishop Nigel of Ely, whom Stephen had displaced in 1 a n d s e t ti n° g at w o rk a t on c e w i t h th e 1 ^4 0, ' , b u s i n e s s of t h e r e ve nu e . F r om t h i.s c o u rt a t D f m e r c e n a - nes Bermondsey went forth the decree that the - Flemish and other foreign mercenaries should leave the kingdom atonce,and that the castlesbuiltunder Stephen shouldbe thrown down. Themercenaries fled forthwith. Their presence was perhaps the most offensive of all insults to the national pride, and the late reign had taught Normans and Englishmen that they had now a common nationality in suffering, ifnot in conquest. By this article of the agreement Henry faithfully stood. Although he fought all his foreign wars with mercenaries, he never but once — and that in the greatest emergency, and to repel foreign mercenaries brought against him by the rebellious earls in 1174 — introduced anysuch force into England. Even Richard employed in the kingdom no more foreigners than formed his ordinary surroundings, and it isnotuntil John's reign that we find the country again oppressed and insulted by hired foreign soldiery.",
+      "text": "All this done, Henry appeared at Westminster on the 19th of December, and was there crowned with the ceremonies observed at his grandfather's coronation, now more than half a century past, and bound himself by the same ancient and solemn promises which Ethelred had made to Dunstan, and which the Conqueror, Henry I., and Stephen had renewed. Nor, when crowned, did he lose a moment : he issued a charter, as Stephen had done, at his coronation, confirming his grandfather's laws. The same week he held a great court and council at Eermondsey. At once he reestablished the Exchequer, recalling to the head of it Bishop Nigel of Ely, whom Stephen had displaced in 1140, and setting ° at work at once with the",
       "pages": [
         8,
         9
@@ -73,7 +66,21 @@
     },
     {
       "kind": "margin_note",
-      "text": "Cti°n °£ J^tE.",
+      "text": "Banishment",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "^ ' , business of the revenue. From this . court at Df mercenanes Bermondsey went forth the decree that the - Flemish and other foreign mercenaries should leave the kingdom at once, and that the castles built under Stephen should be thrown down. The mercenaries fled forthwith. Their presence was perhaps the most offensive of all insults to the national pride, and the late reign had taught Normans and Englishmen that they had now a common nationality in suffering, if not in conquest. By this article of the agreement Henry faithfully stood. Although he fought all his foreign wars with mercenaries, he never but once — and that in the greatest emergency, and to repel foreign mercenaries brought against him by the rebellious earls in 1174 — introduced any such force into England. Even Richard employed in the kingdom no more foreigners than formed his ordinary surroundings, and it is not until John's reign that we find the country again oppressed and insulted by hired foreign soldiery.",
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "margin_note",
+      "text": "Destruction of castles.",
       "pages": [
         9
       ]
@@ -117,6 +124,16 @@
         "reestablished"
       ],
       "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "mercena-",
+        "nes"
+      ],
+      "after": [
+        "mercenanes"
+      ],
+      "reason": "hyphen_join_guessed"
     },
     {
       "before": [

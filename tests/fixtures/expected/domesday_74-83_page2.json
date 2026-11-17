@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4), and again, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed since that check by task 2.5: on book page 77 \"villein\" leaves two body lines for the margin notes \"The villein ...\", so the paragraph of page 76 ends on 77 at \"thegn-right1.'\" Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"Where a note starts\" and \"The marker of a note\"): the first band line holds two notes, \"1 Dialogus\" and \"2 Dialogus\", now two notes; note 3's marker \"z\" is taken as a one-character marker; the last line \"4 Ibid. 29.\" is note 4 of its own (its marker reads one more than note 3's \"z\", rule 3), no longer part of note 3; each marker is taken out of its note's text. Changed by task 2.3 (structure spec section 11, \"References\"): \"lord's1.\", \"peasantry2.\", \"it3.\" and \"services4.\" are linked to the page's notes 1 to 4 (the third marked \"z\"), each split off its word by a note_marker word change.",
+  "changed": "Changed since that check by task 2.5: on book page 77 \"villein\" leaves two body lines for the margin notes \"The villein ...\", so the paragraph of page 76 ends on 77 at \"thegn-right1.'\" Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"Where a note starts\" and \"The marker of a note\"): the first band line holds two notes, \"1 Dialogus\" and \"2 Dialogus\", now two notes; note 3's marker \"z\" is taken as a one-character marker; the last line \"4 Ibid. 29.\" is note 4 of its own (its marker reads one more than note 3's \"z\", rule 3), no longer part of note 3; each marker is taken out of its note's text. Changed by task 2.3 (structure spec section 11, \"References\"): \"lord's1.\", \"peasantry2.\", \"it3.\" and \"services4.\" are linked to the page's notes 1 to 4 (the third marked \"z\"), each split off its word by a note_marker word change. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed by the garbled-copy rule of the clean-text plan (reocr spec section 4, rule (c), 17 November 2026): the layer's garbled copy \"fllght'\" of a margin-note word Tesseract read is replaced with the region's other layer words; compared with the page image by the task 5.4 session.",
   "excerpt": "domesday_74-83",
   "page": 2,
   "book_page_index": 76,
@@ -30,8 +30,8 @@
       "suppose that in the writer's opinion the ordinary peasant was a",
       "nativus (of nativi Domesday Book has nothing to say) we still",
       "have law more favourable to the peasant than was the common",
-      "law of Bracton's age :— a tiller who does his accustomed service",
-      "is not to be ejected ; h e is no tenant at will.",
+      "law of Bracton's age : — a tiller who does his accustomed service",
+      "is not to be ejected ; he is no tenant at will.",
       "Hereafter we shall show that the English peasants did suffer",
       "by the substitution of French for English lords. But the question",
       "that we have asked, so urgent, so fundamental, as it may seem",
@@ -46,13 +46,13 @@
       "soil. Certainly in Norman times the tradition was held that"
     ],
     [
-      "Earity of",
-      "fllght'"
+      "Rarity of",
+      "flight."
     ],
     [
-      "1 Dialogus, i. c. 11 ; i i. c. 14. 2 Dialogus, i. c. 10.",
+      "1 Dialogus, i. c. 11 ; ii. c. 14. 2 Dialogus, i. c. 10.",
       "z Will. Conq. i. 30, 31 : 'Si lea seignurages ne facent altri gainurs venir a",
-      "lour terre, la justise le facet.' The Latin version is ridiculous : ' S i domini",
+      "lour terre, la justise le facet.' The Latin version is ridiculous : ' Si domini",
       "terrarum non procurent idoneos cultores ad terras suas colendas, iustitiarii hoc",
       "uutrui. faciant.' The translator seems to have been puzzled by the word altri or",
       "4 Ibid. 29.",
@@ -62,7 +62,7 @@
   "blocks": [
     {
       "kind": "paragraph",
-      "text": "^ ^e free to (lu*fc k\"8 loi%d and his land, or can he be pursued and captured ? No one word can be obtained in answer to this question. We can only say that in Henry II.'s day the ordinary peasant was regarded by the royal officials as ascriptitius ; the land that he occupied was said to be part of his lord's demesne ; his chattels were his lord's1. But then this was conceived to be, at least in some degree, the result of the Norman Conquest and subsequent rebellions of the peasantry2. To this we may add that in one of our sets of Leges, the French Leis of William the Conqueror, there are certain clauses which would be of great importance could we suppose that they had an authoritative origin, and which in any case are remarkable enough. The nativus who flies from the land on which he is born, let none retain him or his chattels ; if the lords will not send back these men to their land the king's officers are to do it3. On the other hand, the tillers of the soil are not to be worked beyond their proper rent ; their lord may not remove them from their land so long as they perform their right services4. Whether or no we suppose that in the writer's opinion the ordinary peasant was a nativus (of nativi Domesday Book has nothing to say) we still have law more favourable to the peasant than was the common law of Bracton's age :— a tiller who does his accustomed service is not to be ejected ; h e is no tenant at will.",
+      "text": "^ ^e free to (lu*fc k\"8 loi%d and his land, or can he be pursued and captured ? No one word can be obtained in answer to this question. We can only say that in Henry II.'s day the ordinary peasant was regarded by the royal officials as ascriptitius ; the land that he occupied was said to be part of his lord's demesne ; his chattels were his lord's1. But then this was conceived to be, at least in some degree, the result of the Norman Conquest and subsequent rebellions of the peasantry2. To this we may add that in one of our sets of Leges, the French Leis of William the Conqueror, there are certain clauses which would be of great importance could we suppose that they had an authoritative origin, and which in any case are remarkable enough. The nativus who flies from the land on which he is born, let none retain him or his chattels ; if the lords will not send back these men to their land the king's officers are to do it3. On the other hand, the tillers of the soil are not to be worked beyond their proper rent ; their lord may not remove them from their land so long as they perform their right services4. Whether or no we suppose that in the writer's opinion the ordinary peasant was a nativus (of nativi Domesday Book has nothing to say) we still have law more favourable to the peasant than was the common law of Bracton's age : — a tiller who does his accustomed service is not to be ejected ; he is no tenant at will.",
       "pages": [
         1,
         2
@@ -70,7 +70,7 @@
     },
     {
       "kind": "margin_note",
-      "text": "Earity of fllght'",
+      "text": "Rarity of flight.",
       "pages": [
         2
       ]
@@ -90,7 +90,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "Dialogus, i. c. 11 ; i i. c. 14."
+          "text": "Dialogus, i. c. 11 ; ii. c. 14."
         }
       ],
       "pages": [
@@ -114,7 +114,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "Will. Conq. i. 30, 31 : 'Si lea seignurages ne facent altri gainurs venir a lour terre, la justise le facet.' The Latin version is ridiculous : ' S i domini terrarum non procurent idoneos cultores ad terras suas colendas, iustitiarii hoc uutrui. faciant.' The translator seems to have been puzzled by the word altri or"
+          "text": "Will. Conq. i. 30, 31 : 'Si lea seignurages ne facent altri gainurs venir a lour terre, la justise le facet.' The Latin version is ridiculous : ' Si domini terrarum non procurent idoneos cultores ad terras suas colendas, iustitiarii hoc uutrui. faciant.' The translator seems to have been puzzled by the word altri or"
         }
       ],
       "pages": [

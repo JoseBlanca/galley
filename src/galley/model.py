@@ -10,7 +10,9 @@ itself.
 """
 
 import bisect
+import collections
 import dataclasses
+import difflib
 import functools
 import hashlib
 import itertools
@@ -21,18 +23,21 @@ import re
 import threading
 import types
 import typing
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
 from galley.errors import EditError, InputFileError
 
-PAGES_FORMAT_VERSION = 1
-WORDS_FORMAT_VERSION = 1
-LINES_FORMAT_VERSION = 1
+# 2 since the plan clean-text, 17 November 2026: the front matter in
+# pages.json and words.json, the re-read regions in lines.json
+# (architecture section 8).
+PAGES_FORMAT_VERSION = 2
+WORDS_FORMAT_VERSION = 2
+LINES_FORMAT_VERSION = 2
 # 2 since the second plan of structure, 16 November 2026 (architecture section 8).
-BLOCKS_FORMAT_VERSION = 2
+BLOCKS_FORMAT_VERSION = 3
 EDITS_FORMAT_VERSION = 1
 
 
@@ -52,21 +57,24 @@ class Box:
 
 class PageKind(StrEnum):
     """What a page is, as analyze finds it: blank, text, a plate (mostly a
-    picture), or excluded by the config."""
+    picture), excluded by the config, or front matter: a page before the
+    book's text that would otherwise be a text page (front-matter spec)."""
 
     BLANK = "blank"
     TEXT = "text"
     PLATE = "plate"  # mostly a picture
     EXCLUDED = "excluded"
+    FRONT_MATTER = "front_matter"  # before the front-matter end, dropped
 
 
 class TextSource(StrEnum):
     """Where a page's words come from: the book's own text layer, galley's
-    OCR, or none (blank and excluded pages)."""
+    OCR, or none (blank, excluded and front-matter pages, and plates without
+    a text layer)."""
 
     TEXT_LAYER = "text_layer"
     OCR = "ocr"
-    NONE = "none"  # blank and excluded pages
+    NONE = "none"  # blank, excluded and front-matter pages
 
 
 class OcrVerdict(StrEnum):
@@ -165,6 +173,7 @@ class RemovalReason(StrEnum):
 
     EXCLUDED_PAGE = "excluded_page"
     EXCLUDED_REGION = "excluded_region"
+    FRONT_MATTER = "front_matter"  # a word of a page before the book's text
     RUNNING_HEAD = "running_head"
     PAGE_NUMBER = "page_number"
     SIGNATURE_MARK = "signature_mark"
@@ -186,7 +195,7 @@ class Removal:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class WordsFile:
     """words.json, written by extract. `removals` holds the words of
-    excluded pages and regions, one per word."""
+    excluded pages and regions and of front-matter pages, one per word."""
 
     format_version: int = WORDS_FORMAT_VERSION
     source_pdf_sha256: str
@@ -223,14 +232,430 @@ class PageLayout:
     figures: tuple[Figure, ...]
 
 
+class RereadKind(StrEnum):
+    """What region of a page layout read again with Tesseract (reocr spec,
+    section 3)."""
+
+    SMALL_PRINT_PAGE = "small_print_page"  # read whole below its running head
+    MARGIN_NOTE = "margin_note"  # one note band of an outer margin
+    CUT_IN_NOTE = "cut_in_note"  # one crop of notes cut into the column
+    FOOTNOTE_BAND = "footnote_band"  # one page's footnote band
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Reread:
+    """A region of a page that layout read again with Tesseract, recorded
+    whether its reading was kept or not (reocr spec, section 4).
+
+    `box` is the crop, in points. `layer_words` are the words of words.json
+    the reading would replace, `ocr_words` Tesseract's, with boxes in points
+    and their confidence. `layer_score` and `ocr_score` are each reading's
+    known words minus its unknown words. When `kept`, `ocr_words` stand in
+    lines.json in place of `layer_words`; otherwise the record changes
+    nothing. `dropped_junk_count` is the number of Tesseract's words of no
+    letter or digit, not punctuation or a sign the books print, dropped
+    before `ocr_words`, and of its words stripped of an underscore at
+    either end ("_and" is "and" in `ocr_words`; reocr spec, section 4).
+    """
+
+    page_index: int
+    kind: RereadKind
+    box: Box
+    layer_words: tuple[Word, ...]
+    ocr_words: tuple[Word, ...]
+    layer_score: int
+    ocr_score: int
+    kept: bool
+    dropped_junk_count: int = 0
+
+
+# A kept Reread replaces a layer word that is the same printed word as one
+# of its Tesseract words (reocr spec, section 4). (a) Its middle lies inside
+# that word's box widened by 2 pt up and down and 1 pt across: the layer's
+# lines lie off Tesseract's up or down, not its words across, and with 2 pt
+# across a word Tesseract did not read was taken by its neighbour ("The"
+# beside the list number "7" on Gierke page 62, "224" on Domesday page
+# 548). Measured on 17 November 2026 on the kept
+# records of whole Stubbs, Domesday, Gierke and Haskins, the middle of a
+# layer word lies within 2 pt of the box of Tesseract's word of the same
+# text for 95 in 100 of Domesday's pairs and 92 of Gierke's, and the middle
+# of a Tesseract word lies at least 2.9 pt above the box of the line below
+# it for 99 in 100 words, so that a word Tesseract did not read stays out
+# of its neighbour's reach. (b) Its letters and digits, case-folded, equal
+# those of a Tesseract word whose middle lies within 16 pt above or below,
+# the nearest that no other layer word of that text has matched: in the
+# same measurement the middles of 99 in 100 of Domesday's pairs lie within
+# 8.2 pt of each other, and Gierke's layer reads note lines up to 15 pt off
+# Tesseract's ("tium" on page 265, "ality." on 248); with 12 pt, 5 of
+# Gierke's 415 kept margin-note records still read a word twice.
+_UNDER_OCR_WORD_UP_DOWN_PT = 2.0
+_UNDER_OCR_WORD_ACROSS_PT = 1.0
+_SAME_TEXT_REACH_PT = 16.0
+# (c) Its letters, 3 or more, are alike to those of such a Tesseract word,
+# by difflib's ratio, 0.6 or more: the layer's garbled copy of a note word
+# it reads a few points off the ink ("fllght'" below "flight.", Domesday
+# page 76). Measured on 17 November 2026 on the kept margin-note records of
+# whole Domesday and Gierke: 53 copies at 0.6 or more, none of them a word
+# Tesseract missed but numbers, which rule (c) leaves to (a) and (b); from
+# 0.5 to 0.6, 10 copies and 4 body words at the column's edge ("for" beside
+# "lord", Domesday page 310).
+# A layer word glued over two or three Tesseract words is the same printed
+# words as they ("of,96" where Tesseract read "of," "96", Stubbs' index page
+# 312): each Tesseract word's middle lies inside its box widened by 1 pt.
+_GLUED_WORD_COUNTS = (2, 3)
+_GLUED_WIDEN_PT = 1.0
+_ALIKE_LEAST_LETTERS = 3
+_ALIKE_LEAST_RATIO = 0.6
+
+
+def word_middle(word: Word) -> tuple[float, float]:
+    """The middle of `word`'s box, (across, down) in points."""
+    return (word.box.x0 + word.box.x1) / 2, (word.box.top + word.box.bottom) / 2
+
+
+def _is_under(word: Word, ocr_word: Word) -> bool:
+    x, y = word_middle(word)
+    return (
+        ocr_word.box.x0 - _UNDER_OCR_WORD_ACROSS_PT
+        <= x
+        <= ocr_word.box.x1 + _UNDER_OCR_WORD_ACROSS_PT
+        and ocr_word.box.top - _UNDER_OCR_WORD_UP_DOWN_PT
+        <= y
+        <= ocr_word.box.bottom + _UNDER_OCR_WORD_UP_DOWN_PT
+    )
+
+
+def is_under_ocr_word(word: Word, ocr_words: Sequence[Word]) -> bool:
+    """Whether the middle of `word`, a word of the text layer, lies inside
+    the box of one of `ocr_words`, Tesseract's, widened by 2 pt up and down
+    and 1 pt across (reocr spec, section 4). Boxes in points."""
+    return any(_is_under(word, ocr_word) for ocr_word in ocr_words)
+
+
+def folded_letters_and_digits(text: str) -> str:
+    """The letters and digits of `text`, case-folded."""
+    return "".join(character for character in text if character.isalnum()).casefold()
+
+
+def _letter_count(text: str) -> int:
+    return sum(character.isalpha() for character in text)
+
+
+def _folded_letters(text: str) -> str:
+    """The letters of `text`, case-folded."""
+    return "".join(character for character in text if character.isalpha()).casefold()
+
+
+def _are_alike(layer_text: str, ocr_text: str) -> bool:
+    """Whether the case-folded letters of `layer_text` and `ocr_text` are
+    alike, by difflib's ratio."""
+    layer_letters = _folded_letters(layer_text)
+    ocr_letters = _folded_letters(ocr_text)
+    return (
+        difflib.SequenceMatcher(None, layer_letters, ocr_letters).ratio()
+        >= _ALIKE_LEAST_RATIO
+    )
+
+
+def _overlap_up_and_down(first: Word, second: Word) -> bool:
+    return first.box.top < second.box.bottom and second.box.top < first.box.bottom
+
+
+def _under_line(layer_words: Sequence[Word], ocr_word: Word) -> tuple[int, ...]:
+    """The positions in `layer_words` of the words under `ocr_word` that
+    are of its printed line: taken nearest first, by the distance of their
+    middles from its middle up or down, each whose box overlaps, up and
+    down, those of every word taken before it."""
+    ocr_middle = word_middle(ocr_word)[1]
+    under = sorted(
+        (index for index, word in enumerate(layer_words) if _is_under(word, ocr_word)),
+        key=lambda index: (abs(word_middle(layer_words[index])[1] - ocr_middle), index),
+    )
+    line: list[int] = []
+    for index in under:
+        if all(
+            _overlap_up_and_down(layer_words[index], layer_words[other])
+            for other in line
+        ):
+            line.append(index)
+    return tuple(sorted(line))
+
+
+def _lies_over(ocr_word: Word, word: Word) -> bool:
+    """Whether the middle of `ocr_word` lies inside the box of `word`
+    widened by 1 pt."""
+    x, y = word_middle(ocr_word)
+    return (
+        word.box.x0 - _GLUED_WIDEN_PT <= x <= word.box.x1 + _GLUED_WIDEN_PT
+        and word.box.top - _GLUED_WIDEN_PT <= y <= word.box.bottom + _GLUED_WIDEN_PT
+    )
+
+
+def _glued_over(word: Word, ocr_words: Sequence[Word]) -> tuple[int, ...]:
+    """The positions in `ocr_words` of two or three Tesseract words that
+    follow each other there, each lying over `word`, a layer word, whose
+    letters and digits, joined, are those of `word`: the words the layer
+    glued into `word`. The first such group, of two words before three;
+    () when there is none."""
+    folded = folded_letters_and_digits(word.text)
+    if not folded:
+        return ()
+    for count in _GLUED_WORD_COUNTS:
+        for start in range(len(ocr_words) - count + 1):
+            group = ocr_words[start : start + count]
+            if all(_lies_over(ocr_word, word) for ocr_word in group) and (
+                "".join(folded_letters_and_digits(ocr_word.text) for ocr_word in group)
+                == folded
+            ):
+                return tuple(range(start, start + count))
+    return ()
+
+
+def _misread_glued_over(
+    word: Word, ocr_words: Sequence[Word], taken: frozenset[int]
+) -> tuple[int, ...]:
+    """The positions in `ocr_words` of the Tesseract words not in `taken`
+    whose middles lie inside `word`, a layer word: across within its box
+    widened by 1 pt, up and down within its box. They are returned when
+    they are two or three that follow each other in `ocr_words` and
+    overlap each other up and down, words of one printed line, whatever
+    their texts: the words the layer glued and misread into `word`; ()
+    otherwise."""
+    positions = tuple(
+        position
+        for position, ocr_word in enumerate(ocr_words)
+        if position not in taken and _middle_inside(ocr_word, word)
+    )
+    if (
+        len(positions) in _GLUED_WORD_COUNTS
+        and positions == tuple(range(positions[0], positions[0] + len(positions)))
+        and all(
+            _overlap_up_and_down(ocr_words[first], ocr_words[second])
+            for first in positions
+            for second in positions
+        )
+    ):
+        return positions
+    return ()
+
+
+def _middle_inside(ocr_word: Word, word: Word) -> bool:
+    """Whether the middle of `ocr_word` lies inside the box of `word`,
+    widened by 1 pt across only."""
+    x, y = word_middle(ocr_word)
+    return (
+        word.box.x0 - _GLUED_WIDEN_PT <= x <= word.box.x1 + _GLUED_WIDEN_PT
+        and word.box.top <= y <= word.box.bottom
+    )
+
+
+def may_read(word: Word, ocr_word: Word) -> bool:
+    """Whether `ocr_word`, Tesseract's, may be a reading of the printed
+    word that `word`, a word of the text layer, reads, by one of the rules
+    of `replaced_layer_words` taken alone, whatever other words match:
+    `word` lies under it, or, within 16 pt above or below, its letters and
+    digits are those of `word`, or its letters are alike to those of a
+    `word` of 3 letters or more. Boxes in points."""
+    if _is_under(word, ocr_word):
+        return True
+    if abs(word_middle(ocr_word)[1] - word_middle(word)[1]) > _SAME_TEXT_REACH_PT:
+        return False
+    return (
+        bool(folded_letters_and_digits(word.text))
+        and folded_letters_and_digits(word.text)
+        == folded_letters_and_digits(ocr_word.text)
+    ) or (
+        _letter_count(word.text) >= _ALIKE_LEAST_LETTERS
+        and _are_alike(word.text, ocr_word.text)
+    )
+
+
+def _pairing(
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    is_known: Callable[[str], bool],
+) -> tuple[tuple[bool, ...], frozenset[int]]:
+    """Which of `layer_words` the rules of `replaced_layer_words` match,
+    and the positions in `ocr_words` of the Tesseract words they match."""
+    # (a): a Tesseract word with layer words under it reads the printed
+    # words of one line, whatever the texts, and pairs with no other.
+    under_line = {
+        index for ocr_word in ocr_words for index in _under_line(layer_words, ocr_word)
+    }
+    # (a) also: a layer word glued over two or three Tesseract words, which
+    # read it and pair with no other.
+    glued = {
+        index: positions
+        for index, word in enumerate(layer_words)
+        if (positions := _glued_over(word, ocr_words))
+    }
+    under = tuple(
+        index in under_line or index in glued for index in range(len(layer_words))
+    )
+    taken = {
+        position
+        for position, ocr_word in enumerate(ocr_words)
+        if any(_is_under(word, ocr_word) for word in layer_words)
+    } | {position for positions in glued.values() for position in positions}
+    # (b): the pairs of a layer word and a Tesseract word of its text, the
+    # nearest first, each word in one pair at most.
+    pairs = sorted(
+        (
+            abs(word_middle(ocr_word)[0] - word_middle(word)[0])
+            + abs(word_middle(ocr_word)[1] - word_middle(word)[1]),
+            index,
+            position,
+        )
+        for index, word in enumerate(layer_words)
+        if not under[index] and folded_letters_and_digits(word.text)
+        for position, ocr_word in enumerate(ocr_words)
+        if position not in taken
+        and folded_letters_and_digits(ocr_word.text)
+        == folded_letters_and_digits(word.text)
+        and abs(word_middle(ocr_word)[1] - word_middle(word)[1]) <= _SAME_TEXT_REACH_PT
+    )
+    matched = list(under)
+    for _, index, position in pairs:
+        if not matched[index] and position not in taken:
+            matched[index] = True
+            taken.add(position)
+    # (c): the pairs of a layer word of 3 letters or more and a Tesseract
+    # word whose letters are alike, the nearest first, each word in one
+    # pair at most.
+    alike_pairs = sorted(
+        (
+            abs(word_middle(ocr_word)[0] - word_middle(word)[0])
+            + abs(word_middle(ocr_word)[1] - word_middle(word)[1]),
+            index,
+            position,
+        )
+        for index, word in enumerate(layer_words)
+        if not matched[index] and _letter_count(word.text) >= _ALIKE_LEAST_LETTERS
+        for position, ocr_word in enumerate(ocr_words)
+        if position not in taken
+        and abs(word_middle(ocr_word)[1] - word_middle(word)[1]) <= _SAME_TEXT_REACH_PT
+        and _are_alike(word.text, ocr_word.text)
+    )
+    for _, index, position in alike_pairs:
+        if not matched[index] and position not in taken:
+            matched[index] = True
+            taken.add(position)
+    # (d): a layer word not known, over two or three Tesseract words of its
+    # line left free, whatever the texts: the layer glued and misread them
+    # ("lo/.," over "10" "f.,").
+    for index, word in enumerate(layer_words):
+        if matched[index] or is_known(word.text):
+            continue
+        positions = _misread_glued_over(word, ocr_words, frozenset(taken))
+        if positions:
+            matched[index] = True
+            taken.update(positions)
+    return tuple(matched), frozenset(taken)
+
+
+def replaced_layer_words(
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    *,
+    is_known: Callable[[str], bool],
+) -> tuple[Word, ...]:
+    """The words of `layer_words`, the text layer's words a region read
+    again may replace, that a kept Reread with Tesseract's `ocr_words`
+    replaces, in their order: each the same printed word as one of
+    `ocr_words` (reocr spec, section 4).
+
+    A layer word is matched (a) when its middle lies inside the box of
+    one of `ocr_words` widened by 2 pt up and down and 1 pt across, and
+    it is of that word's printed line: the layer words under it taken
+    nearest first, by their middles up or down, each whose box overlaps,
+    up and down, those of all taken before it; or when its letters and
+    digits are those of two or three consecutive `ocr_words` joined, each
+    with its middle inside its box widened by 1 pt, a word the layer
+    glued; or else (b) when its letters and digits, case-folded and not empty, equal
+    those of one of `ocr_words` whose middle lies within 16 pt above or
+    below its own and that no other layer word has matched;
+    or else (c) when it has 3 letters or more and its case-folded letters
+    are alike, by difflib's ratio of 0.6 or more, to those of one of
+    `ocr_words` within 16 pt above or below that (a) and (b) left
+    unmatched; or else (d) when `is_known` says its text is no known word
+    (layout says so of a word of the book's word list with no mark
+    inside it) and, whatever the texts, the `ocr_words` that (a) to (c)
+    left unmatched whose middles lie inside its box, widened by 1 pt
+    across only, are two or three consecutive words of one line, a word
+    the layer glued and misread. A Tesseract word is matched in (a) by any layer word under
+    it, whatever its text, and by a layer word glued over it; in (b) and (c) the pairs of a layer word and a
+    Tesseract word are taken nearest first, by the distance of their
+    middles across plus up or down, each word in one pair at most. A layer
+    word matched by none stays in the layer. Boxes in points.
+    """
+    matched, _ = _pairing(layer_words, ocr_words, is_known)
+    return tuple(
+        word
+        for word, is_matched in zip(layer_words, matched, strict=True)
+        if is_matched
+    )
+
+
+def matched_ocr_positions(
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    *,
+    is_known: Callable[[str], bool],
+) -> frozenset[int]:
+    """The positions in `ocr_words`, Tesseract's, of the words that read a
+    word of `layer_words` by the rules of `replaced_layer_words`: those
+    with a layer word under them or glued over them, and those paired by
+    (b) or (c)."""
+    _, positions = _pairing(layer_words, ocr_words, is_known)
+    return positions
+
+
+def take_out_once(
+    groups: tuple[tuple[Word, ...], ...], taken: Iterable[Word]
+) -> tuple[tuple[Word, ...], ...]:
+    """`groups` of words less the words of `taken`, each word of `taken`
+    taken out once, from the first group that holds it, the others in
+    their order."""
+    left = collections.Counter(taken)
+    result = []
+    for group in groups:
+        kept = []
+        for word in group:
+            if left[word] > 0:
+                left[word] -= 1
+            else:
+                kept.append(word)
+        result.append(tuple(kept))
+    return tuple(result)
+
+
+def words_after_rereads(
+    words: tuple[Word, ...], rereads: tuple[Reread, ...]
+) -> tuple[Word, ...]:
+    """The words of a page as lines.json holds them: `words`, the page's
+    words of words.json, less the `layer_words` of each kept record of
+    `rereads`, the page's records, each taken out once, in their order;
+    then the `ocr_words` of each kept record, in the records' order. A
+    record not kept changes nothing (reocr spec, section 4)."""
+    kept = tuple(reread for reread in rereads if reread.kept)
+    (staying,) = take_out_once(
+        (words,), (word for reread in kept for word in reread.layer_words)
+    )
+    return (*staying, *(word for reread in kept for word in reread.ocr_words))
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class LinesFile:
     """lines.json, written by layout. Every word of words.json is in exactly
-    one line."""
+    one line or among the `layer_words` of exactly one kept Reread, and
+    every word of a line is a word of words.json or among the `ocr_words`
+    of a kept Reread. `rereads` lists every region read again, in page
+    order."""
 
     format_version: int = LINES_FORMAT_VERSION
     source_pdf_sha256: str
     pages: tuple[PageLayout, ...]
+    rereads: tuple[Reread, ...]
 
 
 # blocks.json
@@ -327,12 +752,15 @@ class Note:
 class ChangeReason(StrEnum):
     """Why structure changed words without losing a letter: a hyphen join,
     with the hyphen dropped on evidence, dropped without it (guessed), or
-    kept in a compound; or a note marker split off the word it was glued to."""
+    kept in a compound; a join in a margin note of two parts whose hyphen
+    the OCR lost or read as a full stop; or a note marker split off the
+    word it was glued to."""
 
     HYPHEN_JOIN = "hyphen_join"
     NOTE_MARKER = "note_marker"
     HYPHEN_JOIN_GUESSED = "hyphen_join_guessed"  # dropped without evidence
     HYPHEN_KEPT = "hyphen_kept"  # "Anglo-" "Saxon" to "Anglo-Saxon"
+    HYPHEN_LOST = "hyphen_lost"  # "move." "ment," to "movement," in a margin note
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

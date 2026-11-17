@@ -50,7 +50,10 @@ class BookConfig:
 
     `plate_pages` are pages analyze makes plates whatever its rule finds;
     `contents_pages` are the pages of the printed table of contents, on
-    which structure makes no heading (architecture section 6).
+    which structure makes no heading; `front_matter_end` is the first page
+    after the front matter, None when analyze is to find it, 0 to keep
+    every page; `reread_footnotes` is whether layout re-reads each page's
+    footnote band with Tesseract (architecture section 6).
     """
 
     pdf: Path
@@ -64,6 +67,8 @@ class BookConfig:
     cover_page: int | None = None
     plate_pages: tuple[int, ...] = ()
     contents_pages: tuple[int, ...] = ()
+    front_matter_end: int | None = None
+    reread_footnotes: bool = False
 
 
 _REQUIRED_KEYS = ("pdf", "title", "authors", "language")
@@ -75,6 +80,8 @@ _OPTIONAL_KEYS = (
     "cover_page",
     "plate_pages",
     "contents_pages",
+    "front_matter_end",
+    "reread_footnotes",
 )
 _REGION_KEYS = ("page", "box")
 _BOX_COORDINATES = 4
@@ -122,6 +129,7 @@ def _config_from_toml(content: dict[str, object], path: Path) -> BookConfig:
         pdf = path.parent / pdf
     regions = _list(content.get("exclude_regions", []), "exclude_regions", path)
     cover_page = content.get("cover_page")
+    front_matter_end = content.get("front_matter_end")
     return BookConfig(
         pdf=pdf,
         title=_not_empty(_string(content["title"], "title", path), "title", path),
@@ -148,6 +156,12 @@ def _config_from_toml(content: dict[str, object], path: Path) -> BookConfig:
         else _page_index(cover_page, "cover_page", path),
         plate_pages=_page_indices(content, "plate_pages", path),
         contents_pages=_page_indices(content, "contents_pages", path),
+        front_matter_end=None
+        if front_matter_end is None
+        else _page_index(front_matter_end, "front_matter_end", path),
+        reread_footnotes=_bool(
+            content.get("reread_footnotes", False), "reread_footnotes", path
+        ),
     )
 
 

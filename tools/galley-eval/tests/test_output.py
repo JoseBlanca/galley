@@ -234,6 +234,15 @@ def test_books_summary_has_one_row_per_book_with_a_scorecard(
     assert rows[0].startswith(
         "| first | abc123 | 2026-11-15 | 0.800 | 0.400 | 0.400 | 0.300 | 0.300 |"
     )
+    header = next(
+        line
+        for line in summary.read_text(encoding="utf-8").splitlines()
+        if line.startswith("| book |")
+    )
+    cells = dict(zip(header.split(" | "), rows[0].split(" | "), strict=True))
+    # The small book has no margin note and no front matter.
+    assert cells["margin notes error rate, markdown"] == ""
+    assert cells["front matter not scored"] == "0"
 
 
 def test_books_summary_of_a_scorecard_without_a_score_is_an_error() -> None:

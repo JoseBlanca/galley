@@ -163,6 +163,7 @@ def scorecard_json(scorecard: Scorecard, run: RunInfo) -> str:
         "equal_key_share": scorecard.equal_key_share,
         "anchor_mismatches": scorecard.anchor_mismatches,
         "unplaced": scorecard.unplaced,
+        "front_matter_not_scored": scorecard.front_matter_not_scored,
         "outputs": {
             scores.output.value: {
                 key: item for key, item in _items(scores) if key != "output"
@@ -389,6 +390,11 @@ def _apart_rows(evaluation: Evaluation) -> list[str]:
     listed = ", ".join(f"{count} {reason}" for reason, count in sorted(apart.items()))
     rows.append(f"Differences listed apart and not scored: {listed or 'none'}.")
     rows.append("")
+    rows.append(
+        "Reference tokens not scored as front matter galley dropped: "
+        f"{evaluation.scorecard.front_matter_not_scored}."
+    )
+    rows.append("")
     rows.append(f"### Anchor mismatches: {len(evaluation.anchor_mismatches)}")
     rows.append("")
     rows.extend(
@@ -528,6 +534,19 @@ _SUMMARY_COLUMNS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "notes error rate, markdown",
         ("outputs", "markdown", "text", Part.NOTES.value, "token_error_rate"),
     ),
+    *(
+        (
+            f"margin notes error rate, {output.value}",
+            (
+                "outputs",
+                output.value,
+                "text",
+                Part.MARGIN_NOTES.value,
+                "token_error_rate",
+            ),
+        )
+        for output in StageOutput
+    ),
     (
         "body extra on page edge, words",
         ("outputs", "words", "text", Part.BODY.value, "edge_of_page_extra"),
@@ -570,6 +589,7 @@ _SUMMARY_COLUMNS: tuple[tuple[str, tuple[str, ...]], ...] = (
         ("outputs", "markdown", "paragraph_boundaries", "index", "recall"),
     ),
     ("unplaced", ("unplaced",)),
+    ("front matter not scored", ("front_matter_not_scored",)),
     ("anchor mismatches", ("anchor_mismatches",)),
 )
 

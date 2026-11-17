@@ -1,0 +1,108 @@
+# Book: C. H. Haskins, The Normans in European History (normansineuropea00hask)
+# PDF: samples/public_domain/normansineuropea00hask.pdf, page index 267 (printed page 252)
+#      (also tests/fixtures/pdf/haskins_quotes_index.pdf, excerpt page 9)
+# Read from a 400 dpi render. One printed line per line, left column then right column.
+# Figures are old-style in print; written as digits. "f." and "ff." are printed in italic
+# (ff. as a ligature), as are "Charte aux Normands", "Chronicle", "Coutume de Normandie",
+# "Curia regis" and "Duana". Page ranges are printed with an en dash (–).
+# The quotes around 'povre persoun,' are curly in print (‘ ’).
+
+252 INDEX
+
+Caen, 10 f., 71, 133, 139, 143, 153,
+160, 166, 172, 184; abbeys, 12,
+58, 160, 163, 171, 174, 186–88, 213.
+Calabria, 176, 198, 201–11, 222, 226,
+237, 246.
+Caliphs, Fatimite, 196, 230.
+Campania, 197, 222.
+Canada, Normans in, 3 f., 13, 16.
+Canaries, Normans in, 4, 13.
+Canne, 199.
+Canosa, 214.
+Canterbury, 56, 81, 175.
+Canute, king, 52, 54, 74, 194.
+Cappella Palatina, 242–44.
+Capua, 198, 207, 223, 228.
+Carentan, 172.
+Carlyle, Thomas, quoted, 101, 173.
+Castles, Norman, 68 f., 102, 133–35,
+139, 150–53, 163, 209.
+Castrogiovanni, 209.
+Caux, 8.
+Cefalù, 189, 241.
+Cerisy, 187.
+Chancery, of Henry II, 96–99; of
+Sicilian kingdom, 226 f.
+Channel Islands, 144 f., 172, 184.
+Charlemagne, 18, 31 f., 80, 86, 193 f.
+Charles VII, king of France, 144.
+Charles of Anjou, king of Naples,
+221.
+Charles the Simple, 27, 45.
+Charte aux Normands, 142.
+Charter, Great, 140, 142.
+Chartres, cathedral, 169–71, 186,
+194; school, 177.
+Château Gaillard, 9, 134 f., 139.
+Chaucer, his ‘povre persoun,’ 169.
+Cherbourg, 4 f., 59, 162.
+Chinon, 116.
+Chronicle, Anglo-Saxon, quoted, 32,
+34, 55–58.
+Church, Norman, 67, 71 f., 81,
+100, 164 ff.; the Greek, 198, 203,
+209, 223, 225, 237, 241.
+Civitate, 203.
+Classics, Latin, in Norman libraries,
+179; at Monte Cassino, 235–37;
+Greek, in Sicily, 239 f., 246.
+
+Clermont, 211.
+Clovis, 207.
+Cluny, 164.
+Colombières, 116.
+Commerce, Norman, 4, 73, 81,
+160–63; Sicilian, 231–33, 242; Vik-
+ing, 37.
+Compostela, 16, 193, 217.
+Conan, 163.
+Conches, 154.
+Conquest, Norman, of England, 72–
+81; its results, 81–83, 100 ff., 145
+f.; of Italy, 198 ff.; the two com-
+pared, 223–25.
+Constance, empress, 220.
+Constantine the African, 236.
+Constantinople, 194–96, 212, 214,
+235 f., 240.
+Corneille, 4, 12.
+Cotentin, 28, 50.
+Courcy, 154.
+Coutances, 169, 172, 200; cathedral,
+10, 186 f. See Geoffrey de Mow-
+bray.
+Coutume de Normandie, 11, 48 f.,
+108, 142, 145.
+Crusades, Normans in, 2, 89, 91,
+100, 127–31, 184, 208, 211–17.
+Curia regis, 103, 108, 227 f.
+
+Danegeld, 34, 104.
+Danelaw, 31.
+Daudet, Alphonse, quoted, 5.
+Davis, H. W. C., quoted, 15.
+Delarc, O., quoted, 196.
+Delbrück, H., quoted, 77 f.
+Delisle, L., 4, 114, 189 f.; quoted, 97.
+Dieppe, 4 f., 160.
+Dieulafoy, quoted, 135.
+Dives, 75.
+Domesday, 66, 110, 172, 229.
+Domfront, 63, 154, 172.
+Dover, 166.
+Downing, E., 208.
+Drogo of Hauteville, 200–02.
+Duana, 228 f.
+Dudo of Saint Quentin, 27, 47, 180.
+Durham, 188.

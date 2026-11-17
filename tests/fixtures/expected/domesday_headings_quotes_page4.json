@@ -1,16 +1,16 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "excerpt": "domesday_headings_quotes",
   "page": 4,
   "book_page_index": 40,
   "shows": "a second map as a plate: stray words removed, the caption kept",
   "layout": [
     [
-      ".^^<^«»W»L= f ^ , a U"
-    ],
-    [
+      "^^^»»=f^ a",
+      ".<«WL , U",
       "^^^B^^^r^m^",
-      "• \\ | / .\": ;,///;'///.».\"''*,. ^;\\ \\\\ . ((1^^*^==%-^^^^^^*"
+      "• \\| /.\": ;,///;'///.».\"''*,. ^;\\ \\\\ . ((1^^*^==%-^^^^^^*"
     ],
     [
       "-"
@@ -38,7 +38,11 @@
   "removals": [
     {
       "reason": "plate_text",
-      "text": ".^^<^«»W»L= f ^ , a U"
+      "text": "^^^»»=f^ a"
+    },
+    {
+      "reason": "plate_text",
+      "text": ".<«WL , U"
     },
     {
       "reason": "plate_text",
@@ -50,7 +54,7 @@
     },
     {
       "reason": "plate_text",
-      "text": "• \\ | / .\": ;,///;'///.».\"''*,. ^;\\ \\\\ . ((1^^*^==%-^^^^^^*"
+      "text": "• \\| /.\": ;,///;'///.».\"''*,. ^;\\ \\\\ . ((1^^*^==%-^^^^^^*"
     },
     {
       "reason": "plate_text",

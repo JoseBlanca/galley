@@ -31,7 +31,11 @@ look alike in the EPUB still get different kinds, and how each looks is
 decided by the markdown and epub stages (architecture §3). The two
 points left open, how a heading keeps its chapter label and what
 Haskins' bibliographical notes are, the owner decided on 16 November
-2026 (section 20).
+2026 (section 20). Revised on 17 November 2026: section 3 gains the
+running head of a section of two pages, "The head of a short section",
+which the owner asked for with the changes to how the text layer is read
+(`docs/specs/extract.md`) and to the pages before the preface
+(`docs/specs/front-matter.md`).
 
 It builds on `docs/architecture.md` (cited as "architecture §8") and
 `docs/glossary.md`, and on the layout spec, whose terms (body column,
@@ -224,6 +228,47 @@ then removed as a running head is, with its page number, and the speck
 above stays as it is (in the text, or as a `stray_mark` when it has no
 letter or digit).
 
+**The head of a short section.** A section of two pages has one
+running head, and the rules above miss it: no other page has a head
+like it, and its page number is roman or misread. The second page of
+Haskins' preface keeps "vlil PREFACE" (viii misread) in the text, and
+that of Domesday's keeps "vi Preface.". Its likeness is to the section's
+heading on the page before ("PREFACE" on Haskins' page 12, "PREFACE."
+on Domesday's), which the rules above never compare, because it sits
+lower than the heads: Haskins' at 100.8 pt from the top of the page,
+against a median head top of 35.7 pt, which is 4.3 body line pitches
+(the pitch, the median distance from one row's top to the next, is
+15.2 pt in Haskins; layout §1). So a head line that the rules above
+leave in the text is a running head when all three hold:
+
+- its top lies within 2 pitches of the median head top, as above;
+- its first or last word is **number-like**: 1 to 4 characters, each a
+  digit or one of the letters i, v, x, l, c, d, m in either case, with at
+  most one "." or "," after them ("vi", "vlil", "xiv.", "47"); and
+- the rest of the line, its letters in lower case, at least 4 of them,
+  is at least 0.75 alike, as above, to the letters of the topmost line
+  of one of the two pages before it.
+
+It is then removed as a running head is, below: the number-like word as
+a `page_number`, recorded in `page_numbers`, when it is a page-number
+form ("vi"), and otherwise with the rest of the line ("vlil", as a
+misread number is). Two pages before, not one, so that a blank page or a
+plate between the heading's page and the head does not hide it; a guess,
+since on the six books the heading is always on the page just before.
+The number-like word is required because without it the rule takes the
+first line of a title page that repeats its half-title two pages before
+(Gierke's page 8, "POLITICAL THEORIES", against page 6), a line of the
+book's text. Measured on 17 November 2026 on the six whole books
+(`lines.json` and `blocks.json` of the structure-second build of 16
+November 2026, with a prototype of this rule): it removes exactly two
+lines, Haskins' page 13 "vlil PREFACE" and Domesday's page 13 "vi
+Preface.", and no other in any of the six books; without the
+number-like word it also took Gierke's page 8. The excerpts
+`haskins_front` and `domesday_front_flow` (`docs/specs/front-matter.md`
+§6) hold both pages, whose first line their tests assert is a
+`running_head` removal; on the `whole_book` tests, the new rule's
+removals are exactly these two.
+
 A number alone does not make a running head: a top line that ends with
 a word that is also a roman form ("vi", "mix", "dix", "d", "c.", "i.")
 or with a number of the text stays in the text. On Stubbs' page 267 a
@@ -373,14 +418,29 @@ foot.
 
 ## 5. Hyphens at line ends
 
-A line whose last word ends with "-" (the ASCII hyphen-minus; the text
-layers measured end 2 of their 6,000 hyphenated lines with "~" or "¬",
-and none with another hyphen), with a letter or digit before the
-hyphen, is joined with the first word of the next line of the same
+A line whose last word ends with a hyphen, with a letter or digit
+before the hyphen, is joined with the first word of the next line of the same
 block, when that word starts with a letter or digit, and with a digit
 when a digit is before the hyphen. A line of one word is no exception.
 A digit here is one of the ASCII digits 0 to 9, and a letter a
-character for which Python's `str.isalpha` is true. A **number before a
+character for which Python's `str.isalpha` is true.
+
+A hyphen at a line's end is the ASCII hyphen-minus "-" or the not sign
+"¬" (U+00AC). The OCR of two of the owner's books, modern books scanned
+with the same OCR, marks every line-end hyphen with "¬" ("liter¬"
+"ature"): 1,020 words in one book and 2,219 in the other stayed broken
+in `book.md` while only "-" was a hyphen (measured on 17 November
+2026). The text layers of the six public-domain books end 2 of their
+6,000 hyphenated lines with "~" or "¬", and none with another hyphen;
+"~" is not a hyphen. "¬" follows every rule of this section as "-"
+does, the number before a word, the digit ranges and the three kinds of
+join, and where a rule keeps the hyphen, the word it gives holds "-",
+never "¬": "proto¬" "journalist" is looked up as "proto-journalist" and
+"1830¬" "40" gives "1830-40". The change's `before` keeps the two words
+as the text layer has them. A "¬" anywhere else, not the last character
+of a line's last word, is text and stays as it is.
+
+A **number before a
 word**, a digit before the hyphen and a next word that starts with a
 letter, is not joined: both words stay as they are, and no change is
 recorded. In Haskins' index "136-39-" ends a line and
@@ -479,6 +539,55 @@ between two line-end hyphens is joined twice: the second change has the
 first join's word as its first word ("pre-" "Anglo-" then "preAnglo-"
 "Saxon"), and the fidelity check, which undoes every change, still
 balances.
+
+**A hyphen lost in a margin note.** In a margin note the OCR often
+drops the line-end hyphen or reads it as a full stop, and the two parts
+of the word stay apart in the EPUB: "nation" "al" and "unfree" "dom"
+(Domesday pages 77 and 75), "move." "ment," (Gierke page 88) and
+"posi." "tion" (Stubbs page 58), all four checked by the owner on the
+page images on 17 November 2026. Within a margin-note block, the last
+word of a line that does not end with a hyphen is joined with the first
+word of the next line when all of these hold:
+
+- the first word ends with a letter, or with a letter and one full stop
+  (the hyphen read "."), and has 2 letters or more without the stop;
+- the second word starts with a lower-case letter;
+- the joined word, the first without its stop followed by the second,
+  has a key in the word list (with 2 letters or more in the second
+  word, as for `hyphen_join`) or among the book's own words;
+- the second word is a fragment: its key is printed after the first
+  word of a line of `lines.json` at most 8 times in the whole book. A
+  word printed whole is printed inside lines too; "ment", "tion" and
+  "dom" are not.
+
+The join is a `WordChange` of the reason `hyphen_lost`, whose `before`
+is the two words as the OCR has them and `after` the joined word, on
+the page of the first: ("move.", "ment,") becomes ("movement,",). The
+full stop the join drops is in `before`, so the fidelity check, which
+undoes every change, finds it; and it checks that the change does no
+more: the first word, less one final ".", followed by the second, is
+the joined word, and the joined word is a word of a margin-note block
+that starts on the change's page, the only blocks where the join is
+made. Tried after `join_hyphen`, which a line ending with a
+hyphen goes to.
+
+Measured on 17 November 2026 on the lines of whole Stubbs, Domesday and
+Gierke (galley at 89ed733), counting every pair of lines in a block
+whose joined word is in the word list or among the book's own words.
+The word list holds fragments and joins ("ment", "tion", "al", "dom",
+and "ofthe"), so it cannot tell a fragment; the count of the second
+word inside lines does. In margin notes the right joins have a second
+word printed inside lines 0 to 5 times ("al" 5, "nation" "al", Domesday
+page 77) and 9 times ("length" "wise.", page 409); the first wrong one
+11 ("is" "defined", Gierke page 196), then "de" "facto." (12) and the
+common words ("of" "the", 7,130), each 2 printed words. With 8, the
+rule makes 32 joins in margin notes (Domesday 20, Gierke 11, Stubbs 1),
+all right by the list in `tmp/broken-word-joins.md` of the plan's
+worktree (not committed), and loses "lengthwise". In paragraphs and
+quotes the same rule would make 24 joins, of which 11 join two printed
+words ("de" "facto", "in" "spite", "stand" "alone", "well" "known",
+"an" "ally"), since a body line ends with a whole word far more often
+than a note's short line does; so the rule is for margin notes only.
 
 ## 6. Paragraphs, side text and the order of the blocks
 
@@ -598,14 +707,14 @@ and a joined word in place of its two parts.
 
 ## 7. The format it writes
 
-`blocks.json` as architecture §8 gives it, at `format_version` 2:
+`blocks.json` as architecture §8 gives it, at `format_version` 3:
 
 | field | in the first plan | added by the second plan |
 |---|---|---|
 | `blocks` | `paragraph` blocks, and `margin_note` blocks (section 10); `level` and `figure` `None` | `heading` blocks with `level` 1 or 2 and their chapter label in `label` (section 14); `chapter_summary` (15); `quote` and `verse` (16); `index_entry` (17); `figure` blocks with their image (18); margin notes placed before their paragraph (13) |
 | `notes` | one note per block of a band region, `referenced` false, `marker` empty (section 10) | the notes cut and marked by section 11, each with its `kind` (`footnote`, or `endnote` by section 12), `referenced` true when its reference was found, and margin notes among its blocks (13) |
 | `removals` | the running heads, page numbers, signature marks and stray marks | the guide words of an index (`guide_words`, 17); a plate's running head and stray words (`running_head`, `plate_text`, 18) |
-| `word_changes` | the hyphen joins, of the three reasons of section 5 | the `note_marker` splits of section 11 |
+| `word_changes` | the hyphen joins, of the four reasons of section 5 | the `note_marker` splits of section 11 |
 | `page_numbers` | the head and foot page numbers removed | |
 
 The lists are in a fixed order, so that the file does not depend on the
@@ -653,13 +762,14 @@ class BookSurvey:
     body_word_height: float
     body_line_pitch: float
     book_words: frozenset[str]             # keys of the words printed whole
+    common_inner_words: frozenset[str]     # keys printed after a line's first word more than 8 times (section 5)
     signature_lines: frozenset[int]        # pages whose lowest line is a signature line
     index_pages: frozenset[int]            # section 17, rule 1
     plate_pages: frozenset[int]            # pages with a figure (section 18)
 
 class HyphenJoin(NamedTuple):
     word: str
-    reason: ChangeReason                   # hyphen_join, hyphen_join_guessed or hyphen_kept
+    reason: ChangeReason                   # hyphen_join, hyphen_join_guessed, hyphen_kept or hyphen_lost
 
 class NoteMarker(NamedTuple):
     marker: str                            # as the OCR read it: "13", "(t)", "291."
@@ -679,6 +789,9 @@ def survey_book(lines: LinesFile, *, language: Language = Language.EN,
                 workers: int = DEFAULT_WORKERS) -> BookSurvey: ...
 def join_hyphen(first: str, second: str, book_words: frozenset[str],
                 word_list: frozenset[str]) -> HyphenJoin | None: ...
+def join_lost_hyphen(first: str, second: str, book_words: frozenset[str],
+                     word_list: frozenset[str],
+                     common_inner_words: frozenset[str]) -> HyphenJoin | None: ...
 def note_marker(word: str, *, endnote: bool = False) -> NoteMarker | None: ...
 def reference_candidate(word: str) -> Reference | None: ...
 def make_blocks(lines: LinesFile, lower_case_words: frozenset[str], *,
@@ -694,7 +807,9 @@ section 11 (with `endnote`, also the endnote form), or `None`;
 `StrEnum` of the module. `language` serves the index title of a French
 book ("table alphabétique", section 17); `contents_pages` is the
 config's (section 14). `join_hyphen` gives `None` when the two words are not joined (section
-5); it takes the word list in lower case, which `make_blocks` is given
+5), and `join_lost_hyphen` likewise for the two parts of a margin
+note's word whose hyphen the OCR lost (section 5, `hyphen_lost`); both
+take the word list in lower case, which `make_blocks` is given
 as `wordlist.lower_case_word_list` gives it. `make_blocks` is the whole stage on values: it calls `survey_book`,
 does the per-page work with `map_pages`, then the work across pages.
 `run` reads `pages.json` and `lines.json` with `read_checked_input` as
@@ -1216,10 +1331,17 @@ The first word of a note has a **note marker's form** when it is:
 A note started by its indent (rule 1 or 2) whose first word has none of
 these forms still takes it as its marker when it is one character and
 the next word starts with a capital ("«" on Domesday page 74, "z" on
-page 76), unless it is "A", "I" or "a", which are words, and the next
-word is a known word (`wordlist.is_known_word`, architecture §12):
-"A Treatise", "I have" keep their first word, and the signs when the word is 1 or 2 of the signs above glued
-to a word that starts with a capital ("'There" on Kadesh page 8: the
+page 76), unless it is "A" or "I", which are words, and the next word
+is a known word (`wordlist.is_known_word`, architecture §12): "A
+Treatise", "I have" keep their first word. A lower-case "a" before a
+capital is always the marker: a note's text starts a sentence, where
+the article is "A". The six whole books have two such notes, each
+marked with a superscript digit that the OCR read as "a": "2 In Ramses
+III.'s day" on Kadesh page 8 and "3 See e.g. D. B." on Domesday page
+439 (checked on the page images on 17 November 2026). Kadesh's "a" was
+taken for a word once the text layer read "I n" as "In", a known word.
+A note takes as its marker the signs too, when the word is 1 or 2 of the
+signs above glued to a word that starts with a capital ("'There" on Kadesh page 8: the
 marker is "'" and the text starts with "There"). Otherwise the note has
 no marker: `marker` is empty and every word stays in its text.
 

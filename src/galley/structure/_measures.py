@@ -9,6 +9,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from galley.body_measures import commonest
+from galley.hyphens import LINE_END_HYPHENS
 from galley.model import Box, Line, Region, Removal, RemovalReason, Word
 
 # Spec section 6: a region of fewer lines takes its box's sides as edges.
@@ -132,8 +133,8 @@ def middle(box: Box) -> float:
 
 def is_hyphen_first_part(text: str) -> bool:
     """Whether a word can be the first part of a hyphen join: it ends with
-    the ASCII hyphen-minus after a letter or digit (spec section 5)."""
-    return text.endswith("-") and text[:-1][-1:].isalnum()
+    a hyphen, "-" or "¬", after a letter or digit (spec section 5)."""
+    return text[-1:] in LINE_END_HYPHENS and text[:-1][-1:].isalnum()
 
 
 # Spec section 5: a digit of the hyphen rule is an ASCII digit.
@@ -141,8 +142,9 @@ ASCII_DIGITS = frozenset("0123456789")
 
 
 def is_digit_before_hyphen(text: str) -> bool:
-    """Whether `text` ends with a hyphen after an ASCII digit, "1830-"."""
-    return text.endswith("-") and text[:-1][-1:] in ASCII_DIGITS
+    """Whether `text` ends with a hyphen, "-" or "¬", after an ASCII digit,
+    "1830-"."""
+    return text[-1:] in LINE_END_HYPHENS and text[:-1][-1:] in ASCII_DIGITS
 
 
 def is_number_before_word(first: str, second: str) -> bool:

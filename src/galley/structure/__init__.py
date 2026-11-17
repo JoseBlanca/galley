@@ -31,7 +31,7 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
 from galley.structure._assemble import assemble
-from galley.structure._hyphens import HyphenJoin, join_hyphen
+from galley.structure._hyphens import HyphenJoin, join_hyphen, join_lost_hyphen
 from galley.structure._markers import (
     NoteMarker,
     Reference,
@@ -50,6 +50,7 @@ __all__ = [
     "Reference",
     "ReferenceForm",
     "join_hyphen",
+    "join_lost_hyphen",
     "make_blocks",
     "note_marker",
     "reference_candidate",
@@ -90,6 +91,7 @@ def make_blocks(
         pages,
         survey.book_words,
         lower_case_words,
+        survey.common_inner_words,
         survey.body_word_height,
         survey.body_line_pitch,
         contents_pages,

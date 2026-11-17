@@ -1,5 +1,5 @@
 {
- "format_version": 1,
+ "format_version": 2,
  "source_pdf_sha256": "a5a6f61f934b4d6e2d64be6b8735f234b334113cff0a11a73917479c4668675f",
  "pages": [
   {
@@ -26251,5 +26251,6 @@
    ],
    "figures": []
   }
- ]
+ ],
+ "rereads": []
 }

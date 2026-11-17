@@ -34,6 +34,8 @@ from galley.model import (
     Region,
     Removal,
     RemovalReason,
+    Reread,
+    RereadKind,
     Span,
     TextSource,
     Word,
@@ -86,6 +88,7 @@ def _lines_file(pages: tuple[tuple[str, ...], ...]) -> LinesFile:
             )
             for index, lines in enumerate(pages)
         ),
+        rereads=(),
     )
 
 
@@ -307,6 +310,125 @@ def test_structure_hyphen_join_guessed_with_its_word_change_passes() -> None:
     )
 
     check_stage(FidelityBoundary.STRUCTURE, _HYPHEN_LINES, blocks)
+
+
+@pytest.mark.parametrize(
+    ("lines", "block_text", "change"),
+    [
+        (
+            ("the liter¬", "ature of"),
+            "the literature of",
+            WordChange(
+                page_index=0,
+                before=("liter¬", "ature"),
+                after=("literature",),
+                reason=ChangeReason.HYPHEN_JOIN,
+            ),
+        ),
+        (
+            ("in 1830¬", "40 then"),
+            "in 1830-40 then",
+            WordChange(
+                page_index=0,
+                before=("1830¬", "40"),
+                after=("1830-40",),
+                reason=ChangeReason.HYPHEN_KEPT,
+            ),
+        ),
+    ],
+    ids=["joined", "kept"],
+)
+def test_structure_join_at_a_not_sign_with_its_word_change_passes(
+    lines: tuple[str, ...], block_text: str, change: WordChange
+) -> None:
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0,), (_span(block_text),)),), word_changes=(change,)
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, _lines_file((lines,)), blocks)
+
+
+_LOST_HYPHEN_LINES = _lines_file((("Unity of the move.",), ("ment, here",)))
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [(("move.", "ment,"), ("movement,",)), (("move", "ment,"), ("movement,",))],
+    ids=["full stop", "lost"],
+)
+def test_structure_hyphen_lost_with_its_word_change_passes(
+    before: tuple[str, str], after: tuple[str]
+) -> None:
+    # Structure spec section 5: the full stop the join drops is in `before`.
+    lines = _lines_file(((f"Unity of the {before[0]}",), (f"{before[1]} here",)))
+    blocks = _blocks_file(
+        (_margin_note(f"Unity of the {after[0]} here"),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=before,
+                after=after,
+                reason=ChangeReason.HYPHEN_LOST,
+            ),
+        ),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def _margin_note(text: str) -> Block:
+    """A margin-note block of `text` on pages 0 and 1."""
+    return replace(
+        _block("b-p0000-001", (0, 1), (_span(text),)), kind=BlockKind.MARGIN_NOTE
+    )
+
+
+def test_structure_hyphen_lost_outside_a_margin_note_fails() -> None:
+    # Structure spec section 5: the join is made in margin notes only.
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0, 1), (_span("Unity of the movement, here"),)),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=("move.", "ment,"),
+                after=("movement,",),
+                reason=ChangeReason.HYPHEN_LOST,
+            ),
+        ),
+    )
+
+    with pytest.raises(FidelityError, match="not in a margin note"):
+        check_stage(FidelityBoundary.STRUCTURE, _LOST_HYPHEN_LINES, blocks)
+
+
+@pytest.mark.parametrize(
+    ("first", "after"),
+    [
+        ("move.", "moveent,"),
+        ("move.", "move.ment,"),
+        ("move.", "move-ment,"),
+        ("move..", "movement,"),
+    ],
+    ids=["a letter dropped", "the stop kept", "a hyphen added", "two stops dropped"],
+)
+def test_structure_hyphen_lost_that_changes_more_than_the_stop_fails(
+    first: str, after: str
+) -> None:
+    blocks = _blocks_file(
+        (_margin_note(f"Unity of the {after} here"),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=(first, "ment,"),
+                after=(after,),
+                reason=ChangeReason.HYPHEN_LOST,
+            ),
+        ),
+    )
+    lines = _lines_file(((f"Unity of the {first}",), ("ment, here",)))
+
+    with pytest.raises(FidelityError, match="is not a hyphen_lost"):
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
 def test_structure_hyphen_join_without_its_word_change_fails() -> None:
@@ -683,6 +805,17 @@ def test_structure_heading_label_dropped_from_the_block_is_missing() -> None:
                 reason=ChangeReason.HYPHEN_JOIN_GUESSED,
             ),
         ),
+        # A kept hyphen written as the not sign of the text layer.
+        (
+            ("in 1830¬", "40 then"),
+            "in 1830¬40 then",
+            WordChange(
+                page_index=0,
+                before=("1830¬", "40"),
+                after=("1830¬40",),
+                reason=ChangeReason.HYPHEN_KEPT,
+            ),
+        ),
         # A guessed join that keeps the hyphen.
         (
             ("Bal-", "hazar"),
@@ -704,6 +837,7 @@ def test_structure_heading_label_dropped_from_the_block_is_missing() -> None:
         "three-words",
         "kept-hyphen-dropped",
         "kept-without-hyphen",
+        "kept-as-not-sign",
         "guessed-changed-letter",
         "guessed-hyphen-kept",
     ],
@@ -741,6 +875,7 @@ def test_structure_word_holding_white_space_splits_the_same_on_both_sides(
                 figures=(),
             ),
         ),
+        rereads=(),
     )
     blocks = _blocks_file((_block("b-p0000-001", (0,), (_span(text),)),))
 
@@ -1530,3 +1665,227 @@ def test_read_markdown_without_pandoc_raises(
 
     with pytest.raises(ExternalProgramError, match="pandoc"):
         read_markdown("Text.\n")
+
+
+# The layout boundary with re-read regions (reocr spec, section 4, "The
+# fidelity check"). A page with a body word and a margin note of three
+# layer words, which Tesseract reads as two.
+
+_BODY = Word("Normandy", Box(100.0, 50.0, 160.0, 60.0), None)
+_NOTE_LAYER = (
+    Word("Wil-", Box(20.0, 50.0, 30.0, 58.0), None),
+    Word("1", Box(31.0, 50.0, 33.0, 58.0), None),
+    Word("iam", Box(34.0, 50.0, 44.0, 58.0), None),
+)
+_NOTE_OCR = (
+    Word("William", Box(20.0, 50.0, 44.0, 58.0), 91.0),
+    Word("I.", Box(20.0, 59.0, 26.0, 67.0), 88.0),
+)
+_NOTE_WORDS = WordsFile(
+    source_pdf_sha256=_SHA,
+    pages=(
+        PageWords(
+            index=0,
+            text_source=TextSource.TEXT_LAYER,
+            words=(_BODY, *_NOTE_LAYER),
+            figures=(),
+        ),
+        PageWords(
+            index=1,
+            text_source=TextSource.TEXT_LAYER,
+            words=(Word("Rouen", _BOX, None),),
+            figures=(),
+        ),
+    ),
+    removals=(),
+)
+
+
+def _note_reread(
+    layer_words: tuple[Word, ...] = _NOTE_LAYER,
+    *,
+    page_index: int = 0,
+    kept: bool = True,
+) -> Reread:
+    return Reread(
+        page_index=page_index,
+        kind=RereadKind.MARGIN_NOTE,
+        box=Box(18.0, 48.0, 46.0, 69.0),
+        layer_words=layer_words,
+        ocr_words=_NOTE_OCR,
+        layer_score=-1,
+        ocr_score=2,
+        kept=kept,
+        dropped_junk_count=0,
+    )
+
+
+def _note_lines(page_0: tuple[Word, ...], rereads: tuple[Reread, ...]) -> LinesFile:
+    """lines.json of _NOTE_WORDS: page 0 with `page_0` in one line, page 1
+    as words.json has it."""
+    return LinesFile(
+        source_pdf_sha256=_SHA,
+        pages=(
+            PageLayout(
+                index=0, regions=(Region(_BOX, (Line(_BOX, page_0),)),), figures=()
+            ),
+            PageLayout(
+                index=1,
+                regions=(Region(_BOX, (Line(_BOX, (Word("Rouen", _BOX, None),)),)),),
+                figures=(),
+            ),
+        ),
+        rereads=rereads,
+    )
+
+
+def test_layout_with_a_kept_reread_swaps_its_layer_words_for_its_ocr_words() -> None:
+    lines = _note_lines((_BODY, *_NOTE_OCR), (_note_reread(),))
+
+    check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+
+def test_layout_with_a_kept_reread_whose_ocr_words_are_missing_fails() -> None:
+    lines = _note_lines((_BODY,), (_note_reread(),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+    assert raised.value.missing == frozendict({"I.": 1, "William": 1})
+    assert raised.value.invented == frozendict()
+
+
+def test_layout_with_a_reread_not_kept_changes_nothing() -> None:
+    lines = _note_lines((_BODY, *_NOTE_LAYER), (_note_reread(kept=False),))
+
+    check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+
+def test_layout_with_a_reread_not_kept_whose_ocr_words_are_in_the_lines_fails() -> None:
+    lines = _note_lines((_BODY, *_NOTE_OCR), (_note_reread(kept=False),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+    assert raised.value.missing == frozendict({"1": 1, "Wil-": 1, "iam": 1})
+    assert raised.value.invented == frozendict({"I.": 1, "William": 1})
+
+
+def test_layout_with_a_kept_reread_naming_a_word_its_page_does_not_have_fails() -> None:
+    # "Wil-" at another place, and "Rouen", which is page 1's.
+    elsewhere = replace(_NOTE_LAYER[0], box=Box(20.0, 70.0, 30.0, 78.0))
+    for layer_words, page_index in (
+        ((elsewhere, *_NOTE_LAYER[1:]), 0),
+        (_NOTE_LAYER, 1),
+    ):
+        reread = _note_reread(layer_words, page_index=page_index)
+        lines = _note_lines((_BODY, *_NOTE_OCR), (reread,))
+
+        with pytest.raises(FidelityError) as raised:
+            check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+        assert raised.value.missing == frozendict()
+        assert raised.value.invented == frozendict()
+        assert f"page {page_index} does not have" in raised.value.detail
+
+
+def test_layout_with_a_word_in_two_kept_rereads_fails() -> None:
+    # The second record names "iam" again and reads it as "iam": the words
+    # alone balance, so only the record check can find it.
+    second = replace(
+        _note_reread((_NOTE_LAYER[2],)),
+        kind=RereadKind.CUT_IN_NOTE,
+        ocr_words=(Word("iam", Box(34.0, 50.0, 44.0, 58.0), 70.0),),
+    )
+    lines = _note_lines((_BODY, *_NOTE_OCR), (_note_reread(), second))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+    assert raised.value.missing == frozendict()
+    assert "'iam'" in raised.value.detail
+    assert "two kept rereads" in raised.value.detail
+
+
+def test_layout_with_a_kept_reread_replacing_a_word_no_ocr_word_lies_over_fails() -> (
+    None
+):
+    # The record names the body word "Normandy", which no word of
+    # Tesseract's lies over, and the lines lack it: the words alone balance,
+    # so only the record check can find it.
+    reread = _note_reread((*_NOTE_LAYER, _BODY))
+    lines = _note_lines(_NOTE_OCR, (reread,))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict()
+    assert "'Normandy'" in raised.value.detail
+    assert "none of its ocr_words lies over" in raised.value.detail
+
+
+def test_layout_with_a_kept_reread_replacing_a_word_off_its_box_by_its_text_passes() -> (
+    None
+):
+    # Tesseract also read the body word "Normandy" 10 pt above the layer's:
+    # no box lies over the layer's word, but the texts match (reocr spec,
+    # section 4, rule (b)).
+    normandy = Word("Normandy", Box(100.0, 40.0, 160.0, 50.0), 90.0)
+    reread = replace(
+        _note_reread((*_NOTE_LAYER, _BODY)), ocr_words=(*_NOTE_OCR, normandy)
+    )
+    lines = _note_lines((*_NOTE_OCR, normandy), (reread,))
+
+    check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)
+
+
+def test_layout_with_one_ocr_word_the_only_reading_of_two_lines_words_fails() -> None:
+    # Domesday page 548: Tesseract read "3" for "Dominium, 224" and
+    # "dominieum," over the layer's "dominicum," one line down; a record
+    # that replaces the layer's "Domini" too has "dominieum," stand for two
+    # printed words, and one is lost.
+    domini = Word("Domini", Box(10.0, 92.0, 30.0, 100.0), None)
+    dominicum = Word("dominicum,", Box(10.0, 101.0, 30.0, 109.0), None)
+    ocr = (
+        Word("3", Box(60.0, 92.0, 66.0, 100.0), 40.0),
+        Word("dominieum,", Box(10.0, 101.0, 30.0, 109.0), 80.0),
+    )
+    words = WordsFile(
+        source_pdf_sha256=_SHA,
+        pages=(
+            PageWords(
+                index=0,
+                text_source=TextSource.TEXT_LAYER,
+                words=(domini, dominicum),
+                figures=(),
+            ),
+        ),
+        removals=(),
+    )
+    reread = Reread(
+        page_index=0,
+        kind=RereadKind.SMALL_PRINT_PAGE,
+        box=Box(0.0, 90.0, 100.0, 110.0),
+        layer_words=(domini, dominicum),
+        ocr_words=ocr,
+        layer_score=-2,
+        ocr_score=0,
+        kept=True,
+        dropped_junk_count=0,
+    )
+    lines = LinesFile(
+        source_pdf_sha256=_SHA,
+        pages=(
+            PageLayout(
+                index=0, regions=(Region(_BOX, (Line(_BOX, ocr),)),), figures=()
+            ),
+        ),
+        rereads=(reread,),
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, words, lines)
+
+    assert "'dominieum,'" in raised.value.detail
+    assert "the only ocr word that can read 'Domini'" in raised.value.detail

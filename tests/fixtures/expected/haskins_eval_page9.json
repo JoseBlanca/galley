@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4), and again, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed since that check by task 3.6 (no join after a digit before a letter): \"136-39-\" and \"Bryce,\" are no longer joined. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 4.1 (structure spec section 14, \"Levels\"): \"INDEX\" is a heading of level 1, the first line of a page without a running head, with no label. Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 5.2 (structure spec section 17, rules 3 and 4): the paragraph that held the whole index page is one index_entry block per entry, 65 of them, the left column's then the right's, each with its continuation lines (\"Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100, 112, 131, 136/.\"); \"Brittany, ... 136-39-\" and \"Bryce, James, ...\" are two entries. Checked against the excerpt's text by the task 5.2 session on 16 November 2026, for the orchestrator to check against the page image. Changed by the owner's decision of 16 November 2026 on sub-entries (structure spec section 17, rule 5): each entry is cut after each word ending in \";\", which gives 7 sub-entries on the page, 72 index_entry blocks in all (\"Anjou, counts of, 61, 85;\" then \"relations with Normandy, 61-63, 85, 100, 112, 131, 136/.\"; \"Bayeux, ..., 172,187;BlackBook, III. See ...\" is not cut, the OCR having glued its \";\" to the next word). Checked against the excerpt's text on 16 November 2026, for the orchestrator to check against the page image. Each index_entry now also gives its depth, 1 or 2, compared by the excerpt test (review T4, 16 November 2026); no text changed.",
+  "changed": "Changed since that check by task 3.6 (no join after a digit before a letter): \"136-39-\" and \"Bryce,\" are no longer joined. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 4.1 (structure spec section 14, \"Levels\"): \"INDEX\" is a heading of level 1, the first line of a page without a running head, with no label. Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 5.2 (structure spec section 17, rules 3 and 4): the paragraph that held the whole index page is one index_entry block per entry, 65 of them, the left column's then the right's, each with its continuation lines (\"Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100, 112, 131, 136/.\"); \"Brittany, ... 136-39-\" and \"Bryce, James, ...\" are two entries. Checked against the excerpt's text by the task 5.2 session on 16 November 2026, for the orchestrator to check against the page image. Changed by the owner's decision of 16 November 2026 on sub-entries (structure spec section 17, rule 5): each entry is cut after each word ending in \";\", which gives 7 sub-entries on the page, 72 index_entry blocks in all (\"Anjou, counts of, 61, 85;\" then \"relations with Normandy, 61-63, 85, 100, 112, 131, 136/.\"; \"Bayeux, ..., 172,187;BlackBook, III. See ...\" is not cut, the OCR having glued its \";\" to the next word). Checked against the excerpt's text on 16 November 2026, for the orchestrator to check against the page image. Each index_entry now also gives its depth, 1 or 2, compared by the excerpt test (review T4, 16 November 2026); no text changed. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed again by the fix of task 5.2 (reocr spec, section 4, rules (a) and (b)): a layer word the layer placed off Tesseract's reading of it, of the same text, is replaced and no longer read twice; listed in the task's list of changed reference pages. Changed by review 2, finding A3 (reocr spec, section 4, rule (a), 17 November 2026): the layer's glued \"162,166,\", which Tesseract read \"162,\" \"166,\", is replaced, so \"162, 162,166, 166,\" reads \"162, 166,\"; not yet checked against the page image.",
   "excerpt": "haskins_eval",
   "page": 9,
   "book_page_index": 266,
@@ -10,89 +10,88 @@
       "INDEX"
     ],
     [
-      "Abacus, 106/.",
-      "Abruzzi, 196, 204, 222/.",
-      "Adams,Henry,quoted, 12,22, 188/.",
-      "Adelaide, countess, 210.",
-      "Adelardof Bath, 177, 179, 238.",
-      "Africa, 196/., 222, 232.",
-      "Aime of Monte Cassino, 13, 200/.",
-      "Alengon, 63, 178.",
-      "AlexanderII, Pope,74,79, 165, 175.",
+      "Abacus, 106 f. Avranchin, 28,",
+      "Abruzzi, 196, 204, 222 f. Avre, 7.",
+      "Adams, Henry, quoted, 12, 22, 188 f.",
+      "Adelaide, countess, 210. Bailli, 103, 145."
+    ],
+    [
+      "Adelard of Bath, 177, 179, 238.",
+      "Africa, 196 f., 222, 232.",
+      "Aimé of Monte Cassino, 13, 200 f.",
+      "Alencon, 63, 178.",
+      "Alexander II, Pope, 74, 79, 165, 175.",
       "Alfred, king, 34.",
-      "Alphonso VIII, king, 90.",
-      "Amalfi, 197/., 204, 213, 232.",
+      "Alphonso VIII, king, go.",
+      "Amalfi, 197 f., 204, 213, 232.",
       "Amari, M., 216, 248; quoted, 234.",
       "Anacletus II, Pope, 210.",
       "Andeli, 134.",
       "Angers, 61-63.",
-      "Angoulgme, 160.",
+      "Angouléme, 160.",
       "Anjou, counts of, 61, 85; relations",
       "with Normandy, 61-63, 85, 100,",
-      "112, 131, 136/.",
+      "112, 131, 136 f.",
       "Anna Comnena, quoted, 201.",
       "Anselm, 175-78.",
       "Antioch, 212; principality, 214-16.",
-      "Apulia, 186, 197-211, 222 /., 228,",
+      "Apulia, 186, 197-211, 222 f., 228,",
       "238, 246.",
-      "Aquitaine, 87/.,90, 100, 120/., 136.",
+      "Aquitaine, 87 f., 90, 100, 120f., 136.",
       "Arabic elements in Sicilian state,",
       "226-30, 235, 238-44.",
       "Architecture, Norman, 9-12, 102,",
       "186-89; Sicilian, 189, 241-44.",
-      "Archives, Norman,9,66/., 105, 178.",
-      "Argentan, 10, 71, 133, 139, 153.",
+      "Archives, Norman, 9, 66 f., 105, 178.",
+      "Argentan, I0, 71, 133, 139, 153.",
       "Arlette, mother of William the",
       "Conqueror, 53, 166.",
       "Arnulf of Chocques, patriarch, 212.",
       "Arnulf, bishop of Lisieux, 167.",
       "Arthur, duke of Brittany, 136-39.",
       "Assizes, Anglo-Norman, 94, 100,",
-      "in/., 161; Sicilian, 230/., 234.",
+      "111 f., 161; Sicilian, 230 f., 234.",
       "Aversa, 200, 204, 206.",
       "Avranches, 172, 175, 178."
     ],
     [
-      "Avranchin, 28.",
-      "Avre, 7.",
-      "Bailli, 103, 145.",
       "Barfleur, 132, 160.",
       "Bari, 189, 197, 202, 232, 241.",
       "Baudri of Bourgueil, 76.",
-      "Bayeux, 10, 46, 49, 67, 76, 150 /.,",
-      "162,166, 172,187;BlackBook, III.",
+      "Bayeux, 10, 46, 49, 67, 76, 150 f.,",
+      "162, 166, 172, 187; Black Book, 111.",
       "See Odo, Turold, Richard, Philip",
       "d'Harcourt.",
-      "BayeuxTapestry, 76/., 80, 84, 151,",
+      "Bayeux Tapestry, 76 f., 80, 84, 151,",
       "167.",
       "Bayonne, 161.",
-      "Bee, 171, 185; schools, 175 /.; li-",
+      "Bec, 171, 185; schools, 175 f.; li-",
       "brary, 177-80.",
       "Becket, 4, 100, 118, 168.",
-      "Bellgme, 154.",
+      "Belléme, 154.",
       "Benevento, 198, 203.",
       "Benoit de Sainte-More, 184.",
       "Bertaux, E., quoted, 197, 241.",
       "Bessin, 10, 28.",
-      "Bibliographicalnotes,24/.,51,83/.,",
-      "114/., 147, 189-91,216/.,247-49.",
+      "Bibliographical notes, 24 f., 51, 83 f.,",
+      "114 f., 147, 189-91, 216 f., 247-49.",
       "Bisignano, 201.",
       "Bocage, 10.",
       "Boccaccio, 246.",
       "Bocherville, Saint-Georges de, 169,",
       "187.",
-      "Bohemond I,princeofAntioch,207,",
+      "Bohemond I, prince of Antioch, 207,",
       "213-16.",
       "Bohmer, H., quoted, 165.",
       "Bonneval, 154.",
       "Bordeaux, 88.",
-      "Boutmy, E., quoted, loi.",
+      "Boutmy, E., quoted, ror.",
       "Breteuil, 154, 160.",
       "Brittany, 6-8, 10, 57, 61, 75, 88,",
-      "136-39-",
+      "136-39.",
       "Bryce, James, Viscount, quoted, 43.",
-      "Buchanan, James, 17/.",
-      "Bury St. Edmund's, 173."
+      "Buchanan, James, 17 f.",
+      "Bury St. Edmund’s, 173."
     ]
   ],
   "blocks": [
@@ -107,7 +106,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Abacus, 106/.",
+      "text": "Abacus, 106 f.",
       "level": 1,
       "pages": [
         9
@@ -115,7 +114,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Abruzzi, 196, 204, 222/.",
+      "text": "Abruzzi, 196, 204, 222 f.",
       "level": 1,
       "pages": [
         9
@@ -123,7 +122,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Adams,Henry,quoted, 12,22, 188/.",
+      "text": "Adams, Henry, quoted, 12, 22, 188 f.",
       "level": 1,
       "pages": [
         9
@@ -139,7 +138,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Adelardof Bath, 177, 179, 238.",
+      "text": "Adelard of Bath, 177, 179, 238.",
       "level": 1,
       "pages": [
         9
@@ -147,7 +146,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Africa, 196/., 222, 232.",
+      "text": "Africa, 196 f., 222, 232.",
       "level": 1,
       "pages": [
         9
@@ -155,7 +154,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Aime of Monte Cassino, 13, 200/.",
+      "text": "Aimé of Monte Cassino, 13, 200 f.",
       "level": 1,
       "pages": [
         9
@@ -163,7 +162,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Alengon, 63, 178.",
+      "text": "Alencon, 63, 178.",
       "level": 1,
       "pages": [
         9
@@ -171,7 +170,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "AlexanderII, Pope,74,79, 165, 175.",
+      "text": "Alexander II, Pope, 74, 79, 165, 175.",
       "level": 1,
       "pages": [
         9
@@ -187,7 +186,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Alphonso VIII, king, 90.",
+      "text": "Alphonso VIII, king, go.",
       "level": 1,
       "pages": [
         9
@@ -195,7 +194,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Amalfi, 197/., 204, 213, 232.",
+      "text": "Amalfi, 197 f., 204, 213, 232.",
       "level": 1,
       "pages": [
         9
@@ -243,7 +242,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Angoulgme, 160.",
+      "text": "Angouléme, 160.",
       "level": 1,
       "pages": [
         9
@@ -259,7 +258,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "relations with Normandy, 61-63, 85, 100, 112, 131, 136/.",
+      "text": "relations with Normandy, 61-63, 85, 100, 112, 131, 136 f.",
       "level": 2,
       "pages": [
         9
@@ -299,7 +298,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Apulia, 186, 197-211, 222 /., 228, 238, 246.",
+      "text": "Apulia, 186, 197-211, 222 f., 228, 238, 246.",
       "level": 1,
       "pages": [
         9
@@ -307,7 +306,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Aquitaine, 87/.,90, 100, 120/., 136.",
+      "text": "Aquitaine, 87 f., 90, 100, 120f., 136.",
       "level": 1,
       "pages": [
         9
@@ -339,7 +338,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Archives, Norman,9,66/., 105, 178.",
+      "text": "Archives, Norman, 9, 66 f., 105, 178.",
       "level": 1,
       "pages": [
         9
@@ -347,7 +346,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Argentan, 10, 71, 133, 139, 153.",
+      "text": "Argentan, I0, 71, 133, 139, 153.",
       "level": 1,
       "pages": [
         9
@@ -387,7 +386,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Assizes, Anglo-Norman, 94, 100, in/., 161;",
+      "text": "Assizes, Anglo-Norman, 94, 100, 111 f., 161;",
       "level": 1,
       "pages": [
         9
@@ -395,7 +394,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Sicilian, 230/., 234.",
+      "text": "Sicilian, 230 f., 234.",
       "level": 2,
       "pages": [
         9
@@ -419,7 +418,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Avranchin, 28.",
+      "text": "Avranchin, 28,",
       "level": 1,
       "pages": [
         9
@@ -467,7 +466,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Bayeux, 10, 46, 49, 67, 76, 150 /., 162,166, 172,187;BlackBook, III. See Odo, Turold, Richard, Philip d'Harcourt.",
+      "text": "Bayeux, 10, 46, 49, 67, 76, 150 f., 162, 166, 172, 187;",
       "level": 1,
       "pages": [
         9
@@ -475,7 +474,15 @@
     },
     {
       "kind": "index_entry",
-      "text": "BayeuxTapestry, 76/., 80, 84, 151, 167.",
+      "text": "Black Book, 111. See Odo, Turold, Richard, Philip d'Harcourt.",
+      "level": 2,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bayeux Tapestry, 76 f., 80, 84, 151, 167.",
       "level": 1,
       "pages": [
         9
@@ -491,7 +498,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Bee, 171, 185;",
+      "text": "Bec, 171, 185;",
       "level": 1,
       "pages": [
         9
@@ -499,7 +506,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "schools, 175 /.;",
+      "text": "schools, 175 f.;",
       "level": 2,
       "pages": [
         9
@@ -523,7 +530,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Bellgme, 154.",
+      "text": "Belléme, 154.",
       "level": 1,
       "pages": [
         9
@@ -563,7 +570,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Bibliographicalnotes,24/.,51,83/., 114/., 147, 189-91,216/.,247-49.",
+      "text": "Bibliographical notes, 24 f., 51, 83 f., 114 f., 147, 189-91, 216 f., 247-49.",
       "level": 1,
       "pages": [
         9
@@ -603,7 +610,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Bohemond I,princeofAntioch,207, 213-16.",
+      "text": "Bohemond I, prince of Antioch, 207, 213-16.",
       "level": 1,
       "pages": [
         9
@@ -635,7 +642,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Boutmy, E., quoted, loi.",
+      "text": "Boutmy, E., quoted, ror.",
       "level": 1,
       "pages": [
         9
@@ -651,7 +658,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Brittany, 6-8, 10, 57, 61, 75, 88, 136-39-",
+      "text": "Brittany, 6-8, 10, 57, 61, 75, 88, 136-39.",
       "level": 1,
       "pages": [
         9
@@ -667,7 +674,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Buchanan, James, 17/.",
+      "text": "Buchanan, James, 17 f.",
       "level": 1,
       "pages": [
         9
@@ -675,7 +682,7 @@
     },
     {
       "kind": "index_entry",
-      "text": "Bury St. Edmund's, 173.",
+      "text": "Bury St. Edmund’s, 173.",
       "level": 1,
       "pages": [
         9

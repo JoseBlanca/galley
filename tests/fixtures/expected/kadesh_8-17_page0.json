@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4), and again, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.1 (structure spec section 11, \"Where a note starts\", rule 4, and \"The marker of a note\"): each note's marker is taken out of its text: \"•\" split off \"•Pa\" (the note to the title's \"*\") and \"'\" off \"'There\", each by a note_marker word change, as signs glued to a capitalised word, and \"i\" and \"a\" as one-character markers of indented notes; the right column, \"'There is, however…\", indented 12 pt against its column, is a note of its own, no longer part of note \"a\". Changed by task 2.3 (structure spec section 11, \"References\"): \"STRATEGY*\" is linked to the note marked \"•\" and \"Greece,1\" to the note marked \"i\", each split off its word by a note_marker word change. Changed by task 4.1 (structure spec section 14, \"Heading blocks\"): the three centred lines \"THE BATTLE OF KADESH\", \"A STUDY IN THE EARLIEST KNOWN MILITARY STRATEGY*\" and \"JAMES HENRY BREASTED\" are one heading of level 1 with no label (each line at most 2.6 pitches below the one before; the first line of a page without a running head), its reference \"*\" still linked to the note \"Pa per read before...\" (section 11, \"Candidates\": every body block but a margin note holds candidates). Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image.",
+  "changed": "Changed by task 2.1 (structure spec section 11, \"Where a note starts\", rule 4, and \"The marker of a note\"): each note's marker is taken out of its text: \"•\" split off \"•Pa\" (the note to the title's \"*\") and \"'\" off \"'There\", each by a note_marker word change, as signs glued to a capitalised word, and \"i\" and \"a\" as one-character markers of indented notes; the right column, \"'There is, however…\", indented 12 pt against its column, is a note of its own, no longer part of note \"a\". Changed by task 2.3 (structure spec section 11, \"References\"): \"STRATEGY*\" is linked to the note marked \"•\" and \"Greece,1\" to the note marked \"i\", each split off its word by a note_marker word change. Changed by task 4.1 (structure spec section 14, \"Heading blocks\"): the three centred lines \"THE BATTLE OF KADESH\", \"A STUDY IN THE EARLIEST KNOWN MILITARY STRATEGY*\" and \"JAMES HENRY BREASTED\" are one heading of level 1 with no label (each line at most 2.6 pitches below the one before; the first line of a page without a running head), its reference \"*\" still linked to the note \"Pa per read before...\" (section 11, \"Candidates\": every body block but a margin note holds candidates). Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by review 1 of the clean-text plan (structure spec section 11, \"The marker of a note\"): \"a\", the superscript 2 that the OCR read as \"a\", is again the marker of the note \"In Ramses III.'s day...\", as on the sheet checked on 16 November 2026; task 2.2 had left it in the text as the article once \"I n\" was read as \"In\".",
   "excerpt": "kadesh_8-17",
   "page": 0,
   "book_page_index": 8,
@@ -47,9 +47,9 @@
     [
       "•Pa per read before the International Congress of Ori-",
       "ontalists at Hamburg in September, 1902.",
-      "i J . KKOHATEK, Antike SchlacMfelder in Griechenland,",
+      "i J. KKOHATEK, Antike SchlacMfelder in Griechenland,",
       "Berlin, 1903.",
-      "a I n Ramses III.'s day the Pnrasat-Philistines are seen",
+      "a In Ramses III.'s day the Pnrasat-Philistines are seen",
       "fighting by groups of four (CHAMP., Man., 220-220 6i» = ROB.,",
       "A/on, stor., 127, 128, and MtlLLER, Asien, pp. 365, 316)."
     ],
@@ -107,7 +107,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "J . KKOHATEK, Antike SchlacMfelder in Griechenland, Berlin, 1903."
+          "text": "J. KKOHATEK, Antike SchlacMfelder in Griechenland, Berlin, 1903."
         }
       ],
       "pages": [
@@ -119,7 +119,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "I n Ramses III.'s day the Pnrasat-Philistines are seen fighting by groups of four (CHAMP., Man., 220-220 6i» = ROB., A/on, stor., 127, 128, and MtlLLER, Asien, pp. 365, 316)."
+          "text": "In Ramses III.'s day the Pnrasat-Philistines are seen fighting by groups of four (CHAMP., Man., 220-220 6i» = ROB., A/on, stor., 127, 128, and MtlLLER, Asien, pp. 365, 316)."
         }
       ],
       "pages": [

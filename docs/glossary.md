@@ -68,6 +68,17 @@ invented.
 **footnote band**: the footnotes at the foot of a page, set in smaller
 type below the body, in one column or two. A region found by layout.
 
+**front matter**: the pages of a book before its text: endpapers,
+labels, half-title, title page, publisher's pages, copyright,
+dedication. galley finds where it ends, at the preface or the table of
+contents, and drops its text pages with a record
+(`docs/specs/front-matter.md`). The preface is not front matter.
+
+**glued words**: two or more words of the book that the text layer
+gives as one, because the OCR wrote no space between them and the gap
+is narrower than pdfplumber's 3 pt ("UpperandLowerNormandy,"). extract
+splits them at wide gaps (`docs/specs/extract.md`).
+
 **guide words**: the first letters of the first and last entries of an
 index page, printed under its running head ("BUR CON" in Stubbs).
 Removed by structure, with a record.
@@ -88,6 +99,10 @@ the column's left edge and its continuation lines indented (a **hanging
 indent**). A block kind. A **sub-entry**, a heading under an entry that
 Haskins and Stubbs print inline after a ";" ("Amari, M., 216, 248;
 quoted, 234."), is an index entry of its own, of depth 2.
+
+**known word**: a word the word list holds (at least two letters), or a
+number; `wordlist.is_known_word` decides. An **unknown word** holds a
+letter or a digit and is not known.
 
 **line**: a line of one region of a page, as layout groups the words, left
 to right. Not what pdfplumber calls a line, which runs across columns.
@@ -111,6 +126,9 @@ still linked when it has a **marker's shape** (at most 4 characters, at
 most 3 of them letters or digits and at most 1 a letter) and falls in
 the right order.
 
+**note band**: the rows of ink of one printed margin note, found in a
+render of the margin; what re-reading reads for an outer margin note.
+
 **page index**: the position of a page in the PDF, from 0. **page
 number**: what is printed on the page, a string ("47", "xiv"), which may
 be missing or come in two sequences.
@@ -118,6 +136,10 @@ be missing or come in two sequences.
 **plate**: see figure. Its text layer holds its caption and **stray
 words**, what the OCR read in the picture's lines and shading ("^U;L"),
 which structure removes as plate text.
+
+**reading score**: of a reading of a region, its known words minus its
+unknown words, a word broken by a hyphen at a line end counted once.
+How re-reading chooses between the text layer and Tesseract.
 
 **reference page**: a page of an excerpt whose expected output the owner
 has checked by eye, used as the literal of a test.
@@ -133,13 +155,27 @@ layout; what each region is, structure decides.
 
 **removal**: text a stage took out of the book on purpose, with its page,
 box and reason: a running head, a page number, a signature mark, a stray
-mark, guide words, a plate's stray words, an excluded page or region.
+mark, guide words, a plate's stray words, an excluded page or region,
+a page of the front matter.
+
+**re-reading**: reading a region of a page again with Tesseract, from a
+300-dpi render, and keeping Tesseract's words only where their reading
+score is higher than the text layer's, or equal with more known words.
+Done by layout, which records
+every region it read (`docs/specs/reocr.md`).
 
 **running head**: the line printed at the top of most pages, the book's,
 chapter's or author's name, often with the page number. Not a "header".
 
 **signature mark**: a small printer's mark at the foot of some pages, "I —
 2", which tells the binder how sheets are folded. Not text of the book.
+
+**small-print page**: a page of 50 words or more on which at least 85
+in 100 of the body column's rows of two words or more, below the
+running head, are set in small type (their median word height at most
+0.85 of the body's): a page printed wholly in small type, as an index
+or a bibliographical note. Re-reading reads it whole below its running
+head.
 
 **span**: a run of a block's text with one emphasis and, optionally, a
 note reference.
@@ -152,7 +188,9 @@ speck of the scan that the OCR read as text (";", "^"). Removed by
 structure, with a record.
 
 **text layer**: the invisible words an OCR program placed over the page
-image of a scanned PDF. **text source**: where a page's words come from:
+image of a scanned PDF. Its characters come in **the PDF's order**, the
+order the OCR wrote them, word after word and line after line, which
+galley reads them in. **text source**: where a page's words come from:
 the text layer, galley's own OCR, or none.
 
 **text of a block**: the concatenation of its spans' text, which an edit

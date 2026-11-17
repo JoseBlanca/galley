@@ -1,0 +1,1297 @@
+"""Tests of the pure parts of layout's re-reading (docs/specs/reocr.md,
+sections 3, 4 and 9, "Unit tests").
+
+Every page here is written by hand, with the book's measures given in the
+test, and Tesseract's words are written as it would give them: no PDF is
+read and no Tesseract runs. The word list is a small set of words written
+here, standing for the book language's list.
+"""
+
+from dataclasses import replace
+
+import pytest
+from PIL import Image, ImageDraw
+
+from galley.body_measures import group_rows
+from galley.errors import FidelityBoundary, FidelityError
+from galley.fidelity import check_stage
+from galley.layout import BookMeasures, Side
+from galley.layout._column import ColumnSplit
+from galley.layout._reread import (
+    CutInCrop,
+    RegionReading,
+    _is_known_as_printed,
+    _is_sure_single_word,
+    cut_in_crops,
+    cut_in_reading,
+    footnote_band_crop,
+    footnote_band_reading,
+    is_small_print_page,
+    margin_note_reading,
+    margin_note_sides,
+    margin_strip,
+    note_bands,
+    page_rereads,
+    pixel_box,
+    reading_score,
+    small_print_crop,
+    small_print_reading,
+)
+from galley.model import (
+    Box,
+    LinesFile,
+    PageLayout,
+    PageWords,
+    Region,
+    Reread,
+    RereadKind,
+    TextSource,
+    Word,
+    WordsFile,
+    words_after_rereads,
+)
+from galley.ocr import OCR_DPI
+
+# The words the tests' word list holds, in lower case, as
+# wordlist.lower_case_word_list gives them. It holds "bl" and "en", as the
+# English list of Tesseract 5.5.4 does (reocr spec, section 3).
+_WORD_LIST = frozenset(
+    {
+        "stephen",
+        "of",
+        "blois",
+        "bl",
+        "en",
+        "henry's",
+        "free",
+        "holding",
+        "moral",
+        "lessons",
+        "the",
+        "barons",
+        "next",
+        "history",
+        "index",
+        "coronation",
+    }
+)
+
+
+def _word(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
+    return Word(text, Box(x0, top, x1, bottom), None)
+
+
+def _ocr(text: str, x0: float, top: float, x1: float, bottom: float) -> Word:
+    return Word(text, Box(x0, top, x1, bottom), 90.0)
+
+
+def _layer(*texts: str) -> tuple[Word, ...]:
+    """Words of `texts` side by side on one row."""
+    return tuple(
+        _word(text, 10 + 40 * index, 100, 40 + 40 * index, 110)
+        for index, text in enumerate(texts)
+    )
+
+
+def _texts(words: tuple[Word, ...]) -> tuple[str, ...]:
+    return tuple(word.text for word in words)
+
+
+# reading_score
+
+
+def test_reading_score_counts_each_known_word() -> None:
+    assert reading_score(_layer("Stephen", "of", "Blois."), _WORD_LIST) == 3
+
+
+def test_reading_score_subtracts_unknown_words_from_a_spaced_out_note() -> None:
+    # Known: "Bl", "en", "of" (3); unknown: "S", "t", "o", "e", "i", "p",
+    # "s", "h" (8), single letters having fewer than 2 letters; "." neither.
+    spaced = _layer("S", "Bl", "t", "o", "e", "i", "p", "s", "h", ".", "en", "of")
+    assert reading_score(spaced, _WORD_LIST) == -5
+
+
+def test_reading_score_takes_a_curly_apostrophe_inside_a_word_as_straight() -> None:
+    assert reading_score(_layer("Henry’s"), _WORD_LIST) == 1
+
+
+def test_reading_score_strips_quotation_marks_from_both_ends() -> None:
+    assert reading_score(_layer("“Moral”", "'lessons'", '"Barons"'), _WORD_LIST) == 3
+
+
+def test_reading_score_counts_a_word_broken_at_a_line_end_once_as_known() -> None:
+    assert reading_score(_layer("‘free-", "holding.’"), _WORD_LIST) == 1
+
+
+def test_reading_score_counts_a_broken_word_known_when_joined() -> None:
+    assert reading_score(_layer("bar-", "ons"), _WORD_LIST) == 1
+
+
+def test_reading_score_counts_a_word_broken_with_a_not_sign_once() -> None:
+    # "¬" marks every line-end hyphen in the OCR of two of the owner's books.
+    assert reading_score(_layer("bar\N{NOT SIGN}", "ons"), _WORD_LIST) == 1
+
+
+def test_reading_score_does_not_take_a_dash_alone_as_the_first_part_of_a_word() -> None:
+    # Taken as "free-" broken at a line end, "-" would join it into "free-",
+    # unknown, and leave "holding" alone: 0 instead of 1.
+    assert reading_score(_layer("-", "free-", "holding"), _WORD_LIST) == 1
+
+
+def test_reading_score_counts_a_broken_word_of_unknown_parts_once_as_unknown() -> None:
+    assert reading_score(_layer("satel-", "lites."), _WORD_LIST) == -1
+
+
+def test_reading_score_does_not_join_a_hyphen_before_a_number() -> None:
+    # "free-" alone is unknown (its key keeps the hyphen); "1066" is known.
+    assert reading_score(_layer("free-", "1066"), _WORD_LIST) == 0
+
+
+def test_reading_score_counts_punctuation_as_neither_known_nor_unknown() -> None:
+    assert reading_score(_layer("."), _WORD_LIST) == 0
+    assert reading_score(_layer("—", "‘"), _WORD_LIST) == 0
+
+
+def test_reading_score_of_no_words_is_zero() -> None:
+    assert reading_score((), _WORD_LIST) == 0
+
+
+# is_small_print_page
+
+_MEASURES = BookMeasures(
+    column_width=300,
+    body_word_height=10,
+    body_line_pitch=14,
+    usual_left_edge=frozendict({0: 50.0, 1: 50.0}),
+    cut_in_inset_left=None,
+    cut_in_inset_right=None,
+)
+# A small row's words are at most 0.85 of the body word height, 10 pt.
+_SMALL_PT = 7
+_FULL_PT = 10
+
+
+def _row(top: float, height: float, count: int) -> tuple[Word, ...]:
+    """`count` words spread across the column, 50 to 350 pt; one word sits
+    in its middle."""
+    if count == 1:
+        return (_word("12", 190, top, 210, top + height),)
+    step = 300 / count
+    return tuple(
+        _word(
+            "index", 50 + step * index, top, 50 + step * (index + 1) - 5, top + height
+        )
+        for index in range(count)
+    )
+
+
+def _page(rows: tuple[tuple[float, int], ...], *, first_top: float = 80) -> PageWords:
+    """A page of `rows`, each its words' height and count, 14 pt apart."""
+    words = tuple(
+        word
+        for index, (height, count) in enumerate(rows)
+        for word in _row(first_top + 14 * index, height, count)
+    )
+    return PageWords(
+        index=4, text_source=TextSource.TEXT_LAYER, words=words, figures=()
+    )
+
+
+def _with_words(page: PageWords, words: tuple[Word, ...]) -> PageWords:
+    return replace(page, words=(*words, *page.words))
+
+
+def test_page_of_50_words_in_small_rows_is_small_print() -> None:
+    page = _page(((_SMALL_PT, 5),) * 10)
+    assert len(page.words) == 50
+    assert is_small_print_page(page, _MEASURES)
+
+
+def test_page_of_49_words_in_small_rows_is_not_small_print() -> None:
+    page = _page((*((_SMALL_PT, 5),) * 9, (_SMALL_PT, 4)))
+    assert len(page.words) == 49
+    assert not is_small_print_page(page, _MEASURES)
+
+
+def test_page_of_17_small_rows_of_20_is_small_print() -> None:
+    page = _page((*((_SMALL_PT, 3),) * 17, *((_FULL_PT, 3),) * 3))
+    assert is_small_print_page(page, _MEASURES)
+
+
+def test_page_of_16_small_rows_of_20_is_not_small_print() -> None:
+    page = _page((*((_SMALL_PT, 3),) * 16, *((_FULL_PT, 3),) * 4))
+    assert not is_small_print_page(page, _MEASURES)
+
+
+def test_running_head_of_full_size_words_does_not_count() -> None:
+    # Counted, the head would make 17 small rows of 21, under 0.85.
+    page = _page((*((_SMALL_PT, 3),) * 17, *((_FULL_PT, 3),) * 3))
+    head = tuple(replace(word, text="HISTORY") for word in _row(40, _FULL_PT, 3))
+    assert is_small_print_page(_with_words(page, head), _MEASURES)
+
+
+def test_rows_of_one_word_do_not_count() -> None:
+    # Counted, the five page numbers would make 17 small rows of 25.
+    page = _page(
+        (*((_SMALL_PT, 3),) * 17, *((_FULL_PT, 3),) * 3, *((_FULL_PT, 1),) * 5)
+    )
+    assert is_small_print_page(page, _MEASURES)
+
+
+def test_rows_of_0_85_of_the_body_word_height_are_small() -> None:
+    assert is_small_print_page(_page(((8.5, 5),) * 10), _MEASURES)
+
+
+def test_rows_above_0_85_of_the_body_word_height_are_not_small() -> None:
+    assert not is_small_print_page(_page(((8.6, 5),) * 10), _MEASURES)
+
+
+def test_page_of_full_size_rows_is_not_small_print() -> None:
+    assert not is_small_print_page(_page(((_FULL_PT, 5),) * 12), _MEASURES)
+
+
+def test_small_margin_words_do_not_count_as_column_rows() -> None:
+    # 4 full-size rows of the column, then 30 rows of a small margin note
+    # of two words on the left, outside the column: counted, they would
+    # make 30 small rows of 34.
+    page = _page(((_FULL_PT, 5),) * 4)
+    margin = tuple(
+        word
+        for index in range(30)
+        for word in (
+            _word("Moral", 5, 140 + 8 * index, 20, 146 + 8 * index),
+            _word("lessons", 22, 140 + 8 * index, 40, 146 + 8 * index),
+        )
+    )
+    assert not is_small_print_page(_with_words(page, margin), _MEASURES)
+
+
+# note_bands
+
+
+def _strip(*blocks: tuple[int, int, int, int]) -> Image.Image:
+    """A white strip 100 by 300 px with black `blocks`, each (left, top,
+    right, bottom), the right and bottom pixels not inked."""
+    image = Image.new("L", (100, 300), 255)
+    draw = ImageDraw.Draw(image)
+    for left, top, right, bottom in blocks:
+        draw.rectangle((left, top, right - 1, bottom - 1), fill=0)
+    return image
+
+
+def test_blocks_of_ink_30_px_apart_are_two_bands_cropped_to_ink_plus_6_px() -> None:
+    bands = note_bands(_strip((10, 10, 60, 30), (20, 60, 90, 80)), dpi=OCR_DPI)
+    assert bands == ((4, 4, 66, 36), (14, 54, 96, 86))
+
+
+def test_blocks_of_ink_15_px_apart_are_one_band() -> None:
+    assert note_bands(_strip((10, 10, 60, 30), (20, 45, 90, 65)), dpi=OCR_DPI) == (
+        (4, 4, 96, 71),
+    )
+
+
+def test_block_10_px_high_is_no_band() -> None:
+    assert note_bands(_strip((10, 10, 60, 20)), dpi=OCR_DPI) == ()
+
+
+def test_block_20_px_wide_is_no_band() -> None:
+    assert note_bands(_strip((10, 10, 30, 30)), dpi=OCR_DPI) == ()
+
+
+def test_band_of_fewer_than_150_ink_pixels_is_no_band() -> None:
+    # Two vertical lines 40 px apart, 2 px wide and 30 px high: 120 pixels,
+    # 42 px wide and 30 high.
+    assert note_bands(_strip((10, 10, 12, 40), (50, 10, 52, 40)), dpi=OCR_DPI) == ()
+
+
+def test_rows_of_one_ink_pixel_are_not_inked() -> None:
+    # A line 1 px wide joins nothing: the two blocks stay two bands.
+    image = _strip((10, 10, 60, 30), (10, 60, 60, 80), (80, 30, 81, 60))
+    assert note_bands(image, dpi=OCR_DPI) == ((4, 4, 66, 36), (4, 54, 66, 86))
+
+
+def test_light_grey_is_not_ink() -> None:
+    image = Image.new("L", (100, 300), 255)
+    ImageDraw.Draw(image).rectangle((10, 10, 59, 29), fill=140)
+    assert note_bands(image, dpi=OCR_DPI) == ()
+
+
+def test_band_crop_stays_inside_the_strip() -> None:
+    assert note_bands(_strip((0, 0, 100, 20)), dpi=OCR_DPI) == ((0, 0, 100, 26),)
+
+
+# The crops
+
+
+def test_note_bands_of_a_strip_not_at_300_dpi_raise() -> None:
+    with pytest.raises(ValueError, match="150 dpi"):
+        note_bands(_strip((10, 10, 60, 30)), dpi=150)
+
+
+def test_pixel_box_holds_the_points_box_at_the_dpi() -> None:
+    # At 300 dpi a point is 300/72 px: 10 pt is 41.67 px, 20 pt 83.33 px.
+    assert pixel_box(Box(10, 100, 20, 110), 300) == (41, 416, 84, 459)
+
+
+def test_small_print_crop_starts_1_pt_below_the_running_head() -> None:
+    assert small_print_crop(page_width=400, page_height=600, head_bottom=50) == Box(
+        0, 51, 400, 600
+    )
+
+
+def test_small_print_crop_without_running_head_is_the_whole_page() -> None:
+    assert small_print_crop(page_width=400, page_height=600, head_bottom=None) == Box(
+        0, 0, 400, 600
+    )
+
+
+def test_margin_strip_runs_from_4_pt_inside_the_page_to_4_pt_off_the_column() -> None:
+    common = {"left": 50, "right": 350, "column_top": 60, "lowest": 560}
+    assert margin_strip(Side.LEFT, page_width=400, **common) == Box(4, 56, 46, 564)
+    assert margin_strip(Side.RIGHT, page_width=400, **common) == Box(354, 56, 396, 564)
+
+
+def test_cut_in_crop_is_the_zone_widened_by_2_5_pitches_up_to_the_inset() -> None:
+    # A pitch of 14 pt widens the zone by 35 pt above and below; the crop
+    # runs from 3 pt outside the column's edge to 3 pt short of the inset.
+    left = cut_in_crops(
+        ((200, 220),), Side.LEFT, edge=50, inset=60, pitch=14, head_bottom=None
+    )
+    right = cut_in_crops(
+        ((200, 220),), Side.RIGHT, edge=350, inset=60, pitch=14, head_bottom=None
+    )
+    assert left == (CutInCrop(Box(47, 165, 107, 255), ((200, 220),)),)
+    assert right == (CutInCrop(Box(293, 165, 353, 255), ((200, 220),)),)
+
+
+def test_cut_in_zones_whose_crops_overlap_are_one_crop() -> None:
+    crops = cut_in_crops(
+        ((200, 220), (260, 280), (400, 420)),
+        Side.LEFT,
+        edge=50,
+        inset=60,
+        pitch=14,
+        head_bottom=None,
+    )
+    assert crops == (
+        CutInCrop(Box(47, 165, 107, 315), ((200, 220), (260, 280))),
+        CutInCrop(Box(47, 365, 107, 455), ((400, 420),)),
+    )
+
+
+def test_cut_in_crop_stops_1_pt_below_the_running_head() -> None:
+    crops = cut_in_crops(
+        ((200, 220),), Side.LEFT, edge=50, inset=60, pitch=14, head_bottom=180
+    )
+    assert crops == (CutInCrop(Box(47, 181, 107, 255), ((200, 220),)),)
+
+
+def test_footnote_band_crop_is_3_pt_outside_the_column_and_the_band() -> None:
+    band = (_word("1", 60, 500, 200, 507), _word("note", 55, 510, 340, 517))
+    assert footnote_band_crop(band, left=50, right=350) == Box(47, 497, 353, 520)
+
+
+# The replacement
+
+
+def _page_of(words: tuple[Word, ...], index: int = 7) -> PageWords:
+    return PageWords(
+        index=index, text_source=TextSource.TEXT_LAYER, words=words, figures=()
+    )
+
+
+def _check_fidelity(page: PageWords, rereads: tuple[Reread, ...]) -> None:
+    """layout's fidelity check on `page` laid out as one region of the
+    words `words_after_rereads` gives."""
+    after = words_after_rereads(page.words, rereads)
+    lines = group_rows(after)
+    region = Region(
+        Box(
+            min(line.box.x0 for line in lines),
+            min(line.box.top for line in lines),
+            max(line.box.x1 for line in lines),
+            max(line.box.bottom for line in lines),
+        ),
+        lines,
+    )
+    check_stage(
+        FidelityBoundary.LAYOUT,
+        WordsFile(source_pdf_sha256="0" * 64, pages=(page,), removals=()),
+        LinesFile(
+            source_pdf_sha256="0" * 64,
+            pages=(PageLayout(page.index, (region,), ()),),
+            rereads=rereads,
+        ),
+    )
+
+
+# A margin note of two lines on the left of a column whose left edge is
+# 50 pt, "Moral" and a word the layer split in two, "les-" "sons"; two
+# single letters of the layer just inside the column, under Tesseract's
+# "Moral"; a body word beside the note; a margin word below the band.
+_MORAL = _word("Moral", 10, 100, 40, 108)
+_LES = _word("les-", 10, 115, 24, 123)
+_SONS = _word("sons", 26, 115, 40, 123)
+_LETTER_O = _word("o", 48.5, 101, 49.5, 107)
+_LETTER_A = _word("a", 48.2, 102, 49, 106)
+_BODY_THE = _word("The", 60, 110, 80, 118)
+_BELOW = _word("Fall", 10, 300, 30, 308)
+_MARGIN_PAGE = _page_of((_MORAL, _LES, _SONS, _LETTER_O, _LETTER_A, _BODY_THE, _BELOW))
+_BAND = Box(8, 98, 46, 130)
+_OCR_MORAL = _ocr("Moral", 10, 100, 49, 108)
+_OCR_LESSONS = _ocr("lessons.", 10, 115, 40, 123)
+
+
+def _margin_rereads() -> tuple[Reread, ...]:
+    reading = margin_note_reading(
+        Side.LEFT,
+        _BAND,
+        (_OCR_MORAL, _OCR_LESSONS),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    return page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST, page_words=())
+
+
+def test_margin_note_replaces_its_words_and_the_letters_under_tesseract_words() -> None:
+    (record,) = _margin_rereads()
+    assert record.page_index == 7
+    assert record.kind is RereadKind.MARGIN_NOTE
+    assert record.box == _BAND
+    assert record.layer_words == (_MORAL, _LES, _SONS, _LETTER_O, _LETTER_A)
+    assert record.ocr_words == (_OCR_MORAL, _OCR_LESSONS)
+    # "Moral" and "les-" "sons" known, "o" and "a" unknown.
+    assert (record.layer_score, record.ocr_score) == (0, 2)
+    assert record.kept
+
+
+def test_kept_margin_note_keeps_the_body_word_beside_it() -> None:
+    after = words_after_rereads(_MARGIN_PAGE.words, _margin_rereads())
+    assert sorted(_texts(after)) == sorted(("The", "Fall", "Moral", "lessons."))
+
+
+def test_margin_note_rereads_pass_the_fidelity_check() -> None:
+    _check_fidelity(_MARGIN_PAGE, _margin_rereads())
+
+
+def test_margin_note_reading_scoring_lower_keeps_the_layer() -> None:
+    reading = margin_note_reading(
+        Side.LEFT,
+        _BAND,
+        (_ocr("id", 10, 100, 20, 108), _ocr("i", 22, 100, 24, 108)),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    assert not record.kept
+    assert words_after_rereads(_MARGIN_PAGE.words, (record,)) == _MARGIN_PAGE.words
+
+
+def test_band_with_no_layer_word_and_no_reading_is_not_recorded() -> None:
+    reading = margin_note_reading(
+        Side.LEFT,
+        Box(8, 400, 46, 420),
+        (),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    assert page_rereads(7, (reading,), _WORD_LIST, page_words=()) == ()
+
+
+def test_tesseract_junk_of_no_letter_or_digit_is_dropped_and_counted() -> None:
+    # A pencil curve beside a note read as "|", "¥" and "\\" (Gierke page
+    # 127); punctuation and printed signs stay.
+    reading = margin_note_reading(
+        Side.LEFT,
+        _BAND,
+        (
+            _ocr("|", 2, 98, 4, 130),
+            _OCR_MORAL,
+            _ocr("¥", 42, 100, 44, 108),
+            _ocr("\\", 2, 110, 4, 118),
+            _OCR_LESSONS,
+            _ocr("—", 42, 115, 46, 123),
+            _ocr("§", 2, 120, 4, 128),
+        ),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST, page_words=())
+    assert _texts(record.ocr_words) == ("Moral", "lessons.", "—", "§")
+    assert record.dropped_junk_count == 3
+    assert record.kept
+
+
+def test_underscore_at_the_ends_of_a_tesseract_word_is_stripped_and_counted() -> None:
+    # Gierke page 88: "and" read "_and"; no book prints an underscore. "__"
+    # alone is junk, dropped and counted as before.
+    reading = margin_note_reading(
+        Side.LEFT,
+        _BAND,
+        (
+            _ocr("_Moral_", 10, 100, 49, 108),
+            _ocr("__", 42, 110, 46, 114),
+            _ocr("_lessons.", 10, 115, 40, 123),
+        ),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST, page_words=())
+    assert _texts(record.ocr_words) == ("Moral", "lessons.")
+    assert record.ocr_words[0].box == Box(10, 100, 49, 108)
+    assert record.dropped_junk_count == 3
+    assert record.kept
+
+
+def test_region_of_tesseract_junk_alone_over_no_layer_word_is_recorded() -> None:
+    reading = margin_note_reading(
+        Side.LEFT,
+        Box(8, 400, 46, 420),
+        (_ocr("~", 10, 402, 20, 410), _ocr("|", 22, 400, 24, 418)),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    assert (record.ocr_words, record.layer_words) == ((), ())
+    assert record.dropped_junk_count == 2
+    assert not record.kept
+
+
+def test_note_the_layer_did_not_read_is_kept() -> None:
+    reading = margin_note_reading(
+        Side.LEFT,
+        Box(8, 400, 46, 420),
+        (_ocr("Moral", 10, 402, 40, 410), _ocr("lessons.", 10, 410, 40, 418)),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    assert record.layer_words == ()
+    assert record.kept
+
+
+def _band_over_nothing(
+    *texts: str,
+    confidences: tuple[float, ...] = (),
+    page_words: tuple[Word, ...] = (),
+) -> Reread:
+    """The record of a note band where the layer has no word, read by
+    Tesseract as `texts` on one row, at `confidences` in order (90 for
+    each word past their end), on a page of `_MARGIN_PAGE`'s words and
+    `page_words`."""
+    words = (*_MARGIN_PAGE.words, *page_words)
+    reading = margin_note_reading(
+        Side.LEFT,
+        Box(8, 400, 46, 420),
+        tuple(
+            Word(
+                text,
+                Box(10 + 12 * index, 402, 20 + 12 * index, 410),
+                confidences[index] if index < len(confidences) else 90.0,
+            )
+            for index, text in enumerate(texts)
+        ),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=words)
+    return record
+
+
+def test_band_over_no_layer_word_read_as_one_known_word_of_3_letters_is_not_kept() -> (
+    None
+):
+    # Gierke page 120: "af" over nothing, score 1 against 0. A word of
+    # fewer than 4 letters is no sure single word (reocr spec, section 3).
+    record = _band_over_nothing("the")
+    assert (record.layer_score, record.ocr_score) == (0, 1)
+    assert not record.kept
+
+
+def test_band_over_no_layer_word_read_as_one_sure_word_is_kept() -> None:
+    # Stubbs page 63: "Coronation." over nothing at a confidence of 97; a
+    # word of 4 letters at 80 is enough.
+    assert _band_over_nothing("Coronation.", confidences=(97.0,)).kept
+    assert _band_over_nothing("Next", confidences=(80.0,)).kept
+
+
+def test_band_over_no_layer_word_read_as_a_word_broken_at_a_line_end_is_scored() -> (
+    None
+):
+    # Domesday page 325: "The pre- cariun." over nothing, the broken word
+    # scored once; it is no sure single word, and the record is made.
+    record = _band_over_nothing("Next", "pre-", "cariun.")
+    assert record.ocr_score == 0
+    assert not record.kept
+
+
+def test_band_over_no_layer_word_with_one_known_word_and_an_unknown_is_not_kept() -> (
+    None
+):
+    # "Coronation qzx", every word at 90: a tie at 0, no sure single word
+    # beside an unknown word (reocr spec, section 3).
+    record = _band_over_nothing("Coronation", "qzx")
+    assert (record.layer_score, record.ocr_score) == (0, 0)
+    assert not record.kept
+    assert _band_over_nothing("Coronation", ".").kept
+
+
+def test_band_over_no_layer_word_tying_at_0_with_2_known_words_is_kept() -> None:
+    # Domesday page 53: "Preedial element in serfage.", 3 known words of 4
+    # here 2 known and 2 unknown, a tie at 0 (reocr spec, section 3).
+    record = _band_over_nothing("xq", "Moral", "lessons.", "qz")
+    assert (record.layer_score, record.ocr_score) == (0, 0)
+    assert record.kept
+
+
+def test_band_over_no_layer_word_read_as_one_known_word_at_79_is_not_kept() -> None:
+    assert not _band_over_nothing("Moral", confidences=(79.0,)).kept
+
+
+def test_band_over_no_layer_word_with_a_second_word_under_80_is_not_kept() -> None:
+    assert _band_over_nothing("Moral", ".", confidences=(90.0, 80.0)).kept
+    assert not _band_over_nothing("Moral", ".", confidences=(90.0, 79.0)).kept
+
+
+def test_band_over_no_layer_word_read_as_one_word_a_layer_word_may_read_is_not_kept() -> (
+    None
+):
+    # Stubbs page 181: the note's "Lewis." beside the body's "Lewis", which
+    # could then be read twice. A layer word of the same letters 10 pt
+    # below the Tesseract word may read it (model.may_read); 20 pt below,
+    # it may not.
+    assert _band_over_nothing("Lessons.").kept
+    assert not _band_over_nothing(
+        "Lessons.", page_words=(_word("lessons", 120, 412, 150, 420),)
+    ).kept
+    assert _band_over_nothing(
+        "Lessons.", page_words=(_word("lessons", 120, 422, 150, 430),)
+    ).kept
+
+
+def test_band_over_no_layer_word_with_2_known_words_and_1_unknown_is_kept() -> None:
+    record = _band_over_nothing("Moral", "xq", "lessons.")
+    assert record.ocr_score == 1
+    assert record.kept
+
+
+# A cut-in crop at the left of a column whose left edge is 50 pt, with an
+# inset of 60 pt: the crop runs from 47 to 107 pt, and a note word ends by
+# 106 pt.
+_CROP = CutInCrop(Box(47, 165, 107, 255), ((200, 220),))
+_TANCE = _word("tance", 52, 200, 80, 208)
+_CHANGE = _word("change", 60, 170, 100, 180)
+_BODY_AN = _word("an", 70, 240, 82, 250)
+_HE_BARONS = _word("heBarons", 52, 211, 100, 219)
+_BESIDE = _word("word", 104, 212, 130, 220)
+_CUT_IN_PAGE = _page_of((_CHANGE, _TANCE, _HE_BARONS, _BESIDE, _BODY_AN))
+_OCR_TANCE = _ocr("tance.", 52, 199, 82, 209)
+_OCR_THE = _ocr("the", 52, 210, 64, 220)
+_OCR_BARONS = _ocr("Barons.", 66, 210, 99, 220)
+_OCR_LINES = (
+    # Junk read off a full body line: "NE" over "change".
+    (_ocr("NE", 62, 171, 90, 179),),
+    (_OCR_TANCE,),
+    (_OCR_THE, _OCR_BARONS),
+    # A body line that runs on to within 3 pt of the crop's inset side.
+    (
+        _ocr("he", 48, 230, 58, 238),
+        _ocr("was", 62, 230, 80, 238),
+        _ocr("dd", 85, 230, 105, 238),
+    ),
+    # "an" read over the body's "an".
+    (_ocr("an", 70, 241, 82, 249),),
+)
+
+
+def _cut_in_rereads() -> tuple[Reread, ...]:
+    reading = cut_in_reading(
+        Side.LEFT,
+        _CROP,
+        _OCR_LINES,
+        edge=50,
+        inset=60,
+        cut_in_words=(_TANCE,),
+        column_words=(_CHANGE, _HE_BARONS, _BESIDE, _BODY_AN),
+    )
+    return page_rereads(_CUT_IN_PAGE.index, (reading,), _WORD_LIST, page_words=())
+
+
+def test_cut_in_crop_drops_tesseract_words_over_body_words_and_lines_at_the_inset() -> (
+    None
+):
+    (record,) = _cut_in_rereads()
+    assert record.kind is RereadKind.CUT_IN_NOTE
+    assert record.box == _CROP.box
+    assert record.ocr_words == (_OCR_TANCE, _OCR_THE, _OCR_BARONS)
+
+
+def test_cut_in_crop_replaces_a_column_word_of_a_zone_row_left_of_the_inset() -> None:
+    (record,) = _cut_in_rereads()
+    assert record.layer_words == (_TANCE, _HE_BARONS)
+    assert (record.layer_score, record.ocr_score) == (-2, 1)
+    assert record.kept
+    after = words_after_rereads(_CUT_IN_PAGE.words, (record,))
+    assert sorted(_texts(after)) == sorted(
+        ("change", "word", "an", "tance.", "the", "Barons.")
+    )
+    _check_fidelity(_CUT_IN_PAGE, (record,))
+
+
+def test_cut_in_reading_with_no_word_left_replaces_nothing() -> None:
+    # The layer's note word is unknown, so an empty reading would score
+    # higher; every word of Tesseract's lies over a body word, so no
+    # word of Tesseract's lies over the note, and nothing is recorded.
+    note = _word("Dspnsrs,", 52, 200, 90, 208)
+    reading = cut_in_reading(
+        Side.LEFT,
+        _CROP,
+        ((_ocr("NE", 62, 171, 90, 179),), (_ocr("an", 70, 241, 82, 249),)),
+        edge=50,
+        inset=60,
+        cut_in_words=(note,),
+        column_words=(_CHANGE, _BODY_AN),
+    )
+    assert page_rereads(7, (reading,), _WORD_LIST, page_words=()) == ()
+
+
+def test_reading_scoring_the_same_as_the_layer_keeps_the_layer() -> None:
+    page = _page_of((_MORAL,))
+    reading = margin_note_reading(
+        Side.LEFT, _BAND, (_OCR_MORAL,), page_words=page.words, edge=50
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    assert (record.layer_score, record.ocr_score) == (1, 1)
+    assert not record.kept
+
+
+def _tie_with_moral(*ocr_words: Word) -> Reread:
+    """The record of a band whose layer reads "Moral" alone, read by
+    Tesseract as `ocr_words`."""
+    page = _page_of((_MORAL,))
+    reading = margin_note_reading(
+        Side.LEFT, _BAND, ocr_words, page_words=page.words, edge=50
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    return record
+
+
+def test_tie_with_more_known_words_in_tesseracts_reading_keeps_it() -> None:
+    # Haskins' index page 267: a tie at 250, Tesseract's reading holding
+    # 321 known words to the layer's 303 (reocr spec, section 3). Here 2
+    # known words and 1 unknown against 1 known word.
+    record = _tie_with_moral(
+        _OCR_MORAL, _ocr("xq", 10, 115, 20, 123), _ocr("lessons.", 22, 115, 40, 123)
+    )
+    assert (record.layer_score, record.ocr_score) == (1, 1)
+    assert record.kept
+
+
+def test_tie_with_as_many_known_words_and_more_words_keeps_the_layer() -> None:
+    record = _tie_with_moral(_OCR_MORAL, _ocr(".", 42, 100, 44, 108))
+    assert (record.layer_score, record.ocr_score) == (1, 1)
+    assert not record.kept
+
+
+def _cut_in_after(layer_word: Word, ocr_line: tuple[Word, ...]) -> tuple[str, ...]:
+    """The words of a page holding only `layer_word`, a word layout left in
+    the column, once _CROP, read by Tesseract as `ocr_line`, is applied."""
+    reading = cut_in_reading(
+        Side.LEFT,
+        _CROP,
+        (ocr_line,),
+        edge=50,
+        inset=60,
+        cut_in_words=(),
+        column_words=(layer_word,),
+    )
+    rereads = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    return _texts(words_after_rereads((layer_word,), rereads))
+
+
+# The inset lies at 110 pt: a note word ends at 106 pt or before, and a
+# line of Tesseract's ending at 104 pt or after is dropped.
+_OCR_BARONS_SHORT = _ocr("Barons.", 80, 211, 103.9, 219)
+
+
+def test_column_word_ending_4_pt_short_of_the_inset_is_replaced() -> None:
+    word = _word("Barns", 80, 211, 106, 219)
+    assert _cut_in_after(word, (_OCR_BARONS_SHORT,)) == ("Barons.",)
+
+
+def test_column_word_ending_less_than_4_pt_short_of_the_inset_is_not_replaced() -> None:
+    word = _word("Barns", 80, 211, 106.1, 219)
+    assert _cut_in_after(word, (_OCR_BARONS_SHORT,)) == ("Barns",)
+
+
+def test_column_word_whose_middle_is_1_pt_below_the_zone_is_replaced() -> None:
+    # The zone runs from 200 to 220 pt; the word's middle lies at 221 pt.
+    word = _word("Barns", 80, 217, 100, 225)
+    ocr_line = (_ocr("Barons.", 80, 217, 100, 225),)
+    assert _cut_in_after(word, ocr_line) == ("Barons.",)
+
+
+def test_column_word_whose_middle_is_more_than_1_pt_below_the_zone_stays() -> None:
+    word = _word("Barns", 80, 217.2, 100, 225.2)
+    ocr_line = (_ocr("Barons.", 80, 217, 100, 225),)
+    assert _cut_in_after(word, ocr_line) == ("Barns",)
+
+
+def test_tesseract_line_ending_3_pt_short_of_the_crop_side_is_dropped() -> None:
+    word = _word("Barns", 52, 211, 80, 219)
+    ocr_line = (_ocr("Barons.", 52, 211, 80, 219), _ocr("x", 90, 211, 104, 219))
+    assert _cut_in_after(word, ocr_line) == ("Barns",)
+
+
+def test_tesseract_line_ending_more_than_3_pt_short_of_the_crop_side_is_kept() -> None:
+    word = _word("Barns", 52, 211, 80, 219)
+    ocr_line = (_ocr("Barons.", 52, 211, 80, 219), _ocr("x", 90, 211, 103.9, 219))
+    assert _cut_in_after(word, ocr_line) == ("Barons.", "x")
+
+
+def test_cut_in_crop_at_the_right_side_mirrors_the_left() -> None:
+    # Right edge 350 pt, inset 60 pt: the crop runs from 293 to 353 pt, a
+    # note word starts at 294 pt or right of it.
+    crop = CutInCrop(Box(293, 165, 353, 255), ((200, 220),))
+    note = _word("Barns", 300, 211, 345, 219)
+    body = _word("body", 280, 170, 320, 180)
+    reading = cut_in_reading(
+        Side.RIGHT,
+        crop,
+        (
+            (_ocr("xx", 290, 171, 300, 179),),
+            (_ocr("the", 300, 210, 315, 220), _ocr("Barons.", 318, 210, 345, 220)),
+        ),
+        edge=350,
+        inset=60,
+        cut_in_words=(),
+        column_words=(note, body),
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    assert _texts(record.ocr_words) == ("the", "Barons.")
+    assert record.layer_words == (note,)
+    assert record.kept
+
+
+# Two regions of one page
+
+
+def test_second_of_two_overlapping_regions_takes_no_word_the_first_replaced() -> None:
+    moral = _word("Moral", 10, 100, 40, 108)
+    lesons = _word("lesons", 10, 121, 40, 129)
+    following = _word("Next", 10, 140, 40, 148)
+    page = _page_of((moral, lesons, following))
+    upper = margin_note_reading(
+        Side.LEFT,
+        Box(8, 98, 46, 130),
+        (_ocr("Moral", 10, 100, 40, 108), _ocr("lessons", 10, 121, 40, 129)),
+        page_words=page.words,
+        edge=50,
+    )
+    lower = margin_note_reading(
+        Side.LEFT,
+        Box(8, 125, 46, 160),
+        (_ocr("lessons", 10, 121, 40, 129), _ocr("Next", 10, 140, 40, 148)),
+        page_words=page.words,
+        edge=50,
+    )
+    # Given in either order, the upper band is taken first.
+    first, second = page_rereads(7, (lower, upper), _WORD_LIST, page_words=())
+    assert first.layer_words == (moral, lesons)
+    assert first.kept
+    assert second.layer_words == (following,)
+    assert _texts(second.ocr_words) == ("Next",)
+    _check_fidelity(page, (first, second))
+
+
+def _touching_bands() -> tuple[tuple[Word, Word], tuple[Reread, ...]]:
+    """Two note bands that touch: the lower reads again, 3 pt below the
+    upper's crop, the line "lessons" the upper read and kept. The layer
+    words "Moral" and "lesons", and the records."""
+    moral = _word("Moral", 10, 100, 40, 108)
+    lesons = _word("lesons", 10, 121, 40, 129)
+    page = _page_of((moral, lesons))
+    upper = margin_note_reading(
+        Side.LEFT,
+        Box(8, 98, 46, 126),
+        (_ocr("Moral", 10, 100, 40, 108), _ocr("lessons", 10, 121, 40, 129)),
+        page_words=page.words,
+        edge=50,
+    )
+    lower = margin_note_reading(
+        Side.LEFT,
+        Box(8, 124, 46, 160),
+        (_ocr("lessons", 10, 128, 40, 136), _ocr("free", 10, 140, 40, 148)),
+        page_words=page.words,
+        edge=50,
+    )
+    records = page_rereads(7, (upper, lower), _WORD_LIST, page_words=())
+    _check_fidelity(page, records)
+    return (moral, lesons), records
+
+
+def test_later_region_drops_a_word_an_earlier_kept_region_read() -> None:
+    _, (_, lower) = _touching_bands()
+    assert _texts(lower.ocr_words) == ("free",)
+
+
+def test_later_region_replaces_no_word_an_earlier_kept_region_replaced() -> None:
+    (moral, lesons), (upper, lower) = _touching_bands()
+    assert upper.layer_words == (moral, lesons)
+    assert upper.kept
+    assert lower.layer_words == ()
+
+
+def test_records_of_a_page_are_in_the_order_of_their_kinds_and_tops() -> None:
+    def reading(kind: str, side: Side, top: float) -> RegionReading:
+        x0 = 8 if side is Side.LEFT else 360
+        box = Box(x0, top, x0 + 38, top + 10)
+        word = _ocr("Next", x0 + 8, top + 1, x0 + 30, top + 9)
+        match kind:
+            case "margin":
+                return margin_note_reading(side, box, (word,), page_words=(), edge=50)
+            case "cut-in":
+                return cut_in_reading(
+                    side,
+                    CutInCrop(box, ((top, top + 10),)),
+                    ((word,),),
+                    edge=50 if side is Side.LEFT else 350,
+                    inset=60,
+                    cut_in_words=(),
+                    column_words=(),
+                )
+            case _:
+                return footnote_band_reading(box, (word,), band_words=())
+
+    readings = (
+        reading("footnote", Side.LEFT, 500),
+        reading("cut-in", Side.RIGHT, 150),
+        reading("margin", Side.RIGHT, 200),
+        reading("margin", Side.RIGHT, 100),
+        reading("cut-in", Side.LEFT, 300),
+        reading("margin", Side.LEFT, 100),
+    )
+    # No crop overlaps another, so every region is recorded.
+    records = page_rereads(7, readings, _WORD_LIST, page_words=())
+    assert tuple(
+        (record.kind, record.box.top, record.box.x0) for record in records
+    ) == (
+        (RereadKind.MARGIN_NOTE, 100, 8),
+        (RereadKind.MARGIN_NOTE, 100, 360),
+        (RereadKind.MARGIN_NOTE, 200, 360),
+        (RereadKind.CUT_IN_NOTE, 150, 360),
+        (RereadKind.CUT_IN_NOTE, 300, 8),
+        (RereadKind.FOOTNOTE_BAND, 500, 8),
+    )
+
+
+# A small-print page
+
+
+def test_small_print_page_replaces_every_word_but_its_running_head() -> None:
+    head = _word("INDEX", 150, 40, 250, 50)
+    margin = _word("Moral", 5, 100, 40, 107)
+    entries = (_word("Acre,", 60, 100, 90, 107), _word("siege", 95, 100, 130, 107))
+    page = _page_of((head, margin, *entries))
+    reading = small_print_reading(
+        Box(0, 51, 400, 600),
+        (
+            _ocr("Moral", 5, 100, 40, 107),
+            _ocr("Acre,", 60, 100, 90, 107),
+            _ocr("siege", 95, 100, 130, 107),
+            _ocr("of,", 135, 100, 150, 107),
+        ),
+        page_words=page.words,
+        head_words=(head,),
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    assert record.kind is RereadKind.SMALL_PRINT_PAGE
+    assert record.layer_words == (margin, *entries)
+    assert record.kept
+    _check_fidelity(page, (record,))
+
+
+def test_small_print_page_with_another_region_raises() -> None:
+    page = _page_of((_MORAL,))
+    whole = small_print_reading(
+        Box(0, 0, 400, 600), (), page_words=page.words, head_words=()
+    )
+    margin = margin_note_reading(Side.LEFT, _BAND, (), page_words=page.words, edge=50)
+    with pytest.raises(ValueError, match="small-print page"):
+        page_rereads(7, (whole, margin), _WORD_LIST, page_words=())
+
+
+def test_footnote_band_replaces_the_band_words() -> None:
+    band = (_word("^", 50, 500, 55, 507), _word("Ibid.", 58, 500, 80, 507))
+    page = _page_of((_BODY_THE, *band))
+    reading = footnote_band_reading(
+        Box(47, 497, 353, 510),
+        (_ocr("1", 50, 500, 55, 507), _ocr("Ibid.", 58, 500, 80, 507)),
+        band_words=band,
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    assert record.kind is RereadKind.FOOTNOTE_BAND
+    assert record.layer_words == band
+    # "1" is a number, so known; "^" is neither; "Ibid." is not in the list.
+    assert (record.layer_score, record.ocr_score) == (-1, 0)
+    assert record.kept
+    _check_fidelity(page, (record,))
+
+
+# Layer words no kept word of Tesseract's lies over stay (reocr spec,
+# section 4): the two cases of the first code review, 17 November 2026, a
+# cut-in crop at the left of a column whose left edge is 60 pt, with an
+# inset of 80 pt, so that the crop runs from 57 to 137 pt.
+
+
+def _review_word(
+    text: str, x0: float, top: float, *, width: float = 20, confidence: float | None
+) -> Word:
+    return Word(text, Box(x0, top, x0 + width, top + 6), confidence)
+
+
+_REVIEW_WORD_LIST = frozenset(
+    {"the", "king", "went", "north", "see", "stubbs", "page", "note", "hist"}
+)
+
+
+def test_cut_in_note_line_dropped_at_the_inset_keeps_the_layer_words() -> None:
+    # Tesseract's second note line ends with junk within 3 pt of the
+    # crop's side toward the inset, so the line is dropped; its layer
+    # words "wcnt nortb" stay.
+    notes = tuple(
+        _review_word(text, x0, top, confidence=None)
+        for text, x0, top in (
+            ("Tbe", 62, 600),
+            ("kinq", 84, 600),
+            ("wcnt", 62, 612),
+            ("nortb", 84, 612),
+        )
+    )
+    body = (_review_word("the", 150, 600, confidence=None),)
+    (crop,) = cut_in_crops(
+        ((600.0, 618.0),),
+        Side.LEFT,
+        edge=60.0,
+        inset=80.0,
+        pitch=12.0,
+        head_bottom=None,
+    )
+    ocr_lines = (
+        (
+            _review_word("The", 62, 600, confidence=90),
+            _review_word("king", 84, 600, confidence=90),
+        ),
+        (
+            _review_word("went", 62, 612, confidence=90),
+            _review_word("north", 84, 612, confidence=90),
+            _review_word("x", 125, 612, width=10, confidence=30),
+        ),
+    )
+    reading = cut_in_reading(
+        Side.LEFT,
+        crop,
+        ocr_lines,
+        edge=60.0,
+        inset=80.0,
+        cut_in_words=notes,
+        column_words=body,
+    )
+    (record,) = page_rereads(5, (reading,), _REVIEW_WORD_LIST, page_words=())
+    assert record.kept
+    assert _texts(record.layer_words) == ("Tbe", "kinq")
+    assert _texts(record.ocr_words) == ("The", "king")
+    page = _page_of((*body, *notes), index=5)
+    assert sorted(_texts(words_after_rereads(page.words, (record,)))) == sorted(
+        ("the", "The", "king", "wcnt", "nortb")
+    )
+    _check_fidelity(page, (record,))
+
+
+def _note_and_band(note_reading: str) -> tuple[PageWords, tuple[RegionReading, ...]]:
+    """A page with a cut-in note "nota" and a footnote band whose first two
+    words lie inside the note's crop, Tesseract reading the note as
+    `note_reading`, and the band right."""
+    note = _review_word("nota", 62, 600, width=30, confidence=None)
+    body = (
+        _review_word("the", 150, 600, confidence=None),
+        _review_word("king", 200, 600, confidence=None),
+    )
+    band = tuple(
+        _review_word(text, x0, 632, width=width, confidence=None)
+        for text, x0, width in (
+            ("Sce", 62, 20),
+            ("Stnbbs", 90, 30),
+            ("Pagc", 150, 20),
+            ("hist.", 200, 20),
+        )
+    )
+    (crop,) = cut_in_crops(
+        ((600.0, 606.0),),
+        Side.LEFT,
+        edge=60.0,
+        inset=80.0,
+        pitch=12.0,
+        head_bottom=None,
+    )
+    cut_in = cut_in_reading(
+        Side.LEFT,
+        crop,
+        ((_review_word(note_reading, 62, 600, width=30, confidence=90),),),
+        edge=60.0,
+        inset=80.0,
+        cut_in_words=(note,),
+        column_words=(*body, *band),
+    )
+    footnotes = footnote_band_reading(
+        footnote_band_crop(band, left=60.0, right=400.0),
+        tuple(
+            replace(word, text=text, ocr_confidence=90.0)
+            for word, text in zip(band, ("See", "Stubbs", "page", "hist."), strict=True)
+        ),
+        band_words=band,
+    )
+    return _page_of((*body, note, *band), index=5), (cut_in, footnotes)
+
+
+def test_band_words_inside_an_earlier_kept_crop_keep_the_layer_words() -> None:
+    # The cut-in crop, kept, runs down to 636 pt and holds the middles of
+    # Tesseract's "See" and "Stubbs" of the band: they are dropped, and
+    # the layer's "Sce Stnbbs" stay.
+    page, readings = _note_and_band("note")
+    cut_in, footnotes = page_rereads(5, readings, _REVIEW_WORD_LIST, page_words=())
+    assert cut_in.kept
+    assert footnotes.kept
+    assert _texts(footnotes.layer_words) == ("Pagc", "hist.")
+    assert _texts(footnotes.ocr_words) == ("page", "hist.")
+    after = words_after_rereads(page.words, (cut_in, footnotes))
+    assert sorted(_texts(after)) == sorted(
+        ("the", "king", "note", "Sce", "Stnbbs", "page", "hist.")
+    )
+    _check_fidelity(page, (cut_in, footnotes))
+
+
+def test_band_words_inside_an_earlier_crop_not_kept_are_read_by_the_band() -> None:
+    # Tesseract reads the note "nxta", unknown as the layer's "nota": a
+    # tie, so the crop is not kept and drops nothing from the band.
+    page, readings = _note_and_band("nxta")
+    cut_in, footnotes = page_rereads(5, readings, _REVIEW_WORD_LIST, page_words=())
+    assert not cut_in.kept
+    assert footnotes.kept
+    assert _texts(footnotes.layer_words) == ("Sce", "Stnbbs", "Pagc", "hist.")
+    assert _texts(footnotes.ocr_words) == ("See", "Stubbs", "page", "hist.")
+    _check_fidelity(page, (cut_in, footnotes))
+
+
+def test_margin_word_outside_the_strip_with_no_tesseract_word_over_it_stays() -> None:
+    # "I." lies between the strip's edge, 46 pt, and the column's, 50 pt,
+    # within the band's top and bottom; Tesseract, which reads the strip
+    # only, reads "Moral" over the layer's "Moial" and nothing over it.
+    garbled = _word("Moial", 10, 100, 40, 108)
+    outside = _word("I.", 46.5, 101, 49.5, 107)
+    page = _page_of((garbled, outside, _BODY_THE))
+    reading = margin_note_reading(
+        Side.LEFT,
+        _BAND,
+        (_ocr("Moral", 10, 100, 40, 108),),
+        page_words=page.words,
+        edge=50,
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST, page_words=())
+    assert record.layer_words == (garbled,)
+    assert record.kept
+    after = words_after_rereads(page.words, (record,))
+    assert sorted(_texts(after)) == sorted(("Moral", "I.", "The"))
+    _check_fidelity(page, (record,))
+
+
+# The fidelity check of the records
+
+
+def test_fidelity_check_fails_on_a_kept_record_naming_a_word_the_page_lacks() -> None:
+    (record,) = _margin_rereads()
+    ghost = _word("Ghost", 10, 140, 40, 148)
+    wrong = replace(record, layer_words=(*record.layer_words, ghost))
+    with pytest.raises(FidelityError, match="does not have"):
+        _check_fidelity(_MARGIN_PAGE, (wrong,))
+
+
+def test_fidelity_check_fails_on_two_kept_records_naming_one_word() -> None:
+    (record,) = _margin_rereads()
+    twice = replace(record, ocr_words=())
+    with pytest.raises(FidelityError, match="two kept rereads"):
+        _check_fidelity(_MARGIN_PAGE, (record, twice))
+
+
+# margin_note_sides (reocr spec, section 3, kind 2)
+
+
+def _split(left_margin: tuple[str, ...]) -> ColumnSplit:
+    """A page's words placed by a column at 50 to 250 pt, with `left_margin`
+    as its left margin words and none on the right."""
+    return ColumnSplit(
+        left=50.0,
+        right=250.0,
+        left_margin=tuple(
+            Word(text, Box(10, 100 + 10 * row, 40, 108 + 10 * row), None)
+            for row, text in enumerate(left_margin)
+        ),
+        right_margin=(),
+        column=(),
+    )
+
+
+def test_side_with_2_known_margin_words_on_10_of_100_pages_has_margin_notes() -> None:
+    pages = (
+        *((50, _split(("Stephen", "Blois"))),) * 10,
+        *((50, _split(())),) * 90,
+    )
+    assert margin_note_sides(pages, _WORD_LIST) == frozenset({Side.LEFT})
+
+
+def test_side_with_2_known_margin_words_on_9_of_100_pages_has_none() -> None:
+    pages = (*((50, _split(("Stephen", "Blois"))),) * 9, *((50, _split(())),) * 91)
+    assert margin_note_sides(pages, _WORD_LIST) == frozenset()
+
+
+def test_margin_with_1_known_word_and_1_unknown_counts_no_page() -> None:
+    pages = ((50, _split(("Stephen", "xqz"))),)
+    assert margin_note_sides(pages, _WORD_LIST) == frozenset()
+
+
+def test_pages_of_fewer_than_50_words_are_not_counted() -> None:
+    pages = (
+        (50, _split(("Stephen", "Blois"))),
+        *((49, _split(())),) * 20,
+    )
+    assert margin_note_sides(pages, _WORD_LIST) == frozenset({Side.LEFT})
+    assert margin_note_sides(((49, _split(("Stephen", "Blois"))),), _WORD_LIST) == (
+        frozenset()
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "known"),
+    [
+        ("Devonshire,", True),  # Domesday page 547, printed so
+        ("(Moral).", True),
+        ("1165.", True),
+        ("lo/.,", False),  # Haskins page 267: "lo" is in the list, "/" stays
+        ("164Jf.;", False),
+        ("Godofali", False),
+    ],
+)
+def test_layer_word_known_as_printed_has_no_mark_inside(text: str, known: bool) -> None:
+    words = frozenset({"devonshire", "moral", "lo"})
+    assert _is_known_as_printed(text, words) is known
+
+
+def test_reading_with_a_word_broken_at_a_line_end_has_no_sure_single_word() -> None:
+    # "Next" known, "pre-" "cariun." a broken word scored once (unknown here).
+    words = (
+        _ocr("Next", 10, 100, 30, 108),
+        _ocr("pre-", 10, 110, 30, 118),
+        _ocr("cariun.", 10, 120, 40, 128),
+    )
+    assert not _is_sure_single_word(words, (1, -1), ())
+    assert _is_sure_single_word(words[:1], (1,), ())
