@@ -241,8 +241,8 @@ but was fitted on 16 books only.
 The formats are frozen dataclasses in `src/galley/model.py`, with tuples
 for sequences, `frozendict` (a built-in type of Python 3.15) for
 mappings, `StrEnum` for finite sets, and floats for positions. Each file
-has a `format_version` int: 2 for `pages.json`, `words.json`,
-`lines.json` and `blocks.json`, 1 for the others.
+has a `format_version` int: 3 for `blocks.json`, 2 for `pages.json`,
+`words.json` and `lines.json`, 1 for the others.
 `blocks.json` went to 2 with the second plan of structure (16 November
 2026), which added `Note.kind`, `Block.label`, the block kinds `verse`
 and `chapter_summary` and the removal reason `guide_words`; reading a
@@ -251,7 +251,9 @@ file of version 1 is the error below, and the owner reruns structure.
 page kind and the removal reason `front_matter`
 (`docs/specs/front-matter.md`); the owner reruns analyze. `lines.json`
 went to 2 the same day, with `rereads` (`docs/specs/reocr.md`); the
-owner reruns layout. Each has one pair of functions
+owner reruns layout. `blocks.json` went to 3 the same day, with the word
+change reason `hyphen_lost` (`docs/specs/structure.md` §5); the owner
+reruns structure. Each has one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
 Reading a file whose `format_version` is not the current one is an error

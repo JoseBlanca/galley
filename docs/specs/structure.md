@@ -705,7 +705,7 @@ and a joined word in place of its two parts.
 
 ## 7. The format it writes
 
-`blocks.json` as architecture §8 gives it, at `format_version` 2:
+`blocks.json` as architecture §8 gives it, at `format_version` 3:
 
 | field | in the first plan | added by the second plan |
 |---|---|---|
