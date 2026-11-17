@@ -124,6 +124,11 @@ def test_reading_score_counts_a_broken_word_known_when_joined() -> None:
     assert reading_score(_layer("bar-", "ons"), _WORD_LIST) == 1
 
 
+def test_reading_score_counts_a_word_broken_with_a_not_sign_once() -> None:
+    # "¬" marks every line-end hyphen in the OCR of two of the owner's books.
+    assert reading_score(_layer("bar\N{NOT SIGN}", "ons"), _WORD_LIST) == 1
+
+
 def test_reading_score_does_not_take_a_dash_alone_as_the_first_part_of_a_word() -> None:
     # Taken as "free-" broken at a line end, "-" would join it into "free-",
     # unknown, and leave "holding" alone: 0 instead of 1.
@@ -417,13 +422,13 @@ def _check_fidelity(page: PageWords, rereads: tuple[Reread, ...]) -> None:
     )
 
 
-# A margin note of three layer words on the left of a column whose left
-# edge is 50 pt; two single letters of the layer just inside the column,
-# under Tesseract's "Moral"; a body word beside the note; a margin word
-# below the band.
+# A margin note of two lines on the left of a column whose left edge is
+# 50 pt, "Moral" and a word the layer split in two, "les-" "sons"; two
+# single letters of the layer just inside the column, under Tesseract's
+# "Moral"; a body word beside the note; a margin word below the band.
 _MORAL = _word("Moral", 10, 100, 40, 108)
-_LES = _word("les-", 10, 110, 30, 118)
-_SONS = _word("sons", 10, 120, 30, 128)
+_LES = _word("les-", 10, 115, 24, 123)
+_SONS = _word("sons", 26, 115, 40, 123)
 _LETTER_O = _word("o", 48.5, 101, 49.5, 107)
 _LETTER_A = _word("a", 48.2, 102, 49, 106)
 _BODY_THE = _word("The", 60, 110, 80, 118)
@@ -488,6 +493,44 @@ def test_band_with_no_layer_word_and_no_reading_is_not_recorded() -> None:
         edge=50,
     )
     assert page_rereads(7, (reading,), _WORD_LIST) == ()
+
+
+def test_tesseract_junk_of_no_letter_or_digit_is_dropped_and_counted() -> None:
+    # A pencil curve beside a note read as "|", "¥" and "\\" (Gierke page
+    # 127); punctuation and printed signs stay.
+    reading = margin_note_reading(
+        Side.LEFT,
+        _BAND,
+        (
+            _ocr("|", 2, 98, 4, 130),
+            _OCR_MORAL,
+            _ocr("¥", 42, 100, 44, 108),
+            _ocr("\\", 2, 110, 4, 118),
+            _OCR_LESSONS,
+            _ocr("—", 42, 115, 46, 123),
+            _ocr("§", 2, 120, 4, 128),
+        ),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST)
+    assert _texts(record.ocr_words) == ("Moral", "lessons.", "—", "§")
+    assert record.dropped_junk_count == 3
+    assert record.kept
+
+
+def test_region_of_tesseract_junk_alone_over_no_layer_word_is_recorded() -> None:
+    reading = margin_note_reading(
+        Side.LEFT,
+        Box(8, 400, 46, 420),
+        (_ocr("~", 10, 402, 20, 410), _ocr("|", 22, 400, 24, 418)),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    assert (record.ocr_words, record.layer_words) == ((), ())
+    assert record.dropped_junk_count == 2
+    assert not record.kept
 
 
 def test_note_the_layer_did_not_read_is_kept() -> None:
@@ -732,6 +775,44 @@ def test_second_of_two_overlapping_regions_takes_no_word_the_first_replaced() ->
     assert second.layer_words == (following,)
     assert _texts(second.ocr_words) == ("Next",)
     _check_fidelity(page, (first, second))
+
+
+def _touching_bands() -> tuple[tuple[Word, Word], tuple[Reread, ...]]:
+    """Two note bands that touch: the lower reads again, 3 pt below the
+    upper's crop, the line "lessons" the upper read and kept. The layer
+    words "Moral" and "lesons", and the records."""
+    moral = _word("Moral", 10, 100, 40, 108)
+    lesons = _word("lesons", 10, 121, 40, 129)
+    page = _page_of((moral, lesons))
+    upper = margin_note_reading(
+        Side.LEFT,
+        Box(8, 98, 46, 126),
+        (_ocr("Moral", 10, 100, 40, 108), _ocr("lessons", 10, 121, 40, 129)),
+        page_words=page.words,
+        edge=50,
+    )
+    lower = margin_note_reading(
+        Side.LEFT,
+        Box(8, 124, 46, 160),
+        (_ocr("lessons", 10, 128, 40, 136), _ocr("free", 10, 140, 40, 148)),
+        page_words=page.words,
+        edge=50,
+    )
+    records = page_rereads(7, (upper, lower), _WORD_LIST)
+    _check_fidelity(page, records)
+    return (moral, lesons), records
+
+
+def test_later_region_drops_a_word_an_earlier_kept_region_read() -> None:
+    _, (_, lower) = _touching_bands()
+    assert _texts(lower.ocr_words) == ("free",)
+
+
+def test_later_region_replaces_no_word_an_earlier_kept_region_replaced() -> None:
+    (moral, lesons), (upper, lower) = _touching_bands()
+    assert upper.layer_words == (moral, lesons)
+    assert upper.kept
+    assert lower.layer_words == ()
 
 
 def test_records_of_a_page_are_in_the_order_of_their_kinds_and_tops() -> None:

@@ -19,6 +19,7 @@ from enum import StrEnum
 from typing import Literal, assert_never, overload
 
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
+from galley.hyphens import LINE_END_HYPHENS
 from galley.model import (
     Block,
     BlocksFile,
@@ -31,7 +32,9 @@ from galley.model import (
     Word,
     WordChange,
     WordsFile,
+    may_read,
     replaced_layer_words,
+    take_out_once,
 )
 
 
@@ -135,14 +138,43 @@ def _unmatched(reread: Reread) -> tuple[Word, ...]:
     """The `layer_words` of `reread` that `replaced_layer_words` does not
     match to one of its `ocr_words`, each as many times as it is
     unmatched."""
-    matched = Counter(replaced_layer_words(reread.layer_words, reread.ocr_words))
-    unmatched = []
+    (unmatched,) = take_out_once(
+        (reread.layer_words,),
+        replaced_layer_words(reread.layer_words, reread.ocr_words),
+    )
+    return unmatched
+
+
+def _share_a_line(first: Word, second: Word) -> bool:
+    """Whether the boxes of `first` and `second` overlap up and down, as
+    the words of one printed line do."""
+    return first.box.top < second.box.bottom and second.box.top < first.box.bottom
+
+
+def _one_reading_of_two_lines(reread: Reread) -> tuple[str, ...]:
+    """A problem for each Tesseract word of `reread` that is the only one
+    of its `ocr_words` that may read two of its `layer_words` of different
+    printed lines (`model.may_read`): it would stand for two printed words.
+    Independent of `model.replaced_layer_words`, the pairing layout made."""
+    sole_readings: dict[int, list[Word]] = {}
     for word in reread.layer_words:
-        if matched[word] > 0:
-            matched[word] -= 1
-        else:
-            unmatched.append(word)
-    return tuple(unmatched)
+        readings = tuple(
+            position
+            for position, ocr_word in enumerate(reread.ocr_words)
+            if may_read(word, ocr_word)
+        )
+        if len(readings) == 1:
+            sole_readings.setdefault(readings[0], []).append(word)
+    return tuple(
+        f"a kept reread on page {reread.page_index} has {ocr_word.text!r} at "
+        f"{_box_text(ocr_word.box)} as the only ocr word that can read "
+        f"{first.text!r} and {second.text!r}, of two printed lines"
+        for position, layer_words in sorted(sole_readings.items())
+        for ocr_word in (reread.ocr_words[position],)
+        for index, first in enumerate(layer_words)
+        for second in layer_words[index + 1 :]
+        if not _share_a_line(first, second)
+    )
 
 
 def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
@@ -151,7 +183,9 @@ def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
     that more kept records name than the page has, compared as page, text
     and box; or one that is not the same printed word as one of its
     record's `ocr_words`, by `model.replaced_layer_words` (reocr spec,
-    section 4)."""
+    section 4); or a Tesseract word that is the only one of its record
+    that may read two of its layer words of different printed lines
+    (architecture section 13)."""
     on_pages = Counter(
         (page.index, word.text, word.box) for page in words.pages for word in page.words
     )
@@ -166,6 +200,11 @@ def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
         for reread in _kept_rereads(lines)
         for word in _unmatched(reread)
     ]
+    problems.extend(
+        problem
+        for reread in _kept_rereads(lines)
+        for problem in _one_reading_of_two_lines(reread)
+    )
     for (page_index, text, box), count in named.items():
         where = f"{text!r} at {_box_text(box)}"
         if on_pages[page_index, text, box] == 0:
@@ -478,9 +517,6 @@ def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
 
 # A hyphen join is two parts of a word split at a line end (glossary).
 _HYPHEN_JOIN_PARTS = 2
-# The hyphens at a line's end (structure spec section 5): the ASCII
-# hyphen-minus and the not sign "¬" of the OCR of two of the owner's books.
-_LINE_END_HYPHENS = frozenset({"-", "\N{NOT SIGN}"})
 
 
 def _change_follows_its_reason(change: WordChange) -> bool:
@@ -498,13 +534,13 @@ def _change_follows_its_reason(change: WordChange) -> bool:
         case ChangeReason.HYPHEN_JOIN | ChangeReason.HYPHEN_JOIN_GUESSED:
             return (
                 len(change.before) == _HYPHEN_JOIN_PARTS
-                and change.before[0][-1:] in _LINE_END_HYPHENS
+                and change.before[0][-1:] in LINE_END_HYPHENS
                 and change.before[0][:-1] + change.before[1] == joined_after
             )
         case ChangeReason.HYPHEN_KEPT:
             return (
                 len(change.before) == _HYPHEN_JOIN_PARTS
-                and change.before[0][-1:] in _LINE_END_HYPHENS
+                and change.before[0][-1:] in LINE_END_HYPHENS
                 and change.before[0][:-1] + "-" + change.before[1] == joined_after
             )
         case _:

@@ -322,11 +322,14 @@ tuple[Reread, ...])`:
 - `Reread`: a region of a page that layout read again with Tesseract
   (`docs/specs/reocr.md` §4): `page_index`, `kind: RereadKind`, `box`
   (the crop, in points), `layer_words` (the words of words.json it
-  replaces, each with its middle under one of its `ocr_words`),
-  `ocr_words` (Tesseract's), `layer_score` and `ocr_score`
-  (ints, known words minus unknown words of each reading), and `kept`
+  replaces, each the same printed word as one of its `ocr_words` by
+  the rules of `docs/specs/reocr.md` §4),
+  `ocr_words` (Tesseract's, without its junk), `layer_score` and `ocr_score`
+  (ints, known words minus unknown words of each reading), `kept`
   (whether `ocr_words` took the place of `layer_words`: `ocr_score`
-  higher and, where `layer_words` is empty, at least 2 known words). Every region read is recorded, kept or not, in page order.
+  higher and, where `layer_words` is empty, at least 2 known words), and
+  `dropped_junk_count` (Tesseract's words of no letter or digit, not
+  punctuation or a printed sign, dropped from `ocr_words`). Every region read is recorded, kept or not, in page order.
 - `RereadKind`: `small_print_page` (a page printed wholly in small
   type, read below its running head), `margin_note` (one note of an
   outer margin), `cut_in_note` (one crop of Stubbs' notes cut into the
@@ -598,7 +601,7 @@ A stage imports these and nothing else of galley.
 
 | module | gives |
 |---|---|
-| `model.py` | the formats of section 8, with their read and write functions |
+| `model.py` | the formats of section 8, with their read and write functions; and the rules of re-reading (`docs/specs/reocr.md` §4) that layout and the fidelity check share: `replaced_layer_words(layer_words, ocr_words)`, the layer words a kept `Reread` replaces, and `matched_ocr_positions`, the Tesseract words that read them; `is_under_ocr_word` and `may_read`, the tests of rule (a) and of any one rule alone; `words_after_rereads(words, rereads)`, a page's words as lines.json holds them; `take_out_once(groups, taken)`, `word_middle(word)` and `folded_letters_and_digits(text)` |
 | `config.py` | `BookConfig`, `read_config(path)`, the language codes |
 | `book_folder.py` | `BookFolder` |
 | `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract or Pandoc), `EditError`, `FidelityError` |
@@ -606,8 +609,9 @@ A stage imports these and nothing else of galley.
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file. `layer_words(page) -> tuple[Word, ...]`: the one way galley reads a page's words from the text layer, in analyze and extract alike; `Character`, a frozen value (`text`, one character, and `box`), one glyph of the text layer; and `split_glued(characters)`, which cuts one word's characters into the words the OCR glued (`docs/specs/extract.md` §4 and §5) |
 | `wordlist.py` | `is_known_word(word, lower_case_words)`, whether a word counts as known on a plate (`docs/specs/plates.md` §2); `lower_case_word_list(language, cache_dir)`, the word list in lower case, made once per language and list folder, which structure, analyze and layout take; `word_list(language, cache_dir) -> frozenset[str]`, with the dictionary's case, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`), layout (re-reading, `docs/specs/reocr.md`) and structure |
-| `ocr.py` | Tesseract: `read_image(image, origin, dpi, psm, language)`, the words of an image cropped from a page, with boxes in points and Tesseract's confidence, and `words_of_tsv`, its pure part; `OCR_DPI` (300). Tesseract runs with `OMP_THREAD_LIMIT=1`, one core each, so that the parallelism is galley's; output without Tesseract's tsv header is an `ExternalProgramError` (`docs/specs/reocr.md` §5). layout uses it now, analyze's audit and extract's OCR pages later |
+| `ocr.py` | Tesseract: `read_image(image, origin, dpi, psm, language)`, the words of an image cropped from a page, with boxes in points and Tesseract's confidence, and `words_of_tsv`, its pure part; `read_image_lines` and `lines_of_tsv`, the same words grouped by Tesseract's lines; `point_box(box, origin, dpi)`, a box in pixels of a crop as a box in points on the page; `OCR_DPI` (300). Tesseract runs with `OMP_THREAD_LIMIT=1`, one core each, so that the parallelism is galley's; output without Tesseract's tsv header is an `ExternalProgramError` (`docs/specs/reocr.md` §5). layout uses it now, analyze's audit and extract's OCR pages later |
 | `fidelity.py` | the fidelity check, section 13 |
+| `hyphens.py` | `LINE_END_HYPHENS`, "-" and "¬", the hyphens that end a printed line in the OCR's text, which layout's reading score, structure's hyphen joins and the fidelity check share (`docs/specs/structure.md` §5) |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
 | `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`) and stops naming any that is missing |
 
@@ -661,13 +665,22 @@ lists the words, with the pages they came from where the origins say.
   its `ocr_words` added, and each kept record's `layer_words` required
   to be words of its page in words.json, none in two records, each the same
   printed word as one of the record's `ocr_words`: its middle inside the
-  box of one of them widened by 2 pt up and down and 1 pt across, or its letters and digits equal to
+  box of one of them widened by 2 pt up and down and 1 pt across and of
+  that word's printed line, or glued over two or three of them, or its letters and digits equal to
   those of the nearest one within 16 pt above or below that no other
   layer word matched, or, for a word of 3 letters or more, its letters
   alike to those of the nearest one within 16 pt that neither rule
   matched (difflib's ratio 0.6 or more: the layer's garbled copy of a
   word Tesseract read) (`model.replaced_layer_words`,
-  `docs/specs/reocr.md` §4); structure,
+  `docs/specs/reocr.md` §4). Because that pairing is layout's own, a
+  second test does not use it: no Tesseract word of a kept record may
+  be the only one of the record that can read two of its `layer_words`
+  of different printed lines, whose boxes do not overlap up and down
+  (a Tesseract word can read a layer word that lies under it, or whose
+  letters and digits it holds, or whose letters are alike to its own,
+  within 16 pt, as the three rules say). One Tesseract word then
+  stands for two printed words, and one of them is lost (Domesday page
+  548, review of 17 November 2026); structure,
   lines.json against blocks.json (the text of every body and note block,
   with a note's `marker` and a heading's `label` counted as words of
   it); markdown, blocks.json

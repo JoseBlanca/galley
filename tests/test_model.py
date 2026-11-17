@@ -196,6 +196,7 @@ LINES = LinesFile(
             layer_score=-1,
             ocr_score=1,
             kept=True,
+            dropped_junk_count=0,
         ),
     ),
 )
@@ -1648,6 +1649,7 @@ def test_reread_is_written_with_its_fields_in_order_and_read_back(
             "layer_score": -1,
             "ocr_score": 1,
             "kept": True,
+            "dropped_junk_count": 0,
         }
     ]
     assert read_lines(tmp_path / "lines.json") == LINES
@@ -1764,6 +1766,83 @@ def test_two_layer_words_of_one_text_take_the_nearest_ocr_words_in_turn() -> Non
     assert model.replaced_layer_words((first, second), ocr[:1]) == (second,)
 
 
+def test_ocr_word_over_a_layer_word_of_another_text_pairs_with_no_other() -> None:
+    # Domesday page 548: the layer's "dominicum," lies under Tesseract's
+    # "dominieum,", and the layer's "Domini", a line above, where
+    # Tesseract read only "3", is alike to it; "Domini" stays.
+    domini = _layer("Domini", 10, 92)
+    dominicum = _layer("dominicum,", 10, 100)
+    ocr = (_tesseract("3", 60, 92), _tesseract("dominieum,", 10, 100))
+    assert model.replaced_layer_words((domini, dominicum), ocr) == (dominicum,)
+
+
+def test_ocr_word_over_two_layer_lines_replaces_the_words_of_the_nearer() -> None:
+    # Gierke page 63: Tesseract's "146" lies between two of the layer's
+    # lines "14. c", 8.2 pt apart, and both lie under its widened box.
+    first = (
+        Word("14.", Box(324.0, 379.7, 329.9, 386.7), None),
+        Word("c", Box(332.6, 379.7, 334.7, 386.7), None),
+    )
+    second = (
+        Word("14.", Box(323.4, 387.9, 329.5, 394.9), None),
+        Word("c", Box(332.4, 387.9, 334.4, 394.9), None),
+    )
+    ocr = (Word("146", Box(324.5, 382.8, 336.2, 390.5), 60.0),)
+    assert model.replaced_layer_words((*first, *second), ocr) == first
+
+
+def test_ocr_word_over_two_layer_lines_and_a_word_overlapping_both_takes_one() -> None:
+    # Stubbs' index, page 318: Tesseract's "Soca" for "Normans," lies over
+    # the layer's "I43" of the line above too, and over a stray "k" whose
+    # box overlaps both lines; "I43" stays.
+    stray = Word("k", Box(157.6, 437.6, 161.0, 443.3), None)
+    above = Word("I43", Box(165.3, 433.4, 175.9, 439.3), None)
+    normans = Word("Normans,", Box(157.6, 439.8, 191.9, 446.9), None)
+    ocr = (Word("Soca", Box(157.7, 434.6, 177.6, 445.9), 50.0),)
+    assert model.replaced_layer_words((stray, above, normans), ocr) == (
+        stray,
+        normans,
+    )
+
+
+def test_layer_word_glued_over_two_or_three_ocr_words_is_replaced() -> None:
+    # Stubbs' index, page 312: the layer's "of,96" where Tesseract read
+    # "of," "96"; its middle lies between the two, under neither.
+    glued = Word("of,96", Box(100.0, 50.0, 130.0, 58.0), None)
+    of, ninety_six = (
+        Word("of,", Box(100.5, 50.0, 110.0, 58.0), 90.0),
+        Word("96", Box(122.0, 50.0, 129.5, 58.0), 90.0),
+    )
+    assert model.replaced_layer_words((glued,), (of, ninety_six)) == (glued,)
+    # "abolition of,17," read "of," "17," by Tesseract, after "abolition".
+    three = Word("of,17,", Box(100.0, 50.0, 130.0, 58.0), None)
+    seventeen = Word("17,", Box(122.0, 50.0, 129.5, 58.0), 90.0)
+    abolition = Word("abolition", Box(40.0, 50.0, 98.0, 58.0), 90.0)
+    assert model.replaced_layer_words((three,), (abolition, of, seventeen)) == (three,)
+    # Not when a Tesseract word of the group lies more than 1 pt outside its
+    # box, or the group is of four words.
+    outside = Word("96", Box(129.0, 50.0, 134.2, 58.0), 90.0)
+    assert model.replaced_layer_words((glued,), (of, outside)) == ()
+    four = Word("a,b,c,d", Box(100.0, 50.0, 130.0, 58.0), None)
+    letters = tuple(
+        Word(text, Box(x, 50.0, x + 1.0, 58.0), 90.0)
+        for text, x in (("a,", 101.0), ("b,", 109.0), ("c,", 121.0), ("d", 128.0))
+    )
+    assert model.replaced_layer_words((four,), letters) == ()
+
+
+def test_ocr_words_read_glued_by_the_layer_pair_with_no_other_layer_word() -> None:
+    # The layer's "of," a line below may not take Tesseract's "of," that the
+    # glued "of,96" holds.
+    glued = Word("of,96", Box(100.0, 50.0, 130.0, 58.0), None)
+    below = Word("of,", Box(100.0, 62.0, 110.0, 70.0), None)
+    ocr = (
+        Word("of,", Box(100.5, 50.0, 110.0, 58.0), 90.0),
+        Word("96", Box(122.0, 50.0, 129.5, 58.0), 90.0),
+    )
+    assert model.replaced_layer_words((glued, below), ocr) == (glued,)
+
+
 def test_layer_word_without_a_letter_or_digit_is_matched_only_under_a_word() -> None:
     layer = (_layer("—", 10, 110),)
     assert model.replaced_layer_words(layer, (_tesseract("—", 10, 100),)) == ()
@@ -1787,6 +1866,15 @@ def test_layer_word_of_letters_less_alike_than_0_6_stays() -> None:
     assert model.replaced_layer_words(alike, (_tesseract("regality.", 10, 100),)) == (
         alike
     )
+
+
+def test_layer_word_of_3_letters_alike_is_replaced_and_one_of_2_stays() -> None:
+    # "tbe" and "the" have a ratio of 0.67, "th" and "the" of 0.8; rule (c)
+    # takes words of 3 letters or more.
+    three = (_layer("tbe", 10, 110),)
+    assert model.replaced_layer_words(three, (_tesseract("the", 10, 100),)) == three
+    two = (_layer("th", 10, 110),)
+    assert model.replaced_layer_words(two, (_tesseract("the", 10, 100),)) == ()
 
 
 def test_layer_number_of_other_digits_beside_an_ocr_number_stays() -> None:
@@ -1824,6 +1912,7 @@ def _rereads_record(
         layer_score=0,
         ocr_score=1,
         kept=kept,
+        dropped_junk_count=0,
     )
 
 

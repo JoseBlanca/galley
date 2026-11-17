@@ -20,7 +20,6 @@ except where a name or a docstring says pixels.
 """
 
 import math
-from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Final, assert_never
@@ -28,10 +27,13 @@ from typing import Final, assert_never
 from PIL import Image
 
 from galley.body_measures import group_rows
+from galley.hyphens import LINE_END_HYPHENS
 from galley.layout._column import (
     BookMeasures,
     ColumnSplit,
     Side,
+    ends_short_of_inset,
+    in_cut_in_zone,
     is_small_row,
     running_head_row_count,
     split_at_column,
@@ -43,8 +45,12 @@ from galley.model import (
     Reread,
     RereadKind,
     Word,
+    folded_letters_and_digits,
     is_under_ocr_word,
+    matched_ocr_positions,
     replaced_layer_words,
+    take_out_once,
+    word_middle,
 )
 from galley.ocr import OCR_DPI
 from galley.pdfium import POINTS_PER_INCH
@@ -82,7 +88,6 @@ NOTE_PSM: Final[int] = 6
 # Stubbs and Domesday, section 3.
 _QUOTATION_MARKS: Final[str] = "‘’“”\"'"
 _CURLY_APOSTROPHE: Final[str] = "’"
-_HYPHEN: Final[str] = "-"
 
 # The small-print page (reocr spec, section 3, kind 1): measured on the six
 # books; the share lies in a gap from 0.78 to 0.86.
@@ -136,11 +141,9 @@ _BAND_REACH_PT: Final[float] = 12.0
 _INTO_MARGIN_PT: Final[float] = 2.0
 
 # The filters of a cut-in crop (reocr spec, section 3, kind 3), measured
-# on Stubbs: a note word ends 4 pt short of the inset (layout spec,
-# section 3, step 2b) and lies within 1 pt of its zone; a body line runs on
-# to within 3 pt of the crop's side toward the inset.
-_CUT_IN_ZONE_PT: Final[float] = 1.0
-_CUT_IN_NOTE_SHORT_PT: Final[float] = 4.0
+# on Stubbs: a body line runs on to within 3 pt of the crop's side toward
+# the inset; a note word's place is layout's (_column.in_cut_in_zone and
+# _column.ends_short_of_inset).
 _CUT_IN_LINE_AT_INSET_PT: Final[float] = 3.0
 
 
@@ -171,7 +174,7 @@ def _broken_word_score(
     """The score of a word broken at a line end, `first` ending in a
     hyphen: 1 when each part is known, otherwise the score of the joined
     word, 1 when it is known."""
-    stem = first.removesuffix(_HYPHEN)
+    stem = first[:-1]
     if is_known_word(stem, lower_case_words) and is_known_word(
         second, lower_case_words
     ):
@@ -181,7 +184,9 @@ def _broken_word_score(
 
 def _is_broken_pair(first: str, second: str) -> bool:
     return (
-        first.endswith(_HYPHEN) and _has_letter_or_digit(first) and second[:1].isalpha()
+        first[-1:] in LINE_END_HYPHENS
+        and _has_letter_or_digit(first)
+        and second[:1].isalpha()
     )
 
 
@@ -500,14 +505,6 @@ class RegionReading:
     layer_words: tuple[Word, ...]
 
 
-def _middle(word: Word) -> tuple[float, float]:
-    return (word.box.x0 + word.box.x1) / 2, (word.box.top + word.box.bottom) / 2
-
-
-def _vertical_middle(word: Word) -> float:
-    return (word.box.top + word.box.bottom) / 2
-
-
 def _inside(point: tuple[float, float], box: Box) -> bool:
     x, y = point
     return box.x0 <= x <= box.x1 and box.top <= y <= box.bottom
@@ -520,18 +517,6 @@ def _overlap(first: Box, second: Box) -> bool:
         and first.top < second.bottom
         and second.top < first.bottom
     )
-
-
-def _without(words: tuple[Word, ...], taken: Iterable[Word]) -> tuple[Word, ...]:
-    """`words` less those of `taken`, each taken once, in their order."""
-    left = Counter(taken)
-    kept = []
-    for word in words:
-        if left[word] > 0:
-            left[word] -= 1
-        else:
-            kept.append(word)
-    return tuple(kept)
 
 
 def small_print_reading(
@@ -550,7 +535,7 @@ def small_print_reading(
         side=None,
         box=box,
         ocr_words=ocr_words,
-        layer_words=_without(page_words, head_words),
+        layer_words=take_out_once((page_words,), head_words)[0],
     )
 
 
@@ -595,30 +580,10 @@ def margin_note_reading(
             word
             for word in in_margin
             if box.top - _BAND_REACH_PT
-            <= _vertical_middle(word)
+            <= word_middle(word)[1]
             <= box.bottom + _BAND_REACH_PT
         ),
     )
-
-
-def _in_zone(word: Word, zones: tuple[tuple[float, float], ...]) -> bool:
-    middle = _vertical_middle(word)
-    return any(
-        top - _CUT_IN_ZONE_PT <= middle <= bottom + _CUT_IN_ZONE_PT
-        for top, bottom in zones
-    )
-
-
-def _short_of_inset(word: Word, side: Side, edge: float, inset: float) -> bool:
-    """Whether `word` ends 4 pt or more short of the cut-in inset on
-    `side`, the place of a note word."""
-    match side:
-        case Side.LEFT:
-            return word.box.x1 <= edge + inset - _CUT_IN_NOTE_SHORT_PT
-        case Side.RIGHT:
-            return word.box.x0 >= edge - inset + _CUT_IN_NOTE_SHORT_PT
-        case _:
-            assert_never(side)
 
 
 def _reaches_inset_side(word: Word, side: Side, crop: Box) -> bool:
@@ -661,11 +626,12 @@ def cut_in_reading(
     replaceable = tuple(
         word
         for word in column_words
-        if _in_zone(word, crop.zones) and _short_of_inset(word, side, edge, inset)
+        if in_cut_in_zone(word, crop.zones)
+        and ends_short_of_inset(word, side, edge, inset)
     )
     body = tuple(
         word
-        for word in _without(column_words, replaceable)
+        for word in take_out_once((column_words,), replaceable)[0]
         if _overlap(word.box, crop.box)
     )
     ocr_words = tuple(
@@ -681,7 +647,7 @@ def cut_in_reading(
         box=crop.box,
         ocr_words=ocr_words,
         layer_words=(
-            *(word for word in cut_in_words if _in_zone(word, crop.zones)),
+            *(word for word in cut_in_words if in_cut_in_zone(word, crop.zones)),
             *replaceable,
         ),
     )
@@ -702,6 +668,36 @@ def footnote_band_reading(
 
 
 # The records of a page
+
+# Tesseract's junk (reocr spec, section 4): a word of no letter or digit is
+# dropped unless each character is punctuation or a sign the books print. In
+# the kept records of whole Stubbs, Domesday and Gierke it read a pencil
+# curve or a stain as "|", "¥", "\\", "©", "@", "~", "_", "¢" (34 tokens).
+_PRINTED_SIGNS: Final[frozenset[str]] = frozenset(".,;:!?'\"‘’“”()[]-–—§&£$%*†‡¶/")
+
+
+def _is_junk(text: str) -> bool:
+    """Whether `text`, a word of Tesseract's, is junk: it has no letter or
+    digit and a character that is not punctuation or a printed sign."""
+    return not _has_letter_or_digit(text) and not set(text) <= _PRINTED_SIGNS
+
+
+# A later region drops a Tesseract word that an earlier kept region read
+# within 16 pt above or below, as model.replaced_layer_words pairs words of
+# one text (reocr spec, section 4).
+_READ_BEFORE_REACH_PT: Final[float] = 16.0
+
+
+def _read_before(word: Word, earlier: Iterable[Word]) -> bool:
+    """Whether a word of `earlier`, Tesseract's words of the page's earlier
+    kept regions, has the letters and digits of `word`, case-folded and not
+    empty, with its middle within 16 pt above or below `word`'s."""
+    folded = folded_letters_and_digits(word.text)
+    return bool(folded) and any(
+        folded_letters_and_digits(other.text) == folded
+        and abs(word_middle(other)[1] - word_middle(word)[1]) <= _READ_BEFORE_REACH_PT
+        for other in earlier
+    )
 
 
 def _kind_rank(kind: RereadKind) -> int:
@@ -733,16 +729,22 @@ def page_rereads(
     the margin note bands, top to bottom with the left side first at the
     same top, then the cut-in crops likewise, then the footnote band.
 
-    The regions are taken in that order. A word of Tesseract's whose middle
-    lies inside the crop of an earlier kept region is dropped, so that no
-    printed word is read in by two regions. Of the layer words a region
+    Tesseract's junk, a word of no letter or digit that is not punctuation
+    or a printed sign, is dropped first and counted in the record. The
+    regions are taken in that order. A word of Tesseract's whose middle
+    lies inside the crop of an earlier kept region is dropped, and so is
+    one that reads no layer word the region may still replace and whose
+    letters and digits are those of a Tesseract word of an earlier kept
+    region within 16 pt above or below, so that no printed word is read in
+    by two regions. Of the layer words a region
     may replace, it replaces those under one of its words of Tesseract's
     (`model.replaced_layer_words`) that an earlier kept region does not
     replace; the others stay in the layer. A region is kept when its
     words of Tesseract's are not empty and score higher than the layer
     words it replaces, by `reading_score` against `lower_case_words`, and,
     when it replaces no layer word, hold at least 2 known words. A
-    region where both readings are empty is not recorded. ValueError when
+    region where both readings are empty, before the junk is dropped, is
+    not recorded. ValueError when
     a small-print page comes with another region: no other region of such
     a page is read.
     """
@@ -754,18 +756,25 @@ def page_rereads(
         )
         raise ValueError(msg)
     earlier_crops: list[Box] = []
+    earlier_ocr_words: list[Word] = []
     replaced: list[Word] = []
     records = []
     for reading in ordered:
-        ocr_words = tuple(
+        read = tuple(
             word
             for word in reading.ocr_words
-            if not any(_inside(_middle(word), crop) for crop in earlier_crops)
+            if not any(_inside(word_middle(word), crop) for crop in earlier_crops)
         )
-        layer_words = replaced_layer_words(
-            _without(reading.layer_words, replaced), ocr_words
+        outside_crops = tuple(word for word in read if not _is_junk(word.text))
+        replaceable = take_out_once((reading.layer_words,), replaced)[0]
+        matched = matched_ocr_positions(replaceable, outside_crops)
+        ocr_words = tuple(
+            word
+            for position, word in enumerate(outside_crops)
+            if position in matched or not _read_before(word, earlier_ocr_words)
         )
-        if not layer_words and not ocr_words:
+        layer_words = replaced_layer_words(replaceable, ocr_words)
+        if not layer_words and not read:
             continue
         layer_score = reading_score(layer_words, lower_case_words)
         ocr_scores = _word_scores(ocr_words, lower_case_words)
@@ -776,6 +785,7 @@ def page_rereads(
         if kept:
             replaced.extend(layer_words)
             earlier_crops.append(reading.box)
+            earlier_ocr_words.extend(ocr_words)
         records.append(
             Reread(
                 page_index=page_index,
@@ -786,6 +796,7 @@ def page_rereads(
                 layer_score=layer_score,
                 ocr_score=ocr_score,
                 kept=kept,
+                dropped_junk_count=len(read) - len(outside_crops),
             )
         )
     return tuple(records)

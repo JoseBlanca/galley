@@ -249,7 +249,8 @@ The four kinds, each with what is cropped and how it is read:
    ends of its chapters (40, 99, 129, 130, 205, 206, 232, 263, 264, 0.86
    to 1.00), of Mariéjol's bibliography (14–16, 0.93 to 1.00), and
    Domesday's tables 426 and 528 (0.89, 1.00) and Stubbs' publisher's
-   list on page 7 (0.87); the highest other page is Domesday's 428, a
+   list on page 7 (0.87), which is front matter now and not laid out
+   as text (analyze, `docs/specs/front-matter.md`); the highest other page is Domesday's 428, a
    table (0.78), then pages of text with long footnotes, Domesday's 290
    (0.77) and Mariéjol's 211 (0.73); Kadesh's highest is 0.57 and
    Gierke's 0.17. The threshold, 0.85, lies in that gap, which is 0.08
@@ -265,8 +266,8 @@ The four kinds, each with what is cropped and how it is read:
 
    Each page is then kept or not by the reading score. Kept: Stubbs'
    10 index pages; Domesday's 528, 547, 548 and 551; Haskins' 99, 129,
-   205, 206, 264, 266, 268 and 272. Left as the layer: Stubbs' page 7;
-   Domesday's 426 (Tesseract read its figures as junk), 546, 549, 550
+   205, 206, 264, 266, 268 and 272. Left as the layer: Stubbs' page 7
+   (before it became front matter); Domesday's 426 (Tesseract read its figures as junk), 546, 549, 550
    and 552 (scores within 4 of each other, the layer's index being good
    already); Haskins' other eleven, also within 9. An index is so read
    page by page, some pages from Tesseract and some from the layer;
@@ -436,14 +437,29 @@ word as one of its kept Tesseract words** (`model.replaced_layer_words`);
 the others stay in the layer. A layer word is that word when
 
 - (a) its middle lies inside the box of one of the Tesseract words
-  widened by 2 pt up and down and 1 pt across; or else
+  widened by 2 pt up and down and 1 pt across, and it is of that
+  Tesseract word's printed line: the layer words under a Tesseract word
+  are taken nearest first, by the distance of their middles from its
+  middle up or down, and each is of the line when its box overlaps, up
+  and down, the box of every word taken into the line before it. A
+  Tesseract word reads one printed line; where the layer's lines lie
+  closer than its box widened, a word of the other line under it is
+  left to the rules below. A layer word is also matched in (a) when its
+  letters and digits, case-folded and not empty, equal those of two or
+  three Tesseract words that follow each other in Tesseract's order,
+  joined, each with its middle inside the layer word's box widened by
+  1 pt: a word the layer glued, "of,96" where Tesseract read "of,"
+  "96" (Stubbs' index, page 312; 5 such words on its pages 312 to 321
+  stayed beside Tesseract's two, which read them twice); or else
 - (b) its letters and digits, case-folded and not empty, equal those of
   one of the Tesseract words whose middle lies within 16 pt above or
-  below its own, and that no other layer word of that text has matched.
-  A Tesseract word is matched in (a) by a layer word of its text under
-  it; in (b) the pairs of a layer word and a Tesseract word of the same
-  text are taken nearest first (the distance of their middles across
-  plus up or down), each word in one pair at most; or else
+  below its own, and that no other layer word has matched.
+  A Tesseract word is matched in (a) when a layer word lies under it,
+  whatever the texts of the two: it reads that printed word, and (b) and
+  (c) pair only the Tesseract words (a) left unmatched. In (b) the pairs
+  of a layer word and a Tesseract word of the same text are taken
+  nearest first (the distance of their middles across plus up or down),
+  each word in one pair at most; or else
 - (c) it has 3 letters or more, and its letters, case-folded, are alike
   to those of one of the Tesseract words whose middle lies within 16 pt
   above or below its own and that (a) and (b) left unmatched: difflib's
@@ -451,6 +467,21 @@ the others stay in the layer. A layer word is that word when
   The pairs are taken nearest first, as in (b), each word in one pair at
   most. A word of fewer than 3 letters, a number among them, needs (a)
   or (b).
+
+A Tesseract word under which (a) found a layer word of another text
+used to stay free for (b) and (c), and then stood for two printed
+words: on Domesday page 548 the layer's "dominicum," lay under
+Tesseract's "dominieum,", which (c) then paired with the layer's
+"Domini" of the line above, where Tesseract had read only "3" for
+"Dominium, 224"; "Domini" was lost and "dominieum," read in for both
+(review of 17 November 2026). Likewise, without the line of (a), one
+Tesseract word took the layer words of two printed lines that both lay
+under its widened box: "146" for "14. c" and the "14. c" of the line
+below in Gierke's list of page numbers (page 63), "Soca" for "I43" and
+"Normans," on Stubbs' index page 318 (the layer's stray "k" under it
+overlaps both lines, so a line of the words overlapping the nearest one
+alone still took both); the fidelity check (architecture §13) now fails on such
+a record.
 
 A printed word that Tesseract did not read, or whose reading a filter
 dropped (a cut-in line at the inset, a word over a body word, a word
@@ -514,8 +545,16 @@ Tesseract's reading holds.
 already among the replaced words of a kept region of its page is not
 counted again by a later one, and a word of Tesseract's whose middle
 lies inside the crop of an earlier kept region on the page is dropped,
-so that a printed word is not read in by two regions. A region not
-kept drops no word of a later one, whose reading of the same printed
+and so is one whose letters and digits, case-folded and not empty,
+equal those of a Tesseract word of an earlier kept region whose middle
+lies within 16 pt above or below its own, when it reads no layer word
+the later region may still replace (by the rules above). Two crops
+that touch can read the same printed line, whose words' middles lie
+outside the earlier crop: in a hand-made case of the review of 17
+November 2026, a note band read a line whose middle lay 3 pt below the
+band above, which had read and kept it (no such word on whole Stubbs,
+Domesday and Gierke). So a printed word is not read in by two regions.
+A region not kept drops no word of a later one, whose reading of the same printed
 words may then be kept. The regions of a page are taken in the order of
 the record below.
 
@@ -529,6 +568,19 @@ OCR line, structure took 65 of Haskins' 72 footnotes for body
 text after a footnote re-read, because Tesseract's lines of small type
 are as tall as the body's words. No word of Tesseract's is dropped for
 a low confidence (**Open 2**).
+
+**Tesseract's junk is dropped**: before a region is scored and its
+words paired, a Tesseract word with no letter or digit is dropped
+unless each of its characters is ordinary punctuation or a sign the
+books print: . , ; : ! ? ' " ‘ ’ “ ” ( ) [ ] - – — § & £ $ % * † ‡ ¶ /.
+The record counts the words dropped. Tesseract reads a pencil curve or
+a stain beside a note as such tokens, and in a kept region they went
+into the book: in the kept records of whole Stubbs, Domesday and Gierke
+(17 November 2026), 7, 3 and 24 tokens, "|" four times on Gierke page
+248, "¥" and "\\" on page 127 (a pencil curve), "©", "@", "~", "_", "¢".
+The other tokens with no letter or digit in those records, 100, 20 and
+35, are punctuation and stay. A tall "|" also lay over layer words of several lines
+(Gierke page 132).
 
 **The record.** Every region read is a `Reread` in `lines.json`, whether
 its words were kept or not (a change to a shared format, **Open 3**):
@@ -550,9 +602,11 @@ class Reread:
     layer_score: int
     ocr_score: int
     kept: bool                        # by the rule of section 3
+    dropped_junk_count: int = 0       # Tesseract's junk tokens dropped
 ```
 
-A region where both readings are empty is not recorded. `LinesFile`
+A region where both readings are empty, before Tesseract's junk is
+dropped, is not recorded. `LinesFile`
 gains `rereads: tuple[Reread, ...]`, in page order and, within a page,
 small-print page first, then margin bands top to bottom with the left
 side first at the same top, then cut-in crops likewise, then the
@@ -565,7 +619,10 @@ the `layer_words` of each kept `Reread` are words of its page in
 `words.json`; no word of the page is among the `layer_words` of two
 kept records (compared as page, text and box); and each of a kept
 record's `layer_words` is matched to one of its `ocr_words` by rules (a)
-and (b) above (`model.replaced_layer_words`); so that a record cannot name a word the
+to (c) above (`model.replaced_layer_words`); and, by a test that does not
+use that pairing, no Tesseract word of a kept record is the only one of
+the record that may read two of its `layer_words` of different printed
+lines (architecture §13); so that a record cannot name a word the
 layer never had, one another record already replaced, or one that no
 word of Tesseract's reads. Every word of the layer is then either in `lines.json` or in
 exactly one kept record, with its page and box; a record not kept
@@ -666,8 +723,10 @@ with 12 gave byte-identical records, and Gierke's 762 regions read inside layout
 - **A pencil mark, a tick, a stain in the margin** is a band (7 of 30 of
   Gierke's sample were). Tesseract reads it as short junk ("id i ;"),
   the layer has nothing there, the score is negative, and the layer's
-  nothing is kept. Junk beside a real note ("~" after "The Hilde-",
-  Stubbs page 83) is kept with the note when the note wins (**Open 2**).
+  nothing is kept. Junk of no letter or digit is dropped, beside a real
+  note ("~" after "The Hilde-", Stubbs page 83) or alone; junk of
+  letters ("id i") is kept with the note when the note wins (**Open
+  2**).
 - **A note the layer did not read at all** ("Medieval Thought.", Gierke
   page 88; "Fall of Bristol.", Stubbs page 308): the region replaces no
   word, Tesseract's words hold 2 known words or more and more known
@@ -757,7 +816,17 @@ the extract change, Stubbs' index error rate was 1.543.
   none of its Tesseract words lies over or reads. A layer word whose
   line lies 10 pt off Tesseract's, of the same text, is replaced; one
   more than 16 pt off is not; a layer word read twice, once over
-  Tesseract's word and once off it, is replaced once.
+  Tesseract's word and once off it, is replaced once. A Tesseract word
+  over a layer word of another text pairs with no other layer word
+  (Domesday page 548); one over the layer words of two printed lines
+  replaces those of the nearer only (Gierke page 63, Stubbs page 318);
+  a layer word glued over two or three Tesseract words ("of,96") is
+  replaced, over four or with a word outside its box not. A later
+  region drops a Tesseract word an earlier kept region read 3 pt below
+  its crop, and replaces no word the earlier one replaced. Tesseract's
+  "|", "¥" and "\\" are dropped and counted, "—" and "§" kept. The
+  fidelity check fails when one Tesseract word is the only reading of
+  two layer words of different lines.
   A layer word 6 pt below Tesseract's of alike letters ("fllght'"
   under "flight.") is replaced; one whose ratio is below 0.6 ("for"
   beside "lord") is not; a number of other digits ("131." beside

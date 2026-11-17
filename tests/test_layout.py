@@ -1528,6 +1528,7 @@ def _rereading(
     footnote_bands: bool = False,
 ) -> Rereading:
     return Rereading(
+        pdf=Path("book.pdf"),
         render=render,
         read_lines=read_lines,
         lower_case_words=words,
@@ -1741,6 +1742,22 @@ def test_reread_footnote_band_kept_takes_the_band_place() -> None:
     _assert_fidelity(page, result)
 
 
+def test_reread_tesseract_failure_names_the_page_and_the_pdf() -> None:
+    def failing(
+        image: Image.Image, *, origin: tuple[float, float], psm: int
+    ) -> tuple[tuple[Word, ...], ...]:
+        del image, origin, psm
+        msg = "tesseract (eng) printed no tsv"
+        raise ExternalProgramError(msg)
+
+    rereading = _rereading(failing, render=_render_with_ink(), footnote_bands=True)
+    with pytest.raises(ExternalProgramError) as raised:
+        layout_page_with_rereads(_page_with_band(), _MEASURES, rereading)
+    assert "page 0 of book.pdf" in str(raised.value)
+    assert "tesseract (eng) printed no tsv" in str(raised.value)
+    assert isinstance(raised.value.__cause__, ExternalProgramError)
+
+
 def test_reread_footnote_band_is_not_read_unless_asked() -> None:
     page = _page_with_band()
     assert layout_page_with_rereads(page, _MEASURES, _rereading(_no_reader)) == (
@@ -1750,18 +1767,20 @@ def test_reread_footnote_band_is_not_read_unless_asked() -> None:
 
 
 @pytest.mark.thread_unsafe
-def test_run_with_ocr_verify_rereads_and_with_trust_needs_no_word_list(
+def test_run_with_ocr_verify_rereads_and_with_trust_or_redo_needs_no_word_list(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # The pages of `_book` have no region to read: layout reads the word
     # list for the margins' notes, renders nothing and records nothing.
+    # With `redo` every page is Tesseract's already, and nothing is re-read.
     folder, config = _book(tmp_path)
     monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", tmp_path / "no-cache")
     monkeypatch.setenv("PATH", "")
     with pytest.raises(ExternalProgramError, match="tesseract"):
         layout.run(folder, config, workers=1)
-    layout.run(folder, replace(config, ocr=OcrMode.TRUST), workers=1)
-    assert read_lines(folder.lines_json).rereads == ()
+    for ocr in (OcrMode.TRUST, OcrMode.REDO):
+        layout.run(folder, replace(config, ocr=ocr), workers=1)
+        assert read_lines(folder.lines_json).rereads == ()
 
 
 # run, on a book folder of its own
@@ -1903,7 +1922,10 @@ def test_run_that_loses_a_word_raises_and_writes_no_lines_json(
     ) -> PageLayout:
         return layout_page(replace(page, words=page.words[1:]), measures)
 
-    monkeypatch.setattr(layout, "layout_page", layout_page_losing_a_word)
+    # layout_page_with_rereads, which run calls, lays out with it.
+    monkeypatch.setattr(
+        "galley.layout._rereading.layout_page", layout_page_losing_a_word
+    )
     with pytest.raises(FidelityError):
         layout.run(folder, config, workers=1)
     assert not folder.lines_json.exists()
