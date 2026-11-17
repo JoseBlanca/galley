@@ -3,9 +3,10 @@ skeleton spec section 6, plates spec section 3).
 
 extract reads the words of each text page, and of each plate page that
 has a text layer, from the PDF's text layer with pdfplumber, one document
-per worker thread. The words of an excluded page, and those whose centre
-falls in a region the config excludes, become removals, so that no word
-is dropped without a record. A plate page is rendered whole at 300 dpi
+per worker thread. The words of an excluded page, of a front-matter page
+(front-matter spec section 3), and those whose centre falls in a region
+the config excludes, become removals, so that no word is dropped without
+a record. A plate page is rendered whole at 300 dpi
 into `images/plate-<page index, 4 digits>.png`, and the page gets one
 figure, the whole page. The cover is rendered as `images/cover.png`.
 """
