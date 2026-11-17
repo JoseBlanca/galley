@@ -454,7 +454,14 @@ is laid out as one region, as the skeleton did.
    here is the median of its words' tops, not the top of its box. A
    page whose head row is not that far apart, or has no row with a
    letter or digit below it, has no such region, and the specks above
-   stay with the body.
+   stay with the body. In the region, the head row and the rows of its
+   skew are one line, their words left to right, and each row above
+   them a line of its own (step 7 does not regroup them): the head is
+   one printed line, and structure takes a head line that holds one
+   line with a letter or a digit (structure §2). Grouped by step 7,
+   Stubbs' date was a line of its own and the region no head line
+   (decided on 17 November 2026 while building the plan owner-books;
+   the spec had left it open).
 
    The three changes of 17 November 2026, each for a case measured by
    the public-domain survey on the clean-text build: a row's box top is
@@ -979,7 +986,8 @@ with their boxes, with a `BookMeasures` given in the test:
   the head region; a head row 1.6 pitches above the body by its words'
   median tops, whose next row holds an em dash boxed 10 pt taller than
   its words, still gives one; a head whose last word lies 4 pt lower, a
-  row of its own, gives one region of both rows; a row of "^ _" between
+  row of its own, gives one region whose one line holds both rows'
+  words; a row of "^ _" between
   head and body is passed over and stays with the body;
 - a left margin word "12" 9 pt left of a line's first word on a row
   below the head stays at the start of that line; at 16 pt, or on the
