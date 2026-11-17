@@ -198,10 +198,10 @@ page 62, "5 1 56 T" against the layer's "55 56". Keeping the reading
 with more words, whatever they are, would take 85 regions, most of
 them with junk Tesseract read beside a note. Where the region replaces no word of
 the layer, a higher score is not enough: Tesseract's words are kept
-only when they hold at least 2 known words (and, as they must score
-above the empty layer's 0, more known words than unknown), or when they
-hold one known word that is a **sure single word**: it has 4 letters or
-more, every word of the reading has a confidence of 80 or more, and no
+only when they hold at least 2 known words, or when they are one known
+word, with nothing beside it but marks of punctuation, that is a **sure
+single word**: it has 4 letters or more, every word of the reading has
+a confidence of 80 or more, and no
 word of the page's layer may be a reading of the same printed word
 (`model.may_read`: under it, or within 16 pt above or below with the
 same letters and digits or alike letters, rules (a) to (c) of section
@@ -214,6 +214,18 @@ page 88, 2 known words), and so does a note, or the line of a note, of
 one word ("Coronation.", Stubbs page 63, confidence 97; "Henry’s", page
 62, 91). The owner asked for the one-word notes on 17 November 2026,
 after reading those two on the page images.
+
+By the rule of a tie, a reading over no layer word that scores 0, as
+many unknown words as known, is kept with 2 known words or more: losing
+a printed note costs the reader more than a misread letter
+(orchestrator, 17 November 2026). On whole Stubbs, Domesday, Haskins and
+Gierke 2 regions are kept so, each a printed note, read on the page
+images: "Preedial element in serfage." (Domesday page 53) and "The
+caruea a constant." (page 439). A reading of one known word and an
+unknown word, "Coronation qzx", is no sure single word and is not kept.
+Two printed notes were kept that way, as sure single words beside an
+unknown word, and are now left out: "Motives de-" (Stubbs page 234;
+"de-" is unknown) and "Edward I." (page 258; "I." has 1 letter).
 
 The sure single word was measured on the whole of Stubbs, Domesday and
 Gierke on 17 November 2026 (galley at 89ed733): 74 regions over no
