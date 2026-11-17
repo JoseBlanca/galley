@@ -362,7 +362,7 @@ def test_structure_hyphen_lost_with_its_word_change_passes(
     # Structure spec section 5: the full stop the join drops is in `before`.
     lines = _lines_file(((f"Unity of the {before[0]}",), (f"{before[1]} here",)))
     blocks = _blocks_file(
-        (_block("b-p0000-001", (0, 1), (_span(f"Unity of the {after[0]} here"),)),),
+        (_margin_note(f"Unity of the {after[0]} here"),),
         word_changes=(
             WordChange(
                 page_index=0,
@@ -376,6 +376,31 @@ def test_structure_hyphen_lost_with_its_word_change_passes(
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+def _margin_note(text: str) -> Block:
+    """A margin-note block of `text` on pages 0 and 1."""
+    return replace(
+        _block("b-p0000-001", (0, 1), (_span(text),)), kind=BlockKind.MARGIN_NOTE
+    )
+
+
+def test_structure_hyphen_lost_outside_a_margin_note_fails() -> None:
+    # Structure spec section 5: the join is made in margin notes only.
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0, 1), (_span("Unity of the movement, here"),)),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=("move.", "ment,"),
+                after=("movement,",),
+                reason=ChangeReason.HYPHEN_LOST,
+            ),
+        ),
+    )
+
+    with pytest.raises(FidelityError, match="not in a margin note"):
+        check_stage(FidelityBoundary.STRUCTURE, _LOST_HYPHEN_LINES, blocks)
+
+
 @pytest.mark.parametrize(
     "after",
     ["moveent,", "move.ment,", "move-ment,"],
@@ -385,7 +410,7 @@ def test_structure_hyphen_lost_that_changes_more_than_the_stop_fails(
     after: str,
 ) -> None:
     blocks = _blocks_file(
-        (_block("b-p0000-001", (0, 1), (_span(f"Unity of the {after} here"),)),),
+        (_margin_note(f"Unity of the {after} here"),),
         word_changes=(
             WordChange(
                 page_index=0,

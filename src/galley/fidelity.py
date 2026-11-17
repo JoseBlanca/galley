@@ -22,6 +22,7 @@ from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
 from galley.hyphens import LINE_END_HYPHENS
 from galley.model import (
     Block,
+    BlockKind,
     BlocksFile,
     Box,
     ChangeReason,
@@ -565,14 +566,36 @@ def _change_follows_its_reason(change: WordChange) -> bool:
             assert_never(change.reason)
 
 
+def _margin_note_words(blocks: BlocksFile) -> frozenset[tuple[int, str]]:
+    """The words of the margin-note blocks, each with the page its block
+    starts on."""
+    return frozenset(
+        (block.origin[0].page_index, word)
+        for block in _all_blocks(blocks)
+        if block.kind is BlockKind.MARGIN_NOTE
+        for span in block.spans
+        for word in span.text.split()
+    )
+
+
 def _change_problems(blocks: BlocksFile) -> tuple[str, ...]:
     """The word changes that delete or invent words or change a letter,
-    which the multiset comparison would take on trust."""
+    which the multiset comparison would take on trust, and the joins of a
+    lost hyphen whose word is in no margin note of their page (structure
+    spec section 5)."""
+    in_margin_notes = _margin_note_words(blocks)
     return tuple(
         f"word change on page {change.page_index}: {change.before!r} to "
         f"{change.after!r} is not a {change.reason.value}"
         for change in blocks.word_changes
         if not _change_follows_its_reason(change)
+    ) + tuple(
+        f"word change on page {change.page_index}: {change.after!r}, a "
+        f"{change.reason.value}, is not in a margin note"
+        for change in blocks.word_changes
+        if change.reason is ChangeReason.HYPHEN_LOST
+        and _change_follows_its_reason(change)
+        and (change.page_index, change.after[0]) not in in_margin_notes
     )
 
 
