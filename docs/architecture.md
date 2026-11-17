@@ -457,7 +457,7 @@ page_numbers)`:
   `note_marker`: ("Greece,1",)
   becomes ("Greece,", "1"), the "1" going to the note reference.
   `source_dash`: ("—Hobbes",) becomes ("Hobbes",), the dash before an
-  epigraph's source, which the output draws. `punctuation_attached`:
+  epigraph's source, which markdown writes back. `punctuation_attached`:
   ("subjection", ";") becomes ("subjection;",), a spaced sign attached
   in a book not in French. `case_split`: ("theAvre",) becomes ("the",
   "Avre"), a word the OCR glued at a case change
@@ -578,7 +578,7 @@ link into the right chapter file, checked on 16 November 2026; the
 pop-up itself was not tried on a Kindle); a `verse` block with a hard
 line break at each line feed; an `epigraph` as a div holding its
 quotation, with hard line breaks when it is verse, and a div of class
-`epigraph-source` holding its source, whose dash the style sheet draws;
+`epigraph-source` holding a dash and its source, the dash written as text;
 a note group's heading as a div of class `note-group` before its first
 note, not a heading (`docs/specs/structure.md` §25); a margin note inside a note within that
 note; figures as images with their caption. How each kind is written and
@@ -747,7 +747,8 @@ lists the words, with the pages they came from where the origins say.
   `marker` is written there and counted, referenced or not (section 9).
   A heading's `label` is written in `book.md`, in the form the markdown
   spec gives, and counted as words of its block; so are an epigraph's
-  `source`, in its `epigraph-source` div, and a note's `group`, in the
+  `source`, in its `epigraph-source` div after the dash markdown writes
+  there, which is not compared, and a note's `group`, in the
   `note-group` div before the note (`docs/specs/structure.md` §25).
 - A figure's image is the one place `book.md` holds an image. Pandoc
   reads a figure block with a caption as a `Figure` element whose
@@ -886,13 +887,15 @@ On 17 November 2026:
   paragraph ended at a page break, spaced punctuation, three fixes from
   the public-domain books); an **epigraph** is a block kind of its own
   with its source as a separate part; the dash before a source is look,
-  removed with a record and drawn by the output; a verse epigraph keeps
+  removed with a record and written back by markdown; a verse epigraph keeps
   its line breaks; a spaced "?", ";", ":" or "!" is attached to its
   word in an English book, with a record, and preceded by a no-break
   space in a French one, and left alone after a dash or a quotation
-  mark (`docs/specs/structure.md` §22 and §23). How the source and a
-  note group's heading are stored, and how the dash is drawn, are open
-  (§27 of the same spec).
+  mark (`docs/specs/structure.md` §22 and §23). The source and a note
+  group's heading are strings on the block and the note, the group
+  heading is not in the table of contents, and markdown writes the
+  dash as text, not the style sheet (§27 of the same spec, settled by
+  the plan's orchestrator the same day).
 
 ## 18. Not in this document
 

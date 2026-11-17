@@ -56,7 +56,7 @@ text, with its **source**, the line that names its author and often the
 work or year, printed after a dash or set flush right. A block kind of
 its own, `epigraph`, its source a separate part; a verse epigraph keeps
 its line breaks. The dash is how the source looks, not its text: it is
-removed with a record and drawn by the output. Not a quote, which is
+removed with a record and written back by the output. Not a quote, which is
 quoted inside the text.
 
 **evaluation book**: a book of the evaluation set of
