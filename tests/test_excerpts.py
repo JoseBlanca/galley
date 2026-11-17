@@ -1105,7 +1105,7 @@ def test_index_haskins_267_calabria_one_entry_and_the_rows_cut_at_the_gutter(
     # column, before "Commerce". The page is a small-print page, read whole
     # by Tesseract and kept: the two readings tie at 250 and Tesseract's
     # holds more known words (reocr spec, section 3), and it reads the
-    # printed "10 f.," the layer lost; "Colombières" is printed.
+    # printed "10 f.," the layer lost.
     _, blocks = excerpt_outputs["haskins_quotes_index"]
     entries = _index_entries_on(blocks, 9)
     assert entries[:3] == (
@@ -1118,7 +1118,7 @@ def test_index_haskins_267_calabria_one_entry_and_the_rows_cut_at_the_gutter(
         "Clermont, 211.",
         "Clovis, 207.",
         "Cluny, 164.",
-        "Colombiéres, 116.",
+        "Colombiéres, 116.",  # Tesseract's misreading of the printed "Colombières"
     )
     assert entries[clermont + 4].startswith("Commerce, Norman, 4, 73, 81,")
     assert "quote" not in _kinds_on(blocks, 9) + _kinds_on(blocks, 10)
