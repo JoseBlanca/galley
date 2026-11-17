@@ -544,8 +544,16 @@ Tesseract's reading holds.
 already among the replaced words of a kept region of its page is not
 counted again by a later one, and a word of Tesseract's whose middle
 lies inside the crop of an earlier kept region on the page is dropped,
-so that a printed word is not read in by two regions. A region not
-kept drops no word of a later one, whose reading of the same printed
+and so is one whose letters and digits, case-folded and not empty,
+equal those of a Tesseract word of an earlier kept region whose middle
+lies within 16 pt above or below its own, when it reads no layer word
+the later region may still replace (by the rules above). Two crops
+that touch can read the same printed line, whose words' middles lie
+outside the earlier crop: in a hand-made case of the review of 17
+November 2026, a note band read a line whose middle lay 3 pt below the
+band above, which had read and kept it (no such word on whole Stubbs,
+Domesday and Gierke). So a printed word is not read in by two regions.
+A region not kept drops no word of a later one, whose reading of the same printed
 words may then be kept. The regions of a page are taken in the order of
 the record below.
 
