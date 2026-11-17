@@ -1,7 +1,7 @@
 """Words glued at a case change (spec section 24): a word the OCR gave as
 two, "theAvre", is split at its capital, as a recorded word change, when
-the word list knows the left part and the book prints the right part
-whole."""
+the word list knows the left part, the book prints it often, and the book
+prints the right part whole."""
 
 from dataclasses import replace
 
@@ -20,6 +20,9 @@ CASE_SPLIT = pending_reason("case_split")
 _MIN_LEFT_LETTERS = 2
 # Spec section 24: the capital is followed by at least 2 lower-case letters.
 _MIN_RIGHT_LOWER_LETTERS = 2
+# Spec section 24: the capitals the OCR gives for "li" ("poUtique",
+# "estabHshed"), at which a word is never split.
+_MISREAD_CAPITALS = frozenset("UH")
 
 
 def _letters_span(word: str) -> tuple[int, int]:
@@ -54,26 +57,32 @@ def _capital_position(core: str) -> int | None:
 
 
 def split_at_case(
-    word: str, lower_case_words: frozenset[str], book_words: frozenset[str]
+    word: str,
+    lower_case_words: frozenset[str],
+    book_words: frozenset[str],
+    common_inner_words: frozenset[str],
 ) -> tuple[str, str] | None:
     """The two words a word glued at a lower-to-upper case change makes,
     the punctuation at each end going with its side: "theAvre" gives
     ("the", "Avre"), "ofWilliam," gives ("of", "William,") (spec section
     24). None unless all of these hold: the word without the punctuation
     at its ends is lower-case letters, one capital and at least 2
-    lower-case letters; the left part has at least 2 letters and is a
-    known word of `lower_case_words`, the word list in lower case; the
-    right part's key is among `book_words`, the keys of the words the book
-    prints whole; and the whole word is not a known word."""
+    lower-case letters; the capital is not "U" or "H"; the left part has
+    at least 2 letters, is a known word of `lower_case_words`, the word
+    list in lower case, and is among `common_inner_words`
+    (`BookSurvey.common_inner_words`); the right part's key is among
+    `book_words`, the keys of the words the book prints whole; and the
+    whole word is not a known word."""
     start, end = _letters_span(word)
     core = word[start:end]
     capital = _capital_position(core)
-    if capital is None:
+    if capital is None or core[capital] in _MISREAD_CAPITALS:
         return None
     left = core[:capital]
     right = core[capital:]
     if (
         is_known_word(left, lower_case_words)
+        and left in common_inner_words
         and right.lower() in book_words
         and not is_known_word(core, lower_case_words)
     ):
@@ -83,10 +92,14 @@ def split_at_case(
 
 
 def split_glued_words(
-    block: Unnumbered, lower_case_words: frozenset[str], book_words: frozenset[str]
+    block: Unnumbered,
+    lower_case_words: frozenset[str],
+    book_words: frozenset[str],
+    common_inner_words: frozenset[str],
 ) -> Unnumbered:
     """`block` with each word glued at a case change split in two, as
-    `split_at_case` gives against `lower_case_words` and `book_words`
+    `split_at_case` gives against `lower_case_words`, `book_words` and
+    `common_inner_words`
     (spec section 24). Each split is a `case_split` change on the word's
     page, placed at the position of the first part; both parts are on the
     word's page, and the positions of the block's changes and line starts
@@ -107,7 +120,7 @@ def split_glued_words(
         zip(block.words, block.word_pages, strict=True)
     ):
         moved[position] = len(words)
-        parts = split_at_case(word, lower_case_words, book_words)
+        parts = split_at_case(word, lower_case_words, book_words, common_inner_words)
         if parts is None:
             words.append(word)
             pages.append(page)
