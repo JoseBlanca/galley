@@ -596,7 +596,9 @@ reference token before the first aligned token is not scored when its
 alignment key is the key of a word galley removed as `front_matter`;
 every other token there is scored as usual, so that the lost first words
 of a preface still count as missing. The scorecard gives the number of
-tokens left unscored this way, `front_matter_not_scored`, within
+tokens left unscored this way, together with the reference tokens
+placed on a page galley dropped as front matter,
+`front_matter_not_scored`, within
 `not_scored`, and the differences list them apart as front matter.
 
 ### Differences
