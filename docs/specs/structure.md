@@ -251,7 +251,7 @@ A head line is a **running head** when its top lies at most 2 body line
 pitches below the median top of the head lines of the book, and either:
 
 - its letters, lower case, with everything else dropped, are at least 4
-  letters and at least 0.75 alike (`difflib.SequenceMatcher` ratio) to
+  letters and at least 0.70 alike (`difflib.SequenceMatcher` ratio) to
   those of the head line of at least one other page within the same 2
   pitches; or
 - its first or last word is a page-number form that the book's head
@@ -265,7 +265,7 @@ pitches below the median top of the head lines of the book, and either:
 letters and is not a running head, the line below it, the topmost line of
 the page's other regions, is tested: it is a running head when its top
 lies within the 2 pitches of the median head top and its letters are at
-least 4 and 0.75 alike to those of a running head of another page. It is
+least 4 and 0.70 alike to those of a running head of another page. It is
 then removed as a running head is, with its page number, and the speck
 above stays as it is (in the text, or as a `stray_mark` when it has no
 letter or digit).
@@ -288,7 +288,7 @@ leave in the text is a running head when all three hold:
   digit or one of the letters i, v, x, l, c, d, m in either case, with at
   most one "." or "," after them ("vi", "vlil", "xiv.", "47"); and
 - the rest of the line, its letters in lower case, at least 4 of them,
-  is at least 0.75 alike, as above, to the letters of the topmost line
+  is at least 0.70 alike, as above, to the letters of the topmost line
   of one of the two pages before it.
 
 It is then removed as a running head is, below: the number-like word as
@@ -339,6 +339,18 @@ Asking for 1 finds 3 more pages in Stubbs and 13 in Mariéjol, and takes
 notes) and none in the other three; it also finds Gierke's
 section heads, which run over two pages only ("The Course of
 Development.", pages 88 and 90).
+
+The likeness was 0.75 until 17 November 2026, and 0.70 since: Gierke's
+running heads of pages 72 and 78, read "List of ~-l ntlioritics." and
+"List of slnthoriti* ixxiii", are 0.74 and 0.70 alike to the others and
+stayed in the text, where the tall line of section 14 made each a
+level-1 heading. Measured on the six public-domain books and the
+owner's two with section 3's rules as built (`lines.json` of layout §3's
+new steps), 0.70 takes 13 more head lines for running heads, and each
+is one on the page image: Gierke's 58 ("Analytical Snnittniry. liii"),
+72 and 78, and 10 of Mariéjol's garbled heads (48, 63, 77, 106, 250,
+296, 300, 311, 329, 409); it loses none and changes nothing on the
+owner's books.
 
 **A short region beside the head.** Some books print the page number
 outside the body column, level with the running head. Layout then makes
@@ -2793,7 +2805,7 @@ paragraph of pages 15 to 18).
    head that Kadesh prints on its plates stands 79 to 191 pt from the
    top, so section 3 does not find it. On a plate page, the topmost line
    is a running head when its letters are alike, by section 3's rule
-   (at least 4 letters, 0.75), to the topmost line of another plate page
+   (at least 4 letters, 0.70), to the topmost line of another plate page
    or to a running head of the book, wherever it lies. Kadesh's
    "DECENNIAL PUBLICATIONS, V" on pages 34, 42, 48, 56 and 64 is then
    removed; page 68's garbled form is 0.68 alike and stays, as a
