@@ -439,11 +439,13 @@ the others stay in the layer. A layer word is that word when
   widened by 2 pt up and down and 1 pt across; or else
 - (b) its letters and digits, case-folded and not empty, equal those of
   one of the Tesseract words whose middle lies within 16 pt above or
-  below its own, and that no other layer word of that text has matched.
-  A Tesseract word is matched in (a) by a layer word of its text under
-  it; in (b) the pairs of a layer word and a Tesseract word of the same
-  text are taken nearest first (the distance of their middles across
-  plus up or down), each word in one pair at most; or else
+  below its own, and that no other layer word has matched.
+  A Tesseract word is matched in (a) when a layer word lies under it,
+  whatever the texts of the two: it reads that printed word, and (b) and
+  (c) pair only the Tesseract words (a) left unmatched. In (b) the pairs
+  of a layer word and a Tesseract word of the same text are taken
+  nearest first (the distance of their middles across plus up or down),
+  each word in one pair at most; or else
 - (c) it has 3 letters or more, and its letters, case-folded, are alike
   to those of one of the Tesseract words whose middle lies within 16 pt
   above or below its own and that (a) and (b) left unmatched: difflib's
@@ -451,6 +453,14 @@ the others stay in the layer. A layer word is that word when
   The pairs are taken nearest first, as in (b), each word in one pair at
   most. A word of fewer than 3 letters, a number among them, needs (a)
   or (b).
+
+A Tesseract word under which (a) found a layer word of another text
+used to stay free for (b) and (c), and then stood for two printed
+words: on Domesday page 548 the layer's "dominicum," lay under
+Tesseract's "dominieum,", which (c) then paired with the layer's
+"Domini" of the line above, where Tesseract had read only "3" for
+"Dominium, 224"; "Domini" was lost and "dominieum," read in for both
+(review of 17 November 2026).
 
 A printed word that Tesseract did not read, or whose reading a filter
 dropped (a cut-in line at the inset, a word over a body word, a word
