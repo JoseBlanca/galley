@@ -1,0 +1,61 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "gierke_intro_heads",
+  "page": 2,
+  "book_page_index": 70,
+  "checks": "a running head removed as now (its page number is not in the text layer)",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "List of Authorities."
+      }
+    ],
+    "page_numbers": []
+  },
+  "printed": {
+    "book_page_index": 70,
+    "running_head": {
+      "words": "List of Authorities.",
+      "page_number": "lxv",
+      "number_side": "right",
+      "number_position": "inside the text column: flush with the column's right edge (the right end of the head rule and of the body lines), separated from the italic title by space",
+      "rule_below": true
+    },
+    "above_head": "a small vertical mark/speck at the top right, above the page number",
+    "title_heading": null,
+    "section_headings": [],
+    "entries": {
+      "setting": "Each entry has a hanging number in bold sans-serif figures with a full stop (e.g. '8.'), set flush with the left edge of the column; the entry text is roman (author name in the same plain roman as the rest, not small caps or italic), first line beside the number, turnover lines indented further (hanging indent).",
+      "count_numbered_on_page": 14,
+      "first_entry_first_words": "Hugo de S.",
+      "last_entry_first_words": "Philip of Swabia",
+      "starts_mid_entry": false
+    },
+    "margin_numbers": {
+      "side": "left, hanging (inside the column's left edge, the entry numbers)",
+      "numbers": [
+        "18.",
+        "19.",
+        "20.",
+        "21.",
+        "22.",
+        "23.",
+        "24.",
+        "25.",
+        "26.",
+        "27.",
+        "28.",
+        "29.",
+        "30.",
+        "31."
+      ]
+    },
+    "foot": {
+      "left": "M.",
+      "right": "e (italic lowercase signature letter)",
+      "description": "Signature marks at the foot: 'M.' at left (printer's/translator's mark) and italic 'e' near the right; the 'e' signature begins a gathering."
+    },
+    "notes": "Head rule is drawn in two segments (slight gap) in the scan."
+  }
+}

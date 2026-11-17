@@ -1,0 +1,80 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "haskins_heads_notes",
+  "page": 0,
+  "book_page_index": 22,
+  "checks": "a word glued at a case change, \"theAvre\" (work package 5); the running head and its page number, removed as now; the two footnotes side by side in the band, as now",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "NORMANDY IN HISTORY"
+      },
+      {
+        "reason": "page_number",
+        "text": "7"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "7",
+        "position": "head"
+      }
+    ],
+    "band_first_line": "* La France, p. i6i. ^ Pag^s normandes, dedication.",
+    "notes": [
+      {
+        "marker": "*",
+        "text": "La France, p. i6i."
+      },
+      {
+        "marker": "^",
+        "text": "Pag^s normandes, dedication."
+      }
+    ]
+  },
+  "printed": {
+    "book_page_index": 22,
+    "running_head": {
+      "words": [
+        "NORMANDY",
+        "IN",
+        "HISTORY"
+      ],
+      "page_number": "7",
+      "number_side": "right",
+      "skew": "none visible"
+    },
+    "above_head": null,
+    "below_head_tall": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "If the character of Normandy"
+    ],
+    "ends_mid_paragraph": true,
+    "last_words": "are the perpetual",
+    "margin_notes": [],
+    "footnotes": [
+      {
+        "marker": "superscript 1",
+        "text": "La France, p. 161.",
+        "italic": "La France",
+        "reference": "times.\"¹ (after closing quote: 'of ancient times.\"¹')"
+      },
+      {
+        "marker": "superscript 2",
+        "text": "Pages normandes, dedication.",
+        "italic": "Pages normandes",
+        "reference": "tombs.\"² ('tion for its tombs.\"²')"
+      }
+    ],
+    "footnotes_layout": "both notes on one line, side by side",
+    "quotes_or_verse": [],
+    "spaced_punctuation": [],
+    "case_glued": "'the Avre' is printed with the space very tight: 'of theAvre and theVexin' (tight kerning before the capital A and V; looks run together at 300 dpi)",
+    "foot": null,
+    "notes": "Ink scratch/stray strokes over 'Behind' and 'Blache' in lines 3-4. Two small dots near bottom right below the text block.",
+    "footnote_gap": "close: footnote line set just under the last body line, no blank line (baseline-to-baseline about 1.25 body lines, a touch more than the normal line pitch)"
+  }
+}

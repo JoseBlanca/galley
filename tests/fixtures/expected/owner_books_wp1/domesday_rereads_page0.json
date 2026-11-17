@@ -1,0 +1,43 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "domesday_rereads",
+  "page": 0,
+  "book_page_index": 26,
+  "checks": "a margin note whose broken last word the text layer and re-reading both give (reocr spec section 4, work package 2); the running head removed as now",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "Domesday Booh"
+      }
+    ],
+    "page_numbers": []
+  },
+  "printed": {
+    "book_page_index": 26,
+    "running_head": {
+      "words": "Domesday Book.",
+      "page_number": "5",
+      "number_side": "right"
+    },
+    "above_head": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "We say this, not by"
+    ],
+    "ends_mid_paragraph": true,
+    "last_body_words": "defined by fiscal",
+    "margin_notes": [
+      {
+        "text": "The survey / and the / geld sys- / tem.",
+        "beside": "We say this, not by way of vain complaint"
+      }
+    ],
+    "footnotes": [],
+    "footnote_gap": null,
+    "tables_or_lists": [],
+    "foot": null,
+    "notes": "Right outer margin. A small dark speck in the right margin beside the line 'a villein and a free man ... apportion-'. Body prints 'royal commis-/sioners  Here' with no full stop (as printed)."
+  }
+}

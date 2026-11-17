@@ -1,0 +1,91 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "haskins_heads_notes",
+  "page": 8,
+  "book_page_index": 55,
+  "checks": "a footnote set close under a quotation, 1.1 pitches below the row above (layout step 4): a band, and a note, not body",
+  "expected": {
+    "removals": [
+      {
+        "reason": "stray_mark",
+        "text": "^"
+      },
+      {
+        "reason": "page_number",
+        "text": "40"
+      },
+      {
+        "reason": "running_head",
+        "text": "NORMANS IN EUROPEAN HISTORY"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "40",
+        "position": "head"
+      }
+    ],
+    "band_first_line": "* Corpus Poeticum Boreale, i, p. 265/.",
+    "notes": [
+      {
+        "marker": "*",
+        "text": "Corpus Poeticum Boreale, i, p. 265/."
+      }
+    ]
+  },
+  "printed": {
+    "book_page_index": 55,
+    "running_head": {
+      "words": [
+        "NORMANS",
+        "IN",
+        "EUROPEAN",
+        "HISTORY"
+      ],
+      "page_number": "40",
+      "number_side": "left",
+      "skew": "none visible"
+    },
+    "above_head": null,
+    "below_head_tall": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "Brands broke against the black",
+      "Second Burden: There was a",
+      "Second Stave: The prince reddened",
+      "Third Burden: The lees of",
+      "Third Stave: The flying javelin"
+    ],
+    "paragraph_starts_note": "Page opens inside a quotation (translated skaldic poem) continued from the page before. 'Again: —' is a short body line (larger type, flush left) between two quotations. The 'Burden'/'Stave' labels are italic and begin indented paragraphs inside the second quotation.",
+    "ends_mid_paragraph": true,
+    "last_words": "flaxen-bowstring bore the",
+    "margin_notes": [],
+    "footnotes": [
+      {
+        "marker": "superscript 1",
+        "text": "Corpus Poeticum Boreale, I, p. 265 f.",
+        "italic": "Corpus Poeticum Boreale; the final f. is italic",
+        "note": "I in small capitals",
+        "reference": "brand.¹ (end of first quotation, 'stream of the brand.¹')"
+      }
+    ],
+    "quotes_or_verse": [
+      {
+        "kind": "quotation in smaller type, continued from previous page",
+        "first_words": "den under the Northmen's shield-fires",
+        "last_words": "of the brand.¹"
+      },
+      {
+        "kind": "quotation in smaller type, continues on next page",
+        "first_words": "Brands broke against the black",
+        "last_words": "flaxen-bowstring bore the"
+      }
+    ],
+    "spaced_punctuation": [],
+    "case_glued": null,
+    "foot": null,
+    "footnote_gap": "close: footnote set directly under the last body line, no blank gap (about one line pitch)",
+    "notes": "Dark vertical bar at the right edge (book gutter/edge). Square-bracketed glosses like [weapons], [blood] are printed."
+  }
+}

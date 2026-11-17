@@ -1,0 +1,60 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "haskins_heads_notes",
+  "page": 1,
+  "book_page_index": 23,
+  "checks": "a running head whose next row holds an em dash boxed tall (layout step 3), removed with its page number, and the speck above it a stray_mark",
+  "expected": {
+    "removals": [
+      {
+        "reason": "stray_mark",
+        "text": "!"
+      },
+      {
+        "reason": "page_number",
+        "text": "8"
+      },
+      {
+        "reason": "running_head",
+        "text": "NORMANS IN EUROPEAN HISTORY"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "8",
+        "position": "head"
+      }
+    ]
+  },
+  "printed": {
+    "book_page_index": 23,
+    "running_head": {
+      "words": [
+        "NORMANS",
+        "IN",
+        "EUROPEAN",
+        "HISTORY"
+      ],
+      "page_number": "8",
+      "number_side": "left",
+      "skew": "none visible"
+    },
+    "above_head": null,
+    "below_head_tall": "em dash in first line: 'history — Normandy's Al-'",
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "The most distinctive parts of"
+    ],
+    "ends_mid_paragraph": true,
+    "last_words": "which grow higher",
+    "margin_notes": [],
+    "footnotes": [],
+    "quotes_or_verse": [],
+    "spaced_punctuation": [],
+    "case_glued": "'commonly distinguished as Upper and Lower Normandy' is set tight ('commonlydistinguished as Upper andLowerNormandy' look run together)",
+    "foot": null,
+    "notes": "No footnotes on this page. Short vertical mark at right edge near bottom.",
+    "footnote_gap": "n/a (no footnotes)"
+  }
+}

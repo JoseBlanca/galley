@@ -1,0 +1,74 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "domesday_rereads",
+  "page": 2,
+  "book_page_index": 36,
+  "checks": "a margin note read by re-reading (work package 2); the running head and its page number removed as now, and the footnotes in the band",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "Plan of the Survey."
+      },
+      {
+        "reason": "page_number",
+        "text": "15"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "15",
+        "position": "head"
+      }
+    ],
+    "band_first_line": "1 We do not mean to imply that there were not wide stretches of waste land"
+  },
+  "printed": {
+    "book_page_index": 36,
+    "running_head": {
+      "words": "Plan of the Survey.",
+      "page_number": "15",
+      "number_side": "right"
+    },
+    "above_head": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "The 'vill' or 'town' of"
+    ],
+    "ends_mid_paragraph": true,
+    "last_body_words": "never have been thoroughly effaced.",
+    "margin_notes": [
+      {
+        "text": "The nucle- / ated village / and the / vill of scat- / tered / steads.",
+        "beside": "The 'vill' or 'town' of the later middle ages"
+      }
+    ],
+    "footnotes": [
+      {
+        "marker": "1",
+        "text": "We do not mean to imply that there were not wide stretches of waste land which were regarded as being 'extra-villar,' or common to several vills.",
+        "ref_word": "days (\"after days¹\", line 2)"
+      },
+      {
+        "marker": "2",
+        "text": "Hist. Eng. Law, i. 547.",
+        "ref_word": "finance"
+      },
+      {
+        "marker": "3",
+        "text": "This of course would not be true of cases in which the lands of various villages were intermixed in one large tract of common field. As to these 'discrete vills,' see Hist. Eng. Law, i. 549.",
+        "ref_word": "themselves"
+      },
+      {
+        "marker": "4",
+        "text": "This name-giving cluster will usually contain the parish church and so will enjoy a certain preeminence. But we are to speak of a time when parish churches were novelties.",
+        "ref_word": "vill"
+      }
+    ],
+    "footnote_gap": "visible blank gap (about one line) between body and first footnote",
+    "tables_or_lists": [],
+    "foot": null,
+    "notes": "Last body line ends a sentence ('effaced.') but the paragraph probably continues on the next page; treat end as uncertain (ends at line end with full stop). Body lacks full stops after 'days¹' and 'finance²' as printed. Speck in right margin beside footnote 4; faint grey mark below footnotes."
+  }
+}

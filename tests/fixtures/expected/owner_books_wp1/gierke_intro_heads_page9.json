@@ -1,0 +1,55 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "gierke_intro_heads",
+  "page": 9,
+  "book_page_index": 77,
+  "checks": "a running head with its roman page number printed beside it, a region of its own (structure spec section 3, \"A short region beside the head\"), removed with it",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "ixxii Political Theories of the Middle Age."
+      }
+    ],
+    "page_numbers": []
+  },
+  "known": "The roman page number is read \"ixxii\", which is no well-formed roman numeral, so it goes with the running head (structure spec section 3).",
+  "printed": {
+    "book_page_index": 77,
+    "running_head": {
+      "words": "Political Theories of the Middle Age.",
+      "page_number": "lxxii",
+      "number_side": "left",
+      "number_position": "inside the text column: flush with the column's left edge (the left end of the head rule and of the body lines), separated from the italic title by space",
+      "rule_below": true
+    },
+    "above_head": null,
+    "title_heading": null,
+    "section_headings": [],
+    "entries": {
+      "setting": "Each entry has a hanging number in bold sans-serif figures with a full stop (e.g. '8.'), set flush with the left edge of the column; the entry text is roman (author name in the same plain roman as the rest, not small caps or italic), first line beside the number, turnover lines indented further (hanging indent).",
+      "count_numbered_on_page": 11,
+      "first_entry_first_words": "Theodoricus Laelius episcopus",
+      "last_entry_first_words": "Jacobus Almainus (d.",
+      "starts_mid_entry": true
+    },
+    "margin_numbers": {
+      "side": "left, hanging (inside the column's left edge, the entry numbers)",
+      "numbers": [
+        "94.",
+        "95.",
+        "96.",
+        "97.",
+        "98.",
+        "99.",
+        "100.",
+        "101.",
+        "102.",
+        "103.",
+        "104."
+      ]
+    },
+    "foot": null,
+    "notes": "Starts mid-entry: 4 lines continue entry 93. Numbers 100-104 are three digits; entry text still aligned at the same indent. '95.' and '97.' points look like commas in the scan. Bottom quarter of page empty (end of section I)."
+  }
+}
