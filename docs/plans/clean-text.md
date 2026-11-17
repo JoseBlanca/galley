@@ -457,10 +457,10 @@ those of 5.5.4 only. The note bands are found in pure Python over a
   excerpt fixture skipping without Tesseract; layout §3 and §4; the
   changed reference pages. Spec: reocr §3, §4, §6, §7 and §10; layout
   §3. Needs 5.1. Deliverables 3, 4.
-- [ ] 5.3 The excerpt tests, with the literals reocr §9 gives; the full
+- [x] 5.3 The excerpt tests, with the literals reocr §9 gives; the full
   reading of each region waits for the owner's sheet (task 6.2). Spec:
   reocr §9, "Excerpt tests". Needs 5.2. Deliverable 2.
-- [ ] 5.4 The whole-book tests and the timings. Spec: reocr §7; §9,
+- [x] 5.4 The whole-book tests and the timings. Spec: reocr §7; §9,
   "Whole-book tests". Needs 5.2. Deliverables 5, 6.
 
 ## 6. The evaluation tool, the owner's check and the measurement

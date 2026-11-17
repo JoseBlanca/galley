@@ -321,3 +321,50 @@ their book measures from their own ten pages, so `stubbs_summaries_index`
 has no small-print page; Stubbs' index read whole is held by a
 whole-book test (task 5.4). Default run: 2,006 tests in 40.7 s, of
 which 13.8 s is the excerpt fixture's setup, Tesseract included.
+
+## Tasks 5.3 and 5.4: the re-reading tests
+
+Done (d4f8bf1, 7825926; the garbled-copy fix: spec f1f24bf, code
+28ddb6a). Deliverable 2: 34 tests with "reread" in `test_layout.py`,
+among them Gierke's book page 88 reading "Medieval Thought.", Stubbs'
+cut-in crops with the body lines as in a run with `ocr = "trust"`, 1 and
+6 workers byte for byte, and Haskins' "^" read "1" with
+`reread_footnotes`. Deliverable 5: 8 whole-book tests (the fidelity
+check with re-reading on the six books; Stubbs with 1 and 6 workers;
+Stubbs' index pages 312 to 321 read whole). A session fixture now runs
+each whole book once for the layout and structure tests.
+
+Deliverable 6, layout with 6 workers on the Mac17,9 (M5 Pro):
+
+| book | regions read / kept | time | reocr §7 |
+|---|---|---|---|
+| Stubbs | 359 / 228 | 31.9 s | 365 / 262, 30.7 s |
+| Domesday | 623 / 425 | 71.0 s | 630 / 443, 69.9 s |
+| Gierke | 758 / 417 | 51.7 s | 762 / 490, 52.0 s |
+| Haskins | 17 / 8 | 4.0 s | 17 / 8, 3.5 s |
+
+**Garbled copies.** The count asked of 5.4 found a layer word left in a
+kept margin note beside Tesseract's reading of the same word in another
+spelling ("fllght'" beside "flight", Domesday page 76) in 38 of 421 kept
+Domesday records and 15 of 417 Gierke ones; 4 of 5 looked at on the
+page images were copies, 1 a real number Tesseract missed ("131.",
+Gierke page 79). Decided by the orchestrator: a third match, a layer
+word of 3 letters or more replaced when its letters are alike (ratio
+0.6 or more) to those of the nearest unmatched Tesseract word within
+16 pt; a word of digits only still needs an exact match. All 53 copies
+have a ratio of 0.6 or more; the only words above it that are not
+copies are two numbers. After: no copy at 0.6 on Domesday, 2 numbers on
+Gierke (one real). Left, as a known limit: 10 copies spelled too unlike
+("sey'" beside "Chertsey."), Domesday 7 of 421 records (1.7%), Gierke 3
+of 417 (0.7%). Lowering the threshold to 0.5 would delete 4 real words
+at the column's edge ("for" beside "lord"); matching a word that begins
+or ends another was proposed and not taken, since it would also delete a
+short real word beside a longer one ("its" beside "itself"). The new
+match replaces 58 words; 10 checked on the page images were all copies.
+
+Found, for the review: on Gierke's page 79, a numbered list, Tesseract's
+junk is kept in 6 bands ("130. Ff" scores 2 against "130." at 1,
+because "Ff" is in the word list).
+
+Default run: 2,022 tests in 46.7 s (73.7 s with 8 threads); whole-book
+run 59 tests in 562 s.
