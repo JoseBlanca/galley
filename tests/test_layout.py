@@ -2119,17 +2119,13 @@ def test_reread_stubbs_excerpt_keeps_tesseract_for_seven_of_its_cut_in_crops(
 
 @pytest.mark.tesseract
 @pytest.mark.usefixtures("tesseract_of_the_literals")
-@pytest.mark.xfail(
-    strict=True,
-    reason="the layer's garbled copy 'mentofhis' stays beside Tesseract's "
-    "'ment of his': its text is not theirs and its middle lies under none of "
-    "them (reocr spec, section 4); counted in task 5.4 of the clean-text plan",
-)
 def test_reread_stubbs_59_note_keeps_no_layer_copy_beside_tesseract_reading(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     # Excerpt page 4, book page index 59: the note printed "Henry's
-    # mismanage- ment of his children."
+    # mismanage- ment of his children." The layer's garbled copy
+    # "mentofhis", off Tesseract's "ment of his", is replaced by its likeness
+    # to "ment" (reocr spec, section 4, rule (c)).
     lines = read_lines(excerpt_books["stubbs_51_56-64"].lines_json)
     assert _line_texts(lines.pages[4])[2] == (
         "Henry’s",

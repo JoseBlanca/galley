@@ -1769,6 +1769,49 @@ def test_layer_word_without_a_letter_or_digit_is_matched_only_under_a_word() -> 
     assert model.replaced_layer_words(layer, (_tesseract("—", 10, 100),)) == ()
 
 
+def test_layer_word_6_pt_below_an_ocr_word_of_alike_letters_is_replaced() -> None:
+    # The layer's garbled copy of a note word Tesseract read (Domesday
+    # page 76): "fllght'" and "flight" have a ratio of 0.83. Its middle,
+    # at 114, lies 6 pt below Tesseract's box, out of rule (a)'s reach.
+    layer = (_layer("fllght'", 10, 110),)
+    assert model.replaced_layer_words(layer, (_tesseract("flight.", 10, 100),)) == layer
+
+
+def test_layer_word_of_letters_less_alike_than_0_6_stays() -> None:
+    # "for" and "lord" have a ratio of 0.57: a body word at the column's
+    # edge beside a note word (Domesday page 310).
+    layer = (_layer("for", 10, 110),)
+    assert model.replaced_layer_words(layer, (_tesseract("lord", 10, 100),)) == ()
+    # "rega" and "regality" have a ratio of 0.67.
+    alike = (_layer("rega", 10, 110),)
+    assert model.replaced_layer_words(alike, (_tesseract("regality.", 10, 100),)) == (
+        alike
+    )
+
+
+def test_layer_number_of_other_digits_beside_an_ocr_number_stays() -> None:
+    # A list number Tesseract did not read (Gierke page 79).
+    layer = (_layer("131.", 10, 114),)
+    assert model.replaced_layer_words(layer, (_tesseract("130.", 10, 100),)) == ()
+
+
+def test_layer_word_of_alike_letters_more_than_16_pt_off_stays() -> None:
+    layer = (_layer("fllght'", 10, 116.1),)
+    assert model.replaced_layer_words(layer, (_tesseract("flight.", 10, 100),)) == ()
+
+
+def test_two_alike_layer_words_and_one_ocr_word_replace_the_nearer() -> None:
+    nearer, further = _layer("fllght'", 10, 110), _layer("fiight", 10, 116)
+    ocr = (_tesseract("flight.", 10, 100),)
+    assert model.replaced_layer_words((further, nearer), ocr) == (nearer,)
+
+
+def test_ocr_word_matched_by_its_text_is_not_alike_to_another_layer_word() -> None:
+    same, garbled = _layer("flight.", 10, 110), _layer("fllght'", 10, 116)
+    ocr = (_tesseract("flight.", 10, 100),)
+    assert model.replaced_layer_words((garbled, same), ocr) == (same,)
+
+
 def _rereads_record(
     layer_words: tuple[Word, ...], ocr_words: tuple[Word, ...], *, kept: bool
 ) -> Reread:

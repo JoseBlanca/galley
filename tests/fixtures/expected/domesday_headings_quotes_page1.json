@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed by the garbled-copy rule of the clean-text plan (reocr spec section 4, rule (c), 17 November 2026): the layer's garbled copy \"lltes'\" of a margin-note word Tesseract read is replaced with the region's other layer words; compared with the page image by the task 5.4 session.",
   "known": "The margin note reads \"Domesday Book and its satellites.\" (the owner); the text layer's OCR gives \"Domesday its sateilltes'\", which galley keeps.",
   "excerpt": "domesday_headings_quotes",
   "page": 1,
@@ -39,8 +39,7 @@
       "Domesday",
       "Book and",
       "its satel-",
-      "lites.",
-      "lltes'"
+      "lites."
     ],
     [
       "1 Inquisitio Comitatus Cantabrigiae, ed. N. E. Hamilton. When, as some-",
@@ -65,7 +64,7 @@
     },
     {
       "kind": "margin_note",
-      "text": "Domesday Book and its satellites. lltes'",
+      "text": "Domesday Book and its satellites.",
       "pages": [
         1
       ]

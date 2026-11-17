@@ -12,6 +12,7 @@ itself.
 import bisect
 import collections
 import dataclasses
+import difflib
 import functools
 import hashlib
 import itertools
@@ -286,6 +287,16 @@ class Reread:
 _UNDER_OCR_WORD_UP_DOWN_PT = 2.0
 _UNDER_OCR_WORD_ACROSS_PT = 1.0
 _SAME_TEXT_REACH_PT = 16.0
+# (c) Its letters, 3 or more, are alike to those of such a Tesseract word,
+# by difflib's ratio, 0.6 or more: the layer's garbled copy of a note word
+# it reads a few points off the ink ("fllght'" below "flight.", Domesday
+# page 76). Measured on 17 November 2026 on the kept margin-note records of
+# whole Domesday and Gierke: 53 copies at 0.6 or more, none of them a word
+# Tesseract missed but numbers, which rule (c) leaves to (a) and (b); from
+# 0.5 to 0.6, 10 copies and 4 body words at the column's edge ("for" beside
+# "lord", Domesday page 310).
+_ALIKE_LEAST_LETTERS = 3
+_ALIKE_LEAST_RATIO = 0.6
 
 
 def _middle(word: Word) -> tuple[float, float]:
@@ -316,6 +327,26 @@ def _folded(text: str) -> str:
     return "".join(character for character in text if character.isalnum()).casefold()
 
 
+def _letter_count(text: str) -> int:
+    return sum(character.isalpha() for character in text)
+
+
+def _folded_letters(text: str) -> str:
+    """The letters of `text`, case-folded."""
+    return "".join(character for character in text if character.isalpha()).casefold()
+
+
+def _are_alike(layer_text: str, ocr_text: str) -> bool:
+    """Whether the case-folded letters of `layer_text` and `ocr_text` are
+    alike, by difflib's ratio."""
+    layer_letters = _folded_letters(layer_text)
+    ocr_letters = _folded_letters(ocr_text)
+    return (
+        difflib.SequenceMatcher(None, layer_letters, ocr_letters).ratio()
+        >= _ALIKE_LEAST_RATIO
+    )
+
+
 def replaced_layer_words(
     layer_words: Sequence[Word], ocr_words: Sequence[Word]
 ) -> tuple[Word, ...]:
@@ -325,16 +356,18 @@ def replaced_layer_words(
     `ocr_words` (reocr spec, section 4).
 
     A layer word is matched (a) when its middle lies inside the box of
-    one of `ocr_words` widened by 2 pt up and down and 1 pt across, or
-    else (b) when its letters and
-    digits, case-folded and not empty, equal those of one of `ocr_words`
-    whose middle lies within 12 pt above or below its own and that no
-    other layer word of that text has matched. A Tesseract word is matched
-    in (a) by a layer word of its text under it; in (b) the pairs of a
-    layer word and a Tesseract word of its text are taken nearest first,
-    by the distance of their middles across plus up or down, each word in
-    one pair at most. A layer word matched by neither stays in the layer.
-    Boxes in points.
+    one of `ocr_words` widened by 2 pt up and down and 1 pt across; or
+    else (b) when its letters and digits, case-folded and not empty, equal
+    those of one of `ocr_words` whose middle lies within 16 pt above or
+    below its own and that no other layer word of that text has matched;
+    or else (c) when it has 3 letters or more and its case-folded letters
+    are alike, by difflib's ratio of 0.6 or more, to those of one of
+    `ocr_words` within 16 pt above or below that (a) and (b) left
+    unmatched. A Tesseract word is matched in (a) by a layer word of its
+    text under it; in (b) and (c) the pairs of a layer word and a
+    Tesseract word are taken nearest first, by the distance of their
+    middles across plus up or down, each word in one pair at most. A layer
+    word matched by none stays in the layer. Boxes in points.
     """
     under = tuple(is_under_ocr_word(word, ocr_words) for word in layer_words)
     taken = {
@@ -362,6 +395,27 @@ def replaced_layer_words(
     )
     matched = list(under)
     for _, index, position in pairs:
+        if not matched[index] and position not in taken:
+            matched[index] = True
+            taken.add(position)
+    # (c): the pairs of a layer word of 3 letters or more and a Tesseract
+    # word whose letters are alike, the nearest first, each word in one
+    # pair at most.
+    alike_pairs = sorted(
+        (
+            abs(_middle(ocr_word)[0] - _middle(word)[0])
+            + abs(_middle(ocr_word)[1] - _middle(word)[1]),
+            index,
+            position,
+        )
+        for index, word in enumerate(layer_words)
+        if not matched[index] and _letter_count(word.text) >= _ALIKE_LEAST_LETTERS
+        for position, ocr_word in enumerate(ocr_words)
+        if position not in taken
+        and abs(_middle(ocr_word)[1] - _middle(word)[1]) <= _SAME_TEXT_REACH_PT
+        and _are_alike(word.text, ocr_word.text)
+    )
+    for _, index, position in alike_pairs:
         if not matched[index] and position not in taken:
             matched[index] = True
             taken.add(position)
