@@ -61,6 +61,7 @@ from galley.structure import (
     survey_book,
 )
 from galley.structure._assemble import _taken_body_notes
+from galley.structure._heads import is_number_like
 from galley.structure._index import entry_side, index_page
 from galley.structure._index_entries import _index_runs, _IndexRun
 from galley.structure._lines import Piece, PlacedLine
@@ -459,6 +460,132 @@ def test_running_head_below_a_speck_is_removed_and_the_speck_stays() -> None:
     ) == (("THE BOOK", RemovalReason.RUNNING_HEAD), ("31", RemovalReason.PAGE_NUMBER))
     assert blocks.page_numbers[-1] == PageNumber(16, "31", PageNumberPosition.HEAD)
     assert "d the first line of the body" in block_text(blocks.blocks[-1])
+
+
+# The head of a short section (spec section 3): a section of two pages, its
+# heading on page 4 at 106 pt, 4.7 pitches below the median head top of 36
+# pt, and its one running head on page 5; pages 10 to 15 print 25 to 30, so
+# the first arabic head number is on page 10 and a roman one before it is a
+# page-number form.
+
+
+def _short_section(
+    head: str, head_top: float = 36.0, heading: str = "PREFACE"
+) -> tuple[PageLayout, ...]:
+    return (
+        _page_with_head(4, heading, head_top=106.0),
+        _page_with_head(5, head, head_top=head_top),
+        *_numbered_heads(),
+    )
+
+
+def _removed_texts(blocks: BlocksFile, page_index: int) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        (removal.text, removal.reason) for removal in _removals_of(page_index, blocks)
+    )
+
+
+@pytest.mark.parametrize(
+    "text", ["vi", "vlil", "xiv.", "47", "XIV,", "i", "MDCL", "c."]
+)
+def test_number_like_word_is_recognised(text: str) -> None:
+    assert is_number_like(text)
+
+
+@pytest.mark.parametrize(
+    "text", ["", "vlili", "xiv..", "vi.,", "Pre", "ab", "v.i", "(vi)", "12345"]
+)
+def test_word_that_is_not_number_like_is_refused(text: str) -> None:
+    assert not is_number_like(text)
+
+
+def test_short_section_head_with_a_misread_number_is_removed_with_its_line() -> None:
+    blocks = make_blocks(
+        _lines_of(*_short_section("vlil PREFACE")), _NO_WORDS, workers=1
+    )
+    assert _removed_texts(blocks, 5) == (("vlil PREFACE", RemovalReason.RUNNING_HEAD),)
+    assert all(number.page_index != 5 for number in blocks.page_numbers)
+
+
+def test_short_section_head_with_a_roman_page_number_records_it() -> None:
+    blocks = make_blocks(
+        _lines_of(*_short_section("vi Preface.")), _NO_WORDS, workers=1
+    )
+    assert _removed_texts(blocks, 5) == (
+        ("vi", RemovalReason.PAGE_NUMBER),
+        ("Preface.", RemovalReason.RUNNING_HEAD),
+    )
+    assert blocks.page_numbers[0] == PageNumber(5, "vi", PageNumberPosition.HEAD)
+
+
+def test_short_section_head_with_its_number_last_is_a_running_head() -> None:
+    survey = survey_book(_lines_of(*_short_section("PREFACE vlil")), workers=1)
+    assert 5 in survey.running_heads
+
+
+def test_short_section_rule_keeps_a_title_line_without_a_number_like_word() -> None:
+    # Gierke's page 8 repeats the half-title of page 6 at the top of the page.
+    pages = (
+        _page_with_head(6, "POLITICAL THEORIES", head_top=106.0),
+        PageLayout(7, (), ()),
+        _page_with_head(8, "POLITICAL THEORIES"),
+        *_numbered_heads(),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert _removals_of(8, blocks) == ()
+
+
+def test_short_section_heading_two_pages_before_with_a_blank_page_between() -> None:
+    pages = (
+        _page_with_head(3, "PREFACE", head_top=106.0),
+        PageLayout(4, (), ()),
+        _page_with_head(5, "vi Preface."),
+        *_numbered_heads(),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert 5 in survey.running_heads
+
+
+def test_short_section_heading_three_pages_before_is_not_compared() -> None:
+    pages = (
+        _page_with_head(2, "PREFACE", head_top=106.0),
+        PageLayout(3, (), ()),
+        PageLayout(4, (), ()),
+        _page_with_head(5, "vi Preface."),
+        *_numbered_heads(),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_head_with_fewer_than_4_letters_stays() -> None:
+    survey = survey_book(
+        _lines_of(*_short_section("vi Pre.", heading="PRE")), workers=1
+    )
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_head_less_than_0_75_alike_to_the_heading_stays() -> None:
+    # "preface" against "prefatory": 0.625 alike.
+    survey = survey_book(
+        _lines_of(*_short_section("vi Preface.", heading="PREFATORY")), workers=1
+    )
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_head_more_than_2_pitches_below_the_median_stays() -> None:
+    # 31 pt below the median head top of 36 pt, against 2 pitches of 15 pt.
+    survey = survey_book(
+        _lines_of(*_short_section("vi Preface.", head_top=67.0)), workers=1
+    )
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_head_exactly_2_pitches_below_the_median_is_removed() -> None:
+    survey = survey_book(
+        _lines_of(*_short_section("vi Preface.", head_top=66.0)), workers=1
+    )
+    assert 5 in survey.running_heads
 
 
 # Page numbers at the foot and signature marks, on a column from x 25 to
