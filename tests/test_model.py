@@ -1803,6 +1803,44 @@ def test_ocr_word_over_two_layer_lines_and_a_word_overlapping_both_takes_one() -
     )
 
 
+def test_layer_word_glued_over_two_or_three_ocr_words_is_replaced() -> None:
+    # Stubbs' index, page 312: the layer's "of,96" where Tesseract read
+    # "of," "96"; its middle lies between the two, under neither.
+    glued = Word("of,96", Box(100.0, 50.0, 130.0, 58.0), None)
+    of, ninety_six = (
+        Word("of,", Box(100.5, 50.0, 110.0, 58.0), 90.0),
+        Word("96", Box(122.0, 50.0, 129.5, 58.0), 90.0),
+    )
+    assert model.replaced_layer_words((glued,), (of, ninety_six)) == (glued,)
+    # "abolition of,17," read "of," "17," by Tesseract, after "abolition".
+    three = Word("of,17,", Box(100.0, 50.0, 130.0, 58.0), None)
+    seventeen = Word("17,", Box(122.0, 50.0, 129.5, 58.0), 90.0)
+    abolition = Word("abolition", Box(40.0, 50.0, 98.0, 58.0), 90.0)
+    assert model.replaced_layer_words((three,), (abolition, of, seventeen)) == (three,)
+    # Not when a Tesseract word of the group lies more than 1 pt outside its
+    # box, or the group is of four words.
+    outside = Word("96", Box(129.0, 50.0, 134.2, 58.0), 90.0)
+    assert model.replaced_layer_words((glued,), (of, outside)) == ()
+    four = Word("a,b,c,d", Box(100.0, 50.0, 130.0, 58.0), None)
+    letters = tuple(
+        Word(text, Box(x, 50.0, x + 1.0, 58.0), 90.0)
+        for text, x in (("a,", 101.0), ("b,", 109.0), ("c,", 121.0), ("d", 128.0))
+    )
+    assert model.replaced_layer_words((four,), letters) == ()
+
+
+def test_ocr_words_read_glued_by_the_layer_pair_with_no_other_layer_word() -> None:
+    # The layer's "of," a line below may not take Tesseract's "of," that the
+    # glued "of,96" holds.
+    glued = Word("of,96", Box(100.0, 50.0, 130.0, 58.0), None)
+    below = Word("of,", Box(100.0, 62.0, 110.0, 70.0), None)
+    ocr = (
+        Word("of,", Box(100.5, 50.0, 110.0, 58.0), 90.0),
+        Word("96", Box(122.0, 50.0, 129.5, 58.0), 90.0),
+    )
+    assert model.replaced_layer_words((glued, below), ocr) == (glued,)
+
+
 def test_layer_word_without_a_letter_or_digit_is_matched_only_under_a_word() -> None:
     layer = (_layer("—", 10, 110),)
     assert model.replaced_layer_words(layer, (_tesseract("—", 10, 100),)) == ()

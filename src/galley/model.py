@@ -295,6 +295,11 @@ _SAME_TEXT_REACH_PT = 16.0
 # Tesseract missed but numbers, which rule (c) leaves to (a) and (b); from
 # 0.5 to 0.6, 10 copies and 4 body words at the column's edge ("for" beside
 # "lord", Domesday page 310).
+# A layer word glued over two or three Tesseract words is the same printed
+# words as they ("of,96" where Tesseract read "of," "96", Stubbs' index page
+# 312): each Tesseract word's middle lies inside its box widened by 1 pt.
+_GLUED_WORD_COUNTS = (2, 3)
+_GLUED_WIDEN_PT = 1.0
 _ALIKE_LEAST_LETTERS = 3
 _ALIKE_LEAST_RATIO = 0.6
 
@@ -371,6 +376,35 @@ def _under_line(layer_words: Sequence[Word], ocr_word: Word) -> tuple[int, ...]:
     return tuple(sorted(line))
 
 
+def _lies_over(ocr_word: Word, word: Word) -> bool:
+    """Whether the middle of `ocr_word` lies inside the box of `word`
+    widened by 1 pt."""
+    x, y = _middle(ocr_word)
+    return (
+        word.box.x0 - _GLUED_WIDEN_PT <= x <= word.box.x1 + _GLUED_WIDEN_PT
+        and word.box.top - _GLUED_WIDEN_PT <= y <= word.box.bottom + _GLUED_WIDEN_PT
+    )
+
+
+def _glued_over(word: Word, ocr_words: Sequence[Word]) -> tuple[int, ...]:
+    """The positions in `ocr_words` of two or three Tesseract words that
+    follow each other there, each lying over `word`, a layer word, whose
+    letters and digits, joined, are those of `word`: the words the layer
+    glued into `word`. The first such group, of two words before three;
+    () when there is none."""
+    folded = _folded(word.text)
+    if not folded:
+        return ()
+    for count in _GLUED_WORD_COUNTS:
+        for start in range(len(ocr_words) - count + 1):
+            group = ocr_words[start : start + count]
+            if all(_lies_over(ocr_word, word) for ocr_word in group) and (
+                "".join(_folded(ocr_word.text) for ocr_word in group) == folded
+            ):
+                return tuple(range(start, start + count))
+    return ()
+
+
 def may_read(word: Word, ocr_word: Word) -> bool:
     """Whether `ocr_word`, Tesseract's, may be a reading of the printed
     word that `word`, a word of the text layer, reads, by one of the rules
@@ -400,17 +434,19 @@ def replaced_layer_words(
 
     A layer word is matched (a) when its middle lies inside the box of
     one of `ocr_words` widened by 2 pt up and down and 1 pt across, and
-    it is of that word's printed line: of the layer words under it, the
-    one whose middle lies nearest its middle, up or down, and those whose
-    boxes overlap that one's up and down; or
-    else (b) when its letters and digits, case-folded and not empty, equal
+    it is of that word's printed line: the layer words under it taken
+    nearest first, by their middles up or down, each whose box overlaps,
+    up and down, those of all taken before it; or when its letters and
+    digits are those of two or three consecutive `ocr_words` joined, each
+    with its middle inside its box widened by 1 pt, a word the layer
+    glued; or else (b) when its letters and digits, case-folded and not empty, equal
     those of one of `ocr_words` whose middle lies within 16 pt above or
     below its own and that no other layer word has matched;
     or else (c) when it has 3 letters or more and its case-folded letters
     are alike, by difflib's ratio of 0.6 or more, to those of one of
     `ocr_words` within 16 pt above or below that (a) and (b) left
     unmatched. A Tesseract word is matched in (a) by any layer word under
-    it, whatever its text; in (b) and (c) the pairs of a layer word and a
+    it, whatever its text, and by a layer word glued over it; in (b) and (c) the pairs of a layer word and a
     Tesseract word are taken nearest first, by the distance of their
     middles across plus up or down, each word in one pair at most. A layer
     word matched by none stays in the layer. Boxes in points.
@@ -420,12 +456,21 @@ def replaced_layer_words(
     under_line = {
         index for ocr_word in ocr_words for index in _under_line(layer_words, ocr_word)
     }
-    under = tuple(index in under_line for index in range(len(layer_words)))
+    # (a) also: a layer word glued over two or three Tesseract words, which
+    # read it and pair with no other.
+    glued = {
+        index: positions
+        for index, word in enumerate(layer_words)
+        if (positions := _glued_over(word, ocr_words))
+    }
+    under = tuple(
+        index in under_line or index in glued for index in range(len(layer_words))
+    )
     taken = {
         position
         for position, ocr_word in enumerate(ocr_words)
         if any(_is_under(word, ocr_word) for word in layer_words)
-    }
+    } | {position for positions in glued.values() for position in positions}
     # (b): the pairs of a layer word and a Tesseract word of its text, the
     # nearest first, each word in one pair at most.
     pairs = sorted(
