@@ -1,5 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
   "excerpt_only": "What the excerpt gives, not what the whole book gives: footnote 3, \"D. B. i. 184 b…\", belongs to page 30, and the excerpt runs it on to this page, the next text page it holds.",
   "known": "The table's title \"ARMINGFORD HUNDRED.\" is a false heading of level 2, and the table's rows come out as notes and paragraphs (structure spec section 9). The owner: the links from \"1\" and \"2\" to table rows are wrong, and part of a note comes from a previous page: the text at the foot \"-worth, -wick, -thorpe…\" is the end of a note of page 41, likely, which galley glues to the table's last row \"Croydon 0\". The margin note reads \"Size of the vill.\" (the OCR gives \"Size of the\").",
   "excerpt": "domesday_headings_quotes",
@@ -13,7 +14,7 @@
     [
       "To say that the villa of Domesday Book is in general the",
       "vill of the thirteenth century and the civil parish of the nine-",
-      "teenth ist o say that the areal extent of the villa varied widely",
+      "teenth is to say that the areal extent of the villa varied widely",
       "from case to case. More important is it for us to observe that",
       "the number of inhabitants of the villa varied widely from case",
       "to case. The error into which we are most likely to fall will",
@@ -25,14 +26,14 @@
       "It states the number of the tenants of various classes, soche-",
       "manni, villani, bordarii, and the like, and leaves us to suppose",
       "that each of these persons is, or may be, the head of a house-",
-      "hold. It a lso states how many servi there are. Whether we",
+      "hold. It also states how many servi there are. Whether we",
       "ought to suppose that only the heads of servile households are",
       "reckoned, or whether we ought to think of the servi as having",
       "no households but as living within the lord's gates and being",
       "enumerated, men, women and able-bodied children, by the",
       "head — this is a difficult question. Still we may reach some",
       "results which will enable us to compare township with town-",
-      "ship. By w ay of fair sample we may take the Armingford",
+      "ship. By way of fair sample we may take the Armingford",
       "hundred of Cambridgeshire, and all persons who are above the",
       "rank of servi we will include under the term 'the non-servile",
       "population2/",
@@ -46,11 +47,12 @@
     ],
     [
       "Non-servile",
-      "Servi To1t9a l",
-      "Abington popul1a9t ion 0",
+      "Servi Total 19",
+      "population 19 0",
+      "Abington",
       "Bassiugbourn 3 19",
-      "35 1 9 0",
-      "Clapton 2 9 3289",
+      "35 19 0",
+      "Clapton 29 38 29",
       "Croydon 0",
       "-worth, -wick, -thorpe, this of course is in favour of their antiquity. On the",
       "other hand, if they are known merely hy family names such as Styles's, Nokes's,",
@@ -83,7 +85,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "To say that the villa of Domesday Book is in general the vill of the thirteenth century and the civil parish of the nineteenth ist o say that the areal extent of the villa varied widely from case to case. More important is it for us to observe that the number of inhabitants of the villa varied widely from case to case. The error into which we are most likely to fall will be that of making our vill too populous. Some vills, especially some royal vills, are populous enough; a few contain a hundred households; but the average township is certainly much smaller than this1. Before we give any figures, it should first be observed that Domesday Book never enables us to count heads. It states the number of the tenants of various classes, sochemanni, villani, bordarii, and the like, and leaves us to suppose that each of these persons is, or may be, the head of a household. It a lso states how many servi there are. Whether we ought to suppose that only the heads of servile households are reckoned, or whether we ought to think of the servi as having no households but as living within the lord's gates and being enumerated, men, women and able-bodied children, by the head — this is a difficult question. Still we may reach some results which will enable us to compare township with township. By w ay of fair sample we may take the Armingford hundred of Cambridgeshire, and all persons who are above the rank of servi we will include under the term 'the non-servile population2/",
+      "text": "To say that the villa of Domesday Book is in general the vill of the thirteenth century and the civil parish of the nineteenth is to say that the areal extent of the villa varied widely from case to case. More important is it for us to observe that the number of inhabitants of the villa varied widely from case to case. The error into which we are most likely to fall will be that of making our vill too populous. Some vills, especially some royal vills, are populous enough; a few contain a hundred households; but the average township is certainly much smaller than this1. Before we give any figures, it should first be observed that Domesday Book never enables us to count heads. It states the number of the tenants of various classes, sochemanni, villani, bordarii, and the like, and leaves us to suppose that each of these persons is, or may be, the head of a household. It also states how many servi there are. Whether we ought to suppose that only the heads of servile households are reckoned, or whether we ought to think of the servi as having no households but as living within the lord's gates and being enumerated, men, women and able-bodied children, by the head — this is a difficult question. Still we may reach some results which will enable us to compare township with township. By way of fair sample we may take the Armingford hundred of Cambridgeshire, and all persons who are above the rank of servi we will include under the term 'the non-servile population2/",
       "pages": [
         5
       ]
@@ -104,7 +106,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "D. B. i. 184 b : ' H aec terra non geldat nee consuetudinem dat nee in aliquo hundredo iacet ' ; i . 157 ' H aec terra nunquatn geldavit nee alicui Non-servile Servi To1t9a l"
+          "text": "D. B. i. 184 b : ' Haec terra non geldat nee consuetudinem dat nee in aliquo hundredo iacet ' ; i. 157 ' Haec terra nunquatn geldavit nee alicui Non-servile Servi Total 19 population 19 0"
         }
       ],
       "pages": [
@@ -117,7 +119,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "Abington popul1a9t ion 0"
+          "text": "Abington"
         }
       ],
       "pages": [
@@ -141,7 +143,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "1 9 0"
+          "text": "19 0"
         }
       ],
       "pages": [
@@ -153,7 +155,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "Clapton 2 9 3289"
+          "text": "Clapton 29 38 29"
         }
       ],
       "pages": [

@@ -1670,7 +1670,7 @@ def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(
         [" ".join(word.text for word in line.words) for line in region.lines]
         for region in page.regions
     ]
-    assert regions[2:] == [["Characterof", "Henry II."], ["Hisfamily", "policy."]]
+    assert regions[2:] == [["Character of", "Henry II."], ["His family", "policy."]]
 
 
 @pytest.mark.whole_book

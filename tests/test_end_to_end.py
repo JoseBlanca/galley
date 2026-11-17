@@ -45,8 +45,8 @@ GIERKE = "gierke_86-93_270-271"
 # excluded, and page 9 has no text layer.
 WORD_COUNTS = frozendict(
     {
-        KADESH: (583, 641, 671, 904, 822, 764, 909, 822, 0, 0),
-        GIERKE: (192, 311, 297, 325, 319, 309, 292, 273, 547, 541),
+        KADESH: (581, 639, 668, 854, 818, 733, 832, 816, 0, 0),
+        GIERKE: (192, 311, 297, 323, 318, 306, 290, 272, 537, 534),
     }
 )
 TITLES = frozendict(
