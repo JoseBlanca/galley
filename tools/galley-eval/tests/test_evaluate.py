@@ -1076,6 +1076,92 @@ def test_token_after_the_first_aligned_one_with_a_front_matter_key_is_scored() -
     assert (body.reference_tokens, body.missing) == (9, 2)
 
 
+_PREFACE = "The queen came to Paris in 1533 and the king met her there"
+
+
+def _series_evaluation(
+    closing: str,
+    removed: str = "CATHERINE DE MEDICIS 1920 Epochs of Modern History edited by",
+    galley_text: str = _PREFACE,
+) -> Evaluation:
+    """The title page, the preface, which galley reads on page 1, and a
+    closing paragraph, `closing`, which galley's words lack: as Stubbs'
+    series list ("Epochs of Modern History"), printed on a page galley
+    dropped, `removed`, and placed by the reference after the first
+    aligned token."""
+    reference = dataclasses.replace(
+        _TITLE_REFERENCE,
+        blocks=tuple(
+            ReferenceBlock(
+                kind,
+                tuple(
+                    ReferenceToken(word, marked_correction=False)
+                    for word in words.split()
+                ),
+            )
+            for kind, words in (
+                (ReferenceKind.HEADING, "CATHERINE DE MÉDICIS"),
+                (ReferenceKind.PARAGRAPH, _PREFACE),
+                (ReferenceKind.PARAGRAPH, closing),
+            )
+        ),
+    )
+    words = _galley(galley_text, 1)
+    blocks = _galley(galley_text, 1, "b1")
+    side = dataclasses.replace(
+        _side(words, blocks, blocks),
+        words_file=WordsFile(
+            source_pdf_sha256="0" * 64,
+            pages=(
+                PageWords(index=0, text_source=TextSource.NONE, words=(), figures=()),
+                PageWords(
+                    index=1,
+                    text_source=TextSource.TEXT_LAYER,
+                    words=tuple(
+                        Word(token.text, Box(0.0, 0.0, 1.0, 1.0), None)
+                        for token in words
+                    ),
+                    figures=(),
+                ),
+            ),
+            removals=_front_matter_removals(0, removed),
+        ),
+    )
+    return evaluation_of(_book(body_pages=(1, 1)), reference, side, frozenset())
+
+
+def test_four_missing_tokens_printed_on_a_dropped_page_are_front_matter() -> None:
+    evaluation = _series_evaluation("EPOCHS OF MODERN HISTORY. — Edited")
+    # The title's 3 tokens, and the 6 of the list, "—" among them.
+    assert evaluation.scorecard.front_matter_not_scored == 9
+    body = evaluation.scorecard.outputs[0].text[Part.BODY]
+    assert (body.reference_tokens, body.missing) == (13, 0)
+
+
+def test_three_missing_tokens_printed_on_a_dropped_page_are_scored() -> None:
+    evaluation = _series_evaluation("of Modern History")
+    assert evaluation.scorecard.front_matter_not_scored == 3
+    body = evaluation.scorecard.outputs[0].text[Part.BODY]
+    assert (body.reference_tokens, body.missing) == (16, 3)
+
+
+def test_dropped_words_out_of_their_order_are_scored() -> None:
+    evaluation = _series_evaluation("Epochs of History Modern")
+    assert evaluation.scorecard.front_matter_not_scored == 3
+
+
+def test_an_aligned_token_breaks_a_run_of_dropped_words() -> None:
+    # The closing "queen" aligns with galley's last word, so that neither
+    # side of it holds 4 consecutive unaligned tokens.
+    evaluation = _series_evaluation(
+        "Epochs of Modern queen History edited by",
+        galley_text=f"{_PREFACE} queen",
+    )
+    assert evaluation.scorecard.front_matter_not_scored == 3
+    body = evaluation.scorecard.outputs[0].text[Part.BODY]
+    assert body.missing == 6
+
+
 def test_reference_tokens_placed_on_a_front_matter_page_are_front_matter() -> None:
     # As _book_differences, with page 1, "epsilon zcta eta", dropped as
     # front matter and page 2 not excluded: the anchor of printed page 6
