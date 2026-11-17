@@ -463,13 +463,17 @@ def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
 
 # A hyphen join is two parts of a word split at a line end (glossary).
 _HYPHEN_JOIN_PARTS = 2
+# The hyphens at a line's end (structure spec section 5): the ASCII
+# hyphen-minus and the not sign "¬" of the OCR of two of the owner's books.
+_LINE_END_HYPHENS = frozenset({"-", "\N{NOT SIGN}"})
 
 
 def _change_follows_its_reason(change: WordChange) -> bool:
     """Whether a word change keeps every letter as its reason allows: a note
     marker split off its word keeps the text; a hyphen join of two parts,
     on evidence or guessed, drops only the hyphen ending the first; a kept
-    hyphen joins two parts, the first ending with a hyphen, as they are."""
+    hyphen joins two parts, the first ending with a hyphen, as they are,
+    the hyphen written "-" whether the first ends with "-" or "¬"."""
     if not change.before or not change.after:
         return False
     joined_after = "".join(change.after)
@@ -479,14 +483,14 @@ def _change_follows_its_reason(change: WordChange) -> bool:
         case ChangeReason.HYPHEN_JOIN | ChangeReason.HYPHEN_JOIN_GUESSED:
             return (
                 len(change.before) == _HYPHEN_JOIN_PARTS
-                and change.before[0].endswith("-")
+                and change.before[0][-1:] in _LINE_END_HYPHENS
                 and change.before[0][:-1] + change.before[1] == joined_after
             )
         case ChangeReason.HYPHEN_KEPT:
             return (
                 len(change.before) == _HYPHEN_JOIN_PARTS
-                and change.before[0].endswith("-")
-                and change.before[0] + change.before[1] == joined_after
+                and change.before[0][-1:] in _LINE_END_HYPHENS
+                and change.before[0][:-1] + "-" + change.before[1] == joined_after
             )
         case _:
             assert_never(change.reason)

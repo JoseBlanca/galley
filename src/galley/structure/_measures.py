@@ -130,10 +130,16 @@ def middle(box: Box) -> float:
     return (box.x0 + box.x1) / 2
 
 
+# Spec section 5: the hyphens at a line's end, the ASCII hyphen-minus and
+# the not sign "¬" (U+00AC), with which the OCR of two of the owner's books
+# marks every line-end hyphen.
+LINE_END_HYPHENS = frozenset({"-", "\N{NOT SIGN}"})
+
+
 def is_hyphen_first_part(text: str) -> bool:
     """Whether a word can be the first part of a hyphen join: it ends with
-    the ASCII hyphen-minus after a letter or digit (spec section 5)."""
-    return text.endswith("-") and text[:-1][-1:].isalnum()
+    a hyphen, "-" or "¬", after a letter or digit (spec section 5)."""
+    return text[-1:] in LINE_END_HYPHENS and text[:-1][-1:].isalnum()
 
 
 # Spec section 5: a digit of the hyphen rule is an ASCII digit.
@@ -141,8 +147,9 @@ ASCII_DIGITS = frozenset("0123456789")
 
 
 def is_digit_before_hyphen(text: str) -> bool:
-    """Whether `text` ends with a hyphen after an ASCII digit, "1830-"."""
-    return text.endswith("-") and text[:-1][-1:] in ASCII_DIGITS
+    """Whether `text` ends with a hyphen, "-" or "¬", after an ASCII digit,
+    "1830-"."""
+    return text[-1:] in LINE_END_HYPHENS and text[:-1][-1:] in ASCII_DIGITS
 
 
 def is_number_before_word(first: str, second: str) -> bool:

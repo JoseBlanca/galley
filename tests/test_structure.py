@@ -1073,6 +1073,173 @@ def test_line_of_one_word_between_two_hyphens_is_joined_twice() -> None:
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+# "¬" at a line's end, the hyphen of the owner's OCR (spec section 5)
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "book_words", "word_list", "expected"),
+    [
+        (
+            "liter¬",
+            "ature",
+            frozenset(),
+            frozenset({"literature"}),
+            HyphenJoin("literature", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "proto¬",
+            "journalist",
+            frozenset({"proto-journalist"}),
+            frozenset(),
+            HyphenJoin("proto-journalist", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "Bal¬",
+            "hazar",
+            frozenset(),
+            frozenset(),
+            HyphenJoin("Balhazar", ChangeReason.HYPHEN_JOIN_GUESSED),
+        ),
+        (
+            "1830¬",
+            "40",
+            frozenset(),
+            frozenset(),
+            HyphenJoin("1830-40", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "half¬",
+            "Danish",
+            frozenset({"half-danish"}),
+            frozenset(),
+            HyphenJoin("half-Danish", ChangeReason.HYPHEN_KEPT),
+        ),
+        (
+            "d'in¬",
+            "signes",
+            frozenset(),
+            frozenset({"insignes"}),
+            HyphenJoin("d'insignes", ChangeReason.HYPHEN_JOIN),
+        ),
+        (
+            "tro¬",
+            "d",
+            frozenset(),
+            frozenset({"trod"}),
+            HyphenJoin("trod", ChangeReason.HYPHEN_JOIN_GUESSED),
+        ),
+    ],
+    ids=[
+        "word list",
+        "book's compound",
+        "guessed",
+        "a range of years",
+        "capital with the book's compound",
+        "after the apostrophe",
+        "one letter, word list",
+    ],
+)
+def test_join_hyphen_takes_a_not_sign_as_a_hyphen_and_keeps_it_as_hyphen_minus(
+    first: str,
+    second: str,
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    expected: HyphenJoin,
+) -> None:
+    assert join_hyphen(first, second, book_words, word_list) == expected
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("¬", "and"),
+        ("liter¬", "(1)"),
+        ("136-39¬", "Bryce,"),
+        ("half¬", "Danish"),
+        ("liter¬a", "ture"),
+        ("liter~", "ature"),
+    ],
+    ids=[
+        "not sign alone",
+        "bracket after",
+        "number before a word",
+        "capital without evidence",
+        "not sign inside the word",
+        "tilde",
+    ],
+)
+def test_join_hyphen_with_a_not_sign_does_not_join(first: str, second: str) -> None:
+    known = frozenset({"and", "136-39bryce", "halfdanish", "literature"})
+    assert join_hyphen(first, second, known, known) is None
+
+
+def test_not_sign_at_a_line_end_is_joined_and_recorded_with_the_layer_words() -> None:
+    page = PageLayout(
+        3,
+        (_body(70, "the liter¬", "ature of the Anglo¬", "Saxon age, 1830¬", "40"),),
+        (),
+    )
+    lines = _lines_of(page)
+    blocks = make_blocks(lines, frozenset({"literature"}), workers=1)
+    assert block_text(blocks.blocks[0]) == (
+        "the literature of the Anglo¬ Saxon age, 1830-40"
+    )
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=3,
+            before=("liter¬", "ature"),
+            after=("literature",),
+            reason=ChangeReason.HYPHEN_JOIN,
+        ),
+        WordChange(
+            page_index=3,
+            before=("1830¬", "40"),
+            after=("1830-40",),
+            reason=ChangeReason.HYPHEN_KEPT,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_not_sign_inside_a_line_is_left_as_text() -> None:
+    page = PageLayout(0, (_body(70, "a ¬ sign and a¬b", "here"),), ())
+    blocks = make_blocks(_lines_of(page), frozenset({"a¬bhere"}), workers=1)
+    assert block_text(blocks.blocks[0]) == "a ¬ sign and a¬b here"
+    assert blocks.word_changes == ()
+
+
+def test_survey_book_words_leave_out_the_parts_of_a_word_broken_with_a_not_sign() -> (
+    None
+):
+    page = PageLayout(
+        0, (_body(70, "Of the liter¬", "ature, 136¬", "Bryce, 1066¬", "1087 here"),), ()
+    )
+    assert survey_book(_lines_of(page), workers=1).book_words == frozenset(
+        {"of", "the", "136", "bryce", "here"}
+    )
+
+
+def test_indented_line_after_a_not_sign_does_not_start_a_paragraph() -> None:
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _full("Alpha beta gamma delta", 70),
+                _short("the work of liter¬", 85),
+                _indented("ature here and there", 100),
+                _short("Britain, 136-39¬", 115),
+                _indented("Bryce, James, 12", 130),
+            ),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), frozenset({"literature"}), workers=1)
+    assert _texts(blocks.blocks) == (
+        "Alpha beta gamma delta the work of literature here and there Britain, 136-39¬",
+        "Bryce, James, 12",
+    )
+
+
 # Cases the review of work package 3 found untested
 
 

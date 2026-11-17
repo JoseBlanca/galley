@@ -41,13 +41,14 @@ def join_hyphen(
 ) -> HyphenJoin | None:
     """The word made of `first`, the last word of a line, and `second`, the
     first word of the next, or None when they are not joined (spec section
-    5): `first` must end with "-" after a letter or digit and `second`
+    5): `first` must end with "-" or "¬" after a letter or digit and `second`
     start with a letter or digit, and with an ASCII digit after an ASCII
     digit, in which case the hyphen is always kept (`hyphen_kept`): "235-"
     "37-" gives "235-37-". After a
     lower-case letter, a `second` that starts with a capital is joined
     only when the book prints the hyphenated word (`hyphen_kept`), and
-    else not at all.
+    else not at all. A kept hyphen is "-", whichever `first` ends with:
+    "1830¬" "40" gives "1830-40".
 
     The hyphen is kept (`hyphen_kept`) when the hyphenated word is among
     `book_words`, the keys of the words the book prints whole, and the
@@ -63,8 +64,8 @@ def join_hyphen(
     if is_digit_before_hyphen(first):
         if second[0] not in ASCII_DIGITS:
             return None
-        return HyphenJoin(first + second, ChangeReason.HYPHEN_KEPT)
-    hyphenated = first + second
+        return HyphenJoin(first[:-1] + "-" + second, ChangeReason.HYPHEN_KEPT)
+    hyphenated = first[:-1] + "-" + second
     joined = first[:-1] + second
     if first[-2].islower() and second[0].isupper():
         if word_key(hyphenated) in book_words:
