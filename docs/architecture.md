@@ -608,7 +608,7 @@ A stage imports these and nothing else of galley.
 
 | module | gives |
 |---|---|
-| `model.py` | the formats of section 8, with their read and write functions; and the rules of re-reading (`docs/specs/reocr.md` §4) that layout and the fidelity check share: `replaced_layer_words(layer_words, ocr_words)`, the layer words a kept `Reread` replaces, and `matched_ocr_positions`, the Tesseract words that read them; `is_under_ocr_word` and `may_read`, the tests of rule (a) and of any one rule alone; `words_after_rereads(words, rereads)`, a page's words as lines.json holds them; `take_out_once(groups, taken)`, `word_middle(word)` and `folded_letters_and_digits(text)` |
+| `model.py` | the formats of section 8, with their read and write functions; and the rules of re-reading (`docs/specs/reocr.md` §4) that layout and the fidelity check share: `replaced_layer_words(layer_words, ocr_words, is_known=...)`, the layer words a kept `Reread` replaces, and `matched_ocr_positions`, the Tesseract words that read them; `is_under_ocr_word` and `may_read`, the tests of rule (a) and of any one rule alone; `words_after_rereads(words, rereads)`, a page's words as lines.json holds them; `take_out_once(groups, taken)`, `word_middle(word)` and `folded_letters_and_digits(text)` |
 | `config.py` | `BookConfig`, `read_config(path)`, the language codes |
 | `book_folder.py` | `BookFolder` |
 | `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract or Pandoc), `EditError`, `FidelityError` |
