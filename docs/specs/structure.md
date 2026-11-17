@@ -2152,6 +2152,24 @@ on Gierke's endnote pages the text is smaller than the book's, and the
 book's height took 941 lines there; on the notes pages of Turney, set
 in 8 pt, the group headings (section 12) stand at 9 to 11 pt.
 
+A page whose body stream holds more than 6 lines that tall, 1.2 times
+its median line height, has no tall line: its median is then that of
+smaller type, a table, a list or notes left in the body, and its tall
+lines are its text. Domesday's page 419 sets 18 lines of text under a
+table in small type (8 pt against 10), Gierke's page 50 sets 13 above
+notes in small type, and on Domesday's page 136 the text layer boxes
+14 lines, the last rows of a list and the paragraph under it, 11 to 28
+pt tall, where the page image shows the list's small type and the
+body's; without the condition each made
+false headings of its text, the paragraph run into one heading block
+by the lines that follow a heading line. On the pages of the eight
+books where the branch finds headings, at most 4 lines are that tall
+(Turney's page 39), and Domesday's page 528, the next most, has 11
+and no heading. Any limit from 4 to 10 keeps the same lines out on
+the eight books (measured on 17 November 2026 on the `lines.json` of
+layout §3's new steps): Domesday's pages 136 and 419 and Gierke's page
+50, and no other line.
+
 Two more kinds of line join a heading:
 
 - a **chapter label** that is centred and whose next line is a heading
@@ -2317,12 +2335,12 @@ headings.
   stand above it; Gierke's ten numbered sections ("I. The Evolution of
   Political Theory.") are level 2 under the book's title on page 86,
   where a reader would want level 1.
-- **Tall lines that are text** (this revision): Domesday's pages 136
-  and 419, set mostly in small type, make 4 lines of ordinary text tall
-  against their page's median; they become false level-2 headings. The
-  tables' titles of Domesday (425 to 428) are taken too, and so are the
-  lines of the publisher's lists after Stubbs' text, which the owner
-  can exclude.
+- **Tall lines that are text** (this revision): the tables' titles of
+  Domesday (425 to 428) are taken, and so are the lines of the
+  publisher's lists after Stubbs' text, which its config excludes.
+  Domesday's pages 136 and 419, whose ordinary text stood tall against
+  their page's median, are kept out by the limit of 6 tall lines a page
+  (above).
 - **Title pages** give a few headings (Domesday's "THREE ESSAYS…",
   Mariéjol's "A LA MÊME LIBRAIRIE"): the owner excludes such pages, or
   names them in `contents_pages`, when they matter.
