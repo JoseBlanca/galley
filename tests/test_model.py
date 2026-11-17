@@ -1192,6 +1192,7 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "note_marker",
             "hyphen_join_guessed",
             "hyphen_kept",
+            "hyphen_lost",
         ],
         "PageNumberPosition": ["head", "foot"],
         "RereadKind": [

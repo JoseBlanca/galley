@@ -51,6 +51,12 @@ _SHORT_SECTION_PAGES_BACK = 2
 # 0.54 to 0.73 alike).
 _SIGNATURE_ALIKE_RATIO = 0.5
 _SIGNATURE_MIN_LETTERS = 4
+# Spec section 5: a word printed after the first word of a line more than
+# this many times in the book is printed whole, no fragment of a word whose
+# hyphen was lost. Measured on whole Stubbs, Domesday and Gierke on 17
+# November 2026: the right joins in margin notes have fragments printed so
+# 0 to 5 times ("al") and 9 ("wise."); the first wrong one 11 ("defined").
+_INNER_WORD_MOST_TIMES = 8
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -63,7 +69,9 @@ class BookSurvey:
     arabic page numbers of the running heads, None when there is none;
     `first_arabic_page` the first page index whose running head has one;
     `body_word_height` and `body_line_pitch` in points; `book_words` the
-    keys of the words printed whole (spec section 5); `signature_lines`
+    keys of the words printed whole (spec section 5); `common_inner_words`
+    the keys printed after the first word of a line more than 8 times, no
+    fragment of a word (section 5); `signature_lines`
     the page indices whose lowest line is a signature line (section 4);
     `heads_below_specks` the page indices whose head line is a speck and
     the line below it a running head (section 3); `index_pages` the page
@@ -76,6 +84,7 @@ class BookSurvey:
     body_word_height: float
     body_line_pitch: float
     book_words: frozenset[str]
+    common_inner_words: frozenset[str]
     signature_lines: frozenset[int]
     heads_below_specks: frozenset[int]
     index_pages: frozenset[int]
@@ -86,13 +95,14 @@ class _PageMeasures:
     """What the survey takes from one page: its head line's text line, the
     median word height of each line, the rows of all its words
     (`body_measures.group_rows`), and the keys of its words printed
-    whole."""
+    whole and of its words after the first of a line."""
 
     head: Line | None
     below_head: Line | None
     line_heights: tuple[float, ...]
     rows: tuple[Line, ...]
     words: frozenset[str]
+    inner_words: tuple[str, ...]
 
 
 def _words_printed_whole(page: PageLayout) -> frozenset[str]:
@@ -142,6 +152,13 @@ def _page_measures(page: PageLayout) -> _PageMeasures:
         ),
         rows=rows,
         words=_words_printed_whole(page),
+        inner_words=tuple(
+            key
+            for region in page.regions
+            for line in region.lines
+            for word in line.words[1:]
+            if (key := word_key(word.text))
+        ),
     )
 
 
@@ -422,6 +439,13 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
         body_word_height=body_word_height,
         body_line_pitch=pitch,
         book_words=frozenset().union(*(page.words for page in measures)),
+        common_inner_words=frozenset(
+            key
+            for key, count in Counter(
+                key for page in measures for key in page.inner_words
+            ).items()
+            if count > _INNER_WORD_MOST_TIMES
+        ),
         signature_lines=_alike_pages(
             tuple(
                 (page.index, candidate)

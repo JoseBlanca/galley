@@ -553,7 +553,7 @@ def test_margin_note_beside_the_middle_stubbs_58_goes_before_its_paragraph(
     # before that paragraph, after page 2's two margin notes beside it.
     _, blocks = excerpt_outputs["stubbs_51_56-64"]
     assert _margin_notes_before(blocks, 3) == (
-        ("His great posi. tion in Christendom.", "Henry II. was", [2, 3]),
+        ("His great position in Christendom.", "Henry II. was", [2, 3]),
     )
     assert _margin_notes_before(blocks, 2) == (
         ("Character of Henry II.", "Henry II. was", [2, 3]),

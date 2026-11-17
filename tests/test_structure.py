@@ -61,6 +61,7 @@ from galley.structure import (
     ReferenceForm,
     _survey,
     join_hyphen,
+    join_lost_hyphen,
     make_blocks,
     note_marker,
     reference_candidate,
@@ -1977,6 +1978,132 @@ def test_figure_block_of_a_plate_before_any_body_comes_first() -> None:
     blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     assert tuple(block.id for block in blocks.blocks) == ("b-p0000-001", "b-p0001-001")
     assert blocks.blocks[0].kind is BlockKind.FIGURE
+
+
+# A hyphen lost in a margin note (spec section 5)
+
+_LOST_WORD_LIST = frozenset({"national", "movement", "inspite", "ofthe", "apiece"})
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "book_words", "joined"),
+    [
+        # Domesday page 77, Gierke page 88, Domesday page 75.
+        ("nation", "al", frozenset(), "national"),
+        ("move.", "ment,", frozenset(), "movement,"),
+        ("unfree", "dom", frozenset({"unfreedom"}), "unfreedom"),
+    ],
+)
+def test_join_lost_hyphen_joins_a_fragment_into_a_known_word(
+    first: str, second: str, book_words: frozenset[str], joined: str
+) -> None:
+    assert join_lost_hyphen(
+        first, second, book_words, _LOST_WORD_LIST, frozenset({"the"})
+    ) == HyphenJoin(joined, ChangeReason.HYPHEN_LOST)
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ("of", "the"),  # "the" is printed inside lines more than 8 times
+        ("a", "piece"),  # a first part of 1 letter
+        ("nation", "Al"),  # a capital
+        ("nation-", "al"),  # a hyphen: join_hyphen's
+        ("nation,", "al"),  # a comma is no misread hyphen
+        ("nation..", "al"),  # one full stop only
+        ("unfree", "dom"),  # "unfreedom" is not known here
+        ("nation", "al,x"),  # "nationalx" is not known
+    ],
+)
+def test_join_lost_hyphen_does_not_join(first: str, second: str) -> None:
+    assert (
+        join_lost_hyphen(first, second, _NO_WORDS, _LOST_WORD_LIST, frozenset({"the"}))
+        is None
+    )
+
+
+def test_join_lost_hyphen_takes_the_word_list_only_for_2_letters_or_more() -> None:
+    # As for hyphen_join: "posi." "t" is not looked up in the word list.
+    assert (
+        join_lost_hyphen("posi.", "t", _NO_WORDS, frozenset({"posit"}), frozenset())
+        is None
+    )
+    assert join_lost_hyphen(
+        "posi.", "t", frozenset({"posit"}), _NO_WORDS, frozenset()
+    ) == HyphenJoin("posit", ChangeReason.HYPHEN_LOST)
+
+
+def test_survey_common_inner_words_are_printed_after_a_lines_first_word_9_times() -> (
+    None
+):
+    # "the" after the first word of 8 lines, and first in 9 more: not
+    # common; after the first word of a 9th line, common.
+    eight = PageLayout(0, (_body(70, *(("of the",) * 8), *(("the end",) * 9)),), ())
+    assert survey_book(_lines_of(eight), workers=1).common_inner_words == frozenset(
+        {"end"}
+    )
+    nine = PageLayout(1, (_body(70, "of the"),), ())
+    assert survey_book(
+        _lines_of(eight, nine), workers=1
+    ).common_inner_words == frozenset({"the", "end"})
+
+
+def _lost_hyphen_pages() -> tuple[PageLayout, ...]:
+    """Page 0: a body of five full lines, two ending with a word the next
+    line goes on with ("in" "spite", "of" "the"), and two margin notes,
+    "The villein and nation al justice." and "Unity of the move. ment,".
+    "the" is printed after the first word of a line 9 times, so "of"
+    "the" is not joined into "ofthe", which the word list holds."""
+    margin = _region(
+        _spread("The villein", 310, 340, 85),
+        _spread("and nation", 310, 340, 97),
+        _spread("al justice.", 310, 340, 109),
+    )
+    second = _region(
+        _spread("Unity of", 310, 340, 160),
+        _spread("the move.", 310, 340, 172),
+        _spread("ment,", 310, 340, 184),
+    )
+    body = _region(
+        _full("first of the page and the in", 70),
+        _full("spite of the page went on of", 85),
+        _full("the page and so of the end of the", 100),
+        _full("page of the page and of the page", 115),
+        _full("the end of the page for the all.", 130),
+    )
+    return (PageLayout(0, (body, margin, second), ()),)
+
+
+def test_margin_note_joins_a_word_whose_hyphen_was_lost_and_the_body_does_not() -> None:
+    lines = _lines_of(*_lost_hyphen_pages())
+    blocks = make_blocks(lines, _LOST_WORD_LIST, workers=1)
+    assert tuple((block.kind, block_text(block)) for block in blocks.blocks) == (
+        (BlockKind.MARGIN_NOTE, "The villein and national justice."),
+        (BlockKind.MARGIN_NOTE, "Unity of the movement,"),
+        (
+            BlockKind.PARAGRAPH,
+            (
+                "first of the page and the in spite of the page went on of the page "
+                "and so of the end of the page of the page and of the page the end of "
+                "the page for the all."
+            ),
+        ),
+    )
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=0,
+            before=("nation", "al"),
+            after=("national",),
+            reason=ChangeReason.HYPHEN_LOST,
+        ),
+        WordChange(
+            page_index=0,
+            before=("move.", "ment,"),
+            after=("movement,",),
+            reason=ChangeReason.HYPHEN_LOST,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
 def _side_text_pages() -> tuple[PageLayout, ...]:

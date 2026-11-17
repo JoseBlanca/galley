@@ -524,7 +524,9 @@ def _change_follows_its_reason(change: WordChange) -> bool:
     marker split off its word keeps the text; a hyphen join of two parts,
     on evidence or guessed, drops only the hyphen ending the first; a kept
     hyphen joins two parts, the first ending with a hyphen, as they are,
-    the hyphen written "-" whether the first ends with "-" or "¬"."""
+    the hyphen written "-" whether the first ends with "-" or "¬"; a lost
+    hyphen joins two parts as they are, but for one full stop ending the
+    first."""
     if not change.before or not change.after:
         return False
     joined_after = "".join(change.after)
@@ -536,6 +538,12 @@ def _change_follows_its_reason(change: WordChange) -> bool:
                 len(change.before) == _HYPHEN_JOIN_PARTS
                 and change.before[0][-1:] in LINE_END_HYPHENS
                 and change.before[0][:-1] + change.before[1] == joined_after
+            )
+        case ChangeReason.HYPHEN_LOST:
+            return (
+                len(change.before) == _HYPHEN_JOIN_PARTS
+                and change.before[0].removesuffix(".") + change.before[1]
+                == joined_after
             )
         case ChangeReason.HYPHEN_KEPT:
             return (

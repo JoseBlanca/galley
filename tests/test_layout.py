@@ -2373,12 +2373,9 @@ _DOMESDAY = "domesday_74-83"  # excerpt pages 1 and 3 are book page indices 75 a
         ),
         _owner_note(_STUBBS, 2, "Character of Henry II."),
         _owner_note(_STUBBS, 2, "His family policy."),
-        _owner_note(
-            _STUBBS,
-            3,
-            "His great position in Christendom.",
-            "the layer reads the line-end hyphen of 'posi-' as a full stop",
-        ),
+        # The layer reads the hyphen of "posi-" as a full stop, which
+        # structure drops (structure spec, section 5, "hyphen_lost").
+        _owner_note(_STUBBS, 3, "His great position in Christendom."),
         _owner_note(_STUBBS, 4, "Henry’s mismanagement of his children."),
         _owner_note(_STUBBS, 5, "Plan of reform."),
         _owner_note(_STUBBS, 5, "Terms of pacification.", _FINAL_STOP_READ_AS_COMMA),
@@ -2404,8 +2401,7 @@ _DOMESDAY = "domesday_74-83"  # excerpt pages 1 and 3 are book page indices 75 a
             _GIERKE,
             2,
             "Unity of the movement.",
-            "Tesseract reads the hyphen of 'move-' as a full stop and the final "
-            "full stop as a comma",
+            _FINAL_STOP_READ_AS_COMMA,
         ),
         _owner_note(
             _GIERKE,
@@ -2419,7 +2415,8 @@ _DOMESDAY = "domesday_74-83"  # excerpt pages 1 and 3 are book page indices 75 a
             _DOMESDAY,
             1,
             "The unfreedom of the villein.",
-            "Tesseract misses the hyphen of 'unfree-'",
+            "the excerpt's ten pages never print 'unfreedom' whole, the evidence "
+            "for joining 'unfree' 'dom'; the whole book does (whole-book test below)",
         ),
         _owner_note(
             _DOMESDAY,
@@ -2428,24 +2425,42 @@ _DOMESDAY = "domesday_74-83"  # excerpt pages 1 and 3 are book page indices 75 a
             "the page prints a space before '?', which galley keeps as a word",
         ),
         _owner_note(_DOMESDAY, 3, "The villein and seignorial justice."),
-        _owner_note(
-            _DOMESDAY,
-            3,
-            "The villein and national justice.",
-            "Tesseract misses the hyphen of 'nation-'",
-        ),
+        _owner_note(_DOMESDAY, 3, "The villein and national justice."),
     ],
 )
 def test_reread_owner_checked_margin_note_is_a_block_of_the_printed_text(
     excerpt: str, page: int, note: str, excerpt_books: frozendict[str, BookFolder]
 ) -> None:
-    blocks = read_blocks(excerpt_books[excerpt].blocks_json)
-    notes = tuple(
+    notes = _margin_notes_of_page(excerpt_books[excerpt].blocks_json, page)
+    assert note in notes, notes
+
+
+def _margin_notes_of_page(blocks_json: Path, page: int) -> tuple[str, ...]:
+    """The texts of the margin-note blocks of blocks.json that start on
+    page index `page`."""
+    return tuple(
         "".join(span.text for span in block.spans)
-        for block in blocks.blocks
+        for block in read_blocks(blocks_json).blocks
         if block.kind is BlockKind.MARGIN_NOTE and block.origin[0].page_index == page
     )
-    assert note in notes, notes
+
+
+@pytest.mark.whole_book
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_owner_checked_whole_domesday_75_joins_unfree_dom(
+    whole_book_run: Callable[[str], BookFolder],
+) -> None:
+    # The book prints "unfreedom" whole 6 times, so "unfree" "dom", whose
+    # hyphen Tesseract missed, is joined (structure spec, section 5).
+    folder = whole_book_run("domesdaybook00maituoft")
+    assert _margin_notes_of_page(folder.blocks_json, 75) == (
+        "Free land.",
+        "The unfreedom of the villein.",
+        "Can the villein be pursued ?",
+    )
 
 
 # The whole books (reocr spec, section 9, "Whole-book tests"), from the

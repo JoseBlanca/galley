@@ -348,6 +348,58 @@ def test_structure_join_at_a_not_sign_with_its_word_change_passes(
     check_stage(FidelityBoundary.STRUCTURE, _lines_file((lines,)), blocks)
 
 
+_LOST_HYPHEN_LINES = _lines_file((("Unity of the move.",), ("ment, here",)))
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [(("move.", "ment,"), ("movement,",)), (("move", "ment,"), ("movement,",))],
+    ids=["full stop", "lost"],
+)
+def test_structure_hyphen_lost_with_its_word_change_passes(
+    before: tuple[str, str], after: tuple[str]
+) -> None:
+    # Structure spec section 5: the full stop the join drops is in `before`.
+    lines = _lines_file(((f"Unity of the {before[0]}",), (f"{before[1]} here",)))
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0, 1), (_span(f"Unity of the {after[0]} here"),)),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=before,
+                after=after,
+                reason=ChangeReason.HYPHEN_LOST,
+            ),
+        ),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+@pytest.mark.parametrize(
+    "after",
+    ["moveent,", "move.ment,", "move-ment,"],
+    ids=["a letter dropped", "the stop kept", "a hyphen added"],
+)
+def test_structure_hyphen_lost_that_changes_more_than_the_stop_fails(
+    after: str,
+) -> None:
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0, 1), (_span(f"Unity of the {after} here"),)),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=("move.", "ment,"),
+                after=(after,),
+                reason=ChangeReason.HYPHEN_LOST,
+            ),
+        ),
+    )
+
+    with pytest.raises(FidelityError, match="is not a hyphen_lost"):
+        check_stage(FidelityBoundary.STRUCTURE, _LOST_HYPHEN_LINES, blocks)
+
+
 def test_structure_hyphen_join_without_its_word_change_fails() -> None:
     blocks = _blocks_file((_HYPHEN_BLOCK,))
 

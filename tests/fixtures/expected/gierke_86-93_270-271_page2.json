@@ -86,7 +86,7 @@
     },
     {
       "kind": "margin_note",
-      "text": "Unity of the move. ment,",
+      "text": "Unity of the movement,",
       "pages": [
         2
       ]
@@ -149,6 +149,16 @@
         "Moreover,"
       ],
       "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "move.",
+        "ment,"
+      ],
+      "after": [
+        "movement,"
+      ],
+      "reason": "hyphen_lost"
     },
     {
       "before": [

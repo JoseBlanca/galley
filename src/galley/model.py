@@ -690,12 +690,15 @@ class Note:
 class ChangeReason(StrEnum):
     """Why structure changed words without losing a letter: a hyphen join,
     with the hyphen dropped on evidence, dropped without it (guessed), or
-    kept in a compound; or a note marker split off the word it was glued to."""
+    kept in a compound; a join in a margin note of two parts whose hyphen
+    the OCR lost or read as a full stop; or a note marker split off the
+    word it was glued to."""
 
     HYPHEN_JOIN = "hyphen_join"
     NOTE_MARKER = "note_marker"
     HYPHEN_JOIN_GUESSED = "hyphen_join_guessed"  # dropped without evidence
     HYPHEN_KEPT = "hyphen_kept"  # "Anglo-" "Saxon" to "Anglo-Saxon"
+    HYPHEN_LOST = "hyphen_lost"  # "move." "ment," to "movement," in a margin note
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

@@ -63,7 +63,10 @@ def joined(
     kind: BlockKind,
     book_words: frozenset[str],
     word_list: frozenset[str],
+    common_inner_words: frozenset[str] | None = None,
 ) -> Unnumbered:
+    """The block of `kind` made of `piece`, its hyphens joined
+    (`join_lines`), with `common_inner_words` for a margin note."""
     joined = join_lines(
         tuple(
             PageLine(line.page_index, tuple(word.text for word in line.line.words))
@@ -72,6 +75,7 @@ def joined(
         book_words,
         word_list,
         piece.unjoined,
+        common_inner_words,
     )
     return Unnumbered(
         kind,
