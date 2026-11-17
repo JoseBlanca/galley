@@ -1048,9 +1048,11 @@ def test_caption_kadesh_64_and_68_kept_and_the_back_of_plate_65_removed(
     assert figures[1][2] == ""
     assert _plate_removals(blocks, 6) == (("plate_text", "a"), ("plate_text", "t I"))
     assert figures[2][2].endswith("THE MODERN MODND OF KADESH")
-    # "V", the end of the garbled series head, is on the head's row, which
-    # is caption (spec section 18, rule 2, by row).
-    assert "PLATE VIII V THE MODERN" in figures[2][2]
+    # "V", the end of the garbled series head, lies a row lower than the
+    # rest of the head, which layout makes one line with it, left to right
+    # (layout spec section 3, step 3); the line is caption (spec section
+    # 18, rule 2, by row).
+    assert "PUBLICATIONS, V PLATE VIII THE MODERN" in figures[2][2]
     assert _plate_removals(blocks, 9) == ()
     # The paragraph of page 63 runs on over the plates 64 and 65.
     assert any(_pages(block.origin) == [4, 7] for block in blocks.blocks)
@@ -1072,7 +1074,9 @@ def test_caption_domesday_39_and_40_kept_and_their_stray_words_removed(
     )
     assert ("plate_text", '--,. ^X.^ MoulslVl^rf /\\"?') in _plate_removals(blocks, 3)
     assert {reason for reason, _ in _plate_removals(blocks, 4)} == {"plate_text"}
-    assert len(_plate_removals(blocks, 4)) == 8
+    # The map's first two rows of specks are one line of the head region
+    # (layout spec section 3, step 3).
+    assert len(_plate_removals(blocks, 4)) == 7
 
 
 # Index entries and guide words (structure spec, section 17).
