@@ -326,7 +326,7 @@ tuple[Reread, ...])`:
   `ocr_words` (Tesseract's), `layer_score` and `ocr_score`
   (ints, known words minus unknown words of each reading), and `kept`
   (whether `ocr_words` took the place of `layer_words`: `ocr_score`
-  higher). Every region read is recorded, kept or not, in page order.
+  higher and, where `layer_words` is empty, at least 2 known words). Every region read is recorded, kept or not, in page order.
 - `RereadKind`: `small_print_page` (a page printed wholly in small
   type, read below its running head), `margin_note` (one note of an
   outer margin), `cut_in_note` (one crop of Stubbs' notes cut into the

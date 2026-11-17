@@ -178,7 +178,14 @@ Four kinds of region are read. For each region read, galley computes the
 reading score of the layer's words that the region replaces (section 4
 says which) and of Tesseract's words, and **keeps Tesseract's words only
 when their score is higher** and they hold at least one word; on a tie,
-or lower, the layer's words stay.
+or lower, the layer's words stay. Where the region replaces no word of
+the layer, a higher score is not enough: Tesseract's words are kept
+only when they hold at least 2 known words (and, as they must score
+above the empty layer's 0, more known words than unknown). Junk read over nothing then stays out ("af", Gierke page
+120, kept before at a score of 1 against 0), and a note the layer did
+not read still comes in ("Medieval Thought.", Gierke page 88, 2 known
+words); a note of one word the layer did not read stays missing (owner,
+17 November 2026).
 The choice is made per region, so that a page where Tesseract reads one
 note worse keeps the layer for that note and loses no word, and a book
 that Tesseract reads worse throughout keeps its layer throughout.
@@ -479,7 +486,7 @@ class Reread:
     ocr_words: tuple[Word, ...]       # Tesseract's, as above
     layer_score: int
     ocr_score: int
-    kept: bool                        # ocr_score > layer_score
+    kept: bool                        # by the rule of section 3
 ```
 
 A region where both readings are empty is not recorded. `LinesFile`
@@ -596,7 +603,9 @@ with 12 gave byte-identical records, and Gierke's 762 regions read inside layout
   Stubbs page 83) is kept with the note when the note wins (**Open 2**).
 - **A note the layer did not read at all** ("Medieval Thought.", Gierke
   page 88; "Fall of Bristol.", Stubbs page 308): the region replaces no
-  word, Tesseract's words score above 0, and they are kept.
+  word, Tesseract's words hold 2 known words or more and more known
+  than unknown, and they are kept. Junk read over nothing ("af",
+  Gierke page 120) has fewer, and is not.
 - **A list of numbers in a margin** (Gierke's contents, pages 61–80):
   Tesseract reads the column of page numbers worse, the score keeps the
   layer.
@@ -775,7 +784,9 @@ and 6 when they are built.
    drop words under 30 as removals with a new reason, `ocr_junk`, which
    the owner can review (the reader loses some real words). Recommended:
    keep every word until a sample of the 120 has been read by eye.
-   Meanwhile: keep every word.
+   Meanwhile: keep every word. Junk read where the layer has no word
+   is a separate case, decided: such a region is kept only with 2 known
+   words or more (section 3).
 3. **The new field of `lines.json`, and layout replacing OCR that
    exists** (architecture §7b and §8, applied here): a shared format
    changes, and layout now replaces existing OCR, which §7b had left to
