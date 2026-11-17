@@ -170,25 +170,31 @@ def _has_letter_or_digit(text: str) -> bool:
     return any(character.isalnum() for character in text)
 
 
+# A word's part of the reading score (reocr spec, section 1).
+_KNOWN_SCORE: Final[int] = 1
+_UNKNOWN_SCORE: Final[int] = -1
+_PUNCTUATION_SCORE: Final[int] = 0
+
+
 def _word_score(text: str, lower_case_words: frozenset[str]) -> int:
-    """1 for a known word, -1 for an unknown one (it holds a letter or a
-    digit), 0 for punctuation."""
+    """`_KNOWN_SCORE` for a known word, `_UNKNOWN_SCORE` for an unknown one
+    (it holds a letter or a digit), `_PUNCTUATION_SCORE` for punctuation."""
     if is_known_word(text, lower_case_words):
-        return 1
-    return -1 if _has_letter_or_digit(text) else 0
+        return _KNOWN_SCORE
+    return _UNKNOWN_SCORE if _has_letter_or_digit(text) else _PUNCTUATION_SCORE
 
 
 def _broken_word_score(
     first: str, second: str, lower_case_words: frozenset[str]
 ) -> int:
     """The score of a word broken at a line end, `first` ending in a
-    hyphen: 1 when each part is known, otherwise the score of the joined
-    word, 1 when it is known."""
+    hyphen: `_KNOWN_SCORE` when each part is known, otherwise the score of
+    the joined word."""
     stem = first[:-1]
     if is_known_word(stem, lower_case_words) and is_known_word(
         second, lower_case_words
     ):
-        return 1
+        return _KNOWN_SCORE
     return _word_score(stem + second, lower_case_words)
 
 
@@ -745,7 +751,8 @@ def _scores_higher(ocr_scores: tuple[int, ...], layer_scores: tuple[int, ...]) -
     higher reading score, or the same with more known words."""
     ocr_score, layer_score = sum(ocr_scores), sum(layer_scores)
     return ocr_score > layer_score or (
-        ocr_score == layer_score and ocr_scores.count(1) > layer_scores.count(1)
+        ocr_score == layer_score
+        and ocr_scores.count(_KNOWN_SCORE) > layer_scores.count(_KNOWN_SCORE)
     )
 
 
@@ -784,11 +791,13 @@ def _is_sure_single_word(
     ):
         return False
     known = tuple(
-        word for word, score in zip(ocr_words, ocr_scores, strict=True) if score == 1
+        word
+        for word, score in zip(ocr_words, ocr_scores, strict=True)
+        if score == _KNOWN_SCORE
     )
     return (
         len(known) == 1
-        and all(score in {0, 1} for score in ocr_scores)
+        and _UNKNOWN_SCORE not in ocr_scores
         and sum(character.isalpha() for character in known[0].text)
         >= _SURE_WORD_LEAST_LETTERS
         and all(
@@ -883,7 +892,7 @@ def page_rereads(
         ocr_score = sum(ocr_scores)
         kept = _scores_higher(ocr_scores, layer_scores) and (
             bool(layer_words)
-            or ocr_scores.count(1) >= _OVER_NOTHING_LEAST_KNOWN
+            or ocr_scores.count(_KNOWN_SCORE) >= _OVER_NOTHING_LEAST_KNOWN
             or _is_sure_single_word(ocr_words, ocr_scores, page_words)
         )
         if kept:
