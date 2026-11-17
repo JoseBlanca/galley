@@ -1694,3 +1694,28 @@ def test_reread_field_of_the_wrong_type_names_its_path(
 
     with pytest.raises(InputFileError, match=re.escape(f"rereads[0].{field}")):
         read_lines(path)
+
+
+# The words a kept Reread replaces (reocr spec, section 4)
+
+
+@pytest.mark.parametrize(
+    ("middle", "under"),
+    [
+        ((21.0, 15.0), True),
+        ((21.1, 15.0), False),
+        ((9.0, 15.0), True),
+        ((8.9, 15.0), False),
+        ((15.0, 21.0), True),
+        ((15.0, 21.1), False),
+        ((15.0, 9.0), True),
+        ((15.0, 8.9), False),
+    ],
+)
+def test_layer_word_is_under_an_ocr_word_whose_box_widened_by_1_pt_holds_its_middle(
+    middle: tuple[float, float], under: bool
+) -> None:
+    x, y = middle
+    layer_word = Word("Moial", Box(x - 2, y - 2, x + 2, y + 2), None)
+    ocr_word = Word("Moral", Box(10.0, 10.0, 20.0, 20.0), 90.0)
+    assert model.is_under_ocr_word(layer_word, (ocr_word,)) is under

@@ -143,16 +143,14 @@ def _broken_word_score(
     first: str, second: str, lower_case_words: frozenset[str]
 ) -> int:
     """The score of a word broken at a line end, `first` ending in a
-    hyphen: 1 when the two joined, or each part, are known, otherwise the
-    score of the joined word."""
+    hyphen: 1 when each part is known, otherwise the score of the joined
+    word, 1 when it is known."""
     stem = first.removesuffix(_HYPHEN)
-    joined = stem + second
-    if is_known_word(joined, lower_case_words) or (
-        is_known_word(stem, lower_case_words)
-        and is_known_word(second, lower_case_words)
+    if is_known_word(stem, lower_case_words) and is_known_word(
+        second, lower_case_words
     ):
         return 1
-    return _word_score(joined, lower_case_words)
+    return _word_score(stem + second, lower_case_words)
 
 
 def _is_broken_pair(first: str, second: str) -> bool:

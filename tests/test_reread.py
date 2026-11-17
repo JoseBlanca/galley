@@ -122,6 +122,12 @@ def test_reading_score_counts_a_broken_word_known_when_joined() -> None:
     assert reading_score(_layer("bar-", "ons"), _WORD_LIST) == 1
 
 
+def test_reading_score_does_not_take_a_dash_alone_as_the_first_part_of_a_word() -> None:
+    # Taken as "free-" broken at a line end, "-" would join it into "free-",
+    # unknown, and leave "holding" alone: 0 instead of 1.
+    assert reading_score(_layer("-", "free-", "holding"), _WORD_LIST) == 1
+
+
 def test_reading_score_counts_a_broken_word_of_unknown_parts_once_as_unknown() -> None:
     assert reading_score(_layer("satel-", "lites."), _WORD_LIST) == -1
 
@@ -220,6 +226,14 @@ def test_rows_of_one_word_do_not_count() -> None:
         (*((_SMALL_PT, 3),) * 17, *((_FULL_PT, 3),) * 3, *((_FULL_PT, 1),) * 5)
     )
     assert is_small_print_page(page, _MEASURES)
+
+
+def test_rows_of_0_85_of_the_body_word_height_are_small() -> None:
+    assert is_small_print_page(_page(((8.5, 5),) * 10), _MEASURES)
+
+
+def test_rows_above_0_85_of_the_body_word_height_are_not_small() -> None:
+    assert not is_small_print_page(_page(((8.6, 5),) * 10), _MEASURES)
 
 
 def test_page_of_full_size_rows_is_not_small_print() -> None:
@@ -590,6 +604,72 @@ def test_cut_in_reading_with_no_word_left_replaces_nothing() -> None:
         column_words=(_CHANGE, _BODY_AN),
     )
     assert page_rereads(7, (reading,), _WORD_LIST) == ()
+
+
+def test_reading_scoring_the_same_as_the_layer_keeps_the_layer() -> None:
+    page = _page_of((_MORAL,))
+    reading = margin_note_reading(
+        _Side.LEFT, _BAND, (_OCR_MORAL,), page_words=page.words
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    assert (record.layer_score, record.ocr_score) == (1, 1)
+    assert not record.kept
+
+
+def _cut_in_after(layer_word: Word, ocr_line: tuple[Word, ...]) -> tuple[str, ...]:
+    """The words of a page holding only `layer_word`, a word layout left in
+    the column, once _CROP, read by Tesseract as `ocr_line`, is applied."""
+    reading = cut_in_reading(
+        _Side.LEFT,
+        _CROP,
+        (ocr_line,),
+        edge=50,
+        inset=60,
+        cut_in_words=(),
+        column_words=(layer_word,),
+    )
+    rereads = page_rereads(7, (reading,), _WORD_LIST)
+    return _texts(words_after_rereads((layer_word,), rereads))
+
+
+# The inset lies at 110 pt: a note word ends at 106 pt or before, and a
+# line of Tesseract's ending at 104 pt or after is dropped.
+_OCR_BARONS_SHORT = _ocr("Barons.", 80, 211, 103.9, 219)
+
+
+def test_column_word_ending_4_pt_short_of_the_inset_is_replaced() -> None:
+    word = _word("Barns", 80, 211, 106, 219)
+    assert _cut_in_after(word, (_OCR_BARONS_SHORT,)) == ("Barons.",)
+
+
+def test_column_word_ending_less_than_4_pt_short_of_the_inset_is_not_replaced() -> None:
+    word = _word("Barns", 80, 211, 106.1, 219)
+    assert _cut_in_after(word, (_OCR_BARONS_SHORT,)) == ("Barns",)
+
+
+def test_column_word_whose_middle_is_1_pt_below_the_zone_is_replaced() -> None:
+    # The zone runs from 200 to 220 pt; the word's middle lies at 221 pt.
+    word = _word("Barns", 80, 217, 100, 225)
+    ocr_line = (_ocr("Barons.", 80, 217, 100, 225),)
+    assert _cut_in_after(word, ocr_line) == ("Barons.",)
+
+
+def test_column_word_whose_middle_is_more_than_1_pt_below_the_zone_stays() -> None:
+    word = _word("Barns", 80, 217.2, 100, 225.2)
+    ocr_line = (_ocr("Barons.", 80, 217, 100, 225),)
+    assert _cut_in_after(word, ocr_line) == ("Barns",)
+
+
+def test_tesseract_line_ending_3_pt_short_of_the_crop_side_is_dropped() -> None:
+    word = _word("Barns", 52, 211, 80, 219)
+    ocr_line = (_ocr("Barons.", 52, 211, 80, 219), _ocr("x", 90, 211, 104, 219))
+    assert _cut_in_after(word, ocr_line) == ("Barns",)
+
+
+def test_tesseract_line_ending_more_than_3_pt_short_of_the_crop_side_is_kept() -> None:
+    word = _word("Barns", 52, 211, 80, 219)
+    ocr_line = (_ocr("Barons.", 52, 211, 80, 219), _ocr("x", 90, 211, 103.9, 219))
+    assert _cut_in_after(word, ocr_line) == ("Barons.", "x")
 
 
 def test_cut_in_crop_at_the_right_side_mirrors_the_left() -> None:
