@@ -34,8 +34,10 @@ How the spec is read here, where it leaves a choice:
   is left unscored as front matter, and its difference listed apart as
   `front_matter`, when it is placed on a front-matter page, or when it
   precedes the first reference token aligned at words, is not aligned,
-  and has the non-empty alignment key of a word removed as front matter.
-  `front_matter_not_scored` counts both. Such a token is on no page in
+  and has the non-empty alignment key of a word removed as front matter,
+  or when it lies, wherever, in a window of 4 unaligned tokens with
+  non-empty keys that are, in order, those of 4 consecutive removed
+  words. `front_matter_not_scored` counts them all. Such a token is on no page in
   the table of pages.
 - The tokens of a reference note that galley makes an endnote at blocks
   are `not_scored` at words and lines, and taken as matched there for the
@@ -126,6 +128,14 @@ _CONTEXT_TOKENS = 8
 
 # The states of a reference token aligned to a galley token.
 _ALIGNED = frozenset((State.MATCHED, State.CHANGED, State.SPLIT, State.GLUED))
+
+# The length of a window of unaligned reference tokens that, matching
+# consecutive words galley removed as front matter, is left unscored as
+# front matter wherever it lies: the shortest that leaves nothing
+# unscored outside the front pages of the four books, measured on 17
+# November 2026 at fbdc71f; 3 catches "Catherine de Médicis" in
+# Mariéjol's body (spec section 5, "Front matter").
+_FRONT_MATTER_WINDOW = 4
 
 # The outputs where galley has no notes yet, so that an endnote cannot be
 # aligned near its reference (spec section 5).
@@ -534,10 +544,11 @@ def _front_matter_tokens(
 ) -> frozenset[int]:
     """The indices of the reference tokens left unscored as front matter
     (spec section 5, "Front matter"): those placed on a page galley
-    dropped as front matter, and the unaligned ones before the first
-    token aligned at words, `alignment`, whose key is that of a word
-    galley removed as front matter."""
-    removed_keys = frozenset(
+    dropped as front matter; the unaligned ones before the first token
+    aligned at words, `alignment`, whose key is that of a word galley
+    removed as front matter; and those of a window of unaligned tokens
+    that prints, in order, words galley removed as front matter."""
+    removed_keys = tuple(
         key
         for removal in side.words_file.removals
         if removal.reason is RemovalReason.FRONT_MATTER
@@ -554,12 +565,53 @@ def _front_matter_tokens(
         for index, page in enumerate(page_indices)
         if page is not None and page in front_matter_pages
     )
+    removed_key_set = frozenset(removed_keys)
+    reference_keys = tuple(alignment_key(place.token.text) for place in places)
     leading = (
         index
         for index in range(first_aligned)
-        if alignment_key(places[index].token.text) in removed_keys
+        if reference_keys[index] in removed_key_set
     )
-    return frozenset((*on_pages, *leading))
+    printed = _printed_removed_words(
+        reference_keys,
+        tuple(state not in _ALIGNED for state in aligned),
+        removed_keys,
+    )
+    return frozenset((*on_pages, *leading, *printed))
+
+
+def _printed_removed_words(
+    reference_keys: tuple[str, ...],
+    unaligned: tuple[bool, ...],
+    removed_keys: tuple[str, ...],
+) -> frozenset[int]:
+    """The indices of the reference tokens, of alignment keys
+    `reference_keys`, that lie in a window of _FRONT_MATTER_WINDOW
+    consecutive unaligned tokens (`unaligned` says which are) with
+    non-empty keys, whose keys are, in order, those of as many
+    consecutive words of `removed_keys`, the non-empty keys of the words
+    galley removed as front matter. An aligned token breaks a window; a
+    token with an empty key inside one is in it."""
+    removed_windows = frozenset(
+        removed_keys[start : start + _FRONT_MATTER_WINDOW]
+        for start in range(len(removed_keys) - _FRONT_MATTER_WINDOW + 1)
+    )
+    found: set[int] = set()
+    keyed: list[int] = []
+    for index, (key, is_unaligned) in enumerate(
+        zip(reference_keys, unaligned, strict=True)
+    ):
+        if not is_unaligned:
+            keyed = []
+        elif key:
+            keyed.append(index)
+            window = keyed[-_FRONT_MATTER_WINDOW:]
+            if (
+                len(window) == _FRONT_MATTER_WINDOW
+                and tuple(reference_keys[at] for at in window) in removed_windows
+            ):
+                found.update(range(window[0], window[-1] + 1))
+    return frozenset(found)
 
 
 def _printed_pages(anchors: tuple[AnchorPage, ...]) -> frozendict[int, str]:
