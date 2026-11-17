@@ -29,8 +29,8 @@ _LONE_SIGNS = frozenset({("^",), ("*",), ("•",)})
 
 
 class HyphenJoin(NamedTuple):
-    """The word two parts make, and why: `hyphen_join`, `hyphen_join_guessed`
-    or `hyphen_kept`."""
+    """The word two parts make, and why: `hyphen_join`, `hyphen_join_guessed`,
+    `hyphen_kept`, or `hyphen_lost` in a margin note."""
 
     word: str
     reason: ChangeReason
