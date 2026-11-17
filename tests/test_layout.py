@@ -1528,6 +1528,7 @@ def _rereading(
     footnote_bands: bool = False,
 ) -> Rereading:
     return Rereading(
+        pdf=Path("book.pdf"),
         render=render,
         read_lines=read_lines,
         lower_case_words=words,
@@ -1739,6 +1740,22 @@ def test_reread_footnote_band_kept_takes_the_band_place() -> None:
     assert len(body) == 20
     assert band == (("First",), ("second",), ("third.",))
     _assert_fidelity(page, result)
+
+
+def test_reread_tesseract_failure_names_the_page_and_the_pdf() -> None:
+    def failing(
+        image: Image.Image, *, origin: tuple[float, float], psm: int
+    ) -> tuple[tuple[Word, ...], ...]:
+        del image, origin, psm
+        msg = "tesseract (eng) printed no tsv"
+        raise ExternalProgramError(msg)
+
+    rereading = _rereading(failing, render=_render_with_ink(), footnote_bands=True)
+    with pytest.raises(ExternalProgramError) as raised:
+        layout_page_with_rereads(_page_with_band(), _MEASURES, rereading)
+    assert "page 0 of book.pdf" in str(raised.value)
+    assert "tesseract (eng) printed no tsv" in str(raised.value)
+    assert isinstance(raised.value.__cause__, ExternalProgramError)
 
 
 def test_reread_footnote_band_is_not_read_unless_asked() -> None:

@@ -50,7 +50,7 @@ from galley.body_measures import (
 )
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig, OcrMode, tesseract_language
-from galley.errors import FidelityBoundary
+from galley.errors import ExternalProgramError, FidelityBoundary
 from galley.fidelity import check_stage
 from galley.layout._column import (
     BookMeasures,
@@ -778,7 +778,8 @@ class Rereading:
     """What layout needs to re-read a page's small print with Tesseract
     (reocr spec, sections 3, 4 and 6).
 
-    `render` gives the page of a page index rendered whole at `OCR_DPI`, a
+    `pdf` is the book's PDF, which an error names; `render` gives the page
+    of a page index rendered whole at `OCR_DPI`, a
     grayscale Pillow image; `read_lines` runs Tesseract on a crop of it.
     `lower_case_words` is the word list of the book's language in lower
     case, for the reading scores. `margin_note_sides` are the sides of the
@@ -787,6 +788,7 @@ class Rereading:
     too (the config's `reread_footnotes`).
     """
 
+    pdf: Path
     render: Callable[[int], Image.Image]
     read_lines: ReadLines
     lower_case_words: frozenset[str]
@@ -949,6 +951,22 @@ def _cut_in_readings(
 
 
 def _page_readings(
+    page: PageWords,
+    parts: _PageParts,
+    measures: BookMeasures,
+    rereading: Rereading,
+) -> tuple[RegionReading, ...]:
+    """The regions of `page` read with Tesseract, as `_read_regions` gives
+    them; a failure of Tesseract is an ExternalProgramError that names the
+    page and the PDF."""
+    try:
+        return _read_regions(page, parts, measures, rereading)
+    except ExternalProgramError as err:
+        msg = f"re-reading page {page.index} of {rereading.pdf}: {err}"
+        raise ExternalProgramError(msg) from err
+
+
+def _read_regions(
     page: PageWords,
     parts: _PageParts,
     measures: BookMeasures,
@@ -1185,6 +1203,7 @@ def _rereading(
         )
 
     return Rereading(
+        pdf=config.pdf,
         render=render,
         read_lines=read_lines,
         lower_case_words=lower_case_words,
