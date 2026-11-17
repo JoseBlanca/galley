@@ -371,8 +371,8 @@ word, without a "." or "," after it, is CHAPTER, CHAPITRE, ESSAY,
 PART, PARTIE, BOOK or LIVRE, in any case, is no running head, whatever
 the rules above find: it is the first line of a chapter's heading
 (section 14). Haynes (section 21) sets its chapter label at a top of 56
-to 74 pt, 1.5 to 2.0 pitches below the median top of its heads (34.8
-pt), and its labels, alike to each other ("CHAPTER THIRTEEN",
+to 74 pt, 1.5 to 2.7 pitches below the median top of its heads (34.8
+pt; within the 2 pitches on most openings), and its labels, alike to each other ("CHAPTER THIRTEEN",
 "CHAPTER FOURTEEN"), were removed as running heads on 3 chapter
 openings, their words lost from the chapter's heading; Turney's were
 removed on 9 of its 10 openings, because no ordinary page had a head
@@ -462,9 +462,12 @@ wherever it lies across the page, when its value plus the page's
 **local offset** is the page index exactly. The local offset of a page
 is page index minus printed number of the nearest page, before or
 after it (before on a tie), that has a head page number of the arabic
-form in `page_numbers` (section 3). A local offset, not the book's
+form in `page_numbers` (section 3). Section 3 removes a running head's
+page number whatever offset it reads with, so Turney's heads after the
+plates, running heads by their likeness, give such numbers although the
+book's commonest offset (13) does not confirm them. A local offset, not the book's
 commonest one, because the offset changes inside a book: Turney's is
-13 before its 16 pages of plates (about pages 172 to 187) and 29 after
+13 before its 16 pages of plates (pages 164 to 179) and 29 after
 them, Stubbs' 17 on pages 19 to 51 and 21 from page 56. Turney prints
 the number of a chapter's first page at the foot, aligned with the
 chapter label's indent, not centred (page 26: x 82 to 92 pt in a
@@ -788,8 +791,8 @@ today and the new rule would cut it:
 
 | book | paragraphs running over a page break | last line more than 20 pt short | of which, cut by the rule |
 |---|---|---|---|
-| Turney | (survey, section 21) | 29 with the next first line not indented | 15 |
-| Haynes | (survey) | 22 | 18 |
+| Turney | (survey, section 21; it counted only breaks whose next first line is not indented) | 29 | 15 |
+| Haynes | (survey, the same) | 22 | 18 |
 | Haskins | 217 | 1 | 1 |
 | Stubbs | 280 | 30 | 15, 13 of them in the publisher's lists after the text |
 | Domesday | 456 | 15 | 8 |
@@ -1874,7 +1877,8 @@ the top of a column too. It may be a paragraph, a heading block
 (section 14 makes some, such as Turney's first group heading, an
 unindented "Introduction" 8 pitches below the title "Notes") or what
 section 11 would make a note, since Turney's starts with a number. It
-is no note and no block of the note before it: its text, its lines
+is no note, starts no group (Turney's chapter One heading starts with a
+bare "1", page 253) and is no block of the note before it: its text, its lines
 joined by single spaces, becomes the `group` of the group's first note
 (section 7), and the fidelity check counts it as words of that note.
 Measured by the survey: Haynes' group headings stand about 30 pt (2.1
@@ -1917,9 +1921,12 @@ the group before (the first after `contents_pages` for the first
 group). A label is not compared: Haynes' body heading has "CHAPTER ONE"
 in its label and its group heading "Chapter 1.", and the titles match
 ("AMD" for "AND" in the body's OCR still gives a ratio above 0.9). A
-group's candidates are the glued numbers of the body from its
+group's candidates are the glued numbers of the body, from the pages
+after `contents_pages` and not taken by a footnote, as above, from its
 chapter's heading up to the heading of the next group's chapter, or up
-to the endnote section for the last group. Before this revision the
+to the endnote section for the last group. Only the group heading loses
+its first word; a body heading is compared by its spans, which never
+hold its label. Before this revision the
 whole book was one range and Haynes' 633 endnotes were matched in order
 of their values, all the notes 1 first: 127 were linked, 120 of them
 to a note of another chapter. A prototype that took each group's
@@ -2104,13 +2111,13 @@ when all of these hold:
    band lines (Haskins' page 129 prints "BIBLIOGRAPHICAL NOTE" above a
    section in small type that layout makes a band, so the body column is
    the heading itself). Or it is **flush left**: its left side lies
-   within 3 pt of the left edge its centring is measured against (its
+   within 4 pt of the left edge its centring is measured against (its
    region's, or the page's body column for a line of a region of fewer
    than 5 lines, section 6, rule 2), and its right side at least a
-   quarter of that width short of the right edge, and its top does
-   not lie within 2 pitches of the median top of the book's head lines
-   (section 3) unless it starts with a chapter label word; then rule
-   4's second branch also asks that its last word not end
+   quarter of that width short of the right edge, and it is not a
+   head line that section 3 left in the text within 2 pitches of the
+   median top of the book's head lines, unless it starts with a chapter
+   label word; for a flush-left line, rule 4's second branch also asks that its last word not end
    with ".", ",", ";", ":", "?" or "!" (Turney introduces a block quote
    with a flush-left line set apart by 2.0 pitches above and below on
    its pages 93, 99, 100 and 160, each ending with such a sign);
@@ -2262,25 +2269,37 @@ section 3 now prevents; 20 section headings, level 2, one of them
 (page 19, a short note before chapter one) not in the survey's count;
 and 5 false ones: a picture's scraps (page 9), the two parts of the
 bibliography, which start with "Part" and so are level 1 (390, 404), an
-author's name in the bibliography (412) and the back cover (435). The notes' title (page 330) is not found; the plan checks it
-with section 12's reach back. Turney's back matter titles are found:
+author's name in the bibliography (412) and the back cover (435). The notes' title (page 330, its head line, 14 pt against notes of 9,
+flush left, in capitals) was not found: section 12's reach back, which
+went up to a centred line, took it into the endnote section as a note
+without a marker. As written, it is a heading line by both branches,
+level 1, and the reach back stops at it; the `whole_book` test asserts
+it. Turney's back matter titles are found:
 Acknowledgements, Introduction, Notes, Bibliography, Illustration
 Credits, Index. The survey's own prototype of the tall branch alone
 took on Turney's pages 11 to 251 every chapter label, title and section
 heading and no line of text but those of two newspaper front pages
 reproduced as illustrations (174, 175) and a caption (170).
 
-Two conditions were added on the way, each for a case measured. The
+Three conditions were set on the way, each for a case measured. The
+4 pt: Haynes' labels lie 2.9 pt left to 2.3 pt right of their region's
+commonest left edge (page 117: 2.9), and its bibliography's title 3.4
+pt. The
 flush-left line is measured against the body column when its region
 has fewer than 5 lines, as centring is: measured against its own
 region's box, a title that is a region of one line is never short of
 its own right edge, and Haynes' Index was missed. And a line whose top
-lies within 2 pitches of the median top of the book's head lines (the
-band where section 3 looks for running heads; the prototype took the
-median top of every page's first line) is not flush left unless
-it starts with a chapter label word: Mariéjol's running heads, too
-garbled for section 3 to find alike ("CATHI IlDICIS"), are set flush
-left on even pages and became 13 false headings without it.
+is a head line that section 3 left in the text within 2 pitches of
+the median top of the book's head lines (the band where section 3
+looks for running heads) is not flush left unless it starts with a
+chapter label word: Mariéjol's running heads, too garbled for section
+3 to find alike ("CATHI IlDICIS"), are set flush left on even pages and
+became 13 false headings without it. The condition names the head line,
+not any line in that band, because Haynes' first body line under a
+removed running head lies at a median top of 65.2 pt, inside the band
+(63.6 pt), and a section heading that opens a page would be lost; the
+prototype excluded every line in the band, so it may have missed such
+headings.
 
 ### Where it fails
 
@@ -2894,8 +2913,12 @@ scans of the printed books, each page a picture under an OCR text
 layer, like the six public-domain books, but their type and layout are
 modern. Unless said otherwise the numbers of this revision about them
 come from a survey of 17 November 2026 (galley at 9715a93, both books
-run to the EPUB with the configs below; notes kept outside git), whose
-pages are page indices.
+run to the EPUB with the configs below; its notes and scripts are kept
+outside git and are not needed to read this spec), whose pages are page
+indices. The numbers about the six public-domain books come from a
+second survey the same day on the **clean-text build**, the run of
+those books by galley at the same commit, in `runs/clean-text/build/`
+(ignored by git).
 
 What they show that the public-domain books did not:
 
@@ -2958,10 +2981,18 @@ re-reading):
 | epigraphs | 11, run into the text | 21, run into the text | 22 |
 | a paragraph run over a page with an epigraph alone | pages 12 to 14 | | 6 |
 
+**What remains wrong after this plan**: the bibliographies come out as
+quotes (section 28); an epigraph over a page break is missed (section
+22); some false headings (section 14 and Open 4); tables cut into
+paragraphs (section 6); words glued without a case change (section
+24); the dash of a source is not yet seen on a Kindle (Open 3); and
+Turney's links were not prototyped, so their count is a target, not a
+measurement (section 26).
+
 The chapter openings: Turney 26, 39, 56, 77, 104, 134, 148, 189, 217
 and 229 (chapters One to Ten), the introduction 14, acknowledgements
 11, notes 252 (to 277), bibliography 278, illustration credits 300,
-index 301; its page offset is 13 before its plates and 29 after.
+index 301; its page offset is 13 before its plates (pages 164 to 179) and 29 after.
 Haynes: introduction 14, chapters 1 to 16 at 22, 36, 48, 63, 79, 87,
 105, 117, 141, 156, 175, 200, 224, 249, 281 and 308, the closing
 chapter 326, acknowledgments 10, notes 330 (to 388), bibliography 390,
@@ -3012,7 +3043,10 @@ column** is section 1's.
    summary, if any) are looked at, up to the first line that ends the
    epigraphs (rule 4).
 2. **An epigraph run** is the consecutive lines from there, none a
-   heading line, each with its left side at least 20 pt right of the
+   heading line, passing over any line with no letter or digit, which
+   is removed as a `stray_mark` (Turney's pages 14, 26 and 148 hold a
+   speck "/" between the title and the epigraph, which would otherwise
+   be the quotation's first line), each with its left side at least 20 pt right of the
    body column's left edge, that end at a source line (rule 3). The
    first line after a source line starts the next run when it lies
    within 3 pt of the left side of the run before, across.
@@ -3035,8 +3069,9 @@ column** is section 1's.
    no epigraph and stay as section 6 makes them; so a chapter that
    opens with an indented paragraph (Haynes' introduction) gets none.
 5. **A page of its own.** A page with no heading line whose body stream
-   is one run, of a quotation of at least 1 line and a source line by
-   rule 3, is an epigraph too, without rule 2's indent, which a page set
+   is one run of at most 10 lines, of a quotation of at least 1 line and
+   a source line by rule 3, is an epigraph too (the bound keeps out a
+   preface's last page signed at the right; Turney's has 6 lines), without rule 2's indent, which a page set
    in the quotation's own measure does not show (Turney page 13: the
    source starts 169 pt right of the quotation and ends with it). Not
    measured on the six public-domain books.
@@ -3123,7 +3158,9 @@ the line before, is changed when the word before it ends with a letter,
 a digit or a closing bracket, ")" or "]":
 
 - in a book whose config's `language` is `fr`, the space between the
-  two words becomes a no-break space, U+00A0, in the block's text: no
+  two words becomes a no-break space, U+00A0, in the block's text, and
+  each word stays as it was ("(1) ;" and "hides4 ;" keep their
+  reference word, linked as before): no
   word changes, since the fidelity check splits words on white space and
   Python's `str.split` takes U+00A0 for white space, and Pandoc keeps it
   inside the word it reads, which the check splits in the same way
@@ -3152,7 +3189,7 @@ undoes every change, balances. A sign glued to a reference, "subjection
 ;^" (Haskins page 28, a sign "^" for a superscript 1), becomes
 "subjection;^", a candidate of section 11's sign form, which a spaced
 ";^" was not; the note is then linked. In a French book the reference
-"(1) ;" stays a word of its own, as it was.
+reference "(1)" stays a word of its own, a no-break space after it.
 
 **Measured** by the public-domain survey on the clean-text build (17
 November 2026), words of blocks and notes that start with one of the
@@ -3185,8 +3222,8 @@ is split in two at a lower-to-upper case change when all of these hold:
   letters, and nothing else ("theAvre", "ofWilliam");
 - the left part has at least 2 letters and is a known word (the word
   list, `wordlist.is_known_word`);
-- the right part's key (section 5) is among the book's own words
-  (section 5): the book prints it whole elsewhere;
+- the right part's key (section 5) is among the book's own words, the
+  keys of `lines.json` of section 5: the book prints it whole elsewhere;
 - the whole word's key is not a known word.
 
 The split is a `WordChange` of the new reason `case_split`, on the
@@ -3206,8 +3243,9 @@ because the OCR misreads "li" as "U" or "H": Haskins' "deUver",
 "miUenaire" and "estabHshed", whose right parts the book never prints,
 are words the OCR damaged, and a split would leave two wrong words for
 one. Measured on 17 November 2026 on the words of the clean-text
-build's `blocks.json` and the survey's runs (the book's words taken
-from the blocks, not from `lines.json`):
+build's `blocks.json` and the survey's runs (the prototype took the
+book's words from the blocks, an approximation of section 5's, which
+the plan measures again):
 
 | book | split | examples | kept, glued |
 |---|---|---|---|
@@ -3370,8 +3408,11 @@ checked against the reference texts there.
 
 ## 27. Open points
 
-The orchestrator settles these while the owner is away; each has what
-the implementer does meanwhile.
+The owner decides these. The owner is away while the plan starts, so
+the session that carries the plan out (its orchestrator) may settle
+each as recommended; until one is settled, the implementer does what
+its "meanwhile" says, and the owner can reverse it later at the cost
+named.
 
 1. **How an epigraph's source and a note group's heading are stored.**
    (a) As written: `Block.source` on the `epigraph` block and
@@ -3402,6 +3443,19 @@ the implementer does meanwhile.
    allows that one word there. Meanwhile: the style sheet; the plan
    checks it on a Kindle or the Kindle Previewer if the owner can, and
    reports.
+
+4. **Costs accepted on the public-domain books.** The rules for the
+   owner's books also make, on the six old books: 34 false headings
+   from the publisher's lists after Stubbs' text (pages 322 to 337) and
+   4 lines of Domesday's text taken for headings (136, 419), each an
+   entry in the EPUB's table of contents (section 14); 36 splits of
+   Mariéjol's garbled words into other garbled words (section 24); and
+   Turney's two roman foot numbers kept as notes (section 4). The
+   publisher's lists can be put in Stubbs' `exclude_pages`; Mariéjol
+   is an unreadable scan on which the owner wants no effort. The other
+   answer is a per-book switch, or a tighter rule not yet measured.
+   Recommended: accept, and exclude Stubbs' lists in its config.
+   Meanwhile: as written.
 
 Decided while writing, with the reasons in their sections: the
 spaced-sign rule of languages other than French is English's (no book
