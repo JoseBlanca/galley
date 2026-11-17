@@ -1967,6 +1967,21 @@ def test_glued_misreading_needs_ocr_words_that_follow_each_other() -> None:
     assert model.replaced_layer_words((misread,), ocr, is_known=_unknown) == ()
 
 
+def test_two_glued_misreadings_over_the_same_ocr_words_take_them_once() -> None:
+    # Two layer readings of one printed "10 f.," lie over Tesseract's two
+    # words; the first takes them, the second stays (a word read twice by
+    # the layer is replaced once).
+    first = Word("lo/.,", Box(100.0, 50.0, 130.0, 58.0), None)
+    second = Word("l0/.,", Box(100.2, 50.2, 130.2, 58.2), None)
+    ocr = (
+        Word("10", Box(100.5, 50.0, 110.0, 58.0), 90.0),
+        Word("f.,", Box(121.0, 50.0, 129.5, 58.0), 90.0),
+    )
+    assert model.replaced_layer_words((first, second), ocr, is_known=_unknown) == (
+        first,
+    )
+
+
 def test_ocr_words_read_glued_by_the_layer_pair_with_no_other_layer_word() -> None:
     # The layer's "of," a line below may not take Tesseract's "of," that the
     # glued "of,96" holds.
