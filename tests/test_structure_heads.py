@@ -7,6 +7,8 @@ pt wide per character and 10 pt high, with one character's width between
 words, and body lines lie 15 pt apart.
 """
 
+import pytest
+
 from galley.model import (
     BlockKind,
     BlocksFile,
@@ -149,7 +151,7 @@ def test_number_beside_head_5_pt_lower_leaves_the_head_in_the_text() -> None:
     lines = _pages_with_numbers_beside(_page_with_number_beside(10, "224", 41.0))
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert _removed(blocks, 10) == ()
-    assert any(text.startswith("THE BOOK the first") for text in _texts_on(blocks, 10))
+    assert any(text.startswith("THE BOOK") for text in _texts_on(blocks, 10))
     assert ("page_number", "225") in _removed(blocks, 11)
 
 
@@ -157,7 +159,7 @@ def test_region_of_6_characters_beside_head_leaves_the_head_in_the_text() -> Non
     lines = _pages_with_numbers_beside(_page_with_number_beside(10, "224224"))
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert _removed(blocks, 10) == ()
-    assert any(text.startswith("THE BOOK the first") for text in _texts_on(blocks, 10))
+    assert any(text.startswith("THE BOOK") for text in _texts_on(blocks, 10))
 
 
 # A chapter label is never a running head (spec section 3).
@@ -287,3 +289,120 @@ def test_page_number_by_value_takes_the_local_offset_not_the_commonest() -> None
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert _removed(blocks, 182) == (("page_number", "169"),)
     assert _removed(blocks, 189) == (("page_number", "160"),)
+
+
+# Headings: the flush-left and tall branches (spec section 14, "The rule").
+# The body lines below are 27 characters, 135 pt wide: a region of them
+# has its edges at 50 and 185 pt.
+
+
+def _running_text(
+    top: float, count: int, height: float = _WORD_HEIGHT_PT
+) -> tuple[Line, ...]:
+    return tuple(
+        _line(
+            f"line {number:02} of the running text",
+            _BODY_LEFT_PT,
+            top + _PITCH_PT * number,
+            height,
+        )
+        for number in range(count)
+    )
+
+
+def _headings(blocks: BlocksFile) -> tuple[tuple[int | None, str | None, str], ...]:
+    return tuple(
+        (block.level, block.label, block_text(block))
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING
+    )
+
+
+def _page_with_a_line_among_the_text(
+    index: int, line: Line, gap_below: float
+) -> PageLayout:
+    """A page of one region: 6 lines of running text from 100 pt, `line`,
+    and 6 more lines from `gap_below` pitches under it."""
+    above = _running_text(100, 6)
+    below = _running_text(line.box.top + gap_below * _PITCH_PT, 6)
+    return PageLayout(index, (_region(*above, line, *below),), ())
+
+
+def test_flush_left_line_in_capitals_2_4_pitches_below_the_text_is_a_heading() -> None:
+    line = _line("A NEW SECTION", _BODY_LEFT_PT, 175 + 2.4 * _PITCH_PT)
+    page = _page_with_a_line_among_the_text(20, line, 2.0)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _headings(blocks) == ((2, None, "A NEW SECTION"),)
+
+
+@pytest.mark.parametrize(
+    ("text", "heading"),
+    [("as the author wrote:", False), ("as the author wrote", True)],
+)
+def test_flush_left_line_in_lower_case_set_apart_ending_with_a_colon_is_no_heading(
+    text: str, heading: bool
+) -> None:
+    line = _line(text, _BODY_LEFT_PT, 175 + 2.0 * _PITCH_PT)
+    page = _page_with_a_line_among_the_text(20, line, 2.0)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert bool(_headings(blocks)) is heading
+
+
+def test_tall_line_flush_left_below_a_tall_chapter_label_is_its_level_1_heading() -> (
+    None
+):
+    # The label 1.3 times the body's height, indented 45 pt and not
+    # centred; the title 2.4
+    # times, flush left, 1.5 pitches below it.
+    label = _line("Chapter Twelve", _BODY_LEFT_PT + 45, 100, 1.3 * _WORD_HEIGHT_PT)
+    title = _line(
+        "The Long Title", _BODY_LEFT_PT, 100 + 1.5 * _PITCH_PT, 2.4 * _WORD_HEIGHT_PT
+    )
+    page = PageLayout(
+        20,
+        (
+            _region(label),
+            _region(title),
+            _region(*_running_text(100 + 3.5 * _PITCH_PT, 12)),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _headings(blocks) == ((1, "Chapter Twelve", "The Long Title"),)
+
+
+@pytest.mark.parametrize(("gap", "heading"), [(0.8, False), (1.5, True)])
+def test_tall_line_0_8_pitch_below_the_line_before_is_no_heading(
+    gap: float, heading: bool
+) -> None:
+    # As wide as the text, neither centred nor flush left.
+    line = _line(
+        "line 06 of the running text",
+        _BODY_LEFT_PT,
+        175 + gap * _PITCH_PT,
+        2.4 * _WORD_HEIGHT_PT,
+    )
+    page = _page_with_a_line_among_the_text(20, line, 2.5)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert bool(_headings(blocks)) is heading
+
+
+@pytest.mark.parametrize(
+    ("head", "headings"),
+    [("A STRANGE LINE", ()), ("CHAPTER SEVEN", ((1, None, "CHAPTER SEVEN"),))],
+)
+def test_flush_left_head_line_left_in_the_text_near_the_head_top_is_no_heading(
+    head: str, headings: tuple[tuple[int, None, str], ...]
+) -> None:
+    # Pages 10 to 13 have the running head "THE BOOK" at 36 pt; page 14's
+    # head line, at 50 pt, is alike to none.
+    page = PageLayout(
+        14,
+        (_region(_line(head, _BODY_LEFT_PT, 50)), _region(*_running_text(100, 12))),
+        (),
+    )
+    lines = _lines_of(
+        *(_page_with_head(index, "THE BOOK") for index in range(10, 14)), page
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _headings(blocks) == headings

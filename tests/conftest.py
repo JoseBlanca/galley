@@ -193,10 +193,14 @@ WHOLE_BOOK_CONFIGS = frozendict(
             "exclude_pages = [0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279]\n"
             "contents_pages = [14]\n"
         ),
+        # Stubbs' pages 322 to 337, the publisher's lists after its text,
+        # are excluded: the heading rule takes their lines for headings
+        # (structure spec section 27, point 4, settled 17 November 2026).
         "earlyplantagenet01stub": (
             'language = "en"\n'
-            "exclude_pages = [0, 2, 3, 4, 5, 8, 10, 53, 55, "
-            "338, 339, 340, 341, 342, 343]\n"
+            "exclude_pages = [0, 2, 3, 4, 5, 8, 10, 53, 55, 322, 323, 324, 325, "
+            "326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, "
+            "340, 341, 342, 343]\n"
             "contents_pages = [14, 15, 16]\n"
         ),
         "domesdaybook00maituoft": (

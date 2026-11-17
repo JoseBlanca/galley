@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from galley.model import (
     BlockKind,
     Box,
+    Line,
     PageLayout,
     PageNumber,
     Region,
@@ -30,7 +31,7 @@ from galley.structure._lines import (
 )
 from galley.structure._markers import MarkerForm, marker_form
 from galley.structure._measures import Edges, is_short, region_edges
-from galley.structure._regions import RegionKind, region_kinds
+from galley.structure._regions import RegionKind, head_line, region_kinds
 from galley.structure._removals import foot_removals, head_removals
 from galley.structure._runs import BodyRun, LabelLine
 from galley.structure._summaries import summary_run
@@ -105,17 +106,19 @@ def _runs(
     body: Sequence[PlacedLine],
     band_regions: Sequence[Sequence[PlacedLine]],
     head: PageHead,
+    kept_head: Line | None,
     survey: BookSurvey,
     contents_pages: frozenset[int],
 ) -> tuple[BodyRun, ...]:
     """The runs of the body stream that are blocks of their own (spec
     section 2, step 2.3), in order: the headings, the chapter summary under
     a heading, and the verse; none on a page of the printed table of
-    contents."""
+    contents. `kept_head` is the page's head line that section 3 left in
+    the text near the book's head lines (`kept_head_line`), or None."""
     if page_index in contents_pages:
         return ()
     band_lines = tuple(line for region in band_regions for line in region)
-    headings = heading_runs(body, band_lines, survey.body_line_pitch, head)
+    headings = heading_runs(body, band_lines, survey.body_line_pitch, head, kept_head)
     # Each heading's summary ends at the next heading at the latest.
     limits = (*(run.start for run in headings[1:]), len(body))
     summaries = tuple(
@@ -131,6 +134,32 @@ def _runs(
             headings + summaries + verse_runs(body, taken), key=lambda run: run.start
         )
     )
+
+
+# Spec section 3: running heads lie at most 2 pitches below the median top
+# of the book's head lines.
+_HEAD_TOP_PITCHES = 2.0
+
+
+def kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
+    """The text line of the page's head line when section 3 left it in the
+    text and its top lies at most 2 pitches below the median top of the
+    book's head lines, where running heads are looked for: never a
+    flush-left heading line unless it starts with a chapter label word
+    (spec section 14, rule 1). None otherwise."""
+    head = head_line(page)
+    if (
+        head is None
+        or page.index in survey.running_heads
+        or survey.median_head_top is None
+    ):
+        return None
+    line = head.region.lines[-1]
+    within = (
+        line.box.top - survey.median_head_top
+        <= _HEAD_TOP_PITCHES * survey.body_line_pitch
+    )
+    return line if within else None
 
 
 def page_parts(
@@ -215,6 +244,7 @@ def page_parts(
             body,
             (*band_regions, index_lines),
             page_head,
+            kept_head_line(page, survey),
             survey,
             contents_pages,
         ),
