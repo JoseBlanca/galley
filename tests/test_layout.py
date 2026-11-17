@@ -1750,18 +1750,20 @@ def test_reread_footnote_band_is_not_read_unless_asked() -> None:
 
 
 @pytest.mark.thread_unsafe
-def test_run_with_ocr_verify_rereads_and_with_trust_needs_no_word_list(
+def test_run_with_ocr_verify_rereads_and_with_trust_or_redo_needs_no_word_list(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # The pages of `_book` have no region to read: layout reads the word
     # list for the margins' notes, renders nothing and records nothing.
+    # With `redo` every page is Tesseract's already, and nothing is re-read.
     folder, config = _book(tmp_path)
     monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", tmp_path / "no-cache")
     monkeypatch.setenv("PATH", "")
     with pytest.raises(ExternalProgramError, match="tesseract"):
         layout.run(folder, config, workers=1)
-    layout.run(folder, replace(config, ocr=OcrMode.TRUST), workers=1)
-    assert read_lines(folder.lines_json).rereads == ()
+    for ocr in (OcrMode.TRUST, OcrMode.REDO):
+        layout.run(folder, replace(config, ocr=ocr), workers=1)
+        assert read_lines(folder.lines_json).rereads == ()
 
 
 # run, on a book folder of its own
