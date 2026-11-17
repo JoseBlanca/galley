@@ -1955,6 +1955,18 @@ def test_glued_misreading_takes_only_ocr_words_b_and_c_left_free() -> None:
     assert model.replaced_layer_words((misread, ten), ocr, is_known=_unknown) == (ten,)
 
 
+def test_glued_misreading_needs_ocr_words_that_follow_each_other() -> None:
+    # Tesseract's words inside the layer word are its first and third, a
+    # word read elsewhere between them in Tesseract's order.
+    misread = Word("lo/.,", Box(100.0, 50.0, 130.0, 58.0), None)
+    ocr = (
+        Word("10", Box(100.5, 50.0, 110.0, 58.0), 90.0),
+        Word("Caen,", Box(200.0, 80.0, 226.0, 88.0), 90.0),
+        Word("f.,", Box(121.0, 50.0, 129.5, 58.0), 90.0),
+    )
+    assert model.replaced_layer_words((misread,), ocr, is_known=_unknown) == ()
+
+
 def test_ocr_words_read_glued_by_the_layer_pair_with_no_other_layer_word() -> None:
     # The layer's "of," a line below may not take Tesseract's "of," that the
     # glued "of,96" holds.
