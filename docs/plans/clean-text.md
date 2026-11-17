@@ -526,10 +526,10 @@ and the six EPUBs are built.
 - [x] 6.1 The evaluation tool's three changes. Spec: evaluation §5,
   "Front matter"; §6, the parts; §8, `ocr_confidence_mean`. Stream
   `eval`. Deliverable 1.
-- [ ] 6.2 The owner's sheet, published privately; the plan's one pause
+- [x] 6.2 The owner's sheet, published privately; the plan's one pause
   for the owner, with 6.3 running while they read it. Spec: extract §7,
   "The reference pages"; reocr §9, "Excerpt tests". Deliverable 2.
-- [ ] 6.3 The measurement: `uv run galley-eval run`, the whole-book
+- [x] 6.3 The measurement: `uv run galley-eval run`, the whole-book
   tests, the six EPUBs, Gierke's 30 notes. Spec: reocr §9, "The
   measurement of the plan"; extract §7, "galley-eval before and after";
   `docs/specs/evaluation.md` §9. Needs 6.1 and work package 5.

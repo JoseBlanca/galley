@@ -431,3 +431,68 @@ After the fixes, regions read and kept: Stubbs 359 / 228, Domesday 623
 / 428, Gierke 758 / 418. Stubbs' index gives 934 entries. All checks
 pass at ee4c824: 2,043 tests in 46.9 s (74.3 s with 8 threads), 59
 whole-book tests in 463.6 s.
+
+## Task 6.2: the owner's sheet
+
+Published privately on 17 November 2026:
+https://claude.ai/artifact/ByAgVyaKbUxDxgNvJsAH2y, built at 89ed733 (15
+checks with the page images, most important first; source
+`tmp/sheet3/` of the plan's worktree). One asks for a decision (S-LOST:
+whether to keep a one-word Tesseract reading where the layer has no
+word, as for Stubbs' notes "Henry's" and "Coronation."). The owner's
+answers go here when they come (task 6.4).
+
+## Task 6.3: the final measurement
+
+At 89ed733: `uv run galley-eval run`, in `runs/clean-text-final/` of
+the main checkout; the whole-book tests, 59 passed in 462.5 s; the six
+EPUBs in `runs/clean-text/epubs/`, each with 0 errors and 0 warnings
+from epubcheck 5.4.0 (built one after another: Haskins 14.6 s, Stubbs
+47.0 s, Domesday 95.4 s, Mariéjol 26.3 s, Kadesh 4.3 s, Gierke 65.2 s).
+
+Scores at blocks, against the baseline (start of the plan) and the run
+before re-reading. The tool changed during the plan (margin notes
+scored as a part of their own; dropped front matter unscored: 41, 301,
+79 and 32 tokens on Haskins, Stubbs, Domesday, Mariéjol), so the
+baseline's body rates of Stubbs and Domesday are not comparable.
+
+| score | baseline | before re-reading | final | target (reocr §9) |
+|---|---|---|---|---|
+| Stubbs' index precision / recall | .829 / .789 | .995 / .874 | .984 / .963 | ≥ .97 / .94, met |
+| Stubbs' margin notes as margin notes, of 467 | 241 | 246 | 284 | ≥ 285, **missed by 1** |
+| Domesday's margin notes as margin notes, of 593 | 519 | 522 | 571 | ≥ 560, met |
+| Stubbs' body error rate | (0.142) | 0.059 | 0.055 | ≤ 0.062, met |
+| Domesday's body error rate | (0.100) | 0.075 | 0.075 | ≤ 0.080, met |
+| Domesday's notes whose reference is right | 1,277 | 1,278 | 1,278 | ≥ 1,275, met |
+| Haskins' index error rate | 0.270 | 0.180 | 0.119 | ≤ 0.13, met |
+| margin notes' error rate, Stubbs / Domesday | – | 0.537 / 0.583 | 0.259 / 0.161 | |
+| Stubbs' margin notes in the body / missing | 189 / 37 | 193 / 28 | 172 / 11 | |
+| Domesday's margin notes in the body / missing | 34 / 40 | 30 / 41 | 9 / 13 | |
+| Domesday's paragraphs, precision / recall | .860 / .866 | .872 / .873 | .861 / .890 | |
+
+Haskins' body error rate is 0.023 (0.024 before); Mariéjol changes only
+on its bibliography, pages 14 to 16, as targeted. No kept Stubbs cut-in
+record replaces a word of the column.
+
+**Stubbs' margin notes, missed by 1.** Most wrong margin-note words of
+Stubbs are lines of cut-in notes that layout leaves in the column
+(page 70 "His" read "s"; page 93 "king" read "alking"), which
+re-reading by rule never replaces; and crops read but not kept because
+Tesseract misread a date (page 141, "1191" as "IIgi.", 1 against 2).
+Stubbs keeps 228 of 359 crops, against 262 of 365 in the spec's
+research run, the price of the rules that keep body words out of the
+notes (review 2). What fixing it would take: finding more of the
+cut-in notes' lines in layout (layout §9's rule finds about half), a
+task of its own.
+
+**Gierke's 30 margin notes, by eye** against 300-dpi renders: 129 of
+139 words right (the text layer 52; target 130, **missed by 1**). The
+words lost: page 139 "Theory of Cusanus." keeps only "Theory"
+(Tesseract read it, but scored 1 against the layer's 2, since
+"Cusanus." is not in the word list); page 123 loses "State.", which the
+layer boxed 133 pt wide into the body column; pages 101, 112, 120, 148,
+159 lose one word or a few to misreadings ("Ditferentiation",
+"Repsesentation"). Counted right but flawed: page 125's words are out
+of order ("Reversion 4 J of to power the People."), and some notes
+carry junk or a repeated piece ("lty*", page 95; "Sovereisn-" twice,
+page 128), from the layer where Tesseract's reading was not kept.
