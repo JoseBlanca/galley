@@ -41,6 +41,18 @@ def _after_last_apostrophe(key: str) -> str:
     return key[cut + 1 :]
 
 
+def _is_joined_word(
+    key: str, second: str, book_words: frozenset[str], word_list: frozenset[str]
+) -> bool:
+    """Whether `key`, the key of a word joined from two parts, is among
+    `book_words`, or in `word_list` when `second`, the second part, has
+    `_WORD_LIST_MIN_LETTERS` letters or more (spec section 5)."""
+    return key in book_words or (
+        sum(character.isalpha() for character in second) >= _WORD_LIST_MIN_LETTERS
+        and key in word_list
+    )
+
+
 def join_hyphen(
     first: str, second: str, book_words: frozenset[str], word_list: frozenset[str]
 ) -> HyphenJoin | None:
@@ -82,12 +94,7 @@ def join_hyphen(
     keys = (joined_key,)
     if any(apostrophe in first for apostrophe in APOSTROPHES):
         keys = (joined_key, _after_last_apostrophe(joined_key))
-    word_list_counts = (
-        sum(character.isalpha() for character in second) >= _WORD_LIST_MIN_LETTERS
-    )
-    if any(
-        key in book_words or (word_list_counts and key in word_list) for key in keys
-    ):
+    if any(_is_joined_word(key, second, book_words, word_list) for key in keys):
         return HyphenJoin(joined, ChangeReason.HYPHEN_JOIN)
     return HyphenJoin(joined, ChangeReason.HYPHEN_JOIN_GUESSED)
 
@@ -122,10 +129,7 @@ def join_lost_hyphen(
         return None
     joined = stem + second
     key = word_key(joined)
-    word_list_counts = (
-        sum(character.isalpha() for character in second) >= _WORD_LIST_MIN_LETTERS
-    )
-    if key in book_words or (word_list_counts and key in word_list):
+    if _is_joined_word(key, second, book_words, word_list):
         return HyphenJoin(joined, ChangeReason.HYPHEN_LOST)
     return None
 
