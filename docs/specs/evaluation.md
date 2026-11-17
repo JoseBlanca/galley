@@ -584,13 +584,17 @@ listed apart and not scored.
 
 **Front matter.** A page that galley's `pages.json` makes `front_matter`
 (`docs/specs/front-matter.md`, 17 November 2026) is treated as a page
-of `exclude_pages`, here and in the rule for unplaced tokens above, and
-the reference tokens before the first aligned token are not scored
-either when the book has front-matter pages: galley drops them on
-purpose, and the rule above would otherwise give them the page of the
-preface and count them as missing there (the reference holds Domesday's
-and Mariéjol's title pages). They are counted in `not_scored` and
-listed apart as front matter.
+of `exclude_pages`, here and in the rule for unplaced tokens above. The
+reference's own front pages, its title page and the like, come before
+the first token aligned to galley: the rule above would give them the
+page of galley's first page and count them as missing there (the
+reference holds Domesday's and Mariéjol's title pages). So an unaligned
+reference token before the first aligned token is not scored when its
+alignment key is the key of a word galley removed as `front_matter`;
+every other token there is scored as usual, so that the lost first words
+of a preface still count as missing. The scorecard gives the number of
+tokens left unscored this way, `front_matter_not_scored`, within
+`not_scored`, and the differences list them apart as front matter.
 
 ### Differences
 

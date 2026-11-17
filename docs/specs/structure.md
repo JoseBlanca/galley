@@ -228,18 +228,20 @@ then removed as a running head is, with its page number, and the speck
 above stays as it is (in the text, or as a `stray_mark` when it has no
 letter or digit).
 
-**The head of a short section.** The rules above find a running head by
-its likeness to the heads of other pages, or by a page number the book's
-arabic numbers confirm, and a section of two pages has neither: the
-second page of Haskins' preface keeps "vlil PREFACE" (its page number
-viii misread) and that of Domesday's keeps "vi Preface." in the text.
-Their likeness is to the section's heading on the page before ("PREFACE"
-on Haskins' page 12, "PREFACE." on Domesday's), which sits lower than
-the heads, at 100.8 pt in Haskins against a median head top of 35.7 pt,
-4.3 pitches, and so takes no part in the comparisons above. A head line
-that the rules above do not make a running head is one when:
+**The head of a short section.** A section of two pages has one
+running head, and the rules above miss it: no other page has a head
+like it, and its page number is roman or misread. The second page of
+Haskins' preface keeps "vlil PREFACE" (viii misread) in the text, and
+that of Domesday's keeps "vi Preface.". Its likeness is to the section's
+heading on the page before ("PREFACE" on Haskins' page 12, "PREFACE."
+on Domesday's), which the rules above never compare, because it sits
+lower than the heads: Haskins' at 100.8 pt from the top of the page,
+against a median head top of 35.7 pt, which is 4.3 body line pitches
+(the pitch, the median distance from one row's top to the next, is
+15.2 pt in Haskins; layout §1). So a head line that the rules above
+leave in the text is a running head when all three hold:
 
-- its top lies within the 2 pitches of the median head top;
+- its top lies within 2 pitches of the median head top, as above;
 - its first or last word is **number-like**: 1 to 4 characters, each a
   digit or one of the letters i, v, x, l, c, d, m in either case, with at
   most one "." or "," after them ("vi", "vlil", "xiv.", "47"); and

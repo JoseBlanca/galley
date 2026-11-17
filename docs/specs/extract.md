@@ -22,9 +22,11 @@ the words, the plates and the cover. What extract does with the pages
 before the preface is in `docs/specs/front-matter.md`. The code that
 exists is the walking skeleton's (`src/galley/extract/__init__.py`,
 `_layer_words`; `src/galley/analyze/__init__.py`, `_measurer`). extract
-reads the PDF, the book config and `pages.json`, and writes `words.json`
-in the format of `docs/architecture.md` §8 (cited as "architecture §8")
-and `images/`. It builds on the architecture and on `docs/glossary.md`.
+reads the PDF, the book config and `pages.json` (analyze's file: what
+each page is, text, plate, blank or excluded), and writes `words.json`
+(each page's words with their boxes, and the words it removed) in the
+format of `docs/architecture.md` §8 (cited as "architecture §8"), and
+`images/`. It builds on the architecture and on `docs/glossary.md`.
 
 The numbers were measured on 17 November 2026 with pdfplumber 0.11.10
 on the six public-domain books galley is developed on, whole, as
@@ -33,8 +35,7 @@ European History* (**Haskins**); W. Stubbs, *The Early Plantagenets*
 (**Stubbs**); F. W. Maitland, *Domesday Book and Beyond* (**Domesday**);
 J.-H. Mariéjol, *Catherine de Médicis* (**Mariéjol**); O. Gierke,
 *Political Theories of the Middle Age* (**Gierke**); J. H. Breasted, *The
-Battle of Kadesh* (**Kadesh**). The scripts that measured them are not
-kept. Page means page index, from 0, in the whole book.
+Battle of Kadesh* (**Kadesh**). Page means page index, from 0, in the whole book.
 
 ## 1. Terms
 
@@ -66,7 +67,7 @@ kept. Page means page index, from 0, in the whole book.
 
 **The characters of an OCR word tile its box.** In all six books the
 characters inside one word of the OCR touch, one after the other: of
-the consecutive characters that text flow (section 3) puts in one word,
+the consecutive characters that text flow (section 1) puts in one word,
 the gap is within 0.1 pt of 0 for 98.9% in Haskins (264,623 of 267,632
 pairs), 98.6% in Stubbs, 99.4% in Domesday, 99.7% in Mariéjol, 99.2% in
 Gierke and 98.0% in Kadesh. Between two words of the OCR there is either
@@ -77,8 +78,8 @@ a space character or a gap.
 Mariéjol, Gierke and Kadesh have one space character for every two or
 three others (Domesday 485,035 for 1,106,082). In Haskins and Stubbs a
 word ends only where the gap to the next character is above 3 pt, and
-many of the gaps between their words are smaller (the 7,002 gaps
-under 3 pt that rule 2 splits in the two books, section 4), so the
+many of the gaps between their words are smaller (the 6,978 gaps
+under 3 pt that section 4 splits in the two books), so the
 words of many lines come out glued: on Haskins' page 12 the line
 "This book rests partly upon" has gaps of 2.5 to 2.9 pt between its
 words and is read as "Thisbookrestspartlyupon". Runs of 20 letters or
@@ -178,7 +179,7 @@ between two wrong readings; none made a right word wrong.
 
 **Stubbs' 8,914 words.** 7,614 of them are on its ten index pages, 312
 to 321, whose letter soup text flow turns into glued words
-("becomesarchbishopofCanterbury,"), which rule 2 splits. The other
+("becomesarchbishopofCanterbury,"), which section 4 splits. The other
 1,300 are spread over 90 pages: cut words made whole. None is a margin
 note joined to the body: the cut-in notes are about 27 pt from the body
 lines beside them, and text flow joins nothing more than 3 pt apart.
@@ -190,8 +191,13 @@ when both hold:
 
 - the gap between them is at least a third of the median width of the
   word's characters; and
-- the first is a letter or a closing mark (`, . ; : ! ? ) ] ' " ’ ”`),
-  and the second a letter or an opening mark (`( [ ' " ‘ “`).
+- either the first is a letter and the second a letter or an opening
+  mark (`( [ ‘ “`), or the first is a closing mark (`, . ; : ! ? ) ] '
+  " ’ ”`) and the second a letter. So no split falls between two marks
+  (Stubbs' page 110 ":'", gap 1.8 pt), and a straight quote, `'` or `"`,
+  is never taken for an opening mark: inside a word a letter or a mark
+  always comes before it, and there it closes ("told." with its quote,
+  `told."` on Stubbs' page 325; `waves"` on Haskins' page 24).
 
 Each part is a word of its own, with the box of its characters; the
 parts keep their order. A letter is a character for which Python's
@@ -208,13 +214,13 @@ are not, wrong when the joined word is in it and a part is not.
 
 | gap, in median character widths | right | wrong | both parts and the join in the list | a part and the join not in the list |
 |---|---|---|---|---|
-| below 0.15 | 2 | 26 | 6 | 26 |
-| 0.15 to 0.25 | 15 | 32 | 7 | 26 |
-| 0.25 to 1/3 | 45 | 13 | 6 | 12 |
-| 1/3 to 0.4 | 127 | 6 | 25 | 16 |
-| 0.4 to 0.5 | 1,062 | 5 | 111 | 77 |
-| 0.5 to 0.75 | 3,968 | 10 | 634 | 437 |
-| 0.75 and more | 414 | 5 | 40 | 65 |
+| below 0.15 | 2 | 26 | 5 | 25 |
+| 0.15 to 0.25 | 15 | 32 | 6 | 21 |
+| 0.25 to 1/3 | 45 | 13 | 6 | 10 |
+| 1/3 to 0.4 | 127 | 6 | 21 | 14 |
+| 0.4 to 0.5 | 1,062 | 5 | 100 | 74 |
+| 0.5 to 0.75 | 3,967 | 10 | 634 | 436 |
+| 0.75 and more | 414 | 5 | 40 | 63 |
 
 Below a third, the gaps are mostly inside words the OCR cut in two
 ("Mar|gam,", "earnes|t"); from a third up, the wrong ones are mostly
@@ -237,8 +243,8 @@ it, because a space character fills every gap between their words.
 
 | book | words split | words added | words after both rules | runs of 20 letters or more: default, text flow, both rules |
 |---|---|---|---|---|
-| Haskins | 1,609 | 2,772 | 69,033 | 190, 190, 2 |
-| Stubbs | 3,177 | 4,230 | 104,448 | 137, 146, 0 |
+| Haskins | 1,606 | 2,767 | 69,028 | 190, 190, 2 |
+| Stubbs | 3,164 | 4,211 | 104,429 | 137, 146, 0 |
 | Domesday | 0 | 0 | 251,053 | 4, 4, 4 |
 | Mariéjol | 0 | 0 | 237,920 | 46, 46, 46 |
 | Gierke | 0 | 0 | 112,270 | 25, 24, 24 |
@@ -250,19 +256,20 @@ and Gierke's "Genossenschaftsrecht"), Mariéjol's unreadable OCR
 glued words with gaps.
 
 **Checked by eye.** 60 splits drawn at random, 30 from each book, were
-read on the page rendered at 216 dpi (drawn before the exception for a
-digit after a closing mark was added; the 4 cuts before a digit among
-them, "Stephen, 31" and the like, were right): 59 were right. The wrong one,
+read on the page rendered at 216 dpi (drawn before the exceptions for a
+digit or a mark after a closing mark were added; the 4 cuts before a
+digit among them, "Stephen, 31" and the like, were right): 59 were right. The wrong one,
 "RELA TIONS", is on Stubbs' page 324, one of the publisher's
 advertisements at the end of the book (pages 322 to 328), which are
 set in letter-spaced capitals; those pages hold all 9 of Stubbs' splits
 between two parts in capitals, "NET RA", "A T SUCCESSIVE" among them.
 The splits the table calls wrong, from a third up, were read too.
 Haskins' 7 are a word before an initial ("in L.", "to P."), and right.
-Of Stubbs' 17, 11 are initials the OCR gave as two words (9 "A. d." for
+Of Stubbs' 18, 11 are initials the OCR gave as two words (9 "A. d." for
 "A.D.", "B. C.", "N. Y."); 3 are "Henry s" (pages 127, 128 and 211),
 "Henry's" whose apostrophe the OCR did not read; "By W." and "By S." are
-right; "A T" is on the advertisements. The splits it missed are glued
+right; "A T" is on the advertisements; "d' S" (page 149) was not read
+on the page. The splits it missed are glued
 words with a gap under a third of a character ("coastofSuffolk" on
 Stubbs' page 307).
 
@@ -281,13 +288,13 @@ def layer_words(page: pdfplumber.page.Page) -> tuple[Word, ...]:
     """The words of `page`'s text layer, in the PDF's order: those of
     pdfplumber's extract_words(use_text_flow=True), each split at a gap
     of at least a third of the median width of its characters between a
-    letter or closing mark and a letter or opening mark (extract spec
-    sections 3 and 4). Each Word has `ocr_confidence` None."""
+    letter and a letter or opening mark, or between a closing mark and
+    a letter (extract spec sections 3 and 4). Each Word has `ocr_confidence` None."""
 
 def split_glued(characters: tuple[Character, ...]) -> tuple[tuple[Character, ...], ...]:
     """The characters of one text-flow word, in order, cut into the
-    words of rule 2. `Character` is a frozen value of text_layer.py:
-    `text` and `box`."""
+    words of section 4. `Character` is a frozen value of text_layer.py:
+    `text`, one character, and `box`, in points."""
 ```
 
 `split_glued` is the pure part, which the unit tests call with literal
@@ -297,13 +304,31 @@ it takes the words `layer_words` gives.
 ## 6. The cases
 
 - **A page with no space character** (all of Haskins and Stubbs): its
-  words come from gaps alone; rule 2 splits those under 3 pt.
+  words come from gaps alone; section 4 splits those under 3 pt.
 - **Two OCR words laid over each other**: two words, each in the OCR's
   reading, where the default options mixed their characters.
 - **A word the OCR cut in two with a gap** ("Mar gam", 0.18 pt): stays
   one word, as with the default options.
 - **Letter-spaced capitals**: split where the letter spacing is wide
   ("RELA TIONS"). Measured on Stubbs' advertisements only; accepted.
+- **Words that climb.** On a steeply sloping line, or a word printed
+  sideways, text flow keeps the word whole while each character's top
+  moves by up to 3 pt from the last, so the word's box grows tall:
+  Domesday has 98 words whose characters rise more than 4 pt from first
+  to last, 66 on page 136, whose lower half bends, and 31 on page 481,
+  whose table prints its column headings sideways; their boxes reach
+  30.4 pt, against a body word height of about 9 pt. The other five
+  books have 1 to 11 such words. layout's row rule
+  (`body_measures.rows_of`) takes a tall word as the anchor of a row and
+  pulls the words of the next line into it, so lines interleave there:
+  run on page 136 with the words of text flow, layout gives "There 5
+  mills shillings and fish-weir" and "and 1 one weir are which 6 renders
+  of 64 nothing."; on page 481 the headings "Vespasian, Saxons," and
+  "Cotton," fall among the table's numbers. With the default options
+  both pages were letter soup ("8 b o r s w i t 1 v i r g"; on 481 every
+  word of the body cut into letters, 874 words against 390), so the
+  words are now right and their order is still wrong on those two pages.
+  Mending the order is layout's, and not in this spec.
 - **A glued word with no gap** (Mariéjol's unreadable OCR): stays as it
   is.
 - **A number the OCR cut in two** ("13|15,"), and a note reference glued
@@ -318,19 +343,24 @@ it takes the words `layer_words` gives.
   "book", "rests", "partly", "upon"; the gap of 1.8 pt in "13|15,"
   (Haskins' page 157) and the gaps of about 0.5 pt in
   "Mont-Saint-Michel" (page 206) split nothing; "land3." with a gap
-  before the "3" stays one word; a word of one character comes back
-  whole.
+  before the "3" stays one word; `told."` with a gap before the quote
+  (Stubbs' page 325, gap 1.8 pt) stays one word, and so does `II.'s` (page 318);
+  a word of one character comes back whole.
 - **Excerpt tests.** Three new excerpts cut by `scripts/fetch_samples.py`
   carry the cases above (their pages, and the pages they share with the
   front-matter rule, are in `docs/specs/front-matter.md` §6):
-  `domesday_front_flow` holds Domesday's pages 23, 24 and 200, and
-  asserts "some" and "it" (not "s", "ome", "i", "t") and "London" and
-  "Winchester" in the words of page 200; `gierke_front_flow` holds
-  Gierke's pages 13 and 100, and asserts "The" and "him"; `haskins_front`
-  holds Haskins' page 12, and asserts its words exactly.
-- **The reference pages of the committed excerpts change.** 94 of the
-  108 pages of the eleven committed excerpts get different words with
-  the two rules (every page of `stubbs_51_56-64`,
+  each asserts that the pieces of the cut words are gone, since the
+  whole words are on those pages anyway. `domesday_front_flow` holds
+  Domesday's pages 23, 24 and 200: page 23 has no word "s" or "ome",
+  page 24 no "i" or "t", page 200 no "W", "L" or "ter" (with the
+  default options each had one); `gierke_front_flow` holds Gierke's
+  pages 13 and 100: page 13 has no word "T" (2 before), page 100 no "h"
+  or "im" (1 each before); `haskins_front` holds Haskins' page 12, and
+  asserts its words exactly.
+- **The reference pages of the committed excerpts change.** 95 of the
+  108 pages of the eleven committed excerpts get different words, in
+  order, with the two rules (94 if only the multiset of words is
+  compared) (every page of `stubbs_51_56-64`,
   `stubbs_summaries_index`, `domesday_74-83`, `mariejol_210-219`,
   `mariejol_headings_verse` and `haskins_quotes_index`). The plan lists,
   for each page whose literal changes, the words removed and added, and

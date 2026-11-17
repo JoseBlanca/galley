@@ -18,8 +18,15 @@ and a removal reason to the formats of `docs/architecture.md` §8 (cited
 as "architecture §8") and a key to the book config (architecture §6),
 which the architecture now describes; and it changes how the evaluation
 tool scores the dropped pages (`docs/specs/evaluation.md` §5). No code
-exists for it. analyze reads the PDF and the book config and writes
-`pages.json`; extract reads them and writes `words.json`.
+exists for it. analyze reads the PDF and the book config (`book.toml`,
+architecture §6) and writes `pages.json`, which gives each page a
+**kind** (`PageKind`: text, plate, blank, or excluded by the config) and
+a **text source** (`text_source`: where its words come from, the text
+layer or none). extract reads them and writes `words.json`, each page's
+words, and the **removals**: each word it took out, with its page, box
+and **reason** (`RemovalReason`, an enum of architecture §8). The
+config key `contents_pages` lists the pages of the book's printed table
+of contents (architecture §6); the owner sets it.
 
 The numbers were measured on 17 November 2026 on the six public-domain
 books of `samples/public_domain/`, whole, read as `docs/specs/extract.md`
@@ -34,16 +41,19 @@ from 0, in the whole book.
   finds them; the preface, when there is one, is text and is kept.
 - **Front-matter end**: the index of the first page after the front
   matter. The pages before it are the front matter.
-- **Preface page**: a page whose topmost row (the row rule of
-  `body_measures.group_rows`, architecture §12) has at most 6 words, one
+- **Preface page**: a page whose topmost row of words (a row is the
+  words whose vertical middle lies within the top and bottom of the
+  row's first word, as `body_measures.group_rows` makes it, layout §1)
+  has at most 6 words, one
   of which, reduced to its letters in lower case without accents, is
   "preface", "prefatory", "foreword", "avantpropos", "vorwort",
   "prefazione", "prologo" or "prefacio" (names of a preface in the five
   languages of the config, architecture §6). "PREFACE." on
   Domesday's page 12 is one; "AUTHOR'S PREFACE" would be.
-- **The search window**: the first tenth of the book's pages, and at
-  least its first 10: 28 pages in Haskins, 34 in Stubbs, 55 in Domesday,
-  46 in Mariéjol, 29 in Gierke, 10 in Kadesh. A preface or a table of
+- **The search window**: the first tenth of the PDF's pages, rounded
+  down, and at least its first 10: Haskins' PDF has 280 pages, so 28;
+  Stubbs' 344, so 34; Domesday's 558, 55; Mariéjol's 460, 46; Gierke's
+  290, 29; Kadesh's 76, so 10. A preface or a table of
   contents printed later than that is not the start of the book's text
   (Mariéjol prints its contents on page 450).
 
@@ -77,6 +87,26 @@ after its contents (page 10) and its errata (page 11), which are kept.
 Stubbs has neither preface nor introduction: its contents (14 to 16) and
 its list of maps (17) come before chapter I (18).
 
+**A book without `contents_pages`.** The rule then rests on a preface
+page or on the running text. Haskins, Domesday and Mariéjol end at
+their preface as before. Gierke has no preface page: it ends at 12, its
+first page of running text (Maitland's introduction, 301 words), and
+also drops its contents (10, 43 words) and errata (11, 83 words). Stubbs
+has neither: it ends at 7, the publisher's list of its series (299
+words), and drops only pages 1 and 6, keeping that list (7), the title
+page (12) and its back (13). The six configs of the `whole_book` tests and
+of the evaluation set all name their contents pages. analyze logs a
+WARNING when it ends the front matter at the running text and the
+config has no `contents_pages`, so that the owner adds them.
+
+**Why "introduction" is not a preface name.** It would make Gierke end
+at its translator's introduction, page 12, which is right, but Stubbs'
+first chapter is called "Introduction", and its running head on page 20
+("ch. Introduction. I. 3") would make Stubbs, without `contents_pages`,
+end at 20 and drop its contents and the first two pages of chapter I
+(1,182 words in all). With `contents_pages` it changes nothing on the
+six books.
+
 **Why the running text, and why half the median.** Kadesh, an offprint,
 has neither a preface nor a table of contents: its text starts on page 8
 with 582 words, after a cover, a title page and a copyright page of 6
@@ -93,7 +123,8 @@ INFO the front-matter end, which of steps 1 to 4 gave it, and the pages
 it makes `front_matter`, so that the owner sees what was dropped without
 opening `words.json`.
 
-analyze raises `ConfigError` when `front_matter_end` is not below the
+analyze raises `ConfigError` (galley's error for a wrong config,
+architecture §12) when `front_matter_end` is not below the
 page count, as for the other keys of pages (walking skeleton §6,
 `check_config_pages`), and when a page of `contents_pages` lies before
 it, naming both keys: a contents page that is also dropped is a
@@ -149,12 +180,14 @@ config has a `cover_page`, is rendered from that page as before, even
 when the page is front matter. What the reader no longer sees is what
 only the printed front pages hold: a subtitle (Domesday's "Three Essays
 in the Early History of England"), the publisher, the date and edition,
-and a dedication (Haskins' "TO MY WIFE") (**Open 1**, below).
+and a dedication (Haskins' "TO MY WIFE"). Whether to bring the
+subtitle or the dedication back is **Open 1**, below.
 
 ## 6. How it is verified
 
 - **Unit tests of `front_matter_end`** (section 7) with literal page
-  starts: a preface page in the window, a contents page before a
+  starts. The first: Haskins' pages 0 to 27, each its kind, first row and
+  word count as measured, with `contents_pages = [14]`, give 12. Then: a preface page in the window, a contents page before a
   preface page, a preface past the window (ignored), Kadesh's word
   counts of its 76 pages, as literals (the end is 8), a book with
   neither and no dense page (0), and the config's value winning over
@@ -173,11 +206,13 @@ and a dedication (Haskins' "TO MY WIFE") (**Open 1**, below).
   - `gierke_front_flow`: Gierke's pages 1, 6, 7, 8, 9, 10, 11, 12, 13
     and 100, `contents_pages = [5]`. Excerpt pages 0 to 4 are
     `front_matter`; 5 (contents) and 6 (errata) are not.
-- **The committed excerpts** start inside the book, where the rule could
-  take their first pages for front matter (the running-text step on a
-  ten-page excerpt that opens with plates). Their configs get
-  `front_matter_end = 0`, and their tests are otherwise unchanged by
-  this spec.
+- **The committed excerpts** start inside the book. On each of the
+  eleven the rule drops nothing: two start with their contents page
+  (`contents_pages = [0]`), and the other nine with a page of at least
+  half their median word count (the running-text step gives 0). Their
+  configs are unchanged, and each excerpt's test asserts that its
+  `pages.json` has no `front_matter` page, so that a rule that drops the
+  first pages of a book cut in the middle fails there.
 - **Whole books** (`whole_book` tests): on each of the six books, the
   pages of section 4 and no other are `front_matter`, and the
   `front_matter` removals number as in section 4.
@@ -223,18 +258,25 @@ architecture §6:
 
 ## 8. Open points
 
-1. **What of the printed front pages the EPUB keeps.** The rule drops
-   the dedication with the rest (Haskins' "TO MY WIFE"), and the EPUB's
-   title page has the config's title and authors only, without a
-   subtitle (Domesday's "Three Essays in the Early History of England").
-   The options: (a) keep both out, as decided; nothing to build. (b) A
-   config key `subtitle`, written under the title on the EPUB's title
-   page (Pandoc's metadata `subtitle`); a line of config and of
-   markdown. (c) Keep a dedication page: a dropped page of at most 10
-   words that starts with "TO" or "À" becomes a paragraph before the
-   preface; a rule to measure, and a dedication is rare in the six
-   books (one). The recommendation is (b), and (c) only if the owner
-   misses the dedication. **Meanwhile**: (a).
+1. **Whether the EPUB keeps a subtitle or a dedication.** The rule drops
+   both with the printed front pages: Domesday's subtitle "Three Essays
+   in the Early History of England" and Haskins' dedication "TO MY
+   WIFE", the only dedication in the six books. The options:
+   - (a) Neither. Nothing to build; the EPUB's title page has the
+     config's title and authors only.
+   - (b) A config key `subtitle`, which markdown writes into `book.md`'s
+     metadata and Pandoc puts under the title on the EPUB's title page.
+     About ten lines of config and markdown, and the owner types each
+     book's subtitle.
+   - (c) (b), and a dedication kept: a dropped page of at most 10 words
+     that starts with "TO" or "À" becomes a paragraph before the
+     preface. A rule fitted on one page of one book, to be measured
+     first.
+
+   Recommendation: (b), which gives back what the reader misses most
+   for little work; (c) only if the owner wants the dedication.
+   **Meanwhile**: (a), which is what the decision of 17 November 2026
+   gives; (b) or (c) adds to it without changing the rule.
 
 ## 9. Not in this spec
 
