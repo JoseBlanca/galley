@@ -30,6 +30,7 @@ from galley.model import (
     RemovalReason,
     TextSource,
     Word,
+    WordsFile,
     read_pages,
     read_words,
     write_pages,
@@ -791,3 +792,57 @@ def test_extract_on_pages_json_with_an_ocr_page_names_it_and_analyze(
         "cannot read yet; run `galley2epub analyze` again"
     )
     assert not folder.words_json.exists()
+
+
+# The whole books (front-matter spec sections 4 and 6): the pages of each
+# book that are front matter, by Internet Archive identifier, and the number
+# of their words, each a front_matter removal.
+WHOLE_BOOK_FRONT_MATTER_REMOVALS = frozendict(
+    {
+        "normansineuropea00hask": ((1, 2, 6, 8, 9, 10), 108),
+        "earlyplantagenet01stub": ((1, 6, 7, 12, 13), 370),
+        "domesdaybook00maituoft": ((4, 8, 9, 10, 11), 99),
+        "catherinedemedic00mariuoft": ((6, 7, 8, 9), 95),
+        "politicaltheorie00gieruoft": ((1, 6, 7, 8, 9), 100),
+        "battleofkadeshst00breauoft": ((4, 5, 6, 7), 91),
+    }
+)
+
+
+@pytest.fixture(scope="module")
+def whole_book_words(
+    tmp_path_factory: pytest.TempPathFactory, whole_book_toml: frozendict[str, str]
+) -> frozendict[str, WordsFile]:
+    """words.json of each whole book as analyze and extract give it with
+    the configs of tests/conftest.py, by Internet Archive identifier."""
+    words = {}
+    for book in sorted(whole_book_toml):
+        folder = BookFolder(tmp_path_factory.mktemp(book))
+        folder.book_toml.write_text(whole_book_toml[book], encoding="utf-8")
+        config = read_config(folder.book_toml)
+        analyze.run(folder, config)
+        extract.run(folder, config)
+        words[book] = read_words(folder.words_json)
+    return frozendict(words)
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize("book", sorted(WHOLE_BOOK_FRONT_MATTER_REMOVALS))
+def test_front_matter_removals_of_each_whole_book_are_the_words_of_its_front_pages(
+    book: str, whole_book_words: frozendict[str, WordsFile]
+) -> None:
+    words = whole_book_words[book]
+    removals = tuple(
+        removal
+        for removal in words.removals
+        if removal.reason is RemovalReason.FRONT_MATTER
+    )
+    front_matter, word_count = WHOLE_BOOK_FRONT_MATTER_REMOVALS[book]
+
+    assert (
+        tuple(sorted({removal.page_index for removal in removals})),
+        len(removals),
+    ) == (front_matter, word_count)
+    assert all(not words.pages[index].words for index in front_matter)

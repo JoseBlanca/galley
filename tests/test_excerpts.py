@@ -4,6 +4,7 @@ them exactly."""
 
 import json
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -19,13 +20,15 @@ from galley.model import (
     LinesFile,
     NoteKind,
     Origin,
+    PageKind,
     RemovalReason,
     block_text,
     read_blocks,
     read_lines,
+    read_pages,
     read_words,
 )
-from galley.text_layer import open_pdf
+from galley.text_layer import layer_words, open_pdf
 
 # The excerpts that scripts/fetch_samples.py cuts, with their page counts.
 EXPECTED_EXCERPT_PAGES = {
@@ -1136,3 +1139,98 @@ def test_index_stubbs_313_to_321_one_guide_words_removal_on_each_page(
     # no running head keeps its stray marks (section 3).
     assert _kinds_on(blocks, 4)[:3] == ("paragraph", "heading", "index_entry")
     assert not any(note.origin[0].page_index >= 4 for note in blocks.notes)
+
+
+# The front matter (front-matter spec section 6, "Excerpt tests"): the three
+# excerpts that open with the book's front pages, by excerpt name, with
+# their front-matter pages and the number of words of those pages' text
+# layer (front-matter spec section 4): Haskins' 1, 2, 8, 9 and 10 have 22,
+# 29, 31, 18 and 3 words; Domesday's 4, 8, 9, 10 and 11 have 4, 8, 42, 40
+# and 5; Gierke's 1, 6, 7, 8 and 9 have 7, 6, 47, 33 and 7.
+FRONT_MATTER_EXCERPTS = frozendict(
+    {
+        "haskins_front": ((0, 1, 2, 3, 4), 103),
+        "domesday_front_flow": ((0, 1, 2, 3, 4), 99),
+        "gierke_front_flow": ((0, 1, 2, 3, 4), 100),
+    }
+)
+
+
+def _front_matter_layer_words(pdf_path: Path, pages: tuple[int, ...]) -> list[str]:
+    texts = []
+    with open_pdf(pdf_path) as pdf:
+        for index in pages:
+            with closing(pdf.pages[index]) as page:
+                texts.extend(layer_word.text for layer_word in layer_words(page))
+    return texts
+
+
+@pytest.mark.parametrize("name", sorted(FRONT_MATTER_EXCERPTS))
+def test_front_matter_pages_of_an_excerpt_have_no_words_and_are_its_removals(
+    excerpt_books: frozendict[str, BookFolder],
+    excerpt_pdf: frozendict[str, Path],
+    name: str,
+) -> None:
+    front_matter, word_count = FRONT_MATTER_EXCERPTS[name]
+    pages = read_pages(excerpt_books[name].pages_json).pages
+    words = read_words(excerpt_books[name].words_json)
+    removals = tuple(
+        removal
+        for removal in words.removals
+        if removal.reason is RemovalReason.FRONT_MATTER
+    )
+
+    assert (
+        tuple(page.index for page in pages if page.kind is PageKind.FRONT_MATTER)
+        == front_matter
+    )
+    assert all(not words.pages[index].words for index in front_matter)
+    assert len(removals) == word_count
+    assert [removal.text for removal in removals] == _front_matter_layer_words(
+        excerpt_pdf[name], front_matter
+    )
+    assert {removal.page_index for removal in removals} == set(front_matter)
+
+
+def test_front_matter_of_haskins_front_ends_at_the_preface_page_5_of_layout(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    lines = read_lines(excerpt_books["haskins_front"].lines_json)
+    page_5_lines = [
+        " ".join(word.text for word in line.words)
+        for region in lines.pages[5].regions
+        for line in region.lines
+    ]
+
+    assert page_5_lines[:2] == [
+        "PREFACE",
+        "THE eight lectures which are here published",
+    ]
+
+
+def test_front_matter_of_gierke_front_flow_keeps_its_contents_5_and_errata_6(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    pages = read_pages(excerpt_books["gierke_front_flow"].pages_json).pages
+    words = read_words(excerpt_books["gierke_front_flow"].words_json)
+
+    assert (pages[5].kind, pages[6].kind) == (PageKind.TEXT, PageKind.TEXT)
+    assert (words.pages[5].words[0].text, words.pages[6].words[0].text) == (
+        "CONTENTS.",
+        "ERRATA.",
+    )
+
+
+@pytest.mark.parametrize(
+    "name", sorted(set(EXPECTED_EXCERPT_PAGES) - set(FRONT_MATTER_EXCERPTS))
+)
+def test_front_matter_of_an_excerpt_cut_inside_the_book_is_no_page(
+    excerpt_books: frozendict[str, BookFolder], name: str
+) -> None:
+    # Two start with a contents page, the other nine with running text: the
+    # rule ends the front matter at 0 on all eleven.
+    pages = read_pages(excerpt_books[name].pages_json).pages
+    removals = read_words(excerpt_books[name].words_json).removals
+
+    assert not any(page.kind is PageKind.FRONT_MATTER for page in pages)
+    assert not any(removal.reason is RemovalReason.FRONT_MATTER for removal in removals)
