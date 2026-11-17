@@ -181,11 +181,39 @@ when their score is higher** and they hold at least one word; on a tie,
 or lower, the layer's words stay. Where the region replaces no word of
 the layer, a higher score is not enough: Tesseract's words are kept
 only when they hold at least 2 known words (and, as they must score
-above the empty layer's 0, more known words than unknown). Junk read over nothing then stays out ("af", Gierke page
-120, kept before at a score of 1 against 0), and a note the layer did
-not read still comes in ("Medieval Thought.", Gierke page 88, 2 known
-words); a note of one word the layer did not read stays missing (owner,
-17 November 2026).
+above the empty layer's 0, more known words than unknown), or when they
+hold one known word that is a **sure single word**: it has 4 letters or
+more, every word of the reading has a confidence of 80 or more, and no
+word of the page's layer may be a reading of the same printed word
+(`model.may_read`: under it, or within 16 pt above or below with the
+same letters and digits or alike letters, rules (a) to (c) of section
+4 taken alone). Junk read over nothing then stays out ("af", Gierke page
+120, kept before at a score of 1 against 0: 2 letters, confidence 69),
+a note the layer did not read comes in ("Medieval Thought.", Gierke
+page 88, 2 known words), and so does a note, or the line of a note, of
+one word ("Coronation.", Stubbs page 63, confidence 97; "Henry’s", page
+62, 91). The owner asked for the one-word notes on 17 November 2026,
+after reading those two on the page images.
+
+The sure single word was measured on the whole of Stubbs, Domesday and
+Gierke on 17 November 2026 (galley at 89ed733): 74 regions over no
+layer word scored above 0 with one known word. The 34 of Stubbs at
+confidence 80 or more are each a printed word of a cut-in note, looked
+at on the page images; 8 of them have a layer word of the page that
+may read them ("Lewis" beside the body's "Lewis", page 181; "The"
+beside the layer's "TheHilde-", page 83), and stay out, since keeping
+them could read a word twice; 3 more have fewer than 4 letters ("1165.",
+"jou.", "in"). The letters also exclude the numbers of
+Gierke's contents lists (pages 63 to 66, "143", confidence 96), which
+the layer may have read differently ("14 -3"), its running head's page
+numbers ("lix", "ix", 88 and 89), and "on" (Domesday page 427, 95), the
+end of "Population" in a table's head. Under 80 lie the pencil marks
+and specks ("af" 69, "ww" 57, "NB" 52) and one word not looked at
+("Great", Stubbs page 114, 45); the lowest kept is "enemies." (Stubbs
+page 95, 81). With these conditions 24 regions are newly kept, 23 of
+Stubbs and "Kent." on Domesday page 491; at a threshold of 90 there
+would be 22, and at 95, 19, without "Henry’s". The list:
+`tmp/slost-threshold.md` of the plan's worktree (not committed).
 The choice is made per region, so that a page where Tesseract reads one
 note worse keeps the layer for that note and loses no word, and a book
 that Tesseract reads worse throughout keeps its layer throughout.
@@ -730,8 +758,9 @@ with 12 gave byte-identical records, and Gierke's 762 regions read inside layout
 - **A note the layer did not read at all** ("Medieval Thought.", Gierke
   page 88; "Fall of Bristol.", Stubbs page 308): the region replaces no
   word, Tesseract's words hold 2 known words or more and more known
-  than unknown, and they are kept. Junk read over nothing ("af",
-  Gierke page 120) has fewer, and is not.
+  than unknown, or one sure single word ("Coronation.", Stubbs page
+  63), and they are kept. Junk read over nothing ("af", Gierke page
+  120) has fewer, and is not.
 - **A list of numbers in a margin** (Gierke's contents, pages 61–80):
   Tesseract reads the column of page numbers worse, the score keeps the
   layer.
@@ -799,6 +828,10 @@ the extract change, Stubbs' index error rate was 1.543.
 - `note_bands` on a Pillow image drawn in the test: two blocks of ink 30
   px apart give two bands, 15 px apart one; a block 10 px high, and one
   20 px wide, give none.
+- A region over no layer word read as one known word: kept when the
+  word has 4 letters and a confidence of 80 ("Coronation."); not kept
+  with 3 letters, at a confidence of 79, with a second word under 80,
+  or with a layer word of the page that may read it 10 pt below.
 - The replacement on a hand-made page: a margin note of three layer
   words replaced by two Tesseract words, a body word beside it kept,
   the layer's single letters inside a Tesseract word's box replaced; in
@@ -859,7 +892,9 @@ skips, saying so, on another version:
   in the run without re-reading. "advUers.", the layer's reading of
   the note "advisers." (page 62), ends a body line in both runs, kept in
   the body by layout's 5 pt guard (layout §3, step 2b), and the crop
-  that reads the note's "Henry's" there is not kept.
+  that reads the note's "Henry's" there keeps that word alone, a sure
+  single word (section 3): Tesseract's "advisers." overlaps the body
+  word "advUers." and is dropped with the body's words.
 - `stubbs_summaries_index`: no page is a small-print page in the
   excerpt (see above); its index pages are tested on the whole book.
 - `domesday_74-83`: the margin notes of two pages, one of which the
@@ -941,7 +976,7 @@ and 6 when they are built.
    keep every word until a sample of the 120 has been read by eye.
    Meanwhile: keep every word. Junk read where the layer has no word
    is a separate case, decided: such a region is kept only with 2 known
-   words or more (section 3).
+   words or more, or one sure single word (section 3).
 3. **The new field of `lines.json`, and layout replacing OCR that
    exists** (architecture §7b and §8, applied here): a shared format
    changes, and layout now replaces existing OCR, which §7b had left to
