@@ -108,6 +108,19 @@ BOOKS = (
                     "title, a printer's signature mark at a page foot, endnotes"
                 ),
             ),
+            Excerpt(
+                name="gierke_front_flow",
+                page_indices=(1, 6, 7, 8, 9, 10, 11, 12, 13, 100),
+                covers=(
+                    "the front matter of docs/specs/front-matter.md, section 6: "
+                    "the binder's label (page index 1), half-title (6), "
+                    "publisher's page (7), title page (8) and edition (9), "
+                    "then the printed contents (10) and the errata (11), which "
+                    "are not front matter; and the words that pdfplumber's "
+                    "sorting cuts (docs/specs/extract.md, section 7): a word "
+                    '"T" on page index 13, "h" and "im" on 100'
+                ),
+            ),
         ),
     ),
 )
@@ -119,6 +132,20 @@ EVALUATION_BOOKS_TOML = REPO / "evaluation" / "books.toml"
 EVALUATION_EXCERPTS = frozendict(
     {
         "normansineuropea00hask": (
+            Excerpt(
+                name="haskins_front",
+                page_indices=(1, 2, 8, 9, 10, 12, 13, 14, 16, 17, 18),
+                covers=(
+                    "the front matter of docs/specs/front-matter.md, section 6: "
+                    "patterned endpapers read as garbage (page indices 1, 2), "
+                    "title page (8), copyright (9) and dedication (10); then "
+                    "the two pages of the preface (12, 13), the printed "
+                    "contents (14), the start of chapter I (16) and two pages "
+                    "with running heads (17, 18); page index 12's words are "
+                    "an exact test of extract (docs/specs/extract.md, "
+                    "section 7)"
+                ),
+            ),
             Excerpt(
                 name="haskins_eval",
                 # Printed pages 116 to 123, 250 and 251: page index = printed
@@ -176,6 +203,19 @@ EVALUATION_EXCERPTS = frozendict(
             ),
         ),
         "domesdaybook00maituoft": (
+            Excerpt(
+                name="domesday_front_flow",
+                page_indices=(4, 8, 9, 10, 11, 12, 13, 23, 24, 200),
+                covers=(
+                    "the front matter of docs/specs/front-matter.md, section 6: "
+                    "a flyleaf with handwriting (page index 4), half-title (8), "
+                    "publisher's page (9), title page (10) and edition (11), "
+                    "then the preface (12, 13); and the words that "
+                    "pdfplumber's sorting cuts (docs/specs/extract.md, "
+                    'section 7): "s" and "ome" on page index 23, "i" and "t" '
+                    'on 24, "W", "L" and "ter" on 200'
+                ),
+            ),
             Excerpt(
                 name="domesday_74-83",
                 page_indices=tuple(range(74, 84)),

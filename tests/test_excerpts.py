@@ -40,6 +40,9 @@ EXPECTED_EXCERPT_PAGES = {
     "domesday_headings_quotes": 11,
     "mariejol_headings_verse": 6,
     "kadesh_59-68": 10,
+    "haskins_front": 11,
+    "domesday_front_flow": 10,
+    "gierke_front_flow": 10,
 }
 
 # The pages of each excerpt, by index in the excerpt, that have no word in
@@ -58,6 +61,9 @@ PAGES_WITHOUT_WORDS = {
     "domesday_headings_quotes": (),
     "mariejol_headings_verse": (),
     "kadesh_59-68": (),
+    "haskins_front": (),
+    "domesday_front_flow": (),
+    "gierke_front_flow": (),
 }
 
 
