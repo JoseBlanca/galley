@@ -492,7 +492,7 @@ is split, recorded, when the book's own words support it.
 this change no longer applies (structure §23); none exists for these
 books.
 
-- [ ] 5.1 `attach_spaced_sign`, `split_at_case`, and the passes over a
+- [x] 5.1 `attach_spaced_sign`, `split_at_case`, and the passes over a
   block's words that make the changes and the no-break spaces, as pure
   functions of their own modules, with the unit tests. Spec: structure
   §23, "The rule" and "After a note reference"; §24; §8, the two
