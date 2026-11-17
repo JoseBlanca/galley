@@ -1013,12 +1013,55 @@ def test_front_matter_end_its_step_and_pages_are_logged_at_info(
 
 
 @pytest.mark.thread_unsafe
-def test_front_matter_ended_at_running_text_without_contents_pages_is_a_warning(
+def test_front_matter_ended_at_running_text_dropping_pages_without_contents_pages_is_a_warning(
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Gierke's excerpt without its contents_pages: the running text starts
+    # at excerpt page 2, after two front pages (front-matter spec section 2).
+    folder = BookFolder(tmp_path)
+    folder.book_toml.write_text(
+        excerpt_book_toml["gierke_front_flow"].replace("contents_pages = [5]\n", ""),
+        encoding="utf-8",
+    )
+
+    with caplog.at_level(logging.INFO, logger="galley.analyze"):
+        analyze.run(folder, read_config(folder.book_toml))
+
+    assert [
+        (record.levelno, record.getMessage())
+        for record in caplog.records
+        if "front matter" in record.getMessage()
+    ] == [
+        (
+            logging.INFO,
+            (
+                "analyze: the front matter ends at page index 2, by the first "
+                "page of running text; page indices 0, 1 are front matter, their "
+                "words dropped"
+            ),
+        ),
+        (
+            logging.WARNING,
+            (
+                "analyze: the front matter ends at the first page of running "
+                "text, page index 2, and the config has no `contents_pages`; "
+                "add the pages of the printed table of contents, or set "
+                "`front_matter_end`"
+            ),
+        ),
+    ]
+
+
+@pytest.mark.thread_unsafe
+def test_front_matter_ended_at_running_text_dropping_nothing_logs_no_warning(
     tmp_path: Path,
     excerpt_pdf: frozendict[str, Path],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    # Kadesh's excerpt opens with running text and has no contents_pages.
+    # Kadesh's excerpt opens with running text and has no contents_pages:
+    # the end is 0 and nothing is dropped (front-matter spec section 2).
     folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "exclude_pages = [8]\n")
 
     with caplog.at_level(logging.INFO, logger="galley.analyze"):
@@ -1034,15 +1077,6 @@ def test_front_matter_ended_at_running_text_without_contents_pages_is_a_warning(
             (
                 "analyze: the front matter ends at page index 0, by the first "
                 "page of running text; no page is front matter"
-            ),
-        ),
-        (
-            logging.WARNING,
-            (
-                "analyze: the front matter ends at the first page of running "
-                "text, page index 0, and the config has no `contents_pages`; "
-                "add the pages of the printed table of contents, or set "
-                "`front_matter_end`"
             ),
         ),
     ]
