@@ -566,7 +566,9 @@ the page of the first: ("move.", "ment,") becomes ("movement,",). The
 full stop the join drops is in `before`, so the fidelity check, which
 undoes every change, finds it; and it checks that the change does no
 more: the first word, less one final ".", followed by the second, is
-the joined word. Tried after `join_hyphen`, which a line ending with a
+the joined word, and the joined word is a word of a margin-note block
+that starts on the change's page, the only blocks where the join is
+made. Tried after `join_hyphen`, which a line ending with a
 hyphen goes to.
 
 Measured on 17 November 2026 on the lines of whole Stubbs, Domesday and
