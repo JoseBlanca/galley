@@ -435,7 +435,7 @@ test, the excerpt fixture's setup included. Tesseract's readings are
 those of 5.5.4 only. The note bands are found in pure Python over a
 300-dpi strip; numpy is not a dependency.
 
-- [ ] 5.1 `ocr.py`, and in `layout/_reread.py` the pure parts of
+- [x] 5.1 `ocr.py`, and in `layout/_reread.py` the pure parts of
   re-reading: `reading_score`, `is_small_print_page`, `note_bands`, the
   crop of each kind of region, the two filters of the cut-in crops, the
   words a region replaces, one record at most per word, and the order

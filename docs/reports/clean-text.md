@@ -74,3 +74,22 @@ error rate at blocks falls from 0.142 to 0.129 on Stubbs and from
 0.100 to 0.093 on Domesday, and the margin notes' own rate is 0.728
 and 0.600. Later body rates are compared with these, not with the
 baseline's. Haskins and Mariéjol are unchanged.
+
+## Task 5.1: Tesseract and the pure parts of re-reading (stream `ocr`)
+
+Done (aff3b50), merged. `ocr.py` runs Tesseract on a PNG and turns its
+tsv into words in points; `layout/_reread.py` has the score, the
+small-print page test, the note bands, each kind's crop and the words
+each region replaces, and `page_rereads`, which keeps one record at most
+per word. Deliverable 1: 62 tests, two of them marked `tesseract`.
+Breaking 9 rules of `_reread.py` one at a time failed a test each time.
+
+Differences from the spec, accepted: `read_image_lines` and
+`lines_of_tsv` were added, because the first filter of the cut-in crops
+drops whole Tesseract lines; no export from `galley.layout` yet, because
+`_reread` imports layout's private steps and the export would be
+circular (task 5.2 places it). Three choices the spec left open,
+confirmed by the orchestrator: a note band replaces the margin words
+whose middle lies in its crop (ink and 6 px); a Tesseract word inside an
+earlier region's crop is dropped, kept or not, so no word comes twice; a
+small-print page given other regions is an error.
