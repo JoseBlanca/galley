@@ -1922,7 +1922,10 @@ def test_run_that_loses_a_word_raises_and_writes_no_lines_json(
     ) -> PageLayout:
         return layout_page(replace(page, words=page.words[1:]), measures)
 
-    monkeypatch.setattr(layout, "layout_page", layout_page_losing_a_word)
+    # layout_page_with_rereads, which run calls, lays out with it.
+    monkeypatch.setattr(
+        "galley.layout._rereading.layout_page", layout_page_losing_a_word
+    )
     with pytest.raises(FidelityError):
         layout.run(folder, config, workers=1)
     assert not folder.lines_json.exists()
