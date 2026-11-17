@@ -187,7 +187,10 @@ subtitle or the dedication back is **Open 1**, below.
 
 - **Unit tests of `front_matter_end`** (section 7) with literal page
   starts. The first: Haskins' pages 0 to 27, each its kind, first row and
-  word count as measured, with `contents_pages = [14]`, give 12. Then: a preface page in the window, a contents page before a
+  word count as measured, followed by 252 stand-in text pages so that the
+  book has Haskins' 280 pages and a window of 28 (pages 0 to 27 alone
+  make a window of 10 and give 0), with `contents_pages = [14]`, give
+  12. Then: a preface page in the window, a contents page before a
   preface page, a preface past the window (ignored), Kadesh's word
   counts of its 76 pages, as literals (the end is 8), a book with
   neither and no dense page (0), and the config's value winning over
