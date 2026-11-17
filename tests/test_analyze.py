@@ -16,10 +16,12 @@ import pytest
 
 from galley import analyze
 from galley.analyze import (
+    PageStart,
     PictureArea,
     PlateRule,
     check_config_pages,
     classify_page,
+    front_matter_end,
     is_plate,
     picture_area,
     require_text_layer,
@@ -77,7 +79,7 @@ def page(index: int, kind: PageKind, text_source: TextSource) -> PageInfo:
 
 def test_page_with_layer_words_is_text_with_its_regions_in_config_order() -> None:
     assert classify_page(
-        3, 400.0, 600.0, 12, CONFIG, plate_rule=PlateRule.NOT_PLATE
+        3, 400.0, 600.0, 12, CONFIG, plate_rule=PlateRule.NOT_PLATE, front_matter_end=0
     ) == PageInfo(
         index=3,
         width_pt=400.0,
@@ -94,7 +96,7 @@ def test_page_in_exclude_pages_is_excluded_although_it_has_layer_words() -> None
     config = replace(CONFIG, exclude_pages=(1, 3))
 
     assert classify_page(
-        3, 400.0, 600.0, 12, config, plate_rule=PlateRule.NOT_PLATE
+        3, 400.0, 600.0, 12, config, plate_rule=PlateRule.NOT_PLATE, front_matter_end=0
     ) == PageInfo(
         index=3,
         width_pt=400.0,
@@ -111,14 +113,22 @@ def test_page_in_exclude_pages_without_layer_words_is_excluded_not_blank() -> No
     config = replace(CONFIG, exclude_pages=(4,))
 
     assert (
-        classify_page(4, 400.0, 600.0, 0, config, plate_rule=PlateRule.NOT_PLATE).kind
+        classify_page(
+            4,
+            400.0,
+            600.0,
+            0,
+            config,
+            plate_rule=PlateRule.NOT_PLATE,
+            front_matter_end=0,
+        ).kind
         is PageKind.EXCLUDED
     )
 
 
 def test_page_without_layer_words_is_blank_with_no_text_source() -> None:
     assert classify_page(
-        4, 400.0, 600.0, 0, CONFIG, plate_rule=PlateRule.NOT_PLATE
+        4, 400.0, 600.0, 0, CONFIG, plate_rule=PlateRule.NOT_PLATE, front_matter_end=0
     ) == PageInfo(
         index=4,
         width_pt=400.0,
@@ -135,14 +145,18 @@ def test_page_without_layer_words_is_blank_with_no_text_source() -> None:
 
 
 def test_page_the_plate_rule_takes_is_a_plate_read_from_its_layer() -> None:
-    page = classify_page(3, 400.0, 600.0, 4, CONFIG, plate_rule=PlateRule.PLATE)
+    page = classify_page(
+        3, 400.0, 600.0, 4, CONFIG, plate_rule=PlateRule.PLATE, front_matter_end=0
+    )
 
     assert (page.kind, page.text_source) == (PageKind.PLATE, TextSource.TEXT_LAYER)
     assert page.exclude_regions == (REGION_A, REGION_B)
 
 
 def test_page_without_a_layer_the_plate_rule_takes_is_a_plate_with_no_source() -> None:
-    page = classify_page(4, 400.0, 600.0, 0, CONFIG, plate_rule=PlateRule.PLATE)
+    page = classify_page(
+        4, 400.0, 600.0, 0, CONFIG, plate_rule=PlateRule.PLATE, front_matter_end=0
+    )
 
     assert (page.kind, page.text_source) == (PageKind.PLATE, TextSource.NONE)
 
@@ -158,7 +172,13 @@ def test_page_in_plate_pages_is_a_plate_whatever_the_rule_finds(
     config = replace(CONFIG, plate_pages=(23,))
 
     page = classify_page(
-        23, 612.0, 792.0, layer_word_count, config, plate_rule=PlateRule.NOT_PLATE
+        23,
+        612.0,
+        792.0,
+        layer_word_count,
+        config,
+        plate_rule=PlateRule.NOT_PLATE,
+        front_matter_end=0,
     )
 
     assert (page.kind, page.text_source) == (PageKind.PLATE, text_source)
@@ -167,7 +187,9 @@ def test_page_in_plate_pages_is_a_plate_whatever_the_rule_finds(
 def test_cover_page_the_plate_rule_takes_is_never_a_plate() -> None:
     config = replace(CONFIG, cover_page=0)
 
-    page = classify_page(0, 400.0, 600.0, 12, config, plate_rule=PlateRule.PLATE)
+    page = classify_page(
+        0, 400.0, 600.0, 12, config, plate_rule=PlateRule.PLATE, front_matter_end=0
+    )
 
     assert page.kind is PageKind.TEXT
 
@@ -175,7 +197,9 @@ def test_cover_page_the_plate_rule_takes_is_never_a_plate() -> None:
 def test_excluded_page_the_plate_rule_takes_is_excluded() -> None:
     config = replace(CONFIG, exclude_pages=(3,))
 
-    page = classify_page(3, 400.0, 600.0, 12, config, plate_rule=PlateRule.PLATE)
+    page = classify_page(
+        3, 400.0, 600.0, 12, config, plate_rule=PlateRule.PLATE, front_matter_end=0
+    )
 
     assert (page.kind, page.text_source) == (PageKind.EXCLUDED, TextSource.NONE)
 
@@ -391,7 +415,9 @@ def test_page_in_plate_pages_and_exclude_pages_is_accepted_and_excluded() -> Non
     config = replace(CONFIG, exclude_pages=(23,), plate_pages=(23,))
 
     check_config_pages(config, 24)
-    page = classify_page(23, 612.0, 792.0, 40, config, plate_rule=PlateRule.NOT_PLATE)
+    page = classify_page(
+        23, 612.0, 792.0, 40, config, plate_rule=PlateRule.NOT_PLATE, front_matter_end=0
+    )
 
     assert page.kind is PageKind.EXCLUDED
     assert page.text_source is TextSource.NONE
@@ -420,6 +446,7 @@ def test_contents_pages_and_plate_pages_below_the_page_count_pass() -> None:
         (replace(CONFIG, cover_page=10), "cover_page"),
         (replace(CONFIG, plate_pages=(10,)), "plate_pages[0]"),
         (replace(CONFIG, contents_pages=(4, 5, 10)), "contents_pages[2]"),
+        (replace(CONFIG, front_matter_end=10), "front_matter_end"),
     ],
     ids=[
         "exclude_pages",
@@ -427,6 +454,7 @@ def test_contents_pages_and_plate_pages_below_the_page_count_pass() -> None:
         "cover_page",
         "plate_pages",
         "contents_pages",
+        "front_matter_end",
     ],
 )
 def test_page_index_equal_to_the_page_count_is_a_config_error(
@@ -438,6 +466,299 @@ def test_page_index_equal_to_the_page_count_is_a_config_error(
     assert str(raised.value) == (
         f"key `{key}`: page index 10 is not below the page count of /books/book.pdf, 10"
     )
+
+
+def test_front_matter_end_below_the_page_count_after_the_contents_passes() -> None:
+    # Front-matter spec section 2: a contents page at the front-matter end
+    # is kept, so it is no contradiction.
+    config = replace(CONFIG, contents_pages=(14, 15), front_matter_end=14)
+
+    check_config_pages(config, 16)
+
+
+def test_contents_page_before_front_matter_end_is_a_config_error_naming_both_keys() -> (
+    None
+):
+    config = replace(CONFIG, contents_pages=(10, 14), front_matter_end=12)
+
+    with pytest.raises(ConfigError) as raised:
+        check_config_pages(config, 20)
+
+    assert str(raised.value) == (
+        "key `contents_pages`: page index 10 lies before `front_matter_end`, 12, "
+        "and would be dropped with the front matter; correct one of the two keys"
+    )
+
+
+# The front matter (front-matter spec sections 1, 2 and 7)
+
+
+def start(index: int, kind: PageKind, word_count: int, *first_row: str) -> PageStart:
+    return PageStart(index=index, kind=kind, first_row=first_row, word_count=word_count)
+
+
+def text_starts(page_count: int, word_count: int) -> tuple[PageStart, ...]:
+    """`page_count` text pages of `word_count` words each, whose topmost row
+    is a running head that names no preface."""
+    return tuple(
+        start(index, PageKind.TEXT, word_count, str(index), "A", "BOOK")
+        for index in range(page_count)
+    )
+
+
+TEXT = PageKind.TEXT
+EXCLUDED = PageKind.EXCLUDED
+
+# Haskins' pages 0 to 27 as analyze measured them on 17 November 2026, with
+# the kinds of the whole_book config of tests/conftest.py, which excludes
+# 0, 3, 4, 5, 7, 11 and 15.
+HASKINS_STARTS = (
+    start(0, EXCLUDED, 0),
+    start(1, TEXT, 22, "•^A", "V"),
+    start(2, TEXT, 29, "<^", "-fL"),
+    start(3, EXCLUDED, 0),
+    start(4, EXCLUDED, 0),
+    start(5, EXCLUDED, 0),
+    start(6, TEXT, 5, "THE", "NORMANS", "IN", "EUROPEAN", "HISTORY"),
+    start(7, EXCLUDED, 0),
+    start(8, TEXT, 31, "THE", "NORMANS", "IN"),
+    start(9, TEXT, 18, '^/v"^'),
+    start(10, TEXT, 3, "TO", "MY", "WIFE"),
+    start(11, EXCLUDED, 0),
+    start(12, TEXT, 204, "PREFACE"),
+    start(13, TEXT, 145, "vlil", "PREFACE"),
+    start(14, TEXT, 55, "CONTENTS"),
+    start(15, EXCLUDED, 0),
+    start(16, TEXT, 185, "THE", "NORMANS", "IN"),
+    start(17, TEXT, 252, "2", "NORMANS", "IN", "EUROPEAN", "HISTORY"),
+    start(18, TEXT, 260, "NORMANDY", "IN", "HISTORY", "3"),
+    start(19, TEXT, 269, "4", "NORMANS", "IN", "EUROPEAN", "HISTORY"),
+    start(20, TEXT, 278, "NORMANDY", "IN", "HISTORY", "5"),
+    start(21, TEXT, 273, "6", "NORMANS", "IN", "EUROPEAN", "HISTORY"),
+    start(22, TEXT, 266, "NORMANDY", "IN", "HISTORY", "7"),
+    start(23, TEXT, 249, "!"),
+    start(24, TEXT, 264, "NORMANDY", "IN", "HISTORY", "9"),
+    start(25, TEXT, 257, "10", "NORMANS", "IN", "EUROPEAN", "HISTORY"),
+    start(26, TEXT, 264, "NORMANDY", "IN", "HISTORY", "ii"),
+    start(27, TEXT, 258, "12", "NORMANS", "IN", "EUROPEAN", "HISTORY"),
+)
+
+
+# Haskins' PDF has 280 pages, which make the search window its first 28. Its
+# pages 28 to 279 stand in as text pages: only their number matters here.
+HASKINS_BOOK_STARTS = (*HASKINS_STARTS, *text_starts(280, 260)[28:])
+
+
+def test_front_matter_end_of_haskins_first_28_pages_is_its_preface_page_12() -> None:
+    config = replace(CONFIG, contents_pages=(14,))
+
+    assert front_matter_end(HASKINS_BOOK_STARTS, config) == 12
+
+
+def test_front_matter_end_of_haskins_without_contents_pages_is_still_12() -> None:
+    assert front_matter_end(HASKINS_BOOK_STARTS, CONFIG) == 12
+
+
+@pytest.mark.parametrize(
+    "first_row",
+    [
+        ("PREFACE.",),
+        ("vi", "Preface."),
+        ("AUTHOR'S", "PREFACE"),
+        ("PRÉFACE",),
+        ("AVANT-PROPOS",),
+        ("Vorwort",),
+        ("FOREWORD",),
+        ("PREFATORY", "NOTE"),
+        ("PREFAZIONE",),
+        ("PRÓLOGO",),
+        ("PREFACIO",),
+        ("1", "2", "3", "4", "5", "PREFACE"),
+    ],
+)
+def test_front_matter_end_is_the_first_preface_page_in_the_window(
+    first_row: tuple[str, ...],
+) -> None:
+    starts = (
+        *text_starts(4, 300),
+        start(4, TEXT, 200, *first_row),
+        *text_starts(20, 300)[5:],
+    )
+
+    assert front_matter_end(starts, CONFIG) == 4
+
+
+@pytest.mark.parametrize(
+    "first_row",
+    [
+        ("1", "2", "3", "4", "5", "6", "PREFACE"),
+        ("PREFACES",),
+        ("INTRODUCTION",),
+    ],
+    ids=["seven_words", "plural", "introduction"],
+)
+def test_front_matter_end_takes_no_preface_page_from_a_row_that_names_none(
+    first_row: tuple[str, ...],
+) -> None:
+    # Without a preface page or contents, the end is the first page of
+    # running text, page 5.
+    starts = (
+        *(start(index, TEXT, 10, "TITLE") for index in range(4)),
+        start(4, TEXT, 100, *first_row),
+        *text_starts(20, 300)[5:],
+    )
+
+    assert front_matter_end(starts, CONFIG) == 5
+
+
+def test_front_matter_end_is_a_contents_page_before_a_preface_page() -> None:
+    starts = (
+        *(start(index, TEXT, 10, "TITLE") for index in range(3)),
+        start(3, TEXT, 50, "CONTENTS"),
+        start(4, TEXT, 50, "vi", "CONTENTS"),
+        start(5, TEXT, 200, "PREFACE"),
+        *text_starts(20, 300)[6:],
+    )
+    config = replace(CONFIG, contents_pages=(3, 4))
+
+    assert front_matter_end(starts, config) == 3
+
+
+def test_front_matter_end_is_a_preface_page_before_a_contents_page() -> None:
+    starts = (
+        *(start(index, TEXT, 10, "TITLE") for index in range(3)),
+        start(3, TEXT, 200, "PREFACE"),
+        start(4, TEXT, 50, "CONTENTS"),
+        *text_starts(20, 300)[5:],
+    )
+    config = replace(CONFIG, contents_pages=(4,))
+
+    assert front_matter_end(starts, config) == 3
+
+
+def test_front_matter_end_ignores_a_preface_and_contents_past_the_window() -> None:
+    # 120 pages: the window is the first 12. The first page of running text
+    # is page 5.
+    starts = (
+        *(start(index, TEXT, 10, "TITLE") for index in range(5)),
+        *text_starts(120, 300)[5:12],
+        start(12, TEXT, 200, "PREFACE"),
+        *text_starts(120, 300)[13:],
+    )
+    config = replace(CONFIG, contents_pages=(13, 119))
+
+    assert front_matter_end(starts, config) == 5
+
+
+def test_front_matter_end_takes_a_preface_page_on_the_last_page_of_the_window() -> None:
+    # 120 pages: the window is the first 12, pages 0 to 11.
+    starts = (
+        *(start(index, TEXT, 10, "TITLE") for index in range(11)),
+        start(11, TEXT, 200, "PREFACE"),
+        *text_starts(120, 300)[12:],
+    )
+
+    assert front_matter_end(starts, CONFIG) == 11
+
+
+# Kadesh's 76 pages as analyze measured them on 17 November 2026, with the
+# whole_book config of tests/conftest.py: each page's kind and word count.
+# Their topmost rows name no preface and are left out.
+KADESH_KINDS_AND_WORD_COUNTS = (
+    *((EXCLUDED, 6), (EXCLUDED, 0), (EXCLUDED, 0), (EXCLUDED, 0)),
+    *((TEXT, 26), (TEXT, 6), (TEXT, 47), (TEXT, 12)),
+    *((TEXT, 582), (TEXT, 639), (TEXT, 668), (TEXT, 854)),
+    *((TEXT, 818), (TEXT, 733), (TEXT, 832), (TEXT, 816)),
+    *((EXCLUDED, 4), (PageKind.PLATE, 0), (TEXT, 652), (PageKind.PLATE, 5)),
+    *((TEXT, 545), (TEXT, 639), (PageKind.PLATE, 2), (PageKind.PLATE, 0)),
+    *((PageKind.PLATE, 4), (TEXT, 562), (TEXT, 646), (TEXT, 229)),
+    *((TEXT, 804), (TEXT, 211), (TEXT, 468), (TEXT, 679)),
+    *((TEXT, 433), (TEXT, 386), (PageKind.PLATE, 3), (PageKind.PLATE, 0)),
+    *((TEXT, 387), (TEXT, 358), (TEXT, 317), (TEXT, 302)),
+    *((TEXT, 543), (TEXT, 411), (PageKind.PLATE, 3), (PageKind.PLATE, 0)),
+    *((TEXT, 212), (TEXT, 556), (TEXT, 436), (TEXT, 692)),
+    *((PageKind.PLATE, 8), (EXCLUDED, 4), (TEXT, 271), (TEXT, 435)),
+    *((TEXT, 539), (TEXT, 513), (TEXT, 679), (TEXT, 620)),
+    *((PageKind.PLATE, 13), (PageKind.PLATE, 0), (TEXT, 608), (TEXT, 693)),
+    *((TEXT, 649), (TEXT, 616), (TEXT, 607), (TEXT, 673)),
+    *((PageKind.PLATE, 24), (EXCLUDED, 3), (TEXT, 538), (TEXT, 135)),
+    *((PageKind.PLATE, 12), (PageKind.PLATE, 0), (EXCLUDED, 0), (EXCLUDED, 0)),
+    *((EXCLUDED, 0), (EXCLUDED, 0), (TEXT, 20), (EXCLUDED, 0)),
+)
+
+
+def test_front_matter_end_of_kadesh_is_its_first_page_of_running_text_8() -> None:
+    starts = tuple(
+        start(index, kind, word_count)
+        for index, (kind, word_count) in enumerate(KADESH_KINDS_AND_WORD_COUNTS)
+    )
+
+    assert len(starts) == 76
+    assert sum(1 for page_start in starts if page_start.kind is TEXT) == 49
+    assert front_matter_end(starts, CONFIG) == 8
+
+
+def test_front_matter_end_is_0_without_preface_contents_or_running_text() -> None:
+    # The median is 300 words; no page of the window has 150.
+    starts = (
+        *(start(index, TEXT, 149, "TITLE") for index in range(10)),
+        *text_starts(30, 300)[10:],
+    )
+
+    assert front_matter_end(starts, CONFIG) == 0
+
+
+def test_front_matter_end_is_0_for_a_book_of_no_text_page() -> None:
+    starts = tuple(start(index, EXCLUDED, 0) for index in range(12))
+
+    assert front_matter_end(starts, CONFIG) == 0
+
+
+@pytest.mark.parametrize("config_end", [0, 3, 13])
+def test_front_matter_end_of_the_config_wins_over_the_rule(config_end: int) -> None:
+    config = replace(CONFIG, contents_pages=(14,), front_matter_end=config_end)
+
+    assert front_matter_end(HASKINS_BOOK_STARTS, config) == config_end
+
+
+def test_text_page_before_front_matter_end_is_front_matter_with_no_text_source() -> (
+    None
+):
+    page = classify_page(
+        3, 400.0, 600.0, 12, CONFIG, plate_rule=PlateRule.NOT_PLATE, front_matter_end=4
+    )
+
+    assert (page.kind, page.text_source) == (PageKind.FRONT_MATTER, TextSource.NONE)
+    assert page.exclude_regions == (REGION_A, REGION_B)
+
+
+def test_text_page_at_front_matter_end_stays_text() -> None:
+    page = classify_page(
+        3, 400.0, 600.0, 12, CONFIG, plate_rule=PlateRule.NOT_PLATE, front_matter_end=3
+    )
+
+    assert (page.kind, page.text_source) == (PageKind.TEXT, TextSource.TEXT_LAYER)
+
+
+def test_excluded_plate_and_blank_pages_before_front_matter_end_keep_their_kind() -> (
+    None
+):
+    config = replace(CONFIG, exclude_pages=(1,), plate_pages=(2,))
+
+    kinds = tuple(
+        classify_page(
+            index,
+            400.0,
+            600.0,
+            word_count,
+            config,
+            plate_rule=PlateRule.NOT_PLATE,
+            front_matter_end=10,
+        ).kind
+        for index, word_count in ((1, 12), (2, 12), (3, 0))
+    )
+
+    assert kinds == (PageKind.EXCLUDED, PageKind.PLATE, PageKind.BLANK)
 
 
 # The excerpts, from the session fixture.
@@ -503,24 +824,38 @@ EXCERPT_PLATES = frozendict(
         "domesday_headings_quotes": (3, 4),
     }
 )
+# The front-matter pages of each excerpt (front-matter spec section 6,
+# "Excerpt tests"): pages 0 to 4 of the three that open with the book's
+# front pages. The other eleven have none.
+EXCERPT_FRONT_MATTER = frozendict(
+    {
+        "haskins_front": (0, 1, 2, 3, 4),
+        "domesday_front_flow": (0, 1, 2, 3, 4),
+        "gierke_front_flow": (0, 1, 2, 3, 4),
+    }
+)
 
 
-def test_the_excerpts_plates_are_those_of_the_spec_and_every_other_page_is_text(
+def test_the_excerpts_plates_and_front_matter_are_the_specs_and_other_pages_text(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     for name, folder in excerpt_books.items():
         pages = read_pages(folder.pages_json).pages
         plates = EXCERPT_PLATES.get(name, ())
+        front_matter = EXCERPT_FRONT_MATTER.get(name, ())
         # Haskins' blank page before the index and Kadesh's scan of a cover
         # are excluded by their configs.
         excluded = (8,) if name in ("haskins_eval", KADESH) else ()
         assert tuple(page.index for page in pages if page.kind is PageKind.PLATE) == (
             plates
         ), name
+        assert tuple(
+            page.index for page in pages if page.kind is PageKind.FRONT_MATTER
+        ) == (front_matter), name
         assert all(
             page.kind is PageKind.TEXT
             for page in pages
-            if page.index not in plates and page.index not in excluded
+            if page.index not in (*plates, *excluded, *front_matter)
         ), name
 
 
@@ -593,7 +928,10 @@ def test_each_page_the_plate_rule_takes_is_logged_at_warning_with_its_measures(
 ) -> None:
     # Page 8, the scan of a cover that the rule takes when the config does
     # not exclude it, is logged; page 9 made a plate by the config is not.
-    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "plate_pages = [9]\n")
+    # front_matter_end = 0, so that the front-matter rule logs no WARNING.
+    folder = kadesh_folder(
+        tmp_path, excerpt_pdf[KADESH], "plate_pages = [9]\nfront_matter_end = 0\n"
+    )
 
     with caplog.at_level(logging.WARNING, logger="galley.analyze"):
         analyze.run(folder, read_config(folder.book_toml))
@@ -617,7 +955,9 @@ def test_a_plate_without_a_layer_is_logged_with_its_share_of_the_page(
     excerpt_pdf: frozendict[str, Path],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "exclude_pages = [8]\n")
+    folder = kadesh_folder(
+        tmp_path, excerpt_pdf[KADESH], "exclude_pages = [8]\nfront_matter_end = 0\n"
+    )
 
     with caplog.at_level(logging.WARNING, logger="galley.analyze"):
         analyze.run(folder, read_config(folder.book_toml))
@@ -642,6 +982,100 @@ def test_ocr_redo_stops_analyze_before_writing_and_leaves_no_file(
         analyze.run(folder, read_config(folder.book_toml))
 
     assert not folder.pages_json.exists()
+
+
+@pytest.mark.thread_unsafe
+def test_front_matter_end_its_step_and_pages_are_logged_at_info(
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    folder = BookFolder(tmp_path)
+    folder.book_toml.write_text(excerpt_book_toml["haskins_front"], encoding="utf-8")
+
+    with caplog.at_level(logging.INFO, logger="galley.analyze"):
+        analyze.run(folder, read_config(folder.book_toml))
+
+    assert [
+        (record.levelno, record.getMessage())
+        for record in caplog.records
+        if "front matter" in record.getMessage()
+    ] == [
+        (
+            logging.INFO,
+            (
+                "analyze: the front matter ends at page index 5, by the first "
+                "preface page; page indices 0, 1, 2, 3, 4 are front matter, their "
+                "words dropped"
+            ),
+        )
+    ]
+
+
+@pytest.mark.thread_unsafe
+def test_front_matter_ended_at_running_text_without_contents_pages_is_a_warning(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Kadesh's excerpt opens with running text and has no contents_pages.
+    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "exclude_pages = [8]\n")
+
+    with caplog.at_level(logging.INFO, logger="galley.analyze"):
+        analyze.run(folder, read_config(folder.book_toml))
+
+    assert [
+        (record.levelno, record.getMessage())
+        for record in caplog.records
+        if "front matter" in record.getMessage()
+    ] == [
+        (
+            logging.INFO,
+            (
+                "analyze: the front matter ends at page index 0, by the first "
+                "page of running text; no page is front matter"
+            ),
+        ),
+        (
+            logging.WARNING,
+            (
+                "analyze: the front matter ends at the first page of running "
+                "text, page index 0, and the config has no `contents_pages`; "
+                "add the pages of the printed table of contents, or set "
+                "`front_matter_end`"
+            ),
+        ),
+    ]
+
+
+@pytest.mark.thread_unsafe
+def test_front_matter_ended_by_contents_pages_logs_no_warning(
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    folder = BookFolder(tmp_path)
+    folder.book_toml.write_text(
+        excerpt_book_toml["gierke_front_flow"], encoding="utf-8"
+    )
+
+    with caplog.at_level(logging.INFO, logger="galley.analyze"):
+        analyze.run(folder, read_config(folder.book_toml))
+
+    assert [
+        (record.levelno, record.getMessage())
+        for record in caplog.records
+        if "front matter" in record.getMessage()
+    ] == [
+        (
+            logging.INFO,
+            (
+                "analyze: the front matter ends at page index 5, by the first "
+                "page of `contents_pages`; page indices 0, 1, 2, 3, 4 are front "
+                "matter, their words dropped"
+            ),
+        )
+    ]
 
 
 # The whole books (plates spec section 1)
@@ -871,17 +1305,45 @@ WHOLE_BOOK_PAGE_KINDS_AT_9F012AC = frozendict(
 )
 
 
+# Front-matter spec section 4: the pages of each whole book that analyze
+# makes front_matter, text pages at 9f012ac.
+WHOLE_BOOK_FRONT_MATTER = frozendict(
+    {
+        "normansineuropea00hask": (1, 2, 6, 8, 9, 10),
+        "earlyplantagenet01stub": (1, 6, 7, 12, 13),
+        "domesdaybook00maituoft": (4, 8, 9, 10, 11),
+        "catherinedemedic00mariuoft": (6, 7, 8, 9),
+        "politicaltheorie00gieruoft": (1, 6, 7, 8, 9),
+        "battleofkadeshst00breauoft": (4, 5, 6, 7),
+    }
+)
+
+
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
 @pytest.mark.parametrize("book", sorted(WHOLE_BOOK_PAGE_KINDS_AT_9F012AC))
-def test_page_kinds_of_each_whole_book_are_those_before_the_text_flow(
+def test_page_kinds_of_each_whole_book_are_those_before_the_text_flow_and_front_matter(
     book: str, whole_book_pages: frozendict[str, tuple[PageInfo, ...]]
 ) -> None:
     pages = whole_book_pages[book]
+    page_count, kinds_at_9f012ac = WHOLE_BOOK_PAGE_KINDS_AT_9F012AC[book]
     assert (
         len(pages),
         tuple(
             (page.index, page.kind) for page in pages if page.kind is not PageKind.TEXT
         ),
-    ) == WHOLE_BOOK_PAGE_KINDS_AT_9F012AC[book]
+    ) == (
+        page_count,
+        tuple(
+            sorted(
+                (
+                    *kinds_at_9f012ac,
+                    *(
+                        (index, PageKind.FRONT_MATTER)
+                        for index in WHOLE_BOOK_FRONT_MATTER[book]
+                    ),
+                )
+            )
+        ),
+    )

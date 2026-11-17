@@ -13,11 +13,13 @@ and endpapers it takes too.
 """
 
 import logging
+import statistics
+import unicodedata
 from collections.abc import Callable
 from contextlib import closing
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import assert_never
+from typing import Final, assert_never
 
 import pdfplumber
 
@@ -29,6 +31,7 @@ from galley.analyze._plates import (
     is_plate_by_area,
     picture_area,
 )
+from galley.body_measures import group_rows
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig, OcrMode
 from galley.errors import ConfigError, PdfError
@@ -46,10 +49,12 @@ from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 from galley.text_layer import layer_words, open_pdf
 
 __all__ = [
+    "PageStart",
     "PictureArea",
     "PlateRule",
     "check_config_pages",
     "classify_page",
+    "front_matter_end",
     "is_plate",
     "picture_area",
     "require_text_layer",
@@ -57,6 +62,54 @@ __all__ = [
 ]
 
 _logger = logging.getLogger(__name__)
+
+# Front-matter spec section 1, "Preface page": the names of a preface in the
+# five languages of the config, reduced to their letters in lower case
+# without accents, and the most words of a topmost row that names one.
+_PREFACE_NAMES: Final[frozenset[str]] = frozenset(
+    {
+        "preface",
+        "prefatory",
+        "foreword",
+        "avantpropos",
+        "vorwort",
+        "prefazione",
+        "prologo",
+        "prefacio",
+    }
+)
+_PREFACE_ROW_MOST_WORDS: Final[int] = 6
+# Front-matter spec section 1, "The search window": the first tenth of the
+# PDF's pages, rounded down, and at least its first 10.
+_SEARCH_WINDOW_SHARE: Final[int] = 10
+_SEARCH_WINDOW_LEAST_PAGES: Final[int] = 10
+# Front-matter spec section 2: a page of running text has at least half the
+# median word count of the book's text pages. A guess, measured on Kadesh
+# alone: its median is 545 words, its front pages have at most 47.
+_RUNNING_TEXT_SHARE_OF_MEDIAN: Final[float] = 0.5
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PageStart:
+    """What the front-matter rule needs of one page: its index, the kind
+    classify_page gives it before the front matter is known, the words
+    of its topmost row (empty without words) and its number of words."""
+
+    index: int
+    kind: PageKind
+    first_row: tuple[str, ...]
+    word_count: int
+
+
+class _FrontMatterStep(StrEnum):
+    """The step of the front-matter rule (front-matter spec section 2) that
+    gave the front-matter end, as analyze logs it."""
+
+    CONFIG = "the config's `front_matter_end`"
+    PREFACE = "the first preface page"
+    CONTENTS = "the first page of `contents_pages`"
+    RUNNING_TEXT = "the first page of running text"
+    NOTHING_FOUND = "no preface, contents or running text in the search window"
 
 
 class PlateRule(StrEnum):
@@ -83,12 +136,14 @@ class _PlateTest:
 @dataclass(frozen=True, slots=True)
 class _Measurement:
     """What analyze measures of one page: its size in points from
-    pdfplumber, the number of words of its text layer, and the plate
-    rule's test, None for a page it does not test."""
+    pdfplumber, the number of words of its text layer, the words of the
+    layer's topmost row (empty without words), and the plate rule's test,
+    None for a page it does not test."""
 
     width_pt: float
     height_pt: float
     layer_word_count: int
+    first_row: tuple[str, ...]
     plate_test: _PlateTest | None
 
 
@@ -101,9 +156,11 @@ def run(
     images/, lines.json, blocks.json, book.md, book.epub), so that a failed
     run leaves none and no later file outlives the pages.json it came from.
     Takes the word list of the book's language from its cache folder,
-    extracting it with Tesseract's tools the first time. Raises
-    ConfigError when the config asks for OCR or names a page past the end
-    of the PDF, and PdfError when a page that the config does not exclude
+    extracting it with Tesseract's tools the first time. The text pages
+    before the front-matter end (`front_matter_end`) are `front_matter`.
+    Raises ConfigError when the config asks for OCR, names a page past the
+    end of the PDF or a contents page before its `front_matter_end`, and
+    PdfError when a page that the config does not exclude
     has no text layer and is not a plate. `workers` is the number of
     threads that measure the pages; the renders are made in the one PDFium
     thread.
@@ -118,21 +175,37 @@ def run(
     measurements = map_pages_with_source(
         lambda: open_pdf(config.pdf), measure, range(page_count), workers
     )
-    pages = tuple(
-        classify_page(
-            index,
-            measurement.width_pt,
-            measurement.height_pt,
-            measurement.layer_word_count,
-            config,
-            plate_rule=PlateRule.NOT_PLATE
-            if measurement.plate_test is None
-            else measurement.plate_test.rule,
+
+    def classify(end: int) -> tuple[PageInfo, ...]:
+        return tuple(
+            classify_page(
+                index,
+                measurement.width_pt,
+                measurement.height_pt,
+                measurement.layer_word_count,
+                config,
+                plate_rule=PlateRule.NOT_PLATE
+                if measurement.plate_test is None
+                else measurement.plate_test.rule,
+                front_matter_end=end,
+            )
+            for index, measurement in enumerate(measurements)
         )
-        for index, measurement in enumerate(measurements)
+
+    starts = tuple(
+        PageStart(
+            index=page.index,
+            kind=page.kind,
+            first_row=measurement.first_row,
+            word_count=measurement.layer_word_count,
+        )
+        for page, measurement in zip(classify(0), measurements, strict=True)
     )
+    end, step = _front_matter_end_and_step(starts, config)
+    pages = classify(end)
     for index, measurement in enumerate(measurements):
         _log_plate_taken(index, measurement.plate_test)
+    _log_front_matter(end, step, pages, config)
     require_text_layer(pages)
     write_pages(
         folder.pages_json,
@@ -161,9 +234,9 @@ def _measurer(
             width_pt = float(page.width)
             height_pt = float(page.height)
             # Extract spec section 5: the words extract writes.
-            page_layer_words = tuple(
-                (layer_word.text, layer_word.box) for layer_word in layer_words(page)
-            )
+            words = layer_words(page)
+        page_layer_words = tuple((word.text, word.box) for word in words)
+        rows = group_rows(words)
         plate_test = (
             _test_plate(
                 pdfium.render(config.pdf, page_index, PLATE_RENDER_DPI),
@@ -177,6 +250,7 @@ def _measurer(
             width_pt=width_pt,
             height_pt=height_pt,
             layer_word_count=len(page_layer_words),
+            first_row=tuple(word.text for word in rows[0].words) if rows else (),
             plate_test=plate_test,
         )
 
@@ -217,6 +291,32 @@ def _test_plate(
     )
 
 
+def _log_front_matter(
+    end: int, step: _FrontMatterStep, pages: tuple[PageInfo, ...], config: BookConfig
+) -> None:
+    """Logs at INFO the front-matter end, the step of the rule that gave it
+    and the pages made `front_matter`; and at WARNING an end at the first
+    page of running text when the config has no `contents_pages`, so that
+    the owner adds them (front-matter spec section 2)."""
+    dropped = tuple(page.index for page in pages if page.kind is PageKind.FRONT_MATTER)
+    _logger.info(
+        "analyze: the front matter ends at page index %d, by %s; %s",
+        end,
+        step,
+        f"page indices {', '.join(str(index) for index in dropped)} are front "
+        "matter, their words dropped"
+        if dropped
+        else "no page is front matter",
+    )
+    if step is _FrontMatterStep.RUNNING_TEXT and not config.contents_pages:
+        _logger.warning(
+            "analyze: the front matter ends at the first page of running text, "
+            "page index %d, and the config has no `contents_pages`; add the pages "
+            "of the printed table of contents, or set `front_matter_end`",
+            end,
+        )
+
+
 def _log_plate_taken(page_index: int, plate_test: _PlateTest | None) -> None:
     """Logs at WARNING a page the plate rule takes, with what it measured."""
     if plate_test is None or plate_test.rule is PlateRule.NOT_PLATE:
@@ -248,6 +348,7 @@ def classify_page(
     config: BookConfig,
     *,
     plate_rule: PlateRule,
+    front_matter_end: int,
 ) -> PageInfo:
     """What page `index` (from 0) is, given its size in points, the number
     of words of its text layer and what the plate rule found on it.
@@ -255,8 +356,9 @@ def classify_page(
     A page in the config's `exclude_pages` is `excluded`; else a page in
     `plate_pages`, or one the plate rule takes that is not the
     `cover_page`, is a `plate`, read from its layer when it has a word;
-    else a page with a layer word is `text`, read from the layer; else it
-    is `blank`. `exclude_regions` holds the boxes of the config's regions
+    else a page with a layer word is `front_matter`, with no text source,
+    when its index is below `front_matter_end`, and `text`, read from the
+    layer, otherwise; else it is `blank`. `exclude_regions` holds the boxes of the config's regions
     on this page, in the config's order. No page is checked by OCR and
     none has a score.
     """
@@ -272,6 +374,8 @@ def classify_page(
         kind, text_source = PageKind.EXCLUDED, TextSource.NONE
     elif index in config.plate_pages or taken_by_rule:
         kind, text_source = PageKind.PLATE, layer_source
+    elif layer_word_count > 0 and index < front_matter_end:
+        kind, text_source = PageKind.FRONT_MATTER, TextSource.NONE
     elif layer_word_count > 0:
         kind, text_source = PageKind.TEXT, TextSource.TEXT_LAYER
     else:
@@ -292,11 +396,86 @@ def classify_page(
     )
 
 
+def front_matter_end(starts: tuple[PageStart, ...], config: BookConfig) -> int:
+    """The index of the first page after the front matter, by the rule of
+    the front-matter spec, section 2: the config's front_matter_end; else
+    the first preface page or first contents page in the search window;
+    else the first page of running text in it; else 0.
+
+    `starts` are every page of the PDF, in index order.
+    """
+    return _front_matter_end_and_step(starts, config)[0]
+
+
+def _front_matter_end_and_step(
+    starts: tuple[PageStart, ...], config: BookConfig
+) -> tuple[int, _FrontMatterStep]:
+    """The front-matter end of `front_matter_end`, and the step of the rule
+    that gave it."""
+    if config.front_matter_end is not None:
+        return config.front_matter_end, _FrontMatterStep.CONFIG
+    window_pages = max(_SEARCH_WINDOW_LEAST_PAGES, len(starts) // _SEARCH_WINDOW_SHARE)
+    window = tuple(page for page in starts if page.index < window_pages)
+    found = tuple(
+        (page.index, step)
+        for page, step in (
+            (
+                next((page for page in window if _is_preface_page(page)), None),
+                _FrontMatterStep.PREFACE,
+            ),
+            (
+                next(
+                    (page for page in window if page.index in config.contents_pages),
+                    None,
+                ),
+                _FrontMatterStep.CONTENTS,
+            ),
+        )
+        if page is not None
+    )
+    if found:
+        return min(found, key=lambda index_and_step: index_and_step[0])
+    text_word_counts = tuple(
+        page.word_count for page in starts if page.kind is PageKind.TEXT
+    )
+    if text_word_counts:
+        least_words = _RUNNING_TEXT_SHARE_OF_MEDIAN * statistics.median(
+            text_word_counts
+        )
+        running_text = next(
+            (page for page in window if page.word_count >= least_words), None
+        )
+        if running_text is not None:
+            return running_text.index, _FrontMatterStep.RUNNING_TEXT
+    return 0, _FrontMatterStep.NOTHING_FOUND
+
+
+def _is_preface_page(page: PageStart) -> bool:
+    """Whether the topmost row of `page` names a preface: at most 6 words,
+    one of which, reduced to its letters in lower case without accents, is
+    a preface name (front-matter spec section 1)."""
+    return len(page.first_row) <= _PREFACE_ROW_MOST_WORDS and any(
+        _letters_without_accents(word) in _PREFACE_NAMES for word in page.first_row
+    )
+
+
+def _letters_without_accents(word: str) -> str:
+    """The letters of `word` in lower case without accents: "Préface." gives
+    "preface", "AVANT-PROPOS" "avantpropos"."""
+    return "".join(
+        character
+        for character in unicodedata.normalize("NFKD", word.lower())
+        if character.isalpha() and not unicodedata.combining(character)
+    )
+
+
 def check_config_pages(config: BookConfig, page_count: int) -> None:
     """Raises ConfigError when the config's `ocr` is `redo`, which needs OCR,
     or when a page index of `exclude_pages`, `exclude_regions`,
-    `cover_page`, `plate_pages` or `contents_pages` is not below
-    `page_count`, naming the key, the index and the count."""
+    `cover_page`, `plate_pages`, `contents_pages` or `front_matter_end` is
+    not below `page_count`, naming the key, the index and the count; and
+    when a page of `contents_pages` lies before `front_matter_end`, naming
+    both keys (front-matter spec section 2)."""
     if config.ocr is OcrMode.REDO:
         message = (
             "ocr = redo needs OCR, which the walking skeleton does not have; "
@@ -321,12 +500,28 @@ def check_config_pages(config: BookConfig, page_count: int) -> None:
             (f"contents_pages[{position}]", index)
             for position, index in enumerate(config.contents_pages)
         ),
+        *(
+            ()
+            if config.front_matter_end is None
+            else (("front_matter_end", config.front_matter_end),)
+        ),
     )
     for key, index in indices:
         if index >= page_count:
             message = (
                 f"key `{key}`: page index {index} is not below the page count "
                 f"of {config.pdf}, {page_count}"
+            )
+            raise ConfigError(message)
+    if config.front_matter_end is not None:
+        dropped_contents = tuple(
+            index for index in config.contents_pages if index < config.front_matter_end
+        )
+        if dropped_contents:
+            message = (
+                f"key `contents_pages`: page index {dropped_contents[0]} lies before "
+                f"`front_matter_end`, {config.front_matter_end}, and would be "
+                "dropped with the front matter; correct one of the two keys"
             )
             raise ConfigError(message)
 
