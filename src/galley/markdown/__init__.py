@@ -35,6 +35,14 @@ for "_", which the style sheet styles:
   the Markdown ended by a hard line break (a backslash), and an empty line
   of the text, the end of a stanza, a new paragraph in the div. Lines
   empty or of spaces only are not written.
+- `epigraph`: a fenced div of class `epigraph` holding its quotation,
+  written as a verse block's text is (a prose quotation has no line feed,
+  so it is one line), then, when it has a `source`, a fenced div of class
+  `epigraph-source` holding an em dash, a no-break space and the source
+  (structure spec, section 25). The dash is written as text, not drawn by
+  the style sheet, because generated content was not tried on a Kindle;
+  the no-break space keeps it on the source's line. The style sheet sets
+  the epigraph in and its source to the right.
 - `figure`: a fenced div of class `figure` holding its image alone in a
   paragraph with its caption as the image's text,
   `![PLATE I\\. The battle\\.](images/plate-0016.png)`, which Pandoc
@@ -63,12 +71,22 @@ Notes (structure spec, section 19; architecture sections 9 and 13):
   as a note reference, `Law[1](#n-p0190-001){epub:type="noteref"}`,
   which Pandoc points into the chapter file of the endnote and a Kindle
   can show as a pop-up.
+- A note group's heading, `Note.group`, is a fenced div of class
+  `note-group` just before the div of its endnote, in the list of
+  endnotes. It is not a Pandoc heading, so it stays out of the EPUB's
+  table of contents (structure spec, sections 25 and 27). Only an endnote
+  may have one: the fidelity check reads a group's div only before an
+  endnote's.
 - A note written where it was printed, an unreferenced footnote or an
   endnote, follows the last block, in the order of blocks.json, whose
   first origin is on the note's first page or an earlier one, or comes
   first of all (structure spec, sections 6 and 10, option b). Its marker
   is first in the text of its first block that is not a margin note, so
   that a margin note printed beside it stays a line of its own before it.
+
+A no-break space, U+00A0, which structure puts before a spaced sign in a
+French book (structure spec, section 23), is written as the character,
+which Pandoc keeps inside its word.
 
 Edits are refused, since none can exist before `galley2epub edits-from`
 is built.
@@ -205,14 +223,25 @@ def _image_problems(block: Block) -> tuple[str, ...]:
 
 def _block_problems(block: Block) -> tuple[str, ...]:
     """Why a block cannot be written: a figure's image _image_problems
-    refuses, or a character XML 1.0 does not allow; empty when it can."""
+    refuses, or a character XML 1.0 does not allow, in its text, label or
+    source; empty when it can."""
     image = _image_problems(block)
     label = (
         _character_problems(f"the label of block {block.id}", block.label)
         if block.label is not None
         else ()
     )
-    return image + _character_problems(f"block {block.id}", block_text(block)) + label
+    source = (
+        _character_problems(f"the source of block {block.id}", block.source)
+        if block.source is not None
+        else ()
+    )
+    return (
+        image
+        + _character_problems(f"block {block.id}", block_text(block))
+        + label
+        + source
+    )
 
 
 def _note_block_problems(
@@ -239,6 +268,23 @@ def _note_block_problems(
     return kind + nested + _block_problems(block)
 
 
+def _group_problems(note: Note) -> tuple[str, ...]:
+    """Why a note's group heading cannot be written: a group on a note that
+    is not an endnote, whose div would not stand in a list of endnotes,
+    where the fidelity check reads it, or a character XML 1.0 does not
+    allow."""
+    if note.group is None:
+        return ()
+    misplaced = (
+        f"note {note.id} is a {note.kind.value} and has the group heading "
+        f"{note.group!r}; only an endnote has one"
+    )
+    kind = (misplaced,) if note.kind is not NoteKind.ENDNOTE else ()
+    return kind + _character_problems(
+        f"the group heading of note {note.id}", note.group
+    )
+
+
 def _note_problems(note: Note, footnote_ids: frozenset[str]) -> tuple[str, ...]:
     """Why a note cannot be written; empty when it can."""
     marker = _character_problems(f"the marker of note {note.id}", note.marker)
@@ -247,7 +293,7 @@ def _note_problems(note: Note, footnote_ids: frozenset[str]) -> tuple[str, ...]:
         for block in note.blocks
         for problem in _note_block_problems(note, block, footnote_ids)
     )
-    return marker + blocks
+    return marker + _group_problems(note) + blocks
 
 
 def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
@@ -346,8 +392,8 @@ def _check_writable(blocks: BlocksFile) -> None:
     write, rather than write it wrongly: a figure's image _image_problems
     refuses, a note
     block that is not a paragraph, quote, verse or margin note, a reference
-    to a footnote inside a referenced footnote, or a character XML 1.0 does
-    not allow."""
+    to a footnote inside a referenced footnote, a group heading on a note
+    that is not an endnote, or a character XML 1.0 does not allow."""
     footnote_ids = frozenset(
         note.id for note in blocks.notes if _is_footnote_at_its_reference(note)
     )
@@ -452,19 +498,18 @@ def _verse_markdown(block: Block, notes: frozendict[str, Note]) -> str:
 def _text_markdown(block: Block, notes: frozendict[str, Note], marker: str) -> str:
     """A block's text in Markdown, its spans as _span_markdown writes them:
     on one line, without the spaces at its start and end, or, for verse,
-    line by line; a note's `marker`, when given, first, escaped, with one
+    line by line, as are an epigraph's; a note's `marker`, when given, first, escaped, with one
     space after it. An empty marker adds nothing."""
     match block.kind:
-        case BlockKind.VERSE:
+        # Structure spec section 25: an epigraph's quotation keeps its line
+        # feeds, as verse; a prose one has none.
+        case BlockKind.VERSE | BlockKind.EPIGRAPH:
             text = _verse_markdown(block, notes)
         case (
             BlockKind.HEADING
             | BlockKind.PARAGRAPH
             | BlockKind.QUOTE
             | BlockKind.CHAPTER_SUMMARY
-            # Its source and line feeds wait for task 6.1 of the plan owner-books;
-            # the fidelity check finds the source's words missing until then.
-            | BlockKind.EPIGRAPH
             | BlockKind.FIGURE
             | BlockKind.MARGIN_NOTE
             | BlockKind.INDEX_ENTRY
@@ -488,11 +533,35 @@ def _heading(block: Block, notes: frozendict[str, Note]) -> str:
     return f"{'#' * block.level} {words} {{#{block.id}}}\n"
 
 
+# Structure spec section 25: written before an epigraph's source, an em
+# dash and a no-break space, which keeps the dash on the source's line. The
+# fidelity check takes this word out, since blocks.json does not hold it.
+_SOURCE_DASH = "\u2014\u00a0"
+
+
+def _epigraph(block: Block, notes: frozendict[str, Note]) -> str:
+    """An epigraph's fenced div with its id and the class `epigraph`,
+    holding its quotation and, when it has a source, the div of class
+    `epigraph-source` with the dash and the source."""
+    source = (
+        f"\n::: {{.epigraph-source}}\n{_SOURCE_DASH}{escape_markdown(block.source)}\n:::\n"
+        if block.source is not None
+        else ""
+    )
+    return (
+        f":::: {{#{block.id} .epigraph}}\n"
+        f"{_text_markdown(block, notes, '')}\n{source}::::\n"
+    )
+
+
 def _div(block: Block, notes: frozendict[str, Note], marker: str = "") -> str:
     """A block's fenced div with its id and its class, or for a heading a
-    Pandoc heading; `marker` as _text_markdown takes it."""
+    Pandoc heading, or for an epigraph the div _epigraph writes; `marker`
+    as _text_markdown takes it."""
     if block.kind is BlockKind.HEADING:
         return _heading(block, notes)
+    if block.kind is BlockKind.EPIGRAPH:
+        return _epigraph(block, notes)
     class_name = _class_name(block.kind)
     attributes = f"#{block.id}" + (f" .{class_name}" if class_name is not None else "")
     if block.kind is BlockKind.INDEX_ENTRY:
@@ -526,10 +595,16 @@ def _note_blocks(note: Note, notes: frozendict[str, Note], marker: str) -> str:
 def _note_div(note: Note, notes: frozendict[str, Note]) -> str:
     """A note written where it was printed: a fenced div with its id and
     the class `note` (a footnote) or `endnote`, around its blocks' divs,
-    its marker first."""
+    its marker first; before it, when it has a group heading, a fenced div
+    of class `note-group` holding the heading."""
     class_name = "endnote" if note.kind is NoteKind.ENDNOTE else "note"
+    group = (
+        f"::: {{.note-group}}\n{escape_markdown(note.group)}\n:::\n\n"
+        if note.group is not None
+        else ""
+    )
     return (
-        f":::: {{#{note.id} .{class_name}}}\n"
+        f"{group}:::: {{#{note.id} .{class_name}}}\n"
         f"{_note_blocks(note, notes, note.marker)}::::\n"
     )
 
@@ -579,8 +654,10 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     class `label`; every other block as a fenced div with its id and the
     class of its kind but a paragraph's, its text escaped by
     escape_markdown on one line, or, for verse, line by line with hard
-    line breaks; a figure with an image holds the image alone, its caption
-    as the image's text.
+    line breaks; an epigraph holds its quotation, as verse is written,
+    and a div of class `epigraph-source` with an em dash, a no-break space
+    and its source; a figure with an image holds the image alone, its
+    caption as the image's text. A no-break space is kept as the character.
 
     A referenced footnote is a Pandoc footnote at its reference, its
     definition after the block or note that refers to it, holding its
@@ -589,7 +666,8 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     the class `note` or `endnote` around its blocks' divs, its marker first
     in the first that is not a margin note; it follows the last block, in
     the order of blocks.json, whose first origin is on the note's first
-    page or an earlier one, or comes first of all when there is none.
+    page or an earlier one, or comes first of all when there is none. A
+    note's group heading is a div of class `note-group` before its div.
     Notes written at the same place keep the order of blocks.json, and the
     endnotes among them that follow each other are one list, a div of class
     `endnotes`. A reference to an endnote is a link to it with the
@@ -605,8 +683,9 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     relative or holds other characters than ASCII letters, digits, "_",
     ".", "-" and "/", a note reference in a figure's caption, a note block
     that is not a paragraph, quote, verse or margin note, a reference to a
-    footnote inside a referenced footnote, or a character XML 1.0 does not
-    allow (named as U+FFFE).
+    footnote inside a referenced footnote, a group heading on a note that
+    is not an endnote, or a character XML 1.0 does not allow, in a text,
+    label, source, marker or group heading (named as U+FFFE).
     """
     _check_well_formed(blocks)
     _check_writable(blocks)
