@@ -190,7 +190,9 @@ A word that text flow gives is split between two consecutive characters
 when both hold:
 
 - the gap between them is at least a third of the median width of the
-  word's characters; and
+  word's characters, the larger of the two middle widths when their
+  number is even (with the mean of the two, "A.d." on Stubbs' page 207
+  is split and the book has one word more than the table); and
 - either the first is a letter and the second a letter or an opening
   mark (`( [ ‘ “`), or the first is a closing mark (`, . ; : ! ? ) ] '
   " ’ ”`) and the second a letter. So no split falls between two marks
