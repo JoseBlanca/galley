@@ -27,7 +27,10 @@ never imports it, as epubcheck is only a development tool
 (architecture §16).
 
 Dated 15 November 2026; revised on 17 November 2026 to leave the front
-matter galley drops unscored (section 5, "Pages"). It builds on `docs/architecture.md` and
+matter galley drops unscored (section 5, "Pages"), and the same day to
+score the margin notes' words as a part of their own (section 6), so
+that re-reading small print (`docs/specs/reocr.md`) is measured by the
+tool. It builds on `docs/architecture.md` and
 `docs/glossary.md`; "architecture §8" is a section of that document,
 "section 6" a section of this spec. No code of the tool exists. galley
 exists as the walking skeleton (`docs/specs/walking-skeleton.md`), whose
@@ -715,9 +718,12 @@ markdown.
 
 The scores are computed for each of the four outputs and written to the
 scorecard. Each is given for every part apart: the body, the notes, the
-index, tables, and figure captions. The index and tables are apart
+index, tables, figure captions and margin notes. The index and tables are apart
 because a scrambled text layer there (section 2) would otherwise drown
-the body's score.
+the body's score; the margin notes, because their 1,908 words in Stubbs
+and 2,487 in Domesday are too few to move the body's score when
+re-reading changes them (`docs/specs/reocr.md` §9). A margin note
+inside a note is of the margin notes' part too.
 
 A reference token has the part of its block. An extra galley token has
 the part of its page: the part that holds most of the reference tokens
@@ -903,8 +909,10 @@ Computed from galley's words alone, the candidates:
   (English `a`, `i`, `o`; French `a`, `à`, `y`).
 - `inner_symbol_share`: the share of tokens with a character that is
   neither a letter nor a hyphen between two letters, as `t*e`.
-- `ocr_confidence_mean`: the mean of Tesseract's confidences, on pages
-  galley read with OCR; empty otherwise.
+- `ocr_confidence_mean`: the mean of Tesseract's confidences over the
+  page's words that have one: on pages galley read with OCR, and on
+  the words layout re-read (`docs/specs/reocr.md`); empty when none
+  has one.
 
 And, for context: `page_index`, `printed_page`, `text_source`, `part`,
 and the page's token count.

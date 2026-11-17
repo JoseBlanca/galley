@@ -46,6 +46,16 @@ each (owner, 15 November 2026). The cut-in rule does not reach the bar
 on precision set in section 9; the owner kept it as written on 16
 November 2026 (section 9).
 
+Revised on 17 November 2026: layout also re-reads small print with
+Tesseract where it reads better than the text layer
+(`docs/specs/reocr.md`). It then reads the PDF, through
+`pdfium.render`, and the config, besides `pages.json` and `words.json`;
+the re-reading comes in after steps 2, 2b and 4 of section 3, a page
+printed wholly in small type is read whole after the book's measures,
+and every region read is recorded in `lines.json`, whose format goes to
+version 2. That spec gives the rules, the record and the fidelity rule;
+this one points to it where they meet.
+
 ## 1. Terms
 
 Besides those of the glossary, this spec uses these; the first four, and
@@ -736,8 +746,10 @@ runs the fidelity check and writes lines.json, 2.5 s in all.
 
 ## 7. Fidelity
 
-Every word of `words.json` is in exactly one line of `lines.json`
-(architecture §8 and §13); layout removes nothing. The check runs in
+Every word of `words.json` is in exactly one line of `lines.json`, or is
+among the replaced words of exactly one kept record of re-reading
+(architecture §8 and §13, `docs/specs/reocr.md` §4); layout removes
+nothing. The check runs in
 `run`, as now. Each step of section 3 moves a word from what is left to
 one region; a test asserts, on every reference page, that the words of
 the regions are those of the page.
@@ -923,3 +935,6 @@ margin note breaks the text a reader reads.
 - Figures inside text pages, tables as tables, the order of notes inside
   a band: later.
 - OCR of pages without a text layer: analyze and extract.
+- Re-reading small print with Tesseract: `docs/specs/reocr.md`, which
+  inserts its steps into section 3 and adds its public functions to
+  section 4.

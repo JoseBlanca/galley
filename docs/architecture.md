@@ -14,7 +14,10 @@ label, plates as figures, the config key `contents_pages` and the module
 is read (`docs/specs/extract.md`) and the pages before the preface
 (`docs/specs/front-matter.md`), which add the page kind and the removal
 reason `front_matter`, the config key `front_matter_end` and
-`text_layer.layer_words`.
+`text_layer.layer_words`; and the same day for re-reading small print
+with Tesseract (`docs/specs/reocr.md`), which gives layout the PDF and
+the config as inputs, adds the record `Reread` to `lines.json` (version
+2), the module `ocr.py` and the config key `reread_footnotes`.
 
 Decisions marked "owner", with a date from 14 to 17 November 2026,
 were taken by the owner in chat. The others were taken while writing,
@@ -40,6 +43,10 @@ therefore a stage of its own (layout, section 9).
 
 When a page has no text layer, or a poor one, galley makes its own with
 Tesseract, which gives the same thing: words with boxes, plus a confidence.
+Where the scan is sharp but its text layer poor in small print, the
+margin notes and the pages printed wholly in small type, layout reads
+that print again with Tesseract and keeps, region by region, whichever
+reading has more dictionary words (`docs/specs/reocr.md`).
 
 ## 2. The samples
 
@@ -85,7 +92,7 @@ can be built and tested on its own.
 |---|---|---|---|
 | analyze | PDF, config | `pages.json` | what each page is and where its words come from |
 | extract | PDF, config, `pages.json` | `words.json`, `images/` | the words of each page with their boxes; figures and the cover cut out |
-| layout | `pages.json`, `words.json` | `lines.json` | each page's words grouped into regions and lines, in reading order; the figures carried over |
+| layout | PDF, config, `pages.json`, `words.json` | `lines.json` | each page's words grouped into regions and lines, in reading order; small print re-read with Tesseract where that reads better (`docs/specs/reocr.md`); the figures carried over |
 | structure | `pages.json`, `lines.json`, config | `blocks.json` | the book as ordered blocks and notes; what was removed |
 | correct | PDF, `words.json`, `blocks.json` | `edits/correct.jsonl` | proposed fixes to OCR errors (optional) |
 | markdown | `blocks.json`, `edits/`, config | `book.md` | Pandoc Markdown with the edits applied |
@@ -144,7 +151,7 @@ An unknown key or a wrong type is an error.
 | `title` | string, required | |
 | `authors` | list of strings, required | |
 | `language` | string, required | ISO 639-1 code: `en`, `es`, `fr`, `de`, `it`. `config.py` maps it to Tesseract's code (`eng`, `spa`…) and to the word list |
-| `ocr` | `verify` / `trust` / `redo`, `verify` | how far the book's own OCR is trusted (section 7b) |
+| `ocr` | `verify` / `trust` / `redo`, `verify` | how far the book's own OCR is trusted (section 7b), and whether layout re-reads small print: not with `trust` or `redo` (`docs/specs/reocr.md`) |
 | `correct` | bool, `false` | whether `galley2epub run` runs the correct stage |
 | `exclude_pages` | list of page indices, `[]` | pages left out, as removals |
 | `exclude_regions` | list of `{page, box}`, `[]` | a library stamp, a label |
@@ -152,6 +159,7 @@ An unknown key or a wrong type is an error.
 | `plate_pages` | list of page indices, `[]` | pages analyze makes plates whatever its rule finds, for a plate the rule misses (Kadesh's faint relief on page 23); a page in `exclude_pages` is never a plate, so a page in both lists is accepted and excluded: `exclude_pages` wins (`docs/specs/plates.md` §2) |
 | `contents_pages` | list of page indices, `[]` | the pages of the book's printed table of contents: structure makes no heading on them, so that the EPUB's table of contents does not list each chapter twice; their lines stay paragraphs (owner, 15 November 2026). Without it, the contents' lines that pass the heading rule become headings, and the EPUB lists those chapters twice (Domesday's three essays). analyze checks its page indices as it checks those of the other keys |
 | `front_matter_end` | page index, found by analyze | the first page after the front matter: the pages before it that would be text pages are dropped, each word recorded as a removal (owner, 17 November 2026: "drop the pages before the preface, with a record of what was dropped"). Without the key, analyze finds it: the first preface page or contents page among the book's first pages, else the first page of running text (`docs/specs/front-matter.md` §2). 0 keeps every page |
+| `reread_footnotes` | bool, `false` | whether layout re-reads each page's footnote band with Tesseract (`docs/specs/reocr.md` §3); off by default because Tesseract misreads note markers and loses note links (Domesday) |
 
 A stage spec adds the keys it needs, here and in `config.py` together.
 
@@ -187,7 +195,7 @@ config's `ocr` key sets how far:
 | `ocr` | analyze does |
 |---|---|
 | `verify` (default) | the audit below |
-| `trust` | no audit of the text layer; pages without a layer are still checked as in the audit |
+| `trust` | no audit of the text layer; pages without a layer are still checked as in the audit; layout re-reads nothing |
 | `redo` | ignores the text layer and marks every page for OCR |
 
 The audit runs Tesseract on two sets of pages:
@@ -211,6 +219,16 @@ The audit runs Tesseract on two sets of pages:
   "redo"`. Replacing OCR that exists is the owner's choice; filling a gap
   is not.
 
+Besides the audit, layout re-reads small print where the layer is poor
+(`docs/specs/reocr.md`): the outer margin notes, Stubbs' notes cut into
+the column, the pages printed wholly in small type (Stubbs' index), and
+the footnotes when the config asks. It chooses region by region and
+keeps the layer wherever Tesseract's reading scores no higher, so it
+replaces OCR that exists only where Tesseract reads better, and records
+every word it replaces (owner, 17 November 2026: re-read small print
+where the scan is good and the layer poor). `ocr = "trust"` turns it
+off.
+
 The sample size and the thresholds are set in analyze's spec. ocr_lab's
 triage re-OCRed below a word-list share of 0.70 and checked between 0.70
 and 0.80, which tracked the measured gain closely (ρ = 0.90, as ocr_lab's notes report it)
@@ -221,15 +239,17 @@ but was fitted on 16 books only.
 The formats are frozen dataclasses in `src/galley/model.py`, with tuples
 for sequences, `frozendict` (a built-in type of Python 3.15) for
 mappings, `StrEnum` for finite sets, and floats for positions. Each file
-has a `format_version` int: 2 for `pages.json`, `words.json` and
-`blocks.json`, 1 for the others.
+has a `format_version` int: 2 for `pages.json`, `words.json`,
+`lines.json` and `blocks.json`, 1 for the others.
 `blocks.json` went to 2 with the second plan of structure (16 November
 2026), which added `Note.kind`, `Block.label`, the block kinds `verse`
 and `chapter_summary` and the removal reason `guide_words`; reading a
 file of version 1 is the error below, and the owner reruns structure.
 `pages.json` and `words.json` went to 2 on 17 November 2026, with the
 page kind and the removal reason `front_matter`
-(`docs/specs/front-matter.md`); the owner reruns analyze. Each has one pair of functions
+(`docs/specs/front-matter.md`); the owner reruns analyze. `lines.json`
+went to 2 the same day, with `rereads` (`docs/specs/reocr.md`); the
+owner reruns layout. Each has one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
 Reading a file whose `format_version` is not the current one is an error
@@ -272,7 +292,8 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
   `figures: tuple[Figure, ...]`. A page whose source is `none` has no
   words.
 - `Word`: `text`, `box`, `ocr_confidence: float | None` (Tesseract's,
-  0-100; `None` for the text layer). In the order the source gave them:
+  0-100, for a word galley read with Tesseract, on an OCR page or in a
+  region layout re-read; `None` for the text layer). In the order the source gave them:
   for the text layer, the order in which the PDF draws the characters,
   as `text_layer.layer_words` reads them (`docs/specs/extract.md`).
 - `Figure`: `box`, `image` (path relative to the book folder), `dpi`. For
@@ -285,7 +306,8 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
   `excluded_page`, and those of a front-matter page with
   `front_matter`.
 
-**lines.json**, `LinesFile(pages: tuple[PageLayout, ...])`:
+**lines.json**, `LinesFile(pages: tuple[PageLayout, ...], rereads:
+tuple[Reread, ...])`:
 
 - `PageLayout`: `index`, `regions: tuple[Region, ...]`, in reading order,
   and `figures`, copied from words.json so that structure need not read it.
@@ -295,8 +317,24 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
   what a region is; structure does.
 - `Line`: `box`, `words: tuple[Word, ...]`, left to right.
 
-layout only regroups words: every word of words.json is in exactly one
-line of lines.json. It removes nothing. The removals of words.json are not
+- `Reread`: a region of a page that layout read again with Tesseract
+  (`docs/specs/reocr.md` §4): `page_index`, `kind: RereadKind`, `box`
+  (the crop, in points), `layer_words` (the words of words.json it
+  replaces), `ocr_words` (Tesseract's), `layer_score` and `ocr_score`
+  (ints, known words minus unknown words of each reading), and `kept`
+  (whether `ocr_words` took the place of `layer_words`: `ocr_score`
+  higher). Every region read is recorded, kept or not, in page order.
+- `RereadKind`: `small_print_page` (a page printed wholly in small
+  type, read below its running head), `margin_note` (one note of an
+  outer margin), `cut_in_note` (one crop of Stubbs' notes cut into the
+  column), `footnote_band` (a page's footnotes, when the config's
+  `reread_footnotes` asks).
+
+layout regroups words and re-reads small print: every word of
+words.json is in exactly one line of lines.json or among the
+`layer_words` of exactly one kept `Reread`, and every word of a line is
+a word of words.json or among the `ocr_words` of a kept `Reread`. It
+removes nothing. The removals of words.json are not
 repeated in lines.json or blocks.json: each file lists only the removals
 its own stage made.
 
@@ -449,7 +487,9 @@ and is never a plate.
 **layout** groups each page's words into regions and lines, and orders
 them for reading: a column, then the next; the margin beside the body,
 and the notes Stubbs cuts into the body column; the footnote columns at
-the foot. It copies the page's figures through.
+the foot. Where small print reads better with Tesseract than in the text
+layer, it re-reads it, region by region, with renders from `pdfium.py`
+(`docs/specs/reocr.md`). It copies the page's figures through.
 
 **structure** turns regions and lines into blocks and notes. It first
 reads the whole book to find what repeats: running heads, page numbers,
@@ -562,10 +602,11 @@ A stage imports these and nothing else of galley.
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage`; and `POINTS_PER_INCH` (72), which turns a DPI into pixels per point |
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file. `layer_words(page) -> tuple[Word, ...]`: the one way galley reads a page's words from the text layer, in analyze and extract alike; `Character`, a frozen value (`text`, one character, and `box`), one glyph of the text layer; and `split_glued(characters)`, which cuts one word's characters into the words the OCR glued (`docs/specs/extract.md` §4 and §5) |
-| `wordlist.py` | `is_known_word(word, lower_case_words)`, whether a word counts as known on a plate (`docs/specs/plates.md` §2); `lower_case_word_list(language, cache_dir)`, the word list in lower case, made once per language and list folder, which structure and analyze take; `word_list(language, cache_dir) -> frozenset[str]`, with the dictionary's case, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`) and structure |
+| `wordlist.py` | `is_known_word(word, lower_case_words)`, whether a word counts as known on a plate (`docs/specs/plates.md` §2); `lower_case_word_list(language, cache_dir)`, the word list in lower case, made once per language and list folder, which structure, analyze and layout take; `word_list(language, cache_dir) -> frozenset[str]`, with the dictionary's case, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`), layout (re-reading, `docs/specs/reocr.md`) and structure |
+| `ocr.py` | Tesseract: `read_image(image, origin, dpi, psm, language)`, the words of an image cropped from a page, with boxes in points and Tesseract's confidence, and `words_of_tsv`, its pure part; `OCR_DPI` (300). Tesseract runs with `OMP_THREAD_LIMIT=1`, one core each, so that the parallelism is galley's; output without Tesseract's tsv header is an `ExternalProgramError` (`docs/specs/reocr.md` §5). layout uses it now, analyze's audit and extract's OCR pages later |
 | `fidelity.py` | the fidelity check, section 13 |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
-| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract) and stops naming any that is missing |
+| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`) and stops naming any that is missing |
 
 `src/galley/__init__.py` imports gilguard first: a library that stops a
 program at any import that turns Python's global lock back on, and names
@@ -612,7 +653,10 @@ lists the words, with the pages they came from where the origins say.
   belong to two pages. Order is not part of the check, because columns,
   margins and notes move between stages; order within a block is checked
   by structure's tests.
-- The boundaries: layout, words.json against lines.json; structure,
+- The boundaries: layout, words.json against lines.json, with the
+  `layer_words` of each kept `Reread` taken out of words.json's side and
+  its `ocr_words` added, and each kept record's `layer_words` required
+  to be words of its page in words.json, none in two records; structure,
   lines.json against blocks.json (the text of every body and note block,
   with a note's `marker` and a heading's `label` counted as words of
   it); markdown, blocks.json
@@ -682,7 +726,7 @@ cost than one every run of `galley2epub` needs.
 | program | used by | when | why it is not rebuilt |
 |---|---|---|---|
 | Pandoc | markdown (to read `book.md` back for the fidelity check), epub | every run | writing a valid EPUB 3 with navigation, notes and metadata is a large, well-tested body of work |
-| Tesseract | analyze (the OCR audit), extract (OCR pages), `wordlist.py` | runs that need OCR; the word list, once per language | OCR is not something to rebuild |
+| Tesseract | analyze (the OCR audit), extract (OCR pages), layout (re-reading small print), `wordlist.py` | runs that need OCR, and layout unless `ocr` is `trust` or `redo`; the word list, once per language | OCR is not something to rebuild |
 | epubcheck | the tests of the epub stage and the `whole_book` tests | development only | it is the reference validator of EPUB, and needs Java, which a run of galley should not |
 
 The epub stage does not run epubcheck: an EPUB is checked while
@@ -760,6 +804,10 @@ On 17 November 2026:
   without a preface, were decided while writing.
 - **The running head of a section of two pages** is removed (structure
   spec §3, "The head of a short section").
+- **Small print is re-read** with Tesseract where it reads better than
+  the text layer, region by region, every replaced word recorded
+  (`docs/specs/reocr.md`). That layout does it, the rule that chooses,
+  and footnotes only when the config asks were decided while writing.
 
 ## 18. Not in this document
 

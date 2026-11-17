@@ -100,6 +100,10 @@ indent**). A block kind. A **sub-entry**, a heading under an entry that
 Haskins and Stubbs print inline after a ";" ("Amari, M., 216, 248;
 quoted, 234."), is an index entry of its own, of depth 2.
 
+**known word**: a word the word list holds (at least two letters), or a
+number; `wordlist.is_known_word` decides. An **unknown word** holds a
+letter or a digit and is not known.
+
 **line**: a line of one region of a page, as layout groups the words, left
 to right. Not what pdfplumber calls a line, which runs across columns.
 Once structure has joined hyphens and paragraphs, the book has no lines,
@@ -122,6 +126,9 @@ still linked when it has a **marker's shape** (at most 4 characters, at
 most 3 of them letters or digits and at most 1 a letter) and falls in
 the right order.
 
+**note band**: the rows of ink of one printed margin note, found in a
+render of the margin; what re-reading reads for an outer margin note.
+
 **page index**: the position of a page in the PDF, from 0. **page
 number**: what is printed on the page, a string ("47", "xiv"), which may
 be missing or come in two sequences.
@@ -129,6 +136,10 @@ be missing or come in two sequences.
 **plate**: see figure. Its text layer holds its caption and **stray
 words**, what the OCR read in the picture's lines and shading ("^U;L"),
 which structure removes as plate text.
+
+**reading score**: of a reading of a region, its known words minus its
+unknown words, a word broken by a hyphen at a line end counted once.
+How re-reading chooses between the text layer and Tesseract.
 
 **reference page**: a page of an excerpt whose expected output the owner
 has checked by eye, used as the literal of a test.
@@ -147,11 +158,21 @@ box and reason: a running head, a page number, a signature mark, a stray
 mark, guide words, a plate's stray words, an excluded page or region,
 a page of the front matter.
 
+**re-reading**: reading a region of a page again with Tesseract, from a
+300-dpi render, and keeping Tesseract's words only where their reading
+score is higher than the text layer's. Done by layout, which records
+every region it read (`docs/specs/reocr.md`).
+
 **running head**: the line printed at the top of most pages, the book's,
 chapter's or author's name, often with the page number. Not a "header".
 
 **signature mark**: a small printer's mark at the foot of some pages, "I —
 2", which tells the binder how sheets are folded. Not text of the book.
+
+**small-print page**: a page of 50 words or more of which at least 9
+in 10 lie in layout's footnote band, the small type at the foot: a page
+printed wholly in small type, as an index (Stubbs' and Domesday's) or a
+table. Re-reading reads it whole below its running head.
 
 **span**: a run of a block's text with one emphasis and, optionally, a
 note reference.
