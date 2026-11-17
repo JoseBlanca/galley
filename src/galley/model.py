@@ -36,8 +36,9 @@ from galley.errors import EditError, InputFileError
 PAGES_FORMAT_VERSION = 2
 WORDS_FORMAT_VERSION = 2
 LINES_FORMAT_VERSION = 2
-# 2 since the second plan of structure, 16 November 2026 (architecture section 8).
-BLOCKS_FORMAT_VERSION = 3
+# 4 since the plan owner-books, 17 November 2026: epigraphs, note groups and
+# three word change reasons (architecture section 8).
+BLOCKS_FORMAT_VERSION = 4
 EDITS_FORMAT_VERSION = 1
 
 
@@ -670,6 +671,7 @@ class BlockKind(StrEnum):
     QUOTE = "quote"  # a passage quoted from another text, in prose
     VERSE = "verse"  # lines of a poem, separated by line feeds in the text
     CHAPTER_SUMMARY = "chapter_summary"  # a chapter's topics under its heading
+    EPIGRAPH = "epigraph"  # a quotation at a chapter's head, its source in Block.source
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"
@@ -703,13 +705,16 @@ class Origin:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Block:
     """A block of the book: a heading, paragraph, quote, verse, chapter
-    summary, figure, margin note or index entry.
+    summary, epigraph, figure, margin note or index entry.
 
     `id` is `b-p<page index, 4 digits>-<n, 3 digits>`; `level` is a
     heading's, from 1, an index entry's depth, 1 for an entry and 2 for a
     sub-entry, and None otherwise; `label` is a heading's chapter
     label as printed ("CHAPTER III.", "V"), whose title is in the spans,
-    and None for a heading without one and for every other kind; `figure`
+    and None for a heading without one and for every other kind; `source`
+    is an epigraph's source line as printed, without its leading dash,
+    its words joined by single spaces ("Thomas Hobbes, 1651"), and None
+    for every other kind; `figure`
     is the image path of a figure block; `origin` has one entry per page
     the block was printed on.
     """
@@ -718,6 +723,8 @@ class Block:
     kind: BlockKind
     level: int | None
     label: str | None
+    # A default, so that the stages that make no epigraph need not name it.
+    source: str | None = None
     spans: tuple[Span, ...]
     figure: str | None
     origin: tuple[Origin, ...]
@@ -739,7 +746,10 @@ class Note:
     printed at the start of the note, or as the OCR read it, and empty when
     it has none; `blocks` are its paragraphs, quotes or verse, with each
     margin note printed beside one of them as a block just before it;
-    `referenced` is false when no reference to it was found."""
+    `referenced` is false when no reference to it was found; `group` is,
+    on the first note of a note group of an endnote section, the group's
+    heading as printed, its lines joined by single spaces, and None on
+    every other note."""
 
     id: str
     kind: NoteKind
@@ -747,20 +757,27 @@ class Note:
     blocks: tuple[Block, ...]
     origin: tuple[Origin, ...]
     referenced: bool
+    # A default, so that the stages that make no note group need not name it.
+    group: str | None = None
 
 
 class ChangeReason(StrEnum):
     """Why structure changed words without losing a letter: a hyphen join,
     with the hyphen dropped on evidence, dropped without it (guessed), or
     kept in a compound; a join in a margin note of two parts whose hyphen
-    the OCR lost or read as a full stop; or a note marker split off the
-    word it was glued to."""
+    the OCR lost or read as a full stop; a note marker split off the
+    word it was glued to; the dash before an epigraph's source dropped,
+    which markdown writes back; a spaced sign attached to the word before
+    it; or a word the OCR glued at a case change split in two."""
 
     HYPHEN_JOIN = "hyphen_join"
     NOTE_MARKER = "note_marker"
     HYPHEN_JOIN_GUESSED = "hyphen_join_guessed"  # dropped without evidence
     HYPHEN_KEPT = "hyphen_kept"  # "Anglo-" "Saxon" to "Anglo-Saxon"
     HYPHEN_LOST = "hyphen_lost"  # "move." "ment," to "movement," in a margin note
+    SOURCE_DASH = "source_dash"  # "—Hobbes," to "Hobbes," before an epigraph's source
+    PUNCTUATION_ATTACHED = "punctuation_attached"  # "subjection" ";" to "subjection;"
+    CASE_SPLIT = "case_split"  # "theAvre" to "the" "Avre"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1292,8 +1309,9 @@ def has_index_depth(block: Block) -> bool:
 def read_blocks(path: Path) -> BlocksFile:
     """Reads blocks.json as write_blocks wrote it. Raises InputFileError,
     naming the file and the block, also when a block that is not a heading
-    has a label, an index entry has no depth from 1, or a block that is
-    neither a heading nor an index entry has a level."""
+    has a label, one that is not an epigraph has a source, an index entry
+    has no depth from 1, or a block that is neither a heading nor an index
+    entry has a level."""
     blocks = _read_json(path, BlocksFile, BLOCKS_FORMAT_VERSION, "structure")
     for block in (
         *blocks.blocks,
@@ -1303,6 +1321,12 @@ def read_blocks(path: Path) -> BlocksFile:
             message = (
                 f"{path}: block {block.id} is a {block.kind.value} and has the "
                 f"label {block.label!r}; only a heading has a label"
+            )
+            raise InputFileError(message)
+        if block.source is not None and block.kind is not BlockKind.EPIGRAPH:
+            message = (
+                f"{path}: block {block.id} is a {block.kind.value} and has the "
+                f"source {block.source!r}; only an epigraph has a source"
             )
             raise InputFileError(message)
         if block.kind is BlockKind.INDEX_ENTRY and not has_index_depth(block):

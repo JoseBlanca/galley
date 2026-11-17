@@ -396,6 +396,7 @@ def _class_name(kind: BlockKind) -> str | None:
             | BlockKind.QUOTE
             | BlockKind.VERSE
             | BlockKind.CHAPTER_SUMMARY
+            | BlockKind.EPIGRAPH
             | BlockKind.FIGURE
             | BlockKind.MARGIN_NOTE
             | BlockKind.INDEX_ENTRY
@@ -461,6 +462,9 @@ def _text_markdown(block: Block, notes: frozendict[str, Note], marker: str) -> s
             | BlockKind.PARAGRAPH
             | BlockKind.QUOTE
             | BlockKind.CHAPTER_SUMMARY
+            # Its source and line feeds wait for task 6.1 of the plan owner-books;
+            # the fidelity check finds the source's words missing until then.
+            | BlockKind.EPIGRAPH
             | BlockKind.FIGURE
             | BlockKind.MARGIN_NOTE
             | BlockKind.INDEX_ENTRY
