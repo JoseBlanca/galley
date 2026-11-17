@@ -42,7 +42,8 @@ and "Review 3" below.
 - In Stubbs, about half the lines of the notes set into the text
   column (rather than in the margin) stay in the body text.
 - On index pages neither the scan's text nor Tesseract is clean:
-  on Stubbs' page 312 each is wrong at a different 12 to 19 places.
+  of the 32 places where the two differ on Stubbs' page 312, the scan's
+  text is wrong at 20 and Tesseract at 13.
   Taking the right reading word by word would fix most of them.
 - Two short printed Stubbs notes are lost ("Motives de-", "Edward I.").
 - Two words can come out in the wrong order where the scan's OCR set one
