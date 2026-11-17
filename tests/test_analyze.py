@@ -490,6 +490,18 @@ def test_contents_page_before_front_matter_end_is_a_config_error_naming_both_key
     )
 
 
+def test_contents_page_just_before_front_matter_end_is_a_config_error() -> None:
+    config = replace(CONFIG, contents_pages=(11, 14), front_matter_end=12)
+
+    with pytest.raises(ConfigError) as raised:
+        check_config_pages(config, 20)
+
+    assert str(raised.value) == (
+        "key `contents_pages`: page index 11 lies before `front_matter_end`, 12, "
+        "and would be dropped with the front matter; correct one of the two keys"
+    )
+
+
 # The front matter (front-matter spec sections 1, 2 and 7)
 
 
@@ -706,6 +718,43 @@ def test_front_matter_end_is_0_without_preface_contents_or_running_text() -> Non
     )
 
     assert front_matter_end(starts, CONFIG) == 0
+
+
+def test_front_matter_end_is_a_window_page_of_exactly_half_the_median() -> None:
+    # The median is 300 words, half of it 150: pages 0 to 3, of 140 words,
+    # fall short; page 4, of 150, is the first page of running text.
+    starts = (
+        *(start(index, TEXT, 140, "TITLE") for index in range(4)),
+        start(4, TEXT, 150, "TITLE"),
+        *text_starts(30, 300)[5:],
+    )
+
+    assert front_matter_end(starts, CONFIG) == 4
+
+
+def test_front_matter_end_takes_the_median_of_the_text_pages_only() -> None:
+    # The 7 text pages of 300 words make the median of the 10 text pages 300,
+    # so the first page of running text is page 3. The 20 excluded pages of
+    # no words do not count: with them the median would be 0, and the end 0.
+    starts = (
+        *(start(index, TEXT, 100, "TITLE") for index in range(3)),
+        *text_starts(10, 300)[3:],
+        *(start(index, EXCLUDED, 0) for index in range(10, 30)),
+    )
+
+    assert front_matter_end(starts, CONFIG) == 3
+
+
+def test_front_matter_end_takes_a_preface_on_page_9_of_a_30_page_book() -> None:
+    # A tenth of 30 pages is 3, so the window is its least, the first 10
+    # pages, 0 to 9.
+    starts = (
+        *(start(index, TEXT, 10, "TITLE") for index in range(9)),
+        start(9, TEXT, 200, "PREFACE"),
+        *text_starts(30, 300)[10:],
+    )
+
+    assert front_matter_end(starts, CONFIG) == 9
 
 
 def test_front_matter_end_is_0_for_a_book_of_no_text_page() -> None:
