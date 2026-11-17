@@ -186,11 +186,15 @@ lost, some misread. On Haskins' index page 267 the two tie at 250, with
 "10 f.," and "164 ff.;" and read "f." as "/." 18 times, and Tesseract is
 right at 36 of the 38 places where the two differ (a by-eye check of 17
 November 2026). Measured on the records of whole Stubbs, Domesday,
-Haskins and Gierke on 17 November 2026: 423 regions tie; 41 have more
-known words in Tesseract's reading, and 34 of them are newly kept (the
-others lie over no layer word and fail its rule below): Haskins' page
-267, the only small-print page that ties; 5 of Stubbs' cut-in crops;
-22 of Domesday's margin notes; 6 of Gierke's. Read by their text, all
+Haskins and Gierke on 17 November 2026, with every rule of this section
+and section 4 as they now stand: 423 regions tie; 42 have more known
+words in Tesseract's reading, and 34 of them are kept (the other 8 lie
+over no layer word and fail its rule below): Haskins' page 267, the
+only small-print page that ties; 5 of Stubbs' cut-in crops; 22 of
+Domesday's margin notes, 2 of them over no layer word (pages 53 and
+439, below); 6 of Gierke's. With the same rules, 24 regions over no
+layer word are kept with fewer than 2 known words, each a sure single
+word (below): 23 of Stubbs and 1 of Domesday. Read by their text, all
 but one are the fuller reading ("Precautions taken by Henry I." against
 "Precautions taken by"; "Manorial and non- manorial vills." against
 "Manorial manorial"); the exception is Gierke's list of page numbers on
