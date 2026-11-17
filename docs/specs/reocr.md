@@ -205,7 +205,9 @@ more, every word of the reading has a confidence of 80 or more, and no
 word of the page's layer may be a reading of the same printed word
 (`model.may_read`: under it, or within 16 pt above or below with the
 same letters and digits or alike letters, rules (a) to (c) of section
-4 taken alone). Junk read over nothing then stays out ("af", Gierke page
+4 taken alone). A reading that holds a word broken at a line end, two
+parts scored as one, holds no sure single word ("The pre- cariun.",
+Domesday page 325). Junk read over nothing then stays out ("af", Gierke page
 120, kept before at a score of 1 against 0: 2 letters, confidence 69),
 a note the layer did not read comes in ("Medieval Thought.", Gierke
 page 88, 2 known words), and so does a note, or the line of a note, of
