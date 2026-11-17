@@ -483,6 +483,35 @@ def test_note_the_layer_did_not_read_is_kept() -> None:
     assert record.kept
 
 
+def _band_over_nothing(*texts: str) -> Reread:
+    """The record of a note band where the layer has no word, read by
+    Tesseract as `texts` on one row."""
+    reading = margin_note_reading(
+        _Side.LEFT,
+        Box(8, 400, 46, 420),
+        tuple(
+            _ocr(text, 10 + 12 * index, 402, 20 + 12 * index, 410)
+            for index, text in enumerate(texts)
+        ),
+        page_words=_MARGIN_PAGE.words,
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    return record
+
+
+def test_band_over_no_layer_word_read_as_one_known_word_is_not_kept() -> None:
+    # Gierke page 120: "af" over nothing, score 1 against 0.
+    record = _band_over_nothing("the")
+    assert (record.layer_score, record.ocr_score) == (0, 1)
+    assert not record.kept
+
+
+def test_band_over_no_layer_word_with_2_known_words_and_1_unknown_is_kept() -> None:
+    record = _band_over_nothing("Moral", "xq", "lessons.")
+    assert record.ocr_score == 1
+    assert record.kept
+
+
 # A cut-in crop at the left of a column whose left edge is 50 pt, with an
 # inset of 60 pt: the crop runs from 47 to 107 pt, and a note word ends by
 # 106 pt.

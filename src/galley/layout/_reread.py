@@ -82,6 +82,11 @@ _SMALL_PRINT_LEAST_WORDS: Final[int] = 50
 _SMALL_PRINT_ROWS_PER_100: Final[int] = 85
 _COUNTED_ROW_LEAST_WORDS: Final[int] = 2
 
+# A region over no layer word is kept only with this many known words of
+# Tesseract's (reocr spec, section 3): "af", read over nothing on Gierke
+# page 120, is one; "Medieval Thought.", on page 88, two.
+_OVER_NOTHING_LEAST_KNOWN: Final[int] = 2
+
 # The crops (reocr spec, section 3). Measured on Stubbs and Domesday, or set
 # so that a crop holds its words with a little white around them.
 _BELOW_HEAD_PT: Final[float] = 1.0
@@ -169,18 +174,28 @@ def reading_score(words: Iterable[Word], lower_case_words: frozenset[str]) -> in
     broken at a line end and counts once, as known when the two joined, or
     each part, are known, otherwise as the joined word.
     """
+    return sum(_word_scores(words, lower_case_words))
+
+
+def _word_scores(
+    words: Iterable[Word], lower_case_words: frozenset[str]
+) -> tuple[int, ...]:
+    """The score of each word of `words` as `reading_score` counts them: 1
+    known, -1 unknown, 0 neither, a word broken at a line end once."""
     texts = tuple(_normalized(word.text) for word in words)
-    score = 0
+    scores = []
     position = 0
     while position < len(texts):
         text = texts[position]
         if position + 1 < len(texts) and _is_broken_pair(text, texts[position + 1]):
-            score += _broken_word_score(text, texts[position + 1], lower_case_words)
+            scores.append(
+                _broken_word_score(text, texts[position + 1], lower_case_words)
+            )
             position += 2
         else:
-            score += _word_score(text, lower_case_words)
+            scores.append(_word_score(text, lower_case_words))
             position += 1
-    return score
+    return tuple(scores)
 
 
 # The small-print page
@@ -654,7 +669,8 @@ def page_rereads(
     (`model.is_under_ocr_word`) that an earlier kept region does not
     replace; the others stay in the layer. A region is kept when its
     words of Tesseract's are not empty and score higher than the layer
-    words it replaces, by `reading_score` against `lower_case_words`. A
+    words it replaces, by `reading_score` against `lower_case_words`, and,
+    when it replaces no layer word, hold at least 2 known words. A
     region where both readings are empty is not recorded. ValueError when
     a small-print page comes with another region: no other region of such
     a page is read.
@@ -683,8 +699,11 @@ def page_rereads(
         if not layer_words and not ocr_words:
             continue
         layer_score = reading_score(layer_words, lower_case_words)
-        ocr_score = reading_score(ocr_words, lower_case_words)
-        kept = ocr_score > layer_score
+        ocr_scores = _word_scores(ocr_words, lower_case_words)
+        ocr_score = sum(ocr_scores)
+        kept = ocr_score > layer_score and (
+            bool(layer_words) or ocr_scores.count(1) >= _OVER_NOTHING_LEAST_KNOWN
+        )
         if kept:
             replaced.extend(layer_words)
             earlier_crops.append(reading.box)
