@@ -9,7 +9,9 @@ it once.
 """
 
 import threading
+from collections import Counter
 from collections.abc import Callable, Iterator
+from contextlib import closing
 from pathlib import Path
 from typing import Final, override
 
@@ -17,9 +19,11 @@ import pdfplumber
 import pytest
 from pdfminer import psparser
 from pdfplumber.utils.exceptions import PdfminerException
+from pdfplumber.utils.text import LIGATURES
 
 from galley.errors import PdfError
 from galley.model import Box, Word
+from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 from galley.text_layer import Character, layer_words, open_pdf, split_glued
 
 KADESH = "kadesh_8-17"
@@ -374,6 +378,23 @@ def test_split_glued_does_not_cut_a_gap_under_a_third_of_a_character() -> None:
     assert split_glued(narrow) == (narrow,)
 
 
+def test_split_glued_measures_an_even_word_by_the_larger_middle_width() -> None:
+    # Stubbs' page 207, "A.d." for "A.D.": a gap of 1.44 pt before the "d".
+    # The middle widths are 4.13 and 4.49 pt: a third of the larger is 1.50
+    # pt, and the word stays whole; a third of their mean, 1.44 pt, would
+    # cut it.
+    initials = _glyphs(
+        "A.d.",
+        (
+            (275.84, 37.66, 279.97, 44.55),
+            (279.97, 37.66, 284.10, 44.55),
+            (285.54, 37.36, 290.04, 44.85),
+            (290.04, 37.36, 294.53, 44.85),
+        ),
+    )
+    assert split_glued(initials) == (initials,)
+
+
 def test_split_glued_gives_a_word_of_one_character_whole() -> None:
     single = (Character("a", Box(10.0, 20.0, 15.0, 29.0)),)
     assert split_glued(single) == (single,)
@@ -405,3 +426,85 @@ def test_layer_words_takes_the_characters_in_the_pdfs_order(
     assert "some" in texts
     assert "s" not in texts
     assert "ome" not in texts
+
+
+# The whole books (extract spec section 7, "Whole books")
+
+# Extract spec section 4, the table of what the split changes: each book's
+# words after both rules, measured on 17 November 2026 with pdfplumber
+# 0.11.10.
+WORDS_AFTER_BOTH_RULES = frozendict(
+    {
+        "normansineuropea00hask": 69_028,
+        "earlyplantagenet01stub": 104_429,
+        "domesdaybook00maituoft": 251_053,
+        "catherinedemedic00mariuoft": 237_920,
+        "politicaltheorie00gieruoft": 112_270,
+        "battleofkadeshst00breauoft": 24_188,
+    }
+)
+
+
+def _page_count(pdf_path: Path) -> int:
+    with open_pdf(pdf_path) as pdf:
+        return len(pdf.pages)
+
+
+def _words_and_lost_characters(
+    pdf: pdfplumber.PDF, page_index: int
+) -> tuple[int, Counter[str]]:
+    """The number of words layer_words gives on the page, and the difference
+    between the page's non-space characters and the characters of those
+    words, both ways (empty when each character is in exactly one word)."""
+    with closing(pdf.pages[page_index]) as page:
+        words = layer_words(page)
+        characters = Counter(
+            "".join(
+                LIGATURES.get(str(character["text"]), str(character["text"]))
+                for character in page.chars
+                if not str(character["text"]).isspace()
+            )
+        )
+    in_words = Counter("".join(word.text for word in words))
+    return len(words), (characters - in_words) + (in_words - characters)
+
+
+@pytest.fixture(scope="module")
+def whole_book_layers(
+    books_dir: Path,
+) -> frozendict[str, tuple[int, tuple[int, ...]]]:
+    """For each whole book, by Internet Archive identifier, its words as
+    layer_words reads them, and the indices of its pages where a non-space
+    character is in no word or in more than one."""
+    layers = {}
+    for book in WORDS_AFTER_BOTH_RULES:
+        pdf_path = books_dir / f"{book}.pdf"
+        pages = map_pages_with_source(
+            lambda pdf_path=pdf_path: open_pdf(pdf_path),
+            _words_and_lost_characters,
+            range(_page_count(pdf_path)),
+            DEFAULT_WORKERS,
+        )
+        layers[book] = (
+            sum(word_count for word_count, _ in pages),
+            tuple(index for index, (_, lost) in enumerate(pages) if lost),
+        )
+    return frozendict(layers)
+
+
+@pytest.mark.whole_book
+@pytest.mark.parametrize("book", sorted(WORDS_AFTER_BOTH_RULES))
+def test_layer_words_of_a_whole_book_are_those_of_the_spec_table(
+    whole_book_layers: frozendict[str, tuple[int, tuple[int, ...]]], book: str
+) -> None:
+    word_count, _ = whole_book_layers[book]
+    assert word_count == WORDS_AFTER_BOTH_RULES[book]
+
+
+@pytest.mark.whole_book
+@pytest.mark.parametrize("book", sorted(WORDS_AFTER_BOTH_RULES))
+def test_layer_words_of_a_whole_book_hold_each_non_space_character_once(
+    whole_book_layers: frozendict[str, tuple[int, tuple[int, ...]]], book: str
+) -> None:
+    _, pages_with_lost_characters = whole_book_layers[book]
+    assert pages_with_lost_characters == ()

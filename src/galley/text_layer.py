@@ -84,15 +84,21 @@ def split_glued(characters: tuple[Character, ...]) -> tuple[tuple[Character, ...
 
     A word is cut between two characters when the gap from the right side
     of the first to the left side of the second is at least a third of the
-    median width of the word's characters, and the first is a letter and
-    the second a letter or an opening mark, or the first a closing mark and
-    the second a letter. So a word is never cut at a digit, a hyphen or a
-    dash, nor between two marks. The parts keep their order; a word with
-    no such gap comes back as one part, and no part comes back empty.
+    median width of the word's characters (the larger of the two middle
+    widths when the word has an even number of characters), and the first
+    is a letter and the second a letter or an opening mark, or the first a
+    closing mark and the second a letter. So a word is never cut at a
+    digit, a hyphen or a dash, nor between two marks. The parts keep their
+    order; a word with no such gap comes back as one part, and no part
+    comes back empty.
     """
     if not characters:
         return ()
-    median_width_pt = statistics.median(
+    # The upper median, the larger of the two middle widths of a word with
+    # an even number of characters: with it, the words split are those of
+    # the table of extract spec section 4 (Stubbs 4,211 added, against 4,212
+    # with the mean of the two middle widths and 4,215 with the lower).
+    median_width_pt = statistics.median_high(
         character.box.x1 - character.box.x0 for character in characters
     )
     least_gap_pt = median_width_pt * _GLUED_GAP_IN_CHARACTER_WIDTHS
