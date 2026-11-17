@@ -411,6 +411,31 @@ def _glued_over(word: Word, ocr_words: Sequence[Word]) -> tuple[int, ...]:
     return ()
 
 
+def _misread_glued_over(
+    word: Word, ocr_words: Sequence[Word], free: frozenset[int]
+) -> tuple[int, ...]:
+    """The positions in `ocr_words` of the Tesseract words among `free`
+    whose middles lie over `word`, a layer word, widened by 1 pt, when
+    they are two or three that follow each other in `ocr_words` and
+    overlap each other up and down, words of one printed line, whatever
+    their texts: the words the layer glued and misread into `word`; ()
+    otherwise."""
+    positions = tuple(
+        position for position in sorted(free) if _lies_over(ocr_words[position], word)
+    )
+    if (
+        len(positions) in _GLUED_WORD_COUNTS
+        and positions == tuple(range(positions[0], positions[0] + len(positions)))
+        and all(
+            _overlap_up_and_down(ocr_words[first], ocr_words[second])
+            for first in positions
+            for second in positions
+        )
+    ):
+        return positions
+    return ()
+
+
 def may_read(word: Word, ocr_word: Word) -> bool:
     """Whether `ocr_word`, Tesseract's, may be a reading of the printed
     word that `word`, a word of the text layer, reads, by one of the rules
@@ -449,6 +474,21 @@ def _pairing(
         for index, word in enumerate(layer_words)
         if (positions := _glued_over(word, ocr_words))
     }
+    # (a) also: a layer word lying over two or three Tesseract words with no
+    # layer word under them, whatever the texts: the layer glued and
+    # misread them ("lo/.," over "10" "f.,").
+    free = frozenset(
+        position
+        for position, ocr_word in enumerate(ocr_words)
+        if not any(_is_under(word, ocr_word) for word in layer_words)
+    ) - {position for positions in glued.values() for position in positions}
+    for index, word in enumerate(layer_words):
+        if index in under_line or index in glued:
+            continue
+        positions = _misread_glued_over(word, ocr_words, free)
+        if positions:
+            glued[index] = positions
+            free -= frozenset(positions)
     under = tuple(
         index in under_line or index in glued for index in range(len(layer_words))
     )
@@ -518,7 +558,10 @@ def replaced_layer_words(
     up and down, those of all taken before it; or when its letters and
     digits are those of two or three consecutive `ocr_words` joined, each
     with its middle inside its box widened by 1 pt, a word the layer
-    glued; or else (b) when its letters and digits, case-folded and not empty, equal
+    glued; or when, whatever the texts, the `ocr_words` with no layer word
+    under them whose middles lie inside its box so widened are two or
+    three consecutive words of one line, a word the layer glued and
+    misread; or else (b) when its letters and digits, case-folded and not empty, equal
     those of one of `ocr_words` whose middle lies within 16 pt above or
     below its own and that no other layer word has matched;
     or else (c) when it has 3 letters or more and its case-folded letters

@@ -1832,6 +1832,47 @@ def test_layer_word_glued_over_two_or_three_ocr_words_is_replaced() -> None:
     assert model.replaced_layer_words((four,), letters) == ()
 
 
+def test_layer_word_glued_and_misread_over_two_ocr_words_is_replaced() -> None:
+    # Haskins' index page 267: the layer's "lo/.," where Tesseract read
+    # "10" "f.," (printed "10 f.,"); its middle lies between the two, under
+    # neither, and its letters are not theirs.
+    misread = Word("lo/.,", Box(100.0, 50.0, 130.0, 58.0), None)
+    ocr = (
+        Word("Caen,", Box(70.0, 50.0, 96.0, 58.0), 90.0),
+        Word("10", Box(100.5, 50.0, 110.0, 58.0), 90.0),
+        Word("f.,", Box(121.0, 50.0, 129.5, 58.0), 90.0),
+    )
+    assert model.replaced_layer_words((misread,), ocr) == (misread,)
+
+
+def test_layer_word_over_ocr_words_of_two_lines_is_not_taken_as_glued() -> None:
+    # Domesday page 475: the layer's "fromdfeam" lies over Tesseract's
+    # "from" "teann-" and the middle of "land." of the line below; the
+    # three are no line, and the layer's "land." keeps Tesseract's.
+    misread = Word("fromdfeam", Box(53.0, 237.6, 86.5, 247.9), None)
+    land = Word("land.", Box(52.7, 246.8, 81.0, 257.0), None)
+    ocr = (
+        Word("from", Box(52.8, 237.1, 67.9, 242.2), 90.0),
+        Word("teann-", Box(71.0, 237.8, 88.1, 242.4), 90.0),
+        Word("land.", Box(52.8, 244.3, 68.4, 249.6), 90.0),
+    )
+    assert land in model.replaced_layer_words((misread, land), ocr)
+
+
+def test_layer_word_over_an_ocr_word_another_layer_word_lies_under_is_not_glued() -> (
+    None
+):
+    # "10" reads the layer's "10" under it, so the layer's "lo/.," beside
+    # may not take it with "f.,".
+    misread = Word("lo/.,", Box(100.0, 50.0, 130.0, 58.0), None)
+    ten = Word("10", Box(101.0, 50.0, 109.0, 58.0), None)
+    ocr = (
+        Word("10", Box(100.5, 50.0, 110.0, 58.0), 90.0),
+        Word("f.,", Box(121.0, 50.0, 129.5, 58.0), 90.0),
+    )
+    assert misread not in model.replaced_layer_words((ten, misread), ocr)
+
+
 def test_ocr_words_read_glued_by_the_layer_pair_with_no_other_layer_word() -> None:
     # The layer's "of," a line below may not take Tesseract's "of," that the
     # glued "of,96" holds.
