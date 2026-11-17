@@ -291,6 +291,15 @@ expected, not fixed.
   worktree, written into the test as literal lists of each book's pages
   that are not `text`. Spec: extract §7, "Whole books". Needs 2.2.
   Stream `text-layer`. Deliverable 5.
+- [ ] 2.4 "¬" (U+00AC) at a line's end is a hyphen like "-" (added
+  on 17 November 2026: the owner's two books, Turney and Haynes, mark
+  every line-end hyphen with "¬", which leaves 1,020 and 2,219 broken
+  words such as "liter¬ ature"). Spec first: structure §5, "Hyphens at
+  line ends". Check: a unit test per case of §5 with "¬"; on the two
+  books by hand (`runs/own-samples/`, not committed: their PDFs are the
+  owner's), the count of "¬" in `book.md` before and after. Stream
+  `hyphen` (src/galley/structure/, tests/test_structure.py,
+  docs/specs/structure.md), beside task 5.2.
 
 ## 3. The front matter
 
