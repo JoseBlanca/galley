@@ -10,9 +10,13 @@ Dated 14 November 2026; revised on 16 November 2026 for the second plan
 of structure (`docs/specs/structure.md` §11 to §19), which adds kinds to
 section 8 for chapter summaries, verse and endnotes, a heading's chapter
 label, plates as figures, the config key `contents_pages` and the module
-`body_measures.py`.
+`body_measures.py`. Revised on 17 November 2026 for how the text layer
+is read (`docs/specs/extract.md`) and the pages before the preface
+(`docs/specs/front-matter.md`), which add the page kind and the removal
+reason `front_matter`, the config key `front_matter_end` and
+`text_layer.layer_words`.
 
-Decisions marked "owner", with a date from 14 to 16 November 2026,
+Decisions marked "owner", with a date from 14 to 17 November 2026,
 were taken by the owner in chat. The others were taken while writing,
 from what the committed excerpts show (section 2), and can be questioned.
 
@@ -147,6 +151,7 @@ An unknown key or a wrong type is an error.
 | `cover_page` | page index, none | rendered as the EPUB's cover |
 | `plate_pages` | list of page indices, `[]` | pages analyze makes plates whatever its rule finds, for a plate the rule misses (Kadesh's faint relief on page 23); a page in `exclude_pages` is never a plate, so a page in both lists is accepted and excluded: `exclude_pages` wins (`docs/specs/plates.md` §2) |
 | `contents_pages` | list of page indices, `[]` | the pages of the book's printed table of contents: structure makes no heading on them, so that the EPUB's table of contents does not list each chapter twice; their lines stay paragraphs (owner, 15 November 2026). Without it, the contents' lines that pass the heading rule become headings, and the EPUB lists those chapters twice (Domesday's three essays). analyze checks its page indices as it checks those of the other keys |
+| `front_matter_end` | page index, found by analyze | the first page after the front matter: the pages before it that would be text pages are dropped, each word recorded as a removal (owner, 17 November 2026: "drop the pages before the preface, with a record of what was dropped"). Without the key, analyze finds it: the first preface page or contents page among the book's first pages, else the first page of running text (`docs/specs/front-matter.md` §2). 0 keeps every page |
 
 A stage spec adds the keys it needs, here and in `config.py` together.
 
@@ -216,11 +221,15 @@ but was fitted on 16 books only.
 The formats are frozen dataclasses in `src/galley/model.py`, with tuples
 for sequences, `frozendict` (a built-in type of Python 3.15) for
 mappings, `StrEnum` for finite sets, and floats for positions. Each file
-has a `format_version` int: 2 for `blocks.json`, 1 for the others.
+has a `format_version` int: 2 for `pages.json`, `words.json` and
+`blocks.json`, 1 for the others.
 `blocks.json` went to 2 with the second plan of structure (16 November
 2026), which added `Note.kind`, `Block.label`, the block kinds `verse`
 and `chapter_summary` and the removal reason `guide_words`; reading a
-file of version 1 is the error below, and the owner reruns structure. Each has one pair of functions
+file of version 1 is the error below, and the owner reruns structure.
+`pages.json` and `words.json` went to 2 on 17 November 2026, with the
+page kind and the removal reason `front_matter`
+(`docs/specs/front-matter.md`); the owner reruns analyze. Each has one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
 Reading a file whose `format_version` is not the current one is an error
@@ -237,11 +246,13 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
 - `PageInfo`: `index`, `width_pt`, `height_pt`, `kind: PageKind`,
   `text_source: TextSource`, `text_layer_score: float | None`,
   `exclude_regions: tuple[Box, ...]`.
-- `PageKind`: `blank`, `text`, `plate` (mostly a picture), `excluded`.
-  analyze recognises a plate from a small render of the page, with a
-  text layer or without one (`docs/specs/plates.md`).
-- `TextSource`: `text_layer`, `ocr`, `none` (blank and excluded pages,
-  and plates without a text layer).
+- `PageKind`: `blank`, `text`, `plate` (mostly a picture), `excluded`,
+  `front_matter` (a page before the book's text that would otherwise be
+  a text page: `docs/specs/front-matter.md`). analyze recognises a plate
+  from a small render of the page, with a text layer or without one
+  (`docs/specs/plates.md`).
+- `TextSource`: `text_layer`, `ocr`, `none` (blank, excluded and
+  front-matter pages, and plates without a text layer).
 - `text_layer_score`: the share of the layer's words found in the word
   list (section 12), from 0 to 1; `None` without a layer.
 - `blank_checked_by_ocr: bool`: true for a page without a text layer that
@@ -261,7 +272,9 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
   `figures: tuple[Figure, ...]`. A page whose source is `none` has no
   words.
 - `Word`: `text`, `box`, `ocr_confidence: float | None` (Tesseract's,
-  0-100; `None` for the text layer). In the order the source gave them.
+  0-100; `None` for the text layer). In the order the source gave them:
+  for the text layer, the order in which the PDF draws the characters,
+  as `text_layer.layer_words` reads them (`docs/specs/extract.md`).
 - `Figure`: `box`, `image` (path relative to the book folder), `dpi`. For
   now figures are cut from plate pages only, one per plate, and its box
   is the whole page; figures inside text pages are not detected yet. A
@@ -269,7 +282,8 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
   structure sorts into its caption and stray words.
 - A word inside an excluded region is a removal, one per word, with reason
   `excluded_region`; the words of an excluded page likewise, with
-  `excluded_page`.
+  `excluded_page`, and those of a front-matter page with
+  `front_matter`.
 
 **lines.json**, `LinesFile(pages: tuple[PageLayout, ...])`:
 
@@ -370,9 +384,13 @@ page_numbers)`:
   `page_numbers: tuple[PageNumber, ...]`, taken from the removals; the
   index stage uses it (section 11).
 
-**Removal**, in words.json (excluded pages and regions) and blocks.json
-(the rest): `page_index`, `box`, `text`,
+**Removal**, in words.json (excluded pages and regions, and the front
+matter) and blocks.json (the rest): `page_index`, `box`, `text`,
 `reason: RemovalReason`: `excluded_page`, `excluded_region`,
+`front_matter` (a word of a page before the book's text, where analyze's
+rule or the config's `front_matter_end` puts the end of the front
+matter; a reason apart from `excluded_page`, whose pages the owner names
+one by one),
 `running_head`, `page_number`, `signature_mark`, `plate_text`,
 `stray_mark` (a line with no letter or digit above a running head, a
 speck of the scan), `guide_words` (the first letters of the first and
@@ -407,7 +425,9 @@ it read (the `coding` skill, "Functional style").
 
 **analyze** measures each page: size, text layer, the layer's score,
 whether it is blank, text or a plate; applies the config's
-`exclude_pages` and `exclude_regions`; and runs the OCR audit of section
+`exclude_pages` and `exclude_regions`; finds where the front matter
+ends and makes the text pages before it `front_matter`
+(`docs/specs/front-matter.md`); and runs the OCR audit of section
 7b, which decides each page's `text_source`. A plate is recognised from
 a render of each page at 36 dpi, as a large area of ink that no word
 covers on a page of few known words, or, on a page without a text
@@ -415,7 +435,10 @@ layer, as a large area of faint ink; such a page does not stop the run
 (`docs/specs/plates.md`).
 
 **extract** gives every page its words. Text-layer pages are read with
-pdfplumber, one document per worker thread. OCR pages are rendered at 300
+pdfplumber, one document per worker thread, by
+`text_layer.layer_words`: the characters in the order the PDF draws
+them, and words the OCR left glued split at wide gaps
+(`docs/specs/extract.md`). OCR pages are rendered at 300
 dpi by `pdfium.py` and read by Tesseract in parallel; their pixel boxes are
 turned into points. A plate page is rendered whole at 300 dpi into
 `images/`; its text layer, when it has one, is read as a text page's
@@ -538,7 +561,7 @@ A stage imports these and nothing else of galley.
 | `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract or Pandoc), `EditError`, `FidelityError` |
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage`; and `POINTS_PER_INCH` (72), which turns a DPI into pixels per point |
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
-| `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file |
+| `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file. `layer_words(page) -> tuple[Word, ...]`: the one way galley reads a page's words from the text layer, in analyze and extract alike (`docs/specs/extract.md` §5) |
 | `wordlist.py` | `is_known_word(word, lower_case_words)`, whether a word counts as known on a plate (`docs/specs/plates.md` §2); `lower_case_word_list(language, cache_dir)`, the word list in lower case, made once per language and list folder, which structure and analyze take; `word_list(language, cache_dir) -> frozenset[str]`, with the dictionary's case, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`) and structure |
 | `fidelity.py` | the fidelity check, section 13 |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
@@ -724,6 +747,19 @@ On 16 November 2026, for the same plan:
 - **Haskins' bibliographical notes are paragraphs**: the blocks after a
   level-2 heading "BIBLIOGRAPHICAL NOTE", up to the next heading,
   whatever their type (`docs/specs/structure.md` §16).
+
+On 17 November 2026:
+
+- **The text layer is read in the PDF's order**, not sorted by position,
+  and words the OCR left glued are split at wide gaps
+  (`docs/specs/extract.md`).
+- **The pages before the preface are dropped, with a record**: a page
+  kind and a removal reason `front_matter`, and the config key
+  `front_matter_end` to correct the rule (`docs/specs/front-matter.md`).
+  That the record is a reason of its own, and the rule for books
+  without a preface, were decided while writing.
+- **The running head of a section of two pages** is removed (structure
+  spec §3, "The head of a short section").
 
 ## 18. Not in this document
 

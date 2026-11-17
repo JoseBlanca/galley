@@ -715,7 +715,8 @@ Tests, unit tests with literal values:
 
 analyze measures every page with pdfplumber, with
 `map_pages_with_source`: its width and height (`page.width`,
-`page.height`) and how many words `extract_words()` finds. Then, per
+`page.height`) and how many words `extract_words()` finds (since 17
+November 2026, `text_layer.layer_words`: `docs/specs/extract.md`). Then, per
 page:
 
 1. A page in `exclude_pages` is `excluded`, `text_source` `none`.
@@ -778,7 +779,12 @@ each page its words, with `map_pages_with_source`:
 
 - `text` page: the words of `page.extract_words()` with its default
   options, in pdfplumber's order, each `Word(text, Box(x0, top, x1,
-  bottom), None)` (the `None` is `ocr_confidence`). A word whose centre,
+  bottom), None)` (the `None` is `ocr_confidence`). Replaced on 17
+  November 2026 by `text_layer.layer_words`, in analyze as in extract:
+  the characters in the PDF's order, and glued words split
+  (`docs/specs/extract.md`). The pages before the preface are
+  `front_matter`, whose words are removals like an excluded page's
+  (`docs/specs/front-matter.md`). A word whose centre,
   `((x0 + x1) / 2, (top + bottom) / 2)`, is inside one of the page's
   `exclude_regions`, edges included, is not a word of the page but a
   `Removal` with its box, its text and the reason `excluded_region`.

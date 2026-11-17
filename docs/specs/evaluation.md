@@ -26,7 +26,8 @@ The tool is for development only. It reads galley's files and galley
 never imports it, as epubcheck is only a development tool
 (architecture §16).
 
-Dated 15 November 2026. It builds on `docs/architecture.md` and
+Dated 15 November 2026; revised on 17 November 2026 to leave the front
+matter galley drops unscored (section 5, "Pages"). It builds on `docs/architecture.md` and
 `docs/glossary.md`; "architecture §8" is a section of that document,
 "section 6" a section of this spec. No code of the tool exists. galley
 exists as the walking skeleton (`docs/specs/walking-skeleton.md`), whose
@@ -580,6 +581,16 @@ The scorecard counts them, and `summary.md` lists them.
 
 A difference on a page in `exclude_pages` or `not_in_reference` is
 listed apart and not scored.
+
+**Front matter.** A page that galley's `pages.json` makes `front_matter`
+(`docs/specs/front-matter.md`, 17 November 2026) is treated as a page
+of `exclude_pages`, here and in the rule for unplaced tokens above, and
+the reference tokens before the first aligned token are not scored
+either when the book has front-matter pages: galley drops them on
+purpose, and the rule above would otherwise give them the page of the
+preface and count them as missing there (the reference holds Domesday's
+and Mariéjol's title pages). They are counted in `not_scored` and
+listed apart as front matter.
 
 ### Differences
 

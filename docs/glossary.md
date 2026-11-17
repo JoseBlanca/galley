@@ -68,6 +68,17 @@ invented.
 **footnote band**: the footnotes at the foot of a page, set in smaller
 type below the body, in one column or two. A region found by layout.
 
+**front matter**: the pages of a book before its text: endpapers,
+labels, half-title, title page, publisher's pages, copyright,
+dedication. galley finds where it ends, at the preface or the table of
+contents, and drops its text pages with a record
+(`docs/specs/front-matter.md`). The preface is not front matter.
+
+**glued words**: two or more words of the book that the text layer
+gives as one, because the OCR wrote no space between them and the gap
+is narrower than pdfplumber's 3 pt ("UpperandLowerNormandy,"). extract
+splits them at wide gaps (`docs/specs/extract.md`).
+
 **guide words**: the first letters of the first and last entries of an
 index page, printed under its running head ("BUR CON" in Stubbs).
 Removed by structure, with a record.
@@ -133,7 +144,8 @@ layout; what each region is, structure decides.
 
 **removal**: text a stage took out of the book on purpose, with its page,
 box and reason: a running head, a page number, a signature mark, a stray
-mark, guide words, a plate's stray words, an excluded page or region.
+mark, guide words, a plate's stray words, an excluded page or region,
+a page of the front matter.
 
 **running head**: the line printed at the top of most pages, the book's,
 chapter's or author's name, often with the page number. Not a "header".
@@ -152,7 +164,9 @@ speck of the scan that the OCR read as text (";", "^"). Removed by
 structure, with a record.
 
 **text layer**: the invisible words an OCR program placed over the page
-image of a scanned PDF. **text source**: where a page's words come from:
+image of a scanned PDF. Its characters come in **the PDF's order**, the
+order the OCR wrote them, word after word and line after line, which
+galley reads them in. **text source**: where a page's words come from:
 the text layer, galley's own OCR, or none.
 
 **text of a block**: the concatenation of its spans' text, which an edit
