@@ -535,6 +535,28 @@ def test_short_section_rule_keeps_a_title_line_without_a_number_like_word() -> N
     assert _removals_of(8, blocks) == ()
 
 
+def test_short_section_rule_keeps_a_head_whose_end_word_is_not_number_like() -> None:
+    # Without its first word, "THE PREFACE" is the heading of page 4; "THE"
+    # is not number-like, so the line stays.
+    survey = survey_book(_lines_of(*_short_section("THE PREFACE")), workers=1)
+    assert 5 not in survey.running_heads
+
+
+def test_short_section_heading_is_the_topmost_line_not_the_first_region() -> None:
+    # Page 4's heading is in its second region, above the body of the first.
+    heading_page = PageLayout(
+        4,
+        (
+            _body(140.0, *_BODY_TEXTS),
+            _region(_line("PREFACE", _BODY_LEFT_PT, 106.0)),
+        ),
+        (),
+    )
+    pages = (heading_page, _page_with_head(5, "vi Preface."), *_numbered_heads())
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert 5 in survey.running_heads
+
+
 def test_short_section_heading_two_pages_before_with_a_blank_page_between() -> None:
     pages = (
         _page_with_head(3, "PREFACE", head_top=106.0),
@@ -2148,6 +2170,22 @@ def test_footnote_a_word_a_or_i_before_a_known_word_is_no_marker(
     blocks = make_blocks(_lines_of(page), word_list, workers=1)
     marker, text = _markers_and_texts(blocks)[1]
     assert (marker, text.removesuffix(" its second line.")) == expected
+
+
+def test_footnote_lower_case_a_before_a_known_word_is_the_marker() -> None:
+    # Kadesh page 8: a superscript 2 read as "a", before "In", a known word
+    # (structure spec, section 11, "The marker of a note").
+    page = _page_with_band(
+        0,
+        _note_line("1 The first note.", 300, 62, 160),
+        _note_line("a In Ramses III.'s day the", 300 + _NOTE_PITCH_PT, 62),
+        _note_line("its second line.", 300 + 2 * _NOTE_PITCH_PT, 50, 160),
+    )
+    blocks = make_blocks(_lines_of(page), frozenset({"in"}), workers=1)
+    assert _markers_and_texts(blocks)[1] == (
+        "a",
+        "In Ramses III.'s day the its second line.",
+    )
 
 
 def test_footnote_glued_marker_is_split_off_its_word() -> None:

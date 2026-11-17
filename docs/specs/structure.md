@@ -1261,10 +1261,17 @@ The first word of a note has a **note marker's form** when it is:
 A note started by its indent (rule 1 or 2) whose first word has none of
 these forms still takes it as its marker when it is one character and
 the next word starts with a capital ("«" on Domesday page 74, "z" on
-page 76), unless it is "A", "I" or "a", which are words, and the next
-word is a known word (`wordlist.is_known_word`, architecture §12):
-"A Treatise", "I have" keep their first word, and the signs when the word is 1 or 2 of the signs above glued
-to a word that starts with a capital ("'There" on Kadesh page 8: the
+page 76), unless it is "A" or "I", which are words, and the next word
+is a known word (`wordlist.is_known_word`, architecture §12): "A
+Treatise", "I have" keep their first word. A lower-case "a" before a
+capital is always the marker: a note's text starts a sentence, where
+the article is "A". The six whole books have two such notes, each
+marked with a superscript digit that the OCR read as "a": "2 In Ramses
+III.'s day" on Kadesh page 8 and "3 See e.g. D. B." on Domesday page
+439 (checked on the page images on 17 November 2026). Kadesh's "a" was
+taken for a word once the text layer read "I n" as "In", a known word.
+A note takes as its marker the signs too, when the word is 1 or 2 of the
+signs above glued to a word that starts with a capital ("'There" on Kadesh page 8: the
 marker is "'" and the text starts with "There"). Otherwise the note has
 no marker: `marker` is empty and every word stays in its text.
 

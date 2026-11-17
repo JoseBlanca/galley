@@ -24,7 +24,7 @@ from pdfplumber.utils.text import LIGATURES
 from galley.errors import PdfError
 from galley.model import Box, Word
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
-from galley.text_layer import Character, layer_words, open_pdf, split_glued
+from galley.text_layer import Character, _word, layer_words, open_pdf, split_glued
 
 KADESH = "kadesh_8-17"
 THREADS_AT_ONCE: Final[int] = 4
@@ -398,6 +398,102 @@ def test_split_glued_measures_an_even_word_by_the_larger_middle_width() -> None:
 def test_split_glued_gives_a_word_of_one_character_whole() -> None:
     single = (Character("a", Box(10.0, 20.0, 15.0, 29.0)),)
     assert split_glued(single) == (single,)
+
+
+def test_split_glued_does_not_cut_after_a_hyphen_at_a_wide_gap() -> None:
+    # Stubbs' page 218, "church-revenue,": a gap of 1.8 pt after the hyphen,
+    # more than a third of the characters' median width, 5.0 pt.
+    compound = _glyphs(
+        "church-revenue,",
+        (
+            (92.01, 80.39, 97.24, 89.11),
+            (97.24, 80.39, 102.48, 89.11),
+            (102.48, 80.39, 107.72, 89.11),
+            (107.72, 80.39, 112.95, 89.11),
+            (112.95, 80.39, 118.19, 89.11),
+            (118.19, 80.39, 123.43, 89.11),
+            (123.43, 80.39, 128.66, 89.11),
+            (130.46, 80.18, 135.45, 88.49),
+            (135.45, 80.18, 140.44, 88.49),
+            (140.44, 80.18, 145.42, 88.49),
+            (145.42, 80.18, 150.41, 88.49),
+            (150.41, 80.18, 155.40, 88.49),
+            (155.40, 80.18, 160.38, 88.49),
+            (160.38, 80.18, 165.37, 88.49),
+            (165.37, 80.18, 170.36, 88.49),
+        ),
+    )
+    assert split_glued(compound) == (compound,)
+
+
+def test_split_glued_does_not_cut_after_a_digit_before_a_letter() -> None:
+    # Haskins' page 58, "263ff." read as "263Jf.": a gap of 2.2 pt after the
+    # "3", more than a third of the median width, 4.0 pt.
+    page_reference = _glyphs(
+        "263Jf.",
+        (
+            (85.87, 473.46, 89.88, 480.15),
+            (89.88, 473.46, 93.90, 480.15),
+            (93.90, 473.46, 97.91, 480.15),
+            (100.07, 475.87, 102.82, 480.46),
+            (102.82, 475.87, 105.58, 480.46),
+            (105.58, 475.87, 108.33, 480.46),
+        ),
+    )
+    assert split_glued(page_reference) == (page_reference,)
+
+
+# No page of the six books has a wide gap at the marks below, nor a ligature
+# glyph, so their characters are made up: 4 pt wide, with a gap of 2 pt, half
+# a character, before the character at `gap_before`.
+GLYPH_WIDTH_PT: Final[float] = 4.0
+WIDE_GAP_PT: Final[float] = 2.0
+
+
+def _spaced(
+    text: str, gap_before: int, width_pt: float = GLYPH_WIDTH_PT
+) -> tuple[Character, ...]:
+    """The characters of `text` side by side, `width_pt` wide, with a gap of
+    WIDE_GAP_PT before the one at index `gap_before`."""
+    return tuple(
+        Character(
+            glyph,
+            Box(
+                index * width_pt + (WIDE_GAP_PT if index >= gap_before else 0.0),
+                20.0,
+                (index + 1) * width_pt + (WIDE_GAP_PT if index >= gap_before else 0.0),
+                29.0,
+            ),
+        )
+        for index, glyph in enumerate(text)
+    )
+
+
+@pytest.mark.parametrize("mark", tuple(",.;:!?)]'\"’”"))
+def test_split_glued_cuts_after_each_closing_mark_before_a_letter(mark: str) -> None:
+    glued = _spaced(f"ab{mark}cd", 3)
+    assert _words(split_glued(glued)) == (f"ab{mark}", "cd")
+
+
+@pytest.mark.parametrize("mark", tuple("([‘“"))
+def test_split_glued_cuts_before_each_opening_mark_after_a_letter(mark: str) -> None:
+    glued = _spaced(f"ab{mark}cd", 2)
+    assert _words(split_glued(glued)) == ("ab", f"{mark}cd")
+
+
+def test_split_glued_does_not_cut_between_a_closing_and_an_opening_mark() -> None:
+    marks = _spaced("ab,(cd", 3)
+    assert split_glued(marks) == (marks,)
+
+
+def test_split_glued_cuts_a_gap_of_exactly_a_third_of_a_character() -> None:
+    # Characters 6 pt wide: the gap of 2 pt is exactly a third of them.
+    glued = _spaced("abcd", 2, width_pt=3 * WIDE_GAP_PT)
+    assert _words(split_glued(glued)) == ("ab", "cd")
+
+
+def test_layer_word_writes_a_ligature_as_its_letters() -> None:
+    assert _word(_spaced("ﬁne", 3)).text == "fine"
 
 
 def test_layer_words_of_haskins_page_12_gives_its_glued_line_split(
