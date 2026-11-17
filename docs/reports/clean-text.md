@@ -57,3 +57,20 @@ about 4.5 s to 6.0 s.
 
 Review: this package is reviewed together with work package 2, which
 first reads what it defines.
+
+## Task 6.1: the evaluation tool (stream `eval`)
+
+Done (8bbfe10), merged. The tool counts the dropped front pages and the
+reference words before galley's first word as `front_matter_not_scored`
+(the spec now says it counts both; 0 on every book until work package
+3); scores the margin notes as a part of their own; and gives
+`ocr_confidence_mean` over the words galley outputs, kept re-readings
+included. Deliverable 1: 10 tests collected.
+
+What changes the comparison with the baseline: with galley unchanged,
+taking the margin notes out of the body moves 1,350 differences on
+Stubbs and 1,510 on Domesday from the body to the new part. The body's
+error rate at blocks falls from 0.142 to 0.129 on Stubbs and from
+0.100 to 0.093 on Domesday, and the margin notes' own rate is 0.728
+and 0.600. Later body rates are compared with these, not with the
+baseline's. Haskins and Mariéjol are unchanged.

@@ -514,7 +514,7 @@ and the six EPUBs are built.
 **Stands on:** task 6.1: work package 1. Tasks 6.2 to 6.4: work packages
 1 to 5.
 
-- [ ] 6.1 The evaluation tool's three changes. Spec: evaluation §5,
+- [x] 6.1 The evaluation tool's three changes. Spec: evaluation §5,
   "Front matter"; §6, the parts; §8, `ocr_confidence_mean`. Stream
   `eval`. Deliverable 1.
 - [ ] 6.2 The owner's sheet, published privately; the plan's one pause
