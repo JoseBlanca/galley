@@ -362,10 +362,13 @@ it takes the words `layer_words` gives.
   order, with the two rules (94 if only the multiset of words is
   compared) (every page of `stubbs_51_56-64`,
   `stubbs_summaries_index`, `domesday_74-83`, `mariejol_210-219`,
-  `mariejol_headings_verse` and `haskins_quotes_index`). The plan lists,
-  for each page whose literal changes, the words removed and added, and
-  the owner checks that they are of the kinds of sections 3 and 4 before
-  the new literals are committed.
+  `mariejol_headings_verse` and `haskins_quotes_index`). For each page
+  whose literal changes, a script shows that every change is a join of
+  pieces (section 3) or a split at a gap (section 4), and the words
+  removed and added are listed in the work report and the owner's check
+  sheet. The new literals are committed when the script passes; a change
+  the owner rejects later is fixed in a task of its own (decided on 17
+  November 2026, so that the work does not wait on the owner).
 - **Whole books** (`whole_book` tests): the word counts of each book
   after both rules, exactly as in the table of section 4; every non-space
   character of each page in exactly one word; analyze's page kinds
