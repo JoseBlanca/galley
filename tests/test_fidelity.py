@@ -402,27 +402,33 @@ def test_structure_hyphen_lost_outside_a_margin_note_fails() -> None:
 
 
 @pytest.mark.parametrize(
-    "after",
-    ["moveent,", "move.ment,", "move-ment,"],
-    ids=["a letter dropped", "the stop kept", "a hyphen added"],
+    ("first", "after"),
+    [
+        ("move.", "moveent,"),
+        ("move.", "move.ment,"),
+        ("move.", "move-ment,"),
+        ("move..", "movement,"),
+    ],
+    ids=["a letter dropped", "the stop kept", "a hyphen added", "two stops dropped"],
 )
 def test_structure_hyphen_lost_that_changes_more_than_the_stop_fails(
-    after: str,
+    first: str, after: str
 ) -> None:
     blocks = _blocks_file(
         (_margin_note(f"Unity of the {after} here"),),
         word_changes=(
             WordChange(
                 page_index=0,
-                before=("move.", "ment,"),
+                before=(first, "ment,"),
                 after=(after,),
                 reason=ChangeReason.HYPHEN_LOST,
             ),
         ),
     )
+    lines = _lines_file(((f"Unity of the {first}",), ("ment, here",)))
 
     with pytest.raises(FidelityError, match="is not a hyphen_lost"):
-        check_stage(FidelityBoundary.STRUCTURE, _LOST_HYPHEN_LINES, blocks)
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
 def test_structure_hyphen_join_without_its_word_change_fails() -> None:
