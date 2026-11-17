@@ -2985,7 +2985,7 @@ re-reading):
 quotes (section 28); an epigraph over a page break is missed (section
 22); some false headings (section 14 and Open 4); tables cut into
 paragraphs (section 6); words glued without a case change (section
-24); the dash of a source is not yet seen on a Kindle (Open 3); and
+24); and
 Turney's links were not prototyped, so their count is a target, not a
 measurement (section 26).
 
@@ -3088,7 +3088,7 @@ quotation's and the source's lines.
 
 **The dash is look, not text** (owner, 17 November 2026): the source's
 leading dash says, in print, "this is the source"; the kind says it in
-blocks.json, and the markdown and epub stages draw it (section 25). It
+blocks.json, and the markdown stage writes it back (section 25). It
 is removed with a record: a `WordChange` of the new reason
 `source_dash`, on the source's page, whose `before` is the source's
 first word ("—Hobbes,") or the dash word and the word after it ("—",
@@ -3273,12 +3273,14 @@ never by structure (architecture §3).
 - **An epigraph** is a fenced div with its block id and the class
   `epigraph`, holding the quotation as a paragraph, with a hard line
   break at each line feed of a verse quotation, as a `verse` block's
-  is, and then a fenced div with the class `epigraph-source` holding the
-  `source`. The style sheet sets the epigraph in from both sides, the
-  source on a line of its own aligned right, and draws the dash before
-  the source with generated content, `.epigraph-source::before {
-  content: "— "; }`, so that `book.md` holds no dash the book did not
-  print as text (**Open 3**: not tried on a Kindle).
+  is, and then a fenced div with the class `epigraph-source` holding an
+  em dash, "—", a no-break space, U+00A0, and the `source`. The dash is
+  written as text, not drawn by the style sheet's generated content
+  (`::before`), because generated content was not tried on a Kindle and
+  the source must not depend on it (Open 3, settled); the no-break space
+  keeps the dash on the source's line. The style sheet sets the
+  epigraph in from both sides and the source on a line of its own
+  aligned right.
 - **A note group's heading** is a fenced div with the class
   `note-group`, written just before the div of the note whose `group`
   it is, in the list of endnotes. It is not a Pandoc heading, so it is
@@ -3288,9 +3290,12 @@ never by structure (architecture §3).
 
 The fidelity check at the markdown boundary (architecture §13) counts
 the words of an `epigraph-source` div as words of its epigraph's block,
-as it counts a heading's label, and the words of a `note-group` div as
-words of the note after it; any other div inside an epigraph's div is
-an element galley's Markdown does not make, and an error.
+as it counts a heading's label, but for its first word, the dash
+markdown wrote, which it takes out before comparing (blocks.json does
+not hold it: the `source_dash` change removed it); and the words of a
+`note-group` div as words of the note after it. Any other div inside an
+epigraph's div is an element galley's Markdown does not make, and an
+error.
 
 ## 26. How the owner-books changes are verified
 
@@ -3412,7 +3417,8 @@ The owner decides these. The owner is away while the plan starts, so
 the session that carries the plan out (its orchestrator) may settle
 each as recommended; until one is settled, the implementer does what
 its "meanwhile" says, and the owner can reverse it later at the cost
-named.
+named. The orchestrator settled all four on 17 November 2026, each
+noted under it; the plan `docs/plans/owner-books.md` builds them.
 
 1. **How an epigraph's source and a note group's heading are stored.**
    (a) As written: `Block.source` on the `epigraph` block and
@@ -3427,22 +3433,22 @@ named.
    which `notes`' order by page (section 6) does not allow on a page
    where a group ends and the next begins. Recommended: (a), the
    precedent of `label`, which the owner chose on 16 November 2026 at
-   the same cost. Meanwhile: (a).
+   the same cost. Meanwhile: (a). **Settled**: (a).
 2. **Note group headings outside the table of contents.** (a) As
    written: a styled line before the group's first note, not in the
    EPUB's table of contents. (b) Level-2 headings under "Notes", one
    entry per chapter, which repeats each chapter's title in the table
    of contents, as the printed contents pages did before the owner
    named them in `contents_pages` (15 November 2026). Recommended: (a).
-   Meanwhile: (a).
-3. **The dash before a source is drawn by the style sheet.** CSS
-   generated content (`::before`) was not tried on a Kindle; if the
-   Kindle drops it, the source shows without a dash, still on its own
-   line set right. The other answer is that markdown writes "— " before
-   the source as text, and the fidelity check at the markdown boundary
-   allows that one word there. Meanwhile: the style sheet; the plan
-   checks it on a Kindle or the Kindle Previewer if the owner can, and
-   reports.
+   Meanwhile: (a). **Settled**: (a).
+3. **How the dash before a source is drawn.** (a) By the style sheet,
+   with CSS generated content (`::before`), which was not tried on a
+   Kindle; if the Kindle drops it, the source shows without a dash,
+   still on its own line set right. (b) markdown writes "—" and a
+   no-break space before the source as text, and the fidelity check at
+   the markdown boundary takes that one word out. **Settled**: (b),
+   because the text must not depend on generated content no Kindle has
+   shown; section 25 is written so.
 
 4. **Costs accepted on the public-domain books.** The rules for the
    owner's books also make, on the six old books: 34 false headings
@@ -3455,7 +3461,10 @@ named.
    is an unreadable scan on which the owner wants no effort. The other
    answer is a per-book switch, or a tighter rule not yet measured.
    Recommended: accept, and exclude Stubbs' lists in its config.
-   Meanwhile: as written.
+   Meanwhile: as written. **Settled**: accept on Mariéjol and on
+   Turney's roman foot numbers; Stubbs' pages 322 to 337 go into its
+   `exclude_pages`; Domesday's 4 lines are looked at, and fixed if a
+   rule can tell them from headings, or else reported.
 
 Decided while writing, with the reasons in their sections: the
 spaced-sign rule of languages other than French is English's (no book
