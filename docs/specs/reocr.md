@@ -333,9 +333,9 @@ The four kinds, each with what is cropped and how it is read:
      layer read ("Despensers,", page 306) is not replaced by nothing.
 
    Of the cut-in words and the column words it may replace, a kept crop
-   replaces only those that a word of Tesseract's it keeps lies over
-   (section 4): the note words of a line dropped at the inset stay as
-   the layer read them.
+   replaces only those that are the same printed word as one of the
+   Tesseract words it keeps (section 4): the note words of a line
+   dropped at the inset stay as the layer read them.
 
    On the whole of Stubbs, with these, the kept crops replaced one word
    that layout had left in the column, "heBarons" on page 226, the OCR's
@@ -418,34 +418,68 @@ depend on Tesseract. Then, per page, around layout §3's steps:
 
 - for a small-print page, all its words but those of the running-head
   region;
-- for a note band, every word of the page: the strip lies 4 pt outside
-  the body column, so only the margin's words, and the layer's stray
-  letters at the column's edge, lie under Tesseract's words;
+- for a note band, the words of the page whose middle lies within 12 pt
+  above or below the band and that reach 2 pt or more into that side's
+  margin, past the column's left or right edge (the margin words, and
+  the words that cross the edge so far: a body line's last word may end
+  1 pt past it, as "of" beside a note on Domesday page 74), or that lie
+  under one of its Tesseract words by rule (a) below, as the layer's
+  stray letters at the column's edge;
 - for a cut-in crop, that side's cut-in words whose vertical middle
   lies within 1 pt of a zone the crop was made from, and the words
   layout left in the column that the crop may replace (section 3, kind
   3); never a body word;
 - for a footnote band, the band's words.
 
-**A region replaces, of these, only the words whose middle lies inside
-the box of one of its kept words of Tesseract's, widened by 1 pt**; the
-others stay in the layer. A printed word that Tesseract did not read,
-or whose reading a filter dropped (a cut-in line at the inset, a word
-over a body word, a word inside an earlier kept crop), keeps the
-layer's reading, so no word is lost. The rule before it replaced every
-word a kept region may replace, and lost such words: in hand-made cases
-of the first code review, a cut-in note's second line "wcnt nortb",
-whose Tesseract line was dropped at the inset, and "Sce Stnbbs" of a
-footnote band, whose Tesseract words lay inside an earlier cut-in crop
-(owner, 17 November 2026). The price, not measured: a printed word is
-read twice when the layer cuts or places it otherwise than Tesseract,
-as a layer word whose middle falls in the gap between two of
-Tesseract's words, or a margin word the layer places more than half
-outside the strip toward the column (its middle more than 1 pt outside
-the Tesseract word read from the part inside), which stays beside
-Tesseract's reading. A margin word wholly outside the strip, which
-Tesseract does not see, stays; the rule before replaced it by its
-vertical place alone and lost it.
+**A region replaces, of these, only the words that are the same printed
+word as one of its kept Tesseract words** (`model.replaced_layer_words`);
+the others stay in the layer. A layer word is that word when
+
+- (a) its middle lies inside the box of one of the Tesseract words
+  widened by 2 pt up and down and 1 pt across; or else
+- (b) its letters and digits, case-folded and not empty, equal those of
+  one of the Tesseract words whose middle lies within 16 pt above or
+  below its own, and that no other layer word of that text has matched.
+  A Tesseract word is matched in (a) by a layer word of its text under
+  it; in (b) the pairs of a layer word and a Tesseract word of the same
+  text are taken nearest first (the distance of their middles across
+  plus up or down), each word in one pair at most.
+
+A printed word that Tesseract did not read, or whose reading a filter
+dropped (a cut-in line at the inset, a word over a body word, a word
+inside an earlier kept crop), keeps the layer's reading, so no word is
+lost. The tolerances were measured on 17 November 2026 on the kept
+records of the whole books, pairing each Tesseract word of 3 letters or
+more with the nearest layer word of the same text: the layer word's
+middle lies within 2 pt of the Tesseract word's box for 95 in 100 of
+Domesday's 2,935 pairs and 92 of Gierke's 924 (Stubbs and Haskins: 99
+and more); the two middles lie within 8.2 pt of each other, up or down,
+for 99 in 100 of Domesday's, and Gierke's layer reads some note lines
+up to 15 pt off Tesseract's ("tium" on page 265, "ality." on 248; its
+lines of notes lie 1.4 pt lower than Tesseract's at the median). With
+16 pt in rule (b), none of Domesday's 421 kept margin-note records and
+2 of Gierke's 417 read a word twice by the count below ("reignty" 25 pt
+off on page 244, and "147" in a list of page numbers on page 63); with
+12 pt, 5 of Gierke's. Rule (a) stays at 2 pt
+because a word Tesseract did not read must not fall under its
+neighbour: the middle of a Tesseract word lies at least 2.9 pt above the box of the line below for 99 in 100 of
+the words of the kept records (Stubbs; 3.4 pt Domesday and Gierke).
+Across, the layer places words as Tesseract does, and 2 pt took words
+Tesseract did not read into a neighbour's reading ("The" beside the
+list number "7" on Gierke page 62; "224" on Domesday page 548), so (a)
+widens 1 pt there. Rule (b) takes the layer words that lie further off. Before it, with
+rule (a) alone at 1 pt, a printed word was read twice where the layer
+placed it off Tesseract's: in 108 of Domesday's 435 kept margin-note
+records and 98 of Gierke's 428, counting a record when a layer word that
+reaches 2 pt into its margin within 12 pt of the band stays, and its
+letters and digits are those of a Tesseract word of the record that no
+replaced layer word accounts for (owner, 17 November 2026: a word read
+twice is invented text, and not accepted). The rule before that
+replaced every word a kept region may replace and lost words: in
+hand-made cases of the first code review, a cut-in note's second line
+"wcnt nortb", whose Tesseract line was dropped at the inset, and "Sce
+Stnbbs" of a footnote band, whose Tesseract words lay inside an earlier
+cut-in crop (owner, 17 November 2026).
 
 **Each word of the layer is replaced by one record at most**: a word
 already among the replaced words of a kept region of its page is not
@@ -500,9 +534,9 @@ footnote band. `lines.json` goes to `format_version` 2.
 `ocr_words`, equal the words of `lines.json` as multisets of strings;
 the `layer_words` of each kept `Reread` are words of its page in
 `words.json`; no word of the page is among the `layer_words` of two
-kept records (compared as page, text and box); and the middle of each
-of a kept record's `layer_words` lies inside the box of one of its
-`ocr_words` widened by 1 pt; so that a record cannot name a word the
+kept records (compared as page, text and box); and each of a kept
+record's `layer_words` is matched to one of its `ocr_words` by rules (a)
+and (b) above (`model.replaced_layer_words`); so that a record cannot name a word the
 layer never had, one another record already replaced, or one that no
 word of Tesseract's reads. Every word of the layer is then either in `lines.json` or in
 exactly one kept record, with its page and box; a record not kept
@@ -690,12 +724,23 @@ the extract change, Stubbs' index error rate was 1.543.
   at the inset, and a footnote band's words whose Tesseract words lie
   inside an earlier kept cut-in crop, kept as the layer read them. The
   fidelity check passes, and fails when a kept record names a word the
-  page does not have, a word another kept record names, or a word none
-  of its Tesseract words lies over.
+  page does not have, a word another kept record names, or a word that
+  none of its Tesseract words lies over or reads. A layer word whose
+  line lies 10 pt off Tesseract's, of the same text, is replaced; one
+  more than 16 pt off is not; a layer word read twice, once over
+  Tesseract's word and once off it, is replaced once.
 - A config with `reread_footnotes = true`, and one with a string there,
   an error.
 
-**Excerpt tests**, marked `tesseract`, on the committed excerpts. Each
+**Excerpt tests**, marked `tesseract`, on the committed excerpts. An
+excerpt's book measures are taken from its own pages, about ten, so a
+page may be a small-print page in the excerpt and not in the book, or
+the reverse: Gierke's endnote pages 270 and 271 are small-print pages in
+`gierke_86-93_270-271` and not in the whole book, and the index pages
+of `stubbs_summaries_index`, six of its ten pages, are not small-print
+pages in it, their type being the excerpt's common size (owner, 17
+November 2026: accepted as how excerpts work). The tests below are
+written against what each excerpt gives. Each
 expected reading is a literal of the words galley keeps, written into
 the test once the owner has checked it against the page image, as for
 every reference page (the coding skill, "Tests"); the literals hold for
@@ -710,17 +755,14 @@ skips, saying so, on another version:
   outside the zones and right of the inset alike, in the same line as
   in the run without re-reading. A word layout itself takes into a
   note ("advUers.", page 62) is a note word in both runs.
-- `stubbs_summaries_index`, excerpt pages 4 to 9 (book pages 312, 313,
-  316, 318, 319, 321): each is a small-print page whose Tesseract
-  reading is kept, its running head the layer's; page 0 (book page 16,
-  the contents) is not one; on page 312 the entry
-  "Acre, siege of, 116; the English at, 118;" has both ";" (Tesseract's
-  text output of the page has "116 ;" and "118;").
+- `stubbs_summaries_index`: no page is a small-print page in the
+  excerpt (see above); its index pages are tested on the whole book.
 - `domesday_74-83`: the margin notes of two pages, one of which the
   layer garbles.
 - `haskins_eval` with `reread_footnotes = true`: a footnote whose marker
-  the layer reads "^" is read "1"; and the same excerpt with the
-  default re-reads nothing and runs no Tesseract in layout.
+  the layer reads "^" is read "1"; and the same excerpt with the default
+  reads no footnote band: its one region read is its index page (book
+  page 266), a small-print page by section 3.
 - Any excerpt with `ocr = "trust"`: `rereads` is empty and `lines.json`
   is what layout gives without re-reading.
 - The fidelity check passes on every excerpt, and layout with 1 worker
@@ -733,7 +775,11 @@ paid once.
 
 **Whole-book tests**, marked `whole_book` and `tesseract`: the fidelity
 check passes with re-reading on the six books; Stubbs with 1 and 6
-workers gives byte-identical `lines.json`.
+workers gives byte-identical `lines.json`; Stubbs' index pages 312 to
+321 are small-print pages whose Tesseract reading is kept, their running
+heads the layer's, and on page 312 the entry "Acre, siege of, 116; the
+English at, 118;" has both ";" (Tesseract's text output of the page has
+"116 ;" and "118;").
 
 **The measurement of the plan**, by `galley-eval run` on the four
 evaluation books before and after, quoted in its report, with the

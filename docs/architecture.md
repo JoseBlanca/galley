@@ -659,9 +659,12 @@ lists the words, with the pages they came from where the origins say.
 - The boundaries: layout, words.json against lines.json, with the
   `layer_words` of each kept `Reread` taken out of words.json's side and
   its `ocr_words` added, and each kept record's `layer_words` required
-  to be words of its page in words.json, none in two records, each with
-  its middle inside the box of one of the record's `ocr_words` widened
-  by 1 pt (`docs/specs/reocr.md` §4); structure,
+  to be words of its page in words.json, none in two records, each the same
+  printed word as one of the record's `ocr_words`: its middle inside the
+  box of one of them widened by 2 pt up and down and 1 pt across, or its letters and digits equal to
+  those of the nearest one within 16 pt above or below that no other
+  layer word matched (`model.replaced_layer_words`, `docs/specs/reocr.md`
+  §4); structure,
   lines.json against blocks.json (the text of every body and note block,
   with a note's `marker` and a heading's `label` counted as words of
   it); markdown, blocks.json
