@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
 from galley.model import BlockKind, ChangeReason, NoteKind, Origin, WordChange
-from galley.structure._hyphens import PageLine, join_lines
+from galley.structure._hyphens import LostHyphens, PageLine, join_lines
 from galley.structure._lines import Piece
 from galley.structure._markers import NoteMarker, Reference
 from galley.structure._measures import box_of
@@ -63,10 +63,42 @@ def joined(
     kind: BlockKind,
     book_words: frozenset[str],
     word_list: frozenset[str],
-    common_inner_words: frozenset[str] | None = None,
 ) -> Unnumbered:
     """The block of `kind` made of `piece`, its hyphens joined
-    (`join_lines`), with `common_inner_words` for a margin note."""
+    (`join_lines`); a line end whose hyphen the OCR lost is not joined."""
+    return _joined(
+        piece, kind, book_words, word_list, LostHyphens.NOT_JOINED, frozenset()
+    )
+
+
+def joined_margin_note(
+    piece: Piece,
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    common_inner_words: frozenset[str],
+) -> Unnumbered:
+    """The margin-note block made of `piece`, its hyphens joined, and the
+    line ends whose hyphen the OCR lost (`join_lost_hyphen`, against
+    `common_inner_words`, `BookSurvey.common_inner_words`; spec section
+    5)."""
+    return _joined(
+        piece,
+        BlockKind.MARGIN_NOTE,
+        book_words,
+        word_list,
+        LostHyphens.JOINED,
+        common_inner_words,
+    )
+
+
+def _joined(
+    piece: Piece,
+    kind: BlockKind,
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+    lost_hyphens: LostHyphens,
+    common_inner_words: frozenset[str],
+) -> Unnumbered:
     joined = join_lines(
         tuple(
             PageLine(line.page_index, tuple(word.text for word in line.line.words))
@@ -75,7 +107,8 @@ def joined(
         book_words,
         word_list,
         piece.unjoined,
-        common_inner_words,
+        lost_hyphens=lost_hyphens,
+        common_inner_words=common_inner_words,
     )
     return Unnumbered(
         kind,

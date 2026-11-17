@@ -4,7 +4,8 @@ block's lines."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import NamedTuple
+from enum import StrEnum
+from typing import NamedTuple, assert_never
 
 from galley.model import ChangeReason, WordChange
 from galley.structure._measures import (
@@ -129,6 +130,14 @@ def join_lost_hyphen(
     return None
 
 
+class LostHyphens(StrEnum):
+    """Whether a block's line ends whose hyphen the OCR lost are joined
+    (`join_lost_hyphen`): in a margin note only (spec section 5)."""
+
+    JOINED = "joined"
+    NOT_JOINED = "not_joined"
+
+
 @dataclass(frozen=True, slots=True)
 class PageLine:
     """The words of one line of a block, and the index of its page."""
@@ -158,7 +167,9 @@ def join_lines(
     book_words: frozenset[str],
     word_list: frozenset[str],
     unjoined: frozenset[int] = frozenset(),
-    common_inner_words: frozenset[str] | None = None,
+    *,
+    lost_hyphens: LostHyphens,
+    common_inner_words: frozenset[str],
 ) -> JoinedWords:
     """The words of `lines`, one block's lines in order, possibly over a
     page break, with the last word of each line joined to the first of the
@@ -167,9 +178,10 @@ def join_lines(
     line that holds only a reference sign ("^") after a line ending with a
     hyphen is passed over, and the sign goes after the word the join gives
     (spec section 5). A line whose position is in `unjoined` is never
-    joined to the line before. With `common_inner_words`, for a margin
+    joined to the line before. With `lost_hyphens` JOINED, as in a margin
     note, a line whose last word `join_hyphen` does not join is joined by
-    `join_lost_hyphen` when it gives a word."""
+    `join_lost_hyphen`, against `common_inner_words`, when it gives a
+    word; with NOT_JOINED, `common_inner_words` is not used."""
     words: list[str] = []
     pages: list[int] = []
     changes: list[WordChange] = []
@@ -193,10 +205,16 @@ def join_lines(
             if joinable
             else None
         )
-        if joined is None and joinable and common_inner_words is not None:
-            joined = join_lost_hyphen(
-                words[-1], texts[0], book_words, word_list, common_inner_words
-            )
+        if joined is None and joinable:
+            match lost_hyphens:
+                case LostHyphens.JOINED:
+                    joined = join_lost_hyphen(
+                        words[-1], texts[0], book_words, word_list, common_inner_words
+                    )
+                case LostHyphens.NOT_JOINED:
+                    pass
+                case _:
+                    assert_never(lost_hyphens)
         if joined is not None:
             changes.append(
                 WordChange(

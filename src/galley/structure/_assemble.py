@@ -63,6 +63,7 @@ from galley.structure._unnumbered import (
     changes_in_order,
     first_page,
     joined,
+    joined_margin_note,
     merged_origin,
     piece_origin,
     without_marker,
@@ -110,13 +111,7 @@ def _body(
                 body.append(_body_block(entry, book_words, word_list))
             case MarginNote(piece):
                 body.append(
-                    joined(
-                        piece,
-                        BlockKind.MARGIN_NOTE,
-                        book_words,
-                        word_list,
-                        common_inner_words,
-                    )
+                    joined_margin_note(piece, book_words, word_list, common_inner_words)
                 )
             case _:
                 assert_never(entry)
