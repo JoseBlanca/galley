@@ -12,10 +12,9 @@ import pytest
 
 from galley.model import BlockKind, Box, ChangeReason, Origin, WordChange
 from galley.structure import reference_candidate
-from galley.structure._case_split import CASE_SPLIT, split_at_case, split_glued_words
+from galley.structure._case_split import split_at_case, split_glued_words
 from galley.structure._markers import Reference, ReferenceForm
 from galley.structure._spaced import (
-    PUNCTUATION_ATTACHED,
     attach_spaced_sign,
     attach_spaced_signs,
     no_break_positions,
@@ -41,24 +40,6 @@ def _block(
         changes,
         line_starts=line_starts,
     )
-
-
-# The reasons task 2.1 adds to ChangeReason.
-
-
-def test_new_reasons_have_the_names_of_the_spec() -> None:
-    assert PUNCTUATION_ATTACHED == "punctuation_attached"
-    assert CASE_SPLIT == "case_split"
-
-
-@pytest.mark.parametrize("value", ["punctuation_attached", "case_split"])
-def test_change_reason_lacks_the_new_reason_until_task_2_1_is_merged(
-    value: str,
-) -> None:
-    # When this fails, task 2.1 is merged: PUNCTUATION_ATTACHED and
-    # CASE_SPLIT become ChangeReason's members and this test goes.
-    with pytest.raises(ValueError, match=value):
-        ChangeReason(value)
 
 
 # attach_spaced_sign
@@ -140,7 +121,7 @@ def test_spaced_sign_in_a_block_is_attached_with_its_change() -> None:
                 page_index=4,
                 before=("replied", ";"),
                 after=("replied;",),
-                reason=PUNCTUATION_ATTACHED,
+                reason=ChangeReason.PUNCTUATION_ATTACHED,
             ),
         ),
     )
@@ -321,7 +302,7 @@ def test_glued_word_in_a_block_is_split_with_its_change() -> None:
                 page_index=4,
                 before=("ofWilliam,",),
                 after=("of", "William,"),
-                reason=CASE_SPLIT,
+                reason=ChangeReason.CASE_SPLIT,
             ),
         ),
     )

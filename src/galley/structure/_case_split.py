@@ -5,16 +5,9 @@ prints the right part whole."""
 
 from dataclasses import replace
 
-from galley.model import WordChange
-from galley.structure._spaced import pending_reason
+from galley.model import ChangeReason, WordChange
 from galley.structure._unnumbered import Unnumbered
 from galley.wordlist import is_known_word
-
-# The word change reason of spec section 24. Task 2.1 adds it to
-# ChangeReason as CASE_SPLIT; until that is merged it is its value,
-# which compares equal to the member, and the merge replaces it with the
-# member (tests/test_structure_words.py fails until then).
-CASE_SPLIT = pending_reason("case_split")
 
 # Spec section 24: the left part has at least 2 letters ("aWilliam" stays).
 _MIN_LEFT_LETTERS = 2
@@ -129,7 +122,10 @@ def split_glued_words(
             (
                 len(words),
                 WordChange(
-                    page_index=page, before=(word,), after=parts, reason=CASE_SPLIT
+                    page_index=page,
+                    before=(word,),
+                    after=parts,
+                    reason=ChangeReason.CASE_SPLIT,
                 ),
             )
         )
