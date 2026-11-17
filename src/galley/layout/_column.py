@@ -300,7 +300,8 @@ class _SideWord:
 
 
 class Side(StrEnum):
-    """The side of the body column a cut-in note stands at."""
+    """A side of the body column: that of an outer margin, and of a note
+    cut into the column."""
 
     LEFT = "left"
     RIGHT = "right"
