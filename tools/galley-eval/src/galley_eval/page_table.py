@@ -27,6 +27,11 @@ How the spec is read here, where it leaves a choice:
   spec now says: "repli-" and "cate" are read right.
 - A share is empty (None) when it has nothing to divide by: a page with
   no reference token has no `ocr_recall`.
+- `ocr_confidence_mean` is over the words of the page as lines.json
+  holds them: the words of `words.json` with a confidence, on any page,
+  but those a kept re-reading replaced, and the `ocr_words` of each kept
+  re-reading of the page. A re-reading not kept changes nothing, as in
+  lines.json.
 """
 
 from collections import Counter
@@ -34,7 +39,7 @@ from dataclasses import dataclass
 from statistics import fmean
 
 from galley.config import Language
-from galley.model import TextSource, WordsFile
+from galley.model import PageWords, Reread, TextSource, Word, WordsFile
 from galley_eval.align import (
     Alignment,
     GalleyToken,
@@ -156,11 +161,13 @@ def page_rows(
     printed_pages: frozendict[int, str],
     word_list: frozenset[str],
     language: Language,
+    rereads: tuple[Reread, ...],
 ) -> tuple[PageRow, ...]:
     """One row for each page of `words_file`, from galley's words `galley`
     aligned with the reference by `alignment`. `page_indices` is the page
-    of each reference token, None when unplaced; `word_list` holds the
-    lowered words of the book's language."""
+    of each reference token, None when unplaced and for a token not
+    scored as front matter; `word_list` holds the lowered words of the
+    book's language; `rereads` are the regions layout read again."""
     read: Counter[int] = Counter()
     reference_counts: Counter[int] = Counter()
     for index, page in enumerate(page_indices):
@@ -190,11 +197,7 @@ def page_rows(
     rows: list[PageRow] = []
     for page in words_file.pages:
         page_texts = tuple(texts.get(page.index, ()))
-        confidences = tuple(
-            word.ocr_confidence
-            for word in page.words
-            if word.ocr_confidence is not None
-        )
+        confidences = _confidences(page, rereads)
         rows.append(
             PageRow(
                 page_index=page.index,
@@ -207,9 +210,29 @@ def page_rows(
                 wordlist_share=wordlist_share(page_texts, word_list),
                 single_letter_share=single_letter_share(page_texts, language),
                 inner_symbol_share=inner_symbol_share(page_texts),
-                ocr_confidence_mean=fmean(confidences)
-                if page.text_source is TextSource.OCR and confidences
-                else None,
+                ocr_confidence_mean=fmean(confidences) if confidences else None,
             )
         )
     return tuple(rows)
+
+
+def _confidences(page: PageWords, rereads: tuple[Reread, ...]) -> tuple[float, ...]:
+    """Tesseract's confidences of the words of `page` as lines.json holds
+    them: its words with one, but those a kept re-reading replaced, and
+    the words of each kept re-reading of the page."""
+    kept = tuple(
+        reread for reread in rereads if reread.kept and reread.page_index == page.index
+    )
+    replaced: Counter[Word] = Counter(
+        word for reread in kept for word in reread.layer_words
+    )
+    words: list[Word] = []
+    for word in page.words:
+        if replaced[word] > 0:
+            replaced[word] -= 1
+        else:
+            words.append(word)
+    words.extend(word for reread in kept for word in reread.ocr_words)
+    return tuple(
+        word.ocr_confidence for word in words if word.ocr_confidence is not None
+    )

@@ -1,6 +1,7 @@
 """Tests of galley_eval.galley_side: the tokens of galley's four stage
 outputs (spec section 5, "galley's tokens")."""
 
+import dataclasses
 from collections.abc import Callable
 from pathlib import Path
 
@@ -25,6 +26,8 @@ from galley.model import (
     PageLayout,
     PageWords,
     Region,
+    Reread,
+    RereadKind,
     Span,
     TextSource,
     Word,
@@ -381,6 +384,30 @@ def test_read_galley_side_reads_the_four_files_of_a_folder(tmp_path: Path) -> No
         ("here.", 1),
     )
     assert side.galley_blocks["b-p0001-002"].note_id == "n-p0001-001"
+
+
+@pytest.mark.pandoc
+def test_read_galley_side_keeps_the_rereads_of_lines_json(tmp_path: Path) -> None:
+    # A region of page 0 read again and not kept: it changes no word.
+    reread = Reread(
+        page_index=0,
+        kind=RereadKind.FOOTNOTE_BAND,
+        box=Box(0.0, 20.0, 100.0, 30.0),
+        layer_words=(_word("7", 20.0),),
+        ocr_words=(Word("?", Box(0.0, 20.0, 5.0, 30.0), 12.0),),
+        layer_score=0,
+        ocr_score=-1,
+        kept=False,
+    )
+    lines = dataclasses.replace(_LINES, rereads=(reread,))
+    folder = BookFolder(tmp_path)
+    write_words(folder.words_json, _words_file(lines))
+    write_lines(folder.lines_json, lines)
+    write_blocks(folder.blocks_json, _BLOCKS)
+    folder.book_md.write_text(
+        "::: {#b-p0000-001}\nWe must replicate it here.\n:::\n", encoding="utf-8"
+    )
+    assert read_galley_side(folder).rereads == (reread,)
 
 
 # The page edge skips lines of marks

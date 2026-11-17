@@ -132,6 +132,48 @@ def test_unplaced_and_unscored_tokens_are_left_out_of_the_rate() -> None:
     assert scores.token_error_rate == 0.0
 
 
+def test_front_matter_tokens_are_not_scored_and_counted_apart() -> None:
+    reference = _reference(_paragraph("TITLE one two"))
+    galley = _tokens("one two")
+    scores = text_scores(
+        align(reference, galley),
+        galley,
+        parts=(Part.BODY,) * 3,
+        placements=(Placement.FRONT_MATTER, Placement.SCORED, Placement.SCORED),
+        galley_part=(Part.BODY, Part.BODY),
+        galley_scored=(True, True),
+        repaired=None,
+    )[Part.BODY]
+    assert (scores.reference_tokens, scores.missing) == (2, 0)
+    assert (scores.not_scored, scores.front_matter_not_scored) == (1, 1)
+
+
+def test_margin_notes_part_takes_margin_notes_of_the_body_and_of_notes() -> None:
+    reference = _reference(
+        _block(ReferenceKind.MARGIN_NOTE, "Norman barons."),
+        _paragraph("The barons held"),
+        notes=(
+            ReferenceNote(
+                "Footnote_1",
+                (
+                    _block(ReferenceKind.MARGIN_NOTE, "Gloss."),
+                    _paragraph("Ibid."),
+                ),
+            ),
+        ),
+    )
+    parts = tuple(reference_part(place) for place in reference_places(reference))
+    assert parts == (
+        Part.MARGIN_NOTES,
+        Part.MARGIN_NOTES,
+        Part.BODY,
+        Part.BODY,
+        Part.BODY,
+        Part.MARGIN_NOTES,
+        Part.NOTES,
+    )
+
+
 def test_extra_token_takes_the_part_of_most_of_its_page() -> None:
     reference = _reference(
         _paragraph("the text of the book"),

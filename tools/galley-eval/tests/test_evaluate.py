@@ -12,6 +12,8 @@ from galley.model import (
     Box,
     NoteKind,
     PageWords,
+    Removal,
+    RemovalReason,
     TextSource,
     Word,
     WordsFile,
@@ -953,3 +955,201 @@ def test_endnote_sharing_under_half_of_the_notes_keys_gives_no_cause(
         for difference in evaluation.differences
         if difference.state is State.MISSING and difference.part is Part.NOTES
     } == {cause}
+
+
+# Front matter (spec section 5, "Pages")
+
+
+def _front_matter_removals(page_index: int, text: str) -> tuple[Removal, ...]:
+    return tuple(
+        Removal(
+            page_index=page_index,
+            box=Box(0.0, 0.0, 1.0, 1.0),
+            text=word,
+            reason=RemovalReason.FRONT_MATTER,
+        )
+        for word in text.split()
+    )
+
+
+# The reference's title page, a preface word galley lost, and the text that
+# galley reads on page 1, after the front-matter page 0 it dropped.
+_TITLE_REFERENCE = ReferenceText(
+    blocks=(
+        ReferenceBlock(
+            ReferenceKind.HEADING,
+            tuple(
+                ReferenceToken(word, marked_correction=False)
+                for word in ("CATHERINE", "DE", "MÉDICIS")
+            ),
+        ),
+        ReferenceBlock(
+            ReferenceKind.PARAGRAPH,
+            tuple(
+                ReferenceToken(word, marked_correction=False)
+                for word in [
+                    "Preface",
+                    "The",
+                    "queen",
+                    "came",
+                    "to",
+                    "Paris",
+                    "in",
+                    "1533",
+                ]
+            ),
+        ),
+    ),
+    notes=(),
+    note_references=(),
+    page_anchors=(),
+    anchors_in_notes=(),
+)
+
+
+def _front_matter_evaluation() -> Evaluation:
+    words = _galley("The queen came to Paris in 1533", 1)
+    blocks = _galley("The queen came to Paris in 1533", 1, "b1")
+    side = dataclasses.replace(
+        _side(words, blocks, blocks),
+        words_file=WordsFile(
+            source_pdf_sha256="0" * 64,
+            pages=(
+                PageWords(index=0, text_source=TextSource.NONE, words=(), figures=()),
+                PageWords(
+                    index=1,
+                    text_source=TextSource.TEXT_LAYER,
+                    words=tuple(
+                        Word(token.text, Box(0.0, 0.0, 1.0, 1.0), None)
+                        for token in words
+                    ),
+                    figures=(),
+                ),
+            ),
+            removals=_front_matter_removals(0, "CATHERINE DE MEDICIS 1920"),
+        ),
+    )
+    return evaluation_of(_book(body_pages=(1, 1)), _TITLE_REFERENCE, side, frozenset())
+
+
+def test_reference_title_page_galley_dropped_as_front_matter_is_not_scored() -> None:
+    evaluation = _front_matter_evaluation()
+    for scores in evaluation.scorecard.outputs:
+        body = scores.text[Part.BODY]
+        assert (body.front_matter_not_scored, body.not_scored) == (3, 3)
+        # "Preface", before the first aligned token, is not a word galley
+        # removed as front matter: it counts as missing.
+        assert (body.reference_tokens, body.missing, body.matched) == (8, 1, 7)
+    assert evaluation.scorecard.front_matter_not_scored == 3
+
+
+def test_front_matter_tokens_are_listed_apart_as_front_matter() -> None:
+    apart = tuple(
+        (difference.reference, difference.apart)
+        for difference in _front_matter_evaluation().differences
+    )
+    assert apart == (
+        (("CATHERINE",), Apart.FRONT_MATTER),
+        (("DE",), Apart.FRONT_MATTER),
+        (("MÉDICIS",), Apart.FRONT_MATTER),
+        (("Preface",), None),
+    )
+
+
+def test_front_matter_page_between_anchors_makes_a_token_unplaced() -> None:
+    # As test_difference_between_anchors_around_an_excluded_page_is_unplaced,
+    # with page 2 dropped as front matter instead of excluded.
+    side = _book_side()
+    side = dataclasses.replace(
+        side,
+        words_file=dataclasses.replace(
+            side.words_file, removals=_front_matter_removals(2, "A MAP")
+        ),
+    )
+    evaluation = evaluation_of(
+        _book(not_in_reference=(4,)), _BOOK_REFERENCE, side, frozenset()
+    )
+    (theta,) = (
+        difference
+        for difference in evaluation.differences
+        if difference.reference == ("theta",)
+    )
+    assert (theta.page_index, theta.apart) == (None, Apart.UNPLACED)
+
+
+def test_book_without_front_matter_has_none_not_scored_as_front_matter() -> None:
+    evaluation = _evaluation()
+    assert evaluation.scorecard.front_matter_not_scored == 0
+    assert all(
+        text.front_matter_not_scored == 0
+        for scores in evaluation.scorecard.outputs
+        for text in scores.text.values()
+    )
+
+
+# The margin notes' part (spec section 6)
+
+
+_MARGIN_REFERENCE = ReferenceText(
+    blocks=(
+        ReferenceBlock(
+            ReferenceKind.MARGIN_NOTE,
+            tuple(
+                ReferenceToken(word, marked_correction=False)
+                for word in ("Norman", "barons.")
+            ),
+        ),
+        ReferenceBlock(
+            ReferenceKind.PARAGRAPH,
+            tuple(
+                ReferenceToken(word, marked_correction=False)
+                for word in ["The", "barons", "held", "their", "lands"]
+            ),
+        ),
+    ),
+    notes=(),
+    note_references=(),
+    page_anchors=(),
+    anchors_in_notes=(),
+)
+
+
+def test_margin_notes_part_holds_the_margin_notes_words_apart_from_the_body() -> None:
+    words = _galley("Normam barons. The barons held their lands", 0)
+    blocks = _galley(
+        "Normam barons.", 0, "m1", stream=GalleyStream.MARGIN_NOTES
+    ) + _galley("The barons held their lands", 0, "b1")
+    side = dataclasses.replace(
+        _side(words, blocks, blocks),
+        galley_blocks=frozendict(
+            {
+                "m1": GalleyBlock(
+                    kind=BlockKind.MARGIN_NOTE,
+                    stream=GalleyStream.MARGIN_NOTES,
+                    note_id=None,
+                ),
+                "b1": GalleyBlock(
+                    kind=BlockKind.PARAGRAPH, stream=GalleyStream.BODY, note_id=None
+                ),
+            }
+        ),
+    )
+    evaluation = evaluation_of(_book(), _MARGIN_REFERENCE, side, frozenset())
+    markdown = evaluation.scorecard.outputs[-1]
+    margin = markdown.text[Part.MARGIN_NOTES]
+    body = markdown.text[Part.BODY]
+    assert (margin.reference_tokens, margin.changed_letters, margin.matched) == (
+        2,
+        1,
+        1,
+    )
+    assert margin.token_error_rate == 0.5
+    assert (body.reference_tokens, body.matched, body.token_error_rate) == (5, 5, 0.0)
+    assert markdown.kinds_right is not None
+    assert markdown.kinds_right[Part.MARGIN_NOTES] == 1
+    (normam,) = (
+        difference
+        for difference in evaluation.differences
+        if difference.reference == ("Norman",)
+    )
+    assert normam.part is Part.MARGIN_NOTES
