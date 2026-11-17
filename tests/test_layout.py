@@ -473,13 +473,13 @@ def test_word_reaching_left_stays_when_the_next_word_is_less_than_a_pitch_inside
 def test_word_reaching_left_stays_beside_a_margin_word_of_fewer_than_2_letters() -> (
     None
 ):
-    # A list number hung outside the column, as Gierke's "44" on page 62.
+    # A list number hung outside the column, as Gierke's "44" on page 62,
+    # which then stays in the line as a hanging number (step 2).
     result = _page_with_row_3_reaching_left(
         _word("land.", 30, 136, 57, 144), 67, _word("44", 5, 136, 25, 144)
     )
-    body, margin = _region_texts(result)
-    assert body[3] == ("land.", "The", "idea")
-    assert margin == (("44",),)
+    (body,) = _region_texts(result)
+    assert body[3] == ("44", "land.", "The", "idea")
 
 
 def test_word_reaching_left_stays_when_its_middle_is_1_pt_outside() -> None:
@@ -716,6 +716,68 @@ def test_page_whose_only_row_holds_a_letter_has_no_running_head_region() -> None
     assert _region_texts(result) == ((("Alone",),),)
 
 
+def test_head_set_apart_by_median_top_above_a_tall_em_dash_is_a_running_head_region() -> (
+    None
+):
+    # The head 1.6 pitches above the body by its words' median tops; the
+    # body's first row holds an em dash boxed 10 pt taller than its words,
+    # so the row's box top lies 0.77 pitch below the head's.
+    head = _word("HEAD", 120, 100 - 1.6 * _PITCH, 180, 100 - 1.6 * _PITCH + 8)
+    dash = _word("—", 116, 90, 118, 108)
+    result = layout_page(_page(0, (head, dash, *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("HEAD",),)
+    assert _texts(body.lines)[0] == ("a0", "—", "b0", "c0")
+    assert len(body.lines) == 20
+
+
+def test_skewed_head_whose_last_word_is_a_row_4_pt_lower_is_one_region_of_one_line() -> (
+    None
+):
+    # Words 7 pt high: the date's centre lies below the head's bottom, so
+    # it is a row of its own, 4 pt (a third of a pitch) lower. A speck
+    # above the head stays a line of its own.
+    speck = _word(";", 140, 60, 144, 66)
+    date = _word("1170", 40, 84, 70, 91)
+    head = _word("HEAD", 120, 80, 180, 87)
+    result = layout_page(_page(0, (speck, date, head, *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == ((";",), ("1170", "HEAD"))
+    assert head_region.lines[1].box == Box(40, 80, 180, 91)
+    assert len(body.lines) == 20
+
+
+def test_marks_row_between_head_and_body_is_passed_over_and_stays_in_the_body() -> None:
+    head = _word("HEAD", 120, 80, 180, 88)
+    marks = (_word("^", 130, 90, 134, 96), _word("_", 160, 90, 166, 96))
+    result = layout_page(_page(0, (head, *marks, *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("HEAD",),)
+    assert _texts(body.lines)[0] == ("^", "_")
+    assert len(body.lines) == 21
+
+
+def test_hanging_number_9_pt_left_of_a_line_stays_at_the_start_of_that_line() -> None:
+    number = _word("12", 31, 136, 41, 144)  # beside row 3, 9 pt left of 50
+    result = layout_page(_page(0, (*_rows(20), number)), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[3] == ("12", "a3", "b3", "c3")
+
+
+def test_hanging_number_16_pt_left_of_a_line_is_a_margin_word() -> None:
+    number = _word("12", 24, 136, 34, 144)
+    result = layout_page(_page(0, (*_rows(20), number)), _MEASURES)
+    assert _region_texts(result)[1:] == ((("12",),),)
+
+
+def test_hanging_number_on_the_head_row_is_a_margin_word() -> None:
+    head = _word("HEAD", 50, 80, 110, 88)
+    number = _word("12", 31, 80, 41, 88)
+    result = layout_page(_page(0, (head, number, *_rows(20))), _MEASURES)
+    assert _region_texts(result)[0] == (("HEAD",),)
+    assert _region_texts(result)[2:] == ((("12",),),)
+
+
 def test_margin_note_level_with_the_head_never_joins_the_head() -> None:
     head = _word("HEAD", 120, 80, 180, 88)
     note = _word("Note", 256, 80, 290, 88)
@@ -762,6 +824,31 @@ def test_page_of_small_rows_only_has_no_band() -> None:
     result = layout_page(_page(0, rows), _MEASURES)
     (body,) = result.regions
     assert len(body.lines) == 20
+
+
+def _note_row(texts: tuple[str, ...], top: float) -> tuple[Word, ...]:
+    """A row of small words `texts`, 30 pt wide and 4 pt apart from 50."""
+    return tuple(
+        _word(text, 50 + 34 * place, top, 80 + 34 * place, top + _SMALL_HEIGHT)
+        for place, text in enumerate(texts)
+    )
+
+
+def test_gapless_band_starts_at_a_small_row_opening_with_a_note_marker() -> None:
+    note = _note_row(("1", "Ibid.", "29."), _LAST_BODY_TOP + _PITCH)
+    after = _small_rows(3, _LAST_BODY_TOP + _PITCH + 9)
+    result = layout_page(_page(0, (*_rows(20), *note, *after)), _MEASURES)
+    body, band = result.regions
+    assert len(body.lines) == 20
+    assert _texts(band.lines) == (("1", "Ibid.", "29."), ("n0",), ("n1",), ("n2",))
+
+
+def test_gapless_band_does_not_start_at_a_row_of_numbers() -> None:
+    numbers = _note_row(("35", "52", "26"), _LAST_BODY_TOP + _PITCH)
+    after = _small_rows(3, _LAST_BODY_TOP + _PITCH + 9)
+    result = layout_page(_page(0, (*_rows(20), *numbers, *after)), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 24
 
 
 def test_small_row_set_apart_but_followed_by_body_rows_is_no_band() -> None:

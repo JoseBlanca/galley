@@ -6,6 +6,7 @@ Positions are PDF points from the page's top left.
 """
 
 import math
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from itertools import groupby
@@ -17,6 +18,7 @@ from galley.body_measures import (
 from galley.layout._column import (
     BookMeasures,
     Side,
+    has_letter_or_digit,
     is_small_row,
     running_head_row_count,
     split_at_column,
@@ -88,6 +90,14 @@ _BAND_SMALL_ROWS_SHARE: Final[float] = 2 / 3
 # first note line is 1.16 pitches in Haskins, 1.24 in Domesday, 1.39 in
 # Mariéjol.
 _BAND_GAP_PITCHES: Final[float] = 1.1
+# Measured on 17 November 2026 on the whole books' words.json (layout spec
+# section 3, step 4): a small row that opens with a note marker, 1 to 3
+# digits or 1 or 2 signs and a word with a capital, starts the band without
+# the gap, as Haskins' note on page 28, 1.06 pitches below the text; it
+# starts the band on 23 pages of the eight books (Haskins 5, Domesday 14,
+# Kadesh 3, Haynes 1), none in Stubbs, Mariéjol, Gierke or Turney.
+_NOTE_MARKER = re.compile(r"[0-9]{1,3}\.?|[*^•†‡§]{1,2}")
+_MARKER_ROW_WORDS = 2
 # Measured on the six books (layout spec section 3, "Where the thresholds
 # come from"): a gutter is a strip 6 pt wide in the middle third of the
 # column; a word across it whose middle is more than 6 pt from the strip's
@@ -144,9 +154,24 @@ class _AtGutter(StrEnum):
     BLOCKED = "blocked"
 
 
+def _opens_with_note_marker(row: Line) -> bool:
+    """Whether `row` opens with a note marker (step 4): its first word is 1
+    to 3 digits with an optional "." or 1 or 2 of the signs `* ^ • † ‡ §`,
+    and its second word starts with a capital letter."""
+    words = sorted(row.words, key=lambda word: word.box.x0)
+    return (
+        len(words) >= _MARKER_ROW_WORDS
+        and _NOTE_MARKER.fullmatch(words[0].text) is not None
+        and words[1].text[:1].isupper()
+    )
+
+
 def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
     """The index in `rows` of the first row of the footnote band (step 4),
-    or len(rows) when there is no band."""
+    or len(rows) when there is no band: the first small row, not the
+    first of `rows`, from which on two thirds of the rows are small, and
+    which lies `_BAND_GAP_PITCHES` below the row before or opens with a
+    note marker."""
     small = tuple(is_small_row(row, measures) for row in rows)
     if all(small):
         return len(rows)
@@ -155,9 +180,12 @@ def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
             index
             for index in range(1, len(rows))
             if small[index]
-            and rows[index].box.top - rows[index - 1].box.top
-            >= _BAND_GAP_PITCHES * measures.body_line_pitch
             and sum(small[index:]) >= _BAND_SMALL_ROWS_SHARE * (len(rows) - index)
+            and (
+                rows[index].box.top - rows[index - 1].box.top
+                >= _BAND_GAP_PITCHES * measures.body_line_pitch
+                or _opens_with_note_marker(rows[index])
+            )
         ),
         len(rows),
     )
@@ -299,6 +327,16 @@ def _column_cut_regions(
     return tuple(regions)
 
 
+def _head_region(rows: tuple[Line, ...]) -> Region:
+    """The running-head region of its `rows` (step 3): each row above the
+    head row a line of its own, and the head row with the rows of its
+    skew below it one line, its words left to right."""
+    head_row = next(index for index, row in enumerate(rows) if has_letter_or_digit(row))
+    words = sorted(words_of(rows[head_row:]), key=lambda word: word.box.x0)
+    head_line = Line(_enclosing_box(tuple(word.box for word in words)), tuple(words))
+    return _region((*rows[:head_row], head_line))
+
+
 def _column_regions(
     words: tuple[Word, ...],
     left: float,
@@ -321,7 +359,7 @@ def _column_regions(
     width = measures.column_width
     return (
         (
-            *((_region_of_rows(head),) if head else ()),
+            *((_head_region(head),) if head else ()),
             *_column_cut_regions(body_rows, left, width, _Part.BODY),
         ),
         _column_cut_regions(band_rows, left, width, _Part.BAND),
