@@ -527,7 +527,7 @@ style sheet sets the epigraph in and its source to the right.
 
 **Stands on:** task 2.1.
 
-- [ ] 6.1 The epigraph, the note group heading and the no-break space
+- [x] 6.1 The epigraph, the note group heading and the no-break space
   in markdown, and their rules in the style sheet, with the tests.
   Spec: structure §25; architecture §9, the markdown and epub stages.
   Stream `markdown`. Deliverables 1, 2.
