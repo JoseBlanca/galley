@@ -7,8 +7,12 @@ pt wide per character and 10 pt high, with one character's width between
 words, and body lines lie 15 pt apart.
 """
 
+import functools
+from collections.abc import Callable
+
 import pytest
 
+from galley.book_folder import BookFolder
 from galley.model import (
     BlockKind,
     BlocksFile,
@@ -19,8 +23,10 @@ from galley.model import (
     PageNumber,
     PageNumberPosition,
     Region,
+    RemovalReason,
     Word,
     block_text,
+    read_blocks,
 )
 from galley.structure import make_blocks, survey_book
 
@@ -406,3 +412,92 @@ def test_flush_left_head_line_left_in_the_text_near_the_head_top_is_no_heading(
     )
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert _headings(blocks) == headings
+
+
+# On the six public-domain books (spec section 26, "Whole-book tests"), from
+# the session's run of each whole book (tests/conftest.py).
+
+_PUBLIC_DOMAIN_BOOKS = (
+    "normansineuropea00hask",
+    "earlyplantagenet01stub",
+    "domesdaybook00maituoft",
+    "catherinedemedic00mariuoft",
+    "battleofkadeshst00breauoft",
+    "politicaltheorie00gieruoft",
+)
+_LABEL_WORDS = frozenset(
+    {"chapter", "chapitre", "essay", "part", "partie", "book", "livre"}
+)
+# The pages whose running head layout's step 3 or the regions beside the
+# head (spec section 3) now remove. Gierke's 72 and 78 are not among them:
+# their heads, read "List of ~-l ntlioritics." and "List of slnthoriti*
+# ixxiii", are 0.74 and 0.70 alike to the others, below the 0.75 of
+# section 3, and stay in the text.
+_HEADS_REMOVED = {
+    "normansineuropea00hask": (23, 30, 66, 235),
+    "earlyplantagenet01stub": (20, 100, 152, 158, 186, 202, 210),
+    "politicaltheorie00gieruoft": (69, 70, 71, 73, 74, 75, 76, 77, 79),
+}
+
+
+@pytest.fixture(scope="module")
+def whole_book_blocks(
+    whole_book_run: Callable[[str], BookFolder],
+) -> Callable[[str], BlocksFile]:
+    """A function that gives blocks.json of a whole public-domain book, by
+    Internet Archive identifier, read once from the session's run."""
+
+    @functools.cache
+    def blocks_of(book: str) -> BlocksFile:
+        return read_blocks(whole_book_run(book).blocks_json)
+
+    return blocks_of
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.parametrize("book", _PUBLIC_DOMAIN_BOOKS)
+def test_whole_book_no_running_head_removed_starts_with_a_chapter_label_word(
+    whole_book_blocks: Callable[[str], BlocksFile], book: str
+) -> None:
+    heads = tuple(
+        removal.text
+        for removal in whole_book_blocks(book).removals
+        if removal.reason is RemovalReason.RUNNING_HEAD
+    )
+    assert heads
+    assert not any(
+        head.split()[0].rstrip(".,").lower() in _LABEL_WORDS for head in heads
+    )
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.parametrize("book", sorted(_HEADS_REMOVED))
+def test_whole_book_running_heads_of_the_reference_pages_are_removed(
+    whole_book_blocks: Callable[[str], BlocksFile], book: str
+) -> None:
+    removed = frozenset(
+        removal.page_index
+        for removal in whole_book_blocks(book).removals
+        if removal.reason is RemovalReason.RUNNING_HEAD
+    )
+    assert set(_HEADS_REMOVED[book]) <= removed
+    if book == "politicaltheorie00gieruoft":
+        assert not {72, 78} & removed
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+def test_whole_book_haskins_195_notes_set_close_under_the_text_are_notes(
+    whole_book_blocks: Callable[[str], BlocksFile],
+) -> None:
+    # The excerpt cannot give them: its page 195 follows page 66's
+    # "BIBLIOGRAPHICAL NOTE" with no chapter heading between, so its band
+    # is taken for that note's paragraphs (spec section 16).
+    blocks = whole_book_blocks("normansineuropea00hask")
+    assert tuple(
+        (note.marker, note.origin[0].page_index)
+        for note in blocks.notes
+        if note.origin[0].page_index == 195
+    ) == (("^", 195), ("^", 195))

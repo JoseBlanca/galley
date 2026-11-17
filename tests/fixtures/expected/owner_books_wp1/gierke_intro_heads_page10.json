@@ -8,10 +8,10 @@
     "removals": [],
     "page_numbers": [],
     "heading_lines": [
-      "II. Li.oisTS1."
+      "List of slnthoriti* ixxiii"
     ]
   },
-  "known": "The head is read \"List of slnthoriti* ixxiii\"; its letters are 0.74 (page 72) or 0.70 (page 78) alike to the other heads', below the 0.75 of structure spec section 3, and \"ixxiii\" is no roman numeral, so the head stays in the text under the rules as written, although the plan's deliverable 4 counts it among the running heads removed.",
+  "known": "The head is read \"List of slnthoriti* ixxiii\"; its letters are 0.74 (page 72) or 0.70 (page 78) alike to the other heads', below the 0.75 of structure spec section 3, and \"ixxiii\" is no roman numeral, so the head stays in the text under the rules as written, although the plan's deliverable 4 counts it among the running heads removed. The head left in the text is then the page's first line, set in larger type than the list's lines below it, so the tall branch of structure spec section 14 takes it for a level-1 heading (the first line of a page without a running head). The list's section heading \"II. Li.oisTS1.\" (LEGISTS) is no heading: its line is as tall as the list's lines (9 pt on the whole book), and it is neither centred (89 and 123 pt from the column's edges) nor flush left. Changed by task 1.5 of the plan owner-books, 17 November 2026, from the rules' output, not yet compared with the page image.",
   "printed": {
     "book_page_index": 78,
     "running_head": {
