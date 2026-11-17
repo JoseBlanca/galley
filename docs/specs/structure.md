@@ -418,14 +418,29 @@ foot.
 
 ## 5. Hyphens at line ends
 
-A line whose last word ends with "-" (the ASCII hyphen-minus; the text
-layers measured end 2 of their 6,000 hyphenated lines with "~" or "¬",
-and none with another hyphen), with a letter or digit before the
-hyphen, is joined with the first word of the next line of the same
+A line whose last word ends with a hyphen, with a letter or digit
+before the hyphen, is joined with the first word of the next line of the same
 block, when that word starts with a letter or digit, and with a digit
 when a digit is before the hyphen. A line of one word is no exception.
 A digit here is one of the ASCII digits 0 to 9, and a letter a
-character for which Python's `str.isalpha` is true. A **number before a
+character for which Python's `str.isalpha` is true.
+
+A hyphen at a line's end is the ASCII hyphen-minus "-" or the not sign
+"¬" (U+00AC). The OCR of two of the owner's books, modern books scanned
+with the same OCR, marks every line-end hyphen with "¬" ("liter¬"
+"ature"): 1,020 words in one book and 2,219 in the other stayed broken
+in `book.md` while only "-" was a hyphen (measured on 17 November
+2026). The text layers of the six public-domain books end 2 of their
+6,000 hyphenated lines with "~" or "¬", and none with another hyphen;
+"~" is not a hyphen. "¬" follows every rule of this section as "-"
+does, the number before a word, the digit ranges and the three kinds of
+join, and where a rule keeps the hyphen, the word it gives holds "-",
+never "¬": "proto¬" "journalist" is looked up as "proto-journalist" and
+"1830¬" "40" gives "1830-40". The change's `before` keeps the two words
+as the text layer has them. A "¬" anywhere else, not the last character
+of a line's last word, is text and stays as it is.
+
+A **number before a
 word**, a digit before the hyphen and a next word that starts with a
 letter, is not joined: both words stay as they are, and no change is
 recorded. In Haskins' index "136-39-" ends a line and

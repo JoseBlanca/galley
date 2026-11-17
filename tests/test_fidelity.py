@@ -312,6 +312,42 @@ def test_structure_hyphen_join_guessed_with_its_word_change_passes() -> None:
     check_stage(FidelityBoundary.STRUCTURE, _HYPHEN_LINES, blocks)
 
 
+@pytest.mark.parametrize(
+    ("lines", "block_text", "change"),
+    [
+        (
+            ("the liter¬", "ature of"),
+            "the literature of",
+            WordChange(
+                page_index=0,
+                before=("liter¬", "ature"),
+                after=("literature",),
+                reason=ChangeReason.HYPHEN_JOIN,
+            ),
+        ),
+        (
+            ("in 1830¬", "40 then"),
+            "in 1830-40 then",
+            WordChange(
+                page_index=0,
+                before=("1830¬", "40"),
+                after=("1830-40",),
+                reason=ChangeReason.HYPHEN_KEPT,
+            ),
+        ),
+    ],
+    ids=["joined", "kept"],
+)
+def test_structure_join_at_a_not_sign_with_its_word_change_passes(
+    lines: tuple[str, ...], block_text: str, change: WordChange
+) -> None:
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0,), (_span(block_text),)),), word_changes=(change,)
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, _lines_file((lines,)), blocks)
+
+
 def test_structure_hyphen_join_without_its_word_change_fails() -> None:
     blocks = _blocks_file((_HYPHEN_BLOCK,))
 
@@ -686,6 +722,17 @@ def test_structure_heading_label_dropped_from_the_block_is_missing() -> None:
                 reason=ChangeReason.HYPHEN_JOIN_GUESSED,
             ),
         ),
+        # A kept hyphen written as the not sign of the text layer.
+        (
+            ("in 1830¬", "40 then"),
+            "in 1830¬40 then",
+            WordChange(
+                page_index=0,
+                before=("1830¬", "40"),
+                after=("1830¬40",),
+                reason=ChangeReason.HYPHEN_KEPT,
+            ),
+        ),
         # A guessed join that keeps the hyphen.
         (
             ("Bal-", "hazar"),
@@ -707,6 +754,7 @@ def test_structure_heading_label_dropped_from_the_block_is_missing() -> None:
         "three-words",
         "kept-hyphen-dropped",
         "kept-without-hyphen",
+        "kept-as-not-sign",
         "guessed-changed-letter",
         "guessed-hyphen-kept",
     ],
