@@ -330,7 +330,8 @@ tuple[Reread, ...])`:
   higher and, where `layer_words` is empty, at least 2 known words or
   one sure single word, `docs/specs/reocr.md` §3), and
   `dropped_junk_count` (Tesseract's words of no letter or digit, not
-  punctuation or a printed sign, dropped from `ocr_words`). Every region read is recorded, kept or not, in page order.
+  punctuation or a printed sign, dropped from `ocr_words`, and its words
+  stripped of an underscore at either end, `docs/specs/reocr.md` §4). Every region read is recorded, kept or not, in page order.
 - `RereadKind`: `small_print_page` (a page printed wholly in small
   type, read below its running head), `margin_note` (one note of an
   outer margin), `cut_in_note` (one crop of Stubbs' notes cut into the

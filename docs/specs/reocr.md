@@ -610,6 +610,18 @@ The other tokens with no letter or digit in those records, 100, 20 and
 35, are punctuation and stay. A tall "|" also lay over layer words of several lines
 (Gierke page 132).
 
+**An underscore at either end of a Tesseract word is junk glued to it**:
+"_and" for the printed "and" (Gierke page 88, which the owner read on
+the page image on 17 November 2026), "_Ealdor-" (Domesday page 270).
+None of the six books prints an underscore: the 170 words of their text
+layers that hold one are all garbled ("consists_jn", "A_cccssion",
+"_..."), and Tesseract's kept words on whole Stubbs, Domesday and
+Gierke held one in those two words only (17 November 2026). So the
+underscores at both ends of a Tesseract word are stripped, after the
+junk is dropped and before the region is scored and its words paired,
+and each word so stripped counts as one junk token in the record's
+`dropped_junk_count`. A word of underscores only is junk already.
+
 **The record.** Every region read is a `Reread` in `lines.json`, whether
 its words were kept or not (a change to a shared format, **Open 3**):
 
@@ -857,7 +869,8 @@ the extract change, Stubbs' index error rate was 1.543.
   replaced, over four or with a word outside its box not. A later
   region drops a Tesseract word an earlier kept region read 3 pt below
   its crop, and replaces no word the earlier one replaced. Tesseract's
-  "|", "¥" and "\\" are dropped and counted, "—" and "§" kept. The
+  "|", "¥" and "\\" are dropped and counted, "—" and "§" kept; "_and"
+  is read "and" and counted. The
   fidelity check fails when one Tesseract word is the only reading of
   two layer words of different lines.
   A layer word 6 pt below Tesseract's of alike letters ("fllght'"
