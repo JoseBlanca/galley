@@ -335,7 +335,7 @@ are unlike, so a margin-note word is read once.
 Domesday's and Gierke's excerpt reference pages; each change is
 checked on the render.
 
-- [ ] 2.1 The format of architecture §8 in `model.py` (the new kind,
+- [x] 2.1 The format of architecture §8 in `model.py` (the new kind,
   fields and reasons, version 4, the readers' errors); the fidelity
   check of architecture §13 for the new strings and reasons at
   structure's and markdown's boundaries; the evaluation fixtures at

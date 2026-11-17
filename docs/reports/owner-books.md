@@ -43,3 +43,16 @@ Left to work package 1: Gierke pages 72 and 78, whose damaged heads are
 0.74 and 0.70 alike, under the spec's 0.75, so they stay in the text
 under the rules as written; Stubbs 186 and Gierke 73 record a wrong
 page number ("5" for 165, "xviii" for lxviii).
+
+## Task 2.1: the format
+
+418c726: blocks.json version 4 in `model.py` (the epigraph kind, a
+block's `source`, a note's `group`, the reasons `source_dash`,
+`punctuation_attached` and `case_split`), and the fidelity check's rules
+for them at both boundaries. Changed beyond the task's files, with the
+orchestrator's leave: the epigraph kind in markdown's two `match`
+statements (a plain div until task 6.1) and in galley-eval's two kinds,
+whose tests failed and which would have crashed on a real epigraph.
+`source` and `group` default to empty, so no other stream's code had
+to change. Default run 60.4 s, measured while other streams ran pytest
+on the same machine.
