@@ -4,7 +4,15 @@ section 8), each on a literal page."""
 import pytest
 
 from galley.config import Language
-from galley.model import Box, PageWords, TextSource, Word, WordsFile
+from galley.model import (
+    Box,
+    PageWords,
+    Reread,
+    RereadKind,
+    TextSource,
+    Word,
+    WordsFile,
+)
 from galley_eval.align import GalleyStream, GalleyToken, align, reference_places
 from galley_eval.page_table import (
     PageRow,
@@ -85,6 +93,7 @@ def _rows(
     reference: ReferenceText,
     galley: tuple[GalleyToken, ...],
     words_file: WordsFile | None = None,
+    rereads: tuple[Reread, ...] = (),
 ) -> tuple[PageRow, ...]:
     places = reference_places(reference)
     alignment = align(reference, galley)
@@ -98,6 +107,7 @@ def _rows(
         printed_pages=frozendict({0: "7"}),
         word_list=frozenset(("the", "king", "went")),
         language=Language.EN,
+        rereads=rereads,
     )
 
 
@@ -144,6 +154,48 @@ def test_ocr_confidence_mean_only_on_pages_read_by_ocr() -> None:
     assert ocr_row.ocr_confidence_mean == 80.0
     assert ocr_row.text_source is TextSource.OCR
     assert layer_row.ocr_confidence_mean is None
+
+
+def _reread(
+    layer_words: tuple[Word, ...], confidences: tuple[float, ...], *, kept: bool
+) -> Reread:
+    return Reread(
+        page_index=0,
+        kind=RereadKind.MARGIN_NOTE,
+        box=Box(0.0, 0.0, 10.0, 10.0),
+        layer_words=layer_words,
+        ocr_words=tuple(
+            Word(f"word{position}", Box(0.0, 0.0, 1.0, 1.0), confidence)
+            for position, confidence in enumerate(confidences)
+        ),
+        layer_score=0,
+        ocr_score=1 if kept else -1,
+        kept=kept,
+    )
+
+
+def test_ocr_confidence_mean_over_the_words_layout_reread_and_kept() -> None:
+    reference = _reference("the king went")
+    galley = _tokens("the king went")
+    words_file = _words_file(galley)
+    # Two regions of the text-layer page read again: one kept, whose
+    # words are now the page's, and one not kept, which changes nothing.
+    rereads = (
+        _reread(words_file.pages[0].words[:1], (90.0, 70.0), kept=True),
+        _reread(words_file.pages[0].words[1:], (10.0,), kept=False),
+    )
+    (row,) = _rows(reference, galley, words_file, rereads)
+    assert row.ocr_confidence_mean == 80.0
+
+
+def test_ocr_confidence_mean_leaves_out_ocr_words_a_kept_reread_replaced() -> None:
+    reference = _reference("the king went")
+    galley = _tokens("the king went")
+    words_file = _words_file(galley, TextSource.OCR, 40.0)
+    # The first word, read with 40, replaced by a reading of 100.
+    rereads = (_reread(words_file.pages[0].words[:1], (100.0,), kept=True),)
+    (row,) = _rows(reference, galley, words_file, rereads)
+    assert row.ocr_confidence_mean == 60.0
 
 
 def test_page_with_no_reference_token_has_no_recall() -> None:
@@ -204,5 +256,6 @@ def test_part_column_is_that_of_the_page() -> None:
         printed_pages=frozendict(),
         word_list=frozenset(),
         language=Language.EN,
+        rereads=(),
     )
     assert (row.part, row.printed_page) == (Part.INDEX, None)

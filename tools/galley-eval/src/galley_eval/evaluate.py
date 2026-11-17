@@ -27,6 +27,16 @@ How the spec is read here, where it leaves a choice:
 - A difference that is unplaced, or on a page of `exclude_pages` or
   `not_in_reference`, is written with `apart` saying which, and is not
   scored.
+- Front matter (spec section 5, "Front matter"): galley's front-matter
+  pages are the pages of the words `words.json` removed as
+  `front_matter`. A front-matter page with no word of the text layer has
+  nothing that could be scored there, and is not known. A reference token
+  is left unscored as front matter, and its difference listed apart as
+  `front_matter`, when it is placed on a front-matter page, or when it
+  precedes the first reference token aligned at words, is not aligned,
+  and has the non-empty alignment key of a word removed as front matter.
+  `front_matter_not_scored` counts both. Such a token is on no page in
+  the table of pages.
 - The tokens of a reference note that galley makes an endnote at blocks
   are `not_scored` at words and lines, and taken as matched there for the
   attribution to stages.
@@ -48,6 +58,7 @@ from pathlib import Path
 
 from galley import wordlist
 from galley.book_folder import BookFolder
+from galley.model import RemovalReason
 from galley_eval.align import (
     Alignment,
     GalleyToken,
@@ -113,6 +124,9 @@ _LEAST_EQUAL_KEY_SHARE = 0.5
 _CONTEXT_TOKENS = 8
 
 
+# The states of a reference token aligned to a galley token.
+_ALIGNED = frozenset((State.MATCHED, State.CHANGED, State.SPLIT, State.GLUED))
+
 # The outputs where galley has no notes yet, so that an endnote cannot be
 # aligned near its reference (spec section 5).
 _BEFORE_NOTES = frozenset((StageOutput.WORDS, StageOutput.LINES))
@@ -124,6 +138,7 @@ class Apart(StrEnum):
     UNPLACED = "unplaced"
     EXCLUDED_PAGE = "excluded_page"
     NOT_IN_REFERENCE = "not_in_reference"
+    FRONT_MATTER = "front_matter"
 
 
 class Cause(StrEnum):
@@ -177,7 +192,8 @@ class OutputScores:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Scorecard:
     """The scores of a book at the four outputs, and the counts that say
-    how far the alignment can be trusted. galley's commit and the date
+    how far the alignment can be trusted, and the reference tokens left
+    unscored as front matter galley dropped. galley's commit and the date
     are added when it is written."""
 
     book: str
@@ -185,6 +201,7 @@ class Scorecard:
     equal_key_share: float
     anchor_mismatches: int
     unplaced: int
+    front_matter_not_scored: int
     outputs: tuple[OutputScores, ...]
 
 
@@ -262,19 +279,32 @@ def evaluation_of(
     alignments = (words_alignment,) + tuple(
         align(reference, galley, prepared) for galley in outputs[1:]
     )
+    front_matter_pages = frozenset(
+        removal.page_index
+        for removal in side.words_file.removals
+        if removal.reason is RemovalReason.FRONT_MATTER
+    )
     pages = reference_pages(
-        reference, words_alignment, side.words, frozenset(book.exclude_pages)
+        reference,
+        words_alignment,
+        side.words,
+        frozenset(book.exclude_pages) | front_matter_pages,
     )
     parts = tuple(reference_part(place) for place in places)
     parts_of_pages = page_parts(places, pages.page_indices)
-    apart_pages = _apart_pages(book)
+    apart_pages = _apart_pages(book, front_matter_pages)
+    front_matter = _front_matter_tokens(
+        places, words_alignment, side, pages.page_indices, front_matter_pages
+    )
     placements = tuple(
-        Placement.UNPLACED
+        Placement.FRONT_MATTER
+        if index in front_matter
+        else Placement.UNPLACED
         if page is None
         else Placement.NOT_SCORED
         if page in apart_pages
         else Placement.SCORED
-        for page in pages.page_indices
+        for index, page in enumerate(pages.page_indices)
     )
     by_output = dict(zip(StageOutput, alignments, strict=True))
     in_endnotes = endnote_notes(
@@ -337,6 +367,7 @@ def evaluation_of(
         far_notes=far_notes,
         parts=parts,
         page_indices=pages.page_indices,
+        front_matter=front_matter,
         fates=tuple(fate.difference_stage for fate in fates),
         printed_pages=printed_pages,
         side=side,
@@ -359,6 +390,7 @@ def evaluation_of(
             equal_key_share=share,
             anchor_mismatches=len(mismatches),
             unplaced=sum(len(run.tokens) for run in unplaced),
+            front_matter_not_scored=len(front_matter),
             outputs=output_scores,
         ),
         differences=differences,
@@ -367,11 +399,15 @@ def evaluation_of(
             side.words,
             words_alignment,
             places,
-            page_indices=pages.page_indices,
+            page_indices=tuple(
+                None if index in front_matter else page
+                for index, page in enumerate(pages.page_indices)
+            ),
             parts_of_pages=parts_of_pages,
             printed_pages=printed_pages,
             word_list=word_list,
             language=book.language,
+            rereads=side.rereads,
         ),
         anchor_mismatches=mismatches,
         unplaced=unplaced,
@@ -479,11 +515,51 @@ def _gutenberg_reference_pages(
     return frozendict(pages)
 
 
-def _apart_pages(book: EvaluationBook) -> frozendict[int, Apart]:
+def _apart_pages(
+    book: EvaluationBook, front_matter_pages: frozenset[int]
+) -> frozendict[int, Apart]:
     return frozendict(
-        {page: Apart.NOT_IN_REFERENCE for page in book.not_in_reference}
+        {page: Apart.FRONT_MATTER for page in front_matter_pages}
+        | {page: Apart.NOT_IN_REFERENCE for page in book.not_in_reference}
         | {page: Apart.EXCLUDED_PAGE for page in book.exclude_pages}
     )
+
+
+def _front_matter_tokens(
+    places: tuple[ReferencePlace, ...],
+    alignment: Alignment,
+    side: GalleySide,
+    page_indices: tuple[int | None, ...],
+    front_matter_pages: frozenset[int],
+) -> frozenset[int]:
+    """The indices of the reference tokens left unscored as front matter
+    (spec section 5, "Front matter"): those placed on a page galley
+    dropped as front matter, and the unaligned ones before the first
+    token aligned at words, `alignment`, whose key is that of a word
+    galley removed as front matter."""
+    removed_keys = frozenset(
+        key
+        for removal in side.words_file.removals
+        if removal.reason is RemovalReason.FRONT_MATTER
+        for word in removal.text.split()
+        if (key := alignment_key(word))
+    )
+    aligned = reference_states(alignment)
+    first_aligned = next(
+        (index for index, state in enumerate(aligned) if state in _ALIGNED),
+        len(places),
+    )
+    on_pages = (
+        index
+        for index, page in enumerate(page_indices)
+        if page is not None and page in front_matter_pages
+    )
+    leading = (
+        index
+        for index in range(first_aligned)
+        if alignment_key(places[index].token.text) in removed_keys
+    )
+    return frozenset((*on_pages, *leading))
 
 
 def _printed_pages(anchors: tuple[AnchorPage, ...]) -> frozendict[int, str]:
@@ -609,6 +685,7 @@ def _reference_differences(
     far_notes: frozenset[int],
     parts: tuple[Part, ...],
     page_indices: tuple[int | None, ...],
+    front_matter: frozenset[int],
     fates: tuple[StageOutput | None, ...],
     printed_pages: frozendict[int, str],
     side: GalleySide,
@@ -663,7 +740,11 @@ def _reference_differences(
                 block_id=block_id,
                 note_id=_note_id(side, block_id),
                 edge_of_page=edge,
-                apart=Apart.UNPLACED if page is None else apart_pages.get(page),
+                apart=Apart.FRONT_MATTER
+                if indices[0] in front_matter
+                else Apart.UNPLACED
+                if page is None
+                else apart_pages.get(page),
                 cause=Cause.ENDNOTE_REFERENCE_FAR
                 if places[indices[0]].note_index in far_notes
                 else None,

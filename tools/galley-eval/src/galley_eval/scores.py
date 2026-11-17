@@ -1,23 +1,27 @@
 """The scores of one stage output against the reference (spec section 6).
 
 The text scores count the states of the tokens, for each part of the
-book apart: the body, the notes, the index, tables and figure captions.
+book apart: the body, the notes, the index, tables, figure captions and
+margin notes.
 The structure scores, at blocks and markdown, say whether galley's
 paragraph boundaries, block kinds, notes and margin notes are where the
 reference has them.
 
 How the spec is read here, where it leaves a choice:
 
-- A reference token's part is that of its block: notes for a token of a
-  note, index for an index entry, tables for a table, figures for a
-  figure, body for any other block, headings, quotes and margin notes
-  included. An extra token's part is the part of most of the placed
-  reference tokens of its page, the first in the order body, notes,
-  index, tables, figures on a tie, and the body on a page with none.
+- A reference token's part is that of its block: margin notes for a
+  token of a margin note, in the body or in a note; notes for any other
+  token of a note; index for an index entry, tables for a table, figures
+  for a figure, body for any other block, headings and quotes included.
+  An extra token's part is the part of most of the placed reference
+  tokens of its page, the first in the order body, notes, index, tables,
+  figures, margin notes on a tie, and the body on a page with none.
 - A reference token that is unplaced, or on a page of `exclude_pages` or
   `not_in_reference`, is not scored: it is counted only in `unplaced`,
-  for the first, and nowhere for the second. An extra galley token on
-  such a page is not scored either.
+  for the first, and in `not_scored` for the second. One left unscored
+  as front matter is counted in `not_scored` and in
+  `front_matter_not_scored`. An extra galley token on a page that is not
+  scored is not scored either.
 - A pairing other than matched whose subkind is `reference_correction`
   counts its reference tokens there, and not under its state.
 - `token_error_rate` divides by the scored reference tokens of the part.
@@ -28,7 +32,8 @@ How the spec is read here, where it leaves a choice:
   aligned body token after it, so that a boundary inside a split word is
   never right; with no aligned token after it, to the gap after the last
   aligned one. A boundary's part is that of the reference
-  token after its gap. Two galley boundaries mapped to the same gap count
+  token after its gap. The notes and the margin notes have no
+  boundaries. Two galley boundaries mapped to the same gap count
   as one right one and one wrong one.
 - The boundary between two consecutive reference headings is left out
   when one galley heading with a label holds both, more than half of the
@@ -108,15 +113,18 @@ class Part(StrEnum):
     INDEX = "index"
     TABLES = "tables"
     FIGURES = "figures"
+    MARGIN_NOTES = "margin_notes"
 
 
 class Placement(StrEnum):
     """Whether a reference token is scored: placed on a page that is
-    scored, unplaced, or on a page that is not scored."""
+    scored, unplaced, on a page that is not scored, or left unscored as
+    front matter galley dropped (spec section 5, "Front matter")."""
 
     SCORED = "scored"
     UNPLACED = "unplaced"
     NOT_SCORED = "not_scored"
+    FRONT_MATTER = "front_matter"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -124,6 +132,8 @@ class TextScores:
     """The text scores of one part at one output (spec section 6, "Text").
     `reference_tokens` counts the scored ones; with `unplaced` and
     `not_scored` they add up to the reference's tokens of the part.
+    `front_matter_not_scored` counts those of `not_scored` left unscored
+    as front matter.
     `galley_tokens` counts the galley tokens aligned to a reference token
     of the part and the extra ones on its pages, scored or not.
     `repaired` is None at words; `token_error_rate` is None when the part
@@ -143,6 +153,7 @@ class TextScores:
     reference_correction: int
     unplaced: int
     not_scored: int
+    front_matter_not_scored: int
     galley_tokens: int
     edge_of_page_extra: int
     repaired: int | None
@@ -235,8 +246,11 @@ _KIND_PARTS = frozendict(
 
 
 def reference_part(place: ReferencePlace) -> Part:
-    """The part of a reference token: notes in a note, else by its block's
-    kind, the body for headings, paragraphs, quotes and margin notes."""
+    """The part of a reference token: margin notes in a margin note, in the
+    body or in a note; notes in any other block of a note; else by its
+    block's kind, the body for headings, paragraphs and quotes."""
+    if place.kind is ReferenceKind.MARGIN_NOTE:
+        return Part.MARGIN_NOTES
     if place.stream is Stream.NOTES:
         return Part.NOTES
     return _KIND_PARTS.get(place.kind, Part.BODY)
@@ -297,6 +311,10 @@ def text_scores(
                 continue
             case Placement.NOT_SCORED:
                 counter["not_scored"] += 1
+                continue
+            case Placement.FRONT_MATTER:
+                counter["not_scored"] += 1
+                counter["front_matter_not_scored"] += 1
                 continue
             case Placement.SCORED:
                 pass
@@ -365,6 +383,7 @@ def _text_scores(counter: Counter[str], *, with_repaired: bool) -> TextScores:
         reference_correction=counter["reference_correction"],
         unplaced=counter["unplaced"],
         not_scored=counter["not_scored"],
+        front_matter_not_scored=counter["front_matter_not_scored"],
         galley_tokens=counter["galley_tokens"],
         edge_of_page_extra=counter["edge_of_page_extra"],
         repaired=counter["repaired"] if with_repaired else None,
@@ -428,6 +447,10 @@ def _reference_gaps(
 
 _NO_BLOCKS = frozendict[str, GalleyBlock]()
 
+# The parts with no paragraph boundaries: the notes, and the margin notes,
+# which a boundary skips.
+_NO_BOUNDARIES = frozenset((Part.NOTES, Part.MARGIN_NOTES))
+
 
 def paragraph_boundaries(
     alignment: Alignment,
@@ -478,7 +501,7 @@ def paragraph_boundaries(
                 recall=share(found_counts[part], reference_counts[part]),
             )
             for part in Part
-            if part is not Part.NOTES
+            if part not in _NO_BOUNDARIES
         }
     )
 
