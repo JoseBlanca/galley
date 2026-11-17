@@ -36,7 +36,7 @@ from galley.layout import (
     _Side,
     _split_at_column,
 )
-from galley.model import Box, PageWords, Reread, RereadKind, Word
+from galley.model import Box, PageWords, Reread, RereadKind, Word, is_under_ocr_word
 from galley.wordlist import is_known_word
 
 __all__ = [
@@ -111,9 +111,6 @@ _INK: Final[int] = 255
 _CUT_IN_ZONE_PT: Final[float] = 1.0
 _CUT_IN_NOTE_SHORT_PT: Final[float] = 4.0
 _CUT_IN_LINE_AT_INSET_PT: Final[float] = 3.0
-# A layer word lies under a word of Tesseract's when its middle lies inside
-# that word's box widened by 1 pt (reocr spec, section 4).
-_UNDER_OCR_WORD_PT: Final[float] = 1.0
 
 
 # The reading score
@@ -432,9 +429,9 @@ class RegionReading:
     `kind` and `box`, the crop in points, are those of its record; `side`
     is the side of a margin note band or a cut-in crop, None for the
     others. `ocr_words` are Tesseract's words, after the filters of a
-    cut-in crop. `layer_words` are the layer words it replaces whatever
-    Tesseract read; `coverable` the other layer words it replaces when
-    their middle lies under a word of Tesseract's it keeps.
+    cut-in crop. `layer_words` are the layer words it may replace; it
+    replaces those under a word of Tesseract's it keeps
+    (`model.is_under_ocr_word`).
     """
 
     kind: RereadKind
@@ -442,7 +439,6 @@ class RegionReading:
     box: Box
     ocr_words: tuple[Word, ...]
     layer_words: tuple[Word, ...]
-    coverable: tuple[Word, ...]
 
 
 def _middle(word: Word) -> tuple[float, float]:
@@ -453,12 +449,9 @@ def _vertical_middle(word: Word) -> float:
     return (word.box.top + word.box.bottom) / 2
 
 
-def _inside(point: tuple[float, float], box: Box, widened_by: float = 0.0) -> bool:
+def _inside(point: tuple[float, float], box: Box) -> bool:
     x, y = point
-    return (
-        box.x0 - widened_by <= x <= box.x1 + widened_by
-        and box.top - widened_by <= y <= box.bottom + widened_by
-    )
+    return box.x0 <= x <= box.x1 and box.top <= y <= box.bottom
 
 
 def _overlap(first: Box, second: Box) -> bool:
@@ -490,7 +483,7 @@ def small_print_reading(
     head_words: tuple[Word, ...],
 ) -> RegionReading:
     """A small-print page read in the crop `box`, with Tesseract's
-    `ocr_words`: it replaces every word of the page, `page_words`, but
+    `ocr_words`: it may replace every word of the page, `page_words`, but
     those of the running-head region, `head_words`, its margins and its
     band included."""
     return RegionReading(
@@ -499,7 +492,6 @@ def small_print_reading(
         box=box,
         ocr_words=ocr_words,
         layer_words=_without(page_words, head_words),
-        coverable=(),
     )
 
 
@@ -508,24 +500,18 @@ def margin_note_reading(
     box: Box,
     ocr_words: tuple[Word, ...],
     *,
-    margin_words: tuple[Word, ...],
     page_words: tuple[Word, ...],
 ) -> RegionReading:
     """A note band of the outer margin on `side`, cropped at `box`, with
-    Tesseract's `ocr_words`. It replaces the side's `margin_words` whose
-    vertical middle lies within the band's top and bottom, whatever their
-    place across, and any other word of `page_words` under a word of
-    Tesseract's it keeps: the same printed word read twice."""
-    replaced = tuple(
-        word for word in margin_words if box.top <= _vertical_middle(word) <= box.bottom
-    )
+    Tesseract's `ocr_words`. It may replace any word of `page_words`: the
+    strip lies outside the column, so only margin words, and the layer's
+    stray letters at the column's edge, lie under Tesseract's words."""
     return RegionReading(
         kind=RereadKind.MARGIN_NOTE,
         side=side,
         box=box,
         ocr_words=ocr_words,
-        layer_words=replaced,
-        coverable=_without(page_words, replaced),
+        layer_words=page_words,
     )
 
 
@@ -583,9 +569,8 @@ def cut_in_reading(
     other column word overlapping the crop is a body word. Of Tesseract's
     words, a line with a word ending within 3 pt of the crop's side toward
     the inset is dropped, and so is a word overlapping a body word. The
-    crop replaces the cut-in words in its zones, give or take 1 pt, and the
-    column words it may replace that lie under a word of Tesseract's it
-    keeps; never a body word.
+    crop may replace the cut-in words in its zones, give or take 1 pt, and
+    the column words it may replace; never a body word.
     """
     replaceable = tuple(
         word
@@ -609,8 +594,10 @@ def cut_in_reading(
         side=side,
         box=crop.box,
         ocr_words=ocr_words,
-        layer_words=tuple(word for word in cut_in_words if _in_zone(word, crop.zones)),
-        coverable=replaceable,
+        layer_words=(
+            *(word for word in cut_in_words if _in_zone(word, crop.zones)),
+            *replaceable,
+        ),
     )
 
 
@@ -618,14 +605,13 @@ def footnote_band_reading(
     box: Box, ocr_words: tuple[Word, ...], *, band_words: tuple[Word, ...]
 ) -> RegionReading:
     """A page's footnote band, cropped at `box`, with Tesseract's
-    `ocr_words`: it replaces the band's words, `band_words`."""
+    `ocr_words`: it may replace the band's words, `band_words`."""
     return RegionReading(
         kind=RereadKind.FOOTNOTE_BAND,
         side=None,
         box=box,
         ocr_words=ocr_words,
         layer_words=band_words,
-        coverable=(),
     )
 
 
@@ -662,9 +648,11 @@ def page_rereads(
     same top, then the cut-in crops likewise, then the footnote band.
 
     The regions are taken in that order. A word of Tesseract's whose middle
-    lies inside the crop of an earlier region is dropped, so that no
-    printed word is read in by two regions; a layer word that an earlier
-    kept region replaces is not replaced again. A region is kept when its
+    lies inside the crop of an earlier kept region is dropped, so that no
+    printed word is read in by two regions. Of the layer words a region
+    may replace, it replaces those under one of its words of Tesseract's
+    (`model.is_under_ocr_word`) that an earlier kept region does not
+    replace; the others stay in the layer. A region is kept when its
     words of Tesseract's are not empty and score higher than the layer
     words it replaces, by `reading_score` against `lower_case_words`. A
     region where both readings are empty is not recorded. ValueError when
@@ -687,23 +675,19 @@ def page_rereads(
             for word in reading.ocr_words
             if not any(_inside(_middle(word), crop) for crop in earlier_crops)
         )
-        covered = tuple(
+        layer_words = tuple(
             word
-            for word in reading.coverable
-            if any(
-                _inside(_middle(word), ocr_word.box, _UNDER_OCR_WORD_PT)
-                for ocr_word in ocr_words
-            )
+            for word in _without(reading.layer_words, replaced)
+            if is_under_ocr_word(word, ocr_words)
         )
-        layer_words = _without((*reading.layer_words, *covered), replaced)
-        earlier_crops.append(reading.box)
         if not layer_words and not ocr_words:
             continue
         layer_score = reading_score(layer_words, lower_case_words)
         ocr_score = reading_score(ocr_words, lower_case_words)
-        kept = bool(ocr_words) and ocr_score > layer_score
+        kept = ocr_score > layer_score
         if kept:
             replaced.extend(layer_words)
+            earlier_crops.append(reading.box)
         records.append(
             Reread(
                 page_index=page_index,

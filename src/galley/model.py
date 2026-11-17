@@ -263,6 +263,29 @@ class Reread:
     kept: bool
 
 
+# A layer word lies under a word of Tesseract's when its middle lies inside
+# that word's box widened by 1 pt (reocr spec, section 4).
+_UNDER_OCR_WORD_PT = 1.0
+
+
+def is_under_ocr_word(word: Word, ocr_words: Sequence[Word]) -> bool:
+    """Whether the middle of `word`, a word of the text layer, lies inside
+    the box of one of `ocr_words`, Tesseract's, widened by 1 pt on every
+    side: the same printed word, which a kept Reread may replace (reocr
+    spec, section 4). Boxes in points."""
+    x = (word.box.x0 + word.box.x1) / 2
+    y = (word.box.top + word.box.bottom) / 2
+    return any(
+        ocr_word.box.x0 - _UNDER_OCR_WORD_PT
+        <= x
+        <= ocr_word.box.x1 + _UNDER_OCR_WORD_PT
+        and ocr_word.box.top - _UNDER_OCR_WORD_PT
+        <= y
+        <= ocr_word.box.bottom + _UNDER_OCR_WORD_PT
+        for ocr_word in ocr_words
+    )
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class LinesFile:
     """lines.json, written by layout. Every word of words.json is in exactly

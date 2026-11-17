@@ -30,6 +30,7 @@ from galley.model import (
     Reread,
     WordChange,
     WordsFile,
+    is_under_ocr_word,
 )
 
 
@@ -133,7 +134,8 @@ def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
     """What is wrong with the kept re-readings of lines.json: a word of
     their `layer_words` that its page of words.json does not have, or one
     that more kept records name than the page has, compared as page, text
-    and box (reocr spec, section 4)."""
+    and box; or one that none of its record's `ocr_words` lies over (reocr
+    spec, section 4)."""
     on_pages = Counter(
         (page.index, word.text, word.box) for page in words.pages for word in page.words
     )
@@ -142,7 +144,13 @@ def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
         for reread in _kept_rereads(lines)
         for word in reread.layer_words
     )
-    problems: list[str] = []
+    problems = [
+        f"a kept reread replaces {word.text!r} at {_box_text(word.box)} on page "
+        f"{reread.page_index}, which none of its ocr_words lies over"
+        for reread in _kept_rereads(lines)
+        for word in reread.layer_words
+        if not is_under_ocr_word(word, reread.ocr_words)
+    ]
     for (page_index, text, box), count in named.items():
         where = f"{text!r} at {_box_text(box)}"
         if on_pages[page_index, text, box] == 0:
@@ -545,8 +553,9 @@ def check_stage(
     Raises FidelityError with the missing and invented words, their counts,
     and the pages or blocks each came from. At the layout boundary it also
     raises, with no word, when a kept re-reading names a layer word that
-    its page of words.json does not have (page, text and box), or one that
-    another kept re-reading names too. At the structure and markdown
+    its page of words.json does not have (page, text and box), one that
+    another kept re-reading names too, or one that none of its Tesseract
+    words lies over. At the structure and markdown
     boundaries it also raises, with no word, when a note reference span
     names no note, does not have a marker's shape (1 to 4 characters, at
     most 3 letters or digits, no white space, "&" or dash, a letter only
