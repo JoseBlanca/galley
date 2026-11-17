@@ -134,13 +134,23 @@ def _box_text(box: Box) -> str:
     return f"({box.x0}, {box.top}, {box.x1}, {box.bottom})"
 
 
+# The fidelity check has no word list: no layer word is known to it
+# (reocr spec, section 4).
+_NO_KNOWN_WORDS: frozenset[str] = frozenset()
+
+
 def _unmatched(reread: Reread) -> tuple[Word, ...]:
     """The `layer_words` of `reread` that `replaced_layer_words` does not
     match to one of its `ocr_words`, each as many times as it is
     unmatched."""
     (unmatched,) = take_out_once(
         (reread.layer_words,),
-        replaced_layer_words(reread.layer_words, reread.ocr_words),
+        # Without the book's word list every layer word is unknown, so this
+        # accepts every glued misreading layout matched (reocr spec,
+        # section 4).
+        replaced_layer_words(
+            reread.layer_words, reread.ocr_words, is_known=_NO_KNOWN_WORDS.__contains__
+        ),
     )
     return unmatched
 

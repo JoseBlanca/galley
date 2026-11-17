@@ -748,6 +748,23 @@ def _scores_higher(ocr_scores: tuple[int, ...], layer_scores: tuple[int, ...]) -
     )
 
 
+# The marks stripped from the ends of a layer word before it is taken as a
+# known word as printed (reocr spec, section 4).
+_END_MARKS: Final[str] = ".,;:!?()" + _QUOTATION_MARKS
+
+
+def _is_known_as_printed(text: str, lower_case_words: frozenset[str]) -> bool:
+    """Whether `text`, a layer word, is a known word as printed: known
+    (`wordlist.is_known_word`), and nothing but letters, digits,
+    apostrophes and hyphens once the marks . , ; : ! ? ( ) and quotation
+    marks are stripped from its ends ("lo/.," is not, though "lo" is in
+    the word list)."""
+    return is_known_word(text, lower_case_words) and all(
+        character.isalnum() or character in "-'’"
+        for character in text.strip(_END_MARKS)
+    )
+
+
 def _is_sure_single_word(
     ocr_words: tuple[Word, ...],
     ocr_scores: tuple[int, ...],
@@ -825,6 +842,10 @@ def page_rereads(
             f"{len(ordered) - 1} other regions; a small-print page is read whole"
         )
         raise ValueError(msg)
+
+    def is_known(text: str) -> bool:
+        return _is_known_as_printed(text, lower_case_words)
+
     earlier_crops: list[Box] = []
     earlier_ocr_words: list[Word] = []
     replaced: list[Word] = []
@@ -842,13 +863,13 @@ def page_rereads(
             for word, stripped in zip(not_junk, outside_crops, strict=True)
         )
         replaceable = take_out_once((reading.layer_words,), replaced)[0]
-        matched = matched_ocr_positions(replaceable, outside_crops)
+        matched = matched_ocr_positions(replaceable, outside_crops, is_known=is_known)
         ocr_words = tuple(
             word
             for position, word in enumerate(outside_crops)
             if position in matched or not _read_before(word, earlier_ocr_words)
         )
-        layer_words = replaced_layer_words(replaceable, ocr_words)
+        layer_words = replaced_layer_words(replaceable, ocr_words, is_known=is_known)
         if not layer_words and not read:
             continue
         layer_scores = _word_scores(layer_words, lower_case_words)

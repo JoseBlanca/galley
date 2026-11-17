@@ -1732,39 +1732,69 @@ def _tesseract(text: str, x0: float, top: float) -> Word:
     return Word(text, Box(x0, top, x0 + 20, top + 8), 90.0)
 
 
+def _in(words: frozenset[str]) -> Callable[[str], bool]:
+    """Whether a text, case-folded and without "," and "." at its ends, is
+    one of `words`: a stand-in for the word list."""
+    return lambda text: text.casefold().strip(",.") in words
+
+
+# No word is known.
+_unknown = _in(frozenset())
+
+
 def test_layer_word_under_an_ocr_word_of_another_text_is_replaced() -> None:
     layer = (_layer("Moial", 10, 100),)
-    assert model.replaced_layer_words(layer, (_tesseract("Moral", 10, 100),)) == layer
+    assert (
+        model.replaced_layer_words(
+            layer, (_tesseract("Moral", 10, 100),), is_known=_unknown
+        )
+        == layer
+    )
 
 
 def test_layer_word_off_the_box_with_the_text_of_an_ocr_word_is_replaced() -> None:
     # 10 pt below the word Tesseract read, as Gierke's layer lines lie.
     layer = (_layer("Theory.", 10, 110),)
     ocr = (_tesseract("theory", 10, 100),)
-    assert model.replaced_layer_words(layer, ocr) == layer
+    assert model.replaced_layer_words(layer, ocr, is_known=_unknown) == layer
 
 
 def test_layer_word_of_the_text_of_an_ocr_word_more_than_16_pt_off_stays() -> None:
     layer = (_layer("Theory.", 10, 116.1),)
-    assert model.replaced_layer_words(layer, (_tesseract("Theory.", 10, 100),)) == ()
+    assert (
+        model.replaced_layer_words(
+            layer, (_tesseract("Theory.", 10, 100),), is_known=_unknown
+        )
+        == ()
+    )
     near = (_layer("Theory.", 10, 116.0),)
-    assert model.replaced_layer_words(near, (_tesseract("Theory.", 10, 100),)) == near
+    assert (
+        model.replaced_layer_words(
+            near, (_tesseract("Theory.", 10, 100),), is_known=_unknown
+        )
+        == near
+    )
 
 
 def test_ocr_word_matched_under_a_layer_word_of_its_text_matches_no_other() -> None:
     # The layer read "of" twice, once over Tesseract's "of" and once off it.
     over, off = _layer("of", 10, 100), _layer("of", 60, 100)
     ocr = (_tesseract("of", 10, 100),)
-    assert model.replaced_layer_words((over, off), ocr) == (over,)
-    assert model.replaced_layer_words((off, over), ocr) == (over,)
+    assert model.replaced_layer_words((over, off), ocr, is_known=_unknown) == (over,)
+    assert model.replaced_layer_words((off, over), ocr, is_known=_unknown) == (over,)
 
 
 def test_two_layer_words_of_one_text_take_the_nearest_ocr_words_in_turn() -> None:
     first, second = _layer("the", 10, 112), _layer("the", 70, 112)
     ocr = (_tesseract("the", 70, 105), _tesseract("the", 10, 105))
-    assert model.replaced_layer_words((first, second), ocr) == (first, second)
+    assert model.replaced_layer_words((first, second), ocr, is_known=_unknown) == (
+        first,
+        second,
+    )
     # Tesseract's one "the" is nearer the second.
-    assert model.replaced_layer_words((first, second), ocr[:1]) == (second,)
+    assert model.replaced_layer_words((first, second), ocr[:1], is_known=_unknown) == (
+        second,
+    )
 
 
 def test_ocr_word_over_a_layer_word_of_another_text_pairs_with_no_other() -> None:
@@ -1774,7 +1804,9 @@ def test_ocr_word_over_a_layer_word_of_another_text_pairs_with_no_other() -> Non
     domini = _layer("Domini", 10, 92)
     dominicum = _layer("dominicum,", 10, 100)
     ocr = (_tesseract("3", 60, 92), _tesseract("dominieum,", 10, 100))
-    assert model.replaced_layer_words((domini, dominicum), ocr) == (dominicum,)
+    assert model.replaced_layer_words((domini, dominicum), ocr, is_known=_unknown) == (
+        dominicum,
+    )
 
 
 def test_ocr_word_over_two_layer_lines_replaces_the_words_of_the_nearer() -> None:
@@ -1789,7 +1821,9 @@ def test_ocr_word_over_two_layer_lines_replaces_the_words_of_the_nearer() -> Non
         Word("c", Box(332.4, 387.9, 334.4, 394.9), None),
     )
     ocr = (Word("146", Box(324.5, 382.8, 336.2, 390.5), 60.0),)
-    assert model.replaced_layer_words((*first, *second), ocr) == first
+    assert (
+        model.replaced_layer_words((*first, *second), ocr, is_known=_unknown) == first
+    )
 
 
 def test_ocr_word_over_two_layer_lines_and_a_word_overlapping_both_takes_one() -> None:
@@ -1800,7 +1834,9 @@ def test_ocr_word_over_two_layer_lines_and_a_word_overlapping_both_takes_one() -
     above = Word("I43", Box(165.3, 433.4, 175.9, 439.3), None)
     normans = Word("Normans,", Box(157.6, 439.8, 191.9, 446.9), None)
     ocr = (Word("Soca", Box(157.7, 434.6, 177.6, 445.9), 50.0),)
-    assert model.replaced_layer_words((stray, above, normans), ocr) == (
+    assert model.replaced_layer_words(
+        (stray, above, normans), ocr, is_known=_unknown
+    ) == (
         stray,
         normans,
     )
@@ -1814,22 +1850,26 @@ def test_layer_word_glued_over_two_or_three_ocr_words_is_replaced() -> None:
         Word("of,", Box(100.5, 50.0, 110.0, 58.0), 90.0),
         Word("96", Box(122.0, 50.0, 129.5, 58.0), 90.0),
     )
-    assert model.replaced_layer_words((glued,), (of, ninety_six)) == (glued,)
+    assert model.replaced_layer_words(
+        (glued,), (of, ninety_six), is_known=_unknown
+    ) == (glued,)
     # "abolition of,17," read "of," "17," by Tesseract, after "abolition".
     three = Word("of,17,", Box(100.0, 50.0, 130.0, 58.0), None)
     seventeen = Word("17,", Box(122.0, 50.0, 129.5, 58.0), 90.0)
     abolition = Word("abolition", Box(40.0, 50.0, 98.0, 58.0), 90.0)
-    assert model.replaced_layer_words((three,), (abolition, of, seventeen)) == (three,)
+    assert model.replaced_layer_words(
+        (three,), (abolition, of, seventeen), is_known=_unknown
+    ) == (three,)
     # Not when a Tesseract word of the group lies more than 1 pt outside its
     # box, or the group is of four words.
     outside = Word("96", Box(129.0, 50.0, 134.2, 58.0), 90.0)
-    assert model.replaced_layer_words((glued,), (of, outside)) == ()
+    assert model.replaced_layer_words((glued,), (of, outside), is_known=_unknown) == ()
     four = Word("a,b,c,d", Box(100.0, 50.0, 130.0, 58.0), None)
     letters = tuple(
         Word(text, Box(x, 50.0, x + 1.0, 58.0), 90.0)
         for text, x in (("a,", 101.0), ("b,", 109.0), ("c,", 121.0), ("d", 128.0))
     )
-    assert model.replaced_layer_words((four,), letters) == ()
+    assert model.replaced_layer_words((four,), letters, is_known=_unknown) == ()
 
 
 def test_layer_word_glued_and_misread_over_two_ocr_words_is_replaced() -> None:
@@ -1842,7 +1882,23 @@ def test_layer_word_glued_and_misread_over_two_ocr_words_is_replaced() -> None:
         Word("10", Box(100.5, 50.0, 110.0, 58.0), 90.0),
         Word("f.,", Box(121.0, 50.0, 129.5, 58.0), 90.0),
     )
-    assert model.replaced_layer_words((misread,), ocr) == (misread,)
+    assert model.replaced_layer_words((misread,), ocr, is_known=_unknown) == (misread,)
+
+
+def test_known_layer_word_over_two_ocr_words_of_junk_is_not_replaced() -> None:
+    # Domesday page 547: the layer's "Devonshire,", printed so, over
+    # Tesseract's junk "a" and "aa" (reocr spec, section 4). Without the
+    # word list, the same layer word is taken as glued.
+    devonshire = Word("Devonshire,", Box(100.0, 50.0, 140.0, 58.0), None)
+    ocr = (
+        Word("a", Box(104.0, 50.0, 108.0, 58.0), 28.0),
+        Word("aa", Box(126.0, 50.0, 136.0, 58.0), 27.0),
+    )
+    words = frozenset({"devonshire"})
+    assert model.replaced_layer_words((devonshire,), ocr, is_known=_in(words)) == ()
+    assert model.replaced_layer_words((devonshire,), ocr, is_known=_unknown) == (
+        devonshire,
+    )
 
 
 def test_layer_word_over_ocr_words_of_two_lines_is_not_taken_as_glued() -> None:
@@ -1856,7 +1912,7 @@ def test_layer_word_over_ocr_words_of_two_lines_is_not_taken_as_glued() -> None:
         Word("teann-", Box(71.0, 237.8, 88.1, 242.4), 90.0),
         Word("land.", Box(52.8, 244.3, 68.4, 249.6), 90.0),
     )
-    assert land in model.replaced_layer_words((misread, land), ocr)
+    assert land in model.replaced_layer_words((misread, land), ocr, is_known=_unknown)
 
 
 def test_layer_word_over_an_ocr_word_another_layer_word_lies_under_is_not_glued() -> (
@@ -1870,7 +1926,9 @@ def test_layer_word_over_an_ocr_word_another_layer_word_lies_under_is_not_glued(
         Word("10", Box(100.5, 50.0, 110.0, 58.0), 90.0),
         Word("f.,", Box(121.0, 50.0, 129.5, 58.0), 90.0),
     )
-    assert misread not in model.replaced_layer_words((ten, misread), ocr)
+    assert misread not in model.replaced_layer_words(
+        (ten, misread), ocr, is_known=_unknown
+    )
 
 
 def test_ocr_words_read_glued_by_the_layer_pair_with_no_other_layer_word() -> None:
@@ -1882,12 +1940,19 @@ def test_ocr_words_read_glued_by_the_layer_pair_with_no_other_layer_word() -> No
         Word("of,", Box(100.5, 50.0, 110.0, 58.0), 90.0),
         Word("96", Box(122.0, 50.0, 129.5, 58.0), 90.0),
     )
-    assert model.replaced_layer_words((glued, below), ocr) == (glued,)
+    assert model.replaced_layer_words((glued, below), ocr, is_known=_unknown) == (
+        glued,
+    )
 
 
 def test_layer_word_without_a_letter_or_digit_is_matched_only_under_a_word() -> None:
     layer = (_layer("—", 10, 110),)
-    assert model.replaced_layer_words(layer, (_tesseract("—", 10, 100),)) == ()
+    assert (
+        model.replaced_layer_words(
+            layer, (_tesseract("—", 10, 100),), is_known=_unknown
+        )
+        == ()
+    )
 
 
 def test_layer_word_6_pt_below_an_ocr_word_of_alike_letters_is_replaced() -> None:
@@ -1895,51 +1960,85 @@ def test_layer_word_6_pt_below_an_ocr_word_of_alike_letters_is_replaced() -> Non
     # page 76): "fllght'" and "flight" have a ratio of 0.83. Its middle,
     # at 114, lies 6 pt below Tesseract's box, out of rule (a)'s reach.
     layer = (_layer("fllght'", 10, 110),)
-    assert model.replaced_layer_words(layer, (_tesseract("flight.", 10, 100),)) == layer
+    assert (
+        model.replaced_layer_words(
+            layer, (_tesseract("flight.", 10, 100),), is_known=_unknown
+        )
+        == layer
+    )
 
 
 def test_layer_word_of_letters_less_alike_than_0_6_stays() -> None:
     # "for" and "lord" have a ratio of 0.57: a body word at the column's
     # edge beside a note word (Domesday page 310).
     layer = (_layer("for", 10, 110),)
-    assert model.replaced_layer_words(layer, (_tesseract("lord", 10, 100),)) == ()
+    assert (
+        model.replaced_layer_words(
+            layer, (_tesseract("lord", 10, 100),), is_known=_unknown
+        )
+        == ()
+    )
     # "rega" and "regality" have a ratio of 0.67.
     alike = (_layer("rega", 10, 110),)
-    assert model.replaced_layer_words(alike, (_tesseract("regality.", 10, 100),)) == (
-        alike
-    )
+    assert model.replaced_layer_words(
+        alike, (_tesseract("regality.", 10, 100),), is_known=_unknown
+    ) == (alike)
 
 
 def test_layer_word_of_3_letters_alike_is_replaced_and_one_of_2_stays() -> None:
     # "tbe" and "the" have a ratio of 0.67, "th" and "the" of 0.8; rule (c)
     # takes words of 3 letters or more.
     three = (_layer("tbe", 10, 110),)
-    assert model.replaced_layer_words(three, (_tesseract("the", 10, 100),)) == three
+    assert (
+        model.replaced_layer_words(
+            three, (_tesseract("the", 10, 100),), is_known=_unknown
+        )
+        == three
+    )
     two = (_layer("th", 10, 110),)
-    assert model.replaced_layer_words(two, (_tesseract("the", 10, 100),)) == ()
+    assert (
+        model.replaced_layer_words(
+            two, (_tesseract("the", 10, 100),), is_known=_unknown
+        )
+        == ()
+    )
 
 
 def test_layer_number_of_other_digits_beside_an_ocr_number_stays() -> None:
     # A list number Tesseract did not read (Gierke page 79).
     layer = (_layer("131.", 10, 114),)
-    assert model.replaced_layer_words(layer, (_tesseract("130.", 10, 100),)) == ()
+    assert (
+        model.replaced_layer_words(
+            layer, (_tesseract("130.", 10, 100),), is_known=_unknown
+        )
+        == ()
+    )
 
 
 def test_layer_word_of_alike_letters_more_than_16_pt_off_stays() -> None:
     layer = (_layer("fllght'", 10, 116.1),)
-    assert model.replaced_layer_words(layer, (_tesseract("flight.", 10, 100),)) == ()
+    assert (
+        model.replaced_layer_words(
+            layer, (_tesseract("flight.", 10, 100),), is_known=_unknown
+        )
+        == ()
+    )
 
 
 def test_two_alike_layer_words_and_one_ocr_word_replace_the_nearer() -> None:
     nearer, further = _layer("fllght'", 10, 110), _layer("fiight", 10, 116)
     ocr = (_tesseract("flight.", 10, 100),)
-    assert model.replaced_layer_words((further, nearer), ocr) == (nearer,)
+    assert model.replaced_layer_words((further, nearer), ocr, is_known=_unknown) == (
+        nearer,
+    )
 
 
 def test_ocr_word_matched_by_its_text_is_not_alike_to_another_layer_word() -> None:
     same, garbled = _layer("flight.", 10, 110), _layer("fllght'", 10, 116)
     ocr = (_tesseract("flight.", 10, 100),)
-    assert model.replaced_layer_words((garbled, same), ocr) == (same,)
+    assert model.replaced_layer_words((garbled, same), ocr, is_known=_unknown) == (
+        same,
+    )
 
 
 def _rereads_record(

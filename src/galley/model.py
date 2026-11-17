@@ -458,7 +458,9 @@ def may_read(word: Word, ocr_word: Word) -> bool:
 
 
 def _pairing(
-    layer_words: Sequence[Word], ocr_words: Sequence[Word]
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    is_known: Callable[[str], bool],
 ) -> tuple[tuple[bool, ...], frozenset[int]]:
     """Which of `layer_words` the rules of `replaced_layer_words` match,
     and the positions in `ocr_words` of the Tesseract words they match."""
@@ -483,7 +485,7 @@ def _pairing(
         if not any(_is_under(word, ocr_word) for word in layer_words)
     ) - {position for positions in glued.values() for position in positions}
     for index, word in enumerate(layer_words):
-        if index in under_line or index in glued:
+        if index in under_line or index in glued or is_known(word.text):
             continue
         positions = _misread_glued_over(word, ocr_words, free)
         if positions:
@@ -544,7 +546,10 @@ def _pairing(
 
 
 def replaced_layer_words(
-    layer_words: Sequence[Word], ocr_words: Sequence[Word]
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    *,
+    is_known: Callable[[str], bool],
 ) -> tuple[Word, ...]:
     """The words of `layer_words`, the text layer's words a region read
     again may replace, that a kept Reread with Tesseract's `ocr_words`
@@ -558,10 +563,12 @@ def replaced_layer_words(
     up and down, those of all taken before it; or when its letters and
     digits are those of two or three consecutive `ocr_words` joined, each
     with its middle inside its box widened by 1 pt, a word the layer
-    glued; or when, whatever the texts, the `ocr_words` with no layer word
-    under them whose middles lie inside its box so widened are two or
-    three consecutive words of one line, a word the layer glued and
-    misread; or else (b) when its letters and digits, case-folded and not empty, equal
+    glued; or when `is_known` says its text is not a known word (layout
+    gives `wordlist.is_known_word` with the book's word list), and,
+    whatever the texts, the `ocr_words` with no layer word under
+    them whose middles lie inside its box so widened are two or three
+    consecutive words of one line, a word the layer glued and misread; or
+    else (b) when its letters and digits, case-folded and not empty, equal
     those of one of `ocr_words` whose middle lies within 16 pt above or
     below its own and that no other layer word has matched;
     or else (c) when it has 3 letters or more and its case-folded letters
@@ -573,7 +580,7 @@ def replaced_layer_words(
     middles across plus up or down, each word in one pair at most. A layer
     word matched by none stays in the layer. Boxes in points.
     """
-    matched, _ = _pairing(layer_words, ocr_words)
+    matched, _ = _pairing(layer_words, ocr_words, is_known)
     return tuple(
         word
         for word, is_matched in zip(layer_words, matched, strict=True)
@@ -582,13 +589,16 @@ def replaced_layer_words(
 
 
 def matched_ocr_positions(
-    layer_words: Sequence[Word], ocr_words: Sequence[Word]
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    *,
+    is_known: Callable[[str], bool],
 ) -> frozenset[int]:
     """The positions in `ocr_words`, Tesseract's, of the words that read a
     word of `layer_words` by the rules of `replaced_layer_words`: those
     with a layer word under them or glued over them, and those paired by
     (b) or (c)."""
-    _, positions = _pairing(layer_words, ocr_words)
+    _, positions = _pairing(layer_words, ocr_words, is_known)
     return positions
 
 

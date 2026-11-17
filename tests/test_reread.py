@@ -20,6 +20,7 @@ from galley.layout._column import ColumnSplit
 from galley.layout._reread import (
     CutInCrop,
     RegionReading,
+    _is_known_as_printed,
     cut_in_crops,
     cut_in_reading,
     footnote_band_crop,
@@ -1247,3 +1248,19 @@ def test_pages_of_fewer_than_50_words_are_not_counted() -> None:
     assert margin_note_sides(((49, _split(("Stephen", "Blois"))),), _WORD_LIST) == (
         frozenset()
     )
+
+
+@pytest.mark.parametrize(
+    ("text", "known"),
+    [
+        ("Devonshire,", True),  # Domesday page 547, printed so
+        ("(Moral).", True),
+        ("1165.", True),
+        ("lo/.,", False),  # Haskins page 267: "lo" is in the list, "/" stays
+        ("164Jf.;", False),
+        ("Godofali", False),
+    ],
+)
+def test_layer_word_known_as_printed_has_no_mark_inside(text: str, known: bool) -> None:
+    words = frozenset({"devonshire", "moral", "lo"})
+    assert _is_known_as_printed(text, words) is known
