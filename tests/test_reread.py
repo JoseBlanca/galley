@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw
 from galley.body_measures import group_rows
 from galley.errors import FidelityBoundary, FidelityError
 from galley.fidelity import check_stage
-from galley.layout import BookMeasures, _Side
+from galley.layout import BookMeasures, Side
 from galley.layout._reread import (
     CutInCrop,
     RegionReading,
@@ -337,18 +337,18 @@ def test_small_print_crop_without_running_head_is_the_whole_page() -> None:
 
 def test_margin_strip_runs_from_4_pt_inside_the_page_to_4_pt_off_the_column() -> None:
     common = {"left": 50, "right": 350, "column_top": 60, "lowest": 560}
-    assert margin_strip(_Side.LEFT, page_width=400, **common) == Box(4, 56, 46, 564)
-    assert margin_strip(_Side.RIGHT, page_width=400, **common) == Box(354, 56, 396, 564)
+    assert margin_strip(Side.LEFT, page_width=400, **common) == Box(4, 56, 46, 564)
+    assert margin_strip(Side.RIGHT, page_width=400, **common) == Box(354, 56, 396, 564)
 
 
 def test_cut_in_crop_is_the_zone_widened_by_2_5_pitches_up_to_the_inset() -> None:
     # A pitch of 14 pt widens the zone by 35 pt above and below; the crop
     # runs from 3 pt outside the column's edge to 3 pt short of the inset.
     left = cut_in_crops(
-        ((200, 220),), _Side.LEFT, edge=50, inset=60, pitch=14, head_bottom=None
+        ((200, 220),), Side.LEFT, edge=50, inset=60, pitch=14, head_bottom=None
     )
     right = cut_in_crops(
-        ((200, 220),), _Side.RIGHT, edge=350, inset=60, pitch=14, head_bottom=None
+        ((200, 220),), Side.RIGHT, edge=350, inset=60, pitch=14, head_bottom=None
     )
     assert left == (CutInCrop(Box(47, 165, 107, 255), ((200, 220),)),)
     assert right == (CutInCrop(Box(293, 165, 353, 255), ((200, 220),)),)
@@ -357,7 +357,7 @@ def test_cut_in_crop_is_the_zone_widened_by_2_5_pitches_up_to_the_inset() -> Non
 def test_cut_in_zones_whose_crops_overlap_are_one_crop() -> None:
     crops = cut_in_crops(
         ((200, 220), (260, 280), (400, 420)),
-        _Side.LEFT,
+        Side.LEFT,
         edge=50,
         inset=60,
         pitch=14,
@@ -371,7 +371,7 @@ def test_cut_in_zones_whose_crops_overlap_are_one_crop() -> None:
 
 def test_cut_in_crop_stops_1_pt_below_the_running_head() -> None:
     crops = cut_in_crops(
-        ((200, 220),), _Side.LEFT, edge=50, inset=60, pitch=14, head_bottom=180
+        ((200, 220),), Side.LEFT, edge=50, inset=60, pitch=14, head_bottom=180
     )
     assert crops == (CutInCrop(Box(47, 181, 107, 255), ((200, 220),)),)
 
@@ -434,7 +434,7 @@ _OCR_LESSONS = _ocr("lessons.", 10, 115, 40, 123)
 
 def _margin_rereads() -> tuple[Reread, ...]:
     reading = margin_note_reading(
-        _Side.LEFT,
+        Side.LEFT,
         _BAND,
         (_OCR_MORAL, _OCR_LESSONS),
         page_words=_MARGIN_PAGE.words,
@@ -465,7 +465,7 @@ def test_margin_note_rereads_pass_the_fidelity_check() -> None:
 
 def test_margin_note_reading_scoring_lower_keeps_the_layer() -> None:
     reading = margin_note_reading(
-        _Side.LEFT,
+        Side.LEFT,
         _BAND,
         (_ocr("id", 10, 100, 20, 108), _ocr("i", 22, 100, 24, 108)),
         page_words=_MARGIN_PAGE.words,
@@ -477,7 +477,7 @@ def test_margin_note_reading_scoring_lower_keeps_the_layer() -> None:
 
 def test_band_with_no_layer_word_and_no_reading_is_not_recorded() -> None:
     reading = margin_note_reading(
-        _Side.LEFT,
+        Side.LEFT,
         Box(8, 400, 46, 420),
         (),
         page_words=_MARGIN_PAGE.words,
@@ -487,7 +487,7 @@ def test_band_with_no_layer_word_and_no_reading_is_not_recorded() -> None:
 
 def test_note_the_layer_did_not_read_is_kept() -> None:
     reading = margin_note_reading(
-        _Side.LEFT,
+        Side.LEFT,
         Box(8, 400, 46, 420),
         (_ocr("Moral", 10, 402, 40, 410), _ocr("lessons.", 10, 410, 40, 418)),
         page_words=_MARGIN_PAGE.words,
@@ -501,7 +501,7 @@ def _band_over_nothing(*texts: str) -> Reread:
     """The record of a note band where the layer has no word, read by
     Tesseract as `texts` on one row."""
     reading = margin_note_reading(
-        _Side.LEFT,
+        Side.LEFT,
         Box(8, 400, 46, 420),
         tuple(
             _ocr(text, 10 + 12 * index, 402, 20 + 12 * index, 410)
@@ -557,7 +557,7 @@ _OCR_LINES = (
 
 def _cut_in_rereads() -> tuple[Reread, ...]:
     reading = cut_in_reading(
-        _Side.LEFT,
+        Side.LEFT,
         _CROP,
         _OCR_LINES,
         edge=50,
@@ -595,7 +595,7 @@ def test_cut_in_reading_with_no_word_left_replaces_nothing() -> None:
     # word of Tesseract's lies over the note, and nothing is recorded.
     note = _word("Dspnsrs,", 52, 200, 90, 208)
     reading = cut_in_reading(
-        _Side.LEFT,
+        Side.LEFT,
         _CROP,
         ((_ocr("NE", 62, 171, 90, 179),), (_ocr("an", 70, 241, 82, 249),)),
         edge=50,
@@ -609,7 +609,7 @@ def test_cut_in_reading_with_no_word_left_replaces_nothing() -> None:
 def test_reading_scoring_the_same_as_the_layer_keeps_the_layer() -> None:
     page = _page_of((_MORAL,))
     reading = margin_note_reading(
-        _Side.LEFT, _BAND, (_OCR_MORAL,), page_words=page.words
+        Side.LEFT, _BAND, (_OCR_MORAL,), page_words=page.words
     )
     (record,) = page_rereads(7, (reading,), _WORD_LIST)
     assert (record.layer_score, record.ocr_score) == (1, 1)
@@ -620,7 +620,7 @@ def _cut_in_after(layer_word: Word, ocr_line: tuple[Word, ...]) -> tuple[str, ..
     """The words of a page holding only `layer_word`, a word layout left in
     the column, once _CROP, read by Tesseract as `ocr_line`, is applied."""
     reading = cut_in_reading(
-        _Side.LEFT,
+        Side.LEFT,
         _CROP,
         (ocr_line,),
         edge=50,
@@ -679,7 +679,7 @@ def test_cut_in_crop_at_the_right_side_mirrors_the_left() -> None:
     note = _word("Barns", 300, 211, 345, 219)
     body = _word("body", 280, 170, 320, 180)
     reading = cut_in_reading(
-        _Side.RIGHT,
+        Side.RIGHT,
         crop,
         (
             (_ocr("xx", 290, 171, 300, 179),),
@@ -705,13 +705,13 @@ def test_second_of_two_overlapping_regions_takes_no_word_the_first_replaced() ->
     following = _word("Next", 10, 140, 40, 148)
     page = _page_of((moral, lesons, following))
     upper = margin_note_reading(
-        _Side.LEFT,
+        Side.LEFT,
         Box(8, 98, 46, 130),
         (_ocr("Moral", 10, 100, 40, 108), _ocr("lessons", 10, 121, 40, 129)),
         page_words=page.words,
     )
     lower = margin_note_reading(
-        _Side.LEFT,
+        Side.LEFT,
         Box(8, 125, 46, 160),
         (_ocr("lessons", 10, 121, 40, 129), _ocr("Next", 10, 140, 40, 148)),
         page_words=page.words,
@@ -726,8 +726,8 @@ def test_second_of_two_overlapping_regions_takes_no_word_the_first_replaced() ->
 
 
 def test_records_of_a_page_are_in_the_order_of_their_kinds_and_tops() -> None:
-    def reading(kind: str, side: _Side, top: float) -> RegionReading:
-        x0 = 8 if side is _Side.LEFT else 360
+    def reading(kind: str, side: Side, top: float) -> RegionReading:
+        x0 = 8 if side is Side.LEFT else 360
         box = Box(x0, top, x0 + 38, top + 10)
         word = _ocr("Next", x0 + 8, top + 1, x0 + 30, top + 9)
         match kind:
@@ -738,7 +738,7 @@ def test_records_of_a_page_are_in_the_order_of_their_kinds_and_tops() -> None:
                     side,
                     CutInCrop(box, ((top, top + 10),)),
                     ((word,),),
-                    edge=50 if side is _Side.LEFT else 350,
+                    edge=50 if side is Side.LEFT else 350,
                     inset=60,
                     cut_in_words=(),
                     column_words=(),
@@ -747,12 +747,12 @@ def test_records_of_a_page_are_in_the_order_of_their_kinds_and_tops() -> None:
                 return footnote_band_reading(box, (word,), band_words=())
 
     readings = (
-        reading("footnote", _Side.LEFT, 500),
-        reading("cut-in", _Side.RIGHT, 150),
-        reading("margin", _Side.RIGHT, 200),
-        reading("margin", _Side.RIGHT, 100),
-        reading("cut-in", _Side.LEFT, 300),
-        reading("margin", _Side.LEFT, 100),
+        reading("footnote", Side.LEFT, 500),
+        reading("cut-in", Side.RIGHT, 150),
+        reading("margin", Side.RIGHT, 200),
+        reading("margin", Side.RIGHT, 100),
+        reading("cut-in", Side.LEFT, 300),
+        reading("margin", Side.LEFT, 100),
     )
     # No crop overlaps another, so every region is recorded.
     records = page_rereads(7, readings, _WORD_LIST)
@@ -799,7 +799,7 @@ def test_small_print_page_with_another_region_raises() -> None:
     whole = small_print_reading(
         Box(0, 0, 400, 600), (), page_words=page.words, head_words=()
     )
-    margin = margin_note_reading(_Side.LEFT, _BAND, (), page_words=page.words)
+    margin = margin_note_reading(Side.LEFT, _BAND, (), page_words=page.words)
     with pytest.raises(ValueError, match="small-print page"):
         page_rereads(7, (whole, margin), _WORD_LIST)
 
@@ -854,7 +854,7 @@ def test_cut_in_note_line_dropped_at_the_inset_keeps_the_layer_words() -> None:
     body = (_review_word("the", 150, 600, confidence=None),)
     (crop,) = cut_in_crops(
         ((600.0, 618.0),),
-        _Side.LEFT,
+        Side.LEFT,
         edge=60.0,
         inset=80.0,
         pitch=12.0,
@@ -872,7 +872,7 @@ def test_cut_in_note_line_dropped_at_the_inset_keeps_the_layer_words() -> None:
         ),
     )
     reading = cut_in_reading(
-        _Side.LEFT,
+        Side.LEFT,
         crop,
         ocr_lines,
         edge=60.0,
@@ -911,14 +911,14 @@ def _note_and_band(note_reading: str) -> tuple[PageWords, tuple[RegionReading, .
     )
     (crop,) = cut_in_crops(
         ((600.0, 606.0),),
-        _Side.LEFT,
+        Side.LEFT,
         edge=60.0,
         inset=80.0,
         pitch=12.0,
         head_bottom=None,
     )
     cut_in = cut_in_reading(
-        _Side.LEFT,
+        Side.LEFT,
         crop,
         ((_review_word(note_reading, 62, 600, width=30, confidence=90),),),
         edge=60.0,
@@ -974,7 +974,7 @@ def test_margin_word_outside_the_strip_with_no_tesseract_word_over_it_stays() ->
     outside = _word("I.", 46.5, 101, 49.5, 107)
     page = _page_of((garbled, outside, _BODY_THE))
     reading = margin_note_reading(
-        _Side.LEFT,
+        Side.LEFT,
         _BAND,
         (_ocr("Moral", 10, 100, 40, 108),),
         page_words=page.words,

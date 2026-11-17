@@ -27,14 +27,14 @@ from typing import Final, assert_never
 
 from PIL import Image
 
-from galley.body_measures import group_rows, median_word_height
-from galley.layout import (
-    _SMALL_ROW_SHARE,
+from galley.body_measures import group_rows
+from galley.layout._column import (
     BookMeasures,
-    _cut_in_note_indices,
-    _running_head_row_count,
-    _Side,
-    _split_at_column,
+    Side,
+    is_small_row,
+    running_head_row_count,
+    split_at_column,
+    without_cut_in_notes,
 )
 from galley.model import Box, PageWords, Reread, RereadKind, Word, is_under_ocr_word
 from galley.ocr import OCR_DPI
@@ -211,21 +211,13 @@ def is_small_print_page(page: PageWords, measures: BookMeasures) -> bool:
     """
     if len(page.words) < _SMALL_PRINT_LEAST_WORDS:
         return False
-    split = _split_at_column(page.words, page.index, measures)
-    cut_in = _cut_in_note_indices(
-        split.column, _Side.LEFT, split.left, measures
-    ) | _cut_in_note_indices(split.column, _Side.RIGHT, -split.right, measures)
-    rows = group_rows(
-        tuple(word for index, word in enumerate(split.column) if index not in cut_in)
-    )
-    head_count = _running_head_row_count(rows, measures.body_line_pitch)
+    split = split_at_column(page.words, page.index, measures)
+    rows = group_rows(without_cut_in_notes(split, measures).column)
+    head_count = running_head_row_count(rows, measures.body_line_pitch)
     counted = tuple(
         row for row in rows[head_count:] if len(row.words) >= _COUNTED_ROW_LEAST_WORDS
     )
-    small = sum(
-        median_word_height(row.words) <= _SMALL_ROW_SHARE * measures.body_word_height
-        for row in counted
-    )
+    small = sum(is_small_row(row, measures) for row in counted)
     return bool(counted) and small * 100 >= _SMALL_PRINT_ROWS_PER_100 * len(counted)
 
 
@@ -259,7 +251,7 @@ def small_print_crop(
 
 
 def margin_strip(
-    side: _Side,
+    side: Side,
     *,
     left: float,
     right: float,
@@ -275,9 +267,9 @@ def margin_strip(
     top = column_top - _STRIP_ABOVE_BELOW_PT
     bottom = lowest + _STRIP_ABOVE_BELOW_PT
     match side:
-        case _Side.LEFT:
+        case Side.LEFT:
             return Box(_STRIP_PAGE_EDGE_PT, top, left - _STRIP_COLUMN_PT, bottom)
-        case _Side.RIGHT:
+        case Side.RIGHT:
             return Box(
                 right + _STRIP_COLUMN_PT, top, page_width - _STRIP_PAGE_EDGE_PT, bottom
             )
@@ -352,17 +344,17 @@ class CutInCrop:
     zones: tuple[tuple[float, float], ...]
 
 
-def _crop_sides(side: _Side, edge: float, inset: float) -> tuple[float, float]:
+def _crop_sides(side: Side, edge: float, inset: float) -> tuple[float, float]:
     """The left and right sides of a cut-in crop on `side`, whose column
     edge is `edge` and whose cut-in inset is `inset`: from 3 pt outside
     the edge to 3 pt short of the inset."""
     match side:
-        case _Side.LEFT:
+        case Side.LEFT:
             return (
                 edge - _CUT_IN_CROP_OUTSIDE_PT,
                 edge + inset - _CUT_IN_CROP_OUTSIDE_PT,
             )
-        case _Side.RIGHT:
+        case Side.RIGHT:
             return (
                 edge - inset + _CUT_IN_CROP_OUTSIDE_PT,
                 edge + _CUT_IN_CROP_OUTSIDE_PT,
@@ -373,7 +365,7 @@ def _crop_sides(side: _Side, edge: float, inset: float) -> tuple[float, float]:
 
 def cut_in_crops(
     zones: tuple[tuple[float, float], ...],
-    side: _Side,
+    side: Side,
     *,
     edge: float,
     inset: float,
@@ -439,7 +431,7 @@ class RegionReading:
     """
 
     kind: RereadKind
-    side: _Side | None
+    side: Side | None
     box: Box
     ocr_words: tuple[Word, ...]
     layer_words: tuple[Word, ...]
@@ -500,7 +492,7 @@ def small_print_reading(
 
 
 def margin_note_reading(
-    side: _Side,
+    side: Side,
     box: Box,
     ocr_words: tuple[Word, ...],
     *,
@@ -527,32 +519,32 @@ def _in_zone(word: Word, zones: tuple[tuple[float, float], ...]) -> bool:
     )
 
 
-def _short_of_inset(word: Word, side: _Side, edge: float, inset: float) -> bool:
+def _short_of_inset(word: Word, side: Side, edge: float, inset: float) -> bool:
     """Whether `word` ends 4 pt or more short of the cut-in inset on
     `side`, the place of a note word."""
     match side:
-        case _Side.LEFT:
+        case Side.LEFT:
             return word.box.x1 <= edge + inset - _CUT_IN_NOTE_SHORT_PT
-        case _Side.RIGHT:
+        case Side.RIGHT:
             return word.box.x0 >= edge - inset + _CUT_IN_NOTE_SHORT_PT
         case _:
             assert_never(side)
 
 
-def _reaches_inset_side(word: Word, side: _Side, crop: Box) -> bool:
+def _reaches_inset_side(word: Word, side: Side, crop: Box) -> bool:
     """Whether `word` ends within 3 pt of the side of `crop` toward the
     inset: a body line runs on past it."""
     match side:
-        case _Side.LEFT:
+        case Side.LEFT:
             return word.box.x1 >= crop.x1 - _CUT_IN_LINE_AT_INSET_PT
-        case _Side.RIGHT:
+        case Side.RIGHT:
             return word.box.x0 <= crop.x0 + _CUT_IN_LINE_AT_INSET_PT
         case _:
             assert_never(side)
 
 
 def cut_in_reading(
-    side: _Side,
+    side: Side,
     crop: CutInCrop,
     ocr_lines: tuple[tuple[Word, ...], ...],
     *,
@@ -638,7 +630,7 @@ def _kind_rank(kind: RereadKind) -> int:
 
 
 def _record_order(reading: RegionReading) -> tuple[int, float, bool]:
-    return (_kind_rank(reading.kind), reading.box.top, reading.side is _Side.RIGHT)
+    return (_kind_rank(reading.kind), reading.box.top, reading.side is Side.RIGHT)
 
 
 def page_rereads(
