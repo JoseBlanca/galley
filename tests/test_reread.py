@@ -490,6 +490,44 @@ def test_band_with_no_layer_word_and_no_reading_is_not_recorded() -> None:
     assert page_rereads(7, (reading,), _WORD_LIST) == ()
 
 
+def test_tesseract_junk_of_no_letter_or_digit_is_dropped_and_counted() -> None:
+    # A pencil curve beside a note read as "|", "¥" and "\\" (Gierke page
+    # 127); punctuation and printed signs stay.
+    reading = margin_note_reading(
+        Side.LEFT,
+        _BAND,
+        (
+            _ocr("|", 2, 98, 4, 130),
+            _OCR_MORAL,
+            _ocr("¥", 42, 100, 44, 108),
+            _ocr("\\", 2, 110, 4, 118),
+            _OCR_LESSONS,
+            _ocr("—", 42, 115, 46, 123),
+            _ocr("§", 2, 120, 4, 128),
+        ),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST)
+    assert _texts(record.ocr_words) == ("Moral", "lessons.", "—", "§")
+    assert record.dropped_junk_count == 3
+    assert record.kept
+
+
+def test_region_of_tesseract_junk_alone_over_no_layer_word_is_recorded() -> None:
+    reading = margin_note_reading(
+        Side.LEFT,
+        Box(8, 400, 46, 420),
+        (_ocr("~", 10, 402, 20, 410), _ocr("|", 22, 400, 24, 418)),
+        page_words=_MARGIN_PAGE.words,
+        edge=50,
+    )
+    (record,) = page_rereads(7, (reading,), _WORD_LIST)
+    assert (record.ocr_words, record.layer_words) == ((), ())
+    assert record.dropped_junk_count == 2
+    assert not record.kept
+
+
 def test_note_the_layer_did_not_read_is_kept() -> None:
     reading = margin_note_reading(
         Side.LEFT,

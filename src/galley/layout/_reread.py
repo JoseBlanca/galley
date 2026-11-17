@@ -704,6 +704,19 @@ def footnote_band_reading(
 
 # The records of a page
 
+# Tesseract's junk (reocr spec, section 4): a word of no letter or digit is
+# dropped unless each character is punctuation or a sign the books print. In
+# the kept records of whole Stubbs, Domesday and Gierke it read a pencil
+# curve or a stain as "|", "¥", "\\", "©", "@", "~", "_", "¢" (34 tokens).
+_PRINTED_SIGNS: Final[frozenset[str]] = frozenset(".,;:!?'\"‘’“”()[]-–—§&£$%*†‡¶/")
+
+
+def _is_junk(text: str) -> bool:
+    """Whether `text`, a word of Tesseract's, is junk: it has no letter or
+    digit and a character that is not punctuation or a printed sign."""
+    return not _has_letter_or_digit(text) and not set(text) <= _PRINTED_SIGNS
+
+
 # A later region drops a Tesseract word that an earlier kept region read
 # within 16 pt above or below, as model.replaced_layer_words pairs words of
 # one text (reocr spec, section 4).
@@ -756,7 +769,9 @@ def page_rereads(
     the margin note bands, top to bottom with the left side first at the
     same top, then the cut-in crops likewise, then the footnote band.
 
-    The regions are taken in that order. A word of Tesseract's whose middle
+    Tesseract's junk, a word of no letter or digit that is not punctuation
+    or a printed sign, is dropped first and counted in the record. The
+    regions are taken in that order. A word of Tesseract's whose middle
     lies inside the crop of an earlier kept region is dropped, and so is
     one that reads no layer word the region may still replace and whose
     letters and digits are those of a Tesseract word of an earlier kept
@@ -768,7 +783,8 @@ def page_rereads(
     words of Tesseract's are not empty and score higher than the layer
     words it replaces, by `reading_score` against `lower_case_words`, and,
     when it replaces no layer word, hold at least 2 known words. A
-    region where both readings are empty is not recorded. ValueError when
+    region where both readings are empty, before the junk is dropped, is
+    not recorded. ValueError when
     a small-print page comes with another region: no other region of such
     a page is read.
     """
@@ -784,11 +800,12 @@ def page_rereads(
     replaced: list[Word] = []
     records = []
     for reading in ordered:
-        outside_crops = tuple(
+        read = tuple(
             word
             for word in reading.ocr_words
             if not any(_inside(_middle(word), crop) for crop in earlier_crops)
         )
+        outside_crops = tuple(word for word in read if not _is_junk(word.text))
         replaceable = _without(reading.layer_words, replaced)
         matched = matched_ocr_positions(replaceable, outside_crops)
         ocr_words = tuple(
@@ -797,7 +814,7 @@ def page_rereads(
             if position in matched or not _read_before(word, earlier_ocr_words)
         )
         layer_words = replaced_layer_words(replaceable, ocr_words)
-        if not layer_words and not ocr_words:
+        if not layer_words and not read:
             continue
         layer_score = reading_score(layer_words, lower_case_words)
         ocr_scores = _word_scores(ocr_words, lower_case_words)
@@ -819,6 +836,7 @@ def page_rereads(
                 layer_score=layer_score,
                 ocr_score=ocr_score,
                 kept=kept,
+                dropped_junk_count=len(read) - len(outside_crops),
             )
         )
     return tuple(records)

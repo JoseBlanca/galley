@@ -1633,6 +1633,7 @@ def _note_reread(
         layer_score=-1,
         ocr_score=2,
         kept=kept,
+        dropped_junk_count=0,
     )
 
 
@@ -1788,6 +1789,7 @@ def test_layout_with_one_ocr_word_the_only_reading_of_two_lines_words_fails() ->
         layer_score=-2,
         ocr_score=0,
         kept=True,
+        dropped_junk_count=0,
     )
     lines = LinesFile(
         source_pdf_sha256=_SHA,

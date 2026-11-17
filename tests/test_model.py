@@ -196,6 +196,7 @@ LINES = LinesFile(
             layer_score=-1,
             ocr_score=1,
             kept=True,
+            dropped_junk_count=0,
         ),
     ),
 )
@@ -1648,6 +1649,7 @@ def test_reread_is_written_with_its_fields_in_order_and_read_back(
             "layer_score": -1,
             "ocr_score": 1,
             "kept": True,
+            "dropped_junk_count": 0,
         }
     ]
     assert read_lines(tmp_path / "lines.json") == LINES
@@ -1901,6 +1903,7 @@ def _rereads_record(
         layer_score=0,
         ocr_score=1,
         kept=kept,
+        dropped_junk_count=0,
     )
 
 

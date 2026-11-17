@@ -252,7 +252,9 @@ class Reread:
     and their confidence. `layer_score` and `ocr_score` are each reading's
     known words minus its unknown words. When `kept`, `ocr_words` stand in
     lines.json in place of `layer_words`; otherwise the record changes
-    nothing.
+    nothing. `dropped_junk_count` is the number of Tesseract's words of no
+    letter or digit, not punctuation or a sign the books print, dropped
+    before `ocr_words` (reocr spec, section 4).
     """
 
     page_index: int
@@ -263,6 +265,7 @@ class Reread:
     layer_score: int
     ocr_score: int
     kept: bool
+    dropped_junk_count: int = 0
 
 
 # A kept Reread replaces a layer word that is the same printed word as one
