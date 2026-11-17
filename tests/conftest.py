@@ -17,6 +17,7 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -318,17 +319,26 @@ def whole_book_run(
     first time a test asks for the book and kept for the session, so that
     every stage's whole_book tests share one run per book: layout re-reads
     Domesday and Gierke for about a minute each. Books may be asked for
-    from several threads at once. A test reads these folders and never
-    writes in them."""
+    from several threads at once: a book's run holds that book's lock, so
+    a second thread asking for it waits for the first run and gets its
+    folder, and different books run side by side. A test reads these
+    folders and never writes in them."""
     # The folders are made here, in one thread: pytest's tmp_path_factory
     # is not thread-safe, and its first mktemp from 6 threads at once
     # raised ValueError (17 November 2026).
     roots = frozendict(
         {book: tmp_path_factory.mktemp(book) for book in whole_book_toml}
     )
+    # functools.cache alone lets two threads that miss the cache at once
+    # both run the book, writing the same folder.
+    locks = frozendict({book: threading.Lock() for book in whole_book_toml})
+
+    def run(book: str) -> BookFolder:
+        with locks[book]:
+            return run_once(book)
 
     @functools.cache
-    def run(book: str) -> BookFolder:
+    def run_once(book: str) -> BookFolder:
         folder = BookFolder(roots[book])
         folder.book_toml.write_text(whole_book_toml[book], encoding="utf-8")
         root = str(folder.root)

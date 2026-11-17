@@ -8,6 +8,7 @@ that the 8-thread run does it once.
 """
 
 import shutil
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -30,7 +31,6 @@ from galley.model import (
     RemovalReason,
     TextSource,
     Word,
-    WordsFile,
     read_pages,
     read_words,
     write_pages,
@@ -809,31 +809,17 @@ WHOLE_BOOK_FRONT_MATTER_REMOVALS = frozendict(
 )
 
 
-@pytest.fixture(scope="module")
-def whole_book_words(
-    tmp_path_factory: pytest.TempPathFactory, whole_book_toml: frozendict[str, str]
-) -> frozendict[str, WordsFile]:
-    """words.json of each whole book as analyze and extract give it with
-    the configs of tests/conftest.py, by Internet Archive identifier."""
-    words = {}
-    for book in sorted(whole_book_toml):
-        folder = BookFolder(tmp_path_factory.mktemp(book))
-        folder.book_toml.write_text(whole_book_toml[book], encoding="utf-8")
-        config = read_config(folder.book_toml)
-        analyze.run(folder, config)
-        extract.run(folder, config)
-        words[book] = read_words(folder.words_json)
-    return frozendict(words)
-
-
+# words.json comes from the session's run of the book (tests/conftest.py),
+# which layout's whole_book tests share; the run re-reads with Tesseract.
 @pytest.mark.whole_book
+@pytest.mark.tesseract
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(900)
 @pytest.mark.parametrize("book", sorted(WHOLE_BOOK_FRONT_MATTER_REMOVALS))
 def test_front_matter_removals_of_each_whole_book_are_the_words_of_its_front_pages(
-    book: str, whole_book_words: frozendict[str, WordsFile]
+    book: str, whole_book_run: Callable[[str], BookFolder]
 ) -> None:
-    words = whole_book_words[book]
+    words = read_words(whole_book_run(book).words_json)
     removals = tuple(
         removal
         for removal in words.removals

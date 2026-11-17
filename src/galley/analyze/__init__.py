@@ -296,8 +296,9 @@ def _log_front_matter(
 ) -> None:
     """Logs at INFO the front-matter end, the step of the rule that gave it
     and the pages made `front_matter`; and at WARNING an end at the first
-    page of running text when the config has no `contents_pages`, so that
-    the owner adds them (front-matter spec section 2)."""
+    page of running text that makes a page `front_matter` when the config
+    has no `contents_pages`, so that the owner adds them (front-matter spec
+    section 2)."""
     dropped = tuple(page.index for page in pages if page.kind is PageKind.FRONT_MATTER)
     _logger.info(
         "analyze: the front matter ends at page index %d, by %s; %s",
@@ -308,7 +309,7 @@ def _log_front_matter(
         if dropped
         else "no page is front matter",
     )
-    if step is _FrontMatterStep.RUNNING_TEXT and not config.contents_pages:
+    if step is _FrontMatterStep.RUNNING_TEXT and dropped and not config.contents_pages:
         _logger.warning(
             "analyze: the front matter ends at the first page of running text, "
             "page index %d, and the config has no `contents_pages`; add the pages "

@@ -96,8 +96,12 @@ has neither: it ends at 7, the publisher's list of its series (299
 words), and drops only pages 1 and 6, keeping that list (7), the title
 page (12) and its back (13). The six configs of the `whole_book` tests and
 of the evaluation set all name their contents pages. analyze logs a
-WARNING when it ends the front matter at the running text and the
-config has no `contents_pages`, so that the owner adds them.
+WARNING when it ends the front matter at the running text, makes at
+least one page `front_matter` there, and the config has no
+`contents_pages`, so that the owner adds them. An end at the running
+text that drops nothing gives no warning: nine of the eleven committed
+excerpts start with a page of running text (section 6), and a warning
+on every run of theirs would say nothing.
 
 **Why "introduction" is not a preface name.** It would make Gierke end
 at its translator's introduction, page 12, which is right, but Stubbs'
