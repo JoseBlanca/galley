@@ -29,7 +29,6 @@ from galley.layout._reread import (
     note_bands,
     page_rereads,
     pixel_box,
-    point_box,
     reading_score,
     small_print_crop,
     small_print_reading,
@@ -322,13 +321,6 @@ def test_note_bands_of_a_strip_not_at_300_dpi_raise() -> None:
 def test_pixel_box_holds_the_points_box_at_the_dpi() -> None:
     # At 300 dpi a point is 300/72 px: 10 pt is 41.67 px, 20 pt 83.33 px.
     assert pixel_box(Box(10, 100, 20, 110), 300) == (41, 416, 84, 459)
-
-
-def test_point_box_moves_a_pixel_box_by_the_crop_origin() -> None:
-    box = point_box((4, 4, 66, 36), origin=(10, 100), dpi=300)
-    assert (box.x0, box.top, box.x1, box.bottom) == pytest.approx(
-        (10.96, 100.96, 25.84, 108.64)
-    )
 
 
 def test_small_print_crop_starts_1_pt_below_the_running_head() -> None:

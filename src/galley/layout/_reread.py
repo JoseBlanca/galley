@@ -38,6 +38,7 @@ from galley.layout import (
 )
 from galley.model import Box, PageWords, Reread, RereadKind, Word, is_under_ocr_word
 from galley.ocr import OCR_DPI
+from galley.pdfium import POINTS_PER_INCH
 from galley.wordlist import is_known_word
 
 __all__ = [
@@ -55,7 +56,6 @@ __all__ = [
     "note_bands",
     "page_rereads",
     "pixel_box",
-    "point_box",
     "reading_score",
     "small_print_crop",
     "small_print_reading",
@@ -67,8 +67,6 @@ __all__ = [
 # of the same type (6).
 SMALL_PRINT_PSM: Final[int] = 3
 NOTE_PSM: Final[int] = 6
-
-_POINTS_PER_INCH: Final[float] = 72.0
 
 # The reading score (reocr spec, section 1, "Reading score"): measured on
 # Stubbs and Domesday, section 3.
@@ -237,28 +235,12 @@ def is_small_print_page(page: PageWords, measures: BookMeasures) -> bool:
 def pixel_box(box: Box, dpi: int) -> tuple[int, int, int, int]:
     """The pixels of a render at `dpi` that hold `box`, as Pillow's crop
     box: left, top, right and bottom, the right and bottom excluded."""
-    scale = dpi / _POINTS_PER_INCH
+    scale = dpi / POINTS_PER_INCH
     return (
         math.floor(box.x0 * scale),
         math.floor(box.top * scale),
         math.ceil(box.x1 * scale),
         math.ceil(box.bottom * scale),
-    )
-
-
-def point_box(
-    box: tuple[int, int, int, int], *, origin: tuple[float, float], dpi: int
-) -> Box:
-    """The box in points on the page of `box`, a Pillow crop box in pixels
-    of an image rendered at `dpi` whose top left lies at `origin`, (left,
-    top) in points."""
-    scale = _POINTS_PER_INCH / dpi
-    left, top = origin
-    return Box(
-        left + box[0] * scale,
-        top + box[1] * scale,
-        left + box[2] * scale,
-        top + box[3] * scale,
     )
 
 

@@ -26,8 +26,16 @@ from PIL import Image
 
 from galley.errors import ExternalProgramError
 from galley.model import Box, Word
+from galley.pdfium import POINTS_PER_INCH
 
-__all__ = ["OCR_DPI", "lines_of_tsv", "read_image", "read_image_lines", "words_of_tsv"]
+__all__ = [
+    "OCR_DPI",
+    "lines_of_tsv",
+    "point_box",
+    "read_image",
+    "read_image_lines",
+    "words_of_tsv",
+]
 
 # The resolution galley renders a page at for Tesseract (reocr spec,
 # section 3): the measurements of that spec were taken at it.
@@ -37,12 +45,27 @@ OCR_DPI: Final[int] = 300
 # measured, 0.88 s, with room for a slow machine.
 _TIMEOUT_S: Final[float] = 120.0
 
-_POINTS_PER_INCH: Final[float] = 72.0
 _TSV_HEADER: Final[str] = "level\t"
 _WORD_LEVEL: Final[str] = "5"
 _TSV_FIELDS: Final[int] = 12
 # How much of Tesseract's output or error output an error message quotes.
 _QUOTED_CHARACTERS: Final[int] = 300
+
+
+def point_box(
+    box: tuple[int, int, int, int], *, origin: tuple[float, float], dpi: int
+) -> Box:
+    """The box in points on the page of `box`, a Pillow crop box in pixels
+    (left, top, right, bottom) of an image rendered at `dpi` whose top left
+    lies at `origin`, (left, top) in points."""
+    scale = POINTS_PER_INCH / dpi
+    left, top = origin
+    return Box(
+        left + box[0] * scale,
+        top + box[1] * scale,
+        left + box[2] * scale,
+        top + box[3] * scale,
+    )
 
 
 def _field_number(row: str, field: str, convert: Callable[[str], float]) -> float:
@@ -94,18 +117,13 @@ def lines_of_tsv(
     `tsv` is not tsv output (Tesseract prints plain text when it lacks a
     setting, and exits with 0).
     """
-    scale = _POINTS_PER_INCH / dpi
-    left, top = origin
     numbered = []
     for row, fields in _word_rows(tsv):
         x_px, y_px, width_px, height_px = (
-            _field_number(row, field, int) for field in fields[6:10]
+            int(_field_number(row, field, int)) for field in fields[6:10]
         )
-        box = Box(
-            left + x_px * scale,
-            top + y_px * scale,
-            left + (x_px + width_px) * scale,
-            top + (y_px + height_px) * scale,
+        box = point_box(
+            (x_px, y_px, x_px + width_px, y_px + height_px), origin=origin, dpi=dpi
         )
         word = Word(fields[11].strip(), box, _field_number(row, fields[10], float))
         numbered.append((fields[1:5], word))

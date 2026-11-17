@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from galley.errors import ExternalProgramError
 from galley.model import Box, Word
-from galley.ocr import OCR_DPI, lines_of_tsv, read_image, words_of_tsv
+from galley.ocr import OCR_DPI, lines_of_tsv, point_box, read_image, words_of_tsv
 
 _HEADER = (
     "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num"
@@ -162,3 +162,10 @@ def test_read_image_with_a_language_tesseract_lacks_raises_naming_it() -> None:
     image = _drawn_words("Stephen")
     with pytest.raises(ExternalProgramError, match="xxq"):
         read_image(image, origin=(0, 0), dpi=300, psm=6, language="xxq")
+
+
+def test_point_box_moves_a_pixel_box_by_the_crop_origin() -> None:
+    box = point_box((4, 4, 66, 36), origin=(10, 100), dpi=300)
+    assert (box.x0, box.top, box.x1, box.bottom) == pytest.approx(
+        (10.96, 100.96, 25.84, 108.64)
+    )
