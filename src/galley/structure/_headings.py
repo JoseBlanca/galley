@@ -246,7 +246,7 @@ def _is_tall_line(
     height of the stream, has at least 4 letters, passes rules 2 and 3, and
     lies at least 1.3 pitches below the line before, or is the page's first
     line, or follows a heading line, one of the positions
-    `heading_lines`."""
+    `heading_lines`; a line with no letter or digit counts as no line."""
     line = lines[number]
     texts = _texts(line)
     if not (
@@ -257,23 +257,37 @@ def _is_tall_line(
         and not _ends_with_number(texts)
     ):
         return False
-    if number == 0 or number - 1 in heading_lines:
+    # A line of marks, a speck, is passed over.
+    before = next(
+        (
+            other
+            for other in range(number - 1, -1, -1)
+            if any(c.isalnum() for c in "".join(_texts(lines[other])))
+        ),
+        None,
+    )
+    if before is None or before in heading_lines:
         return True
-    above = _pitches(lines[number - 1], line, pitch)
+    above = _pitches(lines[before], line, pitch)
     return above is not None and above >= _TALL_GAP_ABOVE_MIN_PITCHES
 
 
 def _is_continuation(lines: Sequence[PlacedLine], number: int, pitch: float) -> bool:
     """Spec section 14, "a continuation": the line at `number` follows a
     heading line, has at least 4 letters, lies at most 2.6 pitches below
-    it, and is centred, or is in capitals (0.9) with a gap below of at
-    least 1.5 pitches."""
+    it (4.0 below a chapter label), and is centred, or is in capitals (0.9)
+    with a gap below of at least 1.5 pitches."""
     line = lines[number]
     below_heading = _pitches(lines[number - 1], line, pitch)
+    reach = (
+        _JOIN_AFTER_LABEL_MAX_PITCHES
+        if _is_chapter_label(lines[number - 1])
+        else _CONTINUATION_MAX_PITCHES
+    )
     if (
         _letter_count(line) < _WORD_MIN_LETTERS
         or below_heading is None
-        or below_heading > _CONTINUATION_MAX_PITCHES
+        or below_heading > reach
     ):
         return False
     if is_centred(line):

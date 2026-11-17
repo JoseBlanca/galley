@@ -4080,17 +4080,26 @@ def test_heading_starting_with_a_label_word_is_level_1_with_its_words() -> None:
 
 
 @pytest.mark.parametrize(
-    ("distance", "gap_after", "continued"),
-    [(39.0, 33.0, True), (39.5, 33.0, False), (33.0, 22.5, True), (33.0, 22.0, False)],
+    ("above", "distance", "gap_after", "continued"),
+    [
+        ("THE OPENING TITLE", 39.0, 33.0, True),
+        ("THE OPENING TITLE", 39.5, 33.0, False),
+        ("THE OPENING TITLE", 33.0, 22.5, True),
+        ("THE OPENING TITLE", 33.0, 22.0, False),
+        # Below a chapter label alone, 4.0 pitches (the plan owner-books,
+        # structure spec section 14).
+        ("CHAPITRE V", 60.0, 33.0, True),
+        ("CHAPITRE V", 60.5, 33.0, False),
+    ],
 )
 def test_heading_continuation_in_capitals_within_2_6_pitches_and_1_5_above_the_text(
-    distance: float, gap_after: float, continued: bool
+    above: str, distance: float, gap_after: float, continued: bool
 ) -> None:
     title = "L'EXPERIENCE ET L'ECHEC DE LA POLITIQUE MODEREE"
     blocks = make_blocks(
         _lines_of(
             _around(
-                _centred_line("CHAPITRE V", 130),
+                _centred_line(above, 130),
                 _full(title, 130 + distance),
                 gap_after=gap_after,
             )
@@ -4098,7 +4107,8 @@ def test_heading_continuation_in_capitals_within_2_6_pitches_and_1_5_above_the_t
         _NO_WORDS,
         workers=1,
     )
-    assert (_kinds_and_texts(blocks)[1][3] == title) is continued
+    # The title is the heading's text, after the label or the line above.
+    assert _kinds_and_texts(blocks)[1][3].endswith(title) is continued
 
 
 @pytest.mark.parametrize(

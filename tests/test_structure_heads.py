@@ -433,6 +433,52 @@ def test_tall_lines_of_text_over_small_type_are_no_headings_past_6_on_a_page(
     assert len(_headings(blocks)) == headings
 
 
+def test_tall_chapter_label_under_a_speck_is_its_headings_label() -> None:
+    # Turney's page 134: a speck "#" 6 pt above the label, in its region.
+    speck = _line("#", 140, 94)
+    label = _line("Chapter Twelve", _BODY_LEFT_PT + 45, 100, 1.3 * _WORD_HEIGHT_PT)
+    title = _line(
+        "The Long Title", _BODY_LEFT_PT, 100 + 1.5 * _PITCH_PT, 2.4 * _WORD_HEIGHT_PT
+    )
+    page = PageLayout(
+        20,
+        (
+            _region(speck, label),
+            _region(title),
+            _region(*_running_text(100 + 3.5 * _PITCH_PT, 12)),
+        ),
+        (),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _headings(blocks) == ((1, "Chapter Twelve", "The Long Title"),)
+
+
+@pytest.mark.parametrize(("gap", "label"), [(2.9, "CHAPTER TWELVE"), (4.1, None)])
+def test_title_line_in_capitals_continues_up_to_4_pitches_below_a_chapter_label(
+    gap: float, label: str | None
+) -> None:
+    # Haynes' page 249: the label flush left in capitals; the title's first
+    # line in capitals, as wide as the text but for 15 pt, neither flush
+    # left nor tall; its second line tall, 1.9 pitches lower.
+    head = _line("CHAPTER TWELVE", _BODY_LEFT_PT, 60)
+    first = _line("A RATHER LONG FIRST TITLE", _BODY_LEFT_PT, 60 + gap * _PITCH_PT)
+    second = _line(
+        "THE SECOND LINE",
+        _BODY_LEFT_PT,
+        first.box.top + 1.9 * _PITCH_PT,
+        1.4 * _WORD_HEIGHT_PT,
+    )
+    text = _running_text(second.box.top + 3 * _PITCH_PT, 12)
+    page = PageLayout(20, (_region(head), _region(first, second, *text)), ())
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    if label is None:
+        assert (1, None, "CHAPTER TWELVE") in _headings(blocks)
+    else:
+        assert _headings(blocks) == (
+            (1, label, "A RATHER LONG FIRST TITLE THE SECOND LINE"),
+        )
+
+
 # On the six public-domain books (spec section 26, "Whole-book tests"), from
 # the session's run of each whole book (tests/conftest.py).
 

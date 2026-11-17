@@ -106,34 +106,7 @@ def _level_1_headings(blocks: BlocksFile) -> tuple[str | None, ...]:
     )
 
 
-@pytest.mark.parametrize(
-    "book",
-    [
-        pytest.param(
-            "turney",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason=(
-                    "9 of 10: chapter six's label (page 134) has a speck above "
-                    "it, 0.38 pitch away, so the tall branch finds no gap above "
-                    "it; the plan's decision point"
-                ),
-            ),
-        ),
-        pytest.param(
-            "haynes",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason=(
-                    "15 of 16: chapter fourteen's title (page 249) opens with a "
-                    "line neither flush left (58 pt short of the edge, under a "
-                    "quarter) nor tall (1.09), 2.87 pitches below the label; "
-                    "the plan's decision point"
-                ),
-            ),
-        ),
-    ],
-)
+@pytest.mark.parametrize("book", ["turney", "haynes"])
 def test_every_chapter_is_a_level_1_heading_with_its_label(
     owner_book_run: Callable[[str], BlocksFile], book: str
 ) -> None:
