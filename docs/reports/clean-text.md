@@ -162,3 +162,31 @@ decided by the orchestrator:
 `split_glued` takes the larger of the two middle widths as the median;
 with their mean, "A.d." on Stubbs' page 207 is split. extract §4 now
 says so.
+
+## Work package 3: the front matter
+
+Done (e88abc3, 54467ba), merged. analyze finds where the front matter
+ends and makes the text pages before it `front_matter`; extract records
+each of their words as a removal. On the six whole books the ends,
+steps, pages and word counts equal front matter §4:
+
+| book | end | step | dropped pages | words |
+|---|---|---|---|---|
+| Haskins | 12 | preface | 1, 2, 6, 8, 9, 10 | 108 |
+| Stubbs | 14 | contents | 1, 6, 7, 12, 13 | 370 |
+| Domesday | 12 | preface | 4, 8–11 | 99 |
+| Mariéjol | 10 | preface | 6–9 | 95 |
+| Gierke | 10 | contents | 1, 6–9 | 100 |
+| Kadesh | 8 | running text | 4–7 | 91 |
+
+Deliverables: 37 unit tests, 16 excerpt tests and 12 whole-book tests,
+all passing; no reference literal of an old excerpt changed. After the
+merge the default run is 1,901 tests in 45.1 s, within the minute but
+up from 30.7 s since the plan started; the whole-book run took 467 s.
+
+Decided by the orchestrator: Kadesh, which has no contents, logs a
+warning on every run that its front matter was found by the running
+text alone; that is the warning's purpose, and `front_matter_end`
+silences it. Front matter §6's first unit test gives Haskins' pages 0
+to 27 alone, which make a window of 10 pages and an end of 0; the test
+adds stand-in pages, and the spec is corrected with the review's fixes.

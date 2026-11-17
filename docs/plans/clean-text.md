@@ -331,11 +331,11 @@ or at the contents when they come first.
 **What could go wrong.** The running-text step's threshold, half the
 median word count, was measured on Kadesh alone (front matter §2).
 
-- [ ] 3.1 `PageStart`, `front_matter_end`, `classify_page`'s new
+- [x] 3.1 `PageStart`, `front_matter_end`, `classify_page`'s new
   argument, analyze's checks of the key and its logs, with the unit
   tests. Spec: front matter §1, §2 and §7. Stream `front-matter`.
   Deliverable 1.
-- [ ] 3.2 extract's removals for a `front_matter` page; the excerpt and
+- [x] 3.2 extract's removals for a `front_matter` page; the excerpt and
   whole-book tests. Spec: front matter §3, §4 and §6. Needs 3.1. Stream
   `front-matter`. Deliverables 2 to 4.
 
