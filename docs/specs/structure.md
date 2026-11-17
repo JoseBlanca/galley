@@ -762,13 +762,14 @@ class BookSurvey:
     body_word_height: float
     body_line_pitch: float
     book_words: frozenset[str]             # keys of the words printed whole
+    common_inner_words: frozenset[str]     # keys printed after a line's first word more than 8 times (section 5)
     signature_lines: frozenset[int]        # pages whose lowest line is a signature line
     index_pages: frozenset[int]            # section 17, rule 1
     plate_pages: frozenset[int]            # pages with a figure (section 18)
 
 class HyphenJoin(NamedTuple):
     word: str
-    reason: ChangeReason                   # hyphen_join, hyphen_join_guessed or hyphen_kept
+    reason: ChangeReason                   # hyphen_join, hyphen_join_guessed, hyphen_kept or hyphen_lost
 
 class NoteMarker(NamedTuple):
     marker: str                            # as the OCR read it: "13", "(t)", "291."
@@ -788,6 +789,9 @@ def survey_book(lines: LinesFile, *, language: Language = Language.EN,
                 workers: int = DEFAULT_WORKERS) -> BookSurvey: ...
 def join_hyphen(first: str, second: str, book_words: frozenset[str],
                 word_list: frozenset[str]) -> HyphenJoin | None: ...
+def join_lost_hyphen(first: str, second: str, book_words: frozenset[str],
+                     word_list: frozenset[str],
+                     common_inner_words: frozenset[str]) -> HyphenJoin | None: ...
 def note_marker(word: str, *, endnote: bool = False) -> NoteMarker | None: ...
 def reference_candidate(word: str) -> Reference | None: ...
 def make_blocks(lines: LinesFile, lower_case_words: frozenset[str], *,
@@ -803,7 +807,9 @@ section 11 (with `endnote`, also the endnote form), or `None`;
 `StrEnum` of the module. `language` serves the index title of a French
 book ("table alphabétique", section 17); `contents_pages` is the
 config's (section 14). `join_hyphen` gives `None` when the two words are not joined (section
-5); it takes the word list in lower case, which `make_blocks` is given
+5), and `join_lost_hyphen` likewise for the two parts of a margin
+note's word whose hyphen the OCR lost (section 5, `hyphen_lost`); both
+take the word list in lower case, which `make_blocks` is given
 as `wordlist.lower_case_word_list` gives it. `make_blocks` is the whole stage on values: it calls `survey_book`,
 does the per-page work with `map_pages`, then the work across pages.
 `run` reads `pages.json` and `lines.json` with `read_checked_input` as
