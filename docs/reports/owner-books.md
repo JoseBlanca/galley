@@ -56,3 +56,21 @@ whose tests failed and which would have crashed on a real epigraph.
 `source` and `group` default to empty, so no other stream's code had
 to change. Default run 60.4 s, measured while other streams ran pytest
 on the same machine.
+
+## Task 5.1: spaced signs and case splits (stream `words`)
+
+12c38a4, 76d3db2, 6b33a5d, f99da27, merged into the plan's branch. The
+pure functions `attach_spaced_sign`, `split_at_case` and their passes
+over a block, not yet wired into structure (task 5.2). Counts on the
+six books' clean-text lines (signs attached / case splits): Haskins
+90 / 2, Stubbs 1,022 / 10, Domesday 2,115 / 3, Gierke 888 / 0, Kadesh
+98 / 0; Mariéjol 1,150 no-break spaces and 12 splits.
+
+**Changed from the spec (76d3db2).** As first written, the case split
+took 48 Mariéjol words, at least 30 of them misreadings cut in two
+("poUtique" for "politique"), and Domesday's "jiEthelbert": Tesseract's
+word lists hold "po" and "ji". Now the left part must also be one of
+the book's common inner words, and no split is made before a capital U
+or H (a misread "li"). Mariéjol's 6 remaining wrong splits are an
+accepted cost (the owner's decision on that scan); Domesday's "forSon"
+and "forSan" are to be checked on the page in WP 5's review.
