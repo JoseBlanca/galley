@@ -1889,3 +1889,524 @@ def test_layout_with_one_ocr_word_the_only_reading_of_two_lines_words_fails() ->
 
     assert "'dominieum,'" in raised.value.detail
     assert "the only ocr word that can read 'Domini'" in raised.value.detail
+
+
+# The plan owner-books (structure spec sections 22 to 25, architecture
+# section 13): an epigraph's source and a note's group are words of their
+# block and note; the dash before a source, a spaced sign and a word glued
+# at a case change are word changes the check verifies.
+
+
+def _epigraph(source: str | None, quotation: str = "The life of man.") -> Block:
+    return replace(
+        _block("b-p0000-002", (0,), (_span(quotation),)),
+        kind=BlockKind.EPIGRAPH,
+        source=source,
+    )
+
+
+_SOURCE_DASH = WordChange(
+    page_index=0,
+    before=("—Thomas",),
+    after=("Thomas",),
+    reason=ChangeReason.SOURCE_DASH,
+)
+_EPIGRAPH_LINES = _lines_file((("The life of man.", "—Thomas Hobbes, 1651"),))
+
+
+def test_structure_epigraph_source_counts_as_words_of_its_block() -> None:
+    blocks = _blocks_file(
+        (_epigraph("Thomas Hobbes, 1651"),), word_changes=(_SOURCE_DASH,)
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, _EPIGRAPH_LINES, blocks)
+
+
+def test_structure_source_dash_of_a_dash_word_and_the_word_after_passes() -> None:
+    lines = _lines_file((("The life of man.", "— Hobbes"),))
+    change = WordChange(
+        page_index=0,
+        before=("—", "Hobbes"),
+        after=("Hobbes",),
+        reason=ChangeReason.SOURCE_DASH,
+    )
+    blocks = _blocks_file((_epigraph("Hobbes"),), word_changes=(change,))
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_structure_source_dash_of_several_dashes_read_by_the_ocr_passes() -> None:
+    # Haynes' OCR reads the dash as "—-" (structure spec section 22).
+    lines = _lines_file((("The life of man.", "—-Hobbes"),))
+    change = WordChange(
+        page_index=0,
+        before=("—-Hobbes",),
+        after=("Hobbes",),
+        reason=ChangeReason.SOURCE_DASH,
+    )
+    blocks = _blocks_file((_epigraph("Hobbes"),), word_changes=(change,))
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_structure_epigraph_source_dropped_from_the_block_is_missing() -> None:
+    blocks = _blocks_file((_epigraph("Thomas Hobbes,"),), word_changes=(_SOURCE_DASH,))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, _EPIGRAPH_LINES, blocks)
+
+    assert raised.value.missing == frozendict({"1651": 1})
+    assert raised.value.invented == frozendict()
+    assert "'1651': input page 0, output none" in raised.value.detail
+
+
+# A paragraph with a source: its words balance, only the record is wrong.
+_SOURCED_PARAGRAPH = _blocks_file(
+    (replace(_epigraph("Hobbes"), kind=BlockKind.PARAGRAPH),)
+)
+_SOURCED_PARAGRAPH_DETAIL = (
+    "block b-p0000-002 is a paragraph and has the source 'Hobbes'; only an "
+    "epigraph has a source"
+)
+
+
+def test_structure_block_that_is_not_an_epigraph_with_a_source_fails() -> None:
+    lines = _lines_file((("The life of man.", "Hobbes"),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, _SOURCED_PARAGRAPH)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict()
+    assert raised.value.detail == _SOURCED_PARAGRAPH_DETAIL
+
+
+def test_markdown_block_that_is_not_an_epigraph_with_a_source_fails() -> None:
+    markdown = _markdown(
+        tuple(
+            (word, "b-p0000-002") for word in ("The", "life", "of", "man.", "Hobbes")
+        ),
+        note_count=0,
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.MARKDOWN, _SOURCED_PARAGRAPH, markdown)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict()
+    assert raised.value.detail == _SOURCED_PARAGRAPH_DETAIL
+
+
+def _grouped_endnote(group: str | None) -> BlocksFile:
+    return _blocks_file(
+        (_block("b-p0000-001", (0,), (_span("Text."),)),),
+        notes=(
+            Note(
+                id="n-p0001-001",
+                kind=NoteKind.ENDNOTE,
+                marker="1",
+                blocks=(_block("b-p0001-001", (1,), (_span("See Gierke."),)),),
+                origin=(Origin(1, _BOX),),
+                referenced=False,
+                group=group,
+            ),
+        ),
+    )
+
+
+def test_structure_note_group_counts_as_words_of_its_note() -> None:
+    lines = _lines_file((("Text.",), ("Chapter 1.", "The Seed", "1 See Gierke.")))
+
+    check_stage(
+        FidelityBoundary.STRUCTURE, lines, _grouped_endnote("Chapter 1. The Seed")
+    )
+
+
+def test_structure_note_group_not_in_the_lines_is_invented() -> None:
+    lines = _lines_file((("Text.",), ("1 See Gierke.",)))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, _grouped_endnote("Chapter 1."))
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict({"Chapter": 1, "1.": 1})
+    assert "'Chapter': input none, output note n-p0001-001 page 1" in (
+        raised.value.detail
+    )
+
+
+def test_structure_punctuation_attached_with_its_word_change_passes() -> None:
+    lines = _lines_file((("held in subjection ; and",),))
+    change = WordChange(
+        page_index=0,
+        before=("subjection", ";"),
+        after=("subjection;",),
+        reason=ChangeReason.PUNCTUATION_ATTACHED,
+    )
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0,), (_span("held in subjection; and"),)),),
+        word_changes=(change,),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_structure_case_split_with_its_word_change_passes() -> None:
+    lines = _lines_file((("valley of theAvre.",),))
+    change = WordChange(
+        page_index=0,
+        before=("theAvre.",),
+        after=("the", "Avre."),
+        reason=ChangeReason.CASE_SPLIT,
+    )
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0,), (_span("valley of the Avre."),)),),
+        word_changes=(change,),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+@pytest.mark.parametrize(
+    ("lines", "block_text", "change"),
+    [
+        # The dash taken out with a letter.
+        (
+            ("—Hobbes",),
+            "obbes",
+            WordChange(
+                page_index=0,
+                before=("—Hobbes",),
+                after=("obbes",),
+                reason=ChangeReason.SOURCE_DASH,
+            ),
+        ),
+        # No dash to take out.
+        (
+            ("Hobbes",),
+            "Hobbes",
+            WordChange(
+                page_index=0,
+                before=("Hobbes",),
+                after=("Hobbes",),
+                reason=ChangeReason.SOURCE_DASH,
+            ),
+        ),
+        # Two words of the source glued: the first is more than a dash.
+        (
+            ("—Thomas Hobbes",),
+            "ThomasHobbes",
+            WordChange(
+                page_index=0,
+                before=("—Thomas", "Hobbes"),
+                after=("ThomasHobbes",),
+                reason=ChangeReason.SOURCE_DASH,
+            ),
+        ),
+        # A dash inside the word taken out too.
+        (
+            ("—1873—1881",),
+            "18731881",
+            WordChange(
+                page_index=0,
+                before=("—1873—1881",),
+                after=("18731881",),
+                reason=ChangeReason.SOURCE_DASH,
+            ),
+        ),
+        # A second word that is not a sign.
+        (
+            ("in subjection and",),
+            "in subjectionand",
+            WordChange(
+                page_index=0,
+                before=("subjection", "and"),
+                after=("subjectionand",),
+                reason=ChangeReason.PUNCTUATION_ATTACHED,
+            ),
+        ),
+        # The sign changed on the way.
+        (
+            ("in subjection ;",),
+            "in subjection:",
+            WordChange(
+                page_index=0,
+                before=("subjection", ";"),
+                after=("subjection:",),
+                reason=ChangeReason.PUNCTUATION_ATTACHED,
+            ),
+        ),
+        # Three words joined.
+        (
+            ("in subjection ; ;",),
+            "in subjection;;",
+            WordChange(
+                page_index=0,
+                before=("subjection", ";", ";"),
+                after=("subjection;;",),
+                reason=ChangeReason.PUNCTUATION_ATTACHED,
+            ),
+        ),
+        # Parts that do not make the word.
+        (
+            ("theAvre",),
+            "the Avra",
+            WordChange(
+                page_index=0,
+                before=("theAvre",),
+                after=("the", "Avra"),
+                reason=ChangeReason.CASE_SPLIT,
+            ),
+        ),
+        # A second part that does not start with a capital.
+        (
+            ("theavre",),
+            "the avre",
+            WordChange(
+                page_index=0,
+                before=("theavre",),
+                after=("the", "avre"),
+                reason=ChangeReason.CASE_SPLIT,
+            ),
+        ),
+        # Three parts.
+        (
+            ("ofTheAvre",),
+            "of The Avre",
+            WordChange(
+                page_index=0,
+                before=("ofTheAvre",),
+                after=("of", "The", "Avre"),
+                reason=ChangeReason.CASE_SPLIT,
+            ),
+        ),
+    ],
+    ids=[
+        "source_dash-drops-a-letter",
+        "source_dash-without-a-dash",
+        "source_dash-glues-two-words",
+        "source_dash-inside-the-word",
+        "punctuation_attached-no-sign",
+        "punctuation_attached-changed-sign",
+        "punctuation_attached-three-words",
+        "case_split-other-letters",
+        "case_split-lower-case",
+        "case_split-three-parts",
+    ],
+)
+def test_structure_new_word_change_that_breaks_its_rules_fails(
+    lines: tuple[str, ...], block_text: str, change: WordChange
+) -> None:
+    # Each change accounts for the words exactly, so only its rules can
+    # make the check fail.
+    blocks = _blocks_file(
+        (_block("b-p0000-001", (0,), (_span(block_text),)),), word_changes=(change,)
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, _lines_file((lines,)), blocks)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict()
+    assert raised.value.detail == (
+        f"word change on page 0: {change.before!r} to {change.after!r} is not a "
+        f"{change.reason.value}"
+    )
+
+
+# The markdown boundary: the dash before the source is markdown's and taken
+# out by the walk; the words of the source and of a note group are counted.
+
+_EPIGRAPH_MARKDOWN = tuple(
+    (word, "b-p0000-002")
+    for word in ("The", "life", "of", "man.", "Thomas", "Hobbes,", "1651")
+)
+
+
+def test_markdown_epigraph_source_counts_as_words_of_its_block() -> None:
+    blocks = _blocks_file((_epigraph("Thomas Hobbes, 1651"),))
+
+    check_stage(
+        FidelityBoundary.MARKDOWN, blocks, _markdown(_EPIGRAPH_MARKDOWN, note_count=0)
+    )
+
+
+def test_markdown_epigraph_source_left_out_of_the_markdown_is_missing() -> None:
+    blocks = _blocks_file((_epigraph("Thomas Hobbes, 1651"),))
+    markdown = _markdown(_EPIGRAPH_MARKDOWN[:4], note_count=0)
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
+
+    assert raised.value.missing == frozendict({"Thomas": 1, "Hobbes,": 1, "1651": 1})
+    assert raised.value.invented == frozendict()
+
+
+def test_markdown_note_group_counts_as_words_of_the_note_after_it() -> None:
+    markdown = _markdown(
+        (
+            ("Text.", "b-p0000-001"),
+            ("Chapter", "n-p0001-001"),
+            ("1.", "n-p0001-001"),
+            ("1", "b-p0001-001"),
+            ("See", "b-p0001-001"),
+            ("Gierke.", "b-p0001-001"),
+        ),
+        note_count=0,
+    )
+
+    check_stage(FidelityBoundary.MARKDOWN, _grouped_endnote("Chapter 1."), markdown)
+
+
+def test_markdown_note_group_left_out_of_the_markdown_is_missing() -> None:
+    markdown = _markdown(
+        (
+            ("Text.", "b-p0000-001"),
+            ("1", "b-p0001-001"),
+            ("See", "b-p0001-001"),
+            ("Gierke.", "b-p0001-001"),
+        ),
+        note_count=0,
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.MARKDOWN, _grouped_endnote("Chapter 1."), markdown)
+
+    assert raised.value.missing == frozendict({"Chapter": 1, "1.": 1})
+
+
+# The walk of an epigraph's and a note group's divs, on literal JSON as
+# Pandoc 3.14 writes the Markdown of structure spec section 25.
+
+
+def _classed_div(div_id: str, class_name: str, blocks: str) -> str:
+    return f'{{"t":"Div","c":[["{div_id}",["{class_name}"],[]],[{blocks}]]}}'
+
+
+def _para(*words: str) -> str:
+    inlines = f",{_SPACE},".join(_str(word) for word in words)
+    return f'{{"t":"Para","c":[{inlines}]}}'
+
+
+# The em dash and no-break space markdown writes before a source, one Str
+# with the source's first word.
+_SOURCE_START = "— Thomas"
+
+
+def test_walk_takes_the_dash_out_of_an_epigraph_source_and_counts_it_to_the_epigraph() -> (
+    None
+):
+    source = _classed_div("", "epigraph-source", _para(_SOURCE_START, "Hobbes"))
+    epigraph = _classed_div(
+        "b-p0000-002", "epigraph", f"{_para('The', 'life.')},{source}"
+    )
+
+    markdown = _words_of_pandoc_json(_pandoc_document(epigraph))
+
+    assert markdown.words == tuple(
+        MarkdownWord(word, "b-p0000-002")
+        for word in ("The", "life.", "Thomas", "Hobbes")
+    )
+
+
+@pytest.mark.parametrize(
+    "first_word",
+    ["Thomas", "- Thomas", "—— Thomas"],
+    ids=["no-dash", "hyphen", "two-dashes"],
+)
+def test_walk_of_an_epigraph_source_without_the_dash_markdown_writes_raises(
+    first_word: str,
+) -> None:
+    source = _classed_div("", "epigraph-source", _para(first_word, "Hobbes"))
+    epigraph = _classed_div("b-p0000-002", "epigraph", f"{_para('The')},{source}")
+
+    with pytest.raises(
+        ExternalProgramError, match="epigraph-source div in block b-p0000-002"
+    ):
+        _words_of_pandoc_json(_pandoc_document(epigraph))
+
+
+@pytest.mark.parametrize(
+    "inner_div",
+    [
+        _classed_div("", "quote", _para("Hobbes")),
+        _div("b-p0000-003", _para("Hobbes")),
+    ],
+    ids=["other-class", "block-div"],
+)
+def test_walk_of_another_div_inside_an_epigraph_raises(inner_div: str) -> None:
+    epigraph = _classed_div("b-p0000-002", "epigraph", f"{_para('The')},{inner_div}")
+
+    with pytest.raises(ExternalProgramError, match="Div element in block b-p0000-002"):
+        _words_of_pandoc_json(_pandoc_document(epigraph))
+
+
+def test_walk_of_an_epigraph_source_outside_an_epigraph_raises() -> None:
+    source = _classed_div("", "epigraph-source", _para(_SOURCE_START))
+    paragraph = _div("b-p0000-002", f"{_para('The')},{source}")
+
+    with pytest.raises(ExternalProgramError, match="Div element in block b-p0000-002"):
+        _words_of_pandoc_json(_pandoc_document(paragraph))
+
+
+def test_walk_gives_note_group_words_to_the_endnote_after_it() -> None:
+    group = _classed_div("", "note-group", _para("Chapter", "1."))
+    endnote = _classed_div(
+        "n-p0001-001", "endnote", _div("b-p0001-001", _para("1", "See."))
+    )
+    endnotes = _classed_div("", "endnotes", f"{group},{endnote}")
+
+    markdown = _words_of_pandoc_json(_pandoc_document(endnotes))
+
+    assert markdown.words == (
+        MarkdownWord("Chapter", "n-p0001-001"),
+        MarkdownWord("1.", "n-p0001-001"),
+        MarkdownWord("1", "b-p0001-001"),
+        MarkdownWord("See.", "b-p0001-001"),
+    )
+
+
+@pytest.mark.parametrize(
+    "after_group",
+    ["", f",{_div('b-p0001-001', _para('See.'))}"],
+    ids=["last", "before-a-block"],
+)
+def test_walk_of_a_note_group_not_before_an_endnote_raises(after_group: str) -> None:
+    group = _classed_div("", "note-group", _para("Chapter", "1."))
+    endnotes = _classed_div("", "endnotes", f"{group}{after_group}")
+
+    with pytest.raises(ExternalProgramError, match="note-group div"):
+        _words_of_pandoc_json(_pandoc_document(endnotes))
+
+
+@pytest.mark.pandoc
+def test_read_markdown_reads_an_epigraph_source_and_a_note_group() -> None:
+    markdown = read_markdown(
+        "::: {#b-p0000-002 .epigraph}\n"
+        "The life.\n\n"
+        "::: epigraph-source\n"
+        "— Thomas Hobbes\n"
+        ":::\n"
+        ":::\n\n"
+        "::::: endnotes\n"
+        "::: note-group\n"
+        "Chapter 1.\n"
+        ":::\n\n"
+        ":::: {#n-p0001-001 .endnote}\n"
+        "::: {#b-p0001-001}\n"
+        "1 See.\n"
+        ":::\n"
+        "::::\n"
+        ":::::\n"
+    )
+
+    assert markdown.words == (
+        MarkdownWord("The", "b-p0000-002"),
+        MarkdownWord("life.", "b-p0000-002"),
+        MarkdownWord("Thomas", "b-p0000-002"),
+        MarkdownWord("Hobbes", "b-p0000-002"),
+        MarkdownWord("Chapter", "n-p0001-001"),
+        MarkdownWord("1.", "n-p0001-001"),
+        MarkdownWord("1", "b-p0001-001"),
+        MarkdownWord("See.", "b-p0001-001"),
+    )

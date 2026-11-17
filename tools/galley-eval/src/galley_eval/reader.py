@@ -65,6 +65,7 @@ class ReferenceKind(StrEnum):
     QUOTE = "quote"
     VERSE = "verse"
     CHAPTER_SUMMARY = "chapter_summary"
+    EPIGRAPH = "epigraph"
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"
