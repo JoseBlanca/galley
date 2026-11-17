@@ -190,3 +190,58 @@ text alone; that is the warning's purpose, and `front_matter_end`
 silences it. Front matter §6's first unit test gives Haskins' pages 0
 to 27 alone, which make a window of 10 pages and an end of 0; the test
 adds stand-in pages, and the spec is corrected with the review's fixes.
+
+## Review 1: work packages 1 and 2, tasks 4.1, 5.1 and 6.1
+
+Four reviewers (spec, tests, fidelity, conventions) on d8075e6..f90df04.
+Every finding and its verdict: `tmp/review1-findings.md` of the plan's
+worktree (not committed). What mattered, and is fixed:
+
+- **A kept re-reading could drop printed words unseen** (fidelity).
+  A region replaced all its layer words although some of Tesseract's
+  words for them had been dropped; in the reviewer's simulations a
+  cut-in note lost "wcnt nortb" and a footnote band lost "See Stubbs",
+  and the fidelity check passed. Now a layer word is replaced only when
+  a kept Tesseract word lies over its middle (widened by 1 pt), an
+  earlier crop drops Tesseract's words only when its region was kept,
+  and the fidelity check fails on a replaced word no Tesseract word
+  covers (spec 378c443, code 5c63c89). A margin word wholly outside the
+  strip now stays in the layer; the cost, a word that could be read
+  twice where the layer and Tesseract place it differently, is measured
+  in task 5.2.
+- **A band with no layer words kept Tesseract's junk** (spec): "af"
+  from a pencil mark on Gierke's page 120. Such a region is now kept
+  only with at least 2 known words (spec 0c930ea, code d070bce).
+- **A lost note marker** (found by the text-layer stream): a lower-case
+  "a" before a capital is now always a note's marker. Two notes on the
+  six books change, each a superscript the OCR misread, checked on the
+  page image: Kadesh n-p0008-003 "In Ramses…" and Domesday n-p0439-003
+  "See e.g." (spec 658625b, code 6e8e226). The Kadesh reference page
+  has its marker again, as the owner checked it on 16 November.
+- **Rules no test held**: the tie of the reading score, the cut-in
+  crop never replacing a body word, seven more thresholds of
+  re-reading; the marks of `split_glued` (a hyphen at a wide gap passed
+  the default run); the number-like condition of the short-section
+  rule; five rules of the evaluation tool. Each has a test now that
+  fails on the reviewer's mutation.
+- **Conventions**: the meaning of a kept re-reading coded twice (now
+  `model.words_after_rereads`); `note_bands` took pixels without a DPI
+  (now refuses any but 300); constants defined twice.
+
+Not taken, with the reason: the short-section rule's speck condition
+could never be met (the line on such a page is the speck, under 4
+letters), so it was removed instead of tested, changing no output; the
+verdict's "no more unknown than known words" for an empty-layer region
+adds nothing to a score above 0. Left to task 5.2, which wires
+re-reading into layout: the circular import of layout's private steps
+into `_reread`, the column rule written twice, Tesseract not checked at
+start-up, a public name for the side type. A known limit: Stubbs' page
+218 "A.d" is cut into "A." and "d" (a closing mark, then a letter, at
+1.97 pt against 1.35).
+
+## Task 4.2: the short-section tests
+
+Done (d1c8727). On `haskins_front` and `domesday_front_flow`, excerpt
+page 6, the running head is removed (Domesday's "vi" recorded as a page
+number); on the six whole books the rule adds exactly page 13 of
+Haskins and of Domesday. The whole-book test runs in 72 to 78 s alone.

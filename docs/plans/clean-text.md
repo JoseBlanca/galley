@@ -373,7 +373,7 @@ line 13 may come out with other words under the new one.
 - [x] 4.1 The rule, in structure's running-head pass, with the unit
   tests. Spec: structure §3, "The head of a short section". Stream
   `running-head`. Deliverable 1.
-- [ ] 4.2 The excerpt and whole-book tests. Spec: structure §3, the
+- [x] 4.2 The excerpt and whole-book tests. Spec: structure §3, the
   same part, its last paragraph. On the plan's branch, after
   `front-matter` is merged. Needs 4.1. Deliverables 2, 3.
 
