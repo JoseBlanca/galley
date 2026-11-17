@@ -359,23 +359,25 @@ def replaced_layer_words(
     one of `ocr_words` widened by 2 pt up and down and 1 pt across; or
     else (b) when its letters and digits, case-folded and not empty, equal
     those of one of `ocr_words` whose middle lies within 16 pt above or
-    below its own and that no other layer word of that text has matched;
+    below its own and that no other layer word has matched;
     or else (c) when it has 3 letters or more and its case-folded letters
     are alike, by difflib's ratio of 0.6 or more, to those of one of
     `ocr_words` within 16 pt above or below that (a) and (b) left
-    unmatched. A Tesseract word is matched in (a) by a layer word of its
-    text under it; in (b) and (c) the pairs of a layer word and a
+    unmatched. A Tesseract word is matched in (a) by any layer word under
+    it, whatever its text; in (b) and (c) the pairs of a layer word and a
     Tesseract word are taken nearest first, by the distance of their
     middles across plus up or down, each word in one pair at most. A layer
     word matched by none stays in the layer. Boxes in points.
     """
     under = tuple(is_under_ocr_word(word, ocr_words) for word in layer_words)
+    # (a): a Tesseract word with a layer word under it reads that printed
+    # word, whatever the two texts, and pairs with no other.
     taken = {
         position
         for word, is_under in zip(layer_words, under, strict=True)
-        if is_under and _folded(word.text)
+        if is_under
         for position, ocr_word in enumerate(ocr_words)
-        if _is_under(word, ocr_word) and _folded(ocr_word.text) == _folded(word.text)
+        if _is_under(word, ocr_word)
     }
     # (b): the pairs of a layer word and a Tesseract word of its text, the
     # nearest first, each word in one pair at most.

@@ -1764,6 +1764,16 @@ def test_two_layer_words_of_one_text_take_the_nearest_ocr_words_in_turn() -> Non
     assert model.replaced_layer_words((first, second), ocr[:1]) == (second,)
 
 
+def test_ocr_word_over_a_layer_word_of_another_text_pairs_with_no_other() -> None:
+    # Domesday page 548: the layer's "dominicum," lies under Tesseract's
+    # "dominieum,", and the layer's "Domini", a line above, where
+    # Tesseract read only "3", is alike to it; "Domini" stays.
+    domini = _layer("Domini", 10, 92)
+    dominicum = _layer("dominicum,", 10, 100)
+    ocr = (_tesseract("3", 60, 92), _tesseract("dominieum,", 10, 100))
+    assert model.replaced_layer_words((domini, dominicum), ocr) == (dominicum,)
+
+
 def test_layer_word_without_a_letter_or_digit_is_matched_only_under_a_word() -> None:
     layer = (_layer("—", 10, 110),)
     assert model.replaced_layer_words(layer, (_tesseract("—", 10, 100),)) == ()
