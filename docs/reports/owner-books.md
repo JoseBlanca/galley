@@ -74,3 +74,16 @@ the book's common inner words, and no split is made before a capital U
 or H (a misread "li"). Mariéjol's 6 remaining wrong splits are an
 accepted cost (the owner's decision on that scan); Domesday's "forSon"
 and "forSan" are to be checked on the page in WP 5's review.
+
+## Task 6.1: the epigraph and the note group in Markdown (stream `markdown`)
+
+00f8f1d, merged. An epigraph is a div of class `epigraph` holding the
+quotation (a verse epigraph's lines end in hard line breaks), then a
+div of class `epigraph-source` holding "—", a no-break space and the
+source. A note's group heading is a div of class `note-group` before
+its endnote, not a heading, so it stays out of the table of contents.
+The style sheet sets the epigraph in from both sides with its source
+on its own line at the right, and the group heading in bold. An EPUB
+built by hand from blocks with a verse epigraph and two note groups
+passes epubcheck. Not in the spec, decided by the writer: an epigraph
+with no source is written as its quotation alone.
