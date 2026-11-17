@@ -64,6 +64,8 @@ def test_book_toml_is_read_by_galley_with_every_field(
     assert (config.title, config.authors) == (book.title, book.authors)
     assert config.language is book.language
     assert config.exclude_pages == book.exclude_pages
+    assert config.contents_pages == book.contents_pages
+    assert config.plate_pages == book.plate_pages
 
 
 def test_galley_error_lines_are_those_naming_the_stage() -> None:

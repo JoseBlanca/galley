@@ -9,9 +9,11 @@ four JSON files, pages.json, words.json, lines.json and blocks.json, has a
 itself.
 """
 
+import bisect
 import dataclasses
 import functools
 import hashlib
+import itertools
 import json
 import math
 import os
@@ -19,7 +21,7 @@ import re
 import threading
 import types
 import typing
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -29,7 +31,8 @@ from galley.errors import EditError, InputFileError
 PAGES_FORMAT_VERSION = 1
 WORDS_FORMAT_VERSION = 1
 LINES_FORMAT_VERSION = 1
-BLOCKS_FORMAT_VERSION = 1
+# 2 since the second plan of structure, 16 November 2026 (architecture section 8).
+BLOCKS_FORMAT_VERSION = 2
 EDITS_FORMAT_VERSION = 1
 
 
@@ -167,6 +170,7 @@ class RemovalReason(StrEnum):
     SIGNATURE_MARK = "signature_mark"
     PLATE_TEXT = "plate_text"  # stray text-layer characters on a plate
     STRAY_MARK = "stray_mark"  # a line with no letter or digit above a running head
+    GUIDE_WORDS = "guide_words"  # "BUR CON" under the running head of an index page
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -233,11 +237,14 @@ class LinesFile:
 
 
 class BlockKind(StrEnum):
-    """What a block of the book is."""
+    """What the text of a block is, never how it is printed (architecture
+    section 8)."""
 
-    HEADING = "heading"
+    HEADING = "heading"  # a chapter's or a section's, its label in Block.label
     PARAGRAPH = "paragraph"
-    QUOTE = "quote"
+    QUOTE = "quote"  # a passage quoted from another text, in prose
+    VERSE = "verse"  # lines of a poem, separated by line feeds in the text
+    CHAPTER_SUMMARY = "chapter_summary"  # a chapter's topics under its heading
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"
@@ -252,7 +259,8 @@ class Emphasis(StrEnum):
 @dataclass(frozen=True, slots=True)
 class Span:
     """A run of a block's text. A span with a `note_ref` is a note reference:
-    its text is the marker as printed and `note_ref` the id of the note."""
+    `note_ref` is the id of the note, and its text the reference as printed
+    or as the OCR read it, which may differ from the note's marker."""
 
     text: str
     emphasis: Emphasis
@@ -269,29 +277,47 @@ class Origin:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Block:
-    """A heading, paragraph, quote, figure, margin note or index entry.
+    """A block of the book: a heading, paragraph, quote, verse, chapter
+    summary, figure, margin note or index entry.
 
     `id` is `b-p<page index, 4 digits>-<n, 3 digits>`; `level` is a
-    heading's, from 1, and None otherwise; `figure` is the image path of a
-    figure block; `origin` has one entry per page the block was printed on.
+    heading's, from 1, an index entry's depth, 1 for an entry and 2 for a
+    sub-entry, and None otherwise; `label` is a heading's chapter
+    label as printed ("CHAPTER III.", "V"), whose title is in the spans,
+    and None for a heading without one and for every other kind; `figure`
+    is the image path of a figure block; `origin` has one entry per page
+    the block was printed on.
     """
 
     id: str
     kind: BlockKind
     level: int | None
+    label: str | None
     spans: tuple[Span, ...]
     figure: str | None
     origin: tuple[Origin, ...]
+
+
+class NoteKind(StrEnum):
+    """Where a note was printed: at the foot of its page, or with the
+    others in a section of their own at the end of the book or of a
+    chapter."""
+
+    FOOTNOTE = "footnote"
+    ENDNOTE = "endnote"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Note:
     """A footnote or endnote. `id` is `n-p<page index, 4 digits>-<n, 3
     digits>`, for the n-th note that starts on that page; `marker` is as
-    printed at the start of the note; `referenced` is false when no
-    reference to it was found."""
+    printed at the start of the note, or as the OCR read it, and empty when
+    it has none; `blocks` are its paragraphs, quotes or verse, with each
+    margin note printed beside one of them as a block just before it;
+    `referenced` is false when no reference to it was found."""
 
     id: str
+    kind: NoteKind
     marker: str
     blocks: tuple[Block, ...]
     origin: tuple[Origin, ...]
@@ -670,9 +696,13 @@ def _decode_dataclass[T](cls: type[T], value: object, json_path: str) -> T:
     )
 
 
-def _decode_file[T](cls: type[T], content: object, current_version: int) -> T:
+def _decode_file[T](
+    cls: type[T], content: object, current_version: int, rerun: str
+) -> T:
     """The value of `cls` in the parsed JSON `content` of a file of format
-    version `current_version`. Raises _FieldError at the first problem."""
+    version `current_version`. Raises _FieldError at the first problem; a
+    format version error ends with `rerun`, what to do to remake the file
+    ("; run `galley2epub structure` again"), empty when nothing does."""
     _check_keys_once(content, "")
     if not isinstance(content, dict):
         problem = f"is not a JSON object but {_found(content)}"
@@ -692,7 +722,7 @@ def _decode_file[T](cls: type[T], content: object, current_version: int) -> T:
     if version != current_version:
         problem = (
             f"is format version {version}; "
-            f"this galley reads format version {current_version}"
+            f"this galley reads format version {current_version}{rerun}"
         )
         raise _FieldError(problem)
     return _decode_dataclass(cls, content, "")
@@ -782,7 +812,9 @@ def _read_json[T](path: Path, cls: type[T], current_version: int, stage: str) ->
         )
         raise InputFileError(message) from err
     try:
-        return _decode_file(cls, content, current_version)
+        return _decode_file(
+            cls, content, current_version, f"; run `galley2epub {stage}` again"
+        )
     except _FieldError as err:
         message = f"{path}: {err}"
         raise InputFileError(message) from err
@@ -823,9 +855,47 @@ def write_blocks(path: Path, blocks: BlocksFile) -> None:
     _write_json(path, blocks)
 
 
+def has_index_depth(block: Block) -> bool:
+    """Whether `block`, an index entry, has its depth, a level from 1
+    (architecture section 8)."""
+    return block.level is not None and block.level >= 1
+
+
 def read_blocks(path: Path) -> BlocksFile:
-    """Reads blocks.json as write_blocks wrote it."""
-    return _read_json(path, BlocksFile, BLOCKS_FORMAT_VERSION, "structure")
+    """Reads blocks.json as write_blocks wrote it. Raises InputFileError,
+    naming the file and the block, also when a block that is not a heading
+    has a label, an index entry has no depth from 1, or a block that is
+    neither a heading nor an index entry has a level."""
+    blocks = _read_json(path, BlocksFile, BLOCKS_FORMAT_VERSION, "structure")
+    for block in (
+        *blocks.blocks,
+        *(block for note in blocks.notes for block in note.blocks),
+    ):
+        if block.label is not None and block.kind is not BlockKind.HEADING:
+            message = (
+                f"{path}: block {block.id} is a {block.kind.value} and has the "
+                f"label {block.label!r}; only a heading has a label"
+            )
+            raise InputFileError(message)
+        if block.kind is BlockKind.INDEX_ENTRY and not has_index_depth(block):
+            message = (
+                f"{path}: block {block.id} is an index entry with the depth "
+                f"{block.level!r}, not one from 1 (architecture section 8); a "
+                "blocks.json written before index entries had a depth needs "
+                "`galley2epub structure` run again"
+            )
+            raise InputFileError(message)
+        if block.level is not None and block.kind not in _KINDS_WITH_LEVEL:
+            message = (
+                f"{path}: block {block.id} is a {block.kind.value} and has the "
+                f"level {block.level!r}; only a heading and an index entry have one"
+            )
+            raise InputFileError(message)
+    return blocks
+
+
+# Architecture section 8: a heading's level, and an index entry's depth.
+_KINDS_WITH_LEVEL = frozenset({BlockKind.HEADING, BlockKind.INDEX_ENTRY})
 
 
 # The hashes.
@@ -882,6 +952,33 @@ def read_checked_input[T: WordsFile | LinesFile | BlocksFile](
 def block_text(block: Block) -> str:
     """The text of a block: its spans' text concatenated, with nothing between."""
     return "".join(span.text for span in block.spans)
+
+
+def note_places(
+    block_first_pages: Sequence[int | None], note_first_pages: Sequence[int]
+) -> tuple[int, ...]:
+    """Where each note is written among the blocks (structure spec, section
+    6, "Order"): for each note, given by the page index of its first
+    origin, how many of the blocks, given in their order by the page index
+    of their first origin, are written before it: all up to the last block
+    whose first page is the note's or an earlier one; none when there is no
+    such block. A block without an origin (None) is passed over. structure
+    numbers the blocks by it and markdown writes the notes by it."""
+    by_first_page = sorted(
+        (page_index, position)
+        for position, page_index in enumerate(block_first_pages, start=1)
+        if page_index is not None
+    )
+    first_pages = tuple(page_index for page_index, _ in by_first_page)
+    last_positions = tuple(
+        itertools.accumulate((position for _, position in by_first_page), max)
+    )
+
+    def place(page_index: int) -> int:
+        on_or_before = bisect.bisect_right(first_pages, page_index)
+        return last_positions[on_or_before - 1] if on_or_before else 0
+
+    return tuple(place(page_index) for page_index in note_first_pages)
 
 
 _BLOCK_SHA256_DIGITS = 12  # architecture section 8, the checksum an Edit carries
@@ -953,7 +1050,7 @@ def _edit_from_line(path: Path, line_number: int, line: str) -> Edit:
         message = f"{where}: not valid JSON: {err.msg} at column {err.colno}"
         raise EditError(message) from err
     try:
-        return _decode_file(Edit, content, EDITS_FORMAT_VERSION)
+        return _decode_file(Edit, content, EDITS_FORMAT_VERSION, "")
     except _FieldError as err:
         message = f"{where}: {err}"
         raise EditError(message) from err

@@ -1,0 +1,137 @@
+{
+  "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "excerpt": "haskins_quotes_index",
+  "page": 7,
+  "book_page_index": 209,
+  "shows": "centred Latin verse, a verse block with its line breaks",
+  "layout": [
+    [
+      "194 NORMANS IN EUROPEAN HISTORY"
+    ],
+    [
+      "It needed no pious invention to prove that Charlemagne",
+      "had been in Rome and had received the imperial crown",
+      "as he knelt in St. Peter's, and men told how in theirown",
+      "time the great king Canute had betaken himself thither",
+      "with staff and scrip and many horses laden with gold",
+      "and silver. Already the number of strangers in Rome",
+      "was so great that guide-books were compiled indicating",
+      "its principal sights and marvels — \"seeing Rome,\" we",
+      "might call them — ; and as the processions wound into",
+      "sight of the Eternal City, they burst into its praise in",
+      "that wonderful pilgrim's chorus: —",
+      "O Roma nobilis, orbiset domina,",
+      "Cunctarum urbium excellentissima,",
+      "Roseo martyrum sanguine rubea,",
+      "Albiset virginum liliis Candida;",
+      "Salutem dicimus tibi per omnia,",
+      "Te benedicimus: salve per secula.",
+      "Jerusalem was most precious of all, by reason both of",
+      "its sacred associations and of the difficulty of the jour-",
+      "ney. No Charlemagne was needed to justify resort to",
+      "the Holy Sepulchre, where the mother of the great em-",
+      "peror Constantine had built the first shrine; but the",
+      "great Charles had a hostel constructed there for Prank-",
+      "ish pilgrims, and soon legend makes him, too, follow the",
+      "road to Constantinople and Jerusalem, as we are re-",
+      "minded in the great Charlemagne window at Char-",
+      "tres. There were manuals for the pilgrim to Jerusalem",
+      "also, but these were chiefly occupied with how to reach",
+      "the heavenly city, though one of them contents itself"
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "paragraph",
+      "text": "The best general accountsof constitutional and legal mattersare those of Stubbs, Constitutional History of England, 1 (last edition, Oxford, 1903),corrected by various special studies of J. H. Round,to be found chiefly in his Feudal England (London, 1895; reprinted, 1909) and Commune of London (Westminster, 1899); and by Pollock and Maitland,HistoryofEnglishLaw(secondedition, London, 1898). Theresultsof recentinvestigationareincorporatedin thestudiesand notes appended to the French translation of Stubbs by Petit-Dutaillis (Paris, 1907); this supplementary material is translated into English by W. E. Rhodes (Manchester, 1911). There are admirable studiesof the chanceryinL. Delisle, RecueildesactesdeHenriIIconcernant les provinces franqaisesetles affaires de France, introduction (Paris, 1909); andoftheexchequerinR.L. Poole, TheExchequerinthe TwelfthCentury(Oxford, 1912). SeealsoHubertHall, CourtLifeunder the Plantagenets (London, 1890; reprinted, 1902). For the more distinctivelyNormansideofthegovernmentseeHaskins, \"TheGovern- It needed no pious invention to prove that Charlemagne had been in Rome and had received the imperial crown as he knelt in St. Peter's, and men told how in theirown time the great king Canute had betaken himself thither with staff and scrip and many horses laden with gold and silver. Already the number of strangers in Rome was so great that guide-books were compiled indicating its principal sights and marvels — \"seeing Rome,\" we might call them — ; and as the processions wound into sight of the Eternal City, they burst into its praise in that wonderful pilgrim's chorus: —",
+      "pages": [
+        6,
+        7
+      ]
+    },
+    {
+      "kind": "verse",
+      "text": "O Roma nobilis, orbiset domina,\nCunctarum urbium excellentissima,\nRoseo martyrum sanguine rubea,\nAlbiset virginum liliis Candida;\nSalutem dicimus tibi per omnia,\nTe benedicimus: salve per secula.",
+      "pages": [
+        7
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "Jerusalem was most precious of all, by reason both of its sacred associations and of the difficulty of the journey. No Charlemagne was needed to justify resort to the Holy Sepulchre, where the mother of the great emperor Constantine had built the first shrine; but the great Charles had a hostel constructed there for Prankish pilgrims, and soon legend makes him, too, follow the road to Constantinople and Jerusalem, as we are reminded in the great Charlemagne window at Chartres. There were manuals for the pilgrim to Jerusalem also, but these were chiefly occupied with how to reach the heavenly city, though one of them contents itself THE NORMAN KINGDOM OF SICILY 219 Goethe to the glowing orange-groves of Palermo. And it is not alone the poet whose soul responds to A castle, precipice-encurled, Inagashofthewind-grievedApennine; or",
+      "pages": [
+        7,
+        8
+      ]
+    }
+  ],
+  "notes": [],
+  "removals": [
+    {
+      "reason": "page_number",
+      "text": "194"
+    },
+    {
+      "reason": "running_head",
+      "text": "NORMANS IN EUROPEAN HISTORY"
+    }
+  ],
+  "word_changes": [
+    {
+      "before": [
+        "jour-",
+        "ney."
+      ],
+      "after": [
+        "journey."
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "em-",
+        "peror"
+      ],
+      "after": [
+        "emperor"
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "Prank-",
+        "ish"
+      ],
+      "after": [
+        "Prankish"
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "re-",
+        "minded"
+      ],
+      "after": [
+        "reminded"
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "Char-",
+        "tres."
+      ],
+      "after": [
+        "Chartres."
+      ],
+      "reason": "hyphen_join"
+    }
+  ],
+  "page_numbers": [
+    {
+      "text": "194",
+      "position": "head"
+    }
+  ]
+}

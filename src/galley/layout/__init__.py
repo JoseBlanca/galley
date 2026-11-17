@@ -2,28 +2,42 @@
 
 The rules are those of docs/specs/layout.md. `measure_book` takes the
 book's measures over all its pages: the width of the body column, the
-height of a body word, the distance between rows, and the usual left edge
-of the column. `group_lines` groups words into lines by the walking
-skeleton's rule: a word joins the line of the word that started it, its
+height of a body word, the distance between rows, the usual left edge of
+the column, and the cut-in insets, how far inside the column the body
+lines beside a margin note set into the column start or end (of the six
+sample books, only Stubbs has them); the height and the distance are taken
+by `galley.body_measures`, which structure shares, and so are the rows:
+`body_measures.group_rows` groups words into lines by the walking
+skeleton's rule, a word joining the line of the word that started it, its
 anchor, when the word's vertical centre lies within the anchor's top and
-bottom. `layout_page` places the body column on the page, takes the
-words outside it as margin regions, the first row set apart at the top as
-the running-head region and the small rows at the foot as the footnote
-band, cuts the body and the band into two columns where a gutter runs
-down them, and puts a drop capital first in the line beside it. `run`
-measures the book, then lays out its pages in parallel.
+bottom. `layout_page` places the body column on the page, takes the words
+outside it, and the words of the notes set into it beside its shortened
+lines, as margin regions, the first row set apart at the top as the
+running-head region and the small rows at the foot as the footnote band,
+cuts the body and the band into two columns where a gutter runs down them,
+and puts a drop capital first in the line beside it. `run` measures the
+book, then lays out its pages in parallel.
 """
 
+import bisect
 import logging
 import math
-from bisect import bisect_left, bisect_right
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
-from itertools import groupby, pairwise
+from itertools import groupby
 from statistics import median
 from typing import Final, assert_never
 
+from galley.body_measures import (
+    body_measures,
+    commonest,
+    edge_counts,
+    group_rows,
+    measured_page_positions,
+    measured_pages,
+    median_word_height,
+)
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
 from galley.errors import FidelityBoundary
@@ -43,7 +57,7 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
 
-__all__ = ["BookMeasures", "group_lines", "layout_page", "measure_book", "run"]
+__all__ = ["BookMeasures", "layout_page", "measure_book", "run"]
 
 _logger = logging.getLogger(__name__)
 
@@ -58,45 +72,10 @@ def _enclosing_box(boxes: tuple[Box, ...]) -> Box:
     )
 
 
-def _line(words: tuple[Word, ...]) -> Line:
-    """The line of `words`, sorted left to right by x0; equal x0 keep their order."""
-    left_to_right = tuple(sorted(words, key=lambda word: word.box.x0))
-    return Line(_enclosing_box(tuple(word.box for word in words)), left_to_right)
-
-
-def group_lines(words: tuple[Word, ...]) -> tuple[Line, ...]:
-    """The lines of `words`, top to bottom, each one's words left to right.
-
-    The words are taken by (top, x0), equal keys in their given order. The
-    first word starts a line and is its anchor; a later word joins the
-    current line when its vertical centre, (top + bottom) / 2 in points,
-    lies within the anchor's top and bottom, edges included, and otherwise
-    starts the next line as its anchor. A line's box is the smallest box
-    that holds its words. No words give no lines.
-    """
-    rows: list[list[Word]] = []
-    anchor: Word | None = None
-    for word in sorted(words, key=lambda word: (word.box.top, word.box.x0)):
-        centre = (word.box.top + word.box.bottom) / 2
-        if anchor is not None and anchor.box.top <= centre <= anchor.box.bottom:
-            rows[-1].append(word)
-        else:
-            rows.append([word])
-            anchor = word
-    return tuple(_line(tuple(row)) for row in rows)
-
-
 # The book's measures (layout spec section 3, "The book's measures").
 
-# Guessed: enough rows on a page for a commonest edge.
-_MEASURED_PAGE_ROWS: Final[int] = 15
-# Guessed, not measured: a book with no page of 15 rows is measured on its
-# pages of 3 rows, the fewest that give a pitch between two rows and a
-# commonest edge of more than one.
-_MEASURED_PAGE_ROWS_FALLBACK: Final[int] = 3
-# Measured: body lines start within 2.2 pt of the edge on 99% of Haskins'
-# lines.
-_COMMONEST_EDGE_PT: Final[float] = 2.0
+# The rows, the commonest edge, the pages measured and the body word
+# height and pitch are body_measures' (architecture section 12).
 # Guessed: a full line is the column width.
 _WIDE_ROW_SHARE: Final[float] = 0.8
 # Guessed, not measured: a page places its column itself when 3 of its rows
@@ -117,48 +96,18 @@ class BookMeasures:
     distance from the top of one row to the top of the next.
     `usual_left_edge` is the left edge of the body column on a page that
     has no row wide enough to place it, by the parity of the page index:
-    0 for even pages, 1 for odd.
+    0 for even pages, 1 for odd. `cut_in_inset_left` and
+    `cut_in_inset_right` are how far inside the column's left and right
+    edges the body lines beside a margin note cut into the column start or
+    end, to 0.1 pt; None on a side where the book has no such notes.
     """
 
     column_width: float
     body_word_height: float
     body_line_pitch: float
     usual_left_edge: frozendict[int, float]
-
-
-def _commonest(edges: Iterable[float]) -> float | None:
-    """The commonest value of `edges`, in points: each edge rounded to the
-    point, the value with the most edges within `_COMMONEST_EDGE_PT` of it,
-    the smallest on a tie. None for no edges."""
-    rounded = sorted(float(round(edge)) for edge in edges)
-    if not rounded:
-        return None
-    return min(
-        dict.fromkeys(rounded),
-        key=lambda value: (
-            -(
-                bisect_right(rounded, value + _COMMONEST_EDGE_PT)
-                - bisect_left(rounded, value - _COMMONEST_EDGE_PT)
-            ),
-            value,
-        ),
-    )
-
-
-def _row_word_height(row: Line) -> float:
-    """The median height of the words of `row`, in points."""
-    return median(word.box.bottom - word.box.top for word in row.words)
-
-
-def _edge_counts(edges: Iterable[float]) -> dict[float, int]:
-    """Each value of `edges`, rounded to the point, with the number of
-    edges within `_COMMONEST_EDGE_PT` of it."""
-    rounded = sorted(float(round(edge)) for edge in edges)
-    return {
-        value: bisect_right(rounded, value + _COMMONEST_EDGE_PT)
-        - bisect_left(rounded, value - _COMMONEST_EDGE_PT)
-        for value in dict.fromkeys(rounded)
-    }
+    cut_in_inset_left: float | None
+    cut_in_inset_right: float | None
 
 
 def _common_edges(edges: Iterable[float]) -> tuple[float, ...]:
@@ -167,7 +116,7 @@ def _common_edges(edges: Iterable[float]) -> tuple[float, ...]:
     edge found, and so on, while a value has `_COMMON_EDGE_SHARE` of the
     first one's count."""
     by_count = sorted(
-        _edge_counts(edges).items(),
+        edge_counts(edges).items(),
         key=lambda value_count: (-value_count[1], value_count[0]),
     )
     if not by_count:
@@ -207,17 +156,13 @@ def _wide_rows_edges(
 
 def _commonest_left_edge(rows: tuple[Line, ...]) -> float:
     """The commonest left side of `rows`, which are not empty."""
-    edge = _commonest(row.box.x0 for row in rows)
-    assert edge is not None, "rows is not empty"
-    return edge
+    return commonest(row.box.x0 for row in rows)
 
 
 def _column_width_of_page(rows: tuple[Line, ...]) -> float:
     """The commonest right side of `rows` minus their commonest left side;
     `rows` is not empty."""
-    right = _commonest(row.box.x1 for row in rows)
-    assert right is not None, "rows is not empty"
-    return right - _commonest_left_edge(rows)
+    return commonest(row.box.x1 for row in rows) - _commonest_left_edge(rows)
 
 
 def _usual_left_edges(
@@ -255,35 +200,123 @@ def measure_book(
     """The measures of the book of `words` (layout spec section 3), taken
     from the rows of its pages of at least 15 rows, or of 3 rows when it
     has none of 15. None when no page has 3 rows: its pages are then laid
-    out as one region each. The rows of each page are grouped in `workers`
+    out as one region each. The cut-in insets are measured once every
+    measured page's column is placed. The pages are worked on in `workers`
     threads; the result does not depend on their number."""
 
     def page_rows(page: PageWords) -> tuple[Line, ...]:
-        return group_lines(page.words)
+        return group_rows(page.words)
 
     rows_by_page = map_pages(page_rows, words.pages, workers)
-    measured = tuple(
-        rows for rows in rows_by_page if len(rows) >= _MEASURED_PAGE_ROWS
-    ) or tuple(
-        rows for rows in rows_by_page if len(rows) >= _MEASURED_PAGE_ROWS_FALLBACK
-    )
-    if not measured:
+    measured = measured_pages(rows_by_page)
+    # The measured pages are their own measured pages: body_measures takes
+    # the same rows from them as from every page.
+    body = body_measures(measured)
+    if body is None:
         return None
     column_width = median(_column_width_of_page(rows) for rows in measured)
-    return BookMeasures(
+    without_insets = BookMeasures(
         column_width=column_width,
-        body_word_height=median(
-            _row_word_height(row) for rows in measured for row in rows
-        ),
-        body_line_pitch=median(
-            below.box.top - above.box.top
-            for rows in measured
-            for above, below in pairwise(rows)
-        ),
+        body_word_height=body.body_word_height,
+        body_line_pitch=body.body_line_pitch,
         usual_left_edge=_usual_left_edges(
             words.pages, rows_by_page, measured, column_width
         ),
+        cut_in_inset_left=None,
+        cut_in_inset_right=None,
     )
+    measured_words = tuple(
+        words.pages[position] for position in measured_page_positions(rows_by_page)
+    )
+
+    def page_insets(page: PageWords) -> tuple[tuple[int, ...], tuple[int, ...]]:
+        return _row_insets(_split_at_column(page.words, page.index, without_insets))
+
+    insets = map_pages(page_insets, measured_words, workers)
+    return replace(
+        without_insets,
+        cut_in_inset_left=_cut_in_inset(
+            tuple(inset for left, _ in insets for inset in left)
+        ),
+        cut_in_inset_right=_cut_in_inset(
+            tuple(inset for _, right in insets for inset in right)
+        ),
+    )
+
+
+# Measured on the six whole books and the six excerpts on 16 November 2026
+# (layout spec section 3, "The book's measures"): Stubbs' cut-in insets lie
+# 60.4 and 59.0 pt inside its column, with 394 and 359 rows within 2 pt of
+# them and at most 40 rows 6 to 12 pt to either side (this code, on the
+# books of that day, measures 60.3 and 59.3 pt, 397 and 362 rows); no other
+# book has a peak more than 1.3 times its neighbours'. The floor of 10 rows lets the
+# Stubbs excerpt, 17 and 13 rows, pass; the other excerpts have at most 11
+# rows at their peak, against 9 beside it.
+_CUT_IN_INSET_TENTHS: Final[int] = 10
+_CUT_IN_INSET_LEAST_TENTHS: Final[int] = 300
+_CUT_IN_INSET_MOST_TENTHS: Final[int] = 1000
+_CUT_IN_PEAK_TENTHS: Final[int] = 20
+_CUT_IN_NEIGHBOURS_NEAR_TENTHS: Final[int] = 60
+_CUT_IN_NEIGHBOURS_FAR_TENTHS: Final[int] = 120
+_CUT_IN_PEAK_ROWS: Final[int] = 10
+_CUT_IN_PEAK_TIMES_NEIGHBOURS: Final[int] = 4
+
+
+def _row_insets(split: _ColumnSplit) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """The left and right insets of the rows of `split`'s column words, in
+    tenths of a point: how far each row starts right of the left edge and
+    ends left of the right edge."""
+    rows = group_rows(split.column)
+    return (
+        tuple(_tenths(row.box.x0 - split.left) for row in rows),
+        tuple(_tenths(split.right - row.box.x1) for row in rows),
+    )
+
+
+def _tenths(points: float) -> int:
+    return round(points * _CUT_IN_INSET_TENTHS)
+
+
+def _cut_in_inset(insets: tuple[int, ...]) -> float | None:
+    """The cut-in inset of one side of a book, in points, from the `insets`
+    of the rows of its measured pages, in tenths of a point (layout spec
+    section 3): of the insets from 30 to 100 pt, the one with the most rows
+    within 2 pt of it, the smaller on a tie, when those rows are at least
+    10 and 4 times the rows 6 to 12 pt smaller and 4 times those 6 to 12 pt
+    larger. None otherwise."""
+    ordered = sorted(insets)
+
+    def rows_between(least: int, most: int) -> int:
+        return bisect.bisect_right(ordered, most) - bisect.bisect_left(ordered, least)
+
+    def rows_at(peak: int) -> int:
+        return rows_between(peak - _CUT_IN_PEAK_TENTHS, peak + _CUT_IN_PEAK_TENTHS)
+
+    candidates = sorted(
+        {
+            inset
+            for inset in ordered
+            if _CUT_IN_INSET_LEAST_TENTHS <= inset <= _CUT_IN_INSET_MOST_TENTHS
+        }
+    )
+    if not candidates:
+        return None
+    # The candidates are in increasing order, and max keeps the first of a
+    # tie.
+    peak = max(candidates, key=rows_at)
+    at_peak = rows_at(peak)
+    smaller = rows_between(
+        peak - _CUT_IN_NEIGHBOURS_FAR_TENTHS, peak - _CUT_IN_NEIGHBOURS_NEAR_TENTHS
+    )
+    larger = rows_between(
+        peak + _CUT_IN_NEIGHBOURS_NEAR_TENTHS, peak + _CUT_IN_NEIGHBOURS_FAR_TENTHS
+    )
+    has_notes = (
+        at_peak >= _CUT_IN_PEAK_ROWS
+        and at_peak >= _CUT_IN_PEAK_TIMES_NEIGHBOURS * smaller
+        and at_peak >= _CUT_IN_PEAK_TIMES_NEIGHBOURS * larger
+    )
+    return peak / _CUT_IN_INSET_TENTHS if has_notes else None
 
 
 # Laying out a page (layout spec section 3, "Per page").
@@ -320,7 +353,7 @@ def _words_of(rows: tuple[Line, ...]) -> tuple[Word, ...]:
 def _region_of_rows(rows: tuple[Line, ...]) -> Region:
     """The region of the words of `rows`, which are not empty, grouped
     into lines again (step 7)."""
-    return _region(group_lines(_words_of(rows)))
+    return _region(group_rows(_words_of(rows)))
 
 
 def _column_edges(
@@ -369,7 +402,7 @@ def _margin_regions(words: tuple[Word, ...], pitch: float) -> tuple[Region, ...]
     `_MARGIN_REGION_GAP_PITCHES` times `pitch` below the top of the line
     before."""
     groups: list[list[Line]] = []
-    for line in group_lines(words):
+    for line in group_rows(words):
         if (
             groups
             and line.box.top - groups[-1][-1].box.top
@@ -470,7 +503,7 @@ def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
     """The index in `rows` of the first row of the footnote band (step 4),
     or len(rows) when there is no band."""
     small = tuple(
-        _row_word_height(row) <= _SMALL_ROW_SHARE * measures.body_word_height
+        median_word_height(row.words) <= _SMALL_ROW_SHARE * measures.body_word_height
         for row in rows
     )
     if all(small):
@@ -561,14 +594,14 @@ def _cut_run(rows: tuple[Line, ...], middle: float) -> tuple[Region, Region]:
     words = _words_of(rows)
     return (
         _region(
-            group_lines(
+            group_rows(
                 tuple(
                     word for word in words if (word.box.x0 + word.box.x1) / 2 < middle
                 )
             )
         ),
         _region(
-            group_lines(
+            group_rows(
                 tuple(
                     word for word in words if (word.box.x0 + word.box.x1) / 2 >= middle
                 )
@@ -630,7 +663,7 @@ def _column_regions(
     """The regions of the body column's `words`, a drop capital set aside:
     the running-head region and the body's regions, then the band's (steps
     3 to 5 and 7)."""
-    rows = group_lines(words)
+    rows = group_rows(words)
     head_count = _running_head_row_count(rows, measures.body_line_pitch)
     head, rest = rows[:head_count], rows[head_count:]
     band_start = _band_start(rest, measures)
@@ -711,15 +744,24 @@ def _column_regions_with_drop_capitals(
     return regions[: len(upper)], regions[len(upper) :]
 
 
-def _page_regions(
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _ColumnSplit:
+    """A page's words after steps 1 and 2: the body column's left and
+    right edges, in points, the margin words of each side, and the words
+    left in the column."""
+
+    left: float
+    right: float
+    left_margin: tuple[Word, ...]
+    right_margin: tuple[Word, ...]
+    column: tuple[Word, ...]
+
+
+def _split_at_column(
     words: tuple[Word, ...], page_index: int, measures: BookMeasures
-) -> tuple[Region, ...]:
-    """The regions of a page of `words`, which are not empty, in reading
-    order (layout spec section 3): the running-head region, the body's
-    regions, the margin regions by their top, the left side first, and the
-    band's regions."""
-    pitch = measures.body_line_pitch
-    left, right = _column_edges(group_lines(words), page_index, measures)
+) -> _ColumnSplit:
+    """The words of a page placed by its body column (steps 1 and 2)."""
+    left, right = _column_edges(group_rows(words), page_index, measures)
     # Each word goes to one group, also one whose box is inverted (x0 right
     # of x1), which would otherwise lie in both margins.
     outside_left = tuple(
@@ -741,31 +783,269 @@ def _page_regions(
     # margin; compared by identity, since two words may be equal.
     reaching = {
         id(word)
-        for row in group_lines(in_column)
-        if (word := _word_reaching_from_left_margin(row, left, outside_left, pitch))
+        for row in group_rows(in_column)
+        if (
+            word := _word_reaching_from_left_margin(
+                row, left, outside_left, measures.body_line_pitch
+            )
+        )
         is not None
     }
-    left_margin = (
-        *outside_left,
-        *(word for word in in_column if id(word) in reaching),
+    return _ColumnSplit(
+        left=left,
+        right=right,
+        left_margin=(
+            *outside_left,
+            *(word for word in in_column if id(word) in reaching),
+        ),
+        right_margin=right_margin,
+        column=tuple(word for word in in_column if id(word) not in reaching),
     )
-    column = tuple(word for word in in_column if id(word) not in reaching)
+
+
+# Measured on Stubbs' whole book on 16 November 2026 (layout spec section
+# 3, step 2b): a cut row has a word within 3 pt of the inset, after a gap
+# of 8 pt (the body's word spaces are 8.1 pt at the 95th percentile) or
+# first in its row, and its words from there span half the column, which
+# keeps out a speck at the inset (";", page 51). Cut rows chain within 1.6
+# pitches (with 2.6, 53 more body words moved); a chain needs 2 cut rows
+# (with 1, 47 more) and a shortened row, with nothing 4 pt short of the
+# inset (without one, 56 more). A note word's middle lies within 1 pt of
+# its zone. With these, 1,314 words moved: 767 aligned to a margin note of
+# the reference, 73 to the body (this code moved 1,324 there). A word less
+# than 5 pt from a body word of its row stays, as a word of a sentence does
+# (the body's word spaces are 4.5 pt at the median; "issued as his", page
+# 33): with it 1,318 words move, and 0.940 of those aligned are note words
+# by the evaluation tool of 16 November 2026, 0.936 without it.
+_CUT_ROW_INSET_PT: Final[float] = 3.0
+_CUT_ROW_GAP_PT: Final[float] = 8.0
+_CUT_ROW_SPAN_SHARE: Final[float] = 0.5
+_CUT_IN_CHAIN_PITCHES: Final[float] = 1.6
+_CUT_IN_CHAIN_ROWS: Final[int] = 2
+_CUT_IN_STRIP_PT: Final[float] = 4.0
+_CUT_IN_ZONE_PT: Final[float] = 1.0
+_CUT_IN_BODY_GAP_PT: Final[float] = 5.0
+
+
+@dataclass(frozen=True, slots=True)
+class _SideWord:
+    """A word of the column seen from one side of it, in points: on the
+    left, `start` and `end` are its left and right sides; on the right,
+    its right and left sides negated, so that the rules of the left side
+    read the right side mirrored. `index` is its place among the column's
+    words."""
+
+    index: int
+    start: float
+    end: float
+    top: float
+    bottom: float
+
+
+class _Side(StrEnum):
+    """The side of the body column a cut-in note stands at."""
+
+    LEFT = "left"
+    RIGHT = "right"
+
+
+def _side_words(
+    row: Line, side: _Side, index_of: dict[int, int]
+) -> tuple[_SideWord, ...]:
+    """The words of `row` seen from `side`, in the order of their
+    start; `index_of` gives a word's place by its identity."""
+    match side:
+        case _Side.LEFT:
+            side_words = (
+                _SideWord(
+                    index_of[id(word)],
+                    word.box.x0,
+                    word.box.x1,
+                    word.box.top,
+                    word.box.bottom,
+                )
+                for word in row.words
+            )
+        case _Side.RIGHT:
+            side_words = (
+                _SideWord(
+                    index_of[id(word)],
+                    -word.box.x1,
+                    -word.box.x0,
+                    word.box.top,
+                    word.box.bottom,
+                )
+                for word in row.words
+            )
+        case _:
+            assert_never(side)
+    return tuple(sorted(side_words, key=lambda word: word.start))
+
+
+def _is_cut_row(row: tuple[_SideWord, ...], at: float, least_span: float) -> bool:
+    """Whether `row`, seen from its side, is cut at the inset
+    `at` (step 2b, rule 1): a word starts within `_CUT_ROW_INSET_PT` of
+    `at`, first in the row or after a gap of `_CUT_ROW_GAP_PT`, and the
+    row's words from it on span `least_span` or more."""
+    return any(
+        abs(word.start - at) <= _CUT_ROW_INSET_PT
+        and (
+            position == 0
+            or word.start - max(before.end for before in row[:position])
+            >= _CUT_ROW_GAP_PT
+        )
+        and max(after.end for after in row[position:]) - word.start >= least_span
+        for position, word in enumerate(row)
+    )
+
+
+def _cut_in_zones(
+    rows: tuple[tuple[_SideWord, ...], ...], at: float, least_span: float, pitch: float
+) -> tuple[tuple[float, float], ...]:
+    """The cut-in zones of a page's `rows`, seen from one side, as (top,
+    bottom) in points (step 2b, rule 2): each chain of at least
+    `_CUT_IN_CHAIN_ROWS` cut rows, each within `_CUT_IN_CHAIN_PITCHES`
+    pitches of the one before, that holds a shortened row, trimmed to its
+    first and last shortened rows."""
+    chains: list[list[tuple[_SideWord, ...]]] = []
+    for row in rows:
+        if not _is_cut_row(row, at, least_span):
+            continue
+        top = min(word.top for word in row)
+        if chains and top - min(word.top for word in chains[-1][-1]) <= (
+            _CUT_IN_CHAIN_PITCHES * pitch
+        ):
+            chains[-1].append(row)
+        else:
+            chains.append([row])
+    strip_end = at - _CUT_IN_STRIP_PT
+    zones = []
+    for chain in chains:
+        shortened = tuple(
+            position
+            for position, row in enumerate(chain)
+            if all(word.end > strip_end for word in row)
+        )
+        if len(chain) < _CUT_IN_CHAIN_ROWS or not shortened:
+            continue
+        first, last = chain[shortened[0]], chain[shortened[-1]]
+        zones.append(
+            (min(word.top for word in first), max(word.bottom for word in last))
+        )
+    return tuple(zones)
+
+
+def _cut_in_note_indices(
+    column: tuple[Word, ...], side: _Side, edge: float, measures: BookMeasures
+) -> frozenset[int]:
+    """The places among `column`'s words of the words of the notes cut into
+    the column at `side` (step 2b, rule 3): their middle in a cut-in zone,
+    give or take `_CUT_IN_ZONE_PT`, and ending `_CUT_IN_STRIP_PT` or more
+    short of the inset. `edge` is the column's edge on that side, seen from
+    it as `_SideWord` sees it: the right edge negated. Empty when the book has
+    no inset on that side."""
+    match side:
+        case _Side.LEFT:
+            inset = measures.cut_in_inset_left
+        case _Side.RIGHT:
+            inset = measures.cut_in_inset_right
+        case _:
+            assert_never(side)
+    if inset is None:
+        return frozenset()
+    index_of = {id(word): index for index, word in enumerate(column)}
+    rows = tuple(_side_words(row, side, index_of) for row in group_rows(column))
+    at = edge + inset
+    zones = _cut_in_zones(
+        rows, at, _CUT_ROW_SPAN_SHARE * measures.column_width, measures.body_line_pitch
+    )
+    in_zones = frozenset(
+        word.index
+        for row in rows
+        for word in row
+        if word.end <= at - _CUT_IN_STRIP_PT
+        and any(
+            top - _CUT_IN_ZONE_PT
+            <= (word.top + word.bottom) / 2
+            <= bottom + _CUT_IN_ZONE_PT
+            for top, bottom in zones
+        )
+    )
+    return frozenset(index for row in rows for index in _apart_from_body(row, in_zones))
+
+
+def _apart_from_body(
+    row: tuple[_SideWord, ...], in_zones: frozenset[int]
+) -> frozenset[int]:
+    """The places of the words of `row` that are in `in_zones`
+    and lie `_CUT_IN_BODY_GAP_PT` or more from every body word of the row
+    (step 2b, rule 3): a word not in `in_zones` is a body word, and so is
+    a word of `in_zones` that lies nearer than that to one."""
+    notes = {word.index for word in row if word.index in in_zones}
+    while True:
+        body = tuple(word for word in row if word.index not in notes)
+        near = {
+            word.index
+            for word in row
+            if word.index in notes
+            and any(
+                max(other.start - word.end, word.start - other.end)
+                < _CUT_IN_BODY_GAP_PT
+                for other in body
+            )
+        }
+        if not near:
+            return frozenset(notes)
+        notes -= near
+
+
+def _page_regions(
+    words: tuple[Word, ...], page_index: int, measures: BookMeasures
+) -> tuple[Region, ...]:
+    """The regions of a page of `words`, which are not empty, in reading
+    order (layout spec section 3): the running-head region, the body's
+    regions, the margin regions by their top, the left side first, and the
+    band's regions."""
+    pitch = measures.body_line_pitch
+    split = _split_at_column(words, page_index, measures)
+    left_cut_in = _cut_in_note_indices(split.column, _Side.LEFT, split.left, measures)
+    right_cut_in = _cut_in_note_indices(
+        split.column, _Side.RIGHT, -split.right, measures
+    )
+    column = tuple(
+        word
+        for index, word in enumerate(split.column)
+        if index not in left_cut_in and index not in right_cut_in
+    )
     upper, band = _column_regions_with_drop_capitals(
         column,
         frozenset(
             index
             for index, word in enumerate(column)
-            if _is_drop_capital(word, left, measures)
+            if _is_drop_capital(word, split.left, measures)
         ),
-        left,
+        split.left,
         measures,
+    )
+    # The cut-in notes' words are grouped apart from the outer margin notes
+    # of their side, and their regions placed among them by their top.
+    margin_words = (
+        (_Side.LEFT, split.left_margin),
+        (_Side.LEFT, tuple(split.column[index] for index in sorted(left_cut_in))),
+        (_Side.RIGHT, split.right_margin),
+        (_Side.RIGHT, tuple(split.column[index] for index in sorted(right_cut_in))),
     )
     margins = sorted(
         (
-            *((0, region) for region in _margin_regions(left_margin, pitch)),
-            *((1, region) for region in _margin_regions(right_margin, pitch)),
+            (side, region)
+            for side, side_words in margin_words
+            for region in _margin_regions(side_words, pitch)
         ),
-        key=lambda side_region: (side_region[1].box.top, side_region[0]),
+        # By top, and at the same top the left side first.
+        key=lambda side_region: (
+            side_region[1].box.top,
+            side_region[0] is _Side.RIGHT,
+        ),
     )
     return (*upper, *(region for _, region in margins), *band)
 
@@ -779,7 +1059,7 @@ def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout:
     if not page.words:
         return PageLayout(page.index, (), page.figures)
     regions = (
-        (_region(group_lines(page.words)),)
+        (_region(group_rows(page.words)),)
         if measures is None
         else _page_regions(page.words, page.index, measures)
     )
@@ -805,8 +1085,8 @@ def run(
     measures = measure_book(words, workers=workers)
     if measures is None:
         _logger.info(
-            "layout: no page has %d rows; every page is laid out as one region",
-            _MEASURED_PAGE_ROWS_FALLBACK,
+            "layout: no page has enough rows to measure the book; "
+            "every page is laid out as one region"
         )
     else:
         _logger.info("layout: the book's measures, in points: %s", measures)

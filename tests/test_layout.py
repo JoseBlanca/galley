@@ -9,7 +9,7 @@ exact regions of the reference pages are tested in tests/test_excerpts.py.
 """
 
 import hashlib
-import json
+import math
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
@@ -22,7 +22,7 @@ from galley.cli import main
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
 from galley.fidelity import check_stage
-from galley.layout import BookMeasures, group_lines, layout_page, measure_book
+from galley.layout import BookMeasures, layout_page, measure_book
 from galley.model import (
     Box,
     Figure,
@@ -56,104 +56,6 @@ def _page(index: int, words: tuple[Word, ...]) -> PageWords:
     return PageWords(
         index=index, text_source=TextSource.TEXT_LAYER, words=words, figures=()
     )
-
-
-# group_lines
-
-
-def test_two_rows_given_shuffled_come_out_as_two_lines_left_to_right() -> None:
-    words = (
-        _word("six", 70, 30, 90, 40),
-        _word("two", 40, 10, 60, 20),
-        _word("four", 10, 30, 30, 40),
-        _word("three", 70, 10, 90, 20),
-        _word("five", 40, 30, 60, 40),
-        _word("one", 10, 10, 30, 20),
-    )
-    lines = group_lines(words)
-    assert _texts(lines) == (("one", "two", "three"), ("four", "five", "six"))
-    assert tuple(line.box for line in lines) == (
-        Box(10, 10, 90, 20),
-        Box(10, 30, 90, 40),
-    )
-
-
-def test_word_two_points_below_with_its_centre_in_the_band_joins_the_line() -> None:
-    words = (_word("anchor", 10, 10, 30, 20), _word("low", 40, 12, 60, 22))
-    lines = group_lines(words)
-    assert _texts(lines) == (("anchor", "low"),)
-    assert lines[0].box == Box(10, 10, 60, 22)
-
-
-def test_word_whose_centre_is_on_the_anchors_bottom_joins_the_line() -> None:
-    # Centre (10 + 30) / 2 = 20.0, the anchor's bottom: edges are included.
-    words = (_word("anchor", 10, 10, 30, 20), _word("edge", 40, 10, 60, 30))
-    assert _texts(group_lines(words)) == (("anchor", "edge"),)
-
-
-def test_word_whose_centre_is_just_below_the_anchors_bottom_starts_a_line() -> None:
-    # Centre (10.02 + 30) / 2 = 20.01, 0.01 pt below the anchor's bottom.
-    words = (_word("anchor", 10, 10, 30, 20), _word("below", 40, 10.02, 60, 30))
-    assert _texts(group_lines(words)) == (("anchor",), ("below",))
-
-
-def test_two_columns_of_two_rows_give_two_lines_across_both_columns() -> None:
-    # The skeleton's known bad reading order (spec sections 2 and 7): a row
-    # runs across both columns. The real layout spec changes this.
-    words = (
-        _word("left-1", 10, 10, 100, 20),
-        _word("left-2", 10, 30, 100, 40),
-        _word("right-1", 200, 10, 300, 20),
-        _word("right-2", 200, 30, 300, 40),
-    )
-    assert _texts(group_lines(words)) == (
-        ("left-1", "right-1"),
-        ("left-2", "right-2"),
-    )
-
-
-def test_words_with_the_same_top_and_x0_keep_their_given_order() -> None:
-    words = (_word("first", 10, 10, 30, 20), _word("second", 10, 10, 30, 20))
-    assert _texts(group_lines(words)) == (("first", "second"),)
-
-
-def test_words_of_a_line_are_sorted_by_x0() -> None:
-    # "right" comes first by top and anchors the band 10-20; "left" has its
-    # centre at 16, joins, and goes before "right" by x0.
-    words = (_word("right", 50, 10, 70, 20), _word("left", 10, 11, 30, 21))
-    lines = group_lines(words)
-    assert _texts(lines) == (("left", "right"),)
-    assert lines[0].box == Box(10, 10, 70, 21)
-
-
-def test_a_line_keeps_the_band_of_its_first_word() -> None:
-    # Each word 4 pt lower than the one before: "b" (centre 9) is in the
-    # band of "a" (0-10), "c" (centre 13) is not, though it is in b's.
-    words = (
-        _word("a", 10, 0, 20, 10),
-        _word("b", 30, 4, 40, 14),
-        _word("c", 50, 8, 60, 18),
-    )
-    lines = group_lines(words)
-    assert _texts(lines) == (("a", "b"), ("c",))
-    assert tuple(line.box for line in lines) == (Box(10, 0, 40, 14), Box(50, 8, 60, 18))
-
-
-def test_words_with_the_same_top_are_taken_by_x0() -> None:
-    # "short" goes first by x0 and anchors the band 10-14; the centre of
-    # "tall", 20, is outside it. Taken in the given order, "tall" would
-    # anchor the band 10-30 and "short" (centre 12) would join it.
-    words = (_word("tall", 50, 10, 60, 30), _word("short", 10, 10, 20, 14))
-    lines = group_lines(words)
-    assert _texts(lines) == (("short",), ("tall",))
-    assert tuple(line.box for line in lines) == (
-        Box(10, 10, 20, 14),
-        Box(50, 10, 60, 30),
-    )
-
-
-def test_no_words_give_no_lines() -> None:
-    assert group_lines(()) == ()
 
 
 # layout_page
@@ -243,6 +145,8 @@ def test_measure_book_on_20_pages_gives_the_medians() -> None:
         body_word_height=_ROW_HEIGHT,
         body_line_pitch=_PITCH,
         usual_left_edge=frozendict({0: 50.0, 1: 60.0}),
+        cut_in_inset_left=None,
+        cut_in_inset_right=None,
     )
 
 
@@ -274,6 +178,8 @@ def test_measure_book_with_no_page_of_15_rows_measures_pages_of_3() -> None:
         body_word_height=_ROW_HEIGHT,
         body_line_pitch=_PITCH,
         usual_left_edge=frozendict({0: 50.0, 1: 50.0}),
+        cut_in_inset_left=None,
+        cut_in_inset_right=None,
     )
 
 
@@ -378,6 +284,73 @@ def test_book_without_a_wide_row_takes_the_median_commonest_left_edge() -> None:
     assert measures.usual_left_edge == frozendict({0: 55.0, 1: 55.0})
 
 
+# The cut-in insets (layout spec section 3, "The book's measures")
+
+
+def _inset_pages(insets: tuple[float, ...]) -> WordsFile:
+    """Pages of 17 full rows of the column at 50, 200 wide, starting 0 to 2
+    pt inside its left edge, each with 3 rows of `insets` more, rows that
+    start that far inside the left edge and end at the right one."""
+    pages = []
+    for index in range(math.ceil(len(insets) / 3)):
+        page_insets = insets[3 * index : 3 * index + 3]
+        full = tuple(
+            word
+            for row in range(17)
+            for word in _full_row(row, 50 + row % 3, 200 - row % 3, row * _PITCH)
+        )
+        inset_rows = tuple(
+            word
+            for row, inset in enumerate(page_insets, start=17)
+            for word in (
+                _word(
+                    f"i{row}", 50 + inset, row * _PITCH, 50 + inset + 40, 8 + row * 12
+                ),
+                _word(f"j{row}", 50 + inset + 44, row * _PITCH, 250, 8 + row * _PITCH),
+            )
+        )
+        pages.append(_page(index, full + inset_rows))
+    return _words_file(tuple(pages))
+
+
+def test_cut_in_inset_of_60_rows_60_pt_in_is_measured() -> None:
+    measures = measure_book(_inset_pages((60.0,) * 60))
+    assert measures is not None
+    assert (measures.cut_in_inset_left, measures.cut_in_inset_right) == (60.0, None)
+
+
+def test_cut_in_inset_with_as_many_rows_8_pt_further_in_is_none() -> None:
+    measures = measure_book(_inset_pages((30.0,) * 30 + (38.0,) * 30))
+    assert measures is not None
+    assert measures.cut_in_inset_left is None
+
+
+@pytest.mark.parametrize(("rows", "inset"), [(9, None), (10, 60.0)])
+def test_cut_in_inset_needs_10_rows_at_its_peak(rows: int, inset: float | None) -> None:
+    measures = measure_book(_inset_pages((60.0,) * rows))
+    assert measures is not None
+    assert measures.cut_in_inset_left == inset
+
+
+@pytest.mark.parametrize(
+    ("inset", "found"), [(29.9, None), (30.0, 30.0), (100.0, 100.0), (100.1, None)]
+)
+def test_cut_in_inset_is_looked_for_from_30_to_100_pt(
+    inset: float, found: float | None
+) -> None:
+    measures = measure_book(_inset_pages((inset,) * 30))
+    assert measures is not None
+    assert measures.cut_in_inset_left == found
+
+
+def test_cut_in_inset_takes_the_smaller_peak_within_2_pt_and_rounds_to_0_1_pt() -> None:
+    # 59.97 rounds to 60.0, 4 tenths from 59.6: both peaks have every row
+    # within 2 pt, and the tie goes to the smaller.
+    measures = measure_book(_inset_pages((59.6,) * 10 + (59.97,) * 10))
+    assert measures is not None
+    assert measures.cut_in_inset_left == 59.6
+
+
 # layout_page: outer margin notes and the running-head line (layout spec
 # section 3, steps 1 to 3)
 
@@ -388,6 +361,8 @@ _MEASURES = BookMeasures(
     body_word_height=_ROW_HEIGHT,
     body_line_pitch=_PITCH,
     usual_left_edge=frozendict({0: 50.0, 1: 50.0}),
+    cut_in_inset_left=None,
+    cut_in_inset_right=None,
 )
 
 
@@ -1207,6 +1182,243 @@ def test_line_starting_left_of_the_capitals_middle_does_not_receive_it() -> None
 # The fidelity check at the layout boundary
 
 
+# layout_page: Stubbs' cut-in notes (layout spec section 3, step 2b)
+
+_CUT_IN_MEASURES = replace(_MEASURES, cut_in_inset_left=60.0, cut_in_inset_right=60.0)
+
+
+def _row_top(row: int) -> float:
+    return 100 + row * _PITCH
+
+
+def _cut_row(row: int, start: float = 110) -> tuple[Word, ...]:
+    """Row `row` of the column of `_MEASURES`, its words from `start`, by
+    default 110, 60 pt inside the left edge at 50, to the right edge."""
+    top = _row_top(row)
+    return (
+        _word(f"d{row}", start, top, start + 65, top + 8),
+        _word(f"e{row}", start + 69, top, 250, top + 8),
+    )
+
+
+def _note_words(
+    row: int, words: tuple[tuple[str, float, float], ...]
+) -> tuple[Word, ...]:
+    """The words (text, left side, right side) on row `row`."""
+    top = _row_top(row)
+    return tuple(_word(text, x0, top, x1, top + 8) for text, x0, x1 in words)
+
+
+_CHARACTER_OF_HENRY = (("Character", 55, 80), ("of", 82, 88), ("Henry", 90, 102))
+
+
+def _cut_in_page(
+    rows: dict[int, tuple[Word, ...]], measures: BookMeasures = _CUT_IN_MEASURES
+) -> PageLayout:
+    """A page of 20 full rows of the column of `_MEASURES`, but for the
+    rows of `rows`."""
+    full = tuple(word for word in _rows(20) if int(word.text[1:]) not in rows)
+    return layout_page(
+        _page(0, (*full, *(word for words in rows.values() for word in words))),
+        measures,
+    )
+
+
+def test_cut_in_note_beside_shortened_rows_is_a_margin_region() -> None:
+    result = _cut_in_page(
+        {
+            10: _cut_row(10),
+            11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+            12: _cut_row(12),
+        }
+    )
+    body, margin = _region_texts(result)
+    assert body[10:13] == (("d10", "e10"), ("d11", "e11"), ("d12", "e12"))
+    assert len(body) == 20
+    assert margin == (("Character", "of", "Henry"),)
+
+
+@pytest.mark.parametrize(("start", "margin"), [(113, 1), (114, 0)])
+def test_cut_in_row_starts_within_3_pt_of_the_inset(start: float, margin: int) -> None:
+    rows = {
+        10: _cut_row(10, start),
+        11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+        12: _cut_row(12, start),
+    }
+    assert len(_cut_in_page(rows).regions) == 1 + margin
+
+
+def test_cut_in_note_stays_in_the_body_without_a_cut_in_inset() -> None:
+    rows = {
+        10: _cut_row(10),
+        11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+        12: _cut_row(12),
+    }
+    (body,) = _region_texts(_cut_in_page(rows, _MEASURES))
+    assert body[11] == ("Character", "of", "Henry", "d11", "e11")
+
+
+def test_cut_in_word_at_the_inset_after_a_4_pt_gap_makes_no_cut_row() -> None:
+    # "Henry" ends at 106, 4 pt short of the word at the inset: row 11 is
+    # not cut, and rows 10 and 12, 2 pitches apart, are no chain.
+    rows = {
+        10: _cut_row(10),
+        11: (
+            *_note_words(
+                11, (("Character", 55, 80), ("of", 82, 88), ("Henry", 90, 106))
+            ),
+            *_cut_row(11),
+        ),
+        12: _cut_row(12),
+    }
+    (body,) = _region_texts(_cut_in_page(rows))
+    assert body[11] == ("Character", "of", "Henry", "d11", "e11")
+
+
+def test_cut_in_rows_2_pitches_apart_are_no_chain() -> None:
+    rows = {
+        10: _cut_row(10),
+        11: _note_words(11, _CHARACTER_OF_HENRY),
+        12: _cut_row(12),
+    }
+    (body,) = _region_texts(_cut_in_page(rows))
+    assert body[11] == ("Character", "of", "Henry")
+
+
+def test_cut_in_full_line_at_the_end_of_a_chain_keeps_its_words() -> None:
+    # Row 13 is a full line with a 9-pt space before the word at the inset:
+    # a cut row, but not shortened, so the zone ends at row 12.
+    top = _row_top(13)
+    rows = {
+        10: _cut_row(10),
+        11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+        12: _cut_row(12),
+        13: (_word("a13", 50, top, 101, top + 8), *_cut_row(13)),
+    }
+    body, margin = _region_texts(_cut_in_page(rows))
+    assert body[13] == ("a13", "d13", "e13")
+    assert margin == (("Character", "of", "Henry"),)
+
+
+def test_cut_in_speck_at_the_inset_spanning_a_quarter_of_the_column_is_no_cut_row() -> (
+    None
+):
+    # Row 12's words from ";" span 50 pt, a quarter of the column: had it
+    # been cut, the zone would run from row 10 to row 12 and take row 11's
+    # note.
+    top = _row_top(12)
+    rows = {
+        10: _cut_row(10),
+        11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+        12: (_word(";", 110, top, 113, top + 8), _word("end", 120, top, 160, top + 8)),
+    }
+    (body,) = _region_texts(_cut_in_page(rows))
+    assert body[11] == ("Character", "of", "Henry", "d11", "e11")
+
+
+def test_cut_in_zone_of_one_shortened_row_takes_a_note_word_1_pt_below_it() -> None:
+    # Rows 10 and 11 are cut; only row 11 is shortened, so the zone is row
+    # 11, from 232 to 240. "accession.", a row of its own, has its middle
+    # at 240.75, inside the zone and its 1 pt; row 10's "of" is outside it.
+    top = _row_top(11)
+    rows = {
+        10: (*_note_words(10, (("of", 55, 70),)), *_cut_row(10)),
+        11: (*_cut_row(11), _word("accession.", 55, top + 4.5, 100, top + 13)),
+    }
+    body, margin = _region_texts(_cut_in_page(rows))
+    assert body[10] == ("of", "d10", "e10")
+    assert margin == (("accession.",),)
+
+
+@pytest.mark.parametrize(
+    ("his_right", "margin"),
+    [
+        (86, (("Character", "of", "Henry"),)),
+        (85, (("as", "his"), ("Character", "of", "Henry"))),
+    ],
+)
+def test_cut_in_zone_keeps_its_words_within_5_pt_of_a_body_word(
+    his_right: float, margin: tuple[tuple[str, ...], ...]
+) -> None:
+    # A row of its own at 226, inside the zone from row 10 to row 12, reads
+    # "as his issued": "issued" ends past the strip, a body word. "his"
+    # 4 pt short of it stays, and so then does "as", 4 pt short of "his";
+    # 5 pt short, both move (Stubbs' page 33, mirrored).
+    rows = {
+        10: _cut_row(10),
+        11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
+        12: _cut_row(12),
+    }
+    sentence = (
+        _word("as", 55, 226, his_right - 20, 234),
+        _word("his", his_right - 16, 226, his_right, 234),
+        _word("issued", 90, 226, 130, 234),
+    )
+    page = _page(
+        0,
+        (
+            *(word for word in _rows(20) if int(word.text[1:]) not in rows),
+            *(word for words in rows.values() for word in words),
+            *sentence,
+        ),
+    )
+    _, *margins = _region_texts(layout_page(page, _CUT_IN_MEASURES))
+    assert tuple(margins) == (margin,)
+
+
+def test_cut_in_lone_shortened_row_is_no_zone() -> None:
+    # Row 11 is cut and shortened, but rows 10 and 12 are full lines: a
+    # chain of one cut row, so "accession.", a row of its own beside row
+    # 11, stays in the body.
+    top = _row_top(11)
+    rows: dict[int, tuple[Word, ...]] = {
+        11: (*_cut_row(11), _word("accession.", 55, top + 4.5, 100, top + 13))
+    }
+    (body,) = _region_texts(_cut_in_page(rows))
+    assert ("accession.",) in body
+
+
+def test_cut_in_zone_keeps_a_word_ending_3_pt_short_of_the_inset() -> None:
+    # "Henry", a row of its own inside the zone, ends at 107, 3 pt short of
+    # the inset at 110: not 4, so it stays in the body.
+    top = _row_top(11)
+    rows = {
+        10: _cut_row(10),
+        11: (
+            *_note_words(11, (("Character", 55, 80), ("of", 82, 88))),
+            *_cut_row(11),
+            _word("Henry", 90, top + 4.5, 107, top + 13),
+        ),
+        12: _cut_row(12),
+    }
+    body, margin = _region_texts(_cut_in_page(rows))
+    assert ("Henry",) in body
+    assert margin == (("Character", "of"),)
+
+
+def test_cut_in_note_at_the_right_is_a_margin_region() -> None:
+    # The mirror of the first case: body words from the left edge to 190,
+    # 60 pt inside the right edge at 250, and the note right of them.
+    def shortened(row: int) -> tuple[Word, ...]:
+        top = _row_top(row)
+        return (
+            _word(f"d{row}", 50, top, 120, top + 8),
+            _word(f"e{row}", 124, top, 190, top + 8),
+        )
+
+    rows = {
+        10: shortened(10),
+        11: (
+            *shortened(11),
+            *_note_words(11, (("His", 200, 215), ("family", 217, 245))),
+        ),
+        12: shortened(12),
+    }
+    body, margin = _region_texts(_cut_in_page(rows))
+    assert body[11] == ("d11", "e11")
+    assert margin == (("His", "family"),)
+
+
 def _words_file(pages: tuple[PageWords, ...]) -> WordsFile:
     return WordsFile(source_pdf_sha256="0" * 64, pages=pages, removals=())
 
@@ -1383,42 +1595,13 @@ def test_run_that_loses_a_word_raises_and_writes_no_lines_json(
 
 _EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 
-# The pages without a text layer of each whole book, which analyze refuses
-# unless excluded: the evaluation books' as in evaluation/books.toml;
-# Kadesh's and Gierke's as analyze listed them on 15 November 2026. The
-# whole_book test of tests/test_structure.py uses the same configs.
-_EXCLUDED_PAGES = frozendict(
-    {
-        "normansineuropea00hask": (0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279),
-        "earlyplantagenet01stub": (
-            *(0, 2, 3, 4, 5, 8, 9, 10, 11, 52, 53, 54, 55),
-            *(338, 339, 340, 341, 342, 343),
-        ),
-        "domesdaybook00maituoft": (0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557),
-        "catherinedemedic00mariuoft": (0, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456),
-        "battleofkadeshst00breauoft": (
-            *(1, 2, 3, 17, 23, 35, 43, 57, 69, 70, 71, 72, 73, 75),
-        ),
-        "politicaltheorie00gieruoft": (0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 289),
-    }
-)
-_LANGUAGES = frozendict({"catherinedemedic00mariuoft": "fr"})
 
-
-def _layout_of_pdf(pdf: Path, root: Path) -> tuple[WordsFile, LinesFile]:
-    """The words and lines of `pdf`, from analyze, extract and layout run by
-    galley2epub on a book folder at `root`."""
-    excluded = ", ".join(str(page) for page in _EXCLUDED_PAGES.get(pdf.stem, ()))
+def _layout_of_whole_book(book_toml: str, root: Path) -> tuple[WordsFile, LinesFile]:
+    """The words and lines of the book whose `book.toml` is `book_toml`,
+    from analyze, extract and layout run by galley2epub on a book folder at
+    `root`."""
     folder = BookFolder(root)
-    # TOML basic strings take JSON's escapes, so json.dumps quotes any path.
-    folder.book_toml.write_text(
-        f"pdf = {json.dumps(str(pdf))}\n"
-        f"title = {json.dumps(pdf.stem)}\n"
-        'authors = ["An Author"]\n'
-        f"language = {json.dumps(_LANGUAGES.get(pdf.stem, 'en'))}\n"
-        f"exclude_pages = [{excluded}]\n",
-        encoding="utf-8",
-    )
+    folder.book_toml.write_text(book_toml, encoding="utf-8")
     for stage in ("analyze", "extract", "layout"):
         main([stage, str(root)])
     return read_words(folder.words_json), read_lines(folder.lines_json)
@@ -1455,6 +1638,38 @@ def test_layout_of_an_excerpt_keeps_every_word(
     _assert_laid_out_in_regions(words, lines)
 
 
+def test_cut_in_insets_of_the_excerpts_are_stubbs_only(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Layout spec section 3, "The book's measures": the Stubbs excerpt's
+    # insets are 60.3 pt (17 rows) and 58.2 pt (13 rows); no other excerpt
+    # has 10 rows at its peak and 4 times those beside it.
+    insets = {}
+    for name, folder in excerpt_books.items():
+        measures = measure_book(read_words(folder.words_json))
+        assert measures is not None
+        insets[name] = (measures.cut_in_inset_left, measures.cut_in_inset_right)
+    assert insets == {
+        name: (60.3, 58.2) if name == "stubbs_51_56-64" else (None, None)
+        for name in excerpt_books
+    }
+    assert len(insets) == 11
+
+
+def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Layout spec section 8: excerpt page 2, book page index 57, has two
+    # notes cut into the column at the left.
+    lines = read_lines(excerpt_books["stubbs_51_56-64"].lines_json)
+    page = next(page for page in lines.pages if page.index == 2)
+    regions = [
+        [" ".join(word.text for word in line.words) for line in region.lines]
+        for region in page.regions
+    ]
+    assert regions[2:] == [["Characterof", "Henry II."], ["Hisfamily", "policy."]]
+
+
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
@@ -1470,7 +1685,8 @@ def test_layout_of_an_excerpt_keeps_every_word(
     ],
 )
 def test_layout_of_a_whole_book_keeps_every_word(
-    book: str, books_dir: Path, tmp_path: Path
+    book: str, whole_book_toml: frozendict[str, str], tmp_path: Path
 ) -> None:
-    words, lines = _layout_of_pdf(books_dir / f"{book}.pdf", tmp_path)
+    # The configs of the six books are those of tests/conftest.py.
+    words, lines = _layout_of_whole_book(whole_book_toml[book], tmp_path)
     _assert_laid_out_in_regions(words, lines)

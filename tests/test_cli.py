@@ -28,6 +28,7 @@ from galley.parallel import DEFAULT_WORKERS
 
 KADESH = "kadesh_8-17"
 GIERKE = "gierke_86-93_270-271"
+HASKINS = "haskins_eval"
 
 
 STAGES = ("analyze", "extract", "layout", "structure", "markdown", "epub")
@@ -238,17 +239,13 @@ def test_a_stage_that_fails_leaves_no_file_of_its_own_or_a_later_stage(
     assert [path.name for path in folder.edits_dir.iterdir()] == ["owner.jsonl"]
 
 
-# Runs analyze and extract on an excerpt in a folder of its own.
+# Runs extract on an excerpt in a folder of its own: Haskins', whose extract
+# takes 0.06 s where Kadesh's analyze and extract took 1 s (16 November 2026).
 @pytest.mark.thread_unsafe
 def test_markdown_after_a_new_extract_names_structure_and_leaves_no_book(
     tmp_path: Path, excerpt_books: frozendict[str, BookFolder]
 ) -> None:
-    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
-    book_toml = folder.book_toml.read_text(encoding="utf-8")
-    folder.book_toml.write_text(
-        re.sub(r"exclude_regions = .*\n", "", book_toml), encoding="utf-8"
-    )
-    main(["analyze", str(folder.root)])
+    folder = _copy_of_run(tmp_path, excerpt_books[HASKINS])
     main(["extract", str(folder.root)])
 
     with pytest.raises(
@@ -453,9 +450,13 @@ def _path_with_pandoc_only(tmp_path: Path) -> str:
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
-@pytest.mark.parametrize("command", ["run", "structure"])
-def test_a_command_running_structure_stops_without_tesseract_or_a_cached_word_list(
+@pytest.mark.parametrize(
+    ("command", "first_stage"),
+    [("run", "analyze"), ("analyze", "analyze"), ("structure", "structure")],
+)
+def test_a_command_running_analyze_or_structure_stops_without_tesseract_or_a_cached_word_list(
     command: str,
+    first_stage: str,
     tmp_path: Path,
     excerpt_books: frozendict[str, BookFolder],
     monkeypatch: pytest.MonkeyPatch,
@@ -469,7 +470,7 @@ def test_a_command_running_structure_stops_without_tesseract_or_a_cached_word_li
 
     assert str(raised.value) == (
         "tesseract, combine_tessdata and dawg2wordlist are not installed; "
-        "structure needs them once to extract the word list of eng from "
+        f"{first_stage} needs them once to extract the word list of eng from "
         "Tesseract's data: install them with `brew install tesseract`"
     )
     # No stage ran: each would have deleted its own file first.
@@ -479,7 +480,7 @@ def test_a_command_running_structure_stops_without_tesseract_or_a_cached_word_li
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
-def test_a_command_without_structure_runs_without_tesseract(
+def test_a_command_without_analyze_or_structure_runs_without_tesseract(
     tmp_path: Path,
     excerpt_books: frozendict[str, BookFolder],
     monkeypatch: pytest.MonkeyPatch,

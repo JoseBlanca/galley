@@ -1,9 +1,9 @@
 """The epub stage: book.md to book.epub, built by Pandoc with galley's style
 sheet and, when the config has a `cover_page`, the cover extract rendered.
 
-The style sheet is `style.css`, a file of this package, empty in the
-walking skeleton (spec section 8). The stage does not run epubcheck, which
-only the tests use (architecture section 16).
+The style sheet is `style.css`, a file of this package, which styles each
+kind of block by the class the markdown stage gives it. The stage does not
+run epubcheck, which only the tests use (architecture section 16).
 """
 
 import logging
@@ -35,10 +35,12 @@ def pandoc_arguments(
     folder: BookFolder, config: BookConfig, style_sheet: Path
 ) -> tuple[str, ...]:
     """The arguments Pandoc runs with, after the program's name: book.md
-    read as Markdown with smart quotes and automatic heading ids off, written as EPUB 3 to book.epub
-    with `style_sheet` in place of Pandoc's own, failing on any warning,
-    and with images/cover.png as the cover when the config has a
-    `cover_page`. The paths are written as given; run gives absolute ones.
+    read as Markdown with smart quotes and automatic heading ids off,
+    written as EPUB 3 to book.epub with `style_sheet` in place of Pandoc's
+    own, the figures' images found from the book folder, failing on any
+    warning (an image not found among them), and with images/cover.png as
+    the cover when the config has a `cover_page`. The paths are written as
+    given; run gives absolute ones.
     """
     cover = (
         ("--epub-cover-image", str(folder.cover_png))
@@ -55,6 +57,8 @@ def pandoc_arguments(
         str(folder.book_epub),
         "--css",
         str(style_sheet),
+        "--resource-path",
+        str(folder.root),
         "--fail-if-warnings",
         *cover,
     )

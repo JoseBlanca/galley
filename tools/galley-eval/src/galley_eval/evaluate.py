@@ -27,6 +27,17 @@ How the spec is read here, where it leaves a choice:
 - A difference that is unplaced, or on a page of `exclude_pages` or
   `not_in_reference`, is written with `apart` saying which, and is not
   scored.
+- The tokens of a reference note that galley makes an endnote at blocks
+  are `not_scored` at words and lines, and taken as matched there for the
+  attribution to stages.
+- The cause `endnote_reference_far` pairs a reference note with a galley
+  endnote at markdown, for the cause only, when the note is not found
+  `as_note` there and at least half of its tokens with a non-empty key
+  have their key among the endnote's keys, the endnote with the most
+  such tokens when several have half. The
+  endnote's first reference is placed by the `near_page` of its tokens;
+  the reference text's by the page of the reference token before its
+  first reference to the note.
 """
 
 import dataclasses
@@ -44,19 +55,21 @@ from galley_eval.align import (
     State,
     Subkind,
     align,
+    alignment_key,
     equal_key_share,
     extra_tokens,
     reference_side,
     reference_states,
 )
 from galley_eval.books import EvaluationBook
-from galley_eval.errors import AlignmentError
+from galley_eval.errors import AlignmentError, BooksFileError
 from galley_eval.galley_side import GalleySide, read_galley_side
 from galley_eval.page_table import PageRow, page_rows
 from galley_eval.pages import AnchorPage, reference_pages
-from galley_eval.reader import PageAnchor, ReferenceText, read_reference_file
+from galley_eval.reader import PageAnchor, ReferenceText, Stream, read_reference_file
 from galley_eval.scores import (
     BoundaryScores,
+    HeadingScores,
     KindCount,
     MarginNoteScores,
     NoteScores,
@@ -64,9 +77,13 @@ from galley_eval.scores import (
     Placement,
     TextScores,
     block_kinds,
+    endnote_notes,
     galley_parts,
+    heading_scores,
+    kinds_right,
     margin_note_scores,
     note_scores,
+    notes_found_as_notes,
     page_parts,
     paragraph_boundaries,
     reference_part,
@@ -76,6 +93,7 @@ from galley_eval.stages import StageOutput, TracedExtra, token_fate, trace_extra
 
 __all__ = [
     "Apart",
+    "Cause",
     "Difference",
     "Evaluation",
     "OutputScores",
@@ -95,12 +113,25 @@ _LEAST_EQUAL_KEY_SHARE = 0.5
 _CONTEXT_TOKENS = 8
 
 
+# The outputs where galley has no notes yet, so that an endnote cannot be
+# aligned near its reference (spec section 5).
+_BEFORE_NOTES = frozenset((StageOutput.WORDS, StageOutput.LINES))
+
+
 class Apart(StrEnum):
     """Why a difference is listed apart and not scored."""
 
     UNPLACED = "unplaced"
     EXCLUDED_PAGE = "excluded_page"
     NOT_IN_REFERENCE = "not_in_reference"
+
+
+class Cause(StrEnum):
+    """What is known to have caused a difference (spec section 7)."""
+
+    # galley linked an endnote to a reference more than a page from the
+    # reference text's, so the note is out of the alignment's window.
+    ENDNOTE_REFERENCE_FAR = "endnote_reference_far"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -125,6 +156,7 @@ class Difference:
     note_id: str | None
     edge_of_page: bool
     apart: Apart | None
+    cause: Cause | None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -136,6 +168,8 @@ class OutputScores:
     text: frozendict[Part, TextScores]
     paragraph_boundaries: frozendict[Part, BoundaryScores] | None
     block_kinds: frozendict[Part, tuple[KindCount, ...]] | None
+    kinds_right: frozendict[Part, int] | None
+    headings: HeadingScores | None
     notes: NoteScores | None
     margin_notes: MarginNoteScores | None
 
@@ -211,6 +245,7 @@ def evaluation_of(
 ) -> Evaluation:
     """The comparison of galley's side `side` with `reference`, for
     `book`; `word_list` holds the lowered words of its language."""
+    _check_body_pages(book, side)
     prepared = reference_side(reference)
     places = prepared.places
     outputs = (side.words, side.lines, side.blocks, side.markdown)
@@ -241,7 +276,30 @@ def evaluation_of(
         else Placement.SCORED
         for page in pages.page_indices
     )
-    states = tuple(reference_states(alignment) for alignment in alignments)
+    by_output = dict(zip(StageOutput, alignments, strict=True))
+    in_endnotes = endnote_notes(
+        by_output[StageOutput.BLOCKS], places, side.blocks, side.galley_blocks
+    )
+    endnote_tokens = frozenset(
+        index
+        for index, place in enumerate(places)
+        if place.note_index is not None and place.note_index in in_endnotes
+    )
+    early_placements = tuple(
+        Placement.NOT_SCORED
+        if index in endnote_tokens and placement is Placement.SCORED
+        else placement
+        for index, placement in enumerate(placements)
+    )
+    states = tuple(
+        tuple(
+            State.MATCHED
+            if output in _BEFORE_NOTES and index in endnote_tokens
+            else state
+            for index, state in enumerate(reference_states(alignment))
+        )
+        for output, alignment in zip(StageOutput, alignments, strict=True)
+    )
     fates = tuple(
         token_fate((at_words, at_lines, at_blocks, at_markdown))
         for at_words, at_lines, at_blocks, at_markdown in zip(*states, strict=True)
@@ -257,7 +315,8 @@ def evaluation_of(
             side=side,
             places=places,
             parts=parts,
-            placements=placements,
+            placements=early_placements if output in _BEFORE_NOTES else placements,
+            page_indices=pages.page_indices,
             parts_of_pages=parts_of_pages,
             apart_pages=apart_pages,
             repaired=None
@@ -268,10 +327,14 @@ def evaluation_of(
             StageOutput, alignments, outputs, strict=True
         )
     )
+    far_notes, far_endnotes = _far_endnotes(
+        reference, by_output[StageOutput.MARKDOWN], places, side, pages.page_indices
+    )
     differences = _reference_differences(
         alignments,
         outputs,
         places,
+        far_notes=far_notes,
         parts=parts,
         page_indices=pages.page_indices,
         fates=tuple(fate.difference_stage for fate in fates),
@@ -281,6 +344,7 @@ def evaluation_of(
     ) + _extra_differences(
         alignments,
         outputs,
+        far_endnotes=far_endnotes,
         parts_of_pages=parts_of_pages,
         printed_pages=printed_pages,
         side=side,
@@ -315,6 +379,106 @@ def evaluation_of(
     )
 
 
+def _check_body_pages(book: EvaluationBook, side: GalleySide) -> None:
+    """Raises BooksFileError when the book's body range ends after the
+    PDF's last page, as galley's words.json counts its pages."""
+    last_page = max((page.index for page in side.words_file.pages), default=-1)
+    if book.body_pages[1] > last_page:
+        message = (
+            f"evaluation/books.toml: the body range of {book.name}, body_pages = "
+            f"[{book.body_pages[0]}, {book.body_pages[1]}], ends after the "
+            f"PDF's last page index, {last_page}"
+        )
+        raise BooksFileError(message)
+
+
+def _far_endnotes(
+    reference: ReferenceText,
+    alignment: Alignment,
+    places: tuple[ReferencePlace, ...],
+    side: GalleySide,
+    page_indices: tuple[int | None, ...],
+) -> tuple[frozenset[int], frozenset[str]]:
+    """The reference notes, by index, and the galley endnotes, by id, whose
+    differences have the cause `endnote_reference_far`: a note not found
+    as a note at markdown, `alignment`, that is the same note by its keys
+    as a galley endnote whose first reference galley placed more than one
+    page from the reference text's."""
+    near, keys = _linked_endnotes(side)
+    if not near:
+        return frozenset(), frozenset()
+    found = notes_found_as_notes(alignment, places, side.markdown, side.galley_blocks)
+    by_note: dict[int, list[int]] = {}
+    for index, place in enumerate(places):
+        if place.note_index is not None:
+            by_note.setdefault(place.note_index, []).append(index)
+    gutenberg_page = _gutenberg_reference_pages(reference, page_indices)
+    far_notes: set[int] = set()
+    far_endnotes: set[str] = set()
+    for note_index, indices in by_note.items():
+        if note_index in found:
+            continue  # found as a note: no cause to give
+        note = tuple(
+            key for index in indices if (key := alignment_key(places[index].token.text))
+        )
+        total = len(note)
+        if total == 0:
+            continue
+        # The note's tokens whose key is among each endnote's keys.
+        shared = {
+            note_id: sum(1 for key in note if key in endnote)
+            for note_id, endnote in keys.items()
+        }
+        best = max(shared, key=lambda note_id: shared[note_id])
+        page = gutenberg_page.get(reference.notes[note_index].note_id)
+        if (
+            shared[best] * 2 >= total
+            and page is not None
+            and abs(near[best] - page) > 1
+        ):
+            far_notes.add(note_index)
+            far_endnotes.add(best)
+    return frozenset(far_notes), frozenset(far_endnotes)
+
+
+def _linked_endnotes(
+    side: GalleySide,
+) -> tuple[frozendict[str, int], frozendict[str, frozenset[str]]]:
+    """For each galley endnote linked from a reference, the page of its
+    first reference, and the alignment keys of its tokens at markdown."""
+    near: dict[str, int] = {}
+    keys: dict[str, set[str]] = {}
+    for token in side.markdown:
+        if token.block_id is None or token.near_page is None:
+            continue
+        note_id = side.galley_blocks[token.block_id].note_id
+        if note_id is None:
+            continue
+        near[note_id] = token.near_page
+        found = keys.setdefault(note_id, set())
+        if key := alignment_key(token.text):
+            found.add(key)
+    return frozendict(near), frozendict(
+        {note_id: frozenset(found) for note_id, found in keys.items()}
+    )
+
+
+def _gutenberg_reference_pages(
+    reference: ReferenceText, page_indices: tuple[int | None, ...]
+) -> frozendict[str, int]:
+    """For each reference note, the page of the body token before the
+    reference text's first reference to it."""
+    pages: dict[str, int] = {}
+    for note_reference in reference.note_references:
+        gap = note_reference.gap
+        if gap.stream is not Stream.BODY or note_reference.note_id in pages:
+            continue
+        page = page_indices[max(gap.token_index - 1, 0)] if page_indices else None
+        if page is not None:
+            pages[note_reference.note_id] = page
+    return frozendict(pages)
+
+
 def _apart_pages(book: EvaluationBook) -> frozendict[int, Apart]:
     return frozendict(
         {page: Apart.NOT_IN_REFERENCE for page in book.not_in_reference}
@@ -341,6 +505,7 @@ def _output_scores(
     places: tuple[ReferencePlace, ...],
     parts: tuple[Part, ...],
     placements: tuple[Placement, ...],
+    page_indices: tuple[int | None, ...],
     parts_of_pages: frozendict[int, Part],
     apart_pages: frozendict[int, Apart],
     repaired: tuple[bool, ...] | None,
@@ -360,14 +525,28 @@ def _output_scores(
             text=text,
             paragraph_boundaries=None,
             block_kinds=None,
+            kinds_right=None,
+            headings=None,
             notes=None,
             margin_notes=None,
         )
+    kinds = block_kinds(alignment, places, galley, side.galley_blocks, parts)
     return OutputScores(
         output=output,
         text=text,
-        paragraph_boundaries=paragraph_boundaries(alignment, places, galley, parts),
-        block_kinds=block_kinds(alignment, places, galley, side.galley_blocks, parts),
+        paragraph_boundaries=paragraph_boundaries(
+            alignment, places, galley, parts, galley_blocks=side.galley_blocks
+        ),
+        block_kinds=kinds,
+        kinds_right=kinds_right(kinds),
+        headings=heading_scores(
+            alignment,
+            places,
+            galley,
+            side.galley_blocks,
+            page_indices=page_indices,
+            body_pages=book.body_pages,
+        ),
         notes=note_scores(
             reference,
             alignment,
@@ -427,6 +606,7 @@ def _reference_differences(
     outputs: tuple[tuple[GalleyToken, ...], ...],
     places: tuple[ReferencePlace, ...],
     *,
+    far_notes: frozenset[int],
     parts: tuple[Part, ...],
     page_indices: tuple[int | None, ...],
     fates: tuple[StageOutput | None, ...],
@@ -484,6 +664,9 @@ def _reference_differences(
                 note_id=_note_id(side, block_id),
                 edge_of_page=edge,
                 apart=Apart.UNPLACED if page is None else apart_pages.get(page),
+                cause=Cause.ENDNOTE_REFERENCE_FAR
+                if places[indices[0]].note_index in far_notes
+                else None,
             )
         )
     return tuple(differences)
@@ -499,6 +682,7 @@ def _extra_differences(
     alignments: tuple[Alignment, ...],
     outputs: tuple[tuple[GalleyToken, ...], ...],
     *,
+    far_endnotes: frozenset[str],
     parts_of_pages: frozendict[int, Part],
     printed_pages: frozendict[int, str],
     side: GalleySide,
@@ -526,6 +710,7 @@ def _extra_differences(
             printed_pages=printed_pages,
             side=side,
             apart_pages=apart_pages,
+            far_endnotes=far_endnotes,
         )
         for extra, position in zip(traced, extra_positions, strict=True)
     )
@@ -553,8 +738,10 @@ def _extra_difference(
     printed_pages: frozendict[int, str],
     side: GalleySide,
     apart_pages: frozendict[int, Apart],
+    far_endnotes: frozenset[str],
 ) -> Difference:
     page = extra.token.page_index
+    note_id = _note_id(side, extra.token.block_id)
     return Difference(
         stage=extra.stage,
         state=State.EXTRA,
@@ -569,9 +756,10 @@ def _extra_difference(
         context_before=context[0],
         context_after=context[1],
         block_id=extra.token.block_id,
-        note_id=_note_id(side, extra.token.block_id),
+        note_id=note_id,
         edge_of_page=extra.origin.edge_of_page,
         apart=apart_pages.get(page),
+        cause=Cause.ENDNOTE_REFERENCE_FAR if note_id in far_endnotes else None,
     )
 
 

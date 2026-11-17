@@ -1,6 +1,6 @@
 {
-  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed since that check by task 3.6 (no join after a digit before a letter): \"136-39-\" and \"Bryce,\" are no longer joined. Checked against the page image by the orchestrator on 15 November 2026.",
+  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4), and again, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "changed": "Changed since that check by task 3.6 (no join after a digit before a letter): \"136-39-\" and \"Bryce,\" are no longer joined. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 4.1 (structure spec section 14, \"Levels\"): \"INDEX\" is a heading of level 1, the first line of a page without a running head, with no label. Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 5.2 (structure spec section 17, rules 3 and 4): the paragraph that held the whole index page is one index_entry block per entry, 65 of them, the left column's then the right's, each with its continuation lines (\"Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100, 112, 131, 136/.\"); \"Brittany, ... 136-39-\" and \"Bryce, James, ...\" are two entries. Checked against the excerpt's text by the task 5.2 session on 16 November 2026, for the orchestrator to check against the page image. Changed by the owner's decision of 16 November 2026 on sub-entries (structure spec section 17, rule 5): each entry is cut after each word ending in \";\", which gives 7 sub-entries on the page, 72 index_entry blocks in all (\"Anjou, counts of, 61, 85;\" then \"relations with Normandy, 61-63, 85, 100, 112, 131, 136/.\"; \"Bayeux, ..., 172,187;BlackBook, III. See ...\" is not cut, the OCR having glued its \";\" to the next word). Checked against the excerpt's text on 16 November 2026, for the orchestrator to check against the page image. Each index_entry now also gives its depth, 1 or 2, compared by the excerpt test (review T4, 16 November 2026); no text changed.",
   "excerpt": "haskins_eval",
   "page": 9,
   "book_page_index": 266,
@@ -97,15 +97,586 @@
   ],
   "blocks": [
     {
-      "kind": "paragraph",
+      "kind": "heading",
       "text": "INDEX",
+      "level": 1,
+      "label": null,
       "pages": [
         9
       ]
     },
     {
-      "kind": "paragraph",
-      "text": "Abacus, 106/. Abruzzi, 196, 204, 222/. Adams,Henry,quoted, 12,22, 188/. Adelaide, countess, 210. Adelardof Bath, 177, 179, 238. Africa, 196/., 222, 232. Aime of Monte Cassino, 13, 200/. Alengon, 63, 178. AlexanderII, Pope,74,79, 165, 175. Alfred, king, 34. Alphonso VIII, king, 90. Amalfi, 197/., 204, 213, 232. Amari, M., 216, 248; quoted, 234. Anacletus II, Pope, 210. Andeli, 134. Angers, 61-63. Angoulgme, 160. Anjou, counts of, 61, 85; relations with Normandy, 61-63, 85, 100, 112, 131, 136/. Anna Comnena, quoted, 201. Anselm, 175-78. Antioch, 212; principality, 214-16. Apulia, 186, 197-211, 222 /., 228, 238, 246. Aquitaine, 87/.,90, 100, 120/., 136. Arabic elements in Sicilian state, 226-30, 235, 238-44. Architecture, Norman, 9-12, 102, 186-89; Sicilian, 189, 241-44. Archives, Norman,9,66/., 105, 178. Argentan, 10, 71, 133, 139, 153. Arlette, mother of William the Conqueror, 53, 166. Arnulf of Chocques, patriarch, 212. Arnulf, bishop of Lisieux, 167. Arthur, duke of Brittany, 136-39. Assizes, Anglo-Norman, 94, 100, in/., 161; Sicilian, 230/., 234. Aversa, 200, 204, 206. Avranches, 172, 175, 178. Avranchin, 28. Avre, 7. Bailli, 103, 145. Barfleur, 132, 160. Bari, 189, 197, 202, 232, 241. Baudri of Bourgueil, 76. Bayeux, 10, 46, 49, 67, 76, 150 /., 162,166, 172,187;BlackBook, III. See Odo, Turold, Richard, Philip d'Harcourt. BayeuxTapestry, 76/., 80, 84, 151, 167. Bayonne, 161. Bee, 171, 185; schools, 175 /.; library, 177-80. Becket, 4, 100, 118, 168. Bellgme, 154. Benevento, 198, 203. Benoit de Sainte-More, 184. Bertaux, E., quoted, 197, 241. Bessin, 10, 28. Bibliographicalnotes,24/.,51,83/., 114/., 147, 189-91,216/.,247-49. Bisignano, 201. Bocage, 10. Boccaccio, 246. Bocherville, Saint-Georges de, 169, 187. Bohemond I,princeofAntioch,207, 213-16. Bohmer, H., quoted, 165. Bonneval, 154. Bordeaux, 88. Boutmy, E., quoted, loi. Breteuil, 154, 160. Brittany, 6-8, 10, 57, 61, 75, 88, 136-39- Bryce, James, Viscount, quoted, 43. Buchanan, James, 17/. Bury St. Edmund's, 173.",
+      "kind": "index_entry",
+      "text": "Abacus, 106/.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Abruzzi, 196, 204, 222/.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Adams,Henry,quoted, 12,22, 188/.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Adelaide, countess, 210.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Adelardof Bath, 177, 179, 238.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Africa, 196/., 222, 232.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Aime of Monte Cassino, 13, 200/.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Alengon, 63, 178.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "AlexanderII, Pope,74,79, 165, 175.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Alfred, king, 34.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Alphonso VIII, king, 90.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Amalfi, 197/., 204, 213, 232.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Amari, M., 216, 248;",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "quoted, 234.",
+      "level": 2,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Anacletus II, Pope, 210.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Andeli, 134.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Angers, 61-63.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Angoulgme, 160.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Anjou, counts of, 61, 85;",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "relations with Normandy, 61-63, 85, 100, 112, 131, 136/.",
+      "level": 2,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Anna Comnena, quoted, 201.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Anselm, 175-78.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Antioch, 212;",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "principality, 214-16.",
+      "level": 2,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Apulia, 186, 197-211, 222 /., 228, 238, 246.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Aquitaine, 87/.,90, 100, 120/., 136.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Arabic elements in Sicilian state, 226-30, 235, 238-44.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Architecture, Norman, 9-12, 102, 186-89;",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Sicilian, 189, 241-44.",
+      "level": 2,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Archives, Norman,9,66/., 105, 178.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Argentan, 10, 71, 133, 139, 153.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Arlette, mother of William the Conqueror, 53, 166.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Arnulf of Chocques, patriarch, 212.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Arnulf, bishop of Lisieux, 167.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Arthur, duke of Brittany, 136-39.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Assizes, Anglo-Norman, 94, 100, in/., 161;",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Sicilian, 230/., 234.",
+      "level": 2,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Aversa, 200, 204, 206.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Avranches, 172, 175, 178.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Avranchin, 28.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Avre, 7.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bailli, 103, 145.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Barfleur, 132, 160.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bari, 189, 197, 202, 232, 241.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Baudri of Bourgueil, 76.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bayeux, 10, 46, 49, 67, 76, 150 /., 162,166, 172,187;BlackBook, III. See Odo, Turold, Richard, Philip d'Harcourt.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "BayeuxTapestry, 76/., 80, 84, 151, 167.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bayonne, 161.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bee, 171, 185;",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "schools, 175 /.;",
+      "level": 2,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "library, 177-80.",
+      "level": 2,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Becket, 4, 100, 118, 168.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bellgme, 154.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Benevento, 198, 203.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Benoit de Sainte-More, 184.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bertaux, E., quoted, 197, 241.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bessin, 10, 28.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bibliographicalnotes,24/.,51,83/., 114/., 147, 189-91,216/.,247-49.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bisignano, 201.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bocage, 10.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Boccaccio, 246.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bocherville, Saint-Georges de, 169, 187.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bohemond I,princeofAntioch,207, 213-16.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bohmer, H., quoted, 165.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bonneval, 154.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bordeaux, 88.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Boutmy, E., quoted, loi.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Breteuil, 154, 160.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Brittany, 6-8, 10, 57, 61, 75, 88, 136-39-",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bryce, James, Viscount, quoted, 43.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Buchanan, James, 17/.",
+      "level": 1,
+      "pages": [
+        9
+      ]
+    },
+    {
+      "kind": "index_entry",
+      "text": "Bury St. Edmund's, 173.",
+      "level": 1,
       "pages": [
         9
       ]

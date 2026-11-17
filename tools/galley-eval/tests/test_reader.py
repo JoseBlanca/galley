@@ -286,16 +286,16 @@ def test_other_block_inside_a_paragraph_ends_it_and_the_rest_is_a_new_one() -> N
             "footnote1423",
             (
                 _paragraph("ne contredit pas ce témoin:"),
-                _block(ReferenceKind.QUOTE, "Cor junctum Ante homines"),
+                _block(ReferenceKind.VERSE, "Cor junctum Ante homines"),
                 _paragraph("Amor, en langage poétique."),
             ),
         ),
     )
 
 
-def test_poetry_holding_verse_lines_is_one_quote() -> None:
+def test_poetry_holding_verse_lines_is_one_verse_block() -> None:
     # Haskins, pg72514 lines 6483-6492: div.poetry and div.verse are both
-    # quotes, and the outermost owns the verses.
+    # verse, and the outermost owns the verses.
     reference = _read(
         "<p>pilgrim\u2019s chorus:\u2014</p>"
         '<div class="poetry-container"><div class="poetry"><div class="stanza">'
@@ -306,10 +306,83 @@ def test_poetry_holding_verse_lines_is_one_quote() -> None:
     assert reference.blocks == (
         _paragraph("pilgrim\u2019s chorus:\u2014"),
         _block(
-            ReferenceKind.QUOTE,
+            ReferenceKind.VERSE,
             "O Roma nobilis, orbis et domina, Cunctarum urbium excellentissima,",
         ),
     )
+
+
+def test_poem_is_verse_and_blockquot_a_prose_quote() -> None:
+    reference = _read(
+        '<div class="blockquot"><p>Prose quoted.</p></div>'
+        '<div class="poem"><div class="stanza"><p>A line of verse</p></div></div>'
+    )
+    assert [block.kind for block in reference.blocks] == [
+        ReferenceKind.QUOTE,
+        ReferenceKind.VERSE,
+    ]
+
+
+STUBBS_RULES = change_rules(
+    change_rules(DEFAULT_RULES, RuleChange.ADD, "heading", ("p.ph3",)),
+    RuleChange.ADD,
+    "summary_after",
+    ("div.chapter",),
+)
+
+
+def test_quote_after_a_chapter_label_and_its_title_is_a_chapter_summary() -> None:
+    # Stubbs, pg70828 lines 2209-2222: the label in a div.chapter, the title
+    # a p.ph3, then the summary in a div.blockquot.
+    reference = _read(
+        '<div class="chapter"><h2 id="CHAPTER_III">CHAPTER III.</h2></div>'
+        '<p class="ph3">THE EARLY YEARS OF HENRY II.</p>'
+        '<div class="blockquot"><p>Terms of Henry’s accession—His character</p>'
+        "</div><p>Very few epochs</p>",
+        STUBBS_RULES,
+    )
+    assert reference.blocks == (
+        _block(ReferenceKind.HEADING, "CHAPTER III."),
+        _block(ReferenceKind.HEADING, "THE EARLY YEARS OF HENRY II."),
+        _block(
+            ReferenceKind.CHAPTER_SUMMARY, "Terms of Henry’s accession—His character"
+        ),
+        _paragraph("Very few epochs"),
+    )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # Stubbs' front matter, pg70828 lines 356-360: a p.ph3 with no
+        # chapter label before it.
+        (
+            '<p class="ph3">EPOCHS OF MODERN HISTORY.</p>'
+            '<div class="blockquot"><p>Edited by Edward E. Morris.</p></div>'
+        ),
+        # A paragraph between the title and the quote.
+        (
+            '<div class="chapter"><h2>CHAPTER II.</h2></div>'
+            '<p class="ph3">STEPHEN AND MATILDA.</p><p>The text.</p>'
+            '<div class="blockquot"><p>A quote.</p></div>'
+        ),
+        # A quote right after the label, with no title between.
+        (
+            '<div class="chapter"><h2>CHAPTER II.</h2></div>'
+            '<div class="blockquot"><p>A quote.</p></div>'
+        ),
+        # Two headings after the label.
+        (
+            '<div class="chapter"><h2>CHAPTER II.</h2></div>'
+            '<p class="ph3">STEPHEN AND MATILDA.</p><h3>A section</h3>'
+            '<div class="blockquot"><p>A quote.</p></div>'
+        ),
+    ],
+)
+def test_quote_not_right_after_a_chapter_label_and_title_stays_a_quote(
+    body: str,
+) -> None:
+    assert _read(body, STUBBS_RULES).blocks[-1].kind is ReferenceKind.QUOTE
 
 
 def test_marked_correction_keeps_the_corrected_text_and_tags_its_tokens() -> None:
@@ -529,10 +602,13 @@ def test_reference_file_that_is_not_utf8_is_an_error(tmp_path: Path) -> None:
         read_reference_file(path, DEFAULT_RULES, _sha256(data))
 
 
+# Galley's kinds that the reference has no rule for yet: how its quotes
+# match them is a change to docs/specs/evaluation.md (structure spec
+# section 21), task 7.4 of the plan structure-second.
 def test_reference_kinds_are_galleys_block_kinds_and_table() -> None:
-    assert {kind.value for kind in ReferenceKind} == {
-        kind.value for kind in BlockKind
-    } | {"table"}
+    assert {kind.value for kind in ReferenceKind} == (
+        {kind.value for kind in BlockKind}
+    ) | {"table"}
 
 
 @pytest.mark.parametrize(

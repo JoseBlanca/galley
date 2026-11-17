@@ -12,7 +12,6 @@ from galley.model import (
     PageNumberPosition,
     Removal,
     RemovalReason,
-    Word,
 )
 from galley.structure._foot import (
     LinePlace,
@@ -29,10 +28,10 @@ from galley.structure._measures import (
     Edges,
     line_has_letter_or_digit,
     middle,
-    words_box,
+    words_removal,
     words_text,
 )
-from galley.structure._regions import RegionKind
+from galley.structure._regions import RegionKind, head_line
 from galley.structure._survey import BookSurvey, number_candidates
 
 
@@ -57,19 +56,6 @@ _SIGNATURE_MARK_MAX_CHARACTERS = 6
 _SIGNATURE_MARK_FROM_LEFT_SHARE = 0.3
 # Spec section 4: digits around a dash or a space, "4—2", "12 2".
 _DIGITS_AROUND_A_DASH_OR_SPACE = re.compile(r"[0-9]+ ?[-–—] ?[0-9]+|[0-9]+ [0-9]+")
-
-
-def _removal(
-    page_index: int, words: tuple[Word, ...], reason: RemovalReason
-) -> Removal:
-    """One removal of `words`, of one line, joined by one space, with the
-    smallest box that holds them."""
-    return Removal(
-        page_index=page_index,
-        box=words_box(words),
-        text=words_text(words),
-        reason=reason,
-    )
 
 
 def _head_page_number(
@@ -102,12 +88,12 @@ def _running_head_removals(
     words = line.words
     number = _head_page_number(line, page_index, survey)
     if number is None:
-        return (_removal(page_index, words, RemovalReason.RUNNING_HEAD),), ()
+        return (words_removal(page_index, words, RemovalReason.RUNNING_HEAD),), ()
     number_words = words[number.first : number.last + 1]
     rest = words[: number.first] + words[number.last + 1 :]
-    number_removal = _removal(page_index, number_words, RemovalReason.PAGE_NUMBER)
+    number_removal = words_removal(page_index, number_words, RemovalReason.PAGE_NUMBER)
     rest_removals = (
-        (_removal(page_index, rest, RemovalReason.RUNNING_HEAD),) if rest else ()
+        (words_removal(page_index, rest, RemovalReason.RUNNING_HEAD),) if rest else ()
     )
     in_line_order = (
         (number_removal, *rest_removals)
@@ -119,28 +105,28 @@ def _running_head_removals(
     )
 
 
-def head_removals(
-    page: PageLayout, kinds: tuple[RegionKind, ...], survey: BookSurvey
-) -> LineRemovals:
+def running_head_place(page: PageLayout, survey: BookSurvey) -> LinePlace | None:
+    """The place of the line that section 3 makes the page's running head:
+    the text line of its head line, or the line below a speck; None when
+    the page has none."""
+    if page.index in survey.running_heads and (head := head_line(page)) is not None:
+        return (0, len(head.lines) - 1)
+    if page.index in survey.heads_below_specks:
+        below = line_below_head(page)
+        assert below is not None, "the survey found a line below the speck"
+        return below
+    return None
+
+
+def head_removals(page: PageLayout, survey: BookSurvey) -> LineRemovals:
     """The removals of a running head (spec section 3): a line of marks
     above it as `stray_mark`, its page number as `page_number` with a
     `head` page number, and the rest of its line as `running_head`. When
     the head line is a speck and the line below it the running head, that
     line is removed so, and the speck stays. A page with no running head
-    loses nothing. `kinds` are those of the page's regions, in their order."""
-    if RegionKind.RUNNING_HEAD in kinds:
-        head = page.regions[0]
-        *marks, text_line = head.lines
-        head_place = (0, len(marks))
-    elif page.index in survey.heads_below_specks:
-        below = line_below_head(page)
-        assert below is not None, "the survey found a line below the speck"
-        marks = [
-            line for line in page.regions[0].lines if not line_has_letter_or_digit(line)
-        ]
-        text_line = line_at(page, below)
-        head_place = below
-    else:
+    loses nothing."""
+    head_place = running_head_place(page, survey)
+    if head_place is None:
         return _NOTHING_REMOVED
     mark_places = tuple(
         (0, number)
@@ -148,9 +134,12 @@ def head_removals(
         if not line_has_letter_or_digit(line)
     )
     strays = tuple(
-        _removal(page.index, mark.words, RemovalReason.STRAY_MARK) for mark in marks
+        words_removal(page.index, line_at(page, place).words, RemovalReason.STRAY_MARK)
+        for place in mark_places
     )
-    removals, page_numbers = _running_head_removals(page.index, text_line, survey)
+    removals, page_numbers = _running_head_removals(
+        page.index, line_at(page, head_place), survey
+    )
     return LineRemovals(
         strays + removals, page_numbers, frozenset((*mark_places, head_place))
     )
@@ -180,7 +169,7 @@ def _signature_mark_removals(
     """The line at `place` removed as a signature mark when it is one."""
     if place is None or not _is_signature_mark(line_at(page, place), column):
         return _NOTHING_REMOVED
-    removal = _removal(
+    removal = words_removal(
         page.index, line_at(page, place).words, RemovalReason.SIGNATURE_MARK
     )
     return LineRemovals((removal,), (), frozenset({place}))
@@ -195,8 +184,8 @@ def _signature_line_removals(
     words = line_at(page, place).words
     number = words[position]
     removals = (
-        _removal(page.index, (number,), RemovalReason.PAGE_NUMBER),
-        _removal(
+        words_removal(page.index, (number,), RemovalReason.PAGE_NUMBER),
+        words_removal(
             page.index,
             words[:position] + words[position + 1 :],
             RemovalReason.SIGNATURE_MARK,
@@ -233,7 +222,7 @@ def foot_removals(
         return LineRemovals(
             (
                 *above.removals,
-                _removal(page.index, line.words, RemovalReason.PAGE_NUMBER),
+                words_removal(page.index, line.words, RemovalReason.PAGE_NUMBER),
             ),
             (PageNumber(page.index, text, PageNumberPosition.FOOT),),
             above.lines | {place},

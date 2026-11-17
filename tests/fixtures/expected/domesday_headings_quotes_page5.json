@@ -1,0 +1,284 @@
+{
+  "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "excerpt_only": "What the excerpt gives, not what the whole book gives: footnote 3, \"D. B. i. 184 b…\", belongs to page 30, and the excerpt runs it on to this page, the next text page it holds.",
+  "known": "The table's title \"ARMINGFORD HUNDRED.\" is a false heading of level 2, and the table's rows come out as notes and paragraphs (structure spec section 9). The owner: the links from \"1\" and \"2\" to table rows are wrong, and part of a note comes from a previous page: the text at the foot \"-worth, -wick, -thorpe…\" is the end of a note of page 41, likely, which galley glues to the table's last row \"Croydon 0\". The margin note reads \"Size of the vill.\" (the OCR gives \"Size of the\").",
+  "excerpt": "domesday_headings_quotes",
+  "page": 5,
+  "book_page_index": 42,
+  "shows": "a table whose title is set in capitals, taken for a heading",
+  "layout": [
+    [
+      "Plan of the Survey. 17"
+    ],
+    [
+      "To say that the villa of Domesday Book is in general the",
+      "vill of the thirteenth century and the civil parish of the nine-",
+      "teenth ist o say that the areal extent of the villa varied widely",
+      "from case to case. More important is it for us to observe that",
+      "the number of inhabitants of the villa varied widely from case",
+      "to case. The error into which we are most likely to fall will",
+      "be that of making our vill too populous. Some vills, especially",
+      "some royal vills, are populous enough; a few contain a hundred",
+      "households; but the average township is certainly much smaller",
+      "than this1. Before we give any figures, it should first be",
+      "observed that Domesday Book never enables us to count heads.",
+      "It states the number of the tenants of various classes, soche-",
+      "manni, villani, bordarii, and the like, and leaves us to suppose",
+      "that each of these persons is, or may be, the head of a house-",
+      "hold. It a lso states how many servi there are. Whether we",
+      "ought to suppose that only the heads of servile households are",
+      "reckoned, or whether we ought to think of the servi as having",
+      "no households but as living within the lord's gates and being",
+      "enumerated, men, women and able-bodied children, by the",
+      "head — this is a difficult question. Still we may reach some",
+      "results which will enable us to compare township with town-",
+      "ship. By w ay of fair sample we may take the Armingford",
+      "hundred of Cambridgeshire, and all persons who are above the",
+      "rank of servi we will include under the term 'the non-servile",
+      "population2/",
+      "ARMINGFORD HUNDRED."
+    ],
+    [
+      "Size of the"
+    ],
+    [
+      "•"
+    ],
+    [
+      "Non-servile",
+      "Servi To1t9a l",
+      "Abington popul1a9t ion 0",
+      "Bassiugbourn 3 19",
+      "35 1 9 0",
+      "Clapton 2 9 3289",
+      "Croydon 0",
+      "-worth, -wick, -thorpe, this of course is in favour of their antiquity. On the",
+      "other hand, if they are known merely hy family names such as Styles's, Nokes's,",
+      "Johnson's or the like, this, though not conclusive evidence of, is compatible with",
+      "their modernity. Meitzen thinks that in Kent and along the southern shore the",
+      "German invaders founded but few villages. The map does not convince me that",
+      "this inference is correct.",
+      "1 When more than five-and-twenty team-lands or thereabouts are ascribed to",
+      "a single place, we shall generally find reason to believe that what is being",
+      "described is not a single vill. See above, p. 13.",
+      "2 Inq. Com. Cant. 51 fol. In a few cases our figures will involve a small",
+      "element of conjecture.",
+      "M. 2"
+    ]
+  ],
+  "blocks": [
+    {
+      "kind": "margin_note",
+      "text": "Size of the",
+      "pages": [
+        5
+      ]
+    },
+    {
+      "kind": "margin_note",
+      "text": "•",
+      "pages": [
+        5
+      ]
+    },
+    {
+      "kind": "paragraph",
+      "text": "To say that the villa of Domesday Book is in general the vill of the thirteenth century and the civil parish of the nineteenth ist o say that the areal extent of the villa varied widely from case to case. More important is it for us to observe that the number of inhabitants of the villa varied widely from case to case. The error into which we are most likely to fall will be that of making our vill too populous. Some vills, especially some royal vills, are populous enough; a few contain a hundred households; but the average township is certainly much smaller than this1. Before we give any figures, it should first be observed that Domesday Book never enables us to count heads. It states the number of the tenants of various classes, sochemanni, villani, bordarii, and the like, and leaves us to suppose that each of these persons is, or may be, the head of a household. It a lso states how many servi there are. Whether we ought to suppose that only the heads of servile households are reckoned, or whether we ought to think of the servi as having no households but as living within the lord's gates and being enumerated, men, women and able-bodied children, by the head — this is a difficult question. Still we may reach some results which will enable us to compare township with township. By w ay of fair sample we may take the Armingford hundred of Cambridgeshire, and all persons who are above the rank of servi we will include under the term 'the non-servile population2/",
+      "pages": [
+        5
+      ]
+    },
+    {
+      "kind": "heading",
+      "text": "ARMINGFORD HUNDRED.",
+      "level": 2,
+      "label": null,
+      "pages": [
+        5
+      ]
+    }
+  ],
+  "notes": [
+    {
+      "marker": "3",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "D. B. i. 184 b : ' H aec terra non geldat nee consuetudinem dat nee in aliquo hundredo iacet ' ; i . 157 ' H aec terra nunquatn geldavit nee alicui Non-servile Servi To1t9a l"
+        }
+      ],
+      "pages": [
+        2,
+        5
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "Abington popul1a9t ion 0"
+        }
+      ],
+      "pages": [
+        5
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "Bassiugbourn 3 19"
+        }
+      ],
+      "pages": [
+        5
+      ]
+    },
+    {
+      "marker": "35",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "1 9 0"
+        }
+      ],
+      "pages": [
+        5
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "Clapton 2 9 3289"
+        }
+      ],
+      "pages": [
+        5
+      ]
+    },
+    {
+      "marker": "",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "Croydon 0 -worth, -wick, -thorpe, this of course is in favour of their antiquity. On the other hand, if they are known merely hy family names such as Styles's, Nokes's, Johnson's or the like, this, though not conclusive evidence of, is compatible with their modernity. Meitzen thinks that in Kent and along the southern shore the German invaders founded but few villages. The map does not convince me that this inference is correct."
+        }
+      ],
+      "pages": [
+        5
+      ]
+    },
+    {
+      "marker": "1",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "When more than five-and-twenty team-lands or thereabouts are ascribed to a single place, we shall generally find reason to believe that what is being described is not a single vill. See above, p. 13."
+        }
+      ],
+      "pages": [
+        5
+      ]
+    },
+    {
+      "marker": "2",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "Inq. Com. Cant. 51 fol. In a few cases our figures will involve a small element of conjecture."
+        }
+      ],
+      "pages": [
+        5
+      ]
+    }
+  ],
+  "removals": [
+    {
+      "reason": "running_head",
+      "text": "Plan of the Survey."
+    },
+    {
+      "reason": "page_number",
+      "text": "17"
+    },
+    {
+      "reason": "signature_mark",
+      "text": "M. 2"
+    }
+  ],
+  "word_changes": [
+    {
+      "before": [
+        "nine-",
+        "teenth"
+      ],
+      "after": [
+        "nineteenth"
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "this1."
+      ],
+      "after": [
+        "this",
+        "1",
+        "."
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "soche-",
+        "manni,"
+      ],
+      "after": [
+        "sochemanni,"
+      ],
+      "reason": "hyphen_join_guessed"
+    },
+    {
+      "before": [
+        "house-",
+        "hold."
+      ],
+      "after": [
+        "household."
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "town-",
+        "ship."
+      ],
+      "after": [
+        "township."
+      ],
+      "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "population2/"
+      ],
+      "after": [
+        "population",
+        "2",
+        "/"
+      ],
+      "reason": "note_marker"
+    }
+  ],
+  "page_numbers": [
+    {
+      "text": "17",
+      "position": "head"
+    }
+  ]
+}

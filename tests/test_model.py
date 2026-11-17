@@ -7,6 +7,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -25,6 +26,7 @@ from galley.model import (
     Line,
     LinesFile,
     Note,
+    NoteKind,
     OcrAudit,
     OcrVerdict,
     Origin,
@@ -187,6 +189,7 @@ BLOCKS = BlocksFile(
             id="b-p0003-001",
             kind=BlockKind.HEADING,
             level=1,
+            label="CHAPTER III.",
             spans=(Span(text="The Battle", emphasis=Emphasis.NONE, note_ref=None),),
             figure=None,
             origin=(ORIGIN,),
@@ -195,6 +198,7 @@ BLOCKS = BlocksFile(
             id="b-p0003-002",
             kind=BlockKind.PARAGRAPH,
             level=None,
+            label=None,
             spans=(
                 Span(
                     text="the cities of Greece,", emphasis=Emphasis.NONE, note_ref=None
@@ -209,6 +213,7 @@ BLOCKS = BlocksFile(
             id="b-p0004-001",
             kind=BlockKind.FIGURE,
             level=None,
+            label=None,
             spans=(),
             figure="images/p0004-1.png",
             origin=(Origin(page_index=4, box=Box(30.0, 100.0, 300.0, 500.0)),),
@@ -217,12 +222,14 @@ BLOCKS = BlocksFile(
     notes=(
         Note(
             id="n-p0003-001",
+            kind=NoteKind.FOOTNOTE,
             marker="1",
             blocks=(
                 Block(
                     id="b-p0003-003",
                     kind=BlockKind.PARAGRAPH,
                     level=None,
+                    label=None,
                     spans=(
                         Span(
                             text="Herodotus, ii. 4.",
@@ -237,6 +244,7 @@ BLOCKS = BlocksFile(
                     id="b-p0003-004",
                     kind=BlockKind.PARAGRAPH,
                     level=None,
+                    label=None,
                     spans=(
                         Span(
                             text="See also Strabo.",
@@ -450,6 +458,7 @@ def test_block_sha256_is_the_first_12_hex_digits_of_the_text_hash() -> None:
         id="b-p0000-001",
         kind=BlockKind.PARAGRAPH,
         level=None,
+        label=None,
         spans=(
             Span(text="Ramses ", emphasis=Emphasis.NONE, note_ref=None),
             Span(text="über alles", emphasis=Emphasis.NONE, note_ref=None),
@@ -584,14 +593,33 @@ def test_truncated_file_names_the_line_and_column(tmp_path: Path, name: str) -> 
     assert re.search(r"line \d+, column \d+", str(caught.value))
 
 
+# For each file, a format_version this galley does not read, and the one it
+# reads. blocks.json is at 2 since the second plan of structure; its old
+# version 1 is the case the owner meets (architecture section 8).
+UNSUPPORTED_VERSION: frozendict[str, tuple[int, int]] = frozendict(
+    {
+        "pages.json": (2, 1),
+        "words.json": (2, 1),
+        "lines.json": (2, 1),
+        "blocks.json": (1, 2),
+    }
+)
+
+
 @pytest.mark.parametrize("name", NAMES)
-def test_format_version_2_names_both_versions(tmp_path: Path, name: str) -> None:
+def test_unsupported_format_version_names_both_versions(
+    tmp_path: Path, name: str
+) -> None:
+    unsupported, current = UNSUPPORTED_VERSION[name]
     path = _written(tmp_path, name)
-    _set(path, ("format_version",), 2)
+    _set(path, ("format_version",), unsupported)
     with pytest.raises(InputFileError, match=re.escape(name)) as caught:
         READERS[name](path)
-    assert "format version 2" in str(caught.value)
-    assert "format version 1" in str(caught.value)
+    assert f"is format version {unsupported};" in str(caught.value)
+    assert f"this galley reads format version {current}" in str(caught.value)
+    assert str(caught.value).endswith(
+        f"; run `galley2epub {WRITING_STAGE[name]}` again"
+    )
 
 
 @pytest.mark.parametrize("version", [0, True])
@@ -1100,6 +1128,7 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             OcrVerdict,
             RemovalReason,
             BlockKind,
+            NoteKind,
             Emphasis,
             ChangeReason,
             PageNumberPosition,
@@ -1119,15 +1148,19 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "signature_mark",
             "plate_text",
             "stray_mark",
+            "guide_words",
         ],
         "BlockKind": [
             "heading",
             "paragraph",
             "quote",
+            "verse",
+            "chapter_summary",
             "figure",
             "margin_note",
             "index_entry",
         ],
+        "NoteKind": ["footnote", "endnote"],
         "Emphasis": ["none"],
         "ChangeReason": [
             "hyphen_join",
@@ -1164,10 +1197,24 @@ EVERY_MEMBER_PAGES = tuple(
 EVERY_MEMBER_BLOCKS = replace(
     BLOCKS,
     blocks=tuple(
-        replace(BLOCKS.blocks[1], id=f"b-p0003-{number:03}", kind=kind)
+        replace(
+            BLOCKS.blocks[1],
+            id=f"b-p0003-{number:03}",
+            kind=kind,
+            # An index entry has its depth (architecture section 8).
+            level=1 if kind is BlockKind.INDEX_ENTRY else None,
+        )
         for number, kind in enumerate(BlockKind, start=1)
     ),
-    notes=(replace(BLOCKS.notes[0], referenced=False),),
+    notes=tuple(
+        replace(
+            BLOCKS.notes[0],
+            id=f"n-p0003-{number:03}",
+            kind=kind,
+            referenced=False,
+        )
+        for number, kind in enumerate(NoteKind, start=1)
+    ),
     removals=tuple(
         replace(BLOCKS.removals[0], reason=reason) for reason in RemovalReason
     ),
@@ -1196,3 +1243,282 @@ def test_blocks_with_every_member_and_an_unreferenced_note_is_read_back_equal(
     content = json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
     assert content["notes"][0]["referenced"] is False
     assert read_blocks(tmp_path / "blocks.json") == EVERY_MEMBER_BLOCKS
+
+
+# The second plan of structure: labels, note kinds, the new block kinds and
+# removal reason, and margin notes inside a note (architecture section 8).
+
+
+def _blocks_json(tmp_path: Path, blocks: BlocksFile) -> dict[str, Any]:
+    """`blocks` written as blocks.json, then parsed as plain JSON."""
+    write_blocks(tmp_path / "blocks.json", blocks)
+    return json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
+
+
+def test_blocks_json_is_format_version_2() -> None:
+    assert model.BLOCKS_FORMAT_VERSION == 2
+    assert BLOCKS.format_version == 2
+
+
+def test_heading_label_is_written_after_level_and_read_back(tmp_path: Path) -> None:
+    content = _blocks_json(tmp_path, BLOCKS)
+
+    heading = content["blocks"][0]
+    assert list(heading) == [
+        "id",
+        "kind",
+        "level",
+        "label",
+        "spans",
+        "figure",
+        "origin",
+    ]
+    assert heading["label"] == "CHAPTER III."
+    assert read_blocks(tmp_path / "blocks.json").blocks[0].label == "CHAPTER III."
+
+
+def test_block_without_label_is_written_with_label_null(tmp_path: Path) -> None:
+    content = _blocks_json(tmp_path, BLOCKS)
+
+    assert content["blocks"][1]["label"] is None
+    assert content["notes"][0]["blocks"][0]["label"] is None
+
+
+def test_block_without_its_label_field_names_its_path(tmp_path: Path) -> None:
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _delete(tmp_path / "blocks.json", ("blocks", 1, "label"))
+
+    with pytest.raises(InputFileError, match=re.escape("blocks[1].label: missing")):
+        read_blocks(tmp_path / "blocks.json")
+
+
+def test_label_that_is_not_a_string_names_its_path(tmp_path: Path) -> None:
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _set(tmp_path / "blocks.json", ("blocks", 0, "label"), 3)
+
+    with pytest.raises(InputFileError, match=re.escape("blocks[0].label")):
+        read_blocks(tmp_path / "blocks.json")
+
+
+def test_note_kind_is_written_after_id_and_read_back(tmp_path: Path) -> None:
+    endnote = replace(BLOCKS.notes[0], kind=NoteKind.ENDNOTE, marker="291.")
+    blocks = replace(BLOCKS, notes=(endnote,))
+
+    content = _blocks_json(tmp_path, blocks)
+
+    assert list(content["notes"][0]) == [
+        "id",
+        "kind",
+        "marker",
+        "blocks",
+        "origin",
+        "referenced",
+    ]
+    assert content["notes"][0]["kind"] == "endnote"
+    assert read_blocks(tmp_path / "blocks.json").notes == (endnote,)
+
+
+def test_note_kind_that_is_not_a_member_names_its_path(tmp_path: Path) -> None:
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _set(tmp_path / "blocks.json", ("notes", 0, "kind"), "sidenote")
+
+    with pytest.raises(InputFileError, match=re.escape("notes[0].kind")) as caught:
+        read_blocks(tmp_path / "blocks.json")
+    assert "footnote, endnote" in str(caught.value)
+
+
+def test_note_without_its_kind_field_names_its_path(tmp_path: Path) -> None:
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _delete(tmp_path / "blocks.json", ("notes", 0, "kind"))
+
+    with pytest.raises(InputFileError, match=re.escape("notes[0].kind: missing")):
+        read_blocks(tmp_path / "blocks.json")
+
+
+def test_chapter_summary_block_is_written_as_its_kind_and_read_back(
+    tmp_path: Path,
+) -> None:
+    summary = replace(
+        BLOCKS.blocks[1],
+        kind=BlockKind.CHAPTER_SUMMARY,
+        spans=(
+            Span(
+                text="Character of Henry II. \u2014 His family policy.",
+                emphasis=Emphasis.NONE,
+                note_ref=None,
+            ),
+        ),
+    )
+    blocks = replace(BLOCKS, blocks=(BLOCKS.blocks[0], summary))
+
+    content = _blocks_json(tmp_path, blocks)
+
+    assert content["blocks"][1]["kind"] == "chapter_summary"
+    assert read_blocks(tmp_path / "blocks.json") == blocks
+
+
+def test_verse_block_keeps_the_line_feeds_of_its_text(tmp_path: Path) -> None:
+    verse = replace(
+        BLOCKS.blocks[1],
+        kind=BlockKind.VERSE,
+        spans=(
+            Span(
+                text="Arma virumque cano,\nTroiae qui primus ab oris",
+                emphasis=Emphasis.NONE,
+                note_ref=None,
+            ),
+        ),
+    )
+    blocks = replace(BLOCKS, blocks=(verse,))
+
+    content = _blocks_json(tmp_path, blocks)
+
+    assert content["blocks"][0]["kind"] == "verse"
+    assert content["blocks"][0]["spans"][0]["text"] == (
+        "Arma virumque cano,\nTroiae qui primus ab oris"
+    )
+    assert block_text(read_blocks(tmp_path / "blocks.json").blocks[0]) == (
+        "Arma virumque cano,\nTroiae qui primus ab oris"
+    )
+
+
+def test_guide_words_removal_is_written_as_its_reason_and_read_back(
+    tmp_path: Path,
+) -> None:
+    guide_words = Removal(
+        page_index=3,
+        box=Box(120.0, 40.0, 260.0, 52.0),
+        text="BUR CON",
+        reason=RemovalReason.GUIDE_WORDS,
+    )
+    blocks = replace(BLOCKS, removals=(guide_words,))
+
+    content = _blocks_json(tmp_path, blocks)
+
+    assert content["removals"][0]["reason"] == "guide_words"
+    assert read_blocks(tmp_path / "blocks.json").removals == (guide_words,)
+
+
+def test_note_with_a_margin_note_before_its_paragraph_is_read_back(
+    tmp_path: Path,
+) -> None:
+    # Gierke prints margin notes beside its endnotes; such a margin note is a
+    # block of the note, before the note's block that holds the line.
+    margin_note = Block(
+        id="b-p0003-005",
+        kind=BlockKind.MARGIN_NOTE,
+        level=None,
+        label=None,
+        spans=(Span(text="Medieval Thought.", emphasis=Emphasis.NONE, note_ref=None),),
+        figure=None,
+        origin=(ORIGIN,),
+    )
+    note = replace(
+        BLOCKS.notes[0],
+        kind=NoteKind.ENDNOTE,
+        blocks=(margin_note, *BLOCKS.notes[0].blocks),
+    )
+    blocks = replace(BLOCKS, notes=(note,))
+
+    write_blocks(tmp_path / "blocks.json", blocks)
+
+    read_back = read_blocks(tmp_path / "blocks.json")
+    assert read_back == blocks
+    assert tuple(block.kind for block in read_back.notes[0].blocks) == (
+        BlockKind.MARGIN_NOTE,
+        BlockKind.PARAGRAPH,
+        BlockKind.PARAGRAPH,
+    )
+
+
+@pytest.mark.parametrize(
+    "json_path",
+    [("blocks", 1, "label"), ("notes", 0, "blocks", 1, "label")],
+    ids=["body", "note"],
+)
+def test_label_on_a_block_that_is_not_a_heading_names_the_file_and_block(
+    tmp_path: Path, json_path: JsonPath
+) -> None:
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _set(tmp_path / "blocks.json", json_path, "CHAPTER IV.")
+
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+
+    block_id = "b-p0003-002" if json_path[0] == "blocks" else "b-p0003-004"
+    assert str(caught.value) == (
+        f"{tmp_path / 'blocks.json'}: block {block_id} is a paragraph and has "
+        "the label 'CHAPTER IV.'; only a heading has a label"
+    )
+
+
+# An index entry's depth (architecture section 8)
+
+
+@pytest.mark.parametrize("depth", [None, 0])
+def test_index_entry_without_a_depth_from_1_names_the_block_and_structure(
+    tmp_path: Path, depth: int | None
+) -> None:
+    write_blocks(tmp_path / "blocks.json", EVERY_MEMBER_BLOCKS)
+    position = list(BlockKind).index(BlockKind.INDEX_ENTRY)
+    _set(tmp_path / "blocks.json", ("blocks", position, "level"), depth)
+
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+
+    assert str(caught.value) == (
+        f"{tmp_path / 'blocks.json'}: block b-p0003-{position + 1:03} is an index "
+        f"entry with the depth {depth!r}, not one from 1 (architecture section 8); "
+        "a blocks.json written before index entries had a depth needs "
+        "`galley2epub structure` run again"
+    )
+
+
+def test_index_entry_of_depth_2_is_read_back_and_a_level_on_a_paragraph_is_refused(
+    tmp_path: Path,
+) -> None:
+    position = list(BlockKind).index(BlockKind.INDEX_ENTRY)
+    deeper = replace(
+        EVERY_MEMBER_BLOCKS,
+        blocks=tuple(
+            replace(block, level=2) if number == position else block
+            for number, block in enumerate(EVERY_MEMBER_BLOCKS.blocks)
+        ),
+    )
+    write_blocks(tmp_path / "blocks.json", deeper)
+    assert read_blocks(tmp_path / "blocks.json") == deeper
+
+    paragraph = list(BlockKind).index(BlockKind.PARAGRAPH)
+    _set(tmp_path / "blocks.json", ("blocks", paragraph, "level"), 1)
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+    assert str(caught.value) == (
+        f"{tmp_path / 'blocks.json'}: block b-p0003-{paragraph + 1:03} is a "
+        "paragraph and has the level 1; only a heading and an index entry have one"
+    )
+
+
+# Where a note is written (structure spec, section 6, "Order")
+
+
+@pytest.mark.parametrize(
+    ("block_pages", "note_pages", "places"),
+    [
+        # A paragraph from page 3 to 4, then page 3's margin note: page 3's
+        # and page 4's notes both go after the margin note.
+        ((3, 3), (3, 4), (2, 2)),
+        # A note before every block's page goes first of all.
+        ((5, 6), (4,), (0,)),
+        # Blocks out of page order: the last block on or before the page.
+        ((2, 5, 3), (3, 4, 5), (3, 3, 3)),
+        # A block without an origin is passed over, as if it were not there.
+        ((1, None, 2), (1,), (1,)),
+        ((), (0,), (0,)),
+    ],
+)
+def test_note_places_counts_the_blocks_written_before_each_note(
+    block_pages: tuple[int | None, ...],
+    note_pages: tuple[int, ...],
+    places: tuple[int, ...],
+) -> None:
+    assert model.note_places(block_pages, note_pages) == places

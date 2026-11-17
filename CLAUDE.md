@@ -100,7 +100,7 @@ which have the same kind of OCR text layer, running heads and footnotes:
   fixture.
 
 The development loop must stay fast: `uv run pytest` runs everything but
-the `whole_book` tests and should take seconds, not minutes. The `coding`
+the `whole_book` tests and should take about a minute at most. The `coding`
 skill gives the budget.
 
 Earlier OCR and constrained-correction code worth reusing is in

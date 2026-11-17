@@ -1,6 +1,7 @@
 {
-  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed since that check by task 2.5: on book page 75 \"land.\" leaves the body line for the margin note \"Free land.\", so the last paragraph of page 74 ends at \"privilege.\" on 75. Checked against the page image by the orchestrator on 15 November 2026.",
+  "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4), and again, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
+  "changed": "Changed since that check by task 2.5: on book page 75 \"land.\" leaves the body line for the margin note \"Free land.\", so the last paragraph of page 74 ends at \"privilege.\" on 75. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"Where a note starts\" and \"The marker of a note\"): each note's marker is taken out of its text into `marker`; the first band line holds two notes, \"1\" and \"3\" (note 2 misread), cut at the second marker; note 6's marker \"«\" is taken as a one-character marker of an indented note. Changed by task 2.3 (structure spec section 11, \"References\" and \"What is changed\"): the seven references \"pleased1/\", \"it2.'\", \"free3.\", \"things4.\", \"themselves5.'\", \"would6.'\" and \"mercy7.'\" are linked to the page's notes 1 to 7, each split off its word by a note_marker word change; the block text is unchanged.",
+  "known": "The margin note reads \"The scale of free-holding\" (the owner); the text layer's OCR gives \"The scale holding.\", which galley keeps.",
   "excerpt": "domesday_74-83",
   "page": 0,
   "book_page_index": 74,
@@ -73,35 +74,28 @@
       ]
     },
     {
+      "kind": "margin_note",
+      "text": "The scale holding.",
+      "pages": [
+        0
+      ]
+    },
+    {
       "kind": "paragraph",
       "text": "Comparisons may be instituted between the freedom of one free man and that of another :— ' F ive thegns held this land of Earl Edwin and could go with their land whither they would, and below them they had four soldiers, who were as free as themselves5.' Ah igh degree of liberty is marked when we are told that, ' T he said men were so free that they could sell their land with soke and sake wherever they would6.' But there are yet higher degrees of liberty. Of Worcestershire it is written, ' W hen the king goes upon a military expedition, if anyone who is summoned stays at home, then if he is so free a man that he has his sake and soke and can go whither he pleases with his land, he with all his land shall be in the king's mercy7.' The free man is the freer if he has soke and sake, if he has jurisdiction over other men. Exceptional privileges, immunities from common burdens, are already regarded as ' l iberties.' This is no new thing; often enough when the Anglo-Saxon land books speak of freedom they mean privilege.",
       "pages": [
         0,
         1
       ]
-    },
-    {
-      "kind": "margin_note",
-      "text": "The scale",
-      "pages": [
-        0
-      ]
-    },
-    {
-      "kind": "margin_note",
-      "text": "holding.",
-      "pages": [
-        0
-      ]
     }
   ],
   "notes": [
     {
-      "marker": "",
+      "marker": "1",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "1 D. B. i. 35 b, Tornecrosta. 3 D. B. i. 212 b, Stanford."
+          "text": "D. B. i. 35 b, Tornecrosta."
         }
       ],
       "pages": [
@@ -109,11 +103,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "3",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "3 D. B. i. 249 b: ' T res taini tenuerunt et liberi homines fuerunt'; 256, ' I psi taini liberi erant ' ; 259 b, ' Q uatuor taini tenuerunt ante eum et liberi fuerunt.'"
+          "text": "D. B. i. 212 b, Stanford."
         }
       ],
       "pages": [
@@ -121,11 +115,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "3",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "4 Chron. Abingd. i. 4 90: 'Nam quidam dives, Turkillus nomine, sub Haroldi comitis testimonio et consultu, de ae cum sua terra quae Kingestun dicitur, ecclesiae Abbendonensi et abbati Ordrico homagium fecit ; l icitum quippe libero cuique, illo in tempore, sic agere erat.'"
+          "text": "D. B. i. 249 b: ' T res taini tenuerunt et liberi homines fuerunt'; 256, ' I psi taini liberi erant ' ; 259 b, ' Q uatuor taini tenuerunt ante eum et liberi fuerunt.'"
         }
       ],
       "pages": [
@@ -133,11 +127,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "4",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "6 D. B. i. 180 b: 'et poterant ire curn terra quo volebant, et habebant sub se 4 milites, ita liberos ut ipsi erant.'"
+          "text": "Chron. Abingd. i. 4 90: 'Nam quidam dives, Turkillus nomine, sub Haroldi comitis testimonio et consultu, de ae cum sua terra quae Kingestun dicitur, ecclesiae Abbendonensi et abbati Ordrico homagium fecit ; l icitum quippe libero cuique, illo in tempore, sic agere erat.'"
         }
       ],
       "pages": [
@@ -145,11 +139,11 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "6",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "« D. B. ii. 59."
+          "text": "D. B. i. 180 b: 'et poterant ire curn terra quo volebant, et habebant sub se 4 milites, ita liberos ut ipsi erant.'"
         }
       ],
       "pages": [
@@ -157,11 +151,23 @@
       ]
     },
     {
-      "marker": "",
+      "marker": "«",
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "7 D. B. i. 172: 'si ita liber homo est ut habeat socam suam et sacarn et cum terra sua possit ire quo voluerit.'"
+          "text": "D. B. ii. 59."
+        }
+      ],
+      "pages": [
+        0
+      ]
+    },
+    {
+      "marker": "7",
+      "blocks": [
+        {
+          "kind": "paragraph",
+          "text": "D. B. i. 172: 'si ita liber homo est ut habeat socam suam et sacarn et cum terra sua possit ire quo voluerit.'"
         }
       ],
       "pages": [
@@ -186,6 +192,50 @@
   "word_changes": [
     {
       "before": [
+        "pleased1/"
+      ],
+      "after": [
+        "pleased",
+        "1",
+        "/"
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "it2.'"
+      ],
+      "after": [
+        "it",
+        "2",
+        ".'"
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "free3."
+      ],
+      "after": [
+        "free",
+        "3",
+        "."
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "things4."
+      ],
+      "after": [
+        "things",
+        "4",
+        "."
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
         "them-",
         "selves5.'"
       ],
@@ -193,6 +243,39 @@
         "themselves5.'"
       ],
       "reason": "hyphen_join_guessed"
+    },
+    {
+      "before": [
+        "themselves5.'"
+      ],
+      "after": [
+        "themselves",
+        "5",
+        ".'"
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "would6.'"
+      ],
+      "after": [
+        "would",
+        "6",
+        ".'"
+      ],
+      "reason": "note_marker"
+    },
+    {
+      "before": [
+        "mercy7.'"
+      ],
+      "after": [
+        "mercy",
+        "7",
+        ".'"
+      ],
+      "reason": "note_marker"
     }
   ],
   "page_numbers": [

@@ -6,9 +6,13 @@ removes from each page its running head, with the page number and the
 stray marks above it, and the page number, signature line or printer's
 signature mark at its foot, each kept as a removal with its reason; finds
 the paragraphs of the body, which run over page breaks; joins the hyphens
-at line ends (`join_hyphen`), each join kept as a word change; and keeps
-the text of the margins as margin notes and that of the footnote band as
-notes, after the paragraph in which their page's body ends.
+at line ends (`join_hyphen`), each join kept as a word change; keeps the
+text of the footnote band as notes, after the paragraph in which their
+page's body ends; and puts each margin note before the paragraph, or
+inside the note, beside whose line it was printed. A plate page's lines
+are its running head, its caption, kept as the text of a figure block
+placed after the paragraph that runs over the plate, and its stray words,
+removed.
 """
 
 import logging
@@ -26,15 +30,29 @@ from galley.model import (
     write_blocks,
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
+from galley.structure._assemble import assemble
 from galley.structure._hyphens import HyphenJoin, join_hyphen
-from galley.structure._paragraphs import assemble, page_parts
+from galley.structure._markers import (
+    NoteMarker,
+    Reference,
+    ReferenceForm,
+    note_marker,
+    reference_candidate,
+)
+from galley.structure._paragraphs import page_parts
+from galley.structure._plates import plate_parts, plate_survey
 from galley.structure._survey import BookSurvey, survey_book
 
 __all__ = [
     "BookSurvey",
     "HyphenJoin",
+    "NoteMarker",
+    "Reference",
+    "ReferenceForm",
     "join_hyphen",
     "make_blocks",
+    "note_marker",
+    "reference_candidate",
     "run",
     "survey_book",
 ]
@@ -43,16 +61,39 @@ _logger = logging.getLogger(__name__)
 
 
 def make_blocks(
-    lines: LinesFile, word_list: frozenset[str], *, workers: int = DEFAULT_WORKERS
+    lines: LinesFile,
+    lower_case_words: frozenset[str],
+    *,
+    contents_pages: frozenset[int] = frozenset(),
+    workers: int = DEFAULT_WORKERS,
 ) -> BlocksFile:
     """The blocks of the book, what was removed, the words changed and the
     page numbers, in a pool of `workers` threads; the result does not
-    depend on `workers`. `word_list` is the word list of the book's
-    language as `wordlist.word_list` gives it, in any case."""
+    depend on `workers`. `lower_case_words` is the word list of the book's
+    language in lower case, as `wordlist.lower_case_word_list` gives it;
+    `contents_pages` the page indices of the printed table of contents
+    (the config's), whose lines stay paragraphs (spec section 14) and
+    after the last of which the references to endnotes are taken (spec
+    section 12)."""
     survey = survey_book(lines, workers=workers)
-    lower_word_list = frozenset(word.lower() for word in word_list)
-    pages = map_pages(lambda page: page_parts(page, survey), lines.pages, workers)
-    assembled = assemble(pages, survey.book_words, lower_word_list)
+    plates = plate_survey(lines, survey)
+    pages = map_pages(
+        lambda page: (
+            plate_parts(page, survey, plates, lower_case_words)
+            if page.figures
+            else page_parts(page, survey, contents_pages)
+        ),
+        lines.pages,
+        workers,
+    )
+    assembled = assemble(
+        pages,
+        survey.book_words,
+        lower_case_words,
+        survey.body_word_height,
+        survey.body_line_pitch,
+        contents_pages,
+    )
     return BlocksFile(
         source_pdf_sha256=lines.source_pdf_sha256,
         blocks=assembled.blocks,
@@ -82,8 +123,10 @@ def run(
         folder.pages_json, config.pdf, folder.lines_json, read_lines
     )
     # The cache folder is read here, as the command's check reads it.
-    words = wordlist.word_list(config.language, wordlist.DEFAULT_CACHE_DIR)
-    blocks = make_blocks(lines, words, workers=workers)
+    words = wordlist.lower_case_word_list(config.language, wordlist.DEFAULT_CACHE_DIR)
+    blocks = make_blocks(
+        lines, words, contents_pages=frozenset(config.contents_pages), workers=workers
+    )
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
     write_blocks(folder.blocks_json, blocks)
     _logger.info(

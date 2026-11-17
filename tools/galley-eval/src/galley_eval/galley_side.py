@@ -9,13 +9,21 @@ block's id:
 - lines: every word of `lines.json`, page by page, region by region, line
   by line;
 - blocks: the tokens of each block of `blocks.json`, split as the
-  fidelity check splits them at the markdown boundary: a note reference
-  span is a space, not a token, and so is the marker of a referenced
-  note; the marker of an unreferenced note is a word of the book, the
-  first tokens of the note's first block. The body blocks come in order, with the margin notes in their place, then
-  the notes' blocks;
+  fidelity check splits them at the markdown boundary: a heading's label
+  first; a note reference span is a space, not a token, whether it points
+  to a footnote or an endnote; the marker of a referenced footnote is not
+  a token; the marker of an unreferenced footnote, and of every endnote,
+  is a word of the book, the first tokens of the note's first block that
+  is not a margin note. The body blocks come in order, with the margin
+  notes in their place, then the notes' blocks;
 - markdown: the words of `book.md` as `galley.fidelity.read_markdown`
-  reads them, each in the block its id names.
+  reads them, each in the block its id names, without the words of the
+  links to endnotes.
+
+At blocks and markdown, the words of an endnote that galley links from a
+reference carry the page of its first reference, in galley's order, as
+`near_page`: the page of the token before the reference in its block, or
+of the block's first token when the reference opens it.
 
 A word's text is split on white space, as the fidelity check splits it.
 
@@ -41,8 +49,16 @@ How the spec is read here, where it leaves a choice:
 - At markdown, a note reference is placed before the token of its block
   that it precedes at blocks, counted from the block's start, since
   Pandoc's words carry no place for a note.
+- At markdown, the words of a heading's label are its block's first
+  words, as many as the label has, since markdown writes it first.
+- At markdown, the words of a link to an endnote are found by aligning
+  each block's words, with `difflib.SequenceMatcher(autojunk=False)` over
+  their texts, with its tokens at blocks with the words of its references
+  to endnotes put back in their places; a word on an equal or replaced
+  stretch against a put-back word is dropped.
 """
 
+import dataclasses
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 from typing import assert_never
@@ -56,6 +72,7 @@ from galley.model import (
     Line,
     LinesFile,
     Note,
+    NoteKind,
     PageLayout,
     Word,
     WordsFile,
@@ -71,6 +88,7 @@ __all__ = [
     "GalleyNoteReference",
     "GalleySide",
     "blocks_tokens",
+    "endnote_pages",
     "galley_blocks",
     "lines_tokens",
     "markdown_tokens",
@@ -82,12 +100,17 @@ __all__ = [
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class GalleyBlock:
-    """A block of `blocks.json`: its kind, its stream, and the id of the
-    note it is in, None in the body."""
+    """A block of `blocks.json`: its kind, its stream, the id of the note
+    it is in, None in the body, and the kind of that note; whether it is a
+    heading with a label; and the page index of its first origin, None
+    for a block without one."""
 
     kind: BlockKind
     stream: GalleyStream
     note_id: str | None
+    note_kind: NoteKind | None = None
+    has_label: bool = False
+    first_page: int | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -132,13 +155,16 @@ def read_galley_side(folder: BookFolder) -> GalleySide:
         raise GalleyFilesError(message) from err
     markdown = read_markdown(markdown_text)
     blocks_side = blocks_tokens(blocks, lines)
+    references = note_references(blocks)
     return GalleySide(
         words=words_tokens(words, lines),
         lines=lines_tokens(lines),
-        blocks=blocks_side,
-        markdown=markdown_tokens(markdown, blocks, blocks_side),
+        blocks=endnote_pages(blocks_side, blocks, references),
+        markdown=endnote_pages(
+            markdown_tokens(markdown, blocks, blocks_side), blocks, references
+        ),
         galley_blocks=galley_blocks(blocks),
-        note_references=note_references(blocks),
+        note_references=references,
         words_file=words,
     )
 
@@ -237,6 +263,10 @@ def _block_stream(block: Block, *, in_note: bool) -> GalleyStream:
     return GalleyStream.BODY
 
 
+def _first_page(block: Block) -> int | None:
+    return block.origin[0].page_index if block.origin else None
+
+
 def galley_blocks(blocks: BlocksFile) -> frozendict[str, GalleyBlock]:
     """Every block of `blocks`, the body's and the notes', by its id."""
     body = {
@@ -244,12 +274,19 @@ def galley_blocks(blocks: BlocksFile) -> frozendict[str, GalleyBlock]:
             kind=block.kind,
             stream=_block_stream(block, in_note=False),
             note_id=None,
+            has_label=block.label is not None,
+            first_page=_first_page(block),
         )
         for block in blocks.blocks
     }
     notes = {
         block.id: GalleyBlock(
-            kind=block.kind, stream=GalleyStream.NOTES, note_id=note.id
+            kind=block.kind,
+            stream=GalleyStream.NOTES,
+            note_id=note.id,
+            note_kind=note.kind,
+            has_label=block.label is not None,
+            first_page=_first_page(block),
         )
         for note in blocks.notes
         for block in note.blocks
@@ -257,21 +294,30 @@ def galley_blocks(blocks: BlocksFile) -> frozendict[str, GalleyBlock]:
     return frozendict(body | notes)
 
 
+def _prefix(block: Block, marker: str) -> tuple[str, ...]:
+    """The tokens a block's text starts with before its spans': a
+    heading's label, then `marker`, the marker its note prints before it,
+    else ""."""
+    label = block.label.split() if block.label is not None else []
+    return (*label, *marker.split())
+
+
 def _block_texts(block: Block, marker: str) -> tuple[str, ...]:
     """The tokens of a block as the fidelity check splits them at the
-    markdown boundary: a note reference span is a space; `marker`, the
-    marker of an unreferenced note before its first block, else "", comes
-    first."""
+    markdown boundary: its _prefix, then its spans', a note reference
+    span being a space."""
     text = "".join(
         " " if span.note_ref is not None else span.text for span in block.spans
     )
-    return tuple(marker.split()) + tuple(text.split())
+    return _prefix(block, marker) + tuple(text.split())
 
 
 def _blocks_with_markers(blocks: BlocksFile) -> tuple[tuple[Block, str, bool], ...]:
     """Every block, the body's then the notes', with the marker its text
-    starts with and whether it is in a note. Raises GalleyFilesError for
-    an unreferenced note with no block to hold its marker."""
+    starts with and whether it is in a note: a note's marker, when it is
+    printed, goes before its first block that is not a margin note, else
+    before its first block. Raises GalleyFilesError for a note with no
+    block."""
     found: list[tuple[Block, str, bool]] = [
         (block, "", False) for block in blocks.blocks
     ]
@@ -279,15 +325,27 @@ def _blocks_with_markers(blocks: BlocksFile) -> tuple[tuple[Block, str, bool], .
         if not note.blocks:
             message = f"note {note.id} of blocks.json has no block"
             raise GalleyFilesError(message)
+        marked = next(
+            (
+                position
+                for position, block in enumerate(note.blocks)
+                if block.kind is not BlockKind.MARGIN_NOTE
+            ),
+            0,
+        )
         found.extend(
-            (block, _marker(note) if position == 0 else "", True)
+            (block, _marker(note) if position == marked else "", True)
             for position, block in enumerate(note.blocks)
         )
     return tuple(found)
 
 
 def _marker(note: Note) -> str:
-    return "" if note.referenced else note.marker
+    """The marker as markdown prints it: that of an unreferenced footnote
+    and of every endnote; a referenced footnote's is Pandoc's number."""
+    if note.kind is NoteKind.ENDNOTE or not note.referenced:
+        return note.marker
+    return ""
 
 
 def note_references(blocks: BlocksFile) -> tuple[GalleyNoteReference, ...]:
@@ -295,7 +353,7 @@ def note_references(blocks: BlocksFile) -> tuple[GalleyNoteReference, ...]:
     order, each with the number of its block's tokens before it."""
     found: list[GalleyNoteReference] = []
     for block, marker, _ in _blocks_with_markers(blocks):
-        before = marker + " "
+        before = " ".join(_prefix(block, marker)) + " "
         for span in block.spans:
             if span.note_ref is not None:
                 found.append(
@@ -309,6 +367,51 @@ def note_references(blocks: BlocksFile) -> tuple[GalleyNoteReference, ...]:
             else:
                 before += span.text
     return tuple(found)
+
+
+def endnote_pages(
+    tokens: tuple[GalleyToken, ...],
+    blocks: BlocksFile,
+    references: tuple[GalleyNoteReference, ...],
+) -> tuple[GalleyToken, ...]:
+    """`tokens`, of blocks or markdown, with the words of each endnote
+    that galley links from a reference given the page of its first
+    reference as `near_page`: the page of the token before the reference
+    in its block, or of the block's first token when the reference opens
+    it. A reference in a block with no token at this output gives no
+    page."""
+    endnotes = frozendict(
+        {
+            block.id: note.id
+            for note in blocks.notes
+            if note.kind is NoteKind.ENDNOTE
+            for block in note.blocks
+        }
+    )
+    if not endnotes:
+        return tokens
+    linked = frozenset(endnotes.values())
+    positions: dict[str, list[int]] = {}
+    for index, token in enumerate(tokens):
+        if token.block_id is not None:
+            positions.setdefault(token.block_id, []).append(index)
+    pages: dict[str, int] = {}
+    for reference in references:
+        if reference.note_id not in linked or reference.note_id in pages:
+            continue
+        found = positions.get(reference.block_id, [])
+        if not found:
+            continue  # no token of its block at this output
+        at = found[max(min(reference.tokens_before, len(found)) - 1, 0)]
+        pages[reference.note_id] = tokens[at].page_index
+    return tuple(
+        dataclasses.replace(token, near_page=pages[note_id])
+        if token.block_id is not None
+        and (note_id := endnotes.get(token.block_id)) is not None
+        and note_id in pages
+        else token
+        for token in tokens
+    )
 
 
 def blocks_tokens(blocks: BlocksFile, lines: LinesFile) -> tuple[GalleyToken, ...]:
@@ -351,6 +454,7 @@ def _tokens_of_block(
     source = tuple((word, page) for page in pages for word in page_words[page])
     texts = _block_texts(block, marker)
     stream = _block_stream(block, in_note=in_note)
+    label = _label_length(block)
     return tuple(
         GalleyToken(
             text=text,
@@ -358,11 +462,17 @@ def _tokens_of_block(
             stream=stream,
             edge_of_page=False,
             block_id=block.id,
+            in_label=position < label,
         )
-        for text, page in zip(
-            texts, _pages_through(texts, source, pages[0]), strict=True
+        for position, (text, page) in enumerate(
+            zip(texts, _pages_through(texts, source, pages[0]), strict=True)
         )
     )
+
+
+def _label_length(block: Block) -> int:
+    """The number of words of a heading's label, 0 without one."""
+    return len(block.label.split()) if block.label is not None else 0
 
 
 def _pages_through(
@@ -400,21 +510,24 @@ def _pages_through(
 def markdown_tokens(
     markdown: MarkdownWords, blocks: BlocksFile, blocks_side: tuple[GalleyToken, ...]
 ) -> tuple[GalleyToken, ...]:
-    """The words of `book.md`, in its order, each with the stream of the
-    block its id names and the page of the same word in that block at
-    blocks, `blocks_side`. Raises GalleyFilesError for a word in no block
-    or in a block that `blocks` does not have."""
+    """The words of `book.md`, each with the stream of the block its id
+    names and the page of the same word in that block at blocks,
+    `blocks_side`: the body's and margin notes' in `book.md`'s order, then
+    the notes', in the order of blocks.json's notes and their blocks, as
+    at blocks (spec section 5). Raises GalleyFilesError for a word in no
+    block or in a block that `blocks` does not have."""
     known = galley_blocks(blocks)
     by_block: dict[str, list[tuple[str, int]]] = {}
     for token in blocks_side:
         assert token.block_id is not None  # every token of blocks has a block
         by_block.setdefault(token.block_id, []).append((token.text, token.page_index))
+    every_block = blocks.blocks + tuple(
+        block for note in blocks.notes for block in note.blocks
+    )
     first_page = {
-        block.id: block.origin[0].page_index
-        for block in blocks.blocks
-        + tuple(block for note in blocks.notes for block in note.blocks)
-        if block.origin
+        block.id: block.origin[0].page_index for block in every_block if block.origin
     }
+    labels = {block.id: _label_length(block) for block in every_block}
     grouped: dict[str, list[int]] = {}
     for position, word in enumerate(markdown.words):
         match word.block_id:
@@ -431,24 +544,124 @@ def markdown_tokens(
                 grouped.setdefault(block_id, []).append(position)
             case _:
                 assert_never(word.block_id)
+    links = _endnote_link_words(blocks, by_block)
     pages: dict[int, int] = {}
+    in_label: set[int] = set()
+    dropped: set[int] = set()
     for block_id, positions in grouped.items():
         if block_id not in first_page:
             message = f"block {block_id} of blocks.json has no origin, so no page"
             raise GalleyFilesError(message)
+        if block_id in links:
+            kept = _without_link_words(markdown, positions, links[block_id])
+            dropped.update(frozenset(positions) - frozenset(kept))
+            positions = kept
         texts = tuple(markdown.words[position].text for position in positions)
         found = _pages_through(
             texts, tuple(by_block.get(block_id, ())), first_page[block_id]
         )
         pages.update(zip(positions, found, strict=True))
-    return tuple(
+        in_label.update(positions[: labels[block_id]])
+    tokens = tuple(
         GalleyToken(
             text=word.text,
             page_index=pages[position],
             stream=known[block_id].stream,
             edge_of_page=False,
             block_id=block_id,
+            in_label=position in in_label,
         )
         for position, word in enumerate(markdown.words)
-        if (block_id := word.block_id) is not None
+        if (block_id := word.block_id) is not None and position not in dropped
     )
+    return _notes_in_file_order(tokens, blocks)
+
+
+def _notes_in_file_order(
+    tokens: tuple[GalleyToken, ...], blocks: BlocksFile
+) -> tuple[GalleyToken, ...]:
+    """`tokens` with those of the notes moved after the others, in the
+    order of blocks.json's notes and blocks, each block's in its own
+    order: `book.md` writes a referenced footnote after the block that
+    refers to it and an unreferenced one after the last block of its
+    page, which is not the printed order."""
+    rank = {
+        block.id: position
+        for position, block in enumerate(
+            block for note in blocks.notes for block in note.blocks
+        )
+    }
+    body = tuple(token for token in tokens if token.stream is not GalleyStream.NOTES)
+    notes = sorted(
+        (token for token in tokens if token.stream is GalleyStream.NOTES),
+        key=lambda token: rank[token.block_id] if token.block_id is not None else -1,
+    )
+    return body + tuple(notes)
+
+
+def _endnote_link_words(
+    blocks: BlocksFile, by_block: dict[str, list[tuple[str, int]]]
+) -> frozendict[str, tuple[tuple[str, bool], ...]]:
+    """For each block with a reference to an endnote, its words as
+    markdown writes them: its tokens at blocks, `by_block`, with the words
+    of those references put back in their places, each with whether it is
+    a put-back word."""
+    endnotes = frozenset(
+        note.id for note in blocks.notes if note.kind is NoteKind.ENDNOTE
+    )
+    found: dict[str, tuple[tuple[str, bool], ...]] = {}
+    for block, marker, _ in _blocks_with_markers(blocks):
+        if any(span.note_ref in endnotes for span in block.spans):
+            tokens = [text for text, _ in by_block.get(block.id, ())]
+            found[block.id] = _interleave(tokens, block, marker, endnotes)
+    return frozendict(found)
+
+
+def _interleave(
+    tokens: list[str], block: Block, marker: str, endnotes: frozenset[str]
+) -> tuple[tuple[str, bool], ...]:
+    """The block's `tokens` at blocks with the words of its references to
+    endnotes put back where they stand: before the token each precedes."""
+    inserted: dict[int, list[str]] = {}
+    before = " ".join(_prefix(block, marker)) + " "
+    for span in block.spans:
+        if span.note_ref is None:
+            before += span.text
+            continue
+        if span.note_ref in endnotes:
+            inserted.setdefault(len(before.split()), []).extend(span.text.split())
+        before += " "
+    words: list[tuple[str, bool]] = []
+    for position in range(len(tokens) + 1):
+        words.extend((text, True) for text in inserted.get(position, ()))
+        if position < len(tokens):
+            words.append((tokens[position], False))
+    return tuple(words)
+
+
+def _without_link_words(
+    markdown: MarkdownWords,
+    positions: list[int],
+    expected: tuple[tuple[str, bool], ...],
+) -> list[int]:
+    """`positions`, the words of one block of `book.md`, without those that
+    fall on a put-back word of `expected` when the two are aligned."""
+    texts = tuple(markdown.words[position].text for position in positions)
+    matcher = SequenceMatcher(
+        None, texts, tuple(text for text, _ in expected), autojunk=False
+    )
+    dropped: set[int] = set()
+    for tag, start, end, expected_start, expected_end in matcher.get_opcodes():
+        match tag:
+            case "equal" | "replace":
+                for offset in range(min(end - start, expected_end - expected_start)):
+                    if expected[expected_start + offset][1]:
+                        dropped.add(start + offset)
+            case "insert" | "delete":
+                pass  # words on one side only fall on no put-back word
+            case _:
+                message = f"difflib gave an unknown operation {tag!r}"
+                raise AssertionError(message)
+    return [
+        position for offset, position in enumerate(positions) if offset not in dropped
+    ]

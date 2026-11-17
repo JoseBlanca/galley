@@ -1,132 +1,82 @@
-"""Paragraphs, side text and the order of the blocks (spec section 6).
+"""Paragraphs and side text (spec section 6).
 
 The per-page part, `page_parts`, runs on one page: what each region is,
-what is removed, the body stream, and the side text cut into blocks. The
-part across pages, `assemble`, runs once in page order: it finds the
-paragraphs of the book's body stream, which run over page breaks, joins
-the hyphens of every block, body and side text, puts each page's side
-text after the paragraph in which its body ends, and numbers the blocks
-and notes.
+what is removed, the body stream, and the side text cut into blocks.
+`body_entries` runs once in page order: it finds the paragraphs of the
+book's body stream, which run over page breaks, and puts each page's
+margin notes after the paragraph in which its body ends.
 """
 
-import bisect
-import itertools
-from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import assert_never
 
 from galley.model import (
-    Block,
     BlockKind,
-    Emphasis,
-    Line,
-    Note,
-    Origin,
+    Box,
     PageLayout,
     PageNumber,
     Region,
     Removal,
-    Span,
-    WordChange,
+    RemovalReason,
 )
 from galley.structure._foot import body_column
-from galley.structure._hyphens import PageLine, join_lines
-from galley.structure._measures import (
-    Edges,
-    box_of,
-    is_hyphen_first_part,
-    is_number_before_word,
-    is_short,
-    region_edges,
+from galley.structure._headings import PageHead, heading_runs
+from galley.structure._index import IndexPage, index_page
+from galley.structure._lines import (
+    Piece,
+    PlacedLine,
+    first_word,
+    starts_paragraph,
 )
+from galley.structure._markers import MarkerForm, marker_form
+from galley.structure._measures import Edges, is_short, region_edges
 from galley.structure._regions import RegionKind, region_kinds
 from galley.structure._removals import foot_removals, head_removals
+from galley.structure._runs import BodyRun, LabelLine
+from galley.structure._summaries import summary_run
 from galley.structure._survey import BookSurvey
-
-# Spec section 6, rule 1: an indented line starts 5 to 40 pt right of its
-# region's left edge (Stubbs' cut-in notes push lines 60 pt in), after a
-# line that ends more than 3 pt short of its region's right edge.
-_INDENT_MIN_PT = 5.0
-_INDENT_MAX_PT = 40.0
-_SHORT_LINE_PT = 3.0
-# Spec section 6, rule 2: a centred line is at least 15 pt in from both
-# edges, the two insets differing by at most 10 pt.
-_CENTRED_INSET_MIN_PT = 15.0
-_CENTRED_INSET_DIFFERENCE_PT = 10.0
+from galley.structure._verse import verse_runs
 
 
 @dataclass(frozen=True, slots=True)
-class PlacedLine:
-    """A line of a page with its page index, its region's edges, and the
-    edges its centring is measured against: the region's, or the page's
-    body column for a line of a short body region (spec section 6)."""
+class PageFigure:
+    """A plate page's figure (spec section 18): the path of its image, its
+    box on the page, and its caption lines from the top down, none when it
+    has no caption."""
 
-    page_index: int
-    line: Line
-    edges: Edges
-    centring_edges: Edges
-
-
-@dataclass(frozen=True, slots=True)
-class Piece:
-    """A block's lines, all on one page or over several, in order."""
-
-    lines: tuple[PlacedLine, ...]
+    image: str
+    box: Box
+    caption: Piece
 
 
 @dataclass(frozen=True, slots=True)
 class PageParts:
-    """What the per-page work gives for one page: the removals and page
-    numbers, the body stream, the margin notes and the band blocks, each
-    of one page, and whether the page has a figure."""
+    """What the per-page work gives for one page: its index, the removals and page
+    numbers, the body stream, the margin notes, the lines of each band
+    region and the band blocks they make by rules 1 and 2, each of one
+    page, a plate page's figure (spec section 18), the runs of the body
+    stream that are blocks of their own (spec section 2, step 2.3), the
+    positions of other lines of the body stream that start a block (a
+    bibliographical note's band blocks, spec section 16), and the lines
+    taken from the foot of the body stream as notes (spec section 11, "Notes left
+    in the body"), none until they are taken. On an index page,
+    `index_lines` are the lines of its columns, left then right, and
+    `index_starts` the positions of those that start an entry (spec
+    section 17)."""
 
+    index: int
     removals: tuple[Removal, ...]
     page_numbers: tuple[PageNumber, ...]
     body: tuple[PlacedLine, ...]
     margin_notes: tuple[Piece, ...]
+    band_regions: tuple[tuple[PlacedLine, ...], ...]
     band_blocks: tuple[Piece, ...]
-    has_figure: bool
-
-
-def _is_indented(line: PlacedLine, before: PlacedLine) -> bool:
-    indent = line.line.box.x0 - line.edges.left
-    return (
-        _INDENT_MIN_PT <= indent <= _INDENT_MAX_PT
-        and before.line.box.x1 < before.edges.right - _SHORT_LINE_PT
-    )
-
-
-def _is_centred(line: PlacedLine) -> bool:
-    left_inset = line.line.box.x0 - line.centring_edges.left
-    right_inset = line.centring_edges.right - line.line.box.x1
-    return (
-        left_inset >= _CENTRED_INSET_MIN_PT
-        and right_inset >= _CENTRED_INSET_MIN_PT
-        and abs(left_inset - right_inset) <= _CENTRED_INSET_DIFFERENCE_PT
-    )
-
-
-def _hyphen_between(before: PlacedLine, line: PlacedLine) -> bool:
-    """Whether `before` ends with a hyphen that may join it to `line`: the
-    first part of a join, unless a number before a word (spec section 6)."""
-    if not before.line.words:
-        return False
-    last = before.line.words[-1].text
-    return is_hyphen_first_part(last) and not (
-        bool(line.line.words) and is_number_before_word(last, line.line.words[0].text)
-    )
-
-
-def _starts_paragraph(line: PlacedLine, before: PlacedLine | None) -> bool:
-    """Whether `line` starts a paragraph after `before`, the line before it
-    (spec section 6): never after a hyphen; else when it is indented after
-    a short line, or it or the line before is centred."""
-    if before is None:
-        return True
-    if _hyphen_between(before, line):
-        return False
-    return _is_indented(line, before) or _is_centred(line) or _is_centred(before)
+    figure: PageFigure | None = None
+    runs: tuple[BodyRun, ...] = ()
+    block_starts: frozenset[int] = frozenset()
+    body_notes: tuple[PlacedLine, ...] = ()
+    index_lines: tuple[PlacedLine, ...] = ()
+    index_starts: frozenset[int] = frozenset()
 
 
 def _pieces(lines: tuple[PlacedLine, ...]) -> tuple[Piece, ...]:
@@ -134,7 +84,7 @@ def _pieces(lines: tuple[PlacedLine, ...]) -> tuple[Piece, ...]:
     pieces: list[list[PlacedLine]] = []
     before: PlacedLine | None = None
     for line in lines:
-        if not pieces or _starts_paragraph(line, before):
+        if not pieces or starts_paragraph(line, before):
             pieces.append([])
         pieces[-1].append(line)
         before = line
@@ -150,12 +100,55 @@ def _edges(region: Region, kind: RegionKind) -> Edges:
     return region_edges(region)
 
 
-def page_parts(page: PageLayout, survey: BookSurvey) -> PageParts:
-    """The per-page work on `page` (spec section 2, step 2)."""
+def _runs(
+    page_index: int,
+    body: Sequence[PlacedLine],
+    band_regions: Sequence[Sequence[PlacedLine]],
+    head: PageHead,
+    survey: BookSurvey,
+    contents_pages: frozenset[int],
+) -> tuple[BodyRun, ...]:
+    """The runs of the body stream that are blocks of their own (spec
+    section 2, step 2.3), in order: the headings, the chapter summary under
+    a heading, and the verse; none on a page of the printed table of
+    contents."""
+    if page_index in contents_pages:
+        return ()
+    band_lines = tuple(line for region in band_regions for line in region)
+    headings = heading_runs(body, band_lines, survey.body_line_pitch, head)
+    # Each heading's summary ends at the next heading at the latest.
+    limits = (*(run.start for run in headings[1:]), len(body))
+    summaries = tuple(
+        summary
+        for number, heading in enumerate(headings)
+        if (summary := summary_run(body, heading.end, limits[number])) is not None
+    )
+    taken = frozenset(
+        number for run in headings + summaries for number in range(run.start, run.end)
+    )
+    return tuple(
+        sorted(
+            headings + summaries + verse_runs(body, taken), key=lambda run: run.start
+        )
+    )
+
+
+def page_parts(
+    page: PageLayout, survey: BookSurvey, contents_pages: frozenset[int] = frozenset()
+) -> PageParts:
+    """The per-page work on `page` (spec section 2, step 2). `contents_pages`
+    are the page indices of the printed table of contents, on which no
+    heading is found."""
     kinds = region_kinds(page, survey.body_word_height, survey.running_heads)
-    head = head_removals(page, kinds, survey)
+    head = head_removals(page, survey)
     foot = foot_removals(page, kinds, survey)
     removed = head.lines | foot.lines
+    index = (
+        index_page(page, kinds, removed) if page.index in survey.index_pages else None
+    )
+    taken = index.taken if index is not None else frozenset()
+    if index is not None:
+        removed |= index.removed_lines
     column = body_column(page, kinds)
 
     def centring_edges(region: Region, kind: RegionKind, edges: Edges) -> Edges:
@@ -170,6 +163,7 @@ def page_parts(page: PageLayout, survey: BookSurvey) -> PageParts:
                 PlacedLine(page.index, line, edges, centring_edges(region, kind, edges))
                 for line_number, line in enumerate(region.lines)
                 if (region_number, line_number) not in removed
+                and region_number not in taken
             ),
         )
         for region_number, (region, kind, edges) in enumerate(
@@ -184,240 +178,191 @@ def page_parts(page: PageLayout, survey: BookSurvey) -> PageParts:
             )
         )
     )
+    band_regions = tuple(
+        lines for kind, lines in regions if kind is RegionKind.BAND and lines
+    )
+    body = tuple(
+        line for kind, lines in regions if kind is RegionKind.BODY for line in lines
+    )
+    index_lines = _index_lines(page.index, index)
+    page_head = (
+        PageHead.RUNNING_HEAD
+        if any(
+            removal.reason is RemovalReason.RUNNING_HEAD for removal in head.removals
+        )
+        else PageHead.NO_RUNNING_HEAD
+    )
     return PageParts(
-        removals=head.removals + foot.removals,
-        page_numbers=head.page_numbers + foot.page_numbers,
-        body=tuple(
-            line for kind, lines in regions if kind is RegionKind.BODY for line in lines
-        ),
+        index=page.index,
+        removals=head.removals
+        + (index.removals if index is not None else ())
+        + foot.removals,
+        page_numbers=head.page_numbers
+        + (index.page_numbers if index is not None else ())
+        + foot.page_numbers,
+        body=body,
         margin_notes=tuple(
             Piece(lines)
             for kind, lines in regions
             if kind is RegionKind.MARGIN and lines
         ),
-        band_blocks=tuple(
-            piece
-            for kind, lines in regions
-            if kind is RegionKind.BAND
-            for piece in _pieces(lines)
+        band_regions=band_regions,
+        band_blocks=tuple(piece for lines in band_regions for piece in _pieces(lines)),
+        # Spec section 17, rule 4: the index columns are the page's body or
+        # band lines for the title's centring (section 14, rule 1).
+        runs=_runs(
+            page.index,
+            body,
+            (*band_regions, index_lines),
+            page_head,
+            survey,
+            contents_pages,
         ),
-        has_figure=bool(page.figures),
+        index_lines=index_lines,
+        index_starts=index.starts if index is not None else frozenset(),
+    )
+
+
+def _index_lines(page_index: int, index: IndexPage | None) -> tuple[PlacedLine, ...]:
+    """The lines of an index page's columns, each with its column's edges."""
+    if index is None:
+        return ()
+    return tuple(
+        PlacedLine(page_index, line, edges, edges)
+        for line, edges in zip(index.lines, index.column_edges, strict=True)
     )
 
 
 # Across pages
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class BodyBlock:
+    """A block of the body stream, as a piece: a paragraph, or a run of
+    section 2, step 2.3, with its kind, a heading's level and whether its
+    first line is its chapter label."""
+
+    piece: Piece
+    kind: BlockKind = BlockKind.PARAGRAPH
+    level: int | None = None
+    label_line: LabelLine = LabelLine.NONE
+
+
 @dataclass(frozen=True, slots=True)
-class _Paragraph:
-    """A paragraph of the body stream, as a piece."""
+class MarginNote:
+    """A margin region of a page, as a piece of one page (spec section 6,
+    "Side text")."""
 
     piece: Piece
 
 
-@dataclass(frozen=True, slots=True)
-class _MarginNote:
-    piece: Piece
+type Entry = BodyBlock | MarginNote
 
 
-type _Entry = _Paragraph | _MarginNote
+def _marker_led(lines: Sequence[PlacedLine], form: MarkerForm | None) -> bool:
+    """Whether a paragraph of `lines` starts with a word of the book's
+    marker form `form`: a note that section 11 did not take, which never
+    runs on into the next page (spec section 16)."""
+    return (
+        form is not None and bool(lines) and marker_form(first_word(lines[0])) is form
+    )
 
 
-def _body_entries(pages: Sequence[PageParts]) -> tuple[_Entry, ...]:
-    """The paragraphs of the book's body stream in order, each followed by
-    the margin notes of the pages whose body ends in it; the margin notes
-    of a page with no body stream after the last block so far."""
-    entries: list[_Entry] = []
+def _crosses_section_edge(
+    before: PlacedLine | None, line: PlacedLine, section_pages: range
+) -> bool:
+    """Whether a paragraph running on from `before` into `line`, the first
+    line of a page, would run into or out of the endnote section."""
+    return (
+        before is not None
+        and bool(section_pages)
+        and (before.page_index in section_pages) != (line.page_index in section_pages)
+    )
+
+
+def _run_at(runs: Sequence[BodyRun], number: int) -> BodyRun | None:
+    """The run that holds the line at `number`, None when no run does."""
+    return next((run for run in runs if run.start <= number < run.end), None)
+
+
+def _continues_verse(
+    current_run: BodyRun | None, run: BodyRun | None, number: int
+) -> bool:
+    """Whether the line at `number` of a page's body stream, in `run`,
+    continues the verse block `current_run` that ended the page before:
+    it is the page's first line and starts a verse run (spec section 16,
+    rule 4)."""
+    return (
+        number == 0
+        and run is not None
+        and run.kind is BlockKind.VERSE
+        and current_run is not None
+        and current_run.kind is BlockKind.VERSE
+    )
+
+
+def _block(lines: Sequence[PlacedLine], run: BodyRun | None) -> BodyBlock:
+    piece = Piece(tuple(lines))
+    if run is None:
+        return BodyBlock(piece=piece)
+    return BodyBlock(
+        piece=piece, kind=run.kind, level=run.level, label_line=run.label_line
+    )
+
+
+def body_entries(
+    pages: Sequence[PageParts],
+    form: MarkerForm | None = None,
+    section_pages: range = range(0),
+) -> tuple[Entry, ...]:
+    """The blocks of the book's body stream in order, each followed by the
+    margin notes of the pages whose body ends in it; the margin notes of a
+    page with no body stream after the last block so far. Each run of a
+    page (`PageParts.runs`) is a block of its own, and the line after it
+    starts a block; a verse block that ends a page's body stream goes on
+    into a verse run that starts the next. A paragraph whose first word has
+    the book's marker form `form` does not run on into the next page, and
+    no paragraph runs on into or out of `section_pages`, the pages of the
+    endnote section (spec section 12): the first line of its first page,
+    and the first body line after its last page, start a paragraph."""
+    entries: list[Entry] = []
     current: list[PlacedLine] = []
-    pending: list[_MarginNote] = []
+    current_run: BodyRun | None = None
+    pending: list[MarginNote] = []
     before: PlacedLine | None = None
-    page_before_has_figure = False
     for page in pages:
         for number, line in enumerate(page.body):
-            # The hyphen rule comes before the plate break (spec section 6).
-            plate_break = (
-                number == 0
-                and (page.has_figure or page_before_has_figure)
-                and not (before is not None and _hyphen_between(before, line))
-            )
-            if plate_break or _starts_paragraph(line, before):
+            run = _run_at(page.runs, number)
+            if _continues_verse(current_run, run, number):
+                starts = False
+            elif run is not None or current_run is not None:
+                # A run is a block of its own, and so is what follows it.
+                starts = run is None or run.start == number or number == 0
+            else:
+                note_break = number == 0 and (
+                    _marker_led(current, form)
+                    or _crosses_section_edge(before, line, section_pages)
+                )
+                starts = (
+                    number in page.block_starts
+                    or note_break
+                    or starts_paragraph(line, before)
+                )
+            if starts:
                 if current:
-                    entries.append(_Paragraph(Piece(tuple(current))))
+                    entries.append(_block(current, current_run))
                     entries.extend(pending)
                     pending = []
                 current = []
+                current_run = run
             current.append(line)
             before = line
-        if page.body:
-            page_before_has_figure = page.has_figure
-        notes = tuple(_MarginNote(piece) for piece in page.margin_notes)
+        notes = tuple(MarginNote(piece) for piece in page.margin_notes)
         if current:
             pending.extend(notes)
         else:
             entries.extend(notes)
     if current:
-        entries.append(_Paragraph(Piece(tuple(current))))
+        entries.append(_block(current, current_run))
     entries.extend(pending)
     return tuple(entries)
-
-
-def _origin(piece: Piece) -> tuple[Origin, ...]:
-    """One origin per page the piece has lines on, with the box of those
-    lines."""
-    return tuple(
-        Origin(page_index, box_of(tuple(line.line.box for line in lines)))
-        for page_index, lines in itertools.groupby(
-            piece.lines, key=lambda line: line.page_index
-        )
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class _Unnumbered:
-    """A block before it has its id: its kind, text and origin."""
-
-    kind: BlockKind
-    text: str
-    origin: tuple[Origin, ...]
-
-
-def _joined(
-    piece: Piece,
-    kind: BlockKind,
-    book_words: frozenset[str],
-    word_list: frozenset[str],
-) -> tuple[_Unnumbered, tuple[WordChange, ...]]:
-    joined = join_lines(
-        tuple(
-            PageLine(line.page_index, tuple(word.text for word in line.line.words))
-            for line in piece.lines
-        ),
-        book_words,
-        word_list,
-    )
-    return _Unnumbered(kind, " ".join(joined.words), _origin(piece)), joined.changes
-
-
-def _block(block_id: str, unnumbered: _Unnumbered) -> Block:
-    return Block(
-        id=block_id,
-        kind=unnumbered.kind,
-        level=None,
-        spans=(Span(unnumbered.text, Emphasis.NONE, None),),
-        figure=None,
-        origin=unnumbered.origin,
-    )
-
-
-def _first_page(unnumbered: _Unnumbered) -> int:
-    return unnumbered.origin[0].page_index
-
-
-def _note_places(
-    blocks: tuple[_Unnumbered, ...], notes: tuple[_Unnumbered, ...]
-) -> tuple[int, ...]:
-    """For each note, the position in `blocks` of the block markdown writes
-    it after, -1 for first of all (spec section 6, "Order"): the last block
-    whose first origin is on the note's first page or an earlier one."""
-    first_pages = tuple(_first_page(block) for block in blocks)
-    last_by_page: dict[int, int] = {}
-    for position, page_index in enumerate(first_pages):
-        last_by_page[page_index] = position
-    pages = sorted(last_by_page)
-    last_up_to = tuple(
-        itertools.accumulate((last_by_page[page] for page in pages), max)
-    )
-
-    def place(note: _Unnumbered) -> int:
-        up_to = bisect.bisect_right(pages, _first_page(note))
-        return last_up_to[up_to - 1] if up_to > 0 else -1
-
-    return tuple(place(note) for note in notes)
-
-
-@dataclass(frozen=True, slots=True)
-class Assembled:
-    """The book's blocks and notes in order, with their ids, and the word
-    changes of their hyphen joins in reading order."""
-
-    blocks: tuple[Block, ...]
-    notes: tuple[Note, ...]
-    word_changes: tuple[WordChange, ...]
-
-
-def _numbered(
-    blocks: tuple[_Unnumbered, ...], notes: tuple[_Unnumbered, ...]
-) -> tuple[tuple[Block, ...], tuple[Note, ...]]:
-    """Block and note ids (spec section 6): a block's counts the blocks that
-    start on its page in reading order, each note's block where markdown
-    writes the note; a note's counts the notes that start on its page."""
-    places = _note_places(blocks, notes)
-    notes_after: dict[int, list[int]] = {}
-    for note_number, position in enumerate(places):
-        notes_after.setdefault(position, []).append(note_number)
-    block_counts: Counter[int] = Counter()
-
-    def next_id(unnumbered: _Unnumbered) -> str:
-        page_index = _first_page(unnumbered)
-        block_counts[page_index] += 1
-        return f"b-p{page_index:04d}-{block_counts[page_index]:03d}"
-
-    note_block_ids: dict[int, str] = {}
-    body: list[Block] = []
-    for position in range(-1, len(blocks)):
-        if position >= 0:
-            body.append(_block(next_id(blocks[position]), blocks[position]))
-        for note_number in notes_after.get(position, []):
-            note_block_ids[note_number] = next_id(notes[note_number])
-    note_counts: Counter[int] = Counter()
-    numbered_notes: list[Note] = []
-    for note_number, note in enumerate(notes):
-        page_index = _first_page(note)
-        note_counts[page_index] += 1
-        numbered_notes.append(
-            Note(
-                id=f"n-p{page_index:04d}-{note_counts[page_index]:03d}",
-                marker="",
-                blocks=(_block(note_block_ids[note_number], note),),
-                origin=note.origin,
-                referenced=False,
-            )
-        )
-    return tuple(body), tuple(numbered_notes)
-
-
-def assemble(
-    pages: Sequence[PageParts], book_words: frozenset[str], word_list: frozenset[str]
-) -> Assembled:
-    """The work across pages (spec section 2, step 3), in page order: the
-    paragraphs of the body stream with their hyphens joined, the margin
-    notes after the paragraph in which their page's body ends, the band
-    blocks as notes, and the ids. `word_list` is in lower case."""
-    joined_blocks: list[_Unnumbered] = []
-    body_changes: list[WordChange] = []
-    for entry in _body_entries(pages):
-        match entry:
-            case _Paragraph(piece):
-                kind = BlockKind.PARAGRAPH
-            case _MarginNote(piece):
-                kind = BlockKind.MARGIN_NOTE
-            case _:
-                assert_never(entry)
-        block, changes = _joined(piece, kind, book_words, word_list)
-        joined_blocks.append(block)
-        body_changes.extend(changes)
-    joined_notes: list[_Unnumbered] = []
-    side_changes: list[WordChange] = []
-    for page in pages:
-        for piece in page.band_blocks:
-            note, changes = _joined(piece, BlockKind.PARAGRAPH, book_words, word_list)
-            joined_notes.append(note)
-            side_changes.extend(changes)
-    blocks, notes = _numbered(tuple(joined_blocks), tuple(joined_notes))
-    return Assembled(
-        blocks=blocks,
-        notes=notes,
-        word_changes=tuple(
-            sorted(body_changes + side_changes, key=lambda change: change.page_index)
-        ),
-    )

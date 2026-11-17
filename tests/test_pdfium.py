@@ -84,12 +84,14 @@ def test_render_from_6_threads_at_once_gives_6_times_the_bytes_of_one_call(
     excerpt_pdf: frozendict[str, Path],
 ) -> None:
     pdf = excerpt_pdf[GIERKE]
-    alone = render(pdf, 0, 300)
+    # At 72 dpi: the calls only have to meet in the PDFium thread, and seven
+    # renders at 300 dpi took 1 s of the default run (16 November 2026).
+    alone = render(pdf, 0, 72)
     barrier = threading.Barrier(THREADS_AT_ONCE)
 
     def render_after_barrier(_: int) -> RenderedPage:
         barrier.wait()
-        return render(pdf, 0, 300)
+        return render(pdf, 0, 72)
 
     with ThreadPoolExecutor(THREADS_AT_ONCE) as executor:
         pages = tuple(executor.map(render_after_barrier, range(THREADS_AT_ONCE)))

@@ -82,6 +82,17 @@ BOOKS = (
                     "a plate and a blank page"
                 ),
             ),
+            Excerpt(
+                name="kadesh_59-68",
+                page_indices=tuple(range(59, 69)),
+                covers=(
+                    "plates with captions and the series head over them, a "
+                    "running head on page index 64 and a caption line on 68, "
+                    "and the back of a plate (65), which analyze takes for a "
+                    "plate (docs/specs/structure.md, section 9, and "
+                    "docs/specs/plates.md)"
+                ),
+            ),
         ),
     ),
     Book(
@@ -123,6 +134,20 @@ EVALUATION_EXCERPTS = frozendict(
                     "a text layer, and the first page of the two-column index"
                 ),
             ),
+            Excerpt(
+                name="haskins_quotes_index",
+                page_indices=(39, 41, 53, 71, 72, 73, 129, 209, 234, 267, 269),
+                covers=(
+                    "a level-2 heading BIBLIOGRAPHICAL NOTE mid-page with "
+                    "paragraphs of small type after it (page index 39), "
+                    "ended by the heading of chapter II (41), and "
+                    "above a band of small type (129), quotes in smaller type "
+                    "(53), a quote over two page breaks (71 to 73), Latin and "
+                    "English verse (209, 234), and index pages whose rows are "
+                    "read across both columns, with an entry from the foot of "
+                    "one column to the top of the next (267, 269)"
+                ),
+            ),
         ),
         "earlyplantagenet01stub": (
             Excerpt(
@@ -137,6 +162,18 @@ EVALUATION_EXCERPTS = frozendict(
                     "above the head, and a hyphen across a page break"
                 ),
             ),
+            Excerpt(
+                name="stubbs_summaries_index",
+                page_indices=(16, 28, 79, 157, 312, 313, 316, 318, 319, 321),
+                covers=(
+                    "a printed contents page (page index 16), chapter summaries "
+                    "whose OCR is out of order (28) or whose last line is "
+                    'centred (79), "John." in lower case under "CHAPTER VII." '
+                    "(157), and the index: guide words, columns read as a band, "
+                    "rows across the columns, letter initials and spaced "
+                    "letters (312 to 321)"
+                ),
+            ),
         ),
         "domesdaybook00maituoft": (
             Excerpt(
@@ -147,6 +184,21 @@ EVALUATION_EXCERPTS = frozendict(
                     "(docs/specs/layout.md, section 8): outer margin notes on "
                     "both sides, footnotes, short notes side by side, and the "
                     'signature marks "M. 4" (page index 74) and "4—2" (76)'
+                ),
+            ),
+            Excerpt(
+                name="domesday_headings_quotes",
+                page_indices=(14, 22, 30, 39, 40, 42, 47, 93, 272, 274, 406),
+                covers=(
+                    "a printed contents page (page index 14), an essay's label "
+                    "3.4 pitches above its title (22), a section heading in "
+                    "lower case mid-page (30), maps as plates with a caption "
+                    "and the binder's note (39, 40), a table's title in "
+                    "capitals (42), tables read as verse (47, 406), inset "
+                    "quotes (93) and quotes in smaller type (274) above "
+                    "footnotes; 47 and 272 repeat the running heads of 93 and "
+                    "274 and keep the excerpt's body measures at the book's "
+                    "(structure spec, section 9)"
                 ),
             ),
         ),
@@ -160,6 +212,17 @@ EVALUATION_EXCERPTS = frozendict(
                     "foot in parentheses, a foot line holding the signature "
                     "and the page number (page index 210), and footnotes in "
                     "poor OCR"
+                ),
+            ),
+            Excerpt(
+                name="mariejol_headings_verse",
+                # Six pages, the cases of docs/specs/structure.md, section 9.
+                page_indices=(18, 51, 52, 142, 229, 430),
+                covers=(
+                    "a chapter opening, CHAPITRE and its title (page index "
+                    "18), verse over a page break (51, 52), a title that fills "
+                    "the column (142), two verse quotes on one page (229), and "
+                    "a heading of three lines (430)"
                 ),
             ),
         ),
