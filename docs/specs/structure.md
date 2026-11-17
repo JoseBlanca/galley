@@ -1007,7 +1007,8 @@ def note_marker(word: str, *, endnote: bool = False) -> NoteMarker | None: ...
 def reference_candidate(word: str) -> Reference | None: ...
 def attach_spaced_sign(before: str, word: str) -> str | None: ...
 def split_at_case(word: str, lower_case_words: frozenset[str],
-                  book_words: frozenset[str]) -> tuple[str, str] | None: ...
+                  book_words: frozenset[str],
+                  common_inner_words: frozenset[str]) -> tuple[str, str] | None: ...
 def make_blocks(lines: LinesFile, lower_case_words: frozenset[str], *,
                 language: Language = Language.EN,
                 contents_pages: frozenset[int] = frozenset(),
@@ -3220,8 +3221,12 @@ is split in two at a lower-to-upper case change when all of these hold:
 - the word, with punctuation stripped from both ends, is a run of
   lower-case letters followed by a capital and at least 2 lower-case
   letters, and nothing else ("theAvre", "ofWilliam");
-- the left part has at least 2 letters and is a known word (the word
-  list, `wordlist.is_known_word`);
+- the left part has at least 2 letters, is a known word (the word
+  list, `wordlist.is_known_word`) and its key is among the book's
+  common inner words (`BookSurvey.common_inner_words`, section 5: printed
+  after a line's first word more than 8 times);
+- the capital is not "U" or "H", the letters the OCR gives for "li"
+  (below);
 - the right part's key (section 5) is among the book's own words, the
   keys of `lines.json` of section 5: the book prints it whole elsewhere;
 - the whole word's key is not a known word.
@@ -3242,7 +3247,13 @@ glued word with a capital left part is a name ("McGibbon", "LaFollette",
 because the OCR misreads "li" as "U" or "H": Haskins' "deUver",
 "miUenaire" and "estabHshed", whose right parts the book never prints,
 are words the OCR damaged, and a split would leave two wrong words for
-one. Measured on 17 November 2026 on the words of the clean-text
+one. The word list alone does not stop them: Tesseract's lists hold
+"ji", "po", "catho" and "tt", so the first rule split Domesday's
+"jiEthelbert" and Mariéjol's "poUtique" (8 times) into "po" "Utique".
+The book's common inner words and the capital (orchestrator, 17
+November 2026) took Mariéjol from 48 splits to 12 and Domesday from 4
+to 3, measured on the clean-text build's `lines.json`; the English
+books lost no split that looked right. Measured on 17 November 2026 on the words of the clean-text
 build's `blocks.json` and the survey's runs (the prototype took the
 book's words from the blocks, an approximation of section 5's, which
 the plan measures again):
@@ -3251,11 +3262,19 @@ the plan measures again):
 |---|---|---|---|
 | Haskins | 2 | "theAvre", "theAngevin" | 7 misreadings ("deUver") |
 | Stubbs | 10 | "ofWilliam", "ofJohn", "ofLancaster", "heBarons" (the "t" of "the" lost) | 1 |
-| Domesday | 5 | "ofChatteris", "inBerchescire", "forSon" | 8 |
+| Domesday | 3 | "ofChatteris", "forSon", "forSan" | 9 |
 | Kadesh, Gierke | 0 | | 12, 6 ("inSyrienund", "outsideVhe") |
-| Mariéjol | 36 | mostly misreadings into misreadings ("revHit") | 272 |
+| Mariéjol | 12 | "desMédicis", "deChambord", "laLigue" | the rest |
 | Turney | 0 | | 0 |
 | Haynes | 3 | names after "of" | 2 |
+
+The Haskins, Stubbs, Domesday and Mariéjol rows are of the rule as it
+now stands, on `lines.json`; Turney's and Haynes' are of the first rule
+and were not measured again. Of Mariéjol's 12, 6 look wrong from the
+words alone, misreadings split into misreadings: "paJais", "•oaSat",
+"fiMent", "ttOat", "ftOom)", "tuAiu". They are an accepted cost: the
+scan is not worth more effort (owner, on unreadable scans), and the
+fidelity check holds, since a split loses no letter.
 
 A lower-case pair glued without a case change ("ofone") is not found:
 a test on the word list alone splits 860 to 6,600 words per book
