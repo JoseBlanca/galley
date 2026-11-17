@@ -1102,23 +1102,22 @@ def test_index_haskins_267_calabria_one_entry_and_the_rows_cut_at_the_gutter(
 ) -> None:
     # Layout read the first four rows across both columns; the gutter cut
     # puts "Clermont, 211." and the three entries after it in the right
-    # column, before "Commerce". The page is a small-print page whose
-    # Tesseract reading is kept (reocr spec, section 3, kind 1); the layer's
-    # "lo/.," lies under no word of Tesseract's and stays beside its "10
-    # f.," (section 4).
+    # column, before "Commerce". The page is a small-print page, read whole
+    # by Tesseract and left as the layer: Tesseract's reading scores no
+    # higher (reocr spec, sections 3 and 4).
     _, blocks = excerpt_outputs["haskins_quotes_index"]
     entries = _index_entries_on(blocks, 9)
     assert entries[:3] == (
-        "Caen, 10 lo/., f., 71, 133, 139, 143, 153, 160, 166, 172, 184;",
-        "abbeys, 12, 58, 160, 163, 171, 174, 186-88, 213.",
-        "Calabria, 176, 198, 201-11, 222, 226, 237, 246.",
+        "Caen, lo/., 71, 133, 139, 143, 153. 160, 166, 172, 184;",
+        "abbeys, 12, 58,160, 163, 171, 174,186-88,213.",
+        "Calabria, 176, 198,201-11,222,226, 237, 246.",
     )
     clermont = entries.index("Clermont, 211.")
     assert entries[clermont : clermont + 4] == (
         "Clermont, 211.",
         "Clovis, 207.",
         "Cluny, 164.",
-        "Colombiéres, 116.",
+        "Colombieres, 116.",
     )
     assert entries[clermont + 4].startswith("Commerce, Norman, 4, 73, 81,")
     assert "quote" not in _kinds_on(blocks, 9) + _kinds_on(blocks, 10)

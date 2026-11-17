@@ -1739,3 +1739,18 @@ def test_layout_with_a_kept_reread_replacing_a_word_no_ocr_word_lies_over_fails(
     assert raised.value.invented == frozendict()
     assert "'Normandy'" in raised.value.detail
     assert "none of its ocr_words lies over" in raised.value.detail
+
+
+def test_layout_with_a_kept_reread_replacing_a_word_off_its_box_by_its_text_passes() -> (
+    None
+):
+    # Tesseract also read the body word "Normandy" 10 pt above the layer's:
+    # no box lies over the layer's word, but the texts match (reocr spec,
+    # section 4, rule (b)).
+    normandy = Word("Normandy", Box(100.0, 40.0, 160.0, 50.0), 90.0)
+    reread = replace(
+        _note_reread((*_NOTE_LAYER, _BODY)), ocr_words=(*_NOTE_OCR, normandy)
+    )
+    lines = _note_lines((*_NOTE_OCR, normandy), (reread,))
+
+    check_stage(FidelityBoundary.LAYOUT, _NOTE_WORDS, lines)

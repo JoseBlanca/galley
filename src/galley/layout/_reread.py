@@ -37,7 +37,15 @@ from galley.layout._column import (
     split_at_column,
     without_cut_in_notes,
 )
-from galley.model import Box, PageWords, Reread, RereadKind, Word, is_under_ocr_word
+from galley.model import (
+    Box,
+    PageWords,
+    Reread,
+    RereadKind,
+    Word,
+    is_under_ocr_word,
+    replaced_layer_words,
+)
 from galley.ocr import OCR_DPI
 from galley.pdfium import POINTS_PER_INCH
 from galley.wordlist import is_known_word
@@ -117,6 +125,15 @@ _BAND_LEAST_INK_PX: Final[int] = 150
 _BAND_LEAST_WIDTH_PX: Final[int] = 25
 _BAND_MARGIN_PX: Final[int] = 6
 _INK: Final[int] = 255
+
+# A note band may replace the margin words whose middle lies within 12 pt
+# above or below it: the layer's lines lie up to 12 pt off Tesseract's
+# (model.replaced_layer_words).
+_BAND_REACH_PT: Final[float] = 12.0
+# A body line's last word may end up to 2 pt past the column's edge (layout
+# spec, section 3, step 2: a word 2 pt outside is a margin word); "of" at
+# the end of a body line beside a note on Domesday page 74 ends 1 pt past.
+_INTO_MARGIN_PT: Final[float] = 2.0
 
 # The filters of a cut-in crop (reocr spec, section 3, kind 3), measured
 # on Stubbs: a note word ends 4 pt short of the inset (layout spec,
@@ -473,7 +490,7 @@ class RegionReading:
     others. `ocr_words` are Tesseract's words, after the filters of a
     cut-in crop. `layer_words` are the layer words it may replace; it
     replaces those under a word of Tesseract's it keeps
-    (`model.is_under_ocr_word`).
+    (`model.replaced_layer_words`).
     """
 
     kind: RereadKind
@@ -543,17 +560,44 @@ def margin_note_reading(
     ocr_words: tuple[Word, ...],
     *,
     page_words: tuple[Word, ...],
+    edge: float,
 ) -> RegionReading:
     """A note band of the outer margin on `side`, cropped at `box`, with
-    Tesseract's `ocr_words`. It may replace any word of `page_words`: the
-    strip lies outside the column, so only margin words, and the layer's
-    stray letters at the column's edge, lie under Tesseract's words."""
+    Tesseract's `ocr_words`. It may replace the words of `page_words` whose
+    middle lies within 12 pt above or below the band and that reach 2 pt
+    or more into that side's margin, past the column's left `edge` or its
+    right `edge` (the margin words and the words that cross the edge so
+    far), or lie under one of `ocr_words` (`model.is_under_ocr_word`), as
+    the layer's stray letters at the column's edge."""
+    match side:
+        case Side.LEFT:
+            in_margin = tuple(
+                word
+                for word in page_words
+                if word.box.x0 <= edge - _INTO_MARGIN_PT
+                or is_under_ocr_word(word, ocr_words)
+            )
+        case Side.RIGHT:
+            in_margin = tuple(
+                word
+                for word in page_words
+                if word.box.x1 >= edge + _INTO_MARGIN_PT
+                or is_under_ocr_word(word, ocr_words)
+            )
+        case _:
+            assert_never(side)
     return RegionReading(
         kind=RereadKind.MARGIN_NOTE,
         side=side,
         box=box,
         ocr_words=ocr_words,
-        layer_words=page_words,
+        layer_words=tuple(
+            word
+            for word in in_margin
+            if box.top - _BAND_REACH_PT
+            <= _vertical_middle(word)
+            <= box.bottom + _BAND_REACH_PT
+        ),
     )
 
 
@@ -693,7 +737,7 @@ def page_rereads(
     lies inside the crop of an earlier kept region is dropped, so that no
     printed word is read in by two regions. Of the layer words a region
     may replace, it replaces those under one of its words of Tesseract's
-    (`model.is_under_ocr_word`) that an earlier kept region does not
+    (`model.replaced_layer_words`) that an earlier kept region does not
     replace; the others stay in the layer. A region is kept when its
     words of Tesseract's are not empty and score higher than the layer
     words it replaces, by `reading_score` against `lower_case_words`, and,
@@ -718,10 +762,8 @@ def page_rereads(
             for word in reading.ocr_words
             if not any(_inside(_middle(word), crop) for crop in earlier_crops)
         )
-        layer_words = tuple(
-            word
-            for word in _without(reading.layer_words, replaced)
-            if is_under_ocr_word(word, ocr_words)
+        layer_words = replaced_layer_words(
+            _without(reading.layer_words, replaced), ocr_words
         )
         if not layer_words and not ocr_words:
             continue

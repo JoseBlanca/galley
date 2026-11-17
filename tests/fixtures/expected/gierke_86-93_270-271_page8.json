@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4), and again, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.4 (structure spec section 12): the page is the first of the endnote section, so no paragraph of book page 93 runs on into it; its paragraphs are endnotes, the first, the end of note 290 with the head line \"Notes. 185\" that the excerpt keeps, an endnote without a marker, then 291. to 294., each its marker taken out of its text into `marker`, unreferenced; the margin notes stay blocks after the last block of the page until task 2.5. Changed by task 2.5 (structure spec section 13, rules 2 and 5): each margin note is inside the endnote beside whose line it stands, before its text: \"Tribunals… liberate!?.\" in 292, \"Natural\" and \"the level £tJJ*\" in 293, \"Coercive\" and \"Force of\" in 294; none is left among the page's blocks. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
+  "changed": "Changed by task 2.4 (structure spec section 12): the page is the first of the endnote section, so no paragraph of book page 93 runs on into it; its paragraphs are endnotes, the first, the end of note 290 with the head line \"Notes. 185\" that the excerpt keeps, an endnote without a marker, then 291. to 294., each its marker taken out of its text into `marker`, unreferenced; the margin notes stay blocks after the last block of the page until task 2.5. Changed by task 2.5 (structure spec section 13, rules 2 and 5): each margin note is inside the endnote beside whose line it stands, before its text: \"Tribunals… liberate!?.\" in 292, \"Natural\" and \"the level £tJJ*\" in 293, \"Coercive\" and \"Force of\" in 294; none is left among the page's blocks. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed again by the fix of task 5.2 (reocr spec, section 4, rules (a) and (b)): a layer word the layer placed off Tesseract's reading of it, of the same text, is replaced and no longer read twice; listed in the task's list of changed reference pages.",
   "excerpt_only": "What the excerpt gives, not what the whole book gives: the head line \"Notes. 185\" stays, because the running-head rule compares it with other \"Notes.\" heads or with the offset of other page numbers, and the excerpt has neither; it is therefore the first words of the endnote that ends note 290 (until task 2.4 it was joined, with the lines below it, to the last paragraph of book page 93, which the excerpt puts before 270). On the whole book \"Notes.\" and \"185\" are removed (the whole_book test of tests/test_structure.py).",
   "known": "The owner reads the text at the top (\"accept, the distinction between invasions of right…\") as part of a normal paragraph, the first of the page; galley gives it as the end of endnote 290, an endnote without a marker, since page 270 is inside the endnote section, and the excerpt lacks page 269.",
   "excerpt": "gierke_86-93_270-271",
@@ -12,78 +12,68 @@
       "Notes. 185"
     ],
     [
-      "accept, the distinction between invasions of right (1) legem con-",
+      "accept, the distinction between invasions of right (i) legem con-",
       "dendo, (2) iudicando, (3) rescribendo, and he is inclined to allow",
       "greater force to an act of legislation than to acts of other kinds ;",
       "still it is just he who expressly declares that in conflict with Natural",
-      "Right, strictly so-called, even laws are void.—See also above, Note",
+      "Right, strictly so-called, even laws are void.— See also above, Note",
       "259 in fine.",
-      "291. See above, Notes 129—130 and 134.",
-      "292. ‘This is the core of the doctrine that the lack of a iusfa",
-      "causa for any invasion of vested rights by the Sovereign can be",
+      "291. See above, Notes 129 — 130 and 134.",
+      "292. This is the core of the doctrine that the lack of a iusta",
       "causa for any invasion of vested rights by the Sovereign can be",
       "supplied by the deliberateness (ex certa scientia) with which he",
-      "exercises his plenttudo potestatis: deliberateness which can be mani-",
-      "deliberateness which can be mani-",
-      "fested by such a clause as ‘lege non obstante.’ This doctrine, which",
-      "Tested such a clause as non obstante.' This which",
-      "first appears in a rough form in Durantis, Speculum, 1. tit. interd. leg.",
+      "exercises his plenitudo potestatis : deliberateness which can be mani-",
+      "Tested by such a clause as ' lege non obstante.' This doctrJne, which",
+      "first appears in a rough form in Durantis, Speculum, i. tit. interd. leg.",
       "et sedi Apost. reserv. nr. 89 (cf. G. Meyer, op. cit. p. 101), is attacked",
-      "by the jurists cited in our Note 273 (though Jason in Cons. 11. c. 233,",
-      "c. 236, n. 12—13 and Iv. c. 107, nr. 4, makes large concessions) and",
+      "by the jurists cited in our Note 273 (though Jason in Cons. n. c. 233,",
+      "c. 236, n. 12 — 13 and iv. c. 107, nr. 4, makes large concessions) and",
       "is defended, though to a varying degree, by the jurists mentioned",
-      "in our Note 274. See in particular Alber. Rosc. |. c. where prac-",
-      "tically all all difference between Positive and Natural Right disappears",
+      "in our Note 274. See in particular Alber. Rose. 1. c. where prac-",
+      "tically all difference between Positive and Natural Right disappears",
       "and the same formal omnipotence is claimed both for rescripts and",
-      "for acts of legislation. Baldus, 1. c.; Felin. Sand. |. c. nr. 60—66",
-      "(despite nr. 45—52); Riminald. Cons. 1. c. 73; Capra, Reg. 10,",
-      "nr. 48—52, 56—59; Decius, c. 7, X. 1, 2, nr. 2728, Cons. 198,",
-      "nr. 7, 269, nr. 4—5, 271, nr. 3, 640, nr. 6—7, and esp. 588, nr. r—",
-      "14; also Aen. Sylv. c. 16—17.—The rejection of the right of active",
-      "resistance is a logical consequence ; see above, Note 127.",
-      "293. Thisis made externally visible by the treatment as two dif-",
-      "ferent ferent subjects of (1) the the ' ‘ex lex naturalis naturalis et et divina,’ which which is is binding on on",
-      "rulers as on others, but like all other ‘leges’ is concerned with",
-      "‘actus exteriores,’ and (2) that Instruction for the Virtuous Prince, in",
-      "'actus exteriores,' and that Instruction for the Virtuous Prince, in",
+      "for acts of legislation. Baldus, 1. c. ; Felin. Sand. 1. c. nr. 60 — 66",
+      "(despite nr. 45 — 52); Riminald. Cons. i. c. 73; Capra, Reg. 10,",
+      "nr. 48 — 52, 56 — 59; Decius, c. 7, X. i, 2, nr. 27 — 28, Cons. 198,",
+      "nr. 7, 269, nr. 4 — 5, 271, nr. 3, 640, nr. 6 — 7, and esp. 588, nr. i —",
+      "14; also Aen. Sylv. c. 16 — 17. — The rejection of the right of active",
+      "resistance is a logical consequence; see above, Note 127.",
+      "293. This is made externally visible by the treatment as two dif-",
+      "ferent subjects of (i) the ' lex naturalis et divina,' which is binding on",
+      "rulers as on others, but like all other 'leges' is concerned with",
+      "'actus exteriores,' and (2) that Instruction for the Virtuous Prince, in",
       "the development of which medieval publicists expend much of their",
       "pains.",
-      "294. Already John of Salisbury, Iv. c. 1, 2 and 4, speaks of a",
-      "‘lex 'lex iustitiae,’ to to which which the the Ruler Ruler remains remains subject, since since the the ‘aequitas"
+      "294. Already John of Salisbury, iv. c. i, 2 and 4, speaks of a",
+      "'lex iustitiae,' to which the Ruler remains subject, since the 'aequitas",
+      "et iustitia,' of which the 'lex' is the 'interpres,' should govern his",
+      "will. Then in Aquinas there comes to the front the formula that the",
+      "Prince, in so far as the rules of law have no ' vis coactiva ' against",
+      "him, is still bound by them. * quantum ad vim directivam ' ; comp.",
+      "Sum. Theol. n. i, q. 96, a. 5, also q. 93, a. 3. With Thomas himself",
+      "it is only the ' lex humana ' which is reduced to the exercise of a",
+      "merely directive force over the Prince ; in this province unrighteous",
+      "laws (e.g. those which proceed * ultra sibi commissam potestatem,'"
     ],
     [
       "Tribunals",
-      "a",
+      "«£** Pve",
       "Acts of the",
-      "a",
-      "liberately."
+      "jj^J^jjJJ",
+      "liberate!?."
     ],
     [
-      "Natural",
-      "= et",
+      "Natural"
+    ],
+    [
       "the level",
-      "—_"
+      "£tJJ*"
     ],
     [
-      "Coercive",
-      "SS",
-      "Force of",
-      "_ of"
+      "Coercive"
     ],
     [
-      "et iustitia,’ of which the ‘lex’ is the ‘interpres,’ should govern his",
-      "et of which the 'lex' is the should his",
-      "will, Then in Aquinas there comes to the front the formula that the",
-      "Prince, in so far as the rules of law have no ‘vis coactiva’ against",
-      "in so far as the rules of law have no ' vis coactiva '",
-      "him, is still bound by them, ‘quantum ad vim directivam’; comp.",
-      "is still bound them. ad vim",
-      "Sum. Theol. 11. 1, q. 96, a. 5, also q. 93, a. 3. With Thomas himself",
-      "it is only the ‘lex humana’ which is reduced to the exercise of a",
-      "it is the ' lex humana ' which is reduced to the exercise of a",
-      "merely directive force over the Prince; in this province unrighteous",
-      "laws (e.g. those which proceed ‘ultra sibi commissam potestatem,’",
-      "laws those which * ultra sibi commissam"
+      "Force of"
     ]
   ],
   "blocks": [],
@@ -93,7 +83,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "Notes. 185 accept, the distinction between invasions of right (1) legem condendo, (2) iudicando, (3) rescribendo, and he is inclined to allow greater force to an act of legislation than to acts of other kinds ; still it is just he who expressly declares that in conflict with Natural Right, strictly so-called, even laws are void.—See also above, Note 259 in fine."
+          "text": "Notes. 185 accept, the distinction between invasions of right (i) legem condendo, (2) iudicando, (3) rescribendo, and he is inclined to allow greater force to an act of legislation than to acts of other kinds ; still it is just he who expressly declares that in conflict with Natural Right, strictly so-called, even laws are void.— See also above, Note 259 in fine."
         }
       ],
       "pages": [
@@ -105,7 +95,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "See above, Notes 129—130 and 134."
+          "text": "See above, Notes 129 — 130 and 134."
         }
       ],
       "pages": [
@@ -117,11 +107,11 @@
       "blocks": [
         {
           "kind": "margin_note",
-          "text": "Tribunals a Acts of the a liberately."
+          "text": "Tribunals «£** Pve Acts of the jj^J^jjJJ liberate!?."
         },
         {
           "kind": "paragraph",
-          "text": "‘This is the core of the doctrine that the lack of a iusfa causa for any invasion of vested rights by the Sovereign can be causa for any invasion of vested rights by the Sovereign can be supplied by the deliberateness (ex certa scientia) with which he exercises his plenttudo potestatis: deliberateness which can be manideliberateness which can be manifested by such a clause as ‘lege non obstante.’ This doctrine, which Tested such a clause as non obstante.' This which first appears in a rough form in Durantis, Speculum, 1. tit. interd. leg. et sedi Apost. reserv. nr. 89 (cf. G. Meyer, op. cit. p. 101), is attacked by the jurists cited in our Note 273 (though Jason in Cons. 11. c. 233, c. 236, n. 12—13 and Iv. c. 107, nr. 4, makes large concessions) and is defended, though to a varying degree, by the jurists mentioned in our Note 274. See in particular Alber. Rosc. |. c. where practically all all difference between Positive and Natural Right disappears and the same formal omnipotence is claimed both for rescripts and for acts of legislation. Baldus, 1. c.; Felin. Sand. |. c. nr. 60—66 (despite nr. 45—52); Riminald. Cons. 1. c. 73; Capra, Reg. 10, nr. 48—52, 56—59; Decius, c. 7, X. 1, 2, nr. 2728, Cons. 198, nr. 7, 269, nr. 4—5, 271, nr. 3, 640, nr. 6—7, and esp. 588, nr. r— 14; also Aen. Sylv. c. 16—17.—The rejection of the right of active resistance is a logical consequence ; see above, Note 127."
+          "text": "This is the core of the doctrine that the lack of a iusta causa for any invasion of vested rights by the Sovereign can be supplied by the deliberateness (ex certa scientia) with which he exercises his plenitudo potestatis : deliberateness which can be mani- Tested by such a clause as ' lege non obstante.' This doctrJne, which first appears in a rough form in Durantis, Speculum, i. tit. interd. leg. et sedi Apost. reserv. nr. 89 (cf. G. Meyer, op. cit. p. 101), is attacked by the jurists cited in our Note 273 (though Jason in Cons. n. c. 233, c. 236, n. 12 — 13 and iv. c. 107, nr. 4, makes large concessions) and is defended, though to a varying degree, by the jurists mentioned in our Note 274. See in particular Alber. Rose. 1. c. where practically all difference between Positive and Natural Right disappears and the same formal omnipotence is claimed both for rescripts and for acts of legislation. Baldus, 1. c. ; Felin. Sand. 1. c. nr. 60 — 66 (despite nr. 45 — 52); Riminald. Cons. i. c. 73; Capra, Reg. 10, nr. 48 — 52, 56 — 59; Decius, c. 7, X. i, 2, nr. 27 — 28, Cons. 198, nr. 7, 269, nr. 4 — 5, 271, nr. 3, 640, nr. 6 — 7, and esp. 588, nr. i — 14; also Aen. Sylv. c. 16 — 17. — The rejection of the right of active resistance is a logical consequence; see above, Note 127."
         }
       ],
       "pages": [
@@ -133,11 +123,11 @@
       "blocks": [
         {
           "kind": "margin_note",
-          "text": "Natural = et the level —_ Coercive SS Force of _ of"
+          "text": "Natural the level £tJJ*"
         },
         {
           "kind": "paragraph",
-          "text": "Thisis made externally visible by the treatment as two different ferent subjects of (1) the the ' ‘ex lex naturalis naturalis et et divina,’ which which is is binding on on rulers as on others, but like all other ‘leges’ is concerned with ‘actus exteriores,’ and (2) that Instruction for the Virtuous Prince, in 'actus exteriores,' and that Instruction for the Virtuous Prince, in the development of which medieval publicists expend much of their pains."
+          "text": "This is made externally visible by the treatment as two different subjects of (i) the ' lex naturalis et divina,' which is binding on rulers as on others, but like all other 'leges' is concerned with 'actus exteriores,' and (2) that Instruction for the Virtuous Prince, in the development of which medieval publicists expend much of their pains."
         }
       ],
       "pages": [
@@ -148,16 +138,12 @@
       "marker": "294.",
       "blocks": [
         {
-          "kind": "paragraph",
-          "text": "Already John of Salisbury, Iv. c. 1, 2 and 4, speaks of a ‘lex 'lex iustitiae,’ to to which which the the Ruler Ruler remains remains subject, since since the the ‘aequitas et iustitia,’ of which the ‘lex’ is the ‘interpres,’ should govern his et of which the 'lex' is the should his will, Then in Aquinas there comes to the front the formula that the Prince, in so far as the rules of law have no ‘vis coactiva’ against"
+          "kind": "margin_note",
+          "text": "Coercive Force of"
         },
         {
           "kind": "paragraph",
-          "text": "in so far as the rules of law have no ' vis coactiva '"
-        },
-        {
-          "kind": "paragraph",
-          "text": "him, is still bound by them, ‘quantum ad vim directivam’; comp. is still bound them. ad vim Sum. Theol. 11. 1, q. 96, a. 5, also q. 93, a. 3. With Thomas himself it is only the ‘lex humana’ which is reduced to the exercise of a it is the ' lex humana ' which is reduced to the exercise of a merely directive force over the Prince; in this province unrighteous laws (e.g. those which proceed ‘ultra sibi commissam potestatem,’ laws those which * ultra sibi commissam which impose unjust taxes and unjust divisions of burdens, or which are ‘contra commune bonum’) have formally the force of laws, are 'contra commune have the force of though they are not binding ‘in foro conscientiae’: comp. ib. q. go, are not ' in foro conscientiae ' : ib. a. 2, and q. 96, a. 1—4. Similarly Joh. Friburg. c. 11. t. 5, q. 204. On the other hand, those who unconditionally maintain the formal sovereignty of the legislator and in so doing refuse even to Natural Law any ‘coactive force’ against him, are unanimous in allowing to Law ' coactive force ' are unanimous in to it at least a ‘directive force.’ See also Ptol. Luc. De reg. prince. tv. at least a ' directive force.' See also Ptol. Luc. De TV. c. 1. Ockham, Dial. mi. tr. 2, 1. 2, c. 28. Gerson, Iv. p. 593 ff. esp. 601."
+          "text": "Already John of Salisbury, iv. c. i, 2 and 4, speaks of a 'lex iustitiae,' to which the Ruler remains subject, since the 'aequitas et iustitia,' of which the 'lex' is the 'interpres,' should govern his will. Then in Aquinas there comes to the front the formula that the Prince, in so far as the rules of law have no ' vis coactiva ' against him, is still bound by them. * quantum ad vim directivam ' ; comp. Sum. Theol. n. i, q. 96, a. 5, also q. 93, a. 3. With Thomas himself it is only the ' lex humana ' which is reduced to the exercise of a merely directive force over the Prince ; in this province unrighteous laws (e.g. those which proceed * ultra sibi commissam potestatem,' which impose unjust taxes and unjust divisions of burdens, or which are ‘contra commune bonum’) have formally the force of laws, though they are not binding ‘in foro conscientiae’: comp. ib. q. go, ' ' : a. 2, and q. 96, a. 1—4. Similarly Joh. Friburg. c. 11. t. 5, q. 204. On the other hand, those who unconditionally maintain the formal sovereignty of the legislator and in so doing refuse even to Natural Law any ‘coactive force’ against him, are unanimous in allowing to it at least a ‘directive force.’ See also Ptol. Luc. De reg. prince. tv. c. 1. Ockham, Dial. mi. tr. 2, 1. 2, c. 28. Gerson, Iv. p. 593 ff. esp. 601."
         }
       ],
       "pages": [
@@ -177,26 +163,6 @@
         "condendo,"
       ],
       "reason": "hyphen_join_guessed"
-    },
-    {
-      "before": [
-        "mani-",
-        "deliberateness"
-      ],
-      "after": [
-        "manideliberateness"
-      ],
-      "reason": "hyphen_join_guessed"
-    },
-    {
-      "before": [
-        "mani-",
-        "fested"
-      ],
-      "after": [
-        "manifested"
-      ],
-      "reason": "hyphen_join"
     },
     {
       "before": [

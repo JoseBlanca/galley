@@ -5753,8 +5753,9 @@ def test_whole_book_stubbs_guide_words_on_each_of_its_ten_index_pages(
     # 2026), "Baldwin of Redvers, 18" and others cut in two. With the words
     # in the PDF's order, page 312's 74 entries were 34 notes and 839
     # entries were left; with the pages read by Tesseract (17 November
-    # 2026), 936, and no note on the index pages.
-    assert sum(block.kind is BlockKind.INDEX_ENTRY for block in blocks.blocks) == 936
+    # 2026), 936, and 935 once a layer word read off Tesseract's reading of
+    # it is replaced too (reocr spec, section 4); no note on the index pages.
+    assert sum(block.kind is BlockKind.INDEX_ENTRY for block in blocks.blocks) == 935
     assert not any(312 <= note.origin[0].page_index <= 321 for note in blocks.notes)
 
 

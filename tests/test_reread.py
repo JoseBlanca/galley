@@ -440,6 +440,7 @@ def _margin_rereads() -> tuple[Reread, ...]:
         _BAND,
         (_OCR_MORAL, _OCR_LESSONS),
         page_words=_MARGIN_PAGE.words,
+        edge=50,
     )
     return page_rereads(_MARGIN_PAGE.index, (reading,), _WORD_LIST)
 
@@ -471,6 +472,7 @@ def test_margin_note_reading_scoring_lower_keeps_the_layer() -> None:
         _BAND,
         (_ocr("id", 10, 100, 20, 108), _ocr("i", 22, 100, 24, 108)),
         page_words=_MARGIN_PAGE.words,
+        edge=50,
     )
     (record,) = page_rereads(7, (reading,), _WORD_LIST)
     assert not record.kept
@@ -483,6 +485,7 @@ def test_band_with_no_layer_word_and_no_reading_is_not_recorded() -> None:
         Box(8, 400, 46, 420),
         (),
         page_words=_MARGIN_PAGE.words,
+        edge=50,
     )
     assert page_rereads(7, (reading,), _WORD_LIST) == ()
 
@@ -493,6 +496,7 @@ def test_note_the_layer_did_not_read_is_kept() -> None:
         Box(8, 400, 46, 420),
         (_ocr("Moral", 10, 402, 40, 410), _ocr("lessons.", 10, 410, 40, 418)),
         page_words=_MARGIN_PAGE.words,
+        edge=50,
     )
     (record,) = page_rereads(7, (reading,), _WORD_LIST)
     assert record.layer_words == ()
@@ -510,6 +514,7 @@ def _band_over_nothing(*texts: str) -> Reread:
             for index, text in enumerate(texts)
         ),
         page_words=_MARGIN_PAGE.words,
+        edge=50,
     )
     (record,) = page_rereads(7, (reading,), _WORD_LIST)
     return record
@@ -611,7 +616,7 @@ def test_cut_in_reading_with_no_word_left_replaces_nothing() -> None:
 def test_reading_scoring_the_same_as_the_layer_keeps_the_layer() -> None:
     page = _page_of((_MORAL,))
     reading = margin_note_reading(
-        Side.LEFT, _BAND, (_OCR_MORAL,), page_words=page.words
+        Side.LEFT, _BAND, (_OCR_MORAL,), page_words=page.words, edge=50
     )
     (record,) = page_rereads(7, (reading,), _WORD_LIST)
     assert (record.layer_score, record.ocr_score) == (1, 1)
@@ -711,12 +716,14 @@ def test_second_of_two_overlapping_regions_takes_no_word_the_first_replaced() ->
         Box(8, 98, 46, 130),
         (_ocr("Moral", 10, 100, 40, 108), _ocr("lessons", 10, 121, 40, 129)),
         page_words=page.words,
+        edge=50,
     )
     lower = margin_note_reading(
         Side.LEFT,
         Box(8, 125, 46, 160),
         (_ocr("lessons", 10, 121, 40, 129), _ocr("Next", 10, 140, 40, 148)),
         page_words=page.words,
+        edge=50,
     )
     # Given in either order, the upper band is taken first.
     first, second = page_rereads(7, (lower, upper), _WORD_LIST)
@@ -734,7 +741,7 @@ def test_records_of_a_page_are_in_the_order_of_their_kinds_and_tops() -> None:
         word = _ocr("Next", x0 + 8, top + 1, x0 + 30, top + 9)
         match kind:
             case "margin":
-                return margin_note_reading(side, box, (word,), page_words=())
+                return margin_note_reading(side, box, (word,), page_words=(), edge=50)
             case "cut-in":
                 return cut_in_reading(
                     side,
@@ -801,7 +808,7 @@ def test_small_print_page_with_another_region_raises() -> None:
     whole = small_print_reading(
         Box(0, 0, 400, 600), (), page_words=page.words, head_words=()
     )
-    margin = margin_note_reading(Side.LEFT, _BAND, (), page_words=page.words)
+    margin = margin_note_reading(Side.LEFT, _BAND, (), page_words=page.words, edge=50)
     with pytest.raises(ValueError, match="small-print page"):
         page_rereads(7, (whole, margin), _WORD_LIST)
 
@@ -980,6 +987,7 @@ def test_margin_word_outside_the_strip_with_no_tesseract_word_over_it_stays() ->
         _BAND,
         (_ocr("Moral", 10, 100, 40, 108),),
         page_words=page.words,
+        edge=50,
     )
     (record,) = page_rereads(7, (reading,), _WORD_LIST)
     assert record.layer_words == (garbled,)

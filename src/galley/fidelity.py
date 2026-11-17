@@ -28,9 +28,10 @@ from galley.model import (
     NoteKind,
     Origin,
     Reread,
+    Word,
     WordChange,
     WordsFile,
-    is_under_ocr_word,
+    replaced_layer_words,
 )
 
 
@@ -130,12 +131,27 @@ def _box_text(box: Box) -> str:
     return f"({box.x0}, {box.top}, {box.x1}, {box.bottom})"
 
 
+def _unmatched(reread: Reread) -> tuple[Word, ...]:
+    """The `layer_words` of `reread` that `replaced_layer_words` does not
+    match to one of its `ocr_words`, each as many times as it is
+    unmatched."""
+    matched = Counter(replaced_layer_words(reread.layer_words, reread.ocr_words))
+    unmatched = []
+    for word in reread.layer_words:
+        if matched[word] > 0:
+            matched[word] -= 1
+        else:
+            unmatched.append(word)
+    return tuple(unmatched)
+
+
 def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
     """What is wrong with the kept re-readings of lines.json: a word of
     their `layer_words` that its page of words.json does not have, or one
     that more kept records name than the page has, compared as page, text
-    and box; or one that none of its record's `ocr_words` lies over (reocr
-    spec, section 4)."""
+    and box; or one that is not the same printed word as one of its
+    record's `ocr_words`, by `model.replaced_layer_words` (reocr spec,
+    section 4)."""
     on_pages = Counter(
         (page.index, word.text, word.box) for page in words.pages for word in page.words
     )
@@ -146,10 +162,9 @@ def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
     )
     problems = [
         f"a kept reread replaces {word.text!r} at {_box_text(word.box)} on page "
-        f"{reread.page_index}, which none of its ocr_words lies over"
+        f"{reread.page_index}, which none of its ocr_words lies over or reads"
         for reread in _kept_rereads(lines)
-        for word in reread.layer_words
-        if not is_under_ocr_word(word, reread.ocr_words)
+        for word in _unmatched(reread)
     ]
     for (page_index, text, box), count in named.items():
         where = f"{text!r} at {_box_text(box)}"

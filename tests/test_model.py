@@ -1706,19 +1706,67 @@ def test_reread_field_of_the_wrong_type_names_its_path(
         ((21.1, 15.0), False),
         ((9.0, 15.0), True),
         ((8.9, 15.0), False),
-        ((15.0, 21.0), True),
-        ((15.0, 21.1), False),
-        ((15.0, 9.0), True),
-        ((15.0, 8.9), False),
+        ((15.0, 22.0), True),
+        ((15.0, 22.1), False),
+        ((15.0, 8.0), True),
+        ((15.0, 7.9), False),
     ],
 )
-def test_layer_word_is_under_an_ocr_word_whose_box_widened_by_1_pt_holds_its_middle(
+def test_layer_word_is_under_an_ocr_word_widened_2_pt_up_and_down_1_pt_across(
     middle: tuple[float, float], under: bool
 ) -> None:
     x, y = middle
     layer_word = Word("Moial", Box(x - 2, y - 2, x + 2, y + 2), None)
     ocr_word = Word("Moral", Box(10.0, 10.0, 20.0, 20.0), 90.0)
     assert model.is_under_ocr_word(layer_word, (ocr_word,)) is under
+
+
+def _layer(text: str, x0: float, top: float) -> Word:
+    return Word(text, Box(x0, top, x0 + 20, top + 8), None)
+
+
+def _tesseract(text: str, x0: float, top: float) -> Word:
+    return Word(text, Box(x0, top, x0 + 20, top + 8), 90.0)
+
+
+def test_layer_word_under_an_ocr_word_of_another_text_is_replaced() -> None:
+    layer = (_layer("Moial", 10, 100),)
+    assert model.replaced_layer_words(layer, (_tesseract("Moral", 10, 100),)) == layer
+
+
+def test_layer_word_off_the_box_with_the_text_of_an_ocr_word_is_replaced() -> None:
+    # 10 pt below the word Tesseract read, as Gierke's layer lines lie.
+    layer = (_layer("Theory.", 10, 110),)
+    ocr = (_tesseract("theory", 10, 100),)
+    assert model.replaced_layer_words(layer, ocr) == layer
+
+
+def test_layer_word_of_the_text_of_an_ocr_word_more_than_16_pt_off_stays() -> None:
+    layer = (_layer("Theory.", 10, 116.1),)
+    assert model.replaced_layer_words(layer, (_tesseract("Theory.", 10, 100),)) == ()
+    near = (_layer("Theory.", 10, 116.0),)
+    assert model.replaced_layer_words(near, (_tesseract("Theory.", 10, 100),)) == near
+
+
+def test_ocr_word_matched_under_a_layer_word_of_its_text_matches_no_other() -> None:
+    # The layer read "of" twice, once over Tesseract's "of" and once off it.
+    over, off = _layer("of", 10, 100), _layer("of", 60, 100)
+    ocr = (_tesseract("of", 10, 100),)
+    assert model.replaced_layer_words((over, off), ocr) == (over,)
+    assert model.replaced_layer_words((off, over), ocr) == (over,)
+
+
+def test_two_layer_words_of_one_text_take_the_nearest_ocr_words_in_turn() -> None:
+    first, second = _layer("the", 10, 112), _layer("the", 70, 112)
+    ocr = (_tesseract("the", 70, 105), _tesseract("the", 10, 105))
+    assert model.replaced_layer_words((first, second), ocr) == (first, second)
+    # Tesseract's one "the" is nearer the second.
+    assert model.replaced_layer_words((first, second), ocr[:1]) == (second,)
+
+
+def test_layer_word_without_a_letter_or_digit_is_matched_only_under_a_word() -> None:
+    layer = (_layer("—", 10, 110),)
+    assert model.replaced_layer_words(layer, (_tesseract("—", 10, 100),)) == ()
 
 
 def _rereads_record(

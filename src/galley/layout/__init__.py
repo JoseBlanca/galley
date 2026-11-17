@@ -887,6 +887,7 @@ def _margin_readings(
                         _read_crop(image, band_pixels, NOTE_PSM, rereading.read_lines)
                     ),
                     page_words=page.words,
+                    edge=parts.left if side is Side.LEFT else parts.right,
                 )
             )
     return tuple(readings)

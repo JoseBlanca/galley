@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the orchestrator against the page image on 15 November 2026 (galley at ec2edc4); the owner did not check this page.",
-  "changed": "Changed since that check by task 2.5: \"Eng-\" leaves the body line for the margin note \"The Eng-\", and \"As a last question\" starts a paragraph. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"Two notes on one line\" and \"The marker of a note\"): the three lines of two notes each give two notes each, cut at the second marker (\"2\", \"*\", \"e\"); each marker is taken out of its note's text. Changed by task 2.3 (structure spec section 11, \"References\"): references split off their words by note_marker word changes and linked to the page's notes: \"12s.2\", \"30d8\", \"10s.4\", \"year6\", \"consuetude6.\", \"year7.\", \"provender8.\"; \"£2\" and \"£8.\" are no candidates (\"£\" is no punctuation). Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
+  "changed": "Changed since that check by task 2.5: \"Eng-\" leaves the body line for the margin note \"The Eng-\", and \"As a last question\" starts a paragraph. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"Two notes on one line\" and \"The marker of a note\"): the three lines of two notes each give two notes each, cut at the second marker (\"2\", \"*\", \"e\"); each marker is taken out of its note's text. Changed by task 2.3 (structure spec section 11, \"References\"): references split off their words by note_marker word changes and linked to the page's notes: \"12s.2\", \"30d8\", \"10s.4\", \"year6\", \"consuetude6.\", \"year7.\", \"provender8.\"; \"£2\" and \"£8.\" are no candidates (\"£\" is no punctuation). Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed again by the fix of task 5.2 (reocr spec, section 4, rules (a) and (b)): a layer word the layer placed off Tesseract's reading of it, of the same text, is replaced and no longer read twice; listed in the task's list of changed reference pages.",
   "excerpt": "domesday_74-83",
   "page": 9,
   "book_page_index": 83,
@@ -48,7 +48,7 @@
     ],
     [
       "The Eng-",
-      "lish for Eng-",
+      "lish for",
       "villanus."
     ],
     [
@@ -71,7 +71,7 @@
     },
     {
       "kind": "margin_note",
-      "text": "The English for Engvillanus.",
+      "text": "The English for villanus.",
       "pages": [
         9
       ]
@@ -275,16 +275,6 @@
         "English"
       ],
       "reason": "hyphen_join"
-    },
-    {
-      "before": [
-        "Eng-",
-        "villanus."
-      ],
-      "after": [
-        "Engvillanus."
-      ],
-      "reason": "hyphen_join_guessed"
     },
     {
       "before": [
