@@ -37,6 +37,27 @@ which the owner asked for with the changes to how the text layer is read
 (`docs/specs/extract.md`) and to the pages before the preface
 (`docs/specs/front-matter.md`).
 
+Revised again on 17 November 2026 for the plan **owner-books**, which
+makes galley read the owner's two modern books (section 21) as well as
+the six public-domain ones, and fixes failures found in the
+public-domain books (running heads, notes left in the body, words read
+twice by re-reading, words glued at a case change). Its scope was approved by the owner, who decided
+that an epigraph is a block kind of its own and how spaced punctuation
+is treated; the points left open have a "meanwhile" (section 27). It
+changes, where they stand: the head line, which takes in a short region
+beside it, and a chapter label, which is never a running head (sections
+2 and 3); a page number at the foot read by its value (section 4); a
+hanging number and a short last line at a page break as paragraph
+starts (section 6); notes at the back grouped per chapter (section 12);
+headings set flush left or in large type (section 14). It adds
+epigraphs (section 22), spaced punctuation (section 23), words glued at
+a case change (section 24), the change to markdown (section 25), and
+how all of it is verified (section 26). `blocks.json` goes to
+`format_version` 4 (section 7). Layout changes too
+(`docs/specs/layout.md` §3, steps 2 to 4), and so does the re-reading's
+pairing of words (`docs/specs/reocr.md` §4). No code of this revision
+exists.
+
 It builds on `docs/architecture.md` (cited as "architecture §8") and
 `docs/glossary.md`, and on the layout spec, whose terms (body column,
 footnote band, margin note, row, body word height, body line pitch) it
@@ -66,6 +87,12 @@ Besides those of the glossary and the layout spec:
 - **Guessed join**: a hyphen join that neither the word list nor the
   book's own words support, made anyway and recorded as guessed. Added to
   the glossary, under hyphen join.
+- **Line height**: the median height of a line's words. The text layer
+  gives a word the height of its OCR line, so in the owner's books,
+  whose OCR gives one height per line, it says what size the type is
+  (section 21).
+- **Epigraph**, **source line**, **note group**: sections 22 and 12;
+  in the glossary.
 
 Numbers come from the measurements described in layout §1, called "the
 research" below: a script run on 15 November 2026 on the output of the
@@ -150,11 +177,13 @@ inside it.
       words, keeping its caption (section 18);
    3. in the body stream, find the heading lines (section 14), except on
       the config's `contents_pages`, then the chapter summary under a
-      heading (section 15) and the runs of verse (section 16, rule 4);
+      heading (section 15), the epigraphs under a level-1 heading
+      (section 22) and the runs of verse (section 16, rule 4);
    4. group the body stream into paragraphs (section 6), each heading,
-      summary and verse run being a block of its own, and each side
-      region into blocks of its own (section 6); join hyphens inside
-      each block (section 5);
+      summary, epigraph and verse run being a block of its own, and each
+      side region into blocks of its own (section 6); join hyphens
+      inside each block (section 5), then split the words glued at a
+      case change (section 24);
    5. take the notes left at the foot of the body (section 11, "Notes
       left in the body"), except on the pages of the endnote section
       and the index.
@@ -167,7 +196,12 @@ inside it.
       never runs on into the next page's body, and no paragraph runs on
       into the first page of the endnote section;
    2. split a paragraph at a line beside a margin note that is indented
-      (section 13, rule 3), which needs the paragraphs as joined;
+      (section 13, rule 3), which needs the paragraphs as joined; then,
+      in every block, body and side text alike, attach a spaced "?",
+      ";", ":" or "!" to the word before it, or put a no-break space
+      before it in a French book (section 23), before any reference is
+      looked for, so that a sign glued to a reference ("subjection ;^")
+      becomes a candidate;
    3. the notes (section 11): cut the band blocks and the notes taken
       from the body into notes, take their markers, join a note that
       runs over a page break, make the endnotes (section 12), and match
@@ -183,10 +217,18 @@ inside it.
 **What each region is.** lines.json says nothing of it (architecture
 §8), so structure decides from where each region lies, per page:
 
-- the **head line** is the first region when it lies wholly above every
-  other region and holds one line with a letter or a digit (and any
-  number of lines of marks above it). When section 3 does not make it a
-  running head, it is the first body region;
+- the **head line** is the first region, together with every **region
+  beside it** (below), when together they lie wholly above every other
+  region and the first holds one line with a letter or a digit (and any
+  number of lines of marks above it). Its words are those of the first
+  region's line and of the regions beside it, left to right, as one
+  line. When section 3 does not make it a running head, the first
+  region is the first body region and each region beside it is what
+  the rules below make it. A region beside the head line holds one line
+  of at most 5 characters, spaces left out, whose top lies within 4 pt
+  of the top of the first region's line, and lies wholly left or wholly
+  right of the first region (section 3, "A short region beside the
+  head");
 - a **margin region** is narrower than a quarter of the page's widest
   region other than the head line (the first, on a tie) and lies wholly
   left or wholly right of
@@ -298,6 +340,51 @@ notes) and none in the other three; it also finds Gierke's
 section heads, which run over two pages only ("The Course of
 Development.", pages 88 and 90).
 
+**A short region beside the head.** Some books print the page number
+outside the body column, level with the running head. Layout then makes
+the number a margin region of its own (layout §3, step 2), and before
+this revision the head line needed a first region wholly above every
+other one, so the page had no head line and its running head stayed in
+the text. Turney (section 21) prints its page number 13 to 15 pt beside
+the head, outside the column, on the outer side, on every ordinary page
+from page 15 to 303: on 260 pages the two are separate regions, their
+tops equal on 252 and within 0.8 pt on the other 8, and the head stayed
+in the text 98 times, mid-sentence, while 289 numbers became margin
+notes. Gierke prints its roman numbers so on its pages 69 to 79 and 66
+(tops 0 to 3.9 pt apart), and Mariéjol has a speck so on page 217
+(1.7 pt). So the head line takes in each region beside it (section 2,
+"What each region is"): one line of at most 5 characters, its top
+within 4 pt of the head's, wholly left or right of it. The rules of
+this section then see one line, and a page number at either end of it
+is a page number as any other (Turney's "224" at the left end on even
+pages, at the right on odd ones). The 5 characters take a roman number
+up to "lxxiv" and a speck; a margin note of one short word beside a
+head, as "Free" would be, has its top within 4 pt of the head's on no
+page of the six books (measured on 17 November 2026 on the clean-text
+build's `lines.json`: the regions of one line of at most 5 characters
+within 4 pt of a head line's top are Gierke's 7 numbers and Mariéjol's
+speck). Gierke's page 167 has a speck 12 pt below its head's top,
+which is not taken; the head stays as now.
+
+**A chapter label is never a running head.** A head line whose first
+word, without a "." or "," after it, is CHAPTER, CHAPITRE, ESSAY,
+PART, PARTIE, BOOK or LIVRE, in any case, is no running head, whatever
+the rules above find: it is the first line of a chapter's heading
+(section 14). Haynes (section 21) sets its chapter label at a top of 56
+to 74 pt, 1.5 to 2.0 pitches below the median top of its heads (34.8
+pt), and its labels, alike to each other ("CHAPTER THIRTEEN",
+"CHAPTER FOURTEEN"), were removed as running heads on 3 chapter
+openings, their words lost from the chapter's heading; Turney's were
+removed on 9 of its 10 openings, because no ordinary page had a head
+line (above), so the labels were the only head lines left. The word
+must be the whole first word: Domesday's running head
+"Book-land and the Land-book." starts with "Book-land" and stays a
+running head (28 pages). No running head of the six public-domain books
+starts with such a word (measured on the clean-text build on 17
+November 2026, on its 1,724 `running_head` removals); a book that
+printed "CHAPTER IV" as its running head on every page would keep it in
+the text, and none of the eight books does.
+
 **What is removed.** In a running head, the page-number form at its
 first or last word is removed as `page_number` and recorded in
 `page_numbers` with position `head`; the rest of the line is removed as
@@ -368,6 +455,33 @@ and whose text, the two words joined without the space, is:
   Mariéjol's OCR forms "U9)", "{2)", "(i8)", "(31J", "(ao3)", "(18I)".
 
 A year on a title page ("1907", "1915") is neither.
+
+**A page number by its value.** A lowest line that is one word of the
+arabic page-number form (section 1) is a page number at the foot
+wherever it lies across the page, when its value plus the page's
+**local offset** is the page index exactly. The local offset of a page
+is page index minus printed number of the nearest page, before or
+after it (before on a tie), that has a head page number of the arabic
+form in `page_numbers` (section 3). A local offset, not the book's
+commonest one, because the offset changes inside a book: Turney's is
+13 before its 16 pages of plates (about pages 172 to 187) and 29 after
+them, Stubbs' 17 on pages 19 to 51 and 21 from page 56. Turney prints
+the number of a chapter's first page at the foot, aligned with the
+chapter label's indent, not centred (page 26: x 82 to 92 pt in a
+column from 37 to 411, its middle 0.36 of the column's width left of
+the column's middle, against the 0.15 above), on its 15 opening pages
+(14, 26, 39, 56, 77, 104, 134, 148, 189, 217, 229, 252, 278, 300 and
+301), and each stayed in the text mid-sentence. All 15 numbers meet the
+value rule (measured by the survey of 17 November 2026, section 21).
+The value keeps out what the centring was set against, a lone number
+on the lowest line that belongs to a note or a table (a prototype that
+took any lone number on the lowest line took 330 words on Mariéjol's
+pages, above): such a number gives the page index by chance only. A
+roman number at the foot is not taken by
+it (Turney's pages 10 and 11, whose small foot numbers layout reads as
+a band: they stay notes without a marker). Not measured on the six
+public-domain books, whose foot numbers the centring rule takes; the
+`whole_book` tests show any change.
 
 It is removed as `page_number` and recorded with position `foot`.
 Kadesh then has two entries on the pages where the journal's number
@@ -605,6 +719,29 @@ than a note's short line does; so the rule is for margin notes only.
    Haskins' "INDEX" and Gierke's "NOTES." ran on from the page before.
    Such a title starts a paragraph also at a page break, as rule 2 says,
    which is the chapter's first page of section 9.
+3. **it starts with a hanging number**: its first word is 1 to 3 digits
+   with nothing after them, it has a second word, and its left side
+   lies 5 to 20 pt left of its region's **text edge**, the commonest
+   left side (layout §1) of the region's lines whose first word is not
+   such a number, when the region has at least 3 of those. This is a
+   note printed with its number hung in the margin and its text and
+   later lines at one left edge (a hanging indent), as Turney prints
+   its notes at the back (section 12): a note's first line is not
+   indented against the region, so rule 1 never fired, and its notes
+   and bibliography came out as four `quote` blocks of 1,193 to 13,992
+   words. Measured on 17 November 2026 on the `lines.json` of the
+   survey's runs (section 21): it starts 509 lines of Turney, every one
+   a note's first line on its notes pages 252 to 277 (and one on page
+   174, a caption), hung 8.8 to 18.8 pt; the survey measured the hang
+   of all of Turney's markers at 11 to 17 pt from the text. The 115
+   markers of the left columns are margin regions in that run; layout
+   keeps them in their lines from now on (layout §3, step 2), and the
+   rule takes them too. In the six public-domain books it starts 59
+   lines: 42 rows of tables on Domesday's pages 158, 425, 479 and 499,
+   13 lines of Gierke's printed contents (pages 63 to 66, which are in
+   its `contents_pages`), 3 of Mariéjol's notes and 1 line of Stubbs'
+   index; none of Haynes'. A start inside a table cuts the table into
+   more paragraphs than before; galley has no table kind (section 28).
 
 A line after a line that ends with a hyphen (its last word ends as
 section 5 asks of a first part, "-" after a letter or digit), unless
@@ -619,10 +756,56 @@ A heading is a centred line, and so a paragraph of its own; a title of
 two lines makes two.
 
 At a page break, the first line of a page's body stream continues the
-last paragraph of the page before that has a body stream, unless rule 1
-or rule 2 makes it a start; for rule 1, "the line before" is the last
+last paragraph of the page before that has a body stream, unless rule 1,
+2 or 3 makes it a start; for rule 1, "the line before" is the last
 line of that page, measured against its own region's right edge. A page
 with no body stream (a plate, a blank page) does not end the paragraph.
+
+**A short last line at a page break.** The first line of a page's body
+stream also starts a paragraph when the last line of the body stream of
+the page before ends more than 20 pt short of its region's right edge
+and its last word ends with ".", "?", "!" or ":", or with one of them
+followed by closing quotation marks or brackets, with 1 to 3 digits
+glued after all of them allowed (a note reference: "tendency.43").
+Rule 1 cannot see such an end when the next page's first line is not
+indented: a chapter's first line set flush left, or a line set in a
+measure of its own. On Turney's pages 12 and 13 (section 21), the
+acknowledgements end with a short last line and the next page holds
+only the book's epigraph, in its own narrower measure, so one block ran
+from the acknowledgements over the epigraph into the introduction's
+first paragraph. The rule is meant for page breaks only: inside a page
+the same test is the "third rule" that the paragraph rules left out,
+because the OCR cuts lines short (Mariéjol).
+
+It does not apply where the rules keep a block across a page break on
+purpose: a line after a hyphen (above, which a line ending with
+punctuation never is), a verse block that runs on (section 16, rule 4),
+the index pages (section 17); and it changes nothing where a block is
+already cut (a note left in the body, the endnote section's edges,
+section 12). Measured on 17 November 2026 on the survey's runs and the
+clean-text build, counting the page breaks where a paragraph runs over
+today and the new rule would cut it:
+
+| book | paragraphs running over a page break | last line more than 20 pt short | of which, cut by the rule |
+|---|---|---|---|
+| Turney | (survey, section 21) | 29 with the next first line not indented | 15 |
+| Haynes | (survey) | 22 | 18 |
+| Haskins | 217 | 1 | 1 |
+| Stubbs | 280 | 30 | 15, 13 of them in the publisher's lists after the text |
+| Domesday | 456 | 15 | 8 |
+| Mariéjol | 353 | 28 | 15 |
+| Kadesh | 35 | 9 | 8 |
+| Gierke | 147 | 32 | 32 |
+
+Read by their text, every cut ends a sentence that ends a paragraph, a
+note left in the body (Haskins 258; most of Gierke's 32, the notes of
+its introduction, pages 15 to 81, and of its translator), a list or an
+advertisement; none was checked against a page image
+or the reference texts, which the plan's evaluation run does
+(section 26). The 20 pt is the survey's and was not varied: the
+justified lines of both owner's books end within about 1.3 pt of their
+region's edge (section 22's opening pages), so a line 20 pt short is
+not a justified line.
 A plate's lines are not in the body stream: they are its running head,
 its caption, which becomes a figure block, and its stray words (section
 18). So a paragraph runs on over a plate, and a word split before a
@@ -707,7 +890,7 @@ and a joined word in place of its two parts.
 
 ## 7. The format it writes
 
-`blocks.json` as architecture §8 gives it, at `format_version` 3:
+`blocks.json` as architecture §8 gives it, at `format_version` 4 (3 before the plan owner-books):
 
 | field | in the first plan | added by the second plan |
 |---|---|---|
@@ -745,6 +928,30 @@ and `Note.kind`, `Block.label`, and `RemovalReason.guide_words`, and
 changes the fidelity check's rule for a reference span and counts a
 heading's label as words of its block (architecture §8 and §13).
 
+The plan owner-books adds, and so takes `blocks.json` to version 4
+(architecture §8; a file of version 3 is the error that says to run
+structure again):
+
+- `BlockKind.epigraph`, a quotation set at the head of a chapter, and
+  `Block.source: str | None`, its source line as printed, without the
+  dash before it, the words joined by single spaces ("Thomas Hobbes,
+  1651"); `None` for an epigraph printed without a
+  source, which this revision never makes, and for every other kind:
+  reading a block that is not an epigraph with a source is an error
+  that names the file and the block, as for `label` (section 22). The
+  text of an epigraph whose quotation is verse keeps its line feeds, as
+  a `verse` block's does (architecture §7);
+- `Note.group: str | None`: on the first note of a note group of an
+  endnote section, the group's heading as printed, its lines joined by
+  single spaces; `None` on every other note (section 12);
+- three reasons of `ChangeReason`: `source_dash` (section 22),
+  `punctuation_attached` (section 23) and `case_split` (section 24).
+
+The fidelity check counts an epigraph's `source` as words of its block,
+as it counts a heading's `label`, and a note's `group` as words of the
+note, as it counts its `marker`; it verifies each new change reason as
+those sections say.
+
 ## 8. The public interface
 
 The pipeline calls `run`. The other functions are public so that tests
@@ -766,6 +973,7 @@ class BookSurvey:
     signature_lines: frozenset[int]        # pages whose lowest line is a signature line
     index_pages: frozenset[int]            # section 17, rule 1
     plate_pages: frozenset[int]            # pages with a figure (section 18)
+    head_numbers: frozendict[int, int]     # page index -> its arabic head page number (section 4, local offset)
 
 class HyphenJoin(NamedTuple):
     word: str
@@ -794,6 +1002,9 @@ def join_lost_hyphen(first: str, second: str, book_words: frozenset[str],
                      common_inner_words: frozenset[str]) -> HyphenJoin | None: ...
 def note_marker(word: str, *, endnote: bool = False) -> NoteMarker | None: ...
 def reference_candidate(word: str) -> Reference | None: ...
+def attach_spaced_sign(before: str, word: str) -> str | None: ...
+def split_at_case(word: str, lower_case_words: frozenset[str],
+                  book_words: frozenset[str]) -> tuple[str, str] | None: ...
 def make_blocks(lines: LinesFile, lower_case_words: frozenset[str], *,
                 language: Language = Language.EN,
                 contents_pages: frozenset[int] = frozenset(),
@@ -803,7 +1014,13 @@ def make_blocks(lines: LinesFile, lower_case_words: frozenset[str], *,
 `note_marker` gives the marker of a note's first word by the forms of
 section 11 (with `endnote`, also the endnote form), or `None`;
 `reference_candidate` gives a candidate reference of section 11, or
-`None` (for "p.12", an abbreviation, `None`). `ReferenceForm` is a
+`None` (for "p.12", an abbreviation, `None`). `attach_spaced_sign`
+gives the word that section 23 makes of `before` and the spaced sign
+`word` after it in a book not in French ("subjection" and ";" give
+"subjection;"), or `None` when the sign stays apart (after a dash or a
+quotation mark); `split_at_case` gives the two words section 24 makes of
+a word glued at a case change ("theAvre" gives ("the", "Avre")), or
+`None`. `ReferenceForm` is a
 `StrEnum` of the module. `language` serves the index title of a French
 book ("table alphabétique", section 17); `contents_pages` is the
 config's (section 14). `join_hyphen` gives `None` when the two words are not joined (section
@@ -1157,7 +1374,7 @@ No excerpt has a margin note set between two paragraphs (Gierke page
 the first is checked on the whole book.
 
 **Targets measured by `galley-eval run`**, once the tool reads the new
-kinds (section 21), against the scores of the first plan's work report:
+kinds (section 28), against the scores of the first plan's work report:
 
 | score | Haskins | Stubbs | Domesday | Mariéjol |
 |---|---|---|---|---|
@@ -1595,12 +1812,22 @@ paragraphs whose first words are endnote markers (section 11, the last
 form) with rising values, with any number of paragraphs without such a
 marker between them: a marker that does not rise above the one before
 ends a run and starts the next. The survey finds them (section 2, step
-1) from the lines that start a paragraph by section 6's rules. The
+1) from the lines that start a paragraph by section 6's rules. A
+**bare number**, 1 to 3 digits with nothing after them, as Turney marks
+its notes (section 21), counts as an endnote marker here too, in a run
+of bare numbers whose first value is 1 and outside the config's
+`contents_pages`: the first because each of Turney's groups (below)
+starts at 1, the second because Gierke's printed contents, pages 63 to
+66, start 13 lines with rising bare numbers from 139 (section 6, rule
+3), which would otherwise begin its section 120 pages early. The
 section runs from the first marker of the first run of at least 8 to
 the last marker of the last such run, so that a damaged marker that
 reads lower does not cut it in two. On its first page it reaches back
-over the paragraphs before its first marker up to the first centred
-line above them, which stays out ("NOTES." on Gierke's page 186); it
+over the paragraphs before its first marker up to the first heading
+block above them that is not a group heading (below), which stays out
+("NOTES." on Gierke's page 186, centred; the owner's books set this
+title flush left, so before this revision Haynes' was taken into the
+section, as a note without a marker); it
 ends with the last paragraph that starts on the page of its last
 marker. A paragraph between them that starts with no such marker
 belongs to it. The section's first page starts a new block: no
@@ -1626,10 +1853,46 @@ section 11, its value what the marker reads; the paragraphs after it
 that do not are its later blocks. The heading "NOTES." stays a heading
 in `blocks`. Every note of section 11 is of kind `footnote`.
 
-**References.** Endnotes are numbered through the book, so they are
-matched as in section 11, but once over the whole book, not per page:
-the endnotes in order of their values against the glued numbers of the
-body before the section, in reading order, by the same scores. The
+**Note groups.** Both owner's books (section 21) collect their notes
+at the back under a heading per chapter, the chapter's number and title
+or "Introduction", and number them from 1 again under each heading:
+Haynes in 18 groups, one column, each note "N." with a full stop and
+its first line indented; Turney in 11 groups, two columns a page, each
+note a bare number hung in the margin (section 6, rule 3), its group
+heading starting with the chapter's number, hung the same way. A **note
+group** is the endnotes from a note whose marker reads 1 (its value,
+section 11) up to the next such note, or to the section's end; the
+notes of the section before the first such note belong to the first
+group. A section with no marker reading 1 after its first note is one
+group, as Gierke's, whose numbering runs through the book.
+
+A **group heading** is the block of the section right before a group's
+first note, when it holds at most 3 lines and its first line lies at
+least 1.5 body line pitches below the line before it in the body
+stream, or is the first line of its region: a heading set apart, at
+the top of a column too. It may be a paragraph, a heading block
+(section 14 makes some, such as Turney's first group heading, an
+unindented "Introduction" 8 pitches below the title "Notes") or what
+section 11 would make a note, since Turney's starts with a number. It
+is no note and no block of the note before it: its text, its lines
+joined by single spaces, becomes the `group` of the group's first note
+(section 7), and the fidelity check counts it as words of that note.
+Measured by the survey: Haynes' group headings stand about 30 pt (2.1
+pitches of 14.4 pt) below the last line of the note before; Turney's
+30 to 32 pt (1.8 to 1.9 pitches of 16.8 pt) or at the top of a column;
+the lines of a note lie 13 pt apart (0.8 pitch) in Turney and about
+11.6 pt in Haynes. Any other heading block inside the section is made
+a paragraph, a later block of its note: a heading in the notes would
+enter the EPUB's table of contents. Not in the EPUB's table of contents
+either is a group heading, which markdown writes before its note
+(section 25; **Open 2**).
+
+**References.** Endnotes are numbered through the book, or through each
+group, so they are matched as in section 11, but once over the whole
+book, or once over each group, not per page: the endnotes of a group in
+order of their values against the glued numbers of the body of the
+group's chapter (below), in reading order, by the same scores; a book
+with one group takes the body before the section, as Gierke does. The
 candidates are taken only from the pages after the last of the config's
 `contents_pages` (Gierke: after page 67, so pages 68 to 185), and only
 those no footnote took: Maitland's introduction, before Gierke's own
@@ -1640,6 +1903,34 @@ references do not ("Law1"), so none reads as its marker; linked as
 section 11 says, 205 of them are, 186 by an exact value. Maitland's
 introduction (pages 0 to 85) has notes of its own, printed on pages 62
 to 64; they were not studied, and stay where they are now.
+
+**The chapter of a group** is a level-1 heading block of the body,
+after the config's `contents_pages` and before the endnote section,
+found from the group heading: the heading whose spans' letters, in
+lower case, are the most alike (`difflib.SequenceMatcher` ratio, at
+least 0.75 as for running heads) to the group heading's letters in
+lower case, once a first word that is a chapter label word or a
+number, and a number after a label word, are dropped ("Chapter 1." and
+Turney's leading "2"); a group without a heading, or whose heading is
+alike to none, takes the first level-1 heading after the chapter of
+the group before (the first after `contents_pages` for the first
+group). A label is not compared: Haynes' body heading has "CHAPTER ONE"
+in its label and its group heading "Chapter 1.", and the titles match
+("AMD" for "AND" in the body's OCR still gives a ratio above 0.9). A
+group's candidates are the glued numbers of the body from its
+chapter's heading up to the heading of the next group's chapter, or up
+to the endnote section for the last group. Before this revision the
+whole book was one range and Haynes' 633 endnotes were matched in order
+of their values, all the notes 1 first: 127 were linked, 120 of them
+to a note of another chapter. A prototype that took each group's
+chapter from the survey's list of chapter openings, not from the
+headings, linked 584 of the 633, each to a reference in its own
+chapter (measured on 17 November 2026 on the survey's `lines.json`).
+Turney's could not be prototyped before its notes are cut (section 6,
+rule 3); the survey counts about 555 glued numbers in its body pages 14
+to 251 and about 620 notes. The running head of Turney's notes pages
+names the printed pages their references are on; it is removed with
+the other heads and not used.
 
 **In the EPUB** (owner, 15 November 2026): every endnote stays where it
 was printed, in one list in the book's order after the heading "NOTES.",
@@ -1804,14 +2095,25 @@ the OCR reads one: 1 to 5 of the characters `IVXLCl1`, with an optional
 
 ### The rule
 
-A body line is a **heading line** when all of these hold:
+A body line is a **heading line** when it is a tall line (below), or
+when all of these hold:
 
 1. it is centred (section 6, rule 2). On a page whose body regions hold
    fewer than 5 lines, it may instead be centred, by the same 15 pt and
    10 pt, between the leftmost and rightmost sides of the page's body and
    band lines (Haskins' page 129 prints "BIBLIOGRAPHICAL NOTE" above a
    section in small type that layout makes a band, so the body column is
-   the heading itself);
+   the heading itself). Or it is **flush left**: its left side lies
+   within 3 pt of the left edge its centring is measured against (its
+   region's, or the page's body column for a line of a region of fewer
+   than 5 lines, section 6, rule 2), and its right side at least a
+   quarter of that width short of the right edge, and its top does
+   not lie within 2 pitches of the median top of the book's head lines
+   (section 3) unless it starts with a chapter label word; then rule
+   4's second branch also asks that its last word not end
+   with ".", ",", ";", ":", "?" or "!" (Turney introduces a block quote
+   with a flush-left line set apart by 2.0 pitches above and below on
+   its pages 93, 99, 100 and 160, each ending with such a sign);
 2. at least half of its characters other than spaces are letters, and
    one of its words has at least 4 letters and is not a roman numeral
    ("(VIII)", a page number of Mariéjol's preface, and the garbage of a
@@ -1822,6 +2124,26 @@ A body line is a **heading line** when all of these hold:
 4. its capitals share is at least 0.7, or its gap above is at least 2.0
    pitches (or it is the page's first line) and its gap below at least
    1.3 (or it is the page's last line).
+
+A **tall line** is a body line whose line height (section 1) is at
+least 1.2 times the median line height of the page's body stream, that
+has at least 4 letters, that passes rules 2 and 3, and whose gap above
+is at least 1.3 pitches, or that is the page's first line or follows a
+heading line: whatever its alignment, it is a heading line. Turney
+(section 21) sets its chapter titles flush left at 2.2 to 2.6 times the
+body's line height, its chapter labels, indented 42 to 46 pt, at 1.2 to
+1.4 times, and its section headings, indented the same, at 1.2 to 1.56
+times, and no line of its running text that tall but one (page 40,
+height 14 against 9, an OCR line made tall by an italic title and a
+reference, 0.77 pitch below the line before, which the gap keeps out).
+Haynes sets its chapter titles in capitals at 1.1 to 1.4 times, which
+the flush-left branch of rule 1 takes. The six public-domain books' word
+heights do not tell headings apart (above), so the gap and the 1.2 keep
+the branch off most of their lines; what it takes there is under "What
+the rule gives". The page's median, not the book's body word height:
+on Gierke's endnote pages the text is smaller than the book's, and the
+book's height took 941 lines there; on the notes pages of Turney, set
+in 8 pt, the group headings (section 12) stand at 9 to 11 pt.
 
 Two more kinds of line join a heading:
 
@@ -1853,7 +2175,9 @@ the line after it.
 **Levels.** A heading block is level 1 when its first line is a chapter
 label, or starts with one of the label words (CHAPTER, CHAPITRE, ESSAY,
 PART, PARTIE, BOOK, LIVRE), or when it is the first line of a page that
-has no running head; any other is level 2. A roman numeral counts as a
+has no running head; any other is level 2. A heading block inside an
+endnote section is a group heading or a paragraph (section 12), never a
+heading. A roman numeral counts as a
 label only as a line of its own, so "I. The Evolution of Political
 Theory." is level 2. In the four books with a
 reference text, this makes the chapters, the preface, the contents, the
@@ -1910,6 +2234,54 @@ Neither branch of rule 4 is enough alone: without the capitals, Haskins
 finds 6 of its 18 headings, its titles standing less than a pitch below
 their numerals; without the gaps, Domesday finds 7 of 23.
 
+**The flush-left and tall branches** (this revision) were measured on
+17 November 2026 with a prototype of both, as written here, on the
+`lines.json` of the clean-text build for the six public-domain books
+and of the survey's runs for the owner's two (section 21), counting
+the heading blocks `make_blocks` gives against those it gave without
+them:
+
+| book | heading blocks without | with | what is added |
+|---|---|---|---|
+| Haskins | 19 | 21 | two running heads that layout leaves in the text today (pages 23 and 235), which layout §3, step 3 now removes |
+| Stubbs | 16 | 50 | the half-title's first line (page 18), which section 14 missed; 34 lines of the publisher's lists after the text (pages 322 to 337, one heading of the lists lost) |
+| Domesday | 31 | 39 | 4 lines of text on pages 136 and 419, false; the titles of three tables, "TABLE", "TABLE II." and "AVERAGES." (425 to 428), and "(boroughs" (481) |
+| Mariéjol | 15 | 21 | "BIBLIOGRAPHIE SUCCINCTE" (page 14), right; 5 garbled lines |
+| Kadesh | 4 | 4 | |
+| Gierke | 14 | 32 | 11 section headings of its list of authorities (pages 68 to 81), right; 7 running heads beside their page numbers, which section 3 now removes |
+| Turney | 1 | 79 | not counted further: its running heads were still in the text and its chapter labels removed |
+| Haynes | 0 | 46 | below |
+
+On Haynes: Acknowledgments, Introduction, the closing chapter,
+Bibliography and Index, level 1; 13 of the 16 chapters, each a level-1 heading with
+its label ("CHAPTER ONE", at 0.8 of the body's height, passes rule 1
+flush left and rule 4 by its capitals, and the title stands 2.6 to 2.9
+pitches below it, within the 4.0 after a label); the other 3 as level-2
+titles, because their labels were removed as running heads, which
+section 3 now prevents; 20 section headings, level 2, one of them
+(page 19, a short note before chapter one) not in the survey's count;
+and 5 false ones: a picture's scraps (page 9), the two parts of the
+bibliography, which start with "Part" and so are level 1 (390, 404), an
+author's name in the bibliography (412) and the back cover (435). The notes' title (page 330) is not found; the plan checks it
+with section 12's reach back. Turney's back matter titles are found:
+Acknowledgements, Introduction, Notes, Bibliography, Illustration
+Credits, Index. The survey's own prototype of the tall branch alone
+took on Turney's pages 11 to 251 every chapter label, title and section
+heading and no line of text but those of two newspaper front pages
+reproduced as illustrations (174, 175) and a caption (170).
+
+Two conditions were added on the way, each for a case measured. The
+flush-left line is measured against the body column when its region
+has fewer than 5 lines, as centring is: measured against its own
+region's box, a title that is a region of one line is never short of
+its own right edge, and Haynes' Index was missed. And a line whose top
+lies within 2 pitches of the median top of the book's head lines (the
+band where section 3 looks for running heads; the prototype took the
+median top of every page's first line) is not flush left unless
+it starts with a chapter label word: Mariéjol's running heads, too
+garbled for section 3 to find alike ("CATHI IlDICIS"), are set flush
+left on even pages and became 13 false headings without it.
+
 ### Where it fails
 
 - **Missed**: Stubbs' half-title "THE EARLY PLANTAGENETS." (page 18),
@@ -1926,6 +2298,12 @@ their numerals; without the gaps, Domesday finds 7 of 23.
   stand above it; Gierke's ten numbered sections ("I. The Evolution of
   Political Theory.") are level 2 under the book's title on page 86,
   where a reader would want level 1.
+- **Tall lines that are text** (this revision): Domesday's pages 136
+  and 419, set mostly in small type, make 4 lines of ordinary text tall
+  against their page's median; they become false level-2 headings. The
+  tables' titles of Domesday (425 to 428) are taken too, and so are the
+  lines of the publisher's lists after Stubbs' text, which the owner
+  can exclude.
 - **Title pages** give a few headings (Domesday's "THREE ESSAYS…",
   Mariéjol's "A LA MÊME LIBRAIRIE"): the owner excludes such pages, or
   names them in `contents_pages`, when they matter.
@@ -2504,7 +2882,538 @@ notes"), so that the same section does not come out as quotes in some
 chapters and as unreferenced notes in others. The answer not taken was
 to leave them as the quote and note rules make them.
 
-## 21. Not in this spec
+## 21. The owner's two modern books
+
+The plan owner-books makes galley read two books of the owner's, which
+sit in `samples/` (ignored by git) and are copyrighted: no page of them
+is cut into an excerpt or quoted in the repository, and the tests that
+use them count what comes out (section 26). **Turney** is a 312-page
+book of 1998 on science in popular culture, **Haynes** a 436-page book
+of 1994 on the scientist in literature. Both PDFs are Internet Archive
+scans of the printed books, each page a picture under an OCR text
+layer, like the six public-domain books, but their type and layout are
+modern. Unless said otherwise the numbers of this revision about them
+come from a survey of 17 November 2026 (galley at 9715a93, both books
+run to the EPUB with the configs below; notes kept outside git), whose
+pages are page indices.
+
+What they show that the public-domain books did not:
+
+- **The line height says the size of the type.** Every character of
+  both text layers is in one font, the OCR's invisible one, so there is
+  no bold or italic; but the OCR gives each line one height, rounded to
+  the point (102 of Turney's 12,532 lines have words of two heights, 125
+  of Haynes' 17,592). Turney's body lines are 9 pt (pitch 16.8 pt), its
+  running heads and page numbers 10, section headings 11 to 14, chapter
+  titles 20 to 23.5, notes 8. Haynes' body lines are 10 (pitch 14.4;
+  some whole pages at 11), its chapter titles 12 to 14, chapter labels
+  8, notes 9. The six old books' word heights did not separate headings
+  (section 14); these do, and section 14's tall line uses it.
+- **Headings flush left.** No chapter title, label or section heading
+  of either book is centred. A chapter opens on a new page with no
+  running head: Turney's with a label of a spelled number ("Chapter
+  One") indented 42 to 46 pt, its title 1.4 to 1.6 pitches below,
+  flush left, 2.2 to 2.6 times the body's line height, on one or two
+  lines; Haynes' with a label in small capitals ("CHAPTER ONE") at 0.8
+  of the body's height, flush left, its title 2.6 to 2.9 pitches below,
+  in capitals, on two or three lines. Section headings: Turney's
+  indented 43 to 46 pt in larger type; Haynes' flush left, mixed case,
+  2.2 to 2.4 pitches below the text above. The introduction and the
+  back matter (acknowledgements, notes, bibliography, index) are titled
+  like a chapter without a label.
+- **Epigraphs** open most chapters, one or two (section 22).
+- **The page number outside the column** (Turney): beside the running
+  head on ordinary pages, at the foot under the label's indent on a
+  chapter's first page (sections 3 and 4).
+- **Notes at the back, grouped per chapter, numbered from 1 in each
+  group** (section 12): Haynes "1." in one column, Turney a bare number
+  hung in the margin of two columns. The references in the text are
+  superscript digits that the OCR glues to the word before, at the
+  word's own height (Turney page 40: letters and digit both 9.0 pt).
+- **A left cut-in inset** (layout §3): the indented epigraphs and
+  headings give Turney one of 44.3 pt and Haynes one of 30.0 pt, so
+  layout takes both books for books with cut-in notes. Step 2b moves no
+  word in either: laid out with and without the insets, every page of
+  both gives the same regions (measured on 17 November 2026). A trap
+  for the next change to step 2b.
+
+**Their configs**, as the survey ran them, with `ocr = "trust"` (no
+re-reading):
+
+| book | `exclude_pages` | `contents_pages` |
+|---|---|---|
+| Turney | 2, 3, 5, 9, 165, 168, 171, 306, 307, 308, 309 | 10 |
+| Haynes | 0, 1, 3, 7, 11, 13, 329, 389, 431, 432, 434 | 8 |
+
+**What galley gave, and where this revision answers it:**
+
+| failure | Turney | Haynes | section |
+|---|---|---|---|
+| chapter headings found | 1 | 0 | 14 |
+| chapter labels removed as running heads | 9 | 3 | 3 |
+| running heads left in the text | 98 times in `book.md` | | 2, 3 |
+| page numbers made margin notes | 289 | | 3 |
+| page numbers at the foot left in the text | 15 | | 4 |
+| notes linked | 0 of about 620 (notes and bibliography: four `quote` blocks) | 127 of 633, 120 to another chapter's note | 6, 12 |
+| epigraphs | 11, run into the text | 21, run into the text | 22 |
+| a paragraph run over a page with an epigraph alone | pages 12 to 14 | | 6 |
+
+The chapter openings: Turney 26, 39, 56, 77, 104, 134, 148, 189, 217
+and 229 (chapters One to Ten), the introduction 14, acknowledgements
+11, notes 252 (to 277), bibliography 278, illustration credits 300,
+index 301; its page offset is 13 before its plates and 29 after.
+Haynes: introduction 14, chapters 1 to 16 at 22, 36, 48, 63, 79, 87,
+105, 117, 141, 156, 175, 200, 224, 249, 281 and 308, the closing
+chapter 326, acknowledgments 10, notes 330 (to 388), bibliography 390,
+index 422; offset 13.
+
+## 22. Epigraphs
+
+An **epigraph** is a quotation set at the head of a chapter, before its
+text, with its **source**: the line that names the author and often
+the work or year. It is a block kind of its own, `epigraph` (owner, 17
+November 2026), with its source as a separate part, `Block.source`
+(section 7; **Open 1**). It is not a `quote`, which is a passage quoted
+inside the text, nor the chapter's first paragraph, into which both
+books' epigraphs ran: each line whose two insets happened to be within
+10 pt became a paragraph of one line, short lines became verse, and
+each source was joined to the text after it, because the text's first
+line is not indented.
+
+**What the books show.** Turney: 11 epigraphs, on pages 13 (the book's
+own, alone on its page), 14, 26, 39, 56, 134, 148, 189, 217 (two) and
+229. Every line of the quotation is indented 32 to 46 pt from the body
+column's left edge (most 42 to 46, the indent of the chapter label),
+ragged right, in the body's type; the source is a line of its own set
+flush right: its right side no more than 3 pt left of the quotation's
+rightmost right side (on page 217 it ends 12.7 pt right of it), its
+left side 100.3 to 244.6 pt right of the quotation's left side. Haynes:
+21 epigraphs, on pages 22, 36, 48, 63, 79, 87, 105, 117, 141, 156
+(two), 175 (two), 200, 224 (two), 249, 281 (two), 308 and 326, indented
+26.6 to 31 pt, ragged right; the source starts with a dash, at the
+quotation's indent, in smaller type: its line height 0.73 to 0.90 of
+the quotation's, on all 21. Two epigraphs on a page are about 2 pitches
+apart; after the last comes a gap, then a section heading (Turney,
+indented as the epigraph but taller) or the text, flush left. Haynes
+indents its paragraphs by 29 to 30 pt, as much as its epigraphs, so the
+indent alone does not tell an epigraph from a paragraph's first line;
+the place does, after a chapter's heading, and the source line. Eight
+of Haynes' quotations are verse (pages 22, 48, 63, 79, 87, 117, 224
+the second, 326), by the survey's reading; none of Turney's. (The
+survey listed Turney's page 104 for an epigraph; it has none: its text
+starts at the foot of the chapter's sink.)
+
+**The rule**, per page, after the heading lines are found (section 2,
+step 2.3). Measures are those of the page's body stream; the **body
+column** is section 1's.
+
+1. **Where.** On a page whose body stream holds a heading block of
+   level 1, the lines right after that block (and after its chapter
+   summary, if any) are looked at, up to the first line that ends the
+   epigraphs (rule 4).
+2. **An epigraph run** is the consecutive lines from there, none a
+   heading line, each with its left side at least 20 pt right of the
+   body column's left edge, that end at a source line (rule 3). The
+   first line after a source line starts the next run when it lies
+   within 3 pt of the left side of the run before, across.
+3. **A source line** is a line of the run, not its first, that either
+   - starts with a dash, "—", "–" or "-", alone or several, as a word
+     of its own or at the start of its first word (Haynes' OCR reads
+     one as "—-"), and has a line height at most 0.92 of the median
+     line height of the run's lines before it (Haynes: 0.73 to 0.90);
+     or
+   - lies at least 60 pt right of the leftmost left side of the run's
+     lines before it, and its right side lies no more than 3 pt left
+     of their rightmost right side (Turney: 100.3 to 244.6 pt right; a
+     verse turnover line, the end of a long verse line set further in,
+     lies 32 pt right in Haynes' page 87 and ends short).
+   The lines of the run before the source line are the **quotation**.
+4. **The end.** The epigraphs end at the first line, after a source
+   line, that does not start a run: a line within 20 pt of the body
+   column's left edge, a heading line, or the end of the page's body
+   stream. Lines of a run that reach the end without a source line are
+   no epigraph and stay as section 6 makes them; so a chapter that
+   opens with an indented paragraph (Haynes' introduction) gets none.
+5. **A page of its own.** A page with no heading line whose body stream
+   is one run, of a quotation of at least 1 line and a source line by
+   rule 3, is an epigraph too, without rule 2's indent, which a page set
+   in the quotation's own measure does not show (Turney page 13: the
+   source starts 169 pt right of the quotation and ends with it). Not
+   measured on the six public-domain books.
+
+**The block.** Each epigraph is one `epigraph` block, after the
+heading's block in `blocks`; the line after the last epigraph starts a
+block. Its spans hold the quotation, its lines joined as a paragraph's
+are, with hyphens joined (section 5), or, when the quotation is verse
+(below), with a line feed between its lines, as a `verse` block's
+text (architecture §7; owner, 17 November 2026: a verse epigraph keeps
+its line breaks). Its `source` is the source line's words, joined by
+single spaces, without its leading dash. Its `origin` holds the
+quotation's and the source's lines.
+
+**The dash is look, not text** (owner, 17 November 2026): the source's
+leading dash says, in print, "this is the source"; the kind says it in
+blocks.json, and the markdown and epub stages draw it (section 25). It
+is removed with a record: a `WordChange` of the new reason
+`source_dash`, on the source's page, whose `before` is the source's
+first word ("—Hobbes,") or the dash word and the word after it ("—",
+"Hobbes,"), and whose `after` is the one word without its leading
+dashes ("Hobbes,"). The fidelity check verifies it: `before` is one or
+two words, the first starts with a dash, and `after` is one word, the
+words of `before` joined with every dash at their start dropped. A
+dash anywhere else in the source ("1873—1881") stays. Turney's sources
+have no dash, and no change.
+
+**Verse.** A quotation is verse when it has at least 2 lines, every
+line after its first starts with a capital letter, once quotation
+marks, full stops, ellipses and spaces at its start are passed, or
+lies at least 15 pt right of the quotation's leftmost left side (a
+turnover line), and either every line ends at least 80 pt short of the
+body column's right edge or one of them is a turnover line. A prose
+quotation is ragged right in both books but its lines run on, so a line
+after the first starts in lower case in most, and its lines (but the
+last) end 0 to 67 pt short of the column's edge; verse lines start with
+a capital, and Haynes' end 94 to 186 pt short, but for page 87's long
+lines, which end 37 to 51 pt short with a turnover line among them.
+Measured on 17 November 2026 on the survey's `lines.json` of the 32
+epigraphs found by rules 1 to 4 (Turney's page 13 aside): it makes
+verse of the 8 that the survey read as verse and of no other; without
+the length test it also took two prose quotations whose second line
+happens to start a sentence (Haynes 156, the second; Turney 217, the
+second). A quotation of one line is prose: its line breaks are
+nothing to keep.
+
+**What the rule gives.** Run by hand-written code over the survey's
+`lines.json` on the opening pages listed (17 November 2026), rules 1 to
+4 find all 21 of Haynes' epigraphs, with their sources, and 9 of
+Turney's 11; of the other two, page 229's was missed by the script,
+which placed that page's column edge 43 pt too far right, and its
+lines fit the rule by their geometry; page 13's is rule 5's, which was
+not run. The pages of the six
+public-domain books were not searched for false epigraphs; a page
+whose level-1 heading is followed by indented lines ending at a dash
+line or a line set flush right is the case to watch (a dedication, a
+motto), and the `whole_book` tests count `epigraph` blocks there
+(section 26).
+
+**Where it fails.** An epigraph that runs over a page break is not
+found (none in the two books). An epigraph whose source is neither
+dashed and smaller nor set flush right, or a source line the OCR set
+level with the quotation's left, is missed and stays as before. A
+heading line between a quotation and its source ends the run.
+
+## 23. Spaced punctuation
+
+Nineteenth-century printers set a space before ";", ":", "?" and "!",
+and the OCR reads it: "subjection ;". In an English book the space is a
+fault of the text as galley gives it (a reader sees a sign alone at a
+line's start on the Kindle); in a French book it is the language's rule,
+and the sign must not be cut from its word by the line breaks of the
+EPUB. The owner decided on 17 November 2026: in a French book the space
+becomes a no-break space; in any other book the sign is attached to the
+word before it, as a recorded word change; a sign after a dash or a
+quotation mark is left alone.
+
+**The rule.** In every block, body and side text, after the joins over
+page breaks (section 2, step 3.2) and before notes are cut and
+references looked for, a word that starts with "?", ";", ":" or "!"
+(the **spaced sign**, followed by anything or nothing: ";", ";^",
+"?'") and follows another word of the same block, on the same line or
+the line before, is changed when the word before it ends with a letter,
+a digit or a closing bracket, ")" or "]":
+
+- in a book whose config's `language` is `fr`, the space between the
+  two words becomes a no-break space, U+00A0, in the block's text: no
+  word changes, since the fidelity check splits words on white space and
+  Python's `str.split` takes U+00A0 for white space, and Pandoc keeps it
+  inside the word it reads, which the check splits in the same way
+  ("complète ;" is one Pandoc `Str` and two words; checked with Pandoc
+  3.14 on 17 November 2026);
+- in any other book, the two words become one, the sign attached: a
+  `WordChange` of the new reason `punctuation_attached` on the page of
+  the first word, `before` the two words and `after` the one, ("subjection",
+  ";") to ("subjection;",). The fidelity check verifies that `before`
+  is two words, the second starting with one of the four signs, and
+  that `after` is the two joined with nothing between.
+
+After a dash or a quotation mark ("—", "'", "’", '"', "”", "»") the
+sign stays apart, with its ordinary space, in both cases (owner, 17
+November 2026). Between the two lines of a `verse` block or of a
+verse epigraph, where a line feed separates them, nothing changes. A
+sign that starts a block stays as it is.
+
+**After a note reference.** A sign after a word that holds a reference,
+"hides4 ;" (Domesday 27 times, Mariéjol 9, Gierke 2), is attached to
+that word before references are looked for, "hides4;", which section
+11 then splits into "hides", the reference "4" and ";": the sign
+follows the reference, as print sets it. Its two changes are recorded,
+`punctuation_attached` then `note_marker`; the fidelity check, which
+undoes every change, balances. A sign glued to a reference, "subjection
+;^" (Haskins page 28, a sign "^" for a superscript 1), becomes
+"subjection;^", a candidate of section 11's sign form, which a spaced
+";^" was not; the note is then linked. In a French book the reference
+"(1) ;" stays a word of its own, as it was.
+
+**Measured** by the public-domain survey on the clean-text build (17
+November 2026), words of blocks and notes that start with one of the
+signs and follow a word:
+
+| book | spaced signs | of which ; / : / ? / ! | signs already attached | share spaced | left alone (after a dash or a quotation mark) |
+|---|---|---|---|---|---|
+| Haskins | 91 | 74 / 11 / 0 / 6 | 501 | 15% | under 10 |
+| Stubbs | 1,039 | 973 / 53 / 12 / 1 | 589 | 64% | under 10 |
+| Domesday | 2,181 | 1,254 / 747 / 177 / 3 | 1,095 | 67% | 75 |
+| Gierke | 951 | 523 / 405 / 16 / 7 | 939 | 50% | 31 |
+| Kadesh | 103 | 67 / 31 / 3 / 2 | 221 | 32% | under 10 |
+| Mariéjol (French: no-break space) | 1,349 | 549 / 599 / 43 / 158 | 847 | 61% | 251 |
+
+The owner's two books were not counted. An edit written against a
+block's text before this change no longer applies, since its checksum
+changes (architecture §10); none exists for these books.
+
+## 24. Words glued at a case change
+
+The text layer of the old books sometimes gives two words as one with a
+capital inside, "theAvre" (Haskins page 22, printed "the Avre"): the
+OCR spread its characters evenly over the word's box, so the boxes
+touch and extract's rule for glued words, which cuts at a gap
+(`docs/specs/extract.md` §4), has nothing to measure. A word of a block
+is split in two at a lower-to-upper case change when all of these hold:
+
+- the word, with punctuation stripped from both ends, is a run of
+  lower-case letters followed by a capital and at least 2 lower-case
+  letters, and nothing else ("theAvre", "ofWilliam");
+- the left part has at least 2 letters and is a known word (the word
+  list, `wordlist.is_known_word`);
+- the right part's key (section 5) is among the book's own words
+  (section 5): the book prints it whole elsewhere;
+- the whole word's key is not a known word.
+
+The split is a `WordChange` of the new reason `case_split`, on the
+word's page: ("ofWilliam,",) to ("of", "William,"), the punctuation
+going with its side. The fidelity check verifies that `before` is one
+word and `after` two whose concatenation is it, the second starting
+with a capital. It is made in each block once hyphens are joined
+(section 2, step 2.4), so that a word joined at a line end is split
+too, and before references are looked for.
+
+The left part must be in lower case: in the owner's modern books every
+glued word with a capital left part is a name ("McGibbon", "LaFollette",
+"LeGuin": 6 in Turney, 30 in Haynes), and in the old ones half are
+(Haskins' "LePrevost", Gierke's "MagnaCarta" are two words, Domesday's
+"MacDurnan" one). The book's own words are asked of the right part
+because the OCR misreads "li" as "U" or "H": Haskins' "deUver",
+"miUenaire" and "estabHshed", whose right parts the book never prints,
+are words the OCR damaged, and a split would leave two wrong words for
+one. Measured on 17 November 2026 on the words of the clean-text
+build's `blocks.json` and the survey's runs (the book's words taken
+from the blocks, not from `lines.json`):
+
+| book | split | examples | kept, glued |
+|---|---|---|---|
+| Haskins | 2 | "theAvre", "theAngevin" | 7 misreadings ("deUver") |
+| Stubbs | 10 | "ofWilliam", "ofJohn", "ofLancaster", "heBarons" (the "t" of "the" lost) | 1 |
+| Domesday | 5 | "ofChatteris", "inBerchescire", "forSon" | 8 |
+| Kadesh, Gierke | 0 | | 12, 6 ("inSyrienund", "outsideVhe") |
+| Mariéjol | 36 | mostly misreadings into misreadings ("revHit") | 272 |
+| Turney | 0 | | 0 |
+| Haynes | 3 | names after "of" | 2 |
+
+A lower-case pair glued without a case change ("ofone") is not found:
+a test on the word list alone splits 860 to 6,600 words per book
+wrongly (public-domain survey), because Tesseract's list lacks too many
+words. Looking at the ink in the page's render inside the word's box
+would find both; it needs the render in structure or extract and is
+not part of this plan.
+
+## 25. The change to markdown
+
+markdown writes what this revision adds; how it looks is decided here
+and in the epub stage's style sheet, `src/galley/epub/style.css`,
+never by structure (architecture §3).
+
+- **An epigraph** is a fenced div with its block id and the class
+  `epigraph`, holding the quotation as a paragraph, with a hard line
+  break at each line feed of a verse quotation, as a `verse` block's
+  is, and then a fenced div with the class `epigraph-source` holding the
+  `source`. The style sheet sets the epigraph in from both sides, the
+  source on a line of its own aligned right, and draws the dash before
+  the source with generated content, `.epigraph-source::before {
+  content: "— "; }`, so that `book.md` holds no dash the book did not
+  print as text (**Open 3**: not tried on a Kindle).
+- **A note group's heading** is a fenced div with the class
+  `note-group`, written just before the div of the note whose `group`
+  it is, in the list of endnotes. It is not a Pandoc heading, so it is
+  not in the EPUB's table of contents (**Open 2**).
+- **A no-break space** is written as the character, which Pandoc keeps
+  (section 23).
+
+The fidelity check at the markdown boundary (architecture §13) counts
+the words of an `epigraph-source` div as words of its epigraph's block,
+as it counts a heading's label, and the words of a `note-group` div as
+words of the note after it; any other div inside an epigraph's div is
+an element galley's Markdown does not make, and an error.
+
+## 26. How the owner-books changes are verified
+
+**Unit tests**, on `LinesFile` values and words written in the test:
+
+- head line: a head "THE BOOK" at top 36 pt with a region "224" of one
+  line 14 pt left of it at the same top is one head line, the page
+  number "224" and a running head; with "224" 5 pt lower, or 6
+  characters long, the head stays in the text as now;
+- chapter label: three pages whose first region is "CHAPTER ONE",
+  "CHAPTER TWO", "CHAPTER THREE" within 2 pitches of the median head
+  top keep each line in the text, and the heading has it as `label`;
+- foot number: a page whose head page numbers around it give an offset
+  of 29 and whose lowest line is "160" at the column's left, on page
+  189, is a `page_number` at the foot; "161" there stays;
+- hanging number: a region of 12 lines whose text edge is at 251 pt
+  and whose lines "8 Compare…", "9 Weart…" start at 234 pt starts a
+  paragraph at each; a number at 248 pt does not; a region of 2 such
+  lines and 2 others does not;
+- page break: a page whose last line ends 30 pt short with "it." and a
+  next page whose first line is flush left starts a paragraph; the same
+  with "it," or 15 pt short continues it; a verse block that runs on is
+  kept;
+- headings: a flush-left line in capitals with a 2.4-pitch gap above is
+  a heading line; a flush-left line in lower case set apart by 2.0
+  pitches and ending with ":" is not; a line 2.4 times the page's
+  median height, flush left, 1.5 pitches below a label "Chapter One"
+  indented 45 pt and 1.3 times as tall, gives one level-1 heading with
+  the label; a tall line 0.8 pitch below the line before is no heading;
+  a flush-left line within 2 pitches of the median head top is no
+  heading unless it starts with "CHAPTER";
+- note groups: an endnote section of two groups of 9 notes, "1" to "9"
+  twice, each after a two-line group heading 1.8 pitches below the note
+  before, and two level-1 headings in the body whose titles match the
+  group headings, with glued references "word1." to "word9." under
+  each, links each note to the reference of its own chapter; the
+  group's first note has the heading as `group`; Turney's form, bare
+  numbers hung 17 pt, gives the same;
+- epigraphs: under a level-1 heading, three lines indented 30 pt and a
+  line "—Hobbes" at 0.8 of their height give one `epigraph` whose
+  `source` is "Hobbes" and a `source_dash` change; the same with a
+  source line flush right 150 pt in and no dash gives one with no
+  change; two such epigraphs give two blocks; the same lines with no
+  source line stay paragraphs; a page holding only such a run is an
+  epigraph; the verse rule on 5 lines starting with capitals and ending
+  100 pt short gives line feeds, on 3 lines ending 30 pt short none;
+- spaced signs: ("subjection", ";") gives ("subjection;",) with
+  `punctuation_attached` in English and a no-break space in French;
+  ("—", ";") and ("'", "?") stay; "hides4" ";" gives the reference "4"
+  linked and the text "hides", "4", ";"; "subjection" ";^" gives a
+  linked sign;
+- case split: "theAvre" with "avre" among the book's words gives
+  ("the", "Avre"); without it, or "LeGuin", or "deUver" (no "uver"),
+  stays;
+- the fidelity check passes on all of these and fails on a
+  `source_dash` change that drops a letter, a `punctuation_attached`
+  change whose second word is not a sign, a `case_split` change whose
+  parts do not make the word, and a block not an epigraph that has a
+  `source`.
+
+**Excerpt tests.** The reference pages of section 9 keep their
+expected output except where these rules change it: the plan lists
+each change and the owner checks it by eye. New excerpts, each a case
+the committed excerpts do not hold, are added to
+`scripts/fetch_samples.py`, every page with a text layer; the owner
+checks each expected output against the page image:
+
+| excerpt | page indices | what it checks |
+|---|---|---|
+| `haskins_heads_notes` (Haskins, `normansineuropea00hask`) | 22, 23, 28, 29, 30, 55, 66, 195, 235 | "theAvre" split (22); running heads whose next row has a tall glyph (23, 30, 66, 235; layout §3, step 3) removed with their page numbers, and page 23's speck above as a `stray_mark`; footnotes left in the body found as a band without the gap (28, 55, 195; layout §3, step 4), and page 28's "subjection ;^" linked to its note |
+| `stubbs_heads` (Stubbs, `earlyplantagenet01stub`) | 20, 100, 152, 158, 186, 202, 210 | running heads whose date the skew sets a row lower, removed with their page numbers (layout §3, step 3); spaced ";" attached |
+| `gierke_intro_heads` (Gierke, `politicaltheorie00gieruoft`) | 68 to 79 | roman page numbers beside the running head (section 3), removed with it; the list of authorities' section headings, taken by the tall branch |
+| `domesday_rereads` (Domesday, `domesdaybook00maituoft`) | 26, 36, 97, 136, 138, 139, 150, 160 | a word of a margin note read once, not twice, by re-reading (`docs/specs/reocr.md` §4: "tem," on 26, and 36, 139, 150, 160); footnotes left in the body found as a band (97, 138); page 136's two text lines taken for headings (a known failure) |
+
+Each excerpt's own survey must measure what the whole book's does (the
+trap of section 9 with `domesday_headings_quotes`); the plan checks the
+body measures and the marker form of each when it is cut, and adds
+body pages of the same book if they differ.
+
+**Whole-book tests**, marked `whole_book`, on the owner's two books:
+they find each PDF in `samples/` by a pattern of its file name given in
+the test ("*Turney*.pdf", "*Haynes*.pdf"), run the pipeline to
+`blocks.json` with the configs of section 21, and skip with the reason
+when the PDF is absent. They assert counts only, never text:
+
+| count | Turney | Haynes |
+|---|---|---|
+| level-1 headings whose label starts with "chapter", any case | 10 | 16 |
+| level-1 headings without a label, among them the introduction, notes, bibliography and index | at least 5 | at least 5 |
+| `running_head` removals whose first word is a chapter label word | 0 | 0 |
+| `page_number` removals at the foot | at least 14 of the 15 opening pages | (none printed) |
+| `margin_note` blocks that are a number of 1 to 3 digits | 0 | 0 |
+| endnotes, and note groups (notes with a `group`) | at least 580, 11 | at least 620, 18 |
+| endnotes linked | at least 450 | at least 550 |
+| links from a reference to a note of another group's chapter | 0 | 0 |
+| `epigraph` blocks, and those with line feeds | 11, 0 | 21, 8 |
+| `source_dash` changes | 0 | 21 |
+
+The targets are set below the survey's and the prototypes' counts:
+Haynes' links from the prototype's 584, Turney's from its 620 notes and
+about 555 references, not prototyped. The `whole_book` tests of the six
+public-domain books add: no `running_head` removal starts with a chapter
+label word; the running heads of Haskins' pages 23, 30, 66 and 235,
+Stubbs' 20, 100, 152, 158, 186, 202 and 210 and Gierke's 69 to 79 are
+removed; at most 2 `epigraph` blocks in each book (none is printed;
+the margin is for a motto the rule takes); the fidelity check on every
+book.
+
+**Measured by `galley-eval run`** on the four evaluation books, before
+and after, in the plan's work report: the reference headings in
+`heading` blocks and the paragraph boundaries may not fall (section 9's
+targets), and the notes whose reference is right not either; the
+page-break cuts of section 6 and the new headings of section 14 are
+checked against the reference texts there.
+
+## 27. Open points
+
+The orchestrator settles these while the owner is away; each has what
+the implementer does meanwhile.
+
+1. **How an epigraph's source and a note group's heading are stored.**
+   (a) As written: `Block.source` on the `epigraph` block and
+   `Note.group` on a group's first note, each a string counted by the
+   fidelity check, as `label` and `marker` are; an edit cannot correct
+   them, and the OCR damages some sources (2 of Haynes' 21 hold a
+   misread name). (b) Two block kinds, `epigraph` and
+   `epigraph_source`, the second always right after the first, and the
+   group heading a block of a kind of its own among the endnotes, each
+   editable; a reader of blocks.json must pair the source with its
+   epigraph, and markdown must place a group's block among the notes,
+   which `notes`' order by page (section 6) does not allow on a page
+   where a group ends and the next begins. Recommended: (a), the
+   precedent of `label`, which the owner chose on 16 November 2026 at
+   the same cost. Meanwhile: (a).
+2. **Note group headings outside the table of contents.** (a) As
+   written: a styled line before the group's first note, not in the
+   EPUB's table of contents. (b) Level-2 headings under "Notes", one
+   entry per chapter, which repeats each chapter's title in the table
+   of contents, as the printed contents pages did before the owner
+   named them in `contents_pages` (15 November 2026). Recommended: (a).
+   Meanwhile: (a).
+3. **The dash before a source is drawn by the style sheet.** CSS
+   generated content (`::before`) was not tried on a Kindle; if the
+   Kindle drops it, the source shows without a dash, still on its own
+   line set right. The other answer is that markdown writes "— " before
+   the source as text, and the fidelity check at the markdown boundary
+   allows that one word there. Meanwhile: the style sheet; the plan
+   checks it on a Kindle or the Kindle Previewer if the owner can, and
+   reports.
+
+Decided while writing, with the reasons in their sections: the
+spaced-sign rule of languages other than French is English's (no book
+in Spanish, German or Italian yet); a group's chapter is found by its
+heading's title; the tall line is measured against the page's median;
+words glued at a case change are split in structure, recorded, with
+the book's words as evidence; re-reading lets a pairing by letters win
+over a word under a Tesseract word whose letters are unlike
+(`docs/specs/reocr.md` §4).
+
+## 28. Not in this spec
+
 
 - How regions are found, and Stubbs' cut-in notes: the layout spec.
 - How plates are recognised and their pictures cut: `docs/specs/plates.md`.
@@ -2519,4 +3428,16 @@ to leave them as the quote and note rules make them.
   and Mariéjol's reference texts make of a label and its title): a change
   to `docs/specs/evaluation.md`, before the plan's scores are taken.
 - Removing specks read as margin notes, figures inside text pages,
-  tables as tables: later.
+  tables as tables: later. Domesday's tables (its pages 28, 42 to 44,
+  156 to 158, 425 to 428 and others) stay as the paragraph, verse and
+  note rules make them, and section 6's rule 3 cuts some of their rows
+  into paragraphs.
+- Left out of the plan owner-books, by the owner's scope of 17 November
+  2026: the correct stage; Mariéjol's references read "(i)" (section
+  11), which stay in their words; Kadesh's notes, too damaged to cut
+  (section 11, "Where the rules fail"); the lines of Stubbs' cut-in
+  notes left in the body (layout §9); merging the text layer's and
+  Tesseract's readings of an index word by word (`docs/specs/reocr.md`).
+- The entries of a bibliography (Turney's pages 278 to 299, Haynes' 390
+  to 421), which the quote rules make quotes: a kind of their own, like
+  index entries, later.

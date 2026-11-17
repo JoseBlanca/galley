@@ -55,7 +55,7 @@ The owner decided in chat on 15 November 2026:
   reference, when a page's OCR is bad enough to OCR it again (section 8).
 
 **Changed on 16 November 2026** for the second plan of structure
-(`docs/specs/structure.md` §21), which gives `blocks.json` version 2
+(`docs/specs/structure.md` §28), which gives `blocks.json` version 2
 (architecture §8): a heading's chapter label in a field of its own, the
 block kinds `verse` and `chapter_summary`, and notes of kind `endnote`.
 The reference text marks every note alike, and marks verse with
