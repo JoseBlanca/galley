@@ -613,6 +613,16 @@ def test_band_over_no_layer_word_read_as_one_sure_word_is_kept() -> None:
     assert _band_over_nothing("Next", confidences=(80.0,)).kept
 
 
+def test_band_over_no_layer_word_read_as_a_word_broken_at_a_line_end_is_scored() -> (
+    None
+):
+    # Domesday page 325: "The pre- cariun." over nothing, the broken word
+    # scored once; it is no sure single word, and the record is made.
+    record = _band_over_nothing("Next", "pre-", "cariun.")
+    assert record.ocr_score == 0
+    assert not record.kept
+
+
 def test_band_over_no_layer_word_read_as_one_known_word_at_79_is_not_kept() -> None:
     assert not _band_over_nothing("Moral", confidences=(79.0,)).kept
 
