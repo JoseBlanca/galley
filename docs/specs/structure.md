@@ -2170,6 +2170,15 @@ the eight books (measured on 17 November 2026 on the `lines.json` of
 layout §3's new steps): Domesday's pages 136 and 419 and Gierke's page
 50, and no other line.
 
+For the tall line, a line of the body stream with no letter or digit
+(a speck the OCR read as "#" or "/") does not count: the line before is
+the nearest above that holds a letter or a digit, and the page's first
+line is its first that holds one. On Turney's page 134 a speck "#" lies
+0.38 pitch above the label "Chapter Six", which had then no gap above
+it and was no heading; with the speck passed over, it is the page's
+first line, and chapter six is found with its label. Measured on 17
+November 2026 on the eight books: this changes no other heading.
+
 Two more kinds of line join a heading:
 
 - a **chapter label** that is centred and whose next line is a heading
@@ -2182,6 +2191,15 @@ Two more kinds of line join a heading:
   This takes Stubbs' "John." under "CHAPTER VII." (the OCR read the small
   capitals as lower case) and Mariéjol's "L'EXPÉRIENCE ET L'ÉCHEC DE LA
   POLITIQUE MODÉRÉE", which fills the column and so is not centred.
+  Below a chapter label alone, the continuation may lie up to 4.0
+  pitches below it, as a title may below its label (heading blocks,
+  below): Haynes' page 249 opens chapter fourteen's title with a line
+  in capitals 2.87 pitches below "CHAPTER FOURTEEN", 58 pt short of the
+  right edge, under a quarter of the width, and 1.09 times the page's
+  median height, so neither flush left nor tall; without the 4.0 the
+  label stood alone and the title's second line became a level-2
+  heading of its own. Measured on 17 November 2026 on the eight books:
+  this changes no other heading.
 
 **Heading blocks.** Consecutive heading lines are one heading block when
 the second is at most 2.6 pitches below the first, or at most 4.0 when
