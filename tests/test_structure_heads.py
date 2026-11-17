@@ -414,6 +414,25 @@ def test_flush_left_head_line_left_in_the_text_near_the_head_top_is_no_heading(
     assert _headings(blocks) == headings
 
 
+@pytest.mark.parametrize(("tall_lines", "headings"), [(6, 1), (7, 0)])
+def test_tall_lines_of_text_over_small_type_are_no_headings_past_6_on_a_page(
+    tall_lines: int, headings: int
+) -> None:
+    # 20 lines of small type (7 pt) above `tall_lines` lines of text in the
+    # body's type (10 pt), 1.5 pitches below them: the text's lines stand
+    # 1.43 times the page's median line height.
+    small = tuple(
+        _line(
+            f"line {number:02} of the small type", _BODY_LEFT_PT, 100 + 10 * number, 7
+        )
+        for number in range(20)
+    )
+    text = _running_text(100 + 10 * 19 + 1.5 * _PITCH_PT, tall_lines)
+    page = PageLayout(20, (_region(*small, *text),), ())
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert len(_headings(blocks)) == headings
+
+
 # On the six public-domain books (spec section 26, "Whole-book tests"), from
 # the session's run of each whole book (tests/conftest.py).
 
