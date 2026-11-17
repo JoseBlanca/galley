@@ -17,6 +17,7 @@ from galley.structure._heads import (
     arabic_number,
     end_numbers,
     is_confirmed,
+    is_number_like,
     is_roman_number,
     without,
 )
@@ -40,6 +41,11 @@ _HEAD_PITCHES = 2.0
 _HEAD_ALIKE_RATIO = 0.75
 _HEAD_MIN_LETTERS = 4
 _HEAD_LENGTH_DIFFERENCE = 8
+# Spec section 3, the head of a short section: its likeness is to the
+# topmost line of one of the 2 pages before it, not 1, so that a blank page
+# or a plate between does not hide the heading (a guess: on the six books
+# the heading is always on the page just before).
+_SHORT_SECTION_PAGES_BACK = 2
 # Spec section 4: a signature line's words left of its page number hold at
 # least 4 letters, at least 0.5 alike to another page's (Mariéjol's were
 # 0.54 to 0.73 alike).
@@ -51,7 +57,8 @@ _SIGNATURE_MIN_LETTERS = 4
 class BookSurvey:
     """What structure learns from the whole book before the per-page work.
 
-    `running_heads` are the page indices whose head line is a running head;
+    `running_heads` are the page indices whose head line is a running head,
+    the head of a short section among them;
     `head_page_offset` the commonest page index minus printed number of the
     arabic page numbers of the running heads, None when there is none;
     `first_arabic_page` the first page index whose running head has one;
@@ -246,11 +253,47 @@ def number_candidates(
     )
 
 
+def _topmost_line(page: PageLayout) -> Line | None:
+    """The line of the page whose top is highest, the first in the order of
+    the regions on a tie; None on a page with no line."""
+    lines = tuple(line for region in page.regions for line in region.lines)
+    return min(lines, key=lambda line: line.box.top, default=None)
+
+
+def _is_short_section_head(
+    page_index: int, line: Line, top_letters: frozendict[int, str]
+) -> bool:
+    """Whether a head line near the median head top, left in the text by
+    the other rules, is the head of a short section (spec section 3): its
+    first or last word number-like, and the rest of the line alike to the
+    topmost line of one of the 2 pages before it, `top_letters` holding the
+    letters of each page's topmost line."""
+    texts = _texts(line)
+    rests = tuple(
+        rest
+        for number_like, rest in (
+            (texts[:1], texts[1:]),
+            (texts[-1:], texts[:-1]),
+        )
+        if number_like and is_number_like(number_like[0])
+    )
+    before = tuple(
+        top_letters[back]
+        for back in range(page_index - _SHORT_SECTION_PAGES_BACK, page_index)
+        if back in top_letters
+    )
+    return any(alike_to_a_head(letters("".join(rest)), before) for rest in rests)
+
+
 def _head_survey(
-    heads: tuple[tuple[int, Line, Line | None], ...], pitch: float, workers: int
+    heads: tuple[tuple[int, Line, Line | None], ...],
+    pitch: float,
+    top_letters: frozendict[int, str],
+    workers: int,
 ) -> _HeadSurvey:
     """Running heads, the offset and the first arabic head number from the
-    head lines, (page index, head line, line below it) (spec section 3)."""
+    head lines, (page index, head line, line below it), and `top_letters`,
+    the letters of each page's topmost line (spec section 3)."""
     if not heads:
         return _HeadSurvey(frozenset(), None, None, frozenset())
     median_top = statistics.median(line.box.top for _, line, _ in heads)
@@ -308,7 +351,16 @@ def _head_survey(
         and below.box.top - median_top <= limit
         and _alike_to_any(_line_letters(below), running_letters, _HEADS_ALIKE)
     )
-    return _HeadSurvey(running, offset, first_arabic_page, below_specks)
+    short_sections = frozenset(
+        page_index
+        for page_index, line in near
+        if page_index not in running
+        and page_index not in below_specks
+        and _is_short_section_head(page_index, line, top_letters)
+    )
+    return _HeadSurvey(
+        running | short_sections, offset, first_arabic_page, below_specks
+    )
 
 
 def _commonest_offset(numbers: tuple[tuple[int, int], ...]) -> int | None:
@@ -344,7 +396,14 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
         for page, measured in zip(lines.pages, measures, strict=True)
         if measured.head is not None
     )
-    head_survey = _head_survey(heads, pitch, workers)
+    top_letters = frozendict(
+        {
+            page.index: _line_letters(top)
+            for page in lines.pages
+            if (top := _topmost_line(page)) is not None
+        }
+    )
+    head_survey = _head_survey(heads, pitch, top_letters, workers)
     running_heads = head_survey.running_heads
     kinds = map_pages(
         lambda page: region_kinds(page, body_word_height, running_heads),

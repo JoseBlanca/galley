@@ -13,6 +13,9 @@ _DIGIT_WORD = re.compile(r"[0-9]+[.,]?")
 # the page index within 2 (Stubbs' offset is 17 on pages 19 to 51 and 21
 # after; its heads there are alike by their letters).
 _HEAD_NUMBER_SLACK = 2
+# Spec section 3, the head of a short section: a word that may be a page
+# number, misread or not.
+_NUMBER_LIKE = re.compile(r"[0-9ivxlcdmIVXLCDM]{1,4}[.,]?")
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,3 +75,11 @@ def is_confirmed(page_index: int, value: int | None, offset: int | None) -> bool
         and offset is not None
         and abs(value + offset - page_index) <= _HEAD_NUMBER_SLACK
     )
+
+
+def is_number_like(text: str) -> bool:
+    """Whether `text` is number-like, as the head of a short section's first
+    or last word is (spec section 3): 1 to 4 characters, each a digit or
+    one of the letters i, v, x, l, c, d, m in either case, with at most one
+    "." or "," after them ("vi", "vlil", "xiv.", "47")."""
+    return _NUMBER_LIKE.fullmatch(text) is not None
