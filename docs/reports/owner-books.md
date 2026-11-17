@@ -26,3 +26,20 @@ margin notes (error rate 0.244), Domesday's 579 (0.138), Stubbs' index
 .984 / .963, Domesday's .995 / .998, body error rates .023 / .055 /
 .075 / .310 (Haskins, Stubbs, Domesday, Mariéjol), Domesday's notes
 whose reference is right 1,278.
+
+## Task 1.1: the four excerpts
+
+b6c75e7: haskins_heads_notes (13 pages), stubbs_heads (18),
+gierke_intro_heads (13) and domesday_rereads (11), with the expected
+output of their 36 case pages in `tests/fixtures/expected/owner_books_wp1/`
+(the removals, page numbers, headings and note-band starts WP1's rules
+must give; each with the printed text read from the 300-dpi render by
+the assistant). Pages were added beyond the spec's case pages so that
+each excerpt's measures equal its whole book's (Stubbs' line pitch was
+7.68 pt against 12.87 without them). The default run went from 46.4 s
+to 56.1 s (2,127 passed), 21.4 s of it the excerpts' setup.
+
+Left to work package 1: Gierke pages 72 and 78, whose damaged heads are
+0.74 and 0.70 alike, under the spec's 0.75, so they stay in the text
+under the rules as written; Stubbs 186 and Gierke 73 record a wrong
+page number ("5" for 165, "xviii" for lxviii).
