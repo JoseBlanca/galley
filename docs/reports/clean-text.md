@@ -7,60 +7,84 @@ the owner. Started on 17 November 2026 on branch `plan/clean-text`.
 
 **The plan is done**, on branch `plan/clean-text` (17 November 2026),
 and waits for the owner's order to merge it into `main`. Every check
-passes at 7533d23: 2,111 tests in 47.6 s, the 61 whole-book tests, and
-the six public-domain books' EPUBs with 0 errors and 0 warnings from
-epubcheck.
+passes at 7533d23: 2,111 tests in 47.6 s, the 61 slow tests on whole
+books, and epubcheck (the EPUB validator) finds 0 errors and 0
+warnings in the EPUBs of the six public-domain books. The books are
+scans of about 1900 from the Internet Archive: Haskins, *The Normans in
+European History*; Stubbs, *The Early Plantagenets*; Maitland,
+*Domesday Book and Beyond*; Gierke, *Political Theories of the Middle
+Age*; Mariéjol, *Catherine de Médicis* (French, a poor scan); and
+Breasted, *The Battle of Kadesh*.
 
-**What a reader of the EPUBs now gets**, on the six public-domain books:
+**What a reader of the EPUBs now gets:**
 
-- Words the scan's own text cut or glued are mended: "s ome" is
-  "some", "Thisbookrestspartlyupon" is "This book rests partly upon",
-  and "liter¬ ature" is "literature".
+- Words the scan's own text (the OCR text the scanner put in the PDF)
+  cut or glued are mended: "s ome" is "some", "Thisbookrestspartlyupon"
+  is "This book rests partly upon", and "liter¬ ature" is "literature".
 - The pages before the preface (endpapers, title page, copyright) are
-  dropped, each word recorded as dropped. Haskins opens at its preface.
-- The running head of a two-page section is removed ("vlil PREFACE").
-- Margin notes and index pages are read again with Tesseract where it
-  reads better than the scan's text. Errors in margin notes fell from
-  0.54 to 0.24 (Stubbs) and 0.58 to 0.14 (Domesday); Stubbs' index
-  entries are found at .98 precision and .96 recall, from .83 and .79.
+  dropped, each dropped word recorded in galley's files. Haskins opens
+  at its preface.
+- The running head of a two-page section is removed ("vlil PREFACE" on
+  the second page of Haskins' preface).
+- Margin notes and index pages, printed small, are read again by
+  Tesseract (an OCR program run by galley) and its reading is kept
+  where it scores better. The share of wrong words in margin notes,
+  against the online editions of the books, fell from 0.54 to 0.24 on
+  Stubbs and from 0.58 to 0.14 on Domesday.
 
-Every target of the plan is met except one: Gierke's 30 sampled margin
-notes have 129 of 139 words right, against 130. The scores are in
-"Task 6.3" and "Review 3" below.
+The plan set 8 numeric targets for these scores (reocr spec §9); all
+are met but one, missed by one word: Gierke's 30 sampled margin notes
+have 129 of 139 words right, against 130. The scores are in "Task 6.3"
+and "Review 3" below.
 
 **What is still wrong**, for the next plan:
 
-- Lines of Stubbs' notes set into the text column stay in the body
-  (about half are found).
-- Neither reading of an index page is clean; taking the right one
-  word by word would fix most of the rest.
+- In Stubbs, about half the lines of the notes set into the text
+  column (rather than in the margin) stay in the body text.
+- On index pages neither the scan's text nor Tesseract is clean:
+  on Stubbs' page 312 each is wrong at a different 12 to 19 places.
+  Taking the right reading word by word would fix most of them.
 - Two short printed Stubbs notes are lost ("Motives de-", "Edward I.").
-- Words whose boxes the scan's OCR set one inside the other can come
-  out in the wrong order: two places checked on Mariéjol; up to 447
-  word pairs on 249 pages of the six books could be affected.
-- The owner's own books need headings, running heads with page numbers
-  set apart, notes at the back, and epigraphs.
+- Two words can come out in the wrong order where the scan's OCR set one
+  word's box inside its neighbour's: on Mariéjol pages 210 and 214
+  ("l'envoyé à" for "à l'envoyé"). Such nested boxes occur 447 times on
+  249 pages of the six books; how many come out wrong was not measured.
+- The owner's own two books need headings, running heads whose page
+  number is set apart, notes collected at the back, and epigraphs.
 
 **Asked of the owner:**
 
 1. The order to merge into `main`.
-2. A look at the EPUBs in `runs/clean-text/epubs/` of the main checkout,
-   named by their Internet Archive ids: `normansineuropea00hask`
-   (Haskins: the preface), `domesdaybook00maituoft` (Domesday: the
-   margin notes around page 76), `earlyplantagenet01stub` (Stubbs: the
-   index).
-3. A decision on the space printed before "?", ";", ":" and "!"
-   ("pursued ?"): (a) leave it; (b) a space that never breaks a line;
-   (c) attach the sign in English books and keep (b) in French ones.
+2. A look at three EPUBs in `runs/clean-text/epubs/` of the main
+   checkout, named by their Internet Archive ids:
+   - `normansineuropea00hask.epub` (Haskins): it should open at the
+     preface, with no garbage before it;
+   - `domesdaybook00maituoft.epub` (Domesday): the margin notes around
+     page 76, which were garbled ("dOTQ^tht villein.") and now read
+     "The unfreedom of the villein.";
+   - `earlyplantagenet01stub.epub` (Stubbs): the index, whose entries
+     were glued ("siege of,116") and mixed.
+3. A decision on the space printed before "?", ";", ":" and "!", as in
+   Domesday's "pursued ?" (Domesday has 1,379 such spaces, Stubbs
+   1,045, Mariéjol about 1,030 where French wants them):
+   - (a) leave it: no work; on the Kindle a line can start with "?";
+   - (b) a space that never breaks a line: a few lines in the step that
+     writes the Markdown;
+   - (c) attach the sign in English books and keep (b) in French ones:
+     a recorded change of text in structure, a rule in the check that
+     no word is lost, and the book's language from its config.
    Recommended: (c) in the next plan, (b) until then.
-4. blocks.json is now at version 3, so older runs must run the structure
-   step again.
+4. Nothing to do for this, but to know: the file the structure step
+   writes (blocks.json, the book's paragraphs, headings and notes) has
+   a new format version, 3, so a run of a book from before the merge
+   must run the structure step again.
 
-The open points of the specs keep their "meanwhile", unanswered:
-front-matter Open 1 (a `subtitle` key; recommended), reocr Open 1
-(footnotes not re-read by default), Open 2 (Tesseract's junk kept in
-a kept region), Open 3 (layout replacing words of the text layer, as
-built).
+Four open points of the specs stay as built, and need no answer before
+the merge: whether the EPUB shows a subtitle (recommended: a
+`subtitle` key in the book's config), whether footnotes are read again
+(off unless a book asks), whether junk Tesseract reads beside a margin
+note is kept (kept), and that galley replaces words of the scan's text
+with Tesseract's (as built).
 
 ## Before the first task
 
