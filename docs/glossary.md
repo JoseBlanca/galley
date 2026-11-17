@@ -160,7 +160,8 @@ a page of the front matter.
 
 **re-reading**: reading a region of a page again with Tesseract, from a
 300-dpi render, and keeping Tesseract's words only where their reading
-score is higher than the text layer's. Done by layout, which records
+score is higher than the text layer's, or equal with more known words.
+Done by layout, which records
 every region it read (`docs/specs/reocr.md`).
 
 **running head**: the line printed at the top of most pages, the book's,

@@ -47,8 +47,8 @@ Where the scan is sharp but its text layer poor in small print, the
 margin notes and the pages printed wholly in small type, layout reads
 that print again with Tesseract and keeps, region by region,
 Tesseract's reading only where it scores higher than the layer's by
-known words minus unknown words; on a tie the layer stays
-(`docs/specs/reocr.md`).
+known words minus unknown words, or ties with more known words; on any
+other tie the layer stays (`docs/specs/reocr.md`).
 
 ## 2. The samples
 
@@ -329,7 +329,7 @@ tuple[Reread, ...])`:
   `ocr_words` (Tesseract's, without its junk), `layer_score` and `ocr_score`
   (ints, known words minus unknown words of each reading), `kept`
   (whether `ocr_words` took the place of `layer_words`: `ocr_score`
-  higher and, where `layer_words` is empty, at least 2 known words or
+  higher, or equal with more known words, and, where `layer_words` is empty, at least 2 known words or
   one sure single word, `docs/specs/reocr.md` §3), and
   `dropped_junk_count` (Tesseract's words of no letter or digit, not
   punctuation or a printed sign, dropped from `ocr_words`, and its words

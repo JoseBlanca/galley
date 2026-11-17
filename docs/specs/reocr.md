@@ -177,8 +177,26 @@ page, 0.61 to 0.88 s each on Stubbs' index pages, in one thread.
 Four kinds of region are read. For each region read, galley computes the
 reading score of the layer's words that the region replaces (section 4
 says which) and of Tesseract's words, and **keeps Tesseract's words only
-when their score is higher** and they hold at least one word; on a tie,
-or lower, the layer's words stay. Where the region replaces no word of
+when their score is higher, or equal with more known words** than the
+layer's, and they hold at least one word; on a tie with as many known
+words or fewer, or lower, the layer's words stay. A tie with more known
+words means as many more unknown words: Tesseract read words the layer
+lost, some misread. On Haskins' index page 267 the two tie at 250, with
+321 known words against 303; the layer, kept before, lost the printed
+"10 f.," and "164 ff.;" and read "f." as "/." 18 times, and Tesseract is
+right at 36 of the 38 places where the two differ (a by-eye check of 17
+November 2026). Measured on the records of whole Stubbs, Domesday,
+Haskins and Gierke on 17 November 2026: 423 regions tie; 41 have more
+known words in Tesseract's reading, and 34 of them are newly kept (the
+others lie over no layer word and fail its rule below): Haskins' page
+267, the only small-print page that ties; 5 of Stubbs' cut-in crops;
+22 of Domesday's margin notes; 6 of Gierke's. Read by their text, all
+but one are the fuller reading ("Precautions taken by Henry I." against
+"Precautions taken by"; "Manorial and non- manorial vills." against
+"Manorial manorial"); the exception is Gierke's list of page numbers on
+page 62, "5 1 56 T" against the layer's "55 56". Keeping the reading
+with more words, whatever they are, would take 85 regions, most of
+them with junk Tesseract read beside a note. Where the region replaces no word of
 the layer, a higher score is not enough: Tesseract's words are kept
 only when they hold at least 2 known words (and, as they must score
 above the empty layer's 0, more known words than unknown), or when they
@@ -840,6 +858,9 @@ the extract change, Stubbs' index error rate was 1.543.
 - `note_bands` on a Pillow image drawn in the test: two blocks of ink 30
   px apart give two bands, 15 px apart one; a block 10 px high, and one
   20 px wide, give none.
+- A tie: kept when Tesseract's words hold more known words (and as many
+  more unknown words) than the layer's; not kept with as many known
+  words, or fewer.
 - A region over no layer word read as one known word: kept when the
   word has 4 letters and a confidence of 80 ("Coronation."); not kept
   with 3 letters, at a confidence of 79, with a second word under 80,
