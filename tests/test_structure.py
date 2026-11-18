@@ -69,6 +69,8 @@ from galley.structure import (
     survey_book,
 )
 from galley.structure._assemble import _taken_body_notes
+from galley.structure._figure_blocks import with_figures
+from galley.structure._figures import PageFigure
 from galley.structure._heads import is_number_like
 from galley.structure._index import entry_side, index_page
 from galley.structure._index_entries import _index_runs, _IndexRun
@@ -78,8 +80,8 @@ from galley.structure._margins import BesideLine, InParagraph, line_beside
 from galley.structure._markers import MarkerForm, book_marker_form
 from galley.structure._measures import Edges
 from galley.structure._notes import Numbering
-from galley.structure._paragraphs import PageFigure, PageParts
-from galley.structure._plates import plate_survey, with_figures
+from galley.structure._paragraphs import PageParts
+from galley.structure._plates import plate_survey
 from galley.structure._references import (
     Candidate,
     NoteToMatch,
