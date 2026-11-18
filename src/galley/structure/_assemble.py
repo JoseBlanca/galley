@@ -862,7 +862,9 @@ def assemble(
     # Figures spec section 5: the in-page figures' blocks, each after the
     # block that holds the body line printed above it; then spec section
     # 18: the plates' figure blocks, side text of their pages.
-    linked_body = with_in_page_figures(linked_body, pages, book_words, word_list)
+    linked_body = with_in_page_figures(
+        linked_body, pages, book_words, word_list, body_line_pitch
+    )
     linked_body = tuple(
         mended(block) if block.kind is BlockKind.FIGURE else block
         for block in with_figures(linked_body, parts, book_words, word_list)

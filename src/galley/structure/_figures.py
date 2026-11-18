@@ -484,25 +484,53 @@ class InPageFigure:
         return box_of((self.box, *(line.line.box for line in self.caption.lines)))
 
 
+def _beside(line: PlacedLine, box: Box) -> bool:
+    """Whether `line` lies wholly left or right of the figure of `box`,
+    its top between the figure's top and bottom."""
+    line_box = line.line.box
+    return (line_box.x1 <= box.x0 or line_box.x0 >= box.x1) and (
+        box.top <= line_box.top <= box.bottom
+    )
+
+
+def _above(
+    body: Sequence[PlacedLine], box: Box, body_line_pitch: float
+) -> tuple[bool, ...]:
+    """For each line of a page's `body`, whether it is printed above the
+    figure of `box`: its top lies above the figure's, or it is the only
+    line of `body` beside the figure (`_beside`) and its top lies less
+    than one body line pitch below the figure's top."""
+    beside = tuple(_beside(line, box) for line in body)
+    alone = sum(beside) == 1
+    return tuple(
+        line.line.box.top < box.top
+        or (alone and is_beside and line.line.box.top < box.top + body_line_pitch)
+        for line, is_beside in zip(body, beside, strict=True)
+    )
+
+
 def place_line(
     pages_body: Sequence[tuple[int, tuple[PlacedLine, ...]]],
     page_index: int,
     box: Box,
+    body_line_pitch: float,
 ) -> PlacedLine | None:
     """The body line after whose block the figure of `box` on `page_index`
     goes (figures spec section 5, "structure: where the figure block
     goes"): the last line of the page's body stream, in reading order,
-    whose top lies above the figure's top, or, when the page has none, the
+    printed above the figure (`_above`), or, when the page has none, the
     last body line of the pages before; None when there is none.
     `pages_body` are the book's pages, each its index and body stream, in
-    page order."""
+    page order; `body_line_pitch` is in points."""
     on_page = next(
         (
             line
             for index, body in pages_body
             if index == page_index
-            for line in reversed(body)
-            if line.line.box.top < box.top
+            for line, above in reversed(
+                tuple(zip(body, _above(body, box, body_line_pitch), strict=True))
+            )
+            if above
         ),
         None,
     )

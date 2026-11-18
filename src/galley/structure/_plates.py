@@ -287,13 +287,14 @@ def with_in_page_figures(
     parts: Sequence[PageParts],
     book_words: frozenset[str],
     lower_case_words: frozenset[str],
+    body_line_pitch: float,
 ) -> tuple[Unnumbered, ...]:
     """The book's body blocks with the figure block of each in-page figure
     of `parts`, in page order and on a page in the order of pages.json,
     placed after the block that holds the last body line printed above it,
     after the whole list or contents run that block is in, and before the
     side text placed after it (`docs/specs/figures.md` §5, "structure:
-    where the figure block goes")."""
+    where the figure block goes"); `body_line_pitch` is in points."""
     result = list(body)
     pages_body = tuple((page.index, page.body) for page in parts)
     for page in parts:
@@ -301,7 +302,7 @@ def with_in_page_figures(
             position = figure_position(
                 tuple(block.kind for block in result),
                 tuple(block.origin for block in result),
-                place_line(pages_body, page.index, figure.box),
+                place_line(pages_body, page.index, figure.box, body_line_pitch),
             )
             result.insert(
                 position,

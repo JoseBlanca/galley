@@ -1428,6 +1428,54 @@ def test_figure_place_inside_a_list_is_after_its_last_item() -> None:
     assert blocks.blocks[3].spans == ()
 
 
+def test_figure_place_after_a_line_beside_the_figures_first_row() -> None:
+    # Kadesh 40: the quotation's number "18." is printed left of the first
+    # row of its hieroglyphs, 7.8 pt below the top of their box.
+    box = Box(104.0, 108.0, 430.0, 240.0)
+    lines = (
+        _text_line("The stand of his majesty is told thus:", 60.0, 80.0),
+        _text_line("18.", 84.0, 115.8),
+        _text_line("His majesty was camping alone, no army with", 83.0, 243.0, 360.0),
+        _text_line("him, and the division had not yet arrived.", 60.0, 257.0),
+    )
+    page = PageLayout(0, (_region(*lines),), (_in_page(0, box),))
+    blocks = _structure(_lines_file(page))
+    assert tuple((block.kind, block_text(block)[:12]) for block in blocks.blocks) == (
+        (BlockKind.PARAGRAPH, "The stand of"),
+        (BlockKind.PARAGRAPH, "18."),
+        (BlockKind.FIGURE, ""),
+        (BlockKind.PARAGRAPH, "His majesty "),
+    )
+
+
+def test_figure_place_before_a_paragraph_that_opens_beside_the_figure() -> None:
+    # Kadesh 33: a paragraph ends above the map, and the next opens beside
+    # it, 3.2 pt below the top of its box; 9 lines lie beside the map (and
+    # the page has more than 10, which no epigraph has).
+    box = Box(56.0, 144.0, 288.0, 568.0)
+    above = (
+        _text_line("of forect in the plain and we are now", 55.0, 106.7, 444.0),
+        _text_line("prepared to take up the successive positions", 55.0, 120.7, 444.0),
+        _text_line("of the two armies.", 55.0, 134.7),
+    )
+    beside = (
+        _text_line("FIRST POSITIONS. After camping on", 315.0, 147.2, 444.0),
+        *(
+            _text_line(
+                f"text set beside the map {n} goes", 300.0, 161.2 + 14 * n, 444.0
+            )
+            for n in range(8)
+        ),
+    )
+    page = PageLayout(0, (_region(*above), _region(*beside)), (_in_page(0, box),))
+    blocks = _structure(_lines_file(page))
+    assert tuple((block.kind, block_text(block)[:12]) for block in blocks.blocks) == (
+        (BlockKind.PARAGRAPH, "of forect in"),
+        (BlockKind.FIGURE, ""),
+        (BlockKind.PARAGRAPH, "FIRST POSITI"),
+    )
+
+
 def test_figure_place_before_any_body_line_is_first() -> None:
     box = Box(60.0, 40.0, 300.0, 90.0)
     page = PageLayout(0, (_region(*_ABOVE_THE_MAP),), (_in_page(0, box),))
