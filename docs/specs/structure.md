@@ -832,7 +832,11 @@ followed by closing quotation marks or brackets, with 1 to 3 digits
 glued after all of them allowed (a note reference: "tendency.43"),
 unless the first word of the page's line, past any opening quotation
 marks, starts with a lower-case letter: a sentence that runs on is not
-cut, whatever the line before it ends with.
+cut, whatever the line before it ends with; or unless the last line
+starts with a word of a note marker's form (section 11, "The marker of
+a note": digits, bracketed or a sign) followed by more words, the first
+line of a footnote left in the body ("1 D. B. i. 141.", "8 Companies
+Act, 1862, sec. 4.").
 Rule 1 cannot see such an end when the next page's first line is not
 indented: a chapter's first line set flush left, or a line set in a
 measure of its own. On Turney's pages 12 and 13 (section 21), the
@@ -889,7 +893,11 @@ Gierke's 39 and 156, Mariéjol's 48): 1 ends a paragraph (Kadesh 50);
 ("every" / "English township", Gierke 39; "the" / "People", Gierke
 156; Mariéjol 48), which the condition cannot see; and Kadesh 33 cuts
 "town of" / "Shabtuna", where layout gave the column beside the map
-before the line that ends the stream. The 20 pt is the survey's and was not varied: the
+before the line that ends the stream. The marker condition then keeps
+Gierke 39 and Mariéjol 48 and 281, and no other cut: Mariéjol has 3
+cuts, Gierke 12, the other books as in the last column. Gierke 156
+stays cut, since its note's last line is its second, which starts with
+no marker. The 20 pt is the survey's and was not varied: the
 justified lines of both owner's books end within about 1.3 pt of their
 region's edge (section 22's opening pages), so a line 20 pt short is
 not a justified line.
