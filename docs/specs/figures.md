@@ -341,22 +341,37 @@ line.
      row left of the figure and its last word's right side 0 to 30 pt
      left of the figure's left side (a caption on the left).
 2. **The words of the label row.** Below or above, the words whose
-   middle lies between the figure's sides, each moved 6 pt outwards;
-   on the right, the words whose middle lies right of the figure's
-   right side; on the left, those left of its left side. The other
-   words of the row stay in their lines: on Kadesh 38, layout makes one
-   line of the map's "MAP vi. Third Positions" and of the line of text
-   set beside the map, "Shabtuna and the…", which starts 12 pt right of
-   the map.
+   middle lies between the figure's sides, each moved 6 pt outwards,
+   and the words of the row that follow them on either side, each
+   less than 13 pt from the word before it: a caption wider than its
+   picture is taken whole, and its words past the picture's side never
+   reach the paragraph around the figure. On the right, the words whose
+   middle lies right of the figure's right side; on the left, those
+   left of its left side. The other words of the row stay in their
+   lines: on Kadesh 38, layout makes one line of the map's "MAP vi.
+   Third Positions" and of the line of text set beside the map,
+   "Shabtuna and the…", which starts 12 pt right of the map. Measured
+   on 18 November 2026 on Kadesh, Haynes and Turney: the words of a
+   caption's line are at most 10.0 pt apart (Kadesh's spaced capitals,
+   page 45), and the text set beside Kadesh's maps starts 16.9 to 80 pt
+   after the caption's last word (pages 41, 38, 36, 33); no caption of
+   the three books is wider than its picture.
 3. **The rows after it.** Each next row, from the top down, while all
    three hold: its top is at most 20 pt below the top of the caption's
    previous row; it opens with no caption label; and it lies on the
-   caption's side: below or above, it lies between the figure's sides
+   caption's side. Below or above, it lies between the figure's sides
    each moved 12 pt outwards, or its left side is within 3 pt of the
    label row's (Haynes' captions are set to the width of the text
-   column, which is wider than some of its pictures); on the right or
-   left, it lies wholly on that side of the figure. A row is taken
-   whole.
+   column, which is wider than some of its pictures), and it is taken
+   whole. On the right or left, the row's words on that side, as rule 2
+   takes them, are the caption's, and the test is made on them; the
+   rest of the row stays where it is, and a row with no word on that
+   side is passed over. Layout put the last row of two of Turney's
+   captions beside a picture in one line with lettering printed under
+   the picture (175, figure 15, and 176, figure 17), and on 175 a row of
+   the lettering alone lies 2.6 pt above it; taken whole, such a row
+   ended the caption, and its words ran into the paragraph that the
+   body text of page 180 continues (review, 18 November 2026).
 
 Several label rows next to one figure give one caption, in the order of
 their tops. A figure with no label row next to it has no caption. A
@@ -370,7 +385,8 @@ a caption, 12 below it (5.4 to 8.1 pt below) and 13 on its right (10.4
 to 17.3 pt), of 1 to 13 rows, ending at the caption's last word; 11 of
 Turney's 14 (5.3 to 14.7 pt below, 6.5 to 20.0 pt beside), of 2 to 12
 rows, two of them short of their last row, which layout put in one line
-with words of the picture next to it (175, figure 15; 176, figure 17);
+with words of the picture next to it (175, figure 15; 176, figure 17),
+whole once rule 3 takes a beside row's words on the caption's side;
 each of Kadesh's 6 maps (3.5 pt above its bottom to 11.7 pt below), one
 row each, with no word of the text beside or under the map. The 3 of
 Turney without a caption are the second cover of page 174, whose
@@ -407,8 +423,13 @@ items (structure §32: none) shows it.
 
 A figure's **place** is between the body lines printed above it and
 those below: the last line of the body stream, in reading order, whose
-top lies above the figure's top, on its page or, when the page has none,
-the last body line of the pages before. The figure block goes after the
+top lies above the figure's top, or which lies wholly left or right of
+the figure with its top less than one body line pitch below the
+figure's top, on its page or, when the page has none, the last body
+line of the pages before. The second case is a line printed beside the
+picture's first row: Kadesh 40's quotation number "18.", 7.8 pt below
+the top of the hieroglyphs it numbers, which otherwise came after their
+image (review, 18 November 2026). The figure block goes after the
 paragraph that holds that line: when the figure is printed in the
 middle of a paragraph, after the whole paragraph, never inside it. When
 that line is in a list item (structure §29), the block goes after the
