@@ -86,3 +86,64 @@ candidate, because Domesday prints "St." 28 times and its OCR reads
   would unlink a reference on Kadesh 39 that was not checked.
 - After the merge: ruff and ty pass; pytest 2,838 passed, 19 expected
   failures, in 88 s with the layout stream running alongside.
+
+## Review of work packages 1, 2 and task 3.2
+
+Four reviewers (spec, tests, fidelity, conventions) read a0a1675..b3fa355.
+None found a lost, duplicated, reordered or invented word; the fidelity
+reviewer ran the eight books and found pages.json changed on exactly the
+four inkless pages. All findings were taken and fixed in 10 commits
+(01ed153 to e74cbf1):
+
+- a page both the plate rule and the inkless rule take was logged as a
+  plate; now only plates are;
+- the inkless comparison was written twice, and the filter of excluded
+  regions was untested; one function now decides, and a test on Haskins
+  278 with an excluded region fails without the filter;
+- a short page of faint real print could be removed whole (Gierke 1, a
+  binder's label, has 2 of 7 words below the ink threshold). A page is
+  now not inkless when at least half its words without ink are known
+  words: Gierke 1 is at 0.50; the four inkless pages are at most 0.17
+  (Haynes 9, "SP"). The inkless pages of the eight books are unchanged;
+- the running-head limit of 14 had also reached two callers outside the
+  survey (the top line of a plate, the head of a short section); they
+  keep 8;
+- stale numbers in comments, docstrings and the specs.
+
+## Tasks 3.1, 3.3, 3.4, 4.1, 4.2: the layout half
+
+Merged from the `layout` stream: c9aa1fd (a 2- or 3-digit page number
+boxed above its head joins the head row), 522617f (footnote rows small
+against their page; one-line notes start the band), db59076 (whole-book
+tests), d075104 (Stubbs' cut-in rows with smaller strip words), 34ce6e0
+(whole-book tests). After the merge: ruff and ty pass; pytest 2,883
+passed, 10 expected failures, in 81 s.
+
+Whole-book counts, a0a1675 against now:
+
+| what | before | now |
+|---|---|---|
+| Kadesh 38, Domesday 200 and 428 heads removed as running heads | 0 of 3 | 3 of 3 |
+| Stubbs' margin notes left in the body | 169 | 46 |
+| Stubbs' margin notes found as margin notes | 291 | 413 |
+| Stubbs' strip words the evaluation pairs with the body | 24 | 31 |
+| Gierke introduction pages with their notes as footnotes | 0 of 27 | 0 of 27 |
+| Domesday one-line notes and Gierke 61's as footnotes | 1 of 11 | 1 of 11 |
+
+The head rule also changes Domesday 552, a head of the same kind. Of
+the 7 new Stubbs words paired with the body, 2 are note words.
+
+**Not yet done.** Layout now makes Gierke's introduction notes and
+Domesday's one-line notes into footnote bands, but structure still
+refuses them: its band-region test takes only words at most 0.85 of the
+book's body height. Task 3.5 is added for it. A new cut-in zone on
+Stubbs 56 lets Tesseract's re-reading add "[dy", the tops of body
+letters, as a margin note; task 4.3 is added, and the test asserting the
+clean reading is an expected failure until then. The plan's own counts
+of one-line notes (8, then 10) and Stubbs pages 34 and 143 changed as
+"Changed by work package 1" says.
+
+The stream changed `tests/test_excerpts.py` and the expected files of
+`stubbs_51_56-64` pages 0 and 9 outside its files, with leave: the rule
+takes whole notes out of the body lines of Stubbs 51 and 64, and the
+new expected text was compared with the page images at 200 dpi.

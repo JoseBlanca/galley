@@ -262,17 +262,23 @@ Deliverables:
 
 Tasks:
 
-- [ ] 3.1 (stream `layout`) The head row of item 2 in
+- [x] 3.1 (stream `layout`) The head row of item 2 in
   `running_head_row_count`, and the tests of Kadesh 38 and Domesday 200
   and 428. Spec: layout §3 as 1.1 amends it.
 - [x] 3.2 (stream `structure`) The survey's limit of item 2, and the
   tests of Gierke 16 and 84; then the reference candidates of item 3
   and the test of Domesday 55. Spec: structure §3 and §11 as amended.
-- [ ] 3.3 (stream `layout`) The footnote band and the one-line notes of
+- [x] 3.3 (stream `layout`) The footnote band and the one-line notes of
   item 3, and the tests of Gierke 15 to 18, 40, 146 and Domesday 163,
   174, 278. Spec: layout §3 as amended.
-- [ ] 3.4 (stream `layout`, after 3.3) The whole-book counts of
+- [x] 3.4 (stream `layout`, after 3.3) The whole-book counts of
   deliverable 3, with the counts of the starting commit beside them.
+- [ ] 3.5 (added after 3.4) structure's band-region test (structure §2)
+  measured against the page, as layout's footnote band now is: layout
+  makes Gierke's introduction notes and Domesday's one-line notes into
+  bands, and structure still refuses them because their words are above
+  0.85 of the book's body height. Spec amendment first; the strict
+  xfails of deliverables 2 and 3 pass.
 - [ ] Review of work package 3.
 
 ## 4. Stubbs' cut-in notes
@@ -292,9 +298,14 @@ Deliverables:
 
 Tasks (stream `layout`, after 3.4):
 
-- [ ] 4.1 The shortened-row test of item 4 in the cut-in zones, and the
+- [x] 4.1 The shortened-row test of item 4 in the cut-in zones, and the
   tests of deliverables 1 and 3. Spec: layout §9 as amended.
-- [ ] 4.2 The whole-book counts of deliverable 2.
+- [x] 4.2 The whole-book counts of deliverable 2.
+- [ ] 4.3 (added after 4.2) Re-reading on Stubbs 56: the new cut-in
+  zone lets Tesseract read the tops of body letters as "[dy" in the
+  margin. Find why the re-reading filter (layout §3, "Re-reading small
+  print") lets it through, fix it, and pass the strict xfail that asserts
+  the clean reading.
 - [ ] Review of work packages 4 with 3's layout half, when they are
   reviewed together.
 
