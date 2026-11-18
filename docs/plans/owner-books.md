@@ -31,8 +31,7 @@ to §27 (the parts the plan owner-books revised), `docs/specs/layout.md`
 §3, steps 2 to 4, and §8, `docs/specs/reocr.md` §4, and the changes
 they made to `docs/architecture.md` (`blocks.json` at version 4) and
 `docs/glossary.md`, on branch `plan/owner-books` (commits 18f1e86 to
-6b8c54d). Dated 17 November 2026. State: under way since 17 November
-2026; approved by the owner on 17 November 2026 (scope in chat; plan
+6b8c54d). Dated 17 November 2026. State: done on 18 November 2026; approved by the owner on 17 November 2026 (scope in chat; plan
 not reviewed by them).
 
 "Structure §22" below is section 22 of `docs/specs/structure.md`,
