@@ -599,6 +599,21 @@ def test_local_offset_of_a_page_between_two_takes_the_one_before_on_a_tie() -> N
     assert _removed(blocks, 182) == (("page_number", "169"),)
 
 
+def test_tall_line_right_after_a_tall_heading_line_is_its_second_line() -> None:
+    # Turney's page 80: a section heading on two lines 1.3 times the text's
+    # height, the second 1.1 pitches below the first, 2 pitches below the
+    # text above, and indented as Turney's are.
+    first = _line("A Section Heading", _BODY_LEFT_PT + 45, 175 + 2 * _PITCH_PT, 13)
+    second = _line(
+        "On Two Lines", _BODY_LEFT_PT + 45, first.box.top + 1.1 * _PITCH_PT, 13
+    )
+    above = _running_text(100, 6)
+    below = _running_text(second.box.top + 2 * _PITCH_PT, 6)
+    page = PageLayout(20, (_region(*above, first, second, *below),), ())
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _headings(blocks) == ((2, None, "A Section Heading On Two Lines"),)
+
+
 # On the six public-domain books (spec section 26, "Whole-book tests"), from
 # the session's run of each whole book (tests/conftest.py).
 
