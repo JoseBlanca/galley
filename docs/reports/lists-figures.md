@@ -3,6 +3,72 @@
 The report of the plan `docs/plans/lists-figures.md`, kept as the work
 goes, for the owner. Started on 18 November 2026.
 
+## Summary
+
+**Done**, on 18 November 2026, on branch `plan/lists-figures`, not
+merged. It answers the three problems the owner found in the EPUB of
+Haynes' book: a list run into one paragraph, the printed contents run
+into one paragraph, and pictures inside a page of text lost with their
+captions left in the text.
+
+What exists now:
+
+- **Lists.** A run of items that start with a dash, a bullet, a number or
+  a letter, set with a hanging indent, is a list: the EPUB shows the
+  reader's own bullets or numbers. Haynes has 11 items in 2 lists;
+  Domesday's tables become 8 lists of 40 items until tables are handled;
+  no other book has one. Numbered paragraphs stay paragraphs.
+- **Contents.** The printed contents is one entry per line, nested by
+  depth, each linked to its chapter; printed page numbers are kept in
+  galley's files but not shown. Haynes 22 entries, Turney 16, all linked
+  to the right chapter; 72 links on the public-domain books, one wrong
+  (Gierke's "NOTE" to its "NOTES.").
+- **Figures inside a page.** A picture printed among the text is cut out
+  at 300 dpi and placed where it was printed, with its caption under it;
+  the words the OCR read inside it leave the text, with a record. Haynes
+  25 figures, all whole, captioned and in place; Kadesh 17 (6 maps with
+  captions, 11 blocks of hieroglyphs or Arabic as images); Turney 14.
+- **Scores** of the four public-domain books: no fall beyond the plan's
+  tolerances; Stubbs' and Mariéjol's paragraph scores rose slightly.
+  Every test passes: 2,777 in 69 s, and 144 on whole books. The eight
+  EPUBs in `runs/lists-figures/` of the main checkout pass epubcheck with
+  no error or warning.
+
+Settled for the owner while they were away, each easy to change: the
+reader's own list markers rather than the printed ones; the contents
+title as a heading; pictures without a caption kept; a dash before
+epigraph sources in every book (the owner's choice).
+
+Still wrong:
+
+- **Turney's insert of reproduced pages (164 to 179).** A reproduced
+  newspaper page or cartoon is full of printed words, and the rule finds
+  a picture as ink with no words: three pictures are cut short, one
+  caption is merged into a paragraph, two figures are placed after page
+  180's first paragraph, which gains 9 words of a cartoon. Until a rule
+  for such pages exists, `exclude_regions` in Turney's config fixes them.
+- Haynes' contents: pen circles on the scan cost two entries their
+  chapter number; one page number misread "3x3" stays in its title.
+- Gierke's table of the titles of its notes (pages 61 to 67) comes out
+  in 75 pieces, as messy as before: tables are not handled.
+- Kadesh 44's first box stops 4 pt above its last row of hieroglyphs;
+  Kadesh 33's map loses a 9 pt strip of its frame.
+- The default run is 69 s, under a minute and a bit, by under a second
+  under the plan's limit.
+
+What is asked of the owner:
+
+1. The order to merge `plan/lists-figures` into `main`. After it, runs
+   made before must redo analyze and the stages after it: four file
+   formats changed (pages.json 3, words.json 3, lines.json 4,
+   blocks.json 5), and galley refuses the old files, naming the stage to
+   run.
+2. A look on the Kindle at `runs/lists-figures/haynes/book.epub`: the
+   list of six stereotypes in the introduction, the contents with each
+   entry opening its chapter, and two figures (one with its caption below,
+   one beside); at Turney's insert; at Kadesh's maps; and whether the
+   Kindle shows the contents without bullets (never tried on one).
+
 ## Before the first task
 
 The plan was written from `docs/specs/figures.md` and sections 29 to 33
