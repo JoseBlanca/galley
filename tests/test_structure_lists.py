@@ -261,6 +261,18 @@ def test_i_after_h_is_a_letter_and_after_a_roman_numeral_a_numeral() -> None:
     assert _starts(list_items((numerals,), _PITCH_PT)) == ("i.", "ii.")
 
 
+def test_in_page_figure_between_two_items_does_not_end_the_list() -> None:
+    # Spec section 29, rule 5: the gap is not tested across an in-page
+    # figure, whose lines are out of the body stream.
+    first = _numbered((("1. First", "goes on"),))
+    after = _placed("2. Second", 40.0, 100 + 2 * _PITCH_PT + 120, 0)
+    figure = Box(40.0, 100 + 2 * _PITCH_PT, 300.0, 100 + 2 * _PITCH_PT + 110)
+    with_figure = StreamPage((*first.lines, after), figures=(figure,))
+    without = StreamPage((*first.lines, after))
+    assert _starts(list_items((with_figure,), _PITCH_PT)) == ("1.", "2.")
+    assert list_items((without,), _PITCH_PT) == frozendict()
+
+
 def test_closed_page_between_two_items_ends_the_list() -> None:
     first = _numbered((("1. First", "goes on"),))
     contents = StreamPage((_placed("A contents line", 40.0, 100, 1),), frozenset({0}))

@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from galley.list_markers import ListMarker, follows, marker_readings, starts_a_list
+from galley.model import Box
 from galley.structure._lines import PlacedLine, hyphen_between
 
 # Spec section 29, rule 3: the next item's marker line lies within 3 pt of
@@ -73,12 +74,14 @@ def _following_marker(line: PlacedLine, before: ListMarker) -> ListMarker | None
 @dataclass(frozen=True, slots=True)
 class StreamPage:
     """A page's body stream as the list rules see it (spec section 29, "The
-    rules"): its lines, and the positions of those the rules take none of,
+    rules"): its lines; the positions of those the rules take none of,
     the lines of a run of section 2, step 2.3, or every line of a page of
-    the printed contents, an index or the endnote section."""
+    the printed contents, an index or the endnote section; and the boxes
+    of its in-page figures, across which the gap is not tested (rule 5)."""
 
     lines: tuple[PlacedLine, ...]
     closed: frozenset[int] = frozenset()
+    figures: tuple[Box, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,6 +98,18 @@ class _StreamLine:
     number: int
     line: PlacedLine
     closed: bool
+    figures: tuple[Box, ...]
+
+
+def _across_a_figure(before: _StreamLine, here: _StreamLine) -> bool:
+    """Whether an in-page figure of the page lies between the tops of
+    `before` and `here`, two lines of one page (spec section 29, rule 5)."""
+    return any(
+        before.line.line.box.top
+        < (figure.top + figure.bottom) / 2
+        < here.line.line.box.top
+        for figure in here.figures
+    )
 
 
 def _left(line: _StreamLine) -> float:
@@ -160,6 +175,7 @@ def _grow(
         elif (
             here.line.line.box.top - before.line.line.box.top
             > _GAP_MAX_PITCHES * body_line_pitch
+            and not _across_a_figure(before, here)
         ):
             break
         # Spec section 29, rule 2: the hyphen rule holds, so a line after a
@@ -190,7 +206,7 @@ def list_items(
     marker line. `body_line_pitch` is in points. A page without lines is
     passed over; a closed line ends a list."""
     stream = tuple(
-        _StreamLine(line.page_index, number, line, number in page.closed)
+        _StreamLine(line.page_index, number, line, number in page.closed, page.figures)
         for page in pages
         for number, line in enumerate(page.lines)
     )
