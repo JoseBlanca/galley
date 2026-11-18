@@ -31,12 +31,13 @@ matter galley drops unscored (section 5, "Pages"), wherever the
 reference prints its words, and the same day to
 score the margin notes' words as a part of their own (section 6), so
 that re-reading small print (`docs/specs/reocr.md`) is measured by the
-tool. It builds on `docs/architecture.md` and
-`docs/glossary.md`; "architecture §8" is a section of that document,
-"section 6" a section of this spec. No code of the tool exists. galley
-exists as the walking skeleton (`docs/specs/walking-skeleton.md`), whose
-stages are in their simplest form: one paragraph per page, nothing
-removed, no notes. Every measurement in this spec was taken on 15
+tool; revised on 18 November 2026 to end the reference where a book's
+excluded last pages begin (`reference_ends_at`, section 3). It builds
+on `docs/architecture.md` and `docs/glossary.md`; "architecture §8" is
+a section of that document, "section 6" a section of this spec. No
+code of the tool exists. galley exists as the walking skeleton
+(`docs/specs/walking-skeleton.md`), whose stages are in their simplest
+form: one paragraph per page, nothing removed, no notes. Every measurement in this spec was taken on 15
 November 2026 on an Apple M5 Pro, with Python 3.15.0, Pandoc 3.14 and
 Tesseract 5.5.4, on galley at commit 636b104.
 
@@ -241,6 +242,22 @@ gives:
 - the reading rules of section 4;
 - `not_in_reference`, the page indices whose text Gutenberg left out
   (Mariéjol: 14–16);
+- `reference_ends_at`, optional, the `id` of the element of the HTML
+  where the reference ends: the reader leaves out that element and
+  everything after it in the HTML, as `start` leaves out what comes
+  before, and stops with an error when no element has that `id`. The
+  element may be nested at any depth: of the elements that hold it, the
+  text before it is kept and the text after it left out. It is
+  for last pages that `exclude_pages` takes from galley while the
+  reference still holds their text, which would be scored against the
+  pages kept. Stubbs: `"Page_301"`, the page anchor of printed page
+  301, where its publisher's lists (page indices 322 to 337) begin. With
+  the lists in the reference but excluded from galley (galley at
+  02b41b1, 18 November 2026), the comparison placed their words on page
+  indices 320 and 321, as missing, and counted their paragraph
+  boundaries as missed: Stubbs had 1,576 body tokens missing and a
+  paragraph recall of 0.632, against 89 and 0.733 at 9715a93, where
+  galley kept the lists;
 - `margin_notes_moved`, true when Gutenberg moved the margin notes, so
   that their position is not scored (Domesday);
 - `body_pages`, required, the first and last page index of the book's
@@ -265,7 +282,9 @@ gives:
   page anchors and headings the reader must find, and the first five
   tokens of the body, checked by a test (section 10).
   They are counted from the HTML by hand, with a search for each class,
-  when the entry is written, never by running the reader.
+  when the entry is written, never by running the reader, and only up
+  to `reference_ends_at` when the book has it: Stubbs' 322 page anchors
+  and 37 headings become 306 and 35 without its publisher's lists.
 
 The first four books (owner, 15 November 2026):
 
@@ -1049,7 +1068,10 @@ them is a separate function.
     outside the body range, not counted;
   - the reader on the rules `verse` and `summary_after`, and
     `books.toml` without `body_pages` or with a first page above the
-    last, an error.
+    last, an error;
+  - the reader with `reference_ends_at`: the element with that `id`,
+    nested in a paragraph, and what follows it left out, what comes
+    before kept, and an `id` that no element has, an error.
 - **An excerpt test.** A new excerpt, `haskins_eval`, cut by
   `scripts/fetch_samples.py`: about ten PDF pages of Haskins with
   footnotes, a chapter start and an index page. With it go:
