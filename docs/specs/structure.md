@@ -3087,14 +3087,17 @@ books' epigraphs ran: each line whose two insets happened to be within
 each source was joined to the text after it, because the text's first
 line is not indented.
 
-**What the books show.** Turney: 11 epigraphs, on pages 13 (the book's
+**What the books show.** Turney: 13 epigraphs, on pages 13 (the book's
 own, alone on its page), 14, 26, 39, 56, 134, 148, 189, 217 (two) and
-229. Every line of the quotation is indented 32 to 46 pt from the body
+229 (three; the survey counted one there, and 11 in all). Every line of the quotation is indented 32 to 46 pt from the body
 column's left edge (most 42 to 46, the indent of the chapter label),
 ragged right, in the body's type; the source is a line of its own set
 flush right: its right side no more than 3 pt left of the quotation's
-rightmost right side (on page 217 it ends 12.7 pt right of it), its
-left side 100.3 to 244.6 pt right of the quotation's left side. Haynes:
+rightmost right side (on page 217 it ends 12.7 pt right of it, and
+page 229's second and third sources end 4.5 pt short of it), its
+left side 100.3 to 244.6 pt right of the quotation's left side; page
+56's source runs over four lines set flush right, the first two
+starting only 12.5 and 49.2 pt right of the quotation's left side. Haynes:
 21 epigraphs, on pages 22, 36, 48, 63, 79, 87, 105, 117, 141, 156
 (two), 175 (two), 200, 224 (two), 249, 281 (two), 308 and 326, indented
 26.6 to 31 pt, ragged right; the source starts with a dash, at the
@@ -3111,8 +3114,14 @@ survey listed Turney's page 104 for an epigraph; it has none: its text
 starts at the foot of the chapter's sink.)
 
 **The rule**, per page, after the heading lines are found (section 2,
-step 2.3). Measures are those of the page's body stream; the **body
-column** is section 1's.
+step 2.3). Measures are those of the page's body stream. The **body
+column** here runs from the left side of the stream's leftmost line
+with a letter or digit that is not a heading line to the right edge of
+section 1's body column. (Section 1's left edge, the commonest left
+side of a region's lines, is the epigraph's own indent on a chapter's
+first page whose epigraph lines outnumber its text lines, Turney's
+pages 56 and 229, whose epigraphs it missed; owner's decision, 18
+November 2026.)
 
 1. **Where.** On a page whose body stream holds a heading block of
    level 1, the lines right after that block (and after its chapter
@@ -3133,11 +3142,30 @@ column** is section 1's.
      line height of the run's lines before it (Haynes: 0.73 to 0.90);
      or
    - lies at least 60 pt right of the leftmost left side of the run's
-     lines before it, and its right side lies no more than 3 pt left
-     of their rightmost right side (Turney: 100.3 to 244.6 pt right; a
-     verse turnover line, the end of a long verse line set further in,
-     lies 32 pt right in Haynes' page 87 and ends short).
-   The lines of the run before the source line are the **quotation**.
+     lines before it, and its right side lies no more than 5 pt left
+     of their rightmost right side (Turney: 100.3 to 244.6 pt right,
+     and up to 4.5 pt short on page 229; a verse turnover line, the end
+     of a long verse line set further in, lies 32 pt right in Haynes'
+     page 87 and ends short).
+
+   **A source over several lines** (owner's decision, 18 November
+   2026). The lines after the source line that keep its shape are the
+   source's too, up to the first that does not: after a dashed source
+   line, a line in smaller type by the same 0.92, that starts with no
+   dash and no more than 3 pt left of the source line; after a
+   flush-right one, a line at least 60 pt right of the quotation's
+   leftmost left side whose right side lies no more than 5 pt left of
+   both the quotation's rightmost right side and the source line's.
+   Before a flush-right source line, the last lines of the run are the
+   source's first lines while each is set flush right (within 5 pt)
+   under the run's lines before it and starts at least 10 pt right of
+   their leftmost left side, leaving at least one line of quotation
+   (Turney's page 56: 12.5 and 49.2 pt right, its quotation's lines all
+   starting within 1 pt of each other). The source's lines end the run.
+   The test against the source line's own right side keeps out Turney's
+   back cover (page 311), whose blurbs the OCR cut into a region at the
+   right of the page.
+   The lines of the run before the source are the **quotation**.
 4. **The end.** The epigraphs end at the first line, after a source
    line, that does not start a run: a line within 20 pt of the body
    column's left edge, a heading line, or the end of the page's body
@@ -3145,8 +3173,9 @@ column** is section 1's.
    no epigraph and stay as section 6 makes them; so a chapter that
    opens with an indented paragraph (Haynes' introduction) gets none.
 5. **A page of its own.** A page with no heading line whose body stream
-   is one run of at most 10 lines, of a quotation of at least 1 line and
-   a source line by rule 3, is an epigraph too (the bound keeps out a
+   is one run of at most 10 lines, counting only the lines with a letter
+   or digit (owner's decision, 18 November 2026), of a quotation of at
+   least 1 line and its source by rule 3, last, is an epigraph too (the bound keeps out a
    preface's last page signed at the right; Turney's has 6 lines), without rule 2's indent, which a page set
    in the quotation's own measure does not show (Turney page 13: the
    source starts 169 pt right of the quotation and ends with it). Not
@@ -3158,7 +3187,7 @@ block. Its spans hold the quotation, its lines joined as a paragraph's
 are, with hyphens joined (section 5), or, when the quotation is verse
 (below), with a line feed between its lines, as a `verse` block's
 text (architecture §7; owner, 17 November 2026: a verse epigraph keeps
-its line breaks). Its `source` is the source line's words, joined by
+its line breaks). Its `source` is the source lines' words, joined by
 single spaces, without its leading dash. Its `origin` holds the
 quotation's and the source's lines.
 
@@ -3194,18 +3223,18 @@ happens to start a sentence (Haynes 156, the second; Turney 217, the
 second). A quotation of one line is prose: its line breaks are
 nothing to keep.
 
-**What the rule gives.** Run by hand-written code over the survey's
-`lines.json` on the opening pages listed (17 November 2026), rules 1 to
-4 find all 21 of Haynes' epigraphs, with their sources, and 9 of
-Turney's 11; of the other two, page 229's was missed by the script,
-which placed that page's column edge 43 pt too far right, and its
-lines fit the rule by their geometry; page 13's is rule 5's, which was
-not run. The pages of the six
-public-domain books were not searched for false epigraphs; a page
-whose level-1 heading is followed by indented lines ending at a dash
-line or a line set flush right is the case to watch (a dedication, a
-motto), and the `whole_book` tests count `epigraph` blocks there
-(section 26).
+**What the rule gives.** Run by galley's code (task 4.1 of the plan
+owner-books) on every page of the eight books' `lines.json`, made by
+the layout of 18 November 2026, after the heading lines and summaries
+that structure finds: Haynes 21 epigraphs of 21, with their sources,
+21 dashes and 8 verse, the survey's 8; Turney 13 of 13, page 13's by
+rule 5, page 56's with its four source lines, none verse, none dashed;
+the six public-domain books none, rule 5 included. With section 1's
+body column and one-line sources within 3 pt, the rule had found 9 of
+Turney's, missing pages 56 and 229. A page whose level-1 heading is
+followed by indented lines ending at a dash line or a line set flush
+right is the case to watch (a dedication, a motto), and the
+`whole_book` tests count `epigraph` blocks there (section 26).
 
 **Where it fails.** An epigraph that runs over a page break is not
 found (none in the two books). An epigraph whose source is neither
