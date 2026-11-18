@@ -1995,7 +1995,20 @@ candidates are taken only from the pages after the last of the config's
 those no footnote took: Maitland's introduction, before Gierke's own
 table of contents, refers to its own notes, and its glued numbers took
 endnotes 1 to 7 from Gierke's "Law1" (page 88), "communities2." (93)
-and the rest (decided in the review of 16 November 2026). Gierke's markers end with "." ("1.") and its
+and the rest (decided in the review of 16 November 2026). A reference that reads another number than a note's (a pair the
+scores allow, digits the OCR confuses) never takes that note when
+another glued number of the group reads the note's number, which is
+then the note's own reference, or when the reference's own number lies
+between the group's lowest and highest note numbers and no note reads
+it, so that it stands for a note whose marker the OCR lost: it is left
+unlinked. On Haynes the OCR lost the markers of notes 47 and 49 of
+chapter 15 (page 301) and of note 18 of chapter 14, and references 48,
+49 and 18 (pages 301 and 234) were linked to notes 46, 48 and 19. On the
+survey's configs (18 November 2026) the rule leaves Turney's 530 links
+as they are, with its 8 references the OCR read with a "3" for a printed
+"5", gives Haynes 582 links instead of 584 with none to a note of
+another number, and Gierke 208 instead of 215, among the 7 lost "1"
+linked to note 7 (page 95) and "18" to note 19 (page 97). Gierke's markers end with "." ("1.") and its
 references do not ("Law1"), so none reads as its marker; linked as
 section 11 says, 215 of them are, 193 by an exact value (measured on
 18 November 2026 on the layout of the plan owner-books at 4d9f1e9, the
