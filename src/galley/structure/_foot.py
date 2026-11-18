@@ -152,15 +152,15 @@ def signature_candidate(page: PageLayout, kinds: tuple[RegionKind, ...]) -> str 
     return signature_letters(line.words, position)
 
 
-def line_below_head(page: PageLayout, head: frozenset[int]) -> LinePlace | None:
-    """The topmost line of the page's regions but those of `head`, the
+def line_below_head(page: PageLayout, head_regions: frozenset[int]) -> LinePlace | None:
+    """The topmost line of the page's regions but those of `head_regions`, the
     region numbers of its head line, the first in their order on a tie:
     the line below a head line (spec section 3); None when there is
     none."""
     below: LinePlace | None = None
     below_top = 0.0
     for region_number, region in enumerate(page.regions):
-        if region_number in head:
+        if region_number in head_regions:
             continue
         for line_number, line in enumerate(region.lines):
             if below is None or line.box.top < below_top:

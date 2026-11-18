@@ -15,7 +15,7 @@ from galley.body_measures import median_word_height
 from galley.model import BlockKind
 from galley.structure._heads import starts_with_chapter_label_word
 from galley.structure._lines import PlacedLine, is_centred
-from galley.structure._measures import Edges
+from galley.structure._measures import Edges, line_has_letter_or_digit
 from galley.structure._runs import CHAPTER_LEVEL, SECTION_LEVEL, BodyRun, LabelLine
 
 # Spec section 14, rule 4: a line in capitals has at least 0.7 of its
@@ -261,7 +261,7 @@ def _is_tall_line(
         (
             other
             for other in range(number - 1, -1, -1)
-            if any(c.isalnum() for c in "".join(_texts(lines[other])))
+            if line_has_letter_or_digit(lines[other].line)
         ),
         None,
     )
