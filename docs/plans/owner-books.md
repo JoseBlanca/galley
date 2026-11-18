@@ -348,7 +348,7 @@ checked on the render.
   test; the changed reference pages. Spec: reocr §4, the exception in
   (a) and "A pairing by letters wins over a word under it whose letters
   are unlike". Plan's branch, after `edges` is merged. Deliverable 3.
-- [ ] Review of work package 2.
+- [x] Review of work package 2.
 
 ## 3. Notes collected at the back
 
