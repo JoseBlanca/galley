@@ -843,6 +843,28 @@ def test_gapless_band_starts_at_a_small_row_opening_with_a_note_marker() -> None
     assert _texts(band.lines) == (("1", "Ibid.", "29."), ("n0",), ("n1",), ("n2",))
 
 
+def test_gapless_band_does_not_start_at_a_marker_below_a_small_row() -> None:
+    # A small row with no gap above it, then a note "2 Ibid." among small
+    # rows, as a marker inside notes in two columns (Kadesh's page 14).
+    above = _small_rows(1, _LAST_BODY_TOP + _PITCH)
+    note = _note_row(("2", "Ibid.", "29."), _LAST_BODY_TOP + _PITCH + 9)
+    after = _small_rows(3, _LAST_BODY_TOP + _PITCH + 18)
+    result = layout_page(_page(0, (*_rows(20), *above, *note, *after)), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 25
+
+
+def test_gapless_band_starts_at_a_marker_below_a_speck() -> None:
+    # Domesday's page 406: a speck between the text and its note.
+    speck = _word("•", 140, _LAST_BODY_TOP + _PITCH, 142, _LAST_BODY_TOP + _PITCH + 3)
+    note = _note_row(("1", "Ibid.", "29."), _LAST_BODY_TOP + _PITCH + 6)
+    after = _small_rows(3, _LAST_BODY_TOP + _PITCH + 15)
+    result = layout_page(_page(0, (*_rows(20), speck, *note, *after)), _MEASURES)
+    body, band = result.regions
+    assert len(body.lines) == 21
+    assert _texts(band.lines)[0] == ("1", "Ibid.", "29.")
+
+
 def test_gapless_band_does_not_start_at_a_row_of_numbers() -> None:
     numbers = _note_row(("35", "52", "26"), _LAST_BODY_TOP + _PITCH)
     after = _small_rows(3, _LAST_BODY_TOP + _PITCH + 9)
