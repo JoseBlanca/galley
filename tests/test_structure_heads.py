@@ -574,6 +574,7 @@ def whole_book_blocks(
 
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
 @pytest.mark.parametrize("book", _PUBLIC_DOMAIN_BOOKS)
 def test_whole_book_no_running_head_removed_starts_with_a_chapter_label_word(
     whole_book_blocks: Callable[[str], BlocksFile], book: str
@@ -591,6 +592,7 @@ def test_whole_book_no_running_head_removed_starts_with_a_chapter_label_word(
 
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
 @pytest.mark.parametrize("book", sorted(_HEADS_REMOVED))
 def test_whole_book_running_heads_of_the_reference_pages_are_removed(
     whole_book_blocks: Callable[[str], BlocksFile], book: str
@@ -605,6 +607,7 @@ def test_whole_book_running_heads_of_the_reference_pages_are_removed(
 
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
 def test_whole_book_haskins_195_notes_set_close_under_the_text_are_notes(
     whole_book_blocks: Callable[[str], BlocksFile],
 ) -> None:
