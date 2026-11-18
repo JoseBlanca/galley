@@ -1311,6 +1311,29 @@ def test_a_plate_without_a_layer_is_logged_with_its_share_of_the_page(
 
 
 @pytest.mark.thread_unsafe
+@pytest.mark.parametrize(
+    ("kind", "logged"),
+    [(PageKind.PLATE, 1), (PageKind.INKLESS, 0), (PageKind.FRONT_MATTER, 0)],
+)
+def test_a_page_the_plate_rule_takes_is_logged_as_a_plate_only_when_it_is_one(
+    kind: PageKind, logged: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    # An inkless page the plate rule also takes is inkless (plates spec
+    # section 2b), front matter before the front-matter end: not a plate.
+    plate_test = analyze._PlateTest(
+        area=PictureArea(largest_group=70, squares=400),
+        known_words=0,
+        has_layer=True,
+        rule=PlateRule.PLATE,
+    )
+
+    with caplog.at_level(logging.WARNING, logger="galley.analyze"):
+        analyze._log_plate_taken(page(4, kind, TextSource.NONE), plate_test)
+
+    assert len(caplog.records) == logged
+
+
+@pytest.mark.thread_unsafe
 def test_ocr_redo_stops_analyze_before_writing_and_leaves_no_file(
     tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:

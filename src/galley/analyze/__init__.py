@@ -8,8 +8,8 @@ is `excluded` when the config excludes it, a `plate` when the config's
 `plate_pages` names it or the plate rule takes it, `text` when its layer
 has a word, and `blank` otherwise. It has no OCR, so a blank page stops
 the run: the owner checks it and adds it to `exclude_pages`. Each page the
-plate rule takes is logged at WARNING, so that the owner sees the covers
-and endpapers it takes too. On each text page, the same render is searched
+plate rule makes a plate is logged at WARNING, so that the owner sees the
+covers and endpapers it takes too. On each text page, the same render is searched
 for the figures printed among its lines (`figure_boxes`), whose boxes go
 into pages.json; each page with figures is logged at INFO. The same render
 also tells an inkless page (`is_inkless`), whose layer holds only words
@@ -244,8 +244,8 @@ def run(
     )
     end, step = _front_matter_end_and_step(starts, config)
     pages = classify(end)
-    for index, measurement in enumerate(measurements):
-        _log_plate_taken(index, measurement.plate_test)
+    for page, measurement in zip(pages, measurements, strict=True):
+        _log_plate_taken(page, measurement.plate_test)
     _log_front_matter(end, step, pages, config)
     for page, measurement in zip(pages, measurements, strict=True):
         if page.kind is PageKind.INKLESS and measurement.ink_test is not None:
@@ -447,15 +447,21 @@ def _log_front_matter(
         )
 
 
-def _log_plate_taken(page_index: int, plate_test: _PlateTest | None) -> None:
-    """Logs at WARNING a page the plate rule takes, with what it measured."""
-    if plate_test is None or plate_test.rule is PlateRule.NOT_PLATE:
+def _log_plate_taken(page: PageInfo, plate_test: _PlateTest | None) -> None:
+    """Logs at WARNING a page the plate rule takes, with what it measured,
+    when its kind is `plate`: not an inkless page the rule also takes, which
+    is `inkless` or `front_matter` (plates spec section 2b)."""
+    if (
+        plate_test is None
+        or plate_test.rule is PlateRule.NOT_PLATE
+        or page.kind is not PageKind.PLATE
+    ):
         return
     if plate_test.has_layer:
         _logger.warning(
             "analyze: page index %d taken for a plate: a picture of %d squares, "
             "%d known words; add it to `exclude_pages` if it is not one",
-            page_index,
+            page.index,
             plate_test.area.largest_group,
             plate_test.known_words,
         )
@@ -464,7 +470,7 @@ def _log_plate_taken(page_index: int, plate_test: _PlateTest | None) -> None:
             "analyze: page index %d, without a text layer, taken for a plate: a "
             "picture of %d of its %d squares; add it to `exclude_pages` if it "
             "is not one",
-            page_index,
+            page.index,
             plate_test.area.largest_group,
             plate_test.area.squares,
         )
