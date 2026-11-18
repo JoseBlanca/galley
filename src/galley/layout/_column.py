@@ -156,9 +156,9 @@ _PAGE_NUMBER_FORM = re.compile(
 # 2026, after review: one alone was an OCR speck read as a digit, on
 # Gierke's 115 and 160 and Domesday's 443). So kept: Turney 99, Gierke 28
 # (its contents, pages 62 and 65), none in the other books.
-_HANGING_NUMBER = re.compile(r"[0-9]{1,3}")
-_HANGING_NUMBER_GAP_PT: Final[float] = 15.0
-_HANGING_NUMBERS_LEAST: Final[int] = 2
+HANGING_NUMBER = re.compile(r"[0-9]{1,3}")
+HANGING_NUMBER_GAP_PT: Final[float] = 15.0
+HANGING_NUMBERS_LEAST: Final[int] = 2
 
 
 def _column_edges(
@@ -328,10 +328,10 @@ def _hanging_number(
     """Whether `number`, a word of `left_margin`, hangs before a line of
     `column`'s words (step 2): 1 to 3 digits, on a row that is not the
     first with a letter or a digit (the head row of step 3), whose next
-    word right of it starts at most `_HANGING_NUMBER_GAP_PT` right of the
+    word right of it starts at most `HANGING_NUMBER_GAP_PT` right of the
     number's right side, with no other margin word between them but
     digits."""
-    if _HANGING_NUMBER.fullmatch(number.text) is None:
+    if HANGING_NUMBER.fullmatch(number.text) is None:
         return False
     rows = group_rows((*column, number))
     place = next(
@@ -355,14 +355,14 @@ def _hanging_number(
     # as none.
     between = any(
         other is not number
-        and _HANGING_NUMBER.fullmatch(other.text) is None
+        and HANGING_NUMBER.fullmatch(other.text) is None
         and other.box.x0 >= number.box.x1
         and other.box.x1 <= start
         and other.box.top < row.bottom
         and other.box.bottom > row.top
         for other in left_margin
     )
-    return start - number.box.x1 <= _HANGING_NUMBER_GAP_PT and not between
+    return start - number.box.x1 <= HANGING_NUMBER_GAP_PT and not between
 
 
 def _hanging_numbers(
@@ -370,13 +370,13 @@ def _hanging_numbers(
 ) -> frozenset[int]:
     """The identities of the words of `left_margin` that stay in the column
     as hanging numbers (step 2): those `_hanging_number` takes, when it
-    takes at least `_HANGING_NUMBERS_LEAST` on the page."""
+    takes at least `HANGING_NUMBERS_LEAST` on the page."""
     hanging = frozenset(
         id(number)
         for number in left_margin
         if _hanging_number(number, left_margin, column)
     )
-    return hanging if len(hanging) >= _HANGING_NUMBERS_LEAST else frozenset()
+    return hanging if len(hanging) >= HANGING_NUMBERS_LEAST else frozenset()
 
 
 # Measured on Stubbs' whole book on 16 November 2026 (layout spec section
