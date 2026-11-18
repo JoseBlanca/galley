@@ -301,3 +301,21 @@ cuts are right on the page); Domesday 0.860 / 0.891 → 0.859 / 0.897;
 Mariéjol 0.729 / 0.753 → 0.721 / 0.754 (footnotes its OCR left in the
 body). Stubbs' recall had already fallen from the baseline's 0.733 in
 the earlier work packages: being looked into.
+
+## Stubbs' paragraph recall, and the evaluation's reference cut
+
+After task 4.3 Stubbs' paragraph recall read 0.632 against the
+baseline's 0.733. Bisected, it fell at 6008a0e, which excluded Stubbs'
+publisher's lists (pages 322-337) from galley's run: the reference text
+still held them, and the paragraph score, unlike the word scores, does
+not skip excluded pages, so the lists' 81 boundaries counted as missed.
+galley got no worse. The evaluation now ends Stubbs' reference at the
+lists (`reference_ends_at`, 6c29627 and 5c1b394), and the baseline was
+scored again with it, galley at 9715a93, into
+`runs/owner-books-baseline-cut/` of the main checkout. Against it, at
+5c1b394: Stubbs 0.811 / 0.801 → 0.809 / 0.801; Haskins 0.885 / 0.902 →
+0.908 / 0.902; Domesday 0.860 / 0.889 → 0.859 / 0.897; Mariéjol 0.732 /
+0.753 → 0.721 / 0.754, a fall beyond the plan's 0.005 that comes from
+the page-break cuts of task 4.2 (review 4). Haskins' notes as notes
+66 → 72, with the right reference 61 → 65, none left in the body (6
+before).
