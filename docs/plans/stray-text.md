@@ -265,7 +265,7 @@ Tasks:
 - [ ] 3.1 (stream `layout`) The head row of item 2 in
   `running_head_row_count`, and the tests of Kadesh 38 and Domesday 200
   and 428. Spec: layout §3 as 1.1 amends it.
-- [ ] 3.2 (stream `structure`) The survey's limit of item 2, and the
+- [x] 3.2 (stream `structure`) The survey's limit of item 2, and the
   tests of Gierke 16 and 84; then the reference candidates of item 3
   and the test of Domesday 55. Spec: structure §3 and §11 as amended.
 - [ ] 3.3 (stream `layout`) The footnote band and the one-line notes of
