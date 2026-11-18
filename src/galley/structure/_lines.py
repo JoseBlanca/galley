@@ -1,9 +1,13 @@
 """A line placed on its page, and the rules of spec section 6 that say
 whether a line starts a paragraph: the indent after a short line, the
-centred line, and the hyphen that joins a line to the one before."""
+centred line, the hanging number, and the hyphen that joins a line to the
+one before."""
 
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 
+from galley.body_measures import commonest
 from galley.model import Line, Word
 from galley.structure._measures import (
     Edges,
@@ -22,18 +26,30 @@ _SHORT_LINE_PT = 3.0
 # edges, the two insets differing by at most 10 pt.
 _CENTRED_INSET_MIN_PT = 15.0
 _CENTRED_INSET_DIFFERENCE_PT = 10.0
+# Spec section 6, rule 3: a hanging number is 1 to 3 digits, hung 5 to 20
+# pt left of its region's text edge (Turney's notes hang theirs 8.8 to
+# 18.8 pt), which is the commonest left side of at least 3 lines that do
+# not start with such a number.
+_HANGING_NUMBER = re.compile(r"[0-9]{1,3}")
+_HANG_MIN_PT = 5.0
+_HANG_MAX_PT = 20.0
+_TEXT_EDGE_MIN_LINES = 3
 
 
 @dataclass(frozen=True, slots=True)
 class PlacedLine:
-    """A line of a page with its page index, its region's edges, and the
+    """A line of a page with its page index, its region's edges, the
     edges its centring is measured against: the region's, or the page's
-    body column for a line of a short body region (spec section 6)."""
+    body column for a line of a short body region, and, for a line of a
+    body region, the region's text edge in points from the left of the
+    page, None when it has none or the line is side text (spec section 6,
+    rule 3)."""
 
     page_index: int
     line: Line
     edges: Edges
     centring_edges: Edges
+    text_edge: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,8 +73,40 @@ def with_words(line: PlacedLine, words: tuple[Word, ...]) -> PlacedLine:
     """The part of `line` that holds `words`, some of its words in order,
     which are not none."""
     return PlacedLine(
-        line.page_index, Line(words_box(words), words), line.edges, line.centring_edges
+        line.page_index,
+        Line(words_box(words), words),
+        line.edges,
+        line.centring_edges,
+        line.text_edge,
     )
+
+
+def is_bare_number(word: str) -> bool:
+    """Whether `word` is 1 to 3 digits with nothing after them, "8" or
+    "145" (spec section 6, rule 3; section 12)."""
+    return _HANGING_NUMBER.fullmatch(word) is not None
+
+
+def text_edge(lines: Sequence[Line]) -> float | None:
+    """The text edge of a region of `lines` (spec section 6, rule 3): the
+    commonest left side of its lines whose first word is not a bare
+    number, in points; None when fewer than 3 lines are such."""
+    lefts = tuple(
+        line.box.x0
+        for line in lines
+        if line.words and not is_bare_number(line.words[0].text)
+    )
+    return commonest(lefts) if len(lefts) >= _TEXT_EDGE_MIN_LINES else None
+
+
+def has_hanging_number(line: PlacedLine) -> bool:
+    """Spec section 6, rule 3: the line's first word is a bare number, it
+    has a second word, and its left side lies 5 to 20 pt left of its
+    region's text edge."""
+    words = line.line.words
+    if line.text_edge is None or len(words) <= 1 or not is_bare_number(words[0].text):
+        return False
+    return _HANG_MIN_PT <= line.text_edge - line.line.box.x0 <= _HANG_MAX_PT
 
 
 def is_indented(line: PlacedLine, before: PlacedLine) -> bool:
@@ -98,9 +146,15 @@ def hyphen_between(before: PlacedLine, line: PlacedLine) -> bool:
 def starts_paragraph(line: PlacedLine, before: PlacedLine | None) -> bool:
     """Whether `line` starts a paragraph after `before`, the line before it
     (spec section 6): never after a hyphen; else when it is indented after
-    a short line, or it or the line before is centred."""
+    a short line, it or the line before is centred, or it starts with a
+    hanging number."""
     if before is None:
         return True
     if hyphen_between(before, line):
         return False
-    return is_indented(line, before) or is_centred(line) or is_centred(before)
+    return (
+        is_indented(line, before)
+        or is_centred(line)
+        or is_centred(before)
+        or has_hanging_number(line)
+    )
