@@ -436,3 +436,55 @@ checkout, each with 0 errors and 0 warnings from epubcheck: Haskins
 175 s, Stubbs 317 s, Domesday 359 s, Mariéjol 28 s, Kadesh 5 s, Gierke
 65 s, Turney 11 s, Haynes 15 s (the first three far slower than in the
 last plan; see task 7.2).
+
+## Task 7.2: the checks by eye
+
+Read by a subagent against the pages rendered at 150 dpi, on the
+EPUBs' `book.md` built at f5cdf4e.
+
+- **Turney's chapter openings**: 11 of 11 right (10 chapters and the
+  Introduction: heading, label, epigraphs with their sources). Its
+  note groups: 11 headings right; of 22 first notes, 21 linked right.
+- **Haynes' chapter openings**: 18 checked (16 chapters, Introduction,
+  Implications), heading and label right on all, all epigraphs found
+  with their sources; one verse epigraph on page 87 keeps a turnover
+  line as a line of its own, and two lose their stanza breaks. Its
+  note groups: 18 headings right; of 36 first notes, 35 linked right.
+- The two unlinked notes have the same cause: the reference is a
+  superscript after a year ("1959.²"), which §12's glued-number rule
+  does not take (it needs a letter before the digits). About 5 such
+  references in the two books.
+- **Reference pages changed by the plan**: 43 changes checked, 42 right.
+  Wrong: Stubbs 51, a ";" attached to the word before it in the layer's
+  order, which was already wrong around a cut-in margin note.
+- **Domesday's 2 margin notes**: galley's blocks for them (pages 161 and
+  357) are the same before and after; the scorer now aligns two of
+  their words with the same words in body paragraphs. galley did not
+  get worse.
+- **The slow builds were load**: Haskins rebuilt alone took 17 s
+  (analyze 6.4, extract 1.2, layout 7.8, structure 0.7, markdown 0.3,
+  epub 0.4), byte-identical to the 175 s build made while the
+  whole-book tests ran.
+
+Seen, outside the plan: Turney's two newspaper pages reproduced as
+plates (174-175) become a level-1 heading; the OCR misreads some of
+Haynes' heading words ("AMD", "SCIEIUTIAE").
+
+## For whoever next revises a skill or writes a plan
+
+- Committing in a worktree where a subagent works swept the subagent's
+  unfinished file into the orchestrator's commit (`git commit -a`).
+  Commit only named paths, and only in a tree no agent works in.
+- A tolerance checked against a baseline must use the same reference
+  text on both sides: excluding pages from galley's run without cutting
+  them from the reference made Stubbs' recall fall by 0.10 with no
+  change in galley.
+- Counts reported by a task were twice taken on an intermediate pass
+  (structure runs its body pass twice); a count should be taken on the
+  file the stage writes.
+- Three times a fix made a measured side effect elsewhere (junk back in
+  the text, a tie flipped, a sentence cut): measuring the whole books
+  before and after each rule change, in the task, caught them before
+  review only when the task asked for it.
+- Running the slow tests and the EPUB builds at once made builds ten
+  times slower; time builds on an idle machine.
