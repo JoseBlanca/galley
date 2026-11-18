@@ -30,6 +30,7 @@ from galley.model import (
 )
 from galley.structure import make_blocks, survey_book
 from galley.structure._regions import RegionKind, region_kinds
+from galley.structure._survey import alike_to_a_head
 
 _HASH = "a" * 64
 _NO_WORDS: frozenset[str] = frozenset()
@@ -756,3 +757,11 @@ def test_whole_book_haskins_195_notes_set_close_under_the_text_are_notes(
         for note in blocks.notes
         if note.origin[0].page_index == 195
     ) == (("^", 195), ("^", 195))
+
+
+def test_alike_to_a_head_compares_letters_only_within_8_of_each_other() -> None:
+    # Gierke 16's damaged head against the others, 0.72 alike: section 3's
+    # survey compares them (within 14), the short section's and the plate's
+    # tests keep their limit of 8 (structure spec section 3).
+    assert not alike_to_a_head("sintroduction", ("translatorsintroduction",))
+    assert alike_to_a_head("translatorsintroduct", ("translatorsintroduction",))
