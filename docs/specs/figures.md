@@ -422,13 +422,17 @@ items (structure §32: none) shows it.
 
 A figure's **place** is between the body lines printed above it and
 those below: the last line of the body stream, in reading order, whose
-top lies above the figure's top, or which lies wholly left or right of
-the figure with its top less than one body line pitch below the
-figure's top, on its page or, when the page has none, the last body
-line of the pages before. The second case is a line printed beside the
-picture's first row: Kadesh 40's quotation number "18.", 7.8 pt below
-the top of the hieroglyphs it numbers, which otherwise came after their
-image (review, 18 November 2026). The figure block goes after the
+top lies above the figure's top, or which is the only body line of the
+page that lies wholly left or right of the figure with its top between
+the figure's top and bottom, and whose top is less than one body line
+pitch below the figure's top, on its page or, when the page has none,
+the last body line of the pages before. The second case is a line
+printed beside the picture's first row: Kadesh 40's quotation number
+"18.", 7.8 pt below the top of the hieroglyphs it numbers, which
+otherwise came after their image (review, 18 November 2026). It must be
+the only line beside the figure: the text set beside Kadesh 33's map
+starts 3.2 pt below the box's top, and taken as above it, it put the
+map after the paragraph that opens beside it instead of before. The figure block goes after the
 paragraph that holds that line: when the figure is printed in the
 middle of a paragraph, after the whole paragraph, never inside it. When
 that line is in a list item (structure §29), the block goes after the
