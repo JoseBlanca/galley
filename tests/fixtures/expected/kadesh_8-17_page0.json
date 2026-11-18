@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4), and again, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.1 (structure spec section 11, \"Where a note starts\", rule 4, and \"The marker of a note\"): each note's marker is taken out of its text: \"•\" split off \"•Pa\" (the note to the title's \"*\") and \"'\" off \"'There\", each by a note_marker word change, as signs glued to a capitalised word, and \"i\" and \"a\" as one-character markers of indented notes; the right column, \"'There is, however…\", indented 12 pt against its column, is a note of its own, no longer part of note \"a\". Changed by task 2.3 (structure spec section 11, \"References\"): \"STRATEGY*\" is linked to the note marked \"•\" and \"Greece,1\" to the note marked \"i\", each split off its word by a note_marker word change. Changed by task 4.1 (structure spec section 14, \"Heading blocks\"): the three centred lines \"THE BATTLE OF KADESH\", \"A STUDY IN THE EARLIEST KNOWN MILITARY STRATEGY*\" and \"JAMES HENRY BREASTED\" are one heading of level 1 with no label (each line at most 2.6 pitches below the one before; the first line of a page without a running head), its reference \"*\" still linked to the note \"Pa per read before...\" (section 11, \"Candidates\": every body block but a margin note holds candidates). Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by review 1 of the clean-text plan (structure spec section 11, \"The marker of a note\"): \"a\", the superscript 2 that the OCR read as \"a\", is again the marker of the note \"In Ramses III.'s day...\", as on the sheet checked on 16 November 2026; task 2.2 had left it in the text as the article once \"I n\" was read as \"In\".",
+  "changed": "Changed by task 2.1 (structure spec section 11, \"Where a note starts\", rule 4, and \"The marker of a note\"): each note's marker is taken out of its text: \"•\" split off \"•Pa\" (the note to the title's \"*\") and \"'\" off \"'There\", each by a note_marker word change, as signs glued to a capitalised word, and \"i\" and \"a\" as one-character markers of indented notes; the right column, \"'There is, however…\", indented 12 pt against its column, is a note of its own, no longer part of note \"a\". Changed by task 2.3 (structure spec section 11, \"References\"): \"STRATEGY*\" is linked to the note marked \"•\" and \"Greece,1\" to the note marked \"i\", each split off its word by a note_marker word change. Changed by task 4.1 (structure spec section 14, \"Heading blocks\"): the three centred lines \"THE BATTLE OF KADESH\", \"A STUDY IN THE EARLIEST KNOWN MILITARY STRATEGY*\" and \"JAMES HENRY BREASTED\" are one heading of level 1 with no label (each line at most 2.6 pitches below the one before; the first line of a page without a running head), its reference \"*\" still linked to the note \"Pa per read before...\" (section 11, \"Candidates\": every body block but a margin note holds candidates). Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by review 1 of the clean-text plan (structure spec section 11, \"The marker of a note\"): \"a\", the superscript 2 that the OCR read as \"a\", is again the marker of the note \"In Ramses III.'s day...\", as on the sheet checked on 16 November 2026; task 2.2 had left it in the text as the article once \"I n\" was read as \"In\". Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image.",
   "excerpt": "kadesh_8-17",
   "page": 0,
   "book_page_index": 8,
@@ -75,14 +75,14 @@
     },
     {
       "kind": "paragraph",
-      "text": "THE beginnings of military strategy in all books upon the subject are passed over with a few general remarks. Students of the subject are not orientalists and their discussions begin with Greek sources. Although the present writer, it is needless to say, is totally without special knowledge of the subject, it has seemed to him that the most notable of the materials from the early Orient should be studied from this point of view, and made accessible to the student of military history. We shall never possess sufficient data on the wars of Egypt, Babylonia, and Assyria to build up a work like that of Kromayer on the battlefields of Greece,1 but the surviving materials, which carry our knowledge of military strategy a thousand years back of Greek times hare never been employed for this purpose at all ; and this essay is designed to furnish a beginning, at least, in the explanation of these materials. As it is hoped that this contribution may be used by many who are not orientalists, I must ask my fellow Egyptologists to excuse the translation and explanation of some things which, however obvious to them, must be made clear to those not familiar with Egyptian. For the same reasons I have also withheld almost all grammatical discussion. It should also be further said that the following essay does not intend to discuss the political aspects of this battle, either in the conditions which led up to it, or those which resulted from it. My purpose is only to make clear the military maneuvers involved in the battle. The exact method of deploying troops in action I have also not intended to discuss, It will be evident from the reliefs that well-disciplined battle lines were maintained, and that disorganized, hand-to-hand fighting resulted only when the enemy's lines were broken. This last question needs special investigation.'",
+      "text": "THE beginnings of military strategy in all books upon the subject are passed over with a few general remarks. Students of the subject are not orientalists and their discussions begin with Greek sources. Although the present writer, it is needless to say, is totally without special knowledge of the subject, it has seemed to him that the most notable of the materials from the early Orient should be studied from this point of view, and made accessible to the student of military history. We shall never possess sufficient data on the wars of Egypt, Babylonia, and Assyria to build up a work like that of Kromayer on the battlefields of Greece,1 but the surviving materials, which carry our knowledge of military strategy a thousand years back of Greek times hare never been employed for this purpose at all; and this essay is designed to furnish a beginning, at least, in the explanation of these materials. As it is hoped that this contribution may be used by many who are not orientalists, I must ask my fellow Egyptologists to excuse the translation and explanation of some things which, however obvious to them, must be made clear to those not familiar with Egyptian. For the same reasons I have also withheld almost all grammatical discussion. It should also be further said that the following essay does not intend to discuss the political aspects of this battle, either in the conditions which led up to it, or those which resulted from it. My purpose is only to make clear the military maneuvers involved in the battle. The exact method of deploying troops in action I have also not intended to discuss, It will be evident from the reliefs that well-disciplined battle lines were maintained, and that disorganized, hand-to-hand fighting resulted only when the enemy's lines were broken. This last question needs special investigation.'",
       "pages": [
         0
       ]
     },
     {
       "kind": "paragraph",
-      "text": "The fundamental difficulty in the study of the military operations of the earlier pre-Hellenic world is lack of data. How large, for example, were the armies with which Assyria and Egypt were wont to plunder Syria? What was the disposition of the armies at the battle of Carchemish ? How did an Assyrian commander marshal his forces upon the field ? What were the methods of attack ? We cannot answer one of these fundamental questions. In Egypt, as we shall see, the case is slightly better; but there are only two battles of which the dispositions are indicated. In all others the records are such that we should be utterly unable to affirm that the commanders had yet learned the value of clever manipulation of forces.3 These two battles are Megiddo and Kadeeh. At Me^iddo. already in tli.- sixti-fiith century ln-forr Christ, we find Thutmose III., disposing his troops as in modern times, with a center and two wings, or \"horns\" as he calls them, nf ewh c.f which ho gives the exact location. His enemy also was drawn up in the same way. But Kadesh is still more in-t:n.-ti\\.'. because here we can follow the shrewd maneuvers of the Asiatics, which preceded the battle. No incident in Eygptian history is so impressed upon the mind of the traveler in Egypt as this battle between the forces of Ramses II. and those of the Hittites at Kadesh on the Orontes, in the fourteenth century before Christ. The young king's supreme effort to save himself and his army from destruction is so often depicted and in such graphic pictures upon the walls of the great temples, that no visitor, not even the most blase1 \"globe-trotter\" can ever forget it Yet this dramatic event, so prominent that it attracts the attention of even the most casual visitor over and o\\i<r again, has never received any exhaustive study. It is the earliest battle in history, the strategic of which can be largely determined in detail; and yet this has never been done.",
+      "text": "The fundamental difficulty in the study of the military operations of the earlier pre-Hellenic world is lack of data. How large, for example, were the armies with which Assyria and Egypt were wont to plunder Syria? What was the disposition of the armies at the battle of Carchemish? How did an Assyrian commander marshal his forces upon the field? What were the methods of attack? We cannot answer one of these fundamental questions. In Egypt, as we shall see, the case is slightly better; but there are only two battles of which the dispositions are indicated. In all others the records are such that we should be utterly unable to affirm that the commanders had yet learned the value of clever manipulation of forces.3 These two battles are Megiddo and Kadeeh. At Me^iddo. already in tli.- sixti-fiith century ln-forr Christ, we find Thutmose III., disposing his troops as in modern times, with a center and two wings, or \"horns\" as he calls them, nf ewh c.f which ho gives the exact location. His enemy also was drawn up in the same way. But Kadesh is still more in-t:n.-ti\\.'. because here we can follow the shrewd maneuvers of the Asiatics, which preceded the battle. No incident in Eygptian history is so impressed upon the mind of the traveler in Egypt as this battle between the forces of Ramses II. and those of the Hittites at Kadesh on the Orontes, in the fourteenth century before Christ. The young king's supreme effort to save himself and his army from destruction is so often depicted and in such graphic pictures upon the walls of the great temples, that no visitor, not even the most blase1 \"globe-trotter\" can ever forget it Yet this dramatic event, so prominent that it attracts the attention of even the most casual visitor over and o\\i<r again, has never received any exhaustive study. It is the earliest battle in history, the strategic of which can be largely determined in detail; and yet this has never been done.",
       "pages": [
         0,
         1
@@ -160,6 +160,46 @@
         "1"
       ],
       "reason": "note_marker"
+    },
+    {
+      "before": [
+        "all",
+        ";"
+      ],
+      "after": [
+        "all;"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "Carchemish",
+        "?"
+      ],
+      "after": [
+        "Carchemish?"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "field",
+        "?"
+      ],
+      "after": [
+        "field?"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "attack",
+        "?"
+      ],
+      "after": [
+        "attack?"
+      ],
+      "reason": "punctuation_attached"
     },
     {
       "before": [

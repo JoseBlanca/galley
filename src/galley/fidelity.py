@@ -574,6 +574,11 @@ _PUNCTUATION_ATTACHED_PARTS = 2
 # reason given for _SOURCE_DASHES.
 _SPACED_SIGNS = frozenset("?;:!")
 _CASE_SPLIT_PARTS = 2
+# The changes structure makes after the joins of lost hyphens (structure
+# spec section 2, the paragraph after the steps).
+_CHANGES_AFTER_A_JOIN = frozenset(
+    {ChangeReason.PUNCTUATION_ATTACHED, ChangeReason.CASE_SPLIT}
+)
 
 
 def _is_source_dash(change: WordChange) -> bool:
@@ -658,6 +663,22 @@ def _margin_note_words(blocks: BlocksFile) -> frozenset[tuple[int, str]]:
     )
 
 
+def _margin_note_words_before_changes(
+    blocks: BlocksFile,
+) -> frozenset[tuple[int, str]]:
+    """The words of the margin-note blocks, as `_margin_note_words` gives
+    them, and the word that a sign was attached to or a case split was
+    made of to give them (structure spec section 5): a join of a lost
+    hyphen comes before both, so that its word may be one of these."""
+    words = _margin_note_words(blocks)
+    return words | frozenset(
+        (change.page_index, change.before[0])
+        for change in blocks.word_changes
+        if change.reason in _CHANGES_AFTER_A_JOIN
+        and all((change.page_index, word) in words for word in change.after)
+    )
+
+
 def _source_first_words(blocks: BlocksFile) -> frozenset[tuple[int, str]]:
     """The first word of the source of each epigraph, with each page the
     epigraph has a part on."""
@@ -677,7 +698,7 @@ def _change_problems(blocks: BlocksFile) -> tuple[str, ...]:
     hyphen whose word is in no margin note of their page (structure spec
     section 5), and the source dashes taken off a word that is not the
     first of an epigraph's source on their page (section 22)."""
-    in_margin_notes = _margin_note_words(blocks)
+    in_margin_notes = _margin_note_words_before_changes(blocks)
     source_first_words = _source_first_words(blocks)
     return (
         tuple(

@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the orchestrator against the page image on 15 November 2026 (galley at ec2edc4); the owner did not check this page.",
-  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image.",
   "excerpt_only": "What the excerpt gives, not what the whole book gives: the foot line \"... (l93) 13\" stays as the end of the last footnote and no page number is recorded, because the signature rule compares the line with the lowest line of other pages, and the excerpt has no other signature line. On the whole book the line gives the page number \"(l93)\" and a signature mark (the whole_book test of tests/test_structure.py).",
   "excerpt": "mariejol_210-219",
   "page": 0,
@@ -79,7 +79,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "£Ue aurait volontiers laissé croire aux puissances catholiques, afin de se faire payer très cher, qu'elle préparait depuis longtemps le massacre des ! -. Hais en vérité elle n'avait prémédité que d'assassiner Coligny ; Cl ; par peur des représailles qu'après l'avoir manqué elle avait dtxidéde frapper avec lui les autres chefs du i>arti. « Si l'Amiral était mort du coup b.ise qu'on lui tira, écrivait le 24 août de Paris le nonce Sa^ . cardinal C6me, secrétaire d'État de Grégoire XIII, je ne me résous pas à croire qu'il se fût fait un si grand carnage » (4). « La mort de l'Amiral, affirmait l'ambassadeur d'Espagne, a été un acte réfléchi, ceQe des huguenots k fruit d'une résolution soudaine » (5). La fureur des soldats et des masses avait encore ajouté au nombre voulu des victimes (6).",
+      "text": "£Ue aurait volontiers laissé croire aux puissances catholiques, afin de se faire payer très cher, qu'elle préparait depuis longtemps le massacre des ! -. Hais en vérité elle n'avait prémédité que d'assassiner Coligny ; Cl ; par peur des représailles qu'après l'avoir manqué elle avait dtxidéde frapper avec lui les autres chefs du i>arti. « Si l'Amiral était mort du coup b.ise qu'on lui tira, écrivait le 24 août de Paris le nonce Sa^ . cardinal C6me, secrétaire d'État de Grégoire XIII, je ne me résous pas à croire qu'il se fût fait un si grand carnage » (4). « La mort de l'Amiral, affirmait l'ambassadeur d'Espagne, a été un acte réfléchi, ceQe des huguenots k fruit d'une résolution soudaine » (5). La fureur des soldats et des masses avait encore ajouté au nombre voulu des victimes (6).",
       "pages": [
         0
       ]
@@ -93,7 +93,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "(2) Lettm de Soint-Gonard do 12 et da 19 septembre 1372 : Groéa voo Piinsterer. Arekité» de U wuinm i$ Nm$imt, Premuà^tsériéy SuppUmtnt, 1847, p. 123* eC 127*.",
+      "text": "(2) Lettm de Soint-Gonard do 12 et da 19 septembre 1372 : Groéa voo Piinsterer. Arekité» de U wuinm i$ Nm$imt, Premuà^tsériéy SuppUmtnt, 1847, p. 123* eC 127*.",
       "pages": [
         0
       ]
@@ -121,7 +121,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "(S) La tbéfe da la pcémèdiutioa a été ivpriae par M. Lodea Romier. ce patient azpk>- lataor dct ard^vas italfannfft (La Sminl^BéirAÀtmy, Lm inhmmttUi dé Roms *t U prhmidikilim dm MatMfre, Rama dn xn* tiikle, t. I, 19x3, p. 529-^61) ; mais U n'inoimine paa, coouae on a para la coin, Calhartna al Charlat IX. Ce aéraient laa Gidae qoi, an mois d'artU 1572, mvenleai détibéféda fdtaa tuarCol^ay et tea antrea diafi bognenots pour couper ooort à la çoOàqtm pmtwtanta da «snvameaaat aC mnp^har la nq>t«e et la foerra avao l'E^tagna. • Rien, aa eootralra; dit IL Roaalflr. p. 346. nlsdiqoa qna Catberina da Médids ait été camfUe» ni mêoM infanaia dn pro|et dea Quiae. Caat tardiiraiBent qoa la Rdne-miira trouva dan* ca projet «a taojta toaunodt» pour réaoodca dea çBfftcnltéa imprévnea (c'est-à-dire celle dai PajvBaa). An nai. CatherinB. dan» aa» astratroaa mjrstécianset, an joiUet 1372, avec la dodMaaa da Kesaoon (voir d'dwius p. x88), n'a, oomma laa iait» le prouvent, arrêté qna UAMiàjoL. CmOl da Médidib (l93) 13",
+      "text": "(S) La tbéfe da la pcémèdiutioa a été ivpriae par M. Lodea Romier. ce patient azpk>- lataor dct ard^vas italfannfft (La Sminl^BéirAÀtmy, Lm inhmmttUi dé Roms *t U prhmidikilim dm MatMfre, Rama dn xn* tiikle, t. I, 19x3, p. 529-^61) ; mais U n'inoimine paa, coouae on a para la coin, Calhartna al Charlat IX. Ce aéraient laa Gidae qoi, an mois d'artU 1572, mvenleai détibéféda fdtaa tuarCol^ay et tea antrea diafi bognenots pour couper ooort à la çoOàqtm pmtwtanta da «snvameaaat aC mnp^har la nq>t«e et la foerra avao l'E^tagna. • Rien, aa eootralra; dit IL Roaalflr. p. 346. nlsdiqoa qna Catberina da Médids ait été camfUe» ni mêoM infanaia dn pro|et dea Quiae. Caat tardiiraiBent qoa la Rdne-miira trouva dan* ca projet «a taojta toaunodt» pour réaoodca dea çBfftcnltéa imprévnea (c'est-à-dire celle dai PajvBaa). An nai. CatherinB. dan» aa» astratroaa mjrstécianset, an joiUet 1372, avec la dodMaaa da Kesaoon (voir d'dwius p. x88), n'a, oomma laa iait» le prouvent, arrêté qna UAMiàjoL. CmOl da Médidib (l93) 13",
       "pages": [
         0
       ]

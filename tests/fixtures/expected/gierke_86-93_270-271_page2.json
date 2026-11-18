@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4), and again, after the changes below, on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed since that check by task 2.5 (a margin word at the start of a body line goes to its margin note): on book page 89 \"Antique-\" leaves the body line, so \"None the less\" starts a paragraph and the paragraph of page 88 ends on 89 at \"bold innovator.\" Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed again by the fix of task 5.2 (reocr spec, section 4, rules (a) and (b)): a layer word the layer placed off Tesseract's reading of it, of the same text, is replaced and no longer read twice; listed in the task's list of changed reference pages. Changed by task 6.4 of the clean-text plan, after the owner read the page's margin notes on 17 November 2026: Tesseract's \"_and\" is read \"and\" (reocr spec, section 4), and \"move.\" \"ment,\" is joined into \"movement,\" (structure spec, section 5, hyphen_lost).",
+  "changed": "Changed since that check by task 2.5 (a margin word at the start of a body line goes to its margin note): on book page 89 \"Antique-\" leaves the body line, so \"None the less\" starts a paragraph and the paragraph of page 88 ends on 89 at \"bold innovator.\" Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed again by the fix of task 5.2 (reocr spec, section 4, rules (a) and (b)): a layer word the layer placed off Tesseract's reading of it, of the same text, is replaced and no longer read twice; listed in the task's list of changed reference pages. Changed by task 6.4 of the clean-text plan, after the owner read the page's margin notes on 17 November 2026: Tesseract's \"_and\" is read \"and\" (reocr spec, section 4), and \"move.\" \"ment,\" is joined into \"movement,\" (structure spec, section 5, hyphen_lost). Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image.",
   "known": "The owner: there is an additional margin note, \"Medieval Thought.\", beside the page's last line, which galley does not give; the text layer has no words for it. \"Law1\", which the owner did not find in the page's last paragraph, is in its first, \"Then again, in the method…\", on its fourteenth line, \"Public Law¹\" in print (checked against the page image by the task 7.3 session on 16 November 2026).",
   "excerpt": "gierke_86-93_270-271",
   "page": 2,
@@ -79,7 +79,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "Then again, in the method of handling this wealth of material the tendencies of the different sciences supplemented each other. The deepest speculative penetration falls to the share of the theologian and philosopher ; the keenest practical appreciation of newly-won ideas falls to the share of politicians with an eye on the question of the hour ; still Jurisprudence, albeit with some hesitation, yielded to the impulses that were thus given. Conversely, it was professional Jurisprudence which by its assiduously detailed work brought the aerial scheme of thought into combination with the actual public life of great and small societies, and by so doing both started a science of Positive Public Law1 and provided the philosopher and the speculative politician with a series of legal concepts serviceable for the construction of a system. Moreover, at this point the other writers adhered as closely as was possible to the Legists, Canonists, and Feudists, and by so doing began to give to their abstractions and their postulates a stable formulated shape and a more solid basis among realities.",
+      "text": "Then again, in the method of handling this wealth of material the tendencies of the different sciences supplemented each other. The deepest speculative penetration falls to the share of the theologian and philosopher; the keenest practical appreciation of newly-won ideas falls to the share of politicians with an eye on the question of the hour; still Jurisprudence, albeit with some hesitation, yielded to the impulses that were thus given. Conversely, it was professional Jurisprudence which by its assiduously detailed work brought the aerial scheme of thought into combination with the actual public life of great and small societies, and by so doing both started a science of Positive Public Law1 and provided the philosopher and the speculative politician with a series of legal concepts serviceable for the construction of a system. Moreover, at this point the other writers adhered as closely as was possible to the Legists, Canonists, and Feudists, and by so doing began to give to their abstractions and their postulates a stable formulated shape and a more solid basis among realities.",
       "pages": [
         2
       ]
@@ -107,7 +107,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "Beneath this movement, however, there was an internal contest, which in the history of ideas was of more importance than all the external differences between partizans : namely, the contest between Properly Medieval and 'Antique-Modern' Thought.",
+      "text": "Beneath this movement, however, there was an internal contest, which in the history of ideas was of more importance than all the external differences between partizans: namely, the contest between Properly Medieval and 'Antique-Modern' Thought.",
       "pages": [
         2
       ]
@@ -121,7 +121,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "Throughout the Middle Age and even for a while longer, the outward framework of all Political Doctrine consisted of the grandiose but narrow system of thoughts that had been reared by the Medieval Spirit. It was a system of thoughts which culminated in the idea of a Community which God Himself had constituted and which comprised All Mankind. This system may be expounded, as it is by Dante, in all its purity and all its fulness, or it may become the shadow of a shade ; but rudely to burst its bars asunder is an exploit which is but now and again attempted by some bold innovator.",
+      "text": "Throughout the Middle Age and even for a while longer, the outward framework of all Political Doctrine consisted of the grandiose but narrow system of thoughts that had been reared by the Medieval Spirit. It was a system of thoughts which culminated in the idea of a Community which God Himself had constituted and which comprised All Mankind. This system may be expounded, as it is by Dante, in all its purity and all its fulness, or it may become the shadow of a shade; but rudely to burst its bars asunder is an exploit which is but now and again attempted by some bold innovator.",
       "pages": [
         2,
         3
@@ -140,6 +140,26 @@
     }
   ],
   "word_changes": [
+    {
+      "before": [
+        "philosopher",
+        ";"
+      ],
+      "after": [
+        "philosopher;"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "hour",
+        ";"
+      ],
+      "after": [
+        "hour;"
+      ],
+      "reason": "punctuation_attached"
+    },
     {
       "before": [
         "More-",
@@ -179,6 +199,16 @@
         "between"
       ],
       "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "partizans",
+        ":"
+      ],
+      "after": [
+        "partizans:"
+      ],
+      "reason": "punctuation_attached"
     }
   ],
   "page_numbers": []

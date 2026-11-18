@@ -18,6 +18,7 @@ from galley.model import (
     Block,
     BlockKind,
     BlocksFile,
+    ChangeReason,
     LinesFile,
     NoteKind,
     Origin,
@@ -25,6 +26,7 @@ from galley.model import (
     PageNumber,
     PageNumberPosition,
     RemovalReason,
+    WordChange,
     block_text,
     read_blocks,
     read_lines,
@@ -549,6 +551,119 @@ def test_referenced_kadesh_10_links_notes_12_to_14_and_leaves_10_and_11(
     )[:2] == (("\"'", False), ("11", False))
 
 
+def _word_changes_on(
+    blocks: BlocksFile, page: int, reason: ChangeReason
+) -> tuple[WordChange, ...]:
+    return tuple(
+        change
+        for change in blocks.word_changes
+        if change.page_index == page and change.reason is reason
+    )
+
+
+def _texts_on(blocks: BlocksFile, page: int) -> tuple[str, ...]:
+    """The texts of the blocks, the notes' too, that start on `page`."""
+    return tuple(
+        block_text(block)
+        for block in (
+            *blocks.blocks,
+            *(block for note in blocks.notes for block in note.blocks),
+        )
+        if block.origin[0].page_index == page
+    )
+
+
+def test_spaced_sign_haskins_28_glued_to_its_reference_is_linked_to_its_note(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # haskins_heads_notes page 4 is book page index 28: "subjection ;^",
+    # the "^" a superscript 1 (structure spec section 23, "After a note
+    # reference"); the OCR reads the note's marker "*".
+    _, blocks = excerpt_outputs["haskins_heads_notes"]
+    assert ("subjection;^", "*") in _references_on(blocks, 4)
+    assert _word_changes_on(blocks, 4, ChangeReason.PUNCTUATION_ATTACHED) == (
+        WordChange(
+            page_index=4,
+            before=("subjection", ";^"),
+            after=("subjection;^",),
+            reason=ChangeReason.PUNCTUATION_ATTACHED,
+        ),
+    )
+
+
+def test_spaced_sign_stubbs_heads_20_semicolon_is_attached(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # stubbs_heads page 0 is book page index 20, which prints
+    # "constituted ;".
+    _, blocks = excerpt_outputs["stubbs_heads"]
+    assert any("France was constituted; the" in text for text in _texts_on(blocks, 0))
+    assert not any(" ;" in text for text in _texts_on(blocks, 0))
+    assert _word_changes_on(blocks, 0, ChangeReason.PUNCTUATION_ATTACHED) == (
+        WordChange(
+            page_index=0,
+            before=("constituted", ";"),
+            after=("constituted;",),
+            reason=ChangeReason.PUNCTUATION_ATTACHED,
+        ),
+    )
+
+
+def test_spaced_sign_mariejol_212_takes_a_no_break_space_and_no_change(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # mariejol_210-219 page 2 is book page index 212; the book is French
+    # (structure spec section 23).
+    _, blocks = excerpt_outputs[MARIEJOL]
+    texts = _texts_on(blocks, 2)
+    assert any("d'une nouvelle révolte\u00a0; et elle" in text for text in texts)
+    assert any("l'intérêt et à la peur\u00a0; elles" in text for text in texts)
+    assert not any(" ;" in text for text in texts)
+    assert not any(
+        change.reason is ChangeReason.PUNCTUATION_ATTACHED
+        for change in blocks.word_changes
+    )
+
+
+def test_case_split_stubbs_312_index_entry_of_scotland(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # stubbs_summaries_index page 4 is book page index 312, the index:
+    # "made king ofScotland," in the text layer (structure spec section 24).
+    _, blocks = excerpt_outputs["stubbs_summaries_index"]
+    assert any("made king of Scotland, 241;" in text for text in _texts_on(blocks, 4))
+    assert _word_changes_on(blocks, 4, ChangeReason.CASE_SPLIT) == (
+        WordChange(
+            page_index=4,
+            before=("ofScotland,",),
+            after=("of", "Scotland,"),
+            reason=ChangeReason.CASE_SPLIT,
+        ),
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "the excerpt's pages never print 'Avre' whole, the evidence for the "
+        "split; the whole book does (test_structure_words.py, whole_book)"
+    ),
+)
+def test_case_split_haskins_22_the_avre(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # haskins_heads_notes page 0 is book page index 22, printed "the Avre".
+    _, blocks = excerpt_outputs["haskins_heads_notes"]
+    assert _word_changes_on(blocks, 0, ChangeReason.CASE_SPLIT) == (
+        WordChange(
+            page_index=0,
+            before=("theAvre",),
+            after=("the", "Avre"),
+            reason=ChangeReason.CASE_SPLIT,
+        ),
+    )
+
+
 def test_referenced_mariejol_214_leaves_note_1_unreferenced(
     excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
 ) -> None:
@@ -639,7 +754,7 @@ def test_margin_note_before_domesday_75_paragraphs_whose_first_lines_it_is_besid
     assert _margin_notes_before(blocks, 1) == (
         ("Free land.", "The idea of", [1]),
         ("The unfree dom of the villein.", "If now we", [1]),
-        ("Can the villein be pursued ?", "^ ^e free", [1, 2]),
+        ("Can the villein be pursued?", "^ ^e free", [1, 2]),
     )
 
 
@@ -852,7 +967,7 @@ _VERSE_ON_REFERENCE_PAGES = (
                 "Laquelle (Catherine) dé« qtiaiorw ans\nPortoit au b(^ la sagette\n"
                 "La robe et les arcs duisans (convenant)\nAux pocelles de Taygette\n"
                 "ToDjours dés l'aube du jour\nAlloit aux forftts en qneste\n"
-                "Ou de reths tcmt à l'entour\nCemoit le trac d'une beste ;\n"
+                "Ou de reths tcmt à l'entour\nCemoit le trac d'une beste\u00a0;\n"
                 "Ou pressoit les cerfs au cours;\nOu i«r le pendant des roches.\n"
                 "Sans chiens assaUloit les ours\nEt les sanghers aux dents croches '1)4"
             ),
@@ -882,7 +997,7 @@ _VERSE_ON_REFERENCE_PAGES = (
             ),
             (
                 "Le hon jeune le vieux surmontera\n"
-                "En champ bolliquc par singuUer duelle :\n"
+                "En champ bolliquc par singuUer duelle\u00a0:\n"
                 "Dans cage d'or les yeux luy crèvera, '\n"
                 "Deux classes une, puis mourir, mort cruelle.\n(Cent L, qaatraio 35.)"
             ),
@@ -924,17 +1039,17 @@ _VERSE_ON_REFERENCE_PAGES = (
         6,
         (
             (
-                "South -Western Group : 49,155\nMid- Western Group: 33,191\n"
+                "South -Western Group: 49,155\nMid- Western Group: 33,191\n"
                 "Eastern Group: 72,883"
             ),
             (
-                "South- Western Group : 4,038\nMid-Western Group: 3,514\n"
-                "Eastern Group : 7,329"
+                "South- Western Group: 4,038\nMid-Western Group: 3,514\n"
+                "Eastern Group: 7,329"
             ),
             (
-                "South- Western Group : 183,842 106,086\n"
-                "Mid- Western Group : 158,245 115,679\n"
-                "Eastern Group : 255,498 182,830"
+                "South- Western Group: 183,842 106,086\n"
+                "Mid- Western Group: 158,245 115,679\n"
+                "Eastern Group: 255,498 182,830"
             ),
         ),
     ),

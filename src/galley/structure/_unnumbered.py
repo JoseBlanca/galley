@@ -23,7 +23,9 @@ class Unnumbered:
     and chapter label; the positions of the words that start a printed
     line after the first, which a verse block keeps (spec section 16), and
     a verse epigraph too (section 22); a figure block's image path
-    (section 18); and an epigraph's source (section 22)."""
+    (section 18); an epigraph's source (section 22); and, in a French
+    book, the positions of the words that take a no-break space, U+00A0,
+    before them instead of a space (section 23)."""
 
     kind: BlockKind
     words: tuple[str, ...]
@@ -36,6 +38,7 @@ class Unnumbered:
     line_starts: frozenset[int] = frozenset()
     figure: str | None = None
     source: str | None = None
+    no_break: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)

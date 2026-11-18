@@ -2582,12 +2582,9 @@ _DOMESDAY = "domesday_74-83"  # excerpt pages 1 and 3 are book page indices 75 a
             "the excerpt's ten pages never print 'unfreedom' whole, the evidence "
             "for joining 'unfree' 'dom'; the whole book does (whole-book test below)",
         ),
-        _owner_note(
-            _DOMESDAY,
-            1,
-            "Can the villein be pursued?",
-            "the page prints a space before '?', which galley keeps as a word",
-        ),
+        # The page prints a space before "?", which structure attaches
+        # (structure spec, section 23).
+        _owner_note(_DOMESDAY, 1, "Can the villein be pursued?"),
         _owner_note(_DOMESDAY, 3, "The villein and seignorial justice."),
         _owner_note(_DOMESDAY, 3, "The villein and national justice."),
     ],
@@ -2735,7 +2732,7 @@ def test_reread_owner_checked_whole_domesday_75_joins_unfree_dom(
     assert _margin_notes_of_page(folder.blocks_json, 75) == (
         "Free land.",
         "The unfreedom of the villein.",
-        "Can the villein be pursued ?",
+        "Can the villein be pursued?",
     )
 
 

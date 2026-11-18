@@ -5,7 +5,9 @@ a French one."""
 
 from dataclasses import replace
 
+from galley.config import Language
 from galley.model import BlockKind, ChangeReason, WordChange
+from galley.structure._markers import reference_candidate
 from galley.structure._unnumbered import Unnumbered
 
 # Spec section 23: the signs a nineteenth-century printer set apart.
@@ -14,8 +16,10 @@ _SPACED_SIGNS = frozenset("?;:!")
 # ("(1) ;") as well as a letter or a digit.
 _CLOSING_BRACKETS = frozenset(")]")
 # The kinds whose printed lines are kept, a line feed between them,
-# across which a sign stays as it is (spec section 23).
-_LINE_FEED_KINDS = frozenset({BlockKind.VERSE})
+# across which a sign stays as it is (spec section 23): a verse block,
+# and a verse epigraph, whose line starts are kept (a prose epigraph has
+# none; section 22, "The block").
+_LINE_FEED_KINDS = frozenset({BlockKind.VERSE, BlockKind.EPIGRAPH})
 
 
 def attach_spaced_sign(before: str, word: str) -> str | None:
@@ -23,14 +27,21 @@ def attach_spaced_sign(before: str, word: str) -> str | None:
     a word that starts with "?", ";", ":" or "!" ("?", ";^", "?'"), and
     `before` ends with a letter, a digit, ")" or "]": "subjection" and ";"
     give "subjection;" (spec section 23). None when the sign stays apart,
-    after a dash, a quotation mark or other punctuation, and when `word`
-    is not a spaced sign."""
+    after a dash, a quotation mark or other punctuation; when `word` holds
+    a note reference and the word made would hold none ("14)" and ";13");
+    and when `word` is not a spaced sign."""
     if not (word[:1] in _SPACED_SIGNS and before):
         return None
     last = before[-1]
-    if last.isalnum() or last in _CLOSING_BRACKETS:
-        return before + word
-    return None
+    if not (last.isalnum() or last in _CLOSING_BRACKETS):
+        return None
+    attached = before + word
+    # Spec section 23, "After a note reference": a sign that holds a
+    # reference (";13") is not attached where the word it makes holds none
+    # ("14);13"), so that its note stays linked.
+    if reference_candidate(word) is not None and reference_candidate(attached) is None:
+        return None
+    return attached
 
 
 def _follows_on_its_line(block: Unnumbered, position: int) -> bool:
@@ -111,3 +122,14 @@ def no_break_positions(block: Unnumbered) -> frozenset[int]:
         if _follows_on_its_line(block, position)
         and attach_spaced_sign(block.words[position - 1], word) is not None
     )
+
+
+def with_spaced_signs(block: Unnumbered, language: Language) -> Unnumbered:
+    """`block` with its spaced signs (spec section 23): in a book whose
+    `language` is French, its words as they are and the positions of the
+    signs in `no_break`; in any other, the signs attached
+    (`attach_spaced_signs`)."""
+    if language is Language.FR:
+        _not_linked(block)
+        return replace(block, no_break=no_break_positions(block))
+    return attach_spaced_signs(block)

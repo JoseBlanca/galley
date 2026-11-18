@@ -8,6 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import assert_never
 
+from galley.config import Language
 from galley.model import Block, BlockKind, Note, NoteKind, WordChange
 from galley.structure._bibliography import (
     bibliography,
@@ -15,6 +16,7 @@ from galley.structure._bibliography import (
     with_band_as_body,
 )
 from galley.structure._body_notes import take_body_notes
+from galley.structure._case_split import split_glued_words
 from galley.structure._endnotes import (
     NoteGroup,
     endnote_section,
@@ -64,6 +66,7 @@ from galley.structure._references import (
     match_footnotes,
 )
 from galley.structure._runs import EpigraphParts, LabelLine, QuotationForm
+from galley.structure._spaced import with_spaced_signs
 from galley.structure._unnumbered import (
     Unnumbered,
     UnnumberedNote,
@@ -123,6 +126,22 @@ def _body(
             case _:
                 assert_never(entry)
     return tuple(body)
+
+
+def _mended(
+    block: Unnumbered,
+    word_list: frozenset[str],
+    book_words: frozenset[str],
+    common_inner_words: frozenset[str],
+    language: Language,
+) -> Unnumbered:
+    """`block` with its words glued at a case change split (spec section
+    24) and then its spaced signs attached, or given a no-break space in a
+    French book (section 23)."""
+    return with_spaced_signs(
+        split_glued_words(block, word_list, book_words, common_inner_words),
+        language,
+    )
 
 
 def _body_block(
@@ -530,6 +549,7 @@ def assemble(
     body_word_height: float,
     body_line_pitch: float,
     contents_pages: frozenset[int],
+    language: Language,
 ) -> Assembled:
     """The work after the per-page parts (spec section 2, steps 2.5 and 3),
     in page order: the notes left at the foot of each page's body taken
@@ -544,7 +564,8 @@ def assemble(
     section 16). `word_list` is in lower case; `body_word_height` and
     `body_line_pitch` are in points; `contents_pages` are the pages of the
     printed table of contents, whose lines are never quotes and after the
-    last of which the references to endnotes are taken."""
+    last of which the references to endnotes are taken; `language` is the
+    book's, which decides what a spaced sign becomes (spec section 23)."""
     form = book_marker_form(
         first_word(piece.lines[0]) for page in parts for piece in page.band_blocks
     )
@@ -626,6 +647,17 @@ def assemble(
     body = _body(entries, book_words, word_list, common_inner_words)
     blocks_of = {entry.piece: block for entry, block in zip(entries, body, strict=True)}
     notes = tuple(_note(source, blocks_of, book_words, word_list) for source in sources)
+
+    def mended(block: Unnumbered) -> Unnumbered:
+        return _mended(block, word_list, book_words, common_inner_words, language)
+
+    # Spec section 2, the paragraph after the steps: the case split and the
+    # spaced signs, once the words are joined and the notes' markers taken.
+    body = tuple(mended(block) for block in body)
+    notes = tuple(
+        replace(note, blocks=tuple(mended(block) for block in note.blocks))
+        for note in notes
+    )
     kept_positions = tuple(
         position for position in range(len(entries)) if position not in in_section
     )
@@ -650,7 +682,10 @@ def assemble(
         linked_body, linked_notes, kept_positions, entries, places
     )
     # Spec section 18: the figure blocks, side text of their pages.
-    linked_body = with_figures(linked_body, parts, book_words, word_list)
+    linked_body = tuple(
+        mended(block) if block.kind is BlockKind.FIGURE else block
+        for block in with_figures(linked_body, parts, book_words, word_list)
+    )
     blocks, numbered_notes = numbered(linked_body, linked_notes)
     return Assembled(
         blocks=blocks,
