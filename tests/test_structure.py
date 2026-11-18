@@ -2830,6 +2830,11 @@ def test_footnote_lines_in_the_body_of_a_book_with_digit_markers_stay() -> None:
         ("{2).", Reference("", "{2)", ".", ReferenceForm.BRACKETED, 2)),
         ("rulers.^", Reference("rulers.", "^", "", ReferenceForm.SIGN, None)),
         ("^", Reference("", "^", "", ReferenceForm.SIGN, None)),
+        ("servus*.", Reference("servus", "*", ".", ReferenceForm.SIGN, None)),
+        ("rulers.^),", Reference("rulers.", "^", "),", ReferenceForm.SIGN, None)),
+        ("*.", None),
+        ("^,", None),
+        ("land*£", None),
         ("p.12", None),
         ("pp.3", None),
         ("vol.3", None),
@@ -2926,6 +2931,25 @@ def test_referenced_sign_alone_is_linked_to_a_note_marked_by_a_sign() -> None:
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert _references(blocks) == (("^", "*"),)
     assert blocks.word_changes == ()
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_referenced_sign_followed_by_punctuation_is_split_from_its_word() -> None:
+    # Spec section 11, "References": Domesday 55's "servus*.".
+    lines = _lines_of(_referenced_page(0, "the servus*. was", "* A note."))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("*", "*"),)
+    paragraph = blocks.blocks[0]
+    assert tuple(span.text for span in paragraph.spans)[1:] == ("*", ". was")
+    assert paragraph.spans[0].text.endswith(" servus")
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=0,
+            before=("servus*.",),
+            after=("servus", "*", "."),
+            reason=ChangeReason.NOTE_MARKER,
+        ),
+    )
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
