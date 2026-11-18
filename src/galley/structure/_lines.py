@@ -199,15 +199,26 @@ def hyphen_between(before: PlacedLine, line: PlacedLine) -> bool:
     )
 
 
-def ends_page_paragraph(line: PlacedLine) -> bool:
-    """Whether `line`, the last line of a page's body stream, ends its
-    paragraph (spec section 6, "A short last line at a page break"): it
-    ends more than 20 pt short of its region's right edge, and its last
-    word ends a sentence."""
+def _starts_in_lower_case(line: PlacedLine) -> bool:
+    """Whether the first word of `line`, past its opening quotation marks,
+    starts with a lower-case letter."""
     return (
         bool(line.line.words)
-        and line.edges.right - line.line.box.x1 > _PAGE_END_SHORT_PT
-        and _SENTENCE_END.search(line.line.words[-1].text) is not None
+        and line.line.words[0].text.lstrip("".join(_QUOTATION_MARKS))[:1].islower()
+    )
+
+
+def ends_paragraph_at_page_break(before: PlacedLine, line: PlacedLine) -> bool:
+    """Whether `before`, the last line of a page's body stream, ends its
+    paragraph before `line`, the first of the next page's (spec section
+    6, "A short last line at a page break"): `before` ends more than 20
+    pt short of its region's right edge and its last word ends a
+    sentence, and `line` does not start in lower case."""
+    return (
+        bool(before.line.words)
+        and before.edges.right - before.line.box.x1 > _PAGE_END_SHORT_PT
+        and _SENTENCE_END.search(before.line.words[-1].text) is not None
+        and not _starts_in_lower_case(line)
     )
 
 

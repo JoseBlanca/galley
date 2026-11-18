@@ -684,7 +684,7 @@ whole book whose right form the reference shows:
 |---|---|---|---|---|---|
 | Haskins | 1,139 | 954 | 3 | 35 | 22 |
 | Stubbs | 1,556 | 1,193 | 0 | 33 | 28 |
-| Domesday | 961 | 675 | 9 | 78 | 54 |
+| Domesday | 456 | 961 | 675 | 9 | 78 | 54 |
 | Mariéjol | 2,172 | 1,219 | 0 | 192 | 181 |
 
 The research's "wrong" ones are compounds the book also prints joined,
@@ -843,7 +843,14 @@ stream also starts a paragraph when the last line of the body stream of
 the page before ends more than 20 pt short of its region's right edge
 and its last word ends with ".", "?", "!" or ":", or with one of them
 followed by closing quotation marks or brackets, with 1 to 3 digits
-glued after all of them allowed (a note reference: "tendency.43").
+glued after all of them allowed (a note reference: "tendency.43"),
+unless the first word of the page's line, past any opening quotation
+marks, starts with a lower-case letter: a sentence that runs on is not
+cut, whatever the line before it ends with; or unless the last line
+starts with a word of a note marker's form (section 11, "The marker of
+a note": digits, bracketed or a sign) followed by more words, the first
+line of a footnote left in the body ("1 D. B. i. 141.", "8 Companies
+Act, 1862, sec. 4.").
 Rule 1 cannot see such an end when the next page's first line is not
 indented: a chapter's first line set flush left, or a line set in a
 measure of its own. On Turney's pages 12 and 13 (section 21), the
@@ -858,28 +865,53 @@ It does not apply where the rules keep a block across a page break on
 purpose: a line after a hyphen (above, which a line ending with
 punctuation never is), a verse block that runs on (section 16, rule 4),
 the index pages (section 17); and it changes nothing where a block is
-already cut (a note left in the body, the endnote section's edges,
-section 12). Measured on 17 November 2026 on the survey's runs and the
-clean-text build, counting the page breaks where a paragraph runs over
-today and the new rule would cut it:
+already cut (the endnote section's edges, section 12, and a note that
+section 11 takes out of the body). A note that section 11 leaves in the
+body is not cut off: it is often the last body line of its page, short
+and ending with ".", and the text it interrupts runs on at the next
+page, so that before the lower-case condition the rule cut a sentence
+in two there (Domesday's pages 131 and 132, "We think it" / "highly
+probable that"; Gierke's 39 and 40).
 
-| book | paragraphs running over a page break | last line more than 20 pt short | of which, cut by the rule |
-|---|---|---|---|
-| Turney | (survey, section 21; it counted only breaks whose next first line is not indented) | 29 | 15 |
-| Haynes | (survey, the same) | 22 | 18 |
-| Haskins | 217 | 1 | 1 |
-| Stubbs | 280 | 30 | 15, 13 of them in the publisher's lists after the text |
-| Domesday | 456 | 15 | 8 |
-| Mariéjol | 353 | 28 | 15 |
-| Kadesh | 35 | 9 | 8 |
-| Gierke | 147 | 32 | 32 |
+Measured first on 17 November 2026 on the survey's runs and the
+clean-text build, counting the page breaks where a paragraph ran over
+and the rule would cut it ("first count" below; Turney's and Haynes'
+come from the survey, section 21, which counted only the breaks whose
+next first line is not indented). Measured again on 18 November 2026 by
+galley's code on the eight books' `lines.json` of the plan owner-books'
+layout, on the pass of the paragraphs that reaches `blocks.json`
+(section 12 finds the endnote section on a first pass): the breaks
+where the rule holds and no other rule of this section starts the
+next page's first line, before and after the lower-case condition:
 
-Read by their text, every cut ends a sentence that ends a paragraph, a
-note left in the body (Haskins 258; most of Gierke's 32, the notes of
-its introduction, pages 15 to 81, and of its translator), a list or an
-advertisement; none was checked against a page image
-or the reference texts, which the plan's evaluation run does
-(section 26). The 20 pt is the survey's and was not varied: the
+| book | first count: paragraphs running over a page break | first count: last line more than 20 pt short | first count: cut by the rule | 18 November: cut, without the lower-case condition | 18 November: cut |
+|---|---|---|---|---|---|
+| Turney | (survey) | 29 | 15 | 26 | 24 |
+| Haynes | (survey) | 22 | 18 | 28 | 28 |
+| Haskins | 217 | 1 | 1 | 0 | 0 |
+| Stubbs | 280 | 30 | 15, 13 of them in the publisher's lists after the text | 2 | 2 |
+| Domesday | 456 | 15 | 8 | 8 | 6 |
+| Mariéjol | 353 | 28 | 15 | 14 | 5 |
+| Kadesh | 35 | 9 | 8 | 8 | 3 |
+| Gierke | 147 | 32 | 32 | 32 | 13 |
+
+Stubbs' publisher's lists are excluded pages since 17 November 2026
+(section 27, point 4). Of the cuts without the lower-case condition, 10
+were read against the page images (Stubbs' pages 27 and 151, Domesday's
+28, 176, 418, 478 and 484, Gierke's 25, 41 and 146): 5 end a
+paragraph, 1 falls inside a table, and 4 follow a note left in the
+body, the text before it running on in lower case, which the condition
+now keeps. Of the cuts with it, 5 were read (Kadesh's pages 33 and 50,
+Gierke's 39 and 156, Mariéjol's 48): 1 ends a paragraph (Kadesh 50);
+3 follow a note left in the body where the text runs on with a capital
+("every" / "English township", Gierke 39; "the" / "People", Gierke
+156; Mariéjol 48), which the condition cannot see; and Kadesh 33 cuts
+"town of" / "Shabtuna", where layout gave the column beside the map
+before the line that ends the stream. The marker condition then keeps
+Gierke 39 and Mariéjol 48 and 281, and no other cut: Mariéjol has 3
+cuts, Gierke 12, the other books as in the last column. Gierke 156
+stays cut, since its note's last line is its second, which starts with
+no marker. The 20 pt is the survey's and was not varied: the
 justified lines of both owner's books end within about 1.3 pt of their
 region's edge (section 22's opening pages), so a line 20 pt short is
 not a justified line.
@@ -3291,9 +3323,13 @@ November 2026.)
 3. **A source line** is a line of the run, not its first, that either
    - starts with a dash, "—", "–" or "-", alone or several, as a word
      of its own or at the start of its first word (Haynes' OCR reads
-     one as "—-"), and has a line height at most 0.92 of the median
-     line height of the run's lines before it (Haynes: 0.73 to 0.90);
-     or
+     one as "—-"), has a letter or digit after its dashes, and has a
+     line height at most 0.92 of the median line height of the run's
+     lines before it (Haynes: 0.73 to 0.90). A line of dashes alone has
+     no letter or digit, so rule 2 passes over it as a stray mark and it
+     is never a source line: it would leave a source of no word, and its
+     dash's removal, `before` "—" and `after` "", is one the fidelity
+     check refuses; or
    - lies at least 60 pt right of the leftmost left side of the run's
      lines before it, and its right side lies no more than 5 pt left
      of their rightmost right side (Turney: 100.3 to 244.6 pt right,
