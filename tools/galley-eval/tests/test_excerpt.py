@@ -10,6 +10,7 @@ has them, so every one of the eight starts at words and lasts to
 markdown.
 """
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -47,6 +48,22 @@ def differences() -> frozenset[_Checked]:
         book, BookFolder(_FIXTURES / "haskins_eval"), _FIXTURES / "haskins_eval.html"
     )
     return frozenset(_checked(difference) for difference in evaluation.differences)
+
+
+def test_reference_that_ends_before_the_index_page_scores_no_index() -> None:
+    # The excerpt's index page, printed page 251, is a div with the id
+    # toclink_251 in the HTML; reference_ends_at leaves it out of the
+    # comparison, and the body before it is still scored.
+    book = replace(
+        read_books(_FIXTURES / "haskins_eval.toml")[0], reference_ends_at="toclink_251"
+    )
+    evaluation = evaluate(
+        book, BookFolder(_FIXTURES / "haskins_eval"), _FIXTURES / "haskins_eval.html"
+    )
+    words = evaluation.scorecard.outputs[0]
+    assert words.output is StageOutput.WORDS
+    assert words.text[Part.INDEX].reference_tokens == 0
+    assert words.text[Part.BODY].reference_tokens > 0
 
 
 def _extra_words(page_index: int, galley: tuple[str, ...]) -> tuple[_Checked, ...]:
