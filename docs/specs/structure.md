@@ -3451,8 +3451,8 @@ quotation mark is left alone.
 **The rule.** In every block, body and side text, after the joins over
 page breaks (section 2, step 3.2) and before notes are cut and
 references looked for, a word that starts with "?", ";", ":" or "!"
-(the **spaced sign**, followed by anything or nothing: ";", ";^",
-"?'") and follows another word of the same block, on the same line or
+(the **spaced sign**, followed by nothing or by characters that are not
+letters: ";", ";^", ";13", "?'", "?]") and follows another word of the same block, on the same line or
 the line before, is changed when the word before it ends with a letter,
 a digit or a closing bracket, ")" or "]":
 
@@ -3500,14 +3500,25 @@ reference "(1)" stays a word of its own, a no-break space after it.
 November 2026), words of blocks and notes that start with one of the
 signs and follow a word:
 
-| book | spaced signs | of which ; / : / ? / ! | signs already attached | share spaced | left alone (after a dash or a quotation mark) |
-|---|---|---|---|---|---|
-| Haskins | 91 | 74 / 11 / 0 / 6 | 501 | 15% | under 10 |
-| Stubbs | 1,039 | 973 / 53 / 12 / 1 | 589 | 64% | under 10 |
-| Domesday | 2,181 | 1,254 / 747 / 177 / 3 | 1,095 | 67% | 75 |
-| Gierke | 951 | 523 / 405 / 16 / 7 | 939 | 50% | 31 |
-| Kadesh | 103 | 67 / 31 / 3 / 2 | 221 | 32% | under 10 |
-| Mariéjol (French: no-break space) | 1,349 | 549 / 599 / 43 / 158 | 847 | 61% | 251 |
+| book | spaced signs | of which ; / : / ? / ! | signs already attached | share spaced | left alone (after a dash or a quotation mark) | changed by the rule |
+|---|---|---|---|---|---|---|
+| Haskins | 91 | 74 / 11 / 0 / 6 | 501 | 15% | under 10 | 89 |
+| Stubbs | 1,039 | 973 / 53 / 12 / 1 | 589 | 64% | under 10 | 1,007 |
+| Domesday | 2,181 | 1,254 / 747 / 177 / 3 | 1,095 | 67% | 75 | 2,112 |
+| Gierke | 951 | 523 / 405 / 16 / 7 | 939 | 50% | 31 | 885 |
+| Kadesh | 103 | 67 / 31 / 3 / 2 | 221 | 32% | under 10 | 97 |
+| Mariéjol (French: no-break space) | 1,349 | 549 / 599 / 43 / 158 | 847 | 61% | 251 | 1,036 |
+
+The last column is of the rule as it stands, measured by `make_blocks`
+on the six books' `lines.json` on 18 November 2026: the signs attached,
+and in Mariéjol the no-break spaces. A sign followed by letters is not a
+spaced sign (review of work package 5, 18 November 2026): it is a speck
+the OCR read before a word, and attaching it glued two printed words
+into one with no sign printed between them, Gierke page 29's
+"universitas ;is," into "universitas;is,", 6 times in the English books
+(Gierke's "of ;y°ve'" and "imperatorem ;...a", Stubbs' "on ?uer",
+"the !Ja?nSt" and "m ;s."); in Mariéjol it put 113 of 1,149 no-break
+spaces before such a word ("landgrave !e").
 
 The owner's two books were not counted. An edit written against a
 block's text before this change no longer applies, since its checksum
