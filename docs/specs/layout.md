@@ -506,9 +506,11 @@ is laid out as one region, as the skeleton did.
    whatever its gap, at a row that meets every other condition and
    opens with a **note marker**: its first word is 1 to 3 digits, with
    an optional "." after them, or 1 or 2 of the signs `* ^ • † ‡ §`,
-   and its second word starts with a capital letter; the first such row
-   wins when it comes before the row the gap rule finds. The
-   band runs to the foot of the page; the rows above it are the body.
+   and its second word starts with a capital letter, when the nearest
+   row above it that holds a letter or a digit is not small (a speck
+   above it is passed over); the first such row wins when it comes
+   before the row the gap rule finds. The band runs to the foot of the
+   page; the rows above it are the body.
 
    The gapless start is for notes set close under the text: Haskins'
    page 28, whose note row is small (median word height 5.6 pt against
@@ -526,6 +528,21 @@ is laid out as one region, as the skeleton did.
    Gierke or Turney. This form is narrower than structure's note
    marker (structure §11): layout needs only the forms that start the
    notes found, and keeps none of structure's code.
+
+   The row above must not be small because a note that opens with a
+   marker in the middle of the notes would otherwise start the band
+   there: on Kadesh's pages 14, 28 and 40 the notes, in two columns,
+   opened no band by the gap, and a marker inside them started one, so
+   that the column cut read a note's continuation into another note
+   (found by the review of 18 November 2026). With the condition,
+   measured that day on the eight books' `words.json`, the marker
+   starts the band on Haskins' 5 pages and 13 of Domesday's, as above
+   but 534, and on no page of Kadesh or Haynes; on Domesday's page 406
+   the row above its note is a speck "•", passed over, and the note
+   starts the band as the page image shows it. Kadesh's 14, 28 and 40,
+   Domesday's 534 (whose band opens with a note run on from the page
+   before, small, above the note "1") and Haynes' index page 422 then
+   have no band, as before the gapless start.
    On a page whose every row is small, such as a page of the index, there
    is no band: the rows are the body.
 5. **Columns.** The body, and the band apart from it, are each cut into
