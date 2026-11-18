@@ -592,7 +592,7 @@ def _links(
     )
 
 
-def contents_runs(contents_pages: frozenset[int]) -> tuple[tuple[int, ...], ...]:
+def _contents_runs(contents_pages: frozenset[int]) -> tuple[tuple[int, ...], ...]:
     """The contents runs of `contents_pages`, each its consecutive page
     indices (spec section 30, "Terms")."""
     runs: list[list[int]] = []
@@ -619,14 +619,15 @@ def _contents_entries(
     section 30): each run's body stream but its title."""
     return tuple(
         entry
-        for run in contents_runs(contents_pages)
+        for run in _contents_runs(contents_pages)
         for entry in contents_entries(
             tuple(
                 line
                 for page in pages
                 if page.index in run
+                for taken in (_run_lines(page),)
                 for number, line in enumerate(page.body)
-                if number not in _run_lines(page)
+                if number not in taken
             )
         )
     )
@@ -693,7 +694,7 @@ def _with_contents_links(
     )
     headings = tuple(block_text(blocks[position]) for position in heading_positions)
     refs: dict[int, str] = {}
-    for run in contents_runs(contents_pages):
+    for run in _contents_runs(contents_pages):
         candidates = tuple(
             position
             for position, entry in zip(entry_positions, entries, strict=True)

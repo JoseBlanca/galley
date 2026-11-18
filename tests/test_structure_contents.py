@@ -34,7 +34,6 @@ from galley.structure._contents import (
     contents_entries,
     contents_title,
     is_link_candidate,
-    plain,
     run_links,
 )
 from galley.structure._lines import PlacedLine
@@ -336,8 +335,11 @@ def test_entry_keeps_every_line_for_its_origin_with_its_label_line() -> None:
 # The links (spec section 30, rule 9).
 
 
-def test_plain_text_is_case_folded_letters_with_single_spaces() -> None:
-    assert plain(" (TjDark Chemists,  and-Master ") == "tjdark chemists and master"
+def test_titles_are_compared_case_folded_as_letters_with_single_spaces() -> None:
+    # Spec section 30, rule 9: the plain texts are equal.
+    assert run_links(
+        (" (TjDark Chemists,  and-Master ",), ("tjdark CHEMISTS and master",)
+    ) == ((0, 0),)
 
 
 def test_entries_link_to_their_headings_in_order() -> None:
