@@ -242,4 +242,308 @@ def test_endnote_section_reaches_back_over_a_group_heading_to_the_notes_title() 
     blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     assert _texts(blocks) == ("NOTES",)
     assert blocks.blocks[0].kind is BlockKind.HEADING
-    assert _endnotes(blocks)[0][1].startswith("Introduction")
+    assert blocks.notes[0].group == "Introduction"
+
+
+# Spec section 12: note groups, their headings and the chapter of each.
+# The body: a chapter per page, its centred title the page's first line
+# (a level-1 heading, the page having no running head), then a paragraph
+# whose lines end with the references "word1." to "word9.".
+
+_CHAPTERS = ("Clockwork Garden Story", "Silent Harbour Rebuilt")
+# The body's and the Haynes-form notes' column runs from 50 to 300 pt.
+_LEFT_PT = 50.0
+_RIGHT_PT = 300.0
+
+
+def _spread(text: str, x0: float, x1: float, top: float) -> Line:
+    """A line of the words of `text` spread from `x0` to `x1`."""
+    parts = text.split(" ")
+    step = (x1 - x0) / len(parts)
+    words = tuple(
+        Word(
+            part,
+            Box(
+                x0 + step * n,
+                top,
+                x1 if n == len(parts) - 1 else x0 + step * (n + 1) - 2,
+                top + _WORD_HEIGHT_PT,
+            ),
+            None,
+        )
+        for n, part in enumerate(parts)
+    )
+    return Line(_box(tuple(word.box for word in words)), words)
+
+
+def _chapter_page(index: int, title: str) -> PageLayout:
+    width = _CHAR_PT * len(title)
+    lines = (
+        _spread(title, 175 - width / 2, 175 + width / 2, 50.0),
+        _spread("The chapter opens here and", _LEFT_PT + 20, _RIGHT_PT, 85.0),
+        *(
+            _spread(
+                f"a full line goes on to word{n}.", _LEFT_PT, _RIGHT_PT, 85.0 + 15 * n
+            )
+            for n in range(1, 10)
+        ),
+        _spread("and it ends.", _LEFT_PT, 150.0, 235.0),
+    )
+    return PageLayout(index, (_region(*lines),), ())
+
+
+def _dotted_notes(top: float) -> tuple[Line, ...]:
+    """Haynes' form: notes "1." to "9.", each an indented first line, a full
+    line and a short last line, 15 pt apart."""
+    return tuple(
+        line
+        for n in range(1, 10)
+        for line in (
+            _spread(
+                f"{n}. The note of its", _LEFT_PT + 20, _RIGHT_PT, top + 45 * (n - 1)
+            ),
+            _spread(
+                "chapter goes on over a full",
+                _LEFT_PT,
+                _RIGHT_PT,
+                top + 45 * (n - 1) + 15,
+            ),
+            _spread("line and ends.", _LEFT_PT, 150.0, top + 45 * (n - 1) + 30),
+        )
+    )
+
+
+def _group_heading(number: int, title: str, top: float) -> tuple[Line, ...]:
+    """A two-line group heading at the left edge."""
+    first, *rest = title.split(" ")
+    return (
+        _spread(f"Chapter {number}. {first}", _LEFT_PT, 160.0, top),
+        _spread(" ".join(rest), _LEFT_PT, 140.0, top + _PITCH_PT),
+    )
+
+
+def _links_by_chapter(blocks: BlocksFile) -> tuple[tuple[int, str], ...]:
+    """Each reference to an endnote: the page of its block and the marker
+    of its note, with the group of the note's group as its number."""
+    group_of: dict[str, int] = {}
+    group = -1
+    for note in blocks.notes:
+        if note.group is not None:
+            group += 1
+        group_of[note.id] = group
+    markers = {note.id: note.marker for note in blocks.notes}
+    return tuple(
+        (
+            block.origin[0].page_index,
+            f"{group_of[span.note_ref]}:{markers[span.note_ref]}",
+        )
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref is not None
+    )
+
+
+def _expected_links(marker: str) -> tuple[tuple[int, str], ...]:
+    return tuple((page, f"{page}:{n}{marker}") for page in (0, 1) for n in range(1, 10))
+
+
+def test_note_groups_link_each_note_to_the_references_of_its_own_chapter() -> None:
+    # Two groups of notes "1." to "9." on one page, each under a two-line
+    # group heading 1.8 pitches (27 pt) below the note before, the first at
+    # the page's top.
+    first = (*_group_heading(1, _CHAPTERS[0], 50.0), *_dotted_notes(80.0))
+    second_top = first[-1].box.top + 27.0
+    second = (
+        *_group_heading(2, _CHAPTERS[1], second_top),
+        *_dotted_notes(second_top + 30.0),
+    )
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert _links_by_chapter(blocks) == _expected_links(".")
+    assert tuple(note.group for note in blocks.notes if note.group is not None) == (
+        f"Chapter 1. {_CHAPTERS[0]}",
+        f"Chapter 2. {_CHAPTERS[1]}",
+    )
+    assert len(_endnotes(blocks)) == 18
+
+
+def _turney_group(number: int, title: str, top: float) -> tuple[Line, ...]:
+    """Turney's form: a group heading hung like a note, "2 Silent ...",
+    and notes "1" to "9" hung 17 pt, each of three lines 12 pt apart."""
+    heading = _line(f"{number} {title}", _HUNG_PT, top)
+    return (heading, *_hung_notes(tuple(str(n) for n in range(1, 10)), top + 27.0))
+
+
+def test_note_groups_in_turney_form_link_each_note_to_its_own_chapter() -> None:
+    # The first group heading starts with a bare "1", as Turney's chapter
+    # One does: it is the heading, and no group starts at it.
+    first = _turney_group(1, _CHAPTERS[0], 50.0)
+    second = _turney_group(2, _CHAPTERS[1], first[-1].box.top + 30.0)
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert _links_by_chapter(blocks) == _expected_links("")
+    assert tuple(note.group for note in blocks.notes if note.group is not None) == (
+        f"1 {_CHAPTERS[0]}",
+        f"2 {_CHAPTERS[1]}",
+    )
+
+
+def test_group_heading_left_at_the_end_of_a_note_is_cut_off_it() -> None:
+    # The first test's second heading runs on from note 9's short last
+    # line, flush left: the paragraph rules do not cut it, the group rule
+    # does, and note 9 keeps only its own words.
+    first = (*_group_heading(1, _CHAPTERS[0], 50.0), *_dotted_notes(80.0))
+    second_top = first[-1].box.top + 27.0
+    second = (
+        *_group_heading(2, _CHAPTERS[1], second_top),
+        *_dotted_notes(second_top + 30.0),
+    )
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert _endnotes(blocks)[8] == (
+        "9.",
+        "The note of its chapter goes on over a full line and ends.",
+    )
+
+
+def test_group_heading_at_a_gap_of_1_2_pitches_is_no_heading() -> None:
+    # The second heading 18 pt (1.2 pitches) below note 9 stays in it, and
+    # its group takes the chapter after the first group's: the links stay.
+    first = (*_group_heading(1, _CHAPTERS[0], 50.0), *_dotted_notes(80.0))
+    second_top = first[-1].box.top + 18.0
+    second = (
+        *_group_heading(2, _CHAPTERS[1], second_top),
+        *_dotted_notes(second_top + 30.0),
+    )
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(note.group for note in blocks.notes if note.group is not None) == (
+        f"Chapter 1. {_CHAPTERS[0]}",
+    )
+    assert _endnotes(blocks)[8][1].endswith(f"Chapter 2. {_CHAPTERS[1]}")
+
+
+def test_chapter_of_group_is_the_heading_its_title_matches_not_the_next() -> None:
+    # The groups are printed in the order of the chapters, but a third
+    # chapter "Silent Harbour Rebuilt" comes first in the body: each group
+    # takes the heading its title is alike to.
+    first = (*_group_heading(1, _CHAPTERS[0], 50.0), *_dotted_notes(80.0))
+    second_top = first[-1].box.top + 27.0
+    second = (
+        *_group_heading(2, _CHAPTERS[1], second_top),
+        *_dotted_notes(second_top + 30.0),
+    )
+    pages = (
+        _chapter_page(0, "An Unrelated Opening Chapter"),
+        _chapter_page(1, _CHAPTERS[0]),
+        _chapter_page(2, _CHAPTERS[1]),
+        PageLayout(3, (_region(*first, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    pages_linked = tuple(page for page, _ in _links_by_chapter(blocks))
+    assert pages_linked == (*(1,) * 9, *(2,) * 9)
+
+
+def test_chapter_of_group_without_heading_is_the_one_after_the_group_before() -> None:
+    first = (*_group_heading(1, _CHAPTERS[0], 50.0), *_dotted_notes(80.0))
+    second = _dotted_notes(first[-1].box.top + _PITCH_PT)
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    pages_linked = tuple(page for page, _ in _links_by_chapter(blocks))
+    assert pages_linked == (*(0,) * 9, *(1,) * 9)
+
+
+def test_note_group_is_one_when_no_marker_reads_1_again() -> None:
+    # Gierke's form: one run "1." to "18." under a centred "NOTES": one
+    # group, no group heading, and its notes matched over the whole body.
+    notes = tuple(
+        line
+        for n in range(1, 19)
+        for line in (
+            _spread(f"{n}. The note which", _LEFT_PT + 20, _RIGHT_PT, 35.0 + 45 * n),
+            _spread("goes on over a full", _LEFT_PT, _RIGHT_PT, 50.0 + 45 * n),
+            _spread("line and ends.", _LEFT_PT, 150.0, 65.0 + 45 * n),
+        )
+    )
+    later = tuple(
+        _spread(f"a full line goes on to word{n}.", _LEFT_PT, _RIGHT_PT, 50.0 + 15 * n)
+        for n in range(10, 19)
+    )
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        PageLayout(1, (_region(*later),), ()),
+        PageLayout(
+            2,
+            (_region(_spread("NOTES", 160.0, 190.0, 40.0)), _region(*notes)),
+            (),
+        ),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert not any(note.group for note in blocks.notes)
+    assert sum(note.referenced for note in blocks.notes) == 18
+
+
+def test_heading_block_inside_a_note_group_is_made_a_paragraph_of_its_note() -> None:
+    # A centred line between notes 4 and 5, a heading block in the body,
+    # is a later block of note 4 and no heading.
+    notes = _dotted_notes(80.0)
+    centred = _spread("SEE ALSO", 155.0, 195.0, notes[11].box.top + 15)
+    later = tuple(
+        Line(
+            Box(line.box.x0, line.box.top + 30, line.box.x1, line.box.bottom + 30),
+            tuple(
+                Word(
+                    word.text,
+                    Box(
+                        word.box.x0,
+                        word.box.top + 30,
+                        word.box.x1,
+                        word.box.bottom + 30,
+                    ),
+                    None,
+                )
+                for word in line.words
+            ),
+        )
+        for line in notes[12:]
+    )
+    first = (*_group_heading(1, _CHAPTERS[0], 50.0), *notes[:12], centred, *later)
+    second_top = first[-1].box.top + 27.0
+    second = (
+        *_group_heading(2, _CHAPTERS[1], second_top),
+        *_dotted_notes(second_top + 30.0),
+    )
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    note_4 = next(note for note in blocks.notes if note.marker == "4.")
+    assert tuple((block.kind, block_text(block)) for block in note_4.blocks[1:]) == (
+        (BlockKind.PARAGRAPH, "SEE ALSO"),
+    )
+    assert not any(
+        block.kind is BlockKind.HEADING and "SEE" in block_text(block)
+        for block in blocks.blocks
+    )
