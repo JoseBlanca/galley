@@ -40,3 +40,21 @@ description of the printed page listed an item "(iii)" that the page
 does not print; it is removed. The files leave out, by design, text
 their tests do not measure (page 143's margin note and footnotes, page
 156's opening paragraph, the engraver's credit on Kadesh page 34).
+
+## Tasks 6.1 and 6.2 (stream `markdown`)
+
+Done as planned and merged at 475eafb: markdown writes list items as
+Pandoc lists and the printed contents as one entry per line, nested and
+linked to its heading; the fidelity check at the markdown boundary reads
+both. 23 tests of markdown lists, 21 of the fidelity check (one added on
+the orchestrator's request: each contents link must go to its own
+entry's heading, not only to some heading). epubcheck accepts a book
+with both. Two choices not in the plan: footnotes of a list's items are
+defined after the whole list, so that their definitions do not split
+it; Pandoc reads a list starting at "v." or "x." as letters, which the
+reader shows the same way, so it is documented and left.
+
+The default run grew past a minute while three streams ran tests at once
+(78 to 89 s at a load of 9 to 13, with the shared excerpt fixture
+passing its 30 s timeout); the base commit did the same under that
+load. It is measured again on an idle machine at the end.
