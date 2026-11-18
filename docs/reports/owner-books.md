@@ -22,7 +22,7 @@ output and checked against the page images:
 | chapter headings with their label ("Chapter One") | Turney 1, Haynes 0 headings in all | 10 of 10, 16 of 16 |
 | Turney's running heads left in the text | 98 | 0 |
 | Turney's page numbers taken for margin notes | 329 | 0 |
-| notes at the back linked to their reference | Turney 0; Haynes 127, 120 of them to another chapter's note | Turney 530 of 613; Haynes 582 of 632; none to a wrong note |
+| notes at the back linked to their reference | Turney 0; Haynes 127, 120 of them to another chapter's note | Turney 530 of 613; Haynes 582 of 632 (584 before review 3 refused 2 doubtful links); none to a wrong note |
 | epigraphs, with their source apart | run into the text | Turney 13, Haynes 21 (8 in verse) |
 
 Also, in every book: a page break ends a paragraph after a short last
@@ -32,8 +32,9 @@ sign no longer breaks a line; words glued at a capital ("theAvre") are
 split; and words read twice by re-reading fell (Domesday 30 to 5,
 Gierke 12 to 0).
 
-**The public-domain books**, scored against their online editions
-(galley-eval): the share of wrong words in the body fell on Stubbs from
+**The public-domain books**, scored against their online editions by
+the project's scoring tool (`galley-eval`), against its run at the
+plan's start: the share of wrong words in the body fell on Stubbs from
 0.053 to 0.033 and on Domesday from 0.075 to 0.058; Haskins' notes
 whose reference is right rose from 61 to 66. Three scores fell by
 amounts beyond the plan's tolerances, none by a lost word: Mariéjol's
@@ -48,13 +49,16 @@ a dash, get one in the EPUB as Haynes' do; group headings of the notes
 stay out of the table of contents; Stubbs' publisher's lists are left
 out of its book (config); the running heads' likeness threshold went
 from 0.75 to 0.70; the page-break rule does not cut when the next page
-goes on in lower case or the last line is a footnote's first.
+goes on in lower case or the last line is a footnote's first. Each is a
+rule in a spec and a few lines of code; any can be changed after the
+merge by a spec change and its code, as a later task.
 
 **Format changes**: blocks.json goes to version 4 (the epigraph, its
 source, a note's group, three new kinds of recorded word change), and
 lines.json to version 3 (re-reading records the junk words it
-replaced). Runs made before the merge must run layout and structure
-again.
+replaced). A run made before the merge must run layout and structure
+again: galley refuses to read the old files and says which stage to
+run.
 
 **Still wrong**, for later plans:
 
@@ -75,7 +79,8 @@ again.
 
 1. The order to merge into `main`.
 2. A look at the two EPUBs, `runs/owner-books/turney/book.epub` and
-   `runs/owner-books/haynes/book.epub` in the main checkout: the table
+   `runs/owner-books/haynes/book.epub` in the main checkout, built from
+   the plan's final code: the table
    of contents, a chapter opening with its epigraph, and a note
    followed from the text to the back and back.
 3. Whether Turney's sources should keep the book's look (no dash)
