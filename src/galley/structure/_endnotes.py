@@ -444,8 +444,8 @@ def group_reaches(
     matched against, from the first position to before the second (spec
     section 12, "References" and "The chapter of a group"): with one
     group, the body before the section, the first `before_section`
-    blocks; with several, from the group's chapter heading to the heading
-    of the next group's chapter, or to the section for the last group.
+    blocks; with several, from the group's chapter heading to the chapter
+    heading of the next group after it that has one, or to the section.
     `chapters` are the positions and letters, in lower case, of the
     body's level-1 heading blocks after the contents pages and before the
     section, in order. A group whose chapter is not found reaches no
@@ -464,12 +464,17 @@ def group_reaches(
     found = tuple(
         chapters[index][0] if index is not None else None for index in indices
     )
+    # Each reach ends at the next group after it that has a chapter.
+    next_starts = tuple(
+        next((later for later in found[group + 1 :] if later is not None), None)
+        for group in range(len(found))
+    )
     return tuple(
         (start, end)
         if start is not None
         and (end := next_start if next_start is not None else before_section) > start
         else (0, 0)
-        for start, next_start in zip(found, (*found[1:], None), strict=True)
+        for start, next_start in zip(found, next_starts, strict=True)
     )
 
 

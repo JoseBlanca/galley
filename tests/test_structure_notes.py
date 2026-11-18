@@ -22,6 +22,7 @@ from galley.model import (
     block_text,
 )
 from galley.structure import make_blocks, reference_candidate
+from galley.structure._endnotes import group_reaches
 from galley.structure._references import Candidate, NoteToMatch, match_endnotes
 
 _HASH = "a" * 64
@@ -805,3 +806,13 @@ def test_hanging_number_on_a_contents_page_starts_no_paragraph() -> None:
         _lines_of(page), _NO_WORDS, contents_pages=frozenset({0}), workers=1
     )
     assert len(blocks.blocks) == 1
+
+
+def test_group_reach_ends_at_the_next_group_that_has_a_chapter() -> None:
+    # Two groups without a chapter between "alpha" and "betagamma": the
+    # first reaches to "betagamma"'s chapter, not over it to the section.
+    assert group_reaches(
+        ((10, "alpha"), (20, "betagamma"), (30, "delta")),
+        ("alpha", "zzzz", "qqqq", "betagamma"),
+        40,
+    ) == ((10, 20), (0, 0), (0, 0), (20, 40))
