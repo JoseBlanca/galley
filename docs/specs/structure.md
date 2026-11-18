@@ -760,7 +760,9 @@ than a note's short line does; so the rule is for margin notes only.
    Such a title starts a paragraph also at a page break, as rule 2 says,
    which is the chapter's first page of section 9.
 3. **it starts with a hanging number**: its first word is 1 to 3 digits
-   with nothing after them, it has a second word, and its left side
+   with nothing after them, its second word starts with a letter or a
+   quotation mark, it is not on a page of the config's
+   `contents_pages`, and its left side
    lies 5 to 20 pt left of its region's **text edge**, the commonest
    left side (layout §1) of the region's lines whose first word is not
    such a number, when the region has at least 3 of those. This is a
@@ -782,6 +784,20 @@ than a note's short line does; so the rule is for margin notes only.
    its `contents_pages`), 3 of Mariéjol's notes and 1 line of Stubbs'
    index; none of Haynes'. A start inside a table cuts the table into
    more paragraphs than before; galley has no table kind (section 28).
+   The second word's letter and the contents pages were added in the
+   review of the plan's work package 3 (18 November 2026): the rule as
+   first written also started 39 rows of Domesday's tables (pages 158,
+   425 and 479), whose number columns layout gives as regions of their
+   own ("1 10", "3 0)"), and 8 lines of Gierke's printed contents
+   (pages 65 and 66), and a margin note beside such a row was placed
+   before it ("(?)", "E]"); Domesday had 2,420 blocks against 2,381
+   without the rule. With them it starts no line of Gierke and one of
+   Domesday ("235 L 3 J", page 425), 2,382 blocks; Turney's notes keep
+   their 620 starts, and its page 174's caption loses one. galley-eval
+   gives Domesday's paragraph precision and recall 0.860 and 0.891 with
+   the rule and without it, since its reference texts do not hold the
+   tables, so the cut was judged on the page images: the rows are cells
+   of a table, not paragraphs.
    A line whose first word is one character that is not a digit, with
    a second word, hung so (5 to 20 pt left of the text edge), starts a
    paragraph too when the next three lines of its page that start with
