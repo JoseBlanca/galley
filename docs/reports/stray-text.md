@@ -162,3 +162,35 @@ Stubbs 6,387 to 6,373 (the 5 junk words, and 9 words of two notes on
 pages 102 and 177 that the text layer now gives with the same text);
 Domesday 4,955, unchanged. pytest: 2,885 passed, 9 expected failures;
 `pytest -m whole_book -k stubbs`: 8 passed.
+
+## Task 3.5: footnote bands measured against the page in structure
+
+Merged: 6e7cc3b and 4704e2c (structure §1, §2 and §16), ed5c47c (code
+and tests), ea13ac0 (two whole-book tests corrected). structure now
+accepts the bands layout finds: a footnote band is measured against
+the page's own rows, and a one-line note is a band when it is the
+page's last region, holds one line opening "1" and a capital, and lies
+below the body. A second fix keeps Gierke's endnotes as before: its
+marker form becomes digits, which had cut 79 of its 299 endnotes in
+mid-sentence until the rule that caused it was left out of the endnote
+section.
+
+| book | footnotes before | after | notes without a reference before | after |
+|---|---|---|---|---|
+| Gierke | 2 | 69 | 93 | 98 |
+| Domesday | 1,837 | 1,847 | 323 | 323 |
+| Mariéjol | 1,114 | 1,120 | 424 | 426 |
+
+The other five books do not change. Gierke gains footnotes on 32
+pages: all 27 introduction pages, page 61, and 109, 146, 147 and 156.
+Domesday's ten one-line notes are all linked. Seven changed pages were
+checked against their images (Gierke 15, 37, 61, 109; Domesday 163, 185;
+Mariéjol 245).
+
+Two whole-book tests were wrong, not the code: the one-line test took
+Gierke's contents page number "1 1 6" for a note left in the body, and
+now looks for "1" followed by a capitalised word; Haskins' count of
+footnote pages fell from 65 to 64 because page 277, an endpaper whose
+pattern the text layer read as a footnote, is now inkless.
+After the merge: ruff and ty pass; pytest 2,895 passed, 6 expected
+failures, in 82 s.
