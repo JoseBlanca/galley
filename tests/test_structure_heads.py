@@ -493,15 +493,14 @@ _PUBLIC_DOMAIN_BOOKS = (
 _LABEL_WORDS = frozenset(
     {"chapter", "chapitre", "essay", "part", "partie", "book", "livre"}
 )
-# The pages whose running head layout's step 3 or the regions beside the
-# head (spec section 3) now remove. Gierke's 72 and 78 are not among them:
-# their heads, read "List of ~-l ntlioritics." and "List of slnthoriti*
-# ixxiii", are 0.74 and 0.70 alike to the others, below the 0.75 of
-# section 3, and stay in the text.
+# The pages whose running head layout's step 3, the regions beside the
+# head or the likeness of 0.70 (spec section 3) now remove; Gierke's 72
+# and 78 are read "List of ~-l ntlioritics." and "List of slnthoriti*
+# ixxiii", 0.74 and 0.70 alike to the others.
 _HEADS_REMOVED = {
     "normansineuropea00hask": (23, 30, 66, 235),
     "earlyplantagenet01stub": (20, 100, 152, 158, 186, 202, 210),
-    "politicaltheorie00gieruoft": (69, 70, 71, 73, 74, 75, 76, 77, 79),
+    "politicaltheorie00gieruoft": tuple(range(69, 80)),
 }
 
 
@@ -548,8 +547,6 @@ def test_whole_book_running_heads_of_the_reference_pages_are_removed(
         if removal.reason is RemovalReason.RUNNING_HEAD
     )
     assert set(_HEADS_REMOVED[book]) <= removed
-    if book == "politicaltheorie00gieruoft":
-        assert not {72, 78} & removed
 
 
 @pytest.mark.whole_book

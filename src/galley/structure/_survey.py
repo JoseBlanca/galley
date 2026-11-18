@@ -36,10 +36,12 @@ from galley.wordlist import word_key
 # of the head lines (Haskins' title page 16 is 2.85 below; Kadesh's article
 # title on page 8 about 2.7).
 _HEAD_PITCHES = 2.0
-# Spec section 3: heads alike by at least 0.75 of their letters, which are
+# Spec section 3: heads alike by at least 0.70 of their letters, which are
 # at least 4; heads whose letters differ in length by more than 8 are not
-# compared (spec section 9, for speed).
-_HEAD_ALIKE_RATIO = 0.75
+# compared (spec section 9, for speed). 0.70, not 0.75 (17 November 2026):
+# it takes 13 more running heads on the six books, Gierke's damaged 72 and
+# 78 among them, and no line of text.
+_HEAD_ALIKE_RATIO = 0.70
 _HEAD_MIN_LETTERS = 4
 _HEAD_LENGTH_DIFFERENCE = 8
 # Spec section 3, the head of a short section: its likeness is to the
@@ -218,7 +220,7 @@ def _alike_to_any(line_letters: str, others: tuple[str, ...], alike: _Alike) -> 
 def alike_to_a_head(line_letters: str, others: tuple[str, ...]) -> bool:
     """Whether `line_letters`, the letters of a line, are alike to any of
     `others` by section 3's rule for running heads: at least 4 letters,
-    0.75 alike."""
+    0.70 alike."""
     return _alike_to_any(line_letters, others, _HEADS_ALIKE)
 
 

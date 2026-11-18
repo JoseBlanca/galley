@@ -7,17 +7,20 @@
   "expected": {
     "removals": [
       {
+        "reason": "running_head",
+        "text": "List of ~-l ntlioritics."
+      },
+      {
         "reason": "signature_mark",
         "text": "e 2"
       }
     ],
     "page_numbers": [],
     "heading_lines": [
-      "List of ~-l ntlioritics.",
       "Century XIV."
     ]
   },
-  "known": "The head is read \"List of ~-l ntlioritics.\"; its letters are 0.74 (page 72) or 0.70 (page 78) alike to the other heads', below the 0.75 of structure spec section 3, and \"ixxiii\" is no roman numeral, so the head stays in the text under the rules as written, although the plan's deliverable 4 counts it among the running heads removed. The head left in the text is then the page's first line, set in larger type than the list's lines below it, so the tall branch of structure spec section 14 takes it for a level-1 heading (the first line of a page without a running head); changed by task 1.5 of the plan owner-books, 17 November 2026, from the rules' output, not yet compared with the page image.",
+  "known": "The head is read \"List of ~-l ntlioritics.\", 0.74 alike to the other heads; since structure spec section 3 takes heads 0.70 alike (17 November 2026), it is removed as a running head.",
   "printed": {
     "book_page_index": 72,
     "running_head": {
