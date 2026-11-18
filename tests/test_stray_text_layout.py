@@ -25,7 +25,15 @@ from galley.model import (
 
 _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "stray_text"
 
-_TASK_3_3 = "task 3.3 of docs/plans/stray-text.md: the footnote band and one-line notes"
+# Layout makes the one-line note the page's band (step 4), but structure
+# takes a region as a band region only when its words are at most 0.85 of
+# the body word height (structure spec section 2), which a note boxed as
+# tall as the body is not: it becomes a paragraph or a margin note. No task
+# of the plan changes that rule.
+_STRUCTURE_FULL_HEIGHT_BAND = (
+    "structure's band region needs small words (structure spec section 2); "
+    "no task of docs/plans/stray-text.md takes a full-height band"
+)
 _TASK_4_1 = (
     "task 4.1 of docs/plans/stray-text.md: the shortened-row test by size in "
     "the cut-in zones"
@@ -116,7 +124,22 @@ def _footnotes_of_page(folder: BookFolder, page: int) -> list[tuple[str, str]]:
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.xfail(strict=True, reason=_TASK_3_3)
+@pytest.mark.parametrize("page", [4, 5, 6])
+def test_one_line_note_boxed_as_tall_as_the_body_is_the_last_region_alone(
+    excerpt_books: frozendict[str, BookFolder], page: int
+) -> None:
+    # Layout's half of the case: the note is the band, the page's last
+    # region, apart from the body's.
+    (note,) = _expected("domesday_notes", page)["footnotes"]
+    band = _page_layout(excerpt_books["domesday_notes"], page).regions[-1]
+    assert [" ".join(word.text for word in line.words) for line in band.lines] == [
+        f"{note['marker']} {note['text']}"
+    ]
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+@pytest.mark.xfail(strict=True, reason=_STRUCTURE_FULL_HEIGHT_BAND)
 @pytest.mark.parametrize("page", [4, 5, 6])
 def test_one_line_note_boxed_as_tall_as_the_body_is_a_footnote(
     excerpt_books: frozendict[str, BookFolder], page: int

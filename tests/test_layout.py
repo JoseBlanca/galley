@@ -1324,6 +1324,95 @@ def test_band_needs_a_gap_of_1_1_pitches_above_it(gap: float, regions: int) -> N
     assert len(result.regions) == regions
 
 
+def _tall_rows(count: int, height: float) -> tuple[Word, ...]:
+    """`count` full rows of the column of `_MEASURES`, 12 pt apart from 100,
+    their words `height` high."""
+    return tuple(
+        replace(word, box=replace(word.box, bottom=word.box.top + height))
+        for word in _rows(count)
+    )
+
+
+@pytest.mark.parametrize(("note_height", "regions"), [(8.0, 2), (8.5, 1)])
+def test_band_rows_are_small_at_0_82_of_the_pages_median_row_height(
+    note_height: float, regions: int
+) -> None:
+    # Gierke's introduction: body rows 10 pt high, notes 8 pt, where the
+    # book's body word height is 8 (so 8 is not small against the book).
+    band = _rows_of_height(5, _LAST_BODY_TOP + 1.5 * _PITCH, note_height)
+    result = layout_page(_page(0, (*_tall_rows(20, 10.0), *band)), _MEASURES)
+    assert len(result.regions) == regions
+
+
+def _prose_rows(count: int) -> tuple[Word, ...]:
+    """`count` full rows of the column of `_MEASURES`, 12 pt apart from 100,
+    of three words of 8 characters: 24 characters at 8 pt each."""
+    return tuple(
+        _word(
+            f"{word.text:x<8}", word.box.x0, word.box.top, word.box.x1, word.box.bottom
+        )
+        for word in _rows(count)
+    )
+
+
+def _one_line_note(
+    texts: tuple[str, ...], point_per_character: float, top: float
+) -> tuple[Word, ...]:
+    """A row of words `texts` as high as the body, each `point_per_character`
+    wide for each character, 4 pt apart from 50."""
+    words = []
+    left = 50.0
+    for text in texts:
+        right = left + point_per_character * len(text)
+        words.append(_word(text, left, top, right, top + _ROW_HEIGHT))
+        left = right + 4
+    return tuple(words)
+
+
+_ONE_LINE_NOTE = ("1", "D.", "B.", "i.", "141", "b.")
+
+
+@pytest.mark.parametrize(
+    ("texts", "point_per_character", "band"),
+    [
+        (_ONE_LINE_NOTE, 6.0, True),
+        (_ONE_LINE_NOTE, 7.1, True),
+        (_ONE_LINE_NOTE, 7.3, False),
+        (("2", *_ONE_LINE_NOTE[1:]), 6.0, False),
+        (("1.", *_ONE_LINE_NOTE[1:]), 6.0, False),
+        (("1", "ibid.", "141"), 6.0, False),
+    ],
+)
+def test_one_line_note_with_narrow_characters_is_a_band(
+    texts: tuple[str, ...], point_per_character: float, *, band: bool
+) -> None:
+    # Domesday's page 163: "1 D. B. i. 141 b.", boxed as tall as the body
+    # and 1 pitch below it, at 0.70 of the body's width per character; the
+    # limit is 0.9, 7.2 pt here.
+    note = _one_line_note(texts, point_per_character, _LAST_BODY_TOP + _PITCH)
+    result = layout_page(_page(0, (*_prose_rows(20), *note)), _MEASURES)
+    expected = ((texts,),) if band else ()
+    assert _region_texts(result)[1:] == expected
+    assert len(result.regions[0].lines) == (20 if band else 21)
+
+
+def test_one_line_note_takes_the_marks_below_it_into_the_band() -> None:
+    note = _one_line_note(_ONE_LINE_NOTE, 6.0, _LAST_BODY_TOP + _PITCH)
+    speck = _word(
+        "•", 140, _LAST_BODY_TOP + 2 * _PITCH, 142, _LAST_BODY_TOP + 2 * _PITCH + 3
+    )
+    result = layout_page(_page(0, (*_prose_rows(20), *note, speck)), _MEASURES)
+    assert _region_texts(result)[1:] == ((_ONE_LINE_NOTE, ("•",)),)
+
+
+def test_one_line_note_needs_a_row_of_20_characters_above_it() -> None:
+    # The rows of _rows hold 6 characters each.
+    note = _one_line_note(_ONE_LINE_NOTE, 2.0, _LAST_BODY_TOP + _PITCH)
+    result = layout_page(_page(0, (*_rows(20), *note)), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 21
+
+
 def test_2_band_rows_with_a_gutter_at_the_middle_stay_rows() -> None:
     band = _two_column_rows(
         2, top=_LAST_BODY_TOP + 1.5 * _PITCH, height=_SMALL_HEIGHT, pitch=9.0
