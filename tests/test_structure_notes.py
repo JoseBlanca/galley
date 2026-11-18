@@ -663,3 +663,64 @@ def test_chapter_of_first_group_without_heading_counts_back_from_the_next() -> N
     blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     pages_linked = tuple(page for page, _ in _links_by_chapter(blocks))
     assert pages_linked == (*(1,) * 9, *(2,) * 9)
+
+
+def test_later_paragraph_of_note_1_opening_with_i_is_no_misread_marker() -> None:
+    # Note 1's second paragraph opens with "I", indented, before notes 2 to
+    # 9: it stays a block of note 1, and note 1 is no group heading.
+    top = 70.0
+    lines = list(_hung_note("1", top))
+    top += 3 * _NOTE_PITCH_PT
+    lines += [
+        _line("I think this is a further", _TEXT_EDGE_PT + 15, top),
+        _line("on over a full line of the", _TEXT_EDGE_PT, top + _NOTE_PITCH_PT),
+        _line("second paragraph.", _TEXT_EDGE_PT, top + 2 * _NOTE_PITCH_PT),
+    ]
+    top += 3 * _NOTE_PITCH_PT
+    for number in range(2, 10):
+        lines += _hung_note(str(number), top)
+        top += 3 * _NOTE_PITCH_PT
+    blocks = make_blocks(
+        _lines_of(PageLayout(0, (_region(*lines),), ())), _NO_WORDS, workers=1
+    )
+    assert tuple(marker for marker, _ in _endnotes(blocks)) == tuple(
+        str(n) for n in range(1, 10)
+    )
+    assert not any(note.group for note in blocks.notes)
+
+
+def test_hung_misread_marker_after_note_1_is_no_marker() -> None:
+    # The same "I" paragraph hung like a number: the bare number before it
+    # reads 1, so it is no misread marker.
+    top = 70.0
+    lines = list(_hung_note("1", top))
+    top += 3 * _NOTE_PITCH_PT
+    lines += _hung_note("I", top)
+    top += 3 * _NOTE_PITCH_PT
+    for number in range(2, 10):
+        lines += _hung_note(str(number), top)
+        top += 3 * _NOTE_PITCH_PT
+    blocks = make_blocks(
+        _lines_of(PageLayout(0, (_region(*lines),), ())), _NO_WORDS, workers=1
+    )
+    assert tuple(marker for marker, _ in _endnotes(blocks)) == tuple(
+        str(n) for n in range(1, 10)
+    )
+
+
+def test_short_last_note_at_a_page_top_is_no_group_heading() -> None:
+    # Group one's last note, "10.", two lines at the top of page 3, before
+    # group two's notes: it stays a note, and no group has a heading.
+    last = (
+        _spread("10. A short last note of", _LEFT_PT + 20, _RIGHT_PT, 50.0),
+        _spread("its group.", _LEFT_PT, 120.0, 65.0),
+    )
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*_dotted_notes(50.0)),), ()),
+        PageLayout(3, (_region(*last, *_dotted_notes(95.0)),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert "10." in tuple(marker for marker, _ in _endnotes(blocks))
+    assert not any(note.group for note in blocks.notes)

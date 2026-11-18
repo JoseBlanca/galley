@@ -11,10 +11,12 @@ from difflib import SequenceMatcher
 from galley.model import BlockKind
 from galley.structure._heads import starts_with_chapter_label_word
 from galley.structure._lines import (
+    MISREAD_FOLLOWERS,
     Piece,
     PlacedLine,
     first_word,
     is_bare_number,
+    is_hung,
     is_misread_marker,
 )
 from galley.structure._markers import NoteMarker, endnote_marker
@@ -36,8 +38,6 @@ _GROUP_HEADING_GAP_PITCHES = 1.5
 # 26 group headings of Turney and Haynes, 18 November 2026: 0.94 to 1.00 to
 # their own chapter's, at most 0.76 to another's.
 _CHAPTER_ALIKE_RATIO = 0.85
-# Spec section 12: a misread marker is followed by bare numbers 2, 3, 4.
-_MISREAD_FOLLOWERS = 3
 # A number dropped from the start of a group heading: "1.", "2", "10".
 _NUMBER_WORD = re.compile(r"[0-9]{1,3}[.:]?")
 
@@ -83,9 +83,10 @@ def _misread_markers(
 ) -> dict[int, tuple[NoteMarker, bool]]:
     """The misread markers among the entries (spec section 12), by position:
     a paragraph whose first word is one character that is not a digit,
-    with a word after it, when the next three paragraphs that start with
-    a bare number read 2, 3 and 4. Its marker is that character, its
-    value 1, a bare number's."""
+    with a word after it, whose first line is hung (`is_hung`), when the
+    next three paragraphs that start with a bare number read 2, 3 and 4
+    and the nearest before it does not read 1. Its marker is that
+    character, its value 1, a bare number's."""
     bare = tuple(
         (position, found[0].value)
         for position, entry in enumerate(entries)
@@ -95,11 +96,15 @@ def _misread_markers(
     for position, entry in enumerate(entries):
         if not isinstance(entry, BodyBlock):
             continue
-        words = entry.piece.lines[0].line.words
-        if len(words) <= 1 or not is_misread_marker(words[0].text):
+        line = entry.piece.lines[0]
+        words = line.line.words
+        if not is_hung(line) or not is_misread_marker(words[0].text):
             continue
         following = tuple(value for later, value in bare if later > position)
-        if following[:_MISREAD_FOLLOWERS] == (2, 3, 4):
+        preceding = tuple(value for earlier, value in bare if earlier < position)
+        if following[: len(MISREAD_FOLLOWERS)] == MISREAD_FOLLOWERS and preceding[
+            -1:
+        ] != (1,):
             found_misread[position] = (NoteMarker(words[0].text, "", 1), True)
     return found_misread
 
@@ -331,9 +336,11 @@ def note_groups(
             if place is not None
             else ()
         )
+        # An endnote whose marker reads another number is no heading.
+        numbered = before.marker is not None and before.marker.value != 1
         if (
             place is None
-            or (place == 0 and rest)
+            or (place == 0 and (rest or numbered))
             or not is_group_heading(entries, before.paragraphs[place], body_line_pitch)
         ):
             continue

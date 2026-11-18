@@ -36,7 +36,7 @@ _HANG_MAX_PT = 20.0
 _TEXT_EDGE_MIN_LINES = 3
 # Spec section 6, rule 3, and section 12: a misread marker is followed by
 # lines hung with 2, 3 and 4.
-_MISREAD_FOLLOWERS = 3
+MISREAD_FOLLOWERS = (2, 3, 4)
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +106,7 @@ def has_hanging_number(line: PlacedLine) -> bool:
     """Spec section 6, rule 3: the line's first word is a bare number, it
     has a second word, and its left side lies 5 to 20 pt left of its
     region's text edge."""
-    return _is_hung(line) and is_bare_number(line.line.words[0].text)
+    return is_hung(line) and is_bare_number(line.line.words[0].text)
 
 
 def is_misread_marker(word: str) -> bool:
@@ -116,7 +116,10 @@ def is_misread_marker(word: str) -> bool:
     return len(word) == 1 and not word.isdigit()
 
 
-def _is_hung(line: PlacedLine) -> bool:
+def is_hung(line: PlacedLine) -> bool:
+    """Whether `line` has a second word and its left side lies 5 to 20 pt
+    left of its region's text edge, as a hanging number does (spec section
+    6, rule 3)."""
     return (
         line.text_edge is not None
         and len(line.line.words) > 1
@@ -133,14 +136,14 @@ def misread_marker_lines(lines: Sequence[PlacedLine]) -> frozenset[int]:
     return frozenset(
         number
         for number, line in enumerate(lines)
-        if _is_hung(line)
+        if is_hung(line)
         and is_misread_marker(line.line.words[0].text)
         and tuple(
-            later.line.words[0].text
+            int(later.line.words[0].text)
             for later in lines[number + 1 :]
             if has_hanging_number(later)
-        )[:_MISREAD_FOLLOWERS]
-        == ("2", "3", "4")
+        )[: len(MISREAD_FOLLOWERS)]
+        == MISREAD_FOLLOWERS
     )
 
 
