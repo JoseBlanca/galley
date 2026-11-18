@@ -1872,8 +1872,12 @@ number that does not rise above the marker before it is no marker
 unless it reads 1, so it neither starts a run nor ends one. A run of
 bare numbers may start with one **misread marker**: a paragraph whose
 first word is one character that is not a digit, with a word after it,
-when the next three paragraphs that start with a bare number read 2, 3
-and 4. Its marker is that character as the OCR read it, taken out as
+whose first line is hung as section 6, rule 3, says (5 to 20 pt left of
+its region's text edge), when the next three paragraphs that start with
+a bare number read 2, 3 and 4 and the nearest one before it does not
+read 1. The last two tests keep a later paragraph of note 1 that opens
+with "I", or one indented after it, from being a second note 1 that
+would take the true note 1 for its group heading. Its marker is that character as the OCR read it, taken out as
 any marker (section 11), and its value is 1, given by its place before
 2, 3 and 4, as a note numbered per page takes its value from its place
 (section 11, "Its value"); no word is changed. Turney's chapter Three
@@ -1940,7 +1944,10 @@ stream, or is the first line of its region: a heading set apart, at
 the top of a column too. The first line of a region is told by
 position: a line on a later page than the line before it, or whose top
 lies above that line's, as the top of a right column lies above the
-foot of the left one. A block or a line with no letter or digit (a
+foot of the left one. An endnote whose marker reads a number other
+than 1 is never a group heading: the short last note of a group at the
+top of a page, the first line of its region, would otherwise be taken
+for the heading of the next group. A block or a line with no letter or digit (a
 speck the OCR read as "/") is passed over here, as in the tall line's
 gap of section 14: the block right before a group's first note is the
 nearest before it that holds a letter or a digit, and the line before
