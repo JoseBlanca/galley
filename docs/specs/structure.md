@@ -189,10 +189,10 @@ inside it.
       (section 17), and on a plate page its running head and stray
       words, keeping its caption (section 18); then, on a text page with
       in-page figures, find each figure's caption, take it out of the
-      body stream, and remove the rest of the figure's region as
-      `figure_text` (`docs/specs/figures.md` §5). The captions are taken
-      here, before step 2.3 and step 3.1, so that a caption line is
-      never a heading, a list item or a contents entry: Turney's
+      body stream, and remove the figure's region as `figure_text`
+      (`docs/specs/figures.md` §5). The captions are taken here,
+      before step 2.3 and step 3.1, so that a caption line is never a
+      heading, a list item or a contents entry: Turney's
       captions open with "13." and Haynes' contents entries with "2.",
       and both look like a list's marker line;
    3. in the body stream, find the heading lines (section 14), except on
