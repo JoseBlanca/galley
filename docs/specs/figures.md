@@ -291,8 +291,8 @@ of the book (structure §2: body measures, running heads, the kinds of
 regions) nor in finding the page's body column and margins: a region
 as wide as a picture would otherwise count as the page's widest. Its
 lines are removed as `figure_text`, one removal per line, as
-`plate_text` is (structure §18, rule 2), but for those that open or
-continue a caption (below). So is the page's head line when the middle
+`plate_text` is (structure §18, rule 2): no caption is taken from them
+(below). So is the page's head line when the middle
 of each of its words lies inside an in-page figure's box and structure
 §3 makes it neither a running head nor a page number: Turney 174's
 "Inside: Crisis in Portugal", the lettering at the top of the first
@@ -306,9 +306,20 @@ and its caption is printed inside it.
 
 ### structure: the caption
 
-A figure's **caption** is found among the page's lines, in the figure's
-region or outside it, before the body lines are grouped into
-paragraphs. It works on **rows**, those of structure §18, rule 3: by
+A figure's **caption** is found among the page's lines outside the
+figures' regions, before the body lines are grouped into
+paragraphs. A word whose middle lies inside a figure's box is printed in
+the picture, and layout has put it in the figure's region; a caption's
+words lie outside the box, even Kadesh 38's, whose row starts 3.5 pt
+above the map's bottom and whose words' middles lie below it. Taken
+among the rows, a figure's words cut 3 captions short: on Haynes 310
+and Turney 174 and 176, a mark read in the picture lies on the row of
+one of the caption's lines, beside the caption, so that the row no
+longer lay wholly on the caption's side (rule 3) and the caption lost
+it and the rows after it, Haynes 310's all but its label row (measured
+on 18 November 2026 on Kadesh, Haynes and Turney; the captions of
+their 53 other figures were the same either way). It works on
+**rows**, those of structure §18, rule 3: by
 top, then left side, a line joins a row when its vertical centre lies
 within the top and bottom of the row's first line. Rows, not lines,
 because layout may cut a caption's line: on Turney 175 and 176 it makes
