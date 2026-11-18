@@ -14,22 +14,30 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import assert_never
 
 from galley.body_measures import rows_of
 from galley.model import (
-    BlockKind,
     Box,
     Figure,
     FigureKind,
     Line,
-    Origin,
     PageLayout,
     Region,
+    Removal,
+    RemovalReason,
     box_holds_middle,
 )
-from galley.structure._foot import LinePlace
+from galley.structure._foot import LinePlace, line_at
 from galley.structure._lines import Piece, PlacedLine
-from galley.structure._measures import box_of, middle, words_box
+from galley.structure._measures import (
+    Edges,
+    box_of,
+    middle,
+    words_box,
+    words_removal,
+)
+from galley.structure._regions import HeadLine, head_line
 
 # Figures spec section 1: the words that name a caption's label, in lower
 # case, and a numeral's characters: digits and the letters of a roman
@@ -41,6 +49,7 @@ _NUMERAL_MAX_CHARACTERS = 6
 # Figures spec section 1: Turney's numbered captions ("13. The", "14 (a)")
 # open with a numeral of at most 3 characters, its "." counted.
 _SHORT_NUMERAL_MAX_CHARACTERS = 3
+# A word in brackets has a letter or more between them ("(a)", "(top)").
 _BRACKETED_MIN_CHARACTERS = 3
 # A numbered label is a numeral and the word after it.
 _NUMBERED_LABEL_WORDS = 2
@@ -80,7 +89,7 @@ def _is_numeral(text: str) -> bool:
     """Whether `text` is a numeral (figures spec section 1): 1 to 6 digits
     or letters i, v, x, l, c in either case, with or without a "." or ","
     after them."""
-    bare = text.removesuffix(".") if text.endswith(".") else text.removesuffix(",")
+    bare = text[:-1] if text.endswith(_NUMERAL_ENDINGS) else text
     return 0 < len(bare) <= _NUMERAL_MAX_CHARACTERS and all(
         character in _NUMERAL_CHARACTERS for character in bare
     )
@@ -190,9 +199,16 @@ type WordPlace = tuple[int, int, int]
 
 @dataclass(frozen=True, slots=True)
 class _RowWord:
-    place: WordPlace
+    """A word of a row: the place of its line, the line, and its number in
+    the line."""
+
+    line_place: LinePlace
     line: Line
     word_number: int
+
+    @property
+    def place(self) -> WordPlace:
+        return (*self.line_place, self.word_number)
 
     @property
     def box(self) -> Box:
@@ -217,7 +233,7 @@ def _row(lines: tuple[tuple[LinePlace, Line], ...]) -> _Row:
     words = tuple(
         sorted(
             (
-                _RowWord((*place, number), line, number)
+                _RowWord(place, line, number)
                 for place, line in lines
                 for number in range(len(line.words))
             ),
@@ -342,6 +358,8 @@ def _label_words(row: _Row, box: Box, side: _Side) -> tuple[_RowWord, ...]:
             return tuple(word for word in row.words if middle(word.box) > box.x1)
         case _Side.LEFT:
             return tuple(word for word in row.words if middle(word.box) < box.x0)
+        case _:
+            assert_never(side)
 
 
 def _next_row_words(
@@ -362,6 +380,8 @@ def _next_row_words(
             return row.words if on_side else ()
         case _Side.RIGHT | _Side.LEFT:
             return _label_words(row, box, side)
+        case _:
+            assert_never(side)
 
 
 def _caption_line(words: Sequence[_RowWord]) -> Line:
@@ -379,7 +399,7 @@ def _row_lines(words: Sequence[_RowWord]) -> tuple[Line, ...]:
     row that gives any, from the left."""
     by_line: dict[LinePlace, list[_RowWord]] = {}
     for word in words:
-        by_line.setdefault(word.place[:2], []).append(word)
+        by_line.setdefault(word.line_place, []).append(word)
     return tuple(
         _caption_line(sorted(line_words, key=lambda word: word.word_number))
         for line_words in sorted(
@@ -466,14 +486,15 @@ def in_any_figure(line: Line, boxes: Sequence[Box]) -> bool:
     )
 
 
-# The figure blocks' places.
+# The page's figures.
 
 
 @dataclass(frozen=True, slots=True)
-class InPageFigure:
-    """An in-page figure of a page as structure places it: the path of its
-    image, its box, its caption lines from the top down, and the box that
-    holds the figure and its caption, its block's origin."""
+class PageFigure:
+    """A figure of a page as its figure block shows it (structure spec
+    section 18; figures spec section 5): the path of its image, its box on
+    the page, and its caption lines from the top down, none when it has no
+    caption."""
 
     image: str
     box: Box
@@ -481,135 +502,113 @@ class InPageFigure:
 
     @property
     def origin_box(self) -> Box:
+        """The box that holds the figure and its caption, its block's
+        origin: a plate's box, the whole page, holds its caption."""
         return box_of((self.box, *(line.line.box for line in self.caption.lines)))
 
 
-def _beside(line: PlacedLine, box: Box) -> bool:
-    """Whether `line` lies wholly left or right of the figure of `box`,
-    its top between the figure's top and bottom."""
-    line_box = line.line.box
-    return (line_box.x1 <= box.x0 or line_box.x0 >= box.x1) and (
-        box.top <= line_box.top <= box.bottom
+@dataclass(frozen=True, slots=True)
+class PageFigures:
+    """What a page's in-page figures take from it (figures spec section 5):
+    the places of the lines of its head line printed inside a figure,
+    removed; the removals of those lines and of the figures' regions, as
+    `figure_text`; the places of the words the captions took out of the
+    page's lines; and the figures with their captions, in the order of
+    pages.json."""
+
+    head_places: frozenset[LinePlace]
+    removals: tuple[Removal, ...]
+    taken: frozenset[WordPlace]
+    figures: tuple[PageFigure, ...]
+
+
+def _head_inside_figures(
+    head: HeadLine | None, removed: frozenset[LinePlace], boxes: tuple[Box, ...]
+) -> tuple[LinePlace, ...]:
+    """The places of the lines of the page's head line `head` when each of
+    its words lies inside an in-page figure of `boxes` and structure spec
+    section 3 did not remove it (`removed`): lettering printed at a
+    picture's top; none otherwise."""
+    if head is None or not boxes:
+        return ()
+    places = (
+        (0, len(head.region.lines) - 1),
+        *((number, 0) for number in head.beside),
     )
+    if any(place in removed for place in places) or not in_any_figure(head.line, boxes):
+        return ()
+    return places
 
 
-def _above(
-    body: Sequence[PlacedLine], box: Box, body_line_pitch: float
-) -> tuple[bool, ...]:
-    """For each line of a page's `body`, whether it is printed above the
-    figure of `box`: its top lies above the figure's, or it is the only
-    line of `body` beside the figure (`_beside`) and its top lies less
-    than one body line pitch below the figure's top."""
-    beside = tuple(_beside(line, box) for line in body)
-    alone = sum(beside) == 1
-    return tuple(
-        line.line.box.top < box.top
-        or (alone and is_beside and line.line.box.top < box.top + body_line_pitch)
-        for line, is_beside in zip(body, beside, strict=True)
+def page_figures(
+    split: SplitPage, removed: frozenset[LinePlace], closed: frozenset[int]
+) -> PageFigures:
+    """The figure text, captions and figures of the page of `split`, whose
+    lines at `removed` structure spec sections 3 and 4 removed and whose
+    regions `closed` an index takes (figures spec section 5): its head line
+    when printed inside a figure and every line of the figures' regions
+    are removed as `figure_text`, and each figure's caption is found among
+    the other lines (`figure_captions`)."""
+    page = split.text
+    boxes = tuple(figure.box for figure in split.figures)
+    head_places = _head_inside_figures(head_line(page), removed, boxes)
+    left = removed | frozenset(head_places)
+    captions = figure_captions(
+        tuple(
+            ((region_number, line_number), line)
+            for region_number, region in enumerate(page.regions)
+            if region_number not in closed
+            for line_number, line in enumerate(region.lines)
+            if (region_number, line_number) not in left
+        ),
+        boxes,
     )
-
-
-def place_line(
-    pages_body: Sequence[tuple[int, tuple[PlacedLine, ...]]],
-    page_index: int,
-    box: Box,
-    body_line_pitch: float,
-) -> PlacedLine | None:
-    """The body line after whose block the figure of `box` on `page_index`
-    goes (figures spec section 5, "structure: where the figure block
-    goes"): the last line of the page's body stream, in reading order,
-    printed above the figure (`_above`), or, when the page has none, the
-    last body line of the pages before; None when there is none.
-    `pages_body` are the book's pages, each its index and body stream, in
-    page order; `body_line_pitch` is in points."""
-    on_page = next(
-        (
-            line
-            for index, body in pages_body
-            if index == page_index
-            for line, above in reversed(
-                tuple(zip(body, _above(body, box, body_line_pitch), strict=True))
+    return PageFigures(
+        head_places=frozenset(head_places),
+        removals=tuple(
+            words_removal(
+                page.index, line_at(page, place).words, RemovalReason.FIGURE_TEXT
             )
-            if above
-        ),
-        None,
-    )
-    if on_page is not None:
-        return on_page
-    return next(
-        (
-            body[-1]
-            for index, body in reversed(pages_body)
-            if index < page_index and body
-        ),
-        None,
-    )
-
-
-def _holds(origin: Sequence[Origin], line: PlacedLine) -> bool:
-    """Whether a block of `origin` holds `line`: an origin of its page
-    whose box holds the line's box."""
-    box = line.line.box
-    return any(
-        entry.page_index == line.page_index
-        and entry.box.x0 <= box.x0
-        and entry.box.top <= box.top
-        and entry.box.x1 >= box.x1
-        and entry.box.bottom >= box.bottom
-        for entry in origin
-    )
-
-
-# The runs a figure block never cuts: a list's items and a contents run's
-# entries (figures spec section 5).
-_RUN_KINDS = frozenset({BlockKind.LIST_ITEM, BlockKind.CONTENTS_ENTRY})
-_SIDE_KINDS = frozenset({BlockKind.MARGIN_NOTE, BlockKind.FIGURE})
-
-
-def figure_position(
-    kinds: Sequence[BlockKind],
-    origins: Sequence[Sequence[Origin]],
-    line: PlacedLine | None,
-) -> int:
-    """The position among blocks of `kinds` and `origins`, in order, at which
-    a figure block goes whose place is after the block that holds `line`
-    (`place_line`): after that block, after the whole list or contents run
-    when it is a list item or a contents entry, and after the figure blocks
-    placed there before it; first, after the figure blocks already there,
-    when `line` is None. When no block but side text holds `line`, the
-    block that holds it is the last that starts on its page or before."""
-    holder = (
-        None
-        if line is None
-        else next(
-            (
-                number
-                for number, (kind, origin) in enumerate(
-                    zip(kinds, origins, strict=True)
-                )
-                if kind not in _SIDE_KINDS and _holds(origin, line)
-            ),
-            None,
+            for place in head_places
         )
+        + tuple(
+            words_removal(page.index, line.words, RemovalReason.FIGURE_TEXT)
+            for region in split.regions
+            if region is not None
+            for line in region.lines
+        ),
+        taken=captions.taken,
+        figures=tuple(
+            PageFigure(
+                figure.image,
+                figure.box,
+                Piece(
+                    tuple(
+                        PlacedLine(
+                            page.index,
+                            line,
+                            Edges(figure.box.x0, figure.box.x1),
+                            Edges(figure.box.x0, figure.box.x1),
+                        )
+                        for line in caption
+                    )
+                ),
+            )
+            for figure, caption in zip(split.figures, captions.lines, strict=True)
+        ),
     )
-    if holder is None and line is not None:
-        # A line no body block holds, as one of the endnote section's:
-        # after the last block that starts on its page or before.
-        holder = max(
-            (
-                number
-                for number, (kind, origin) in enumerate(
-                    zip(kinds, origins, strict=True)
-                )
-                if kind not in _SIDE_KINDS
-                and min(entry.page_index for entry in origin) <= line.page_index
-            ),
-            default=None,
-        )
-    position = 0 if holder is None else holder + 1
-    if holder is not None and kinds[holder] in _RUN_KINDS:
-        while position < len(kinds) and kinds[position] is kinds[holder]:
-            position += 1
-    while position < len(kinds) and kinds[position] is BlockKind.FIGURE:
-        position += 1
-    return position
+
+
+def without_taken(
+    line: Line, place: LinePlace, taken: frozenset[WordPlace]
+) -> Line | None:
+    """`line`, at `place`, without the words a caption took; None when it
+    took them all."""
+    kept = tuple(
+        word for number, word in enumerate(line.words) if (*place, number) not in taken
+    )
+    if len(kept) == len(line.words):
+        return line
+    if not kept:
+        return None
+    return Line(words_box(kept), kept)

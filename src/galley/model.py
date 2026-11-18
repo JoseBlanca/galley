@@ -360,9 +360,21 @@ def word_middle(word: Word) -> tuple[float, float]:
 def box_holds_middle(box: Box, inner: Box) -> bool:
     """Whether the middle of `inner` lies inside `box`, edges included: the
     test of a word in an excluded region (extract), in an in-page figure
-    (analyze, layout) and of a picture group in a figure (analyze)."""
+    (analyze, layout, structure) and of a picture group in a figure
+    (analyze)."""
     across, down = box_middle(inner)
     return box.x0 <= across <= box.x1 and box.top <= down <= box.bottom
+
+
+def box_holds(box: Box, inner: Box) -> bool:
+    """Whether all of `inner` lies inside `box`, edges included: the test
+    of a line in a block's origin (structure, placing a figure block)."""
+    return (
+        box.x0 <= inner.x0
+        and box.top <= inner.top
+        and inner.x1 <= box.x1
+        and inner.bottom <= box.bottom
+    )
 
 
 def _is_under(word: Word, ocr_word: Word) -> bool:

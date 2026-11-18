@@ -38,6 +38,7 @@ from galley.structure._endnotes import (
     note_groups,
     with_group_headings_cut,
 )
+from galley.structure._figure_blocks import with_figures, with_in_page_figures
 from galley.structure._ids import numbered
 from galley.structure._index_entries import with_index_breaks, with_index_entries
 from galley.structure._lines import Piece, PlacedLine, first_word
@@ -74,7 +75,6 @@ from galley.structure._paragraphs import (
     PageParts,
     body_entries,
 )
-from galley.structure._plates import with_figures, with_in_page_figures
 from galley.structure._quotes import book_density, with_quotes
 from galley.structure._references import (
     Link,
