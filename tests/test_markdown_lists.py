@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from galley import epub
+from galley import epub, markdown
 from galley.book_folder import BookFolder
 from galley.config import BookConfig, Language
 from galley.errors import InputFileError
@@ -550,9 +550,7 @@ def test_the_epub_of_lists_and_a_contents_linked_into_another_chapter_passes_epu
 ) -> None:
     folder, config = _book(tmp_path, EPUB_BOOK)
 
-    folder.book_md.write_text(
-        render_markdown(EPUB_BOOK, config), encoding="utf-8", newline="\n"
-    )
+    markdown.run(folder, config)
     epub.run(folder, config)
 
     check_epubs(folder.book_epub)
