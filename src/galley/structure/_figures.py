@@ -175,6 +175,9 @@ class _Side(StrEnum):
     LEFT = "left"
 
 
+_BESIDE = frozenset({_Side.RIGHT, _Side.LEFT})
+
+
 type WordPlace = tuple[int, int, int]
 """A word of a page, as (region number, line number, word number)."""
 
@@ -309,19 +312,24 @@ def _label_words(row: _Row, box: Box, side: _Side) -> tuple[_RowWord, ...]:
             return tuple(word for word in row.words if middle(word.box) < box.x0)
 
 
-def _on_side(row: _Row, box: Box, side: _Side, label_left: float) -> bool:
-    """Whether `row` lies on the caption's `side` of the figure of `box`
-    (rule 3); `label_left` is the left side of the label row's words."""
+def _next_row_words(
+    row: _Row, box: Box, side: _Side, label_left: float
+) -> tuple[_RowWord, ...]:
+    """The words of `row` that a caption on `side` of the figure of `box`
+    takes as its next row (rule 3), none when the row is not on that side:
+    below or above, the whole row when it lies between the figure's sides
+    moved 12 pt outwards or its left side is within 3 pt of `label_left`,
+    the left side of the label row's words; on the right or left, the
+    row's words on that side, as rule 2 takes them."""
     match side:
         case _Side.BELOW | _Side.ABOVE:
-            return (
+            on_side = (
                 row.box.x0 >= box.x0 - _NEXT_ROW_SIDES_SLACK_PT
                 and row.box.x1 <= box.x1 + _NEXT_ROW_SIDES_SLACK_PT
             ) or abs(row.box.x0 - label_left) <= _SAME_LEFT_PT
-        case _Side.RIGHT:
-            return row.box.x0 >= box.x1
-        case _Side.LEFT:
-            return row.box.x1 <= box.x0
+            return row.words if on_side else ()
+        case _Side.RIGHT | _Side.LEFT:
+            return _label_words(row, box, side)
 
 
 def _caption_line(words: Sequence[_RowWord]) -> Line:
@@ -366,11 +374,12 @@ def figure_captions(
     with its place, which are the lines left once its running head and
     page numbers are removed, outside the figures' regions (figures spec
     section 5, rules 1 to 3): a label row next to a figure gives the
-    caption the words of rule 2, and each next row from the top down, while
-    its top is at most 20 pt below the top of the caption's row before, it
-    opens with no caption label and it lies on the caption's side, is taken
-    whole. Several label rows of one figure give one caption in the order
-    of their tops."""
+    caption the words of rule 2, and each next row from the top down gives
+    it its words on the caption's side (`_next_row_words`), while its top is
+    at most `_NEXT_ROW_MAX_PT` below the top of the caption's row before and
+    they open with no caption label; beside the figure, a row with no word
+    on the caption's side is passed over. Several label rows of one figure
+    give one caption in the order of their tops."""
     rows = tuple(_row(row) for row in rows_of(lines, lambda pair: pair[1].box))
     label_rows = _label_rows(rows, boxes)
     label_numbers = frozenset(label.row for label in label_rows)
@@ -386,15 +395,17 @@ def figure_captions(
         before_top = rows[label.row].box.top
         for number in range(label.row + 1, len(rows)):
             row = rows[number]
-            if (
-                number in used
-                or row.box.top - before_top > _NEXT_ROW_MAX_PT
-                or is_caption_label(tuple(word.text for word in row.words))
-                or not _on_side(row, box, label.side, label_left)
-            ):
+            if number in used or row.box.top - before_top > _NEXT_ROW_MAX_PT:
+                break
+            words = _next_row_words(row, box, label.side, label_left)
+            if not words and label.side in _BESIDE:
+                # A row with no word on a beside caption's side is passed
+                # over (rule 3).
+                continue
+            if not words or is_caption_label(tuple(word.text for word in words)):
                 break
             used.add(number)
-            caption_rows[label.figure].append((number, row.words))
+            caption_rows[label.figure].append((number, words))
             before_top = row.box.top
     return Captions(
         lines=tuple(
