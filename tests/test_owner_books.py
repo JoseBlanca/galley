@@ -16,7 +16,6 @@ import itertools
 import json
 import re
 import threading
-from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
@@ -72,19 +71,6 @@ _OPENINGS = {
 _ENDNOTES = {"turney": 580, "haynes": 620}
 _NOTE_GROUPS = {"turney": 11, "haynes": 18}
 _LINKED = {"turney": 450, "haynes": 550}
-# Turney's notes miss three targets (18 November 2026), for causes outside
-# the rules of section 12: layout puts the right column's numbers 12 to 31
-# of page 262 into the left column's lines, which loses 20 notes and
-# chapter Four's group heading; the OCR reads chapter Three's first "1" as
-# "x" (page 258), so its notes 2 to 48 stay in chapter Two's last note and
-# its group is lost; a stray "/" under chapter Six's heading (page 268) is
-# the block before its first note, so that group has no heading either.
-_TURNEY_LAYOUT_AND_OCR = pytest.mark.xfail(
-    strict=True,
-    reason="Turney: layout's page 262, the OCR's 'x' for 1 on page 258 and a "
-    "stray '/' on page 268 (structure spec section 12)",
-)
-_TURNEY_MISSED = pytest.param("turney", marks=_TURNEY_LAYOUT_AND_OCR)
 # Structure spec sections 3 and 14: the words that start a chapter label.
 _LABEL_WORDS = frozenset(
     {"chapter", "chapitre", "essay", "part", "partie", "book", "livre"}
@@ -207,14 +193,14 @@ def _endnotes(blocks: BlocksFile) -> tuple[Note, ...]:
     return tuple(note for note in blocks.notes if note.kind is NoteKind.ENDNOTE)
 
 
-@pytest.mark.parametrize("book", [_TURNEY_MISSED, "haynes"])
+@pytest.mark.parametrize("book", ["turney", "haynes"])
 def test_endnotes_number_at_least_the_target(
     owner_book_run: Callable[[str], BlocksFile], book: str
 ) -> None:
     assert len(_endnotes(owner_book_run(book))) >= _ENDNOTES[book]
 
 
-@pytest.mark.parametrize("book", [_TURNEY_MISSED, "haynes"])
+@pytest.mark.parametrize("book", ["turney", "haynes"])
 def test_note_groups_with_a_heading_number_at_least_the_target(
     owner_book_run: Callable[[str], BlocksFile], book: str
 ) -> None:
@@ -246,57 +232,27 @@ def _chapter_of_page(book: str, page_index: int) -> int:
     return bisect.bisect_right(_OPENINGS[book], page_index) - 1
 
 
-def _heading_chapter(group: str, first: bool, last_chapter: int) -> int:
-    """The chapter a group heading names by its first number ("Chapter 5."
-    or "5 Into"): the introduction for the first group without a number,
-    the closing chapter for a later one."""
-    number = next(
-        (
-            int(word.rstrip(".:"))
-            for word in group.split()
-            if word.rstrip(".:").isdigit()
-        ),
-        None,
-    )
-    if number is not None:
-        return number
-    return 0 if first else last_chapter
-
-
-@pytest.mark.parametrize("book", [_TURNEY_MISSED, "haynes"])
+@pytest.mark.parametrize("book", ["turney", "haynes"])
 def test_no_reference_links_to_a_note_of_another_groups_chapter(
     owner_book_run: Callable[[str], BlocksFile], book: str
 ) -> None:
-    # Each group's chapter is the one its heading names, or, for a group
-    # without a heading, the chapter most of its links fall in; a link from
-    # a page of another chapter (structure spec section 21) is wrong.
+    # The groups follow the chapters' order, one per chapter of structure
+    # spec section 21's openings (the introduction first): the n-th group's
+    # chapter is the n-th. A link from a page of another chapter is wrong.
     blocks = owner_book_run(book)
     endnotes = _endnotes(blocks)
     starts = (*_group_starts(endnotes), len(endnotes))
+    assert len(starts) - 1 == len(_OPENINGS[book]) - 1
     group_of = {
         note.id: number
         for number, (start, end) in enumerate(itertools.pairwise(starts))
         for note in endnotes[start:end]
     }
-    pages_of: dict[int, list[int]] = {}
-    for block in blocks.blocks:
-        for span in block.spans:
-            if span.note_ref in group_of:
-                pages_of.setdefault(group_of[span.note_ref], []).append(
-                    block.origin[0].page_index
-                )
-    last_chapter = len(_OPENINGS[book]) - 2
-    wrong = 0
-    for number, start in enumerate(starts[:-1]):
-        chapters = Counter(
-            _chapter_of_page(book, page) for page in pages_of.get(number, ())
-        )
-        heading = endnotes[start].group
-        chapter = (
-            _heading_chapter(heading, number == 0, last_chapter)
-            if heading is not None
-            else max(chapters, key=lambda found: chapters[found], default=None)
-        )
-        wrong += sum(count for found, count in chapters.items() if found != chapter)
-    assert pages_of
-    assert wrong == 0
+    links = tuple(
+        (group_of[span.note_ref], _chapter_of_page(book, block.origin[0].page_index))
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref in group_of
+    )
+    assert links
+    assert sum(group != chapter for group, chapter in links) == 0
