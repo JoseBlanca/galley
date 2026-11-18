@@ -233,16 +233,33 @@ A word of the text layer printed inside a picture lies on the same rows
 as the text beside it: Kadesh's map labels beside the lines set to the
 right of the map, Turney's caption beside a cover. Grouped with them,
 it joins their lines, and structure cannot take it back out. So layout,
-first of all on a page with in-page figures, before its step 1 (layout
-§3, "Per page"), takes out of the page's words those whose middle lies
-inside an in-page figure's box, but for the words of the page's first
-row (the row with the smallest top, as layout §1 makes rows), which may
-be the head line and stay with the page's words as today. The words
-taken out make one region per figure, whose box is the figure's box
-exactly, its lines grouped as layout groups any region's; a figure
-with no such word has no region. Steps 1 to the end then run on the
-words left, as today. A figure's region is never re-read with Tesseract
-(`docs/specs/reocr.md`).
+on a page with in-page figures, first lays the page out with all its
+words, as today (layout §3, "Per page", steps 1 to the end, and the
+re-reading), and then takes out of its regions' lines the words whose
+middle lies inside an in-page figure's box, but for the words of the
+page's first row (the row with the smallest top, as layout §1 makes
+rows), which may be the head line and stay where they are. A line left
+with no word is dropped, and so is a region left with no line; a line
+or region that lost a word has again the smallest box that holds what
+is left. The words taken out make one region per figure, after the
+page's other regions, whose box is the figure's box exactly, its lines
+grouped as layout groups any region's; a figure with no such word has
+no region. The page's other regions are then those it has today, less
+the figure's words. The words are taken out after the layout, not
+before it, because the bands and columns are found on all the page's
+rows: taken out before step 1, as a draft of this section did, the
+hieroglyphs among the footnotes of Kadesh page 52 left gaps that turned
+its 7 footnotes into 4, three of them into quotations of the body, and
+whole Kadesh had 148 footnotes against 152 (review, 18 November 2026).
+
+A figure's region is never re-read with Tesseract
+(`docs/specs/reocr.md`): no region read again replaces a word of the
+text layer whose middle lies inside an in-page figure's box, and of
+Tesseract's words, those whose middle lies inside one are dropped
+before the reading is scored. A footnote band's crop runs across the
+page's width, and on Kadesh page 51 it crosses the hieroglyphs: without
+this, Tesseract's reading of them would enter the notes, a second copy
+of words the figure's region holds.
 
 ### structure: removing the figure text
 
@@ -447,7 +464,8 @@ of what this spec changed there.
   `in_page`."
 - §8, lines.json, after `Region`: "On a page with in-page figures, the
   words whose middle lies inside a figure's box, but for those of the
-  page's first row, are a region of their own whose box is the figure's
+  page's first row, are taken out of the regions the page's layout made
+  with them and are a region of their own whose box is the figure's
   box (`docs/specs/figures.md` §5)."
 - §8, the versions: pages.json 3, words.json 3, lines.json 4, blocks.json
   5, with the sentence on what each change added.
