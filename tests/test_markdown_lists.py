@@ -7,14 +7,11 @@ import re
 import shutil
 import subprocess
 import zipfile
-from collections.abc import Callable
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
-from galley import epub, markdown
 from galley.book_folder import BookFolder
 from galley.config import BookConfig, Language
 from galley.errors import InputFileError
@@ -28,13 +25,7 @@ from galley.model import (
     Note,
     NoteKind,
     Origin,
-    PageInfo,
-    PageKind,
-    PagesFile,
     Span,
-    TextSource,
-    write_blocks,
-    write_pages,
 )
 
 _PDF_BYTES = b"%PDF-1.4 a stand-in: markdown reads only its hash"
@@ -112,33 +103,24 @@ def _div_ids(items: list[Any]) -> tuple[object, ...]:
     return tuple(item[0]["c"][0][0] for item in items)
 
 
-# Structure spec section 32: a dash list in the geometry of the owner's
-# book, its texts written here: a lead-in, six items and a paragraph.
-DASH_LIST = _blocks_file(
-    (
-        _paragraph("b-p0016-001", "The figure comes in six kinds:"),
-        *(
-            _item(f"b-p0016-{number:03d}", "—", f"The kind {number}, as it stands.")
-            for number in range(2, 8)
-        ),
-        _paragraph("b-p0017-001", "After the list, the text goes on."),
-    )
-)
-
-
 @pytest.mark.pandoc
-def test_a_dash_list_is_a_bullet_list_of_its_items_without_their_dashes() -> None:
-    body = _pandoc_blocks(DASH_LIST)
+def test_a_dash_list_is_a_bullet_list_of_its_items_without_their_dashes(
+    lists_book: frozendict[str, BlocksFile],
+) -> None:
+    dash_list = lists_book["dash_list"]
+    body = _pandoc_blocks(dash_list)
 
     assert [element["t"] for element in body] == ["Div", "BulletList", "Div"]
     items = body[1]["c"]
     assert _div_ids(items) == tuple(f"b-p0016-{number:03d}" for number in range(2, 8))
     assert all(item[0]["c"][0][1] == ["list-item"] for item in items)
-    assert "—" not in render_markdown(DASH_LIST, CONFIG)
+    assert "—" not in render_markdown(dash_list, CONFIG)
 
 
-def test_a_dash_item_is_written_as_the_spec_gives_it() -> None:
-    written = render_markdown(DASH_LIST, CONFIG)
+def test_a_dash_item_is_written_as_the_spec_gives_it(
+    lists_book: frozendict[str, BlocksFile],
+) -> None:
+    written = render_markdown(lists_book["dash_list"], CONFIG)
 
     assert (
         "-   ::: {#b-p0016-002 .list-item}\n"
@@ -149,21 +131,11 @@ def test_a_dash_item_is_written_as_the_spec_gives_it() -> None:
     ) in written
 
 
-# A numbered list "1." to "5." whose third and fourth items have one line.
-NUMBERED_LIST = _blocks_file(
-    (
-        _paragraph("b-p0226-001", "The steps are these:"),
-        *(
-            _item(f"b-p0226-{number + 1:03d}", f"{number}.", f"Step {number} is done.")
-            for number in range(1, 6)
-        ),
-    )
-)
-
-
 @pytest.mark.pandoc
-def test_a_numbered_list_is_an_ordered_list_from_1_in_decimal_with_a_period() -> None:
-    body = _pandoc_blocks(NUMBERED_LIST)
+def test_a_numbered_list_is_an_ordered_list_from_1_in_decimal_with_a_period(
+    lists_book: frozendict[str, BlocksFile],
+) -> None:
+    body = _pandoc_blocks(lists_book["numbered_list"])
 
     assert body[1]["t"] == "OrderedList"
     attributes, items = body[1]["c"]
@@ -333,50 +305,11 @@ def test_a_printed_note_after_an_item_ends_the_list() -> None:
     assert written.index(".endnote") < written.index("2.  ::: {#b-p0006-001")
 
 
-CHAPTER_ONE = _block("b-p0036-001", BlockKind.HEADING, "The Old Masters", level=1)
-CHAPTER_TWO = _block("b-p0050-001", BlockKind.HEADING, "New Scientists", level=1)
-
-# A printed contents with depths 1 and 2: its title a level-1 heading, an
-# entry of depth 1, one of depth 2 under it, and another of depth 1.
-CONTENTS = _blocks_file(
-    (
-        _block("b-p0008-001", BlockKind.HEADING, "CONTENTS", level=1),
-        _block(
-            "b-p0008-002",
-            BlockKind.CONTENTS_ENTRY,
-            "The Old Masters",
-            level=1,
-            label="1.",
-            page_number="9",
-            heading_ref="b-p0036-001",
-        ),
-        _block(
-            "b-p0008-003",
-            BlockKind.CONTENTS_ENTRY,
-            "Their workshops",
-            level=2,
-            page_number="12",
-        ),
-        _block(
-            "b-p0008-004",
-            BlockKind.CONTENTS_ENTRY,
-            "New Scientists",
-            level=1,
-            label="2.",
-            page_number="23",
-            heading_ref="b-p0050-001",
-        ),
-        CHAPTER_ONE,
-        _paragraph("b-p0036-002", "The masters worked alone."),
-        CHAPTER_TWO,
-        _paragraph("b-p0050-002", "The scientists worked together."),
-    )
-)
-
-
 @pytest.mark.pandoc
-def test_a_contents_is_a_div_holding_a_bullet_list_nested_by_depth() -> None:
-    body = _pandoc_blocks(CONTENTS)
+def test_a_contents_is_a_div_holding_a_bullet_list_nested_by_depth(
+    lists_book: frozendict[str, BlocksFile],
+) -> None:
+    body = _pandoc_blocks(lists_book["contents"])
 
     contents = body[1]
     assert contents["t"] == "Div"
@@ -391,10 +324,10 @@ def test_a_contents_is_a_div_holding_a_bullet_list_nested_by_depth() -> None:
     assert second[0]["c"][0] == ["b-p0008-004", ["contents-entry"], []]
 
 
-def test_a_contents_entry_is_its_label_and_a_link_to_its_heading_without_its_page() -> (
-    None
-):
-    written = render_markdown(CONTENTS, CONFIG)
+def test_a_contents_entry_is_its_label_and_a_link_to_its_heading_without_its_page(
+    lists_book: frozendict[str, BlocksFile],
+) -> None:
+    written = render_markdown(lists_book["contents"], CONFIG)
 
     assert (
         "::: contents\n"
@@ -499,61 +432,13 @@ def test_render_markdown_refuses_a_malformed_list_item_or_entry(
         render_markdown(_blocks_file((block,)), CONFIG)
 
 
-def _book(root: Path, blocks: BlocksFile) -> tuple[BookFolder, BookConfig]:
-    """A book folder with book.pdf, pages.json of its pages made from it,
-    and `blocks`, and CONFIG with book.pdf as its PDF."""
-    pdf = root / "book.pdf"
-    pdf.write_bytes(_PDF_BYTES)
-    folder = BookFolder(root)
-    write_pages(
-        folder.pages_json,
-        PagesFile(
-            source_pdf_sha256=SOURCE_PDF_SHA256,
-            pages=tuple(
-                PageInfo(
-                    index=index,
-                    width_pt=432.0,
-                    height_pt=648.0,
-                    kind=PageKind.TEXT,
-                    text_source=TextSource.TEXT_LAYER,
-                    text_layer_score=None,
-                    exclude_regions=(),
-                    figure_boxes=(),
-                    blank_checked_by_ocr=False,
-                )
-                for index in range(300)
-            ),
-            ocr_audit=None,
-        ),
-    )
-    write_blocks(folder.blocks_json, blocks)
-    return folder, replace(CONFIG, pdf=pdf)
-
-
-EPUB_BOOK = _blocks_file(
-    (
-        *CONTENTS.blocks[:4],
-        CHAPTER_ONE,
-        *NUMBERED_LIST.blocks,
-        CHAPTER_TWO,
-        *DASH_LIST.blocks,
-    )
-)
-
-
-# Java starts in about a second; the 8-thread run would start it 8 times.
-@pytest.mark.thread_unsafe
+# epubcheck validates this EPUB in test_epub.py, in one call with the other
+# EPUBs of hand-written blocks: Java starts in about a second and a half.
 @pytest.mark.pandoc
-@pytest.mark.epubcheck
-def test_the_epub_of_lists_and_a_contents_linked_into_another_chapter_passes_epubcheck(
-    tmp_path: Path, check_epubs: Callable[..., None]
+def test_the_epub_of_lists_links_a_contents_entry_into_another_chapter(
+    lists_book_epub: BookFolder,
 ) -> None:
-    folder, config = _book(tmp_path, EPUB_BOOK)
-
-    markdown.run(folder, config)
-    epub.run(folder, config)
-
-    check_epubs(folder.book_epub)
+    folder = lists_book_epub
     with zipfile.ZipFile(folder.book_epub) as book:
         names = book.namelist()
         chapters = {
