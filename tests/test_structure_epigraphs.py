@@ -8,8 +8,11 @@ column runs from 50 to 400 pt; a quotation is indented 30 pt, as Haynes'
 are, or 44 pt, as Turney's.
 """
 
+from collections.abc import Callable
+
 import pytest
 
+from galley.book_folder import BookFolder
 from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage
 from galley.model import (
@@ -25,6 +28,7 @@ from galley.model import (
     Word,
     WordChange,
     block_text,
+    read_blocks,
 )
 from galley.structure import make_blocks
 from galley.structure._epigraphs import (
@@ -655,3 +659,29 @@ def test_page_break_inside_a_verse_block_keeps_it_one_block() -> None:
         BlockKind.PARAGRAPH,
     )
     assert tuple(origin.page_index for origin in blocks.blocks[1].origin) == (20, 21)
+
+
+# Structure spec section 26, "Whole-book tests": none of the six
+# public-domain books prints an epigraph; the margin of 2 is for a motto
+# the rule takes.
+_PUBLIC_DOMAIN_BOOKS = (
+    "normansineuropea00hask",
+    "earlyplantagenet01stub",
+    "domesdaybook00maituoft",
+    "catherinedemedic00mariuoft",
+    "battleofkadeshst00breauoft",
+    "politicaltheorie00gieruoft",
+)
+_PUBLIC_DOMAIN_EPIGRAPHS_MAX = 2
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize("book", _PUBLIC_DOMAIN_BOOKS)
+def test_whole_book_public_domain_book_has_at_most_2_epigraph_blocks(
+    whole_book_run: Callable[[str], BookFolder], book: str
+) -> None:
+    blocks = read_blocks(whole_book_run(book).blocks_json)
+    epigraphs = sum(block.kind is BlockKind.EPIGRAPH for block in blocks.blocks)
+    assert epigraphs <= _PUBLIC_DOMAIN_EPIGRAPHS_MAX

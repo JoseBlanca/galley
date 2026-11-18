@@ -26,6 +26,7 @@ from galley.cli import main
 from galley.model import (
     BlockKind,
     BlocksFile,
+    ChangeReason,
     Note,
     NoteKind,
     PageNumberPosition,
@@ -256,3 +257,47 @@ def test_no_reference_links_to_a_note_of_another_groups_chapter(
     )
     assert links
     assert sum(group != chapter for group, chapter in links) == 0
+
+
+# Structure spec section 26, "Whole-book tests": the epigraphs (section 22).
+_EPIGRAPHS = {"turney": (13, 0), "haynes": (21, 8)}
+_SOURCE_DASHES = {"turney": 0, "haynes": 21}
+# Structure spec section 22: Turney's own epigraph, alone on its page.
+_TURNEY_EPIGRAPH_PAGE = 13
+
+
+@pytest.mark.parametrize("book", ["turney", "haynes"])
+def test_epigraph_blocks_and_those_with_line_feeds_number_the_books_own(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    epigraphs = tuple(
+        block
+        for block in owner_book_run(book).blocks
+        if block.kind is BlockKind.EPIGRAPH
+    )
+    assert (
+        len(epigraphs),
+        sum("\n" in block_text(block) for block in epigraphs),
+    ) == _EPIGRAPHS[book]
+
+
+@pytest.mark.parametrize("book", ["turney", "haynes"])
+def test_source_dash_changes_number_the_dashed_sources(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    changes = owner_book_run(book).word_changes
+    assert (
+        sum(change.reason is ChangeReason.SOURCE_DASH for change in changes)
+        == _SOURCE_DASHES[book]
+    )
+
+
+def test_turney_page_13_is_the_origin_of_an_epigraph_block_and_of_no_other(
+    owner_book_run: Callable[[str], BlocksFile],
+) -> None:
+    kinds = tuple(
+        block.kind
+        for block in owner_book_run("turney").blocks
+        if any(origin.page_index == _TURNEY_EPIGRAPH_PAGE for origin in block.origin)
+    )
+    assert kinds == (BlockKind.EPIGRAPH,)
