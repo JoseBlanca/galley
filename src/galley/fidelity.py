@@ -474,18 +474,33 @@ def _contents_link_problems(
     blocks: BlocksFile, markdown: MarkdownWords
 ) -> tuple[str, ...]:
     """The contents links whose target is not "#" and the id of a heading
-    block of blocks.json (structure spec section 31)."""
+    block of blocks.json (structure spec section 31), and those to a
+    heading that is not the one their entry's heading_ref names."""
+    every_block = _all_blocks(blocks)
     headings = frozenset(
         _LINK_TARGET_PREFIX + block.id
-        for block in _all_blocks(blocks)
+        for block in every_block
         if block.kind is BlockKind.HEADING
     )
-    return tuple(
+    references = {
+        block.id: _LINK_TARGET_PREFIX + block.heading_ref
+        for block in every_block
+        if block.heading_ref is not None
+    }
+    not_headings = tuple(
         f"the contents entry {link.block_id} links to {link.target!r}, which is "
         "not the id of a heading block"
         for link in markdown.contents_links
         if link.target not in headings
     )
+    other_headings = tuple(
+        f"the contents entry {link.block_id} links to {link.target!r}, and its "
+        f"heading reference is {references.get(link.block_id or '')!r}"
+        for link in markdown.contents_links
+        if link.target in headings
+        and references.get(link.block_id or "") != link.target
+    )
+    return not_headings + other_headings
 
 
 def _places(words: Iterable[_PlacedWord], text: str) -> str:
@@ -890,7 +905,7 @@ def check_stage(
     and a contents entry's page number; the number of list items against
     the items of Pandoc's lists of list items, and of contents entries with
     a heading reference against the links of contents entries, each of
-    which must target a heading. The words are compared as multisets over
+    which must target the heading its entry's heading_ref names. The words are compared as multisets over
     the whole book, split on white space, nothing normalised.
 
     Raises FidelityError with the missing and invented words, their counts,
@@ -905,7 +920,8 @@ def check_stage(
     beside a round bracket), or holds a letter without a note_marker word
     change that split it off a word, or when a block that is not an
     epigraph has a source; at the markdown boundary when a contents link
-    targets anything but "#" and the id of a heading block; and at the
+    targets anything but "#" and the id of a heading block, or a heading
+    other than its entry's heading_ref; and at the
     structure boundary when a word
     change does more than its reason allows (a hyphen join of two parts,
     with the hyphen dropped or kept, a marker split off its word, the
