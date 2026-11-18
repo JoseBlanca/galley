@@ -3,6 +3,83 @@
 The work of the plan `docs/plans/owner-books.md`, written as it goes, for
 the owner. Started on 17 November 2026 on branch `plan/owner-books`.
 
+## Summary
+
+**The plan is done** on branch `plan/owner-books` (18 November 2026)
+and waits for the owner's order to merge it into `main`. The owner
+asked that it be written and carried out without their review; every
+decision taken in their absence is listed below. Every check passes at
+9672288: 2,494 quick tests in about 68 s, 106 slow tests on whole books
+(the owner's two included) in 515 s, and the EPUBs of all eight books
+with 0 errors and 0 warnings from epubcheck.
+
+**What changed for the owner's two books** (Turney's book; Haynes' book), counted on galley's
+output and checked against the page images:
+
+| | before the plan | now |
+|---|---|---|
+| chapter headings with their label ("Chapter One") | Turney 1, Haynes 0 headings in all | 10 of 10, 16 of 16 |
+| Turney's running heads left in the text | 98 | 0 |
+| Turney's page numbers taken for margin notes | 329 | 0 |
+| notes at the back linked to their reference | Turney 0; Haynes 127, 120 of them to another chapter's note | Turney 530 of 613; Haynes 582 of 632; none to a wrong note |
+| epigraphs, with their source apart | run into the text | Turney 13, Haynes 21 (8 in verse) |
+
+Also, in every book: a page break ends a paragraph after a short last
+line that ends a sentence; in English books "pursued ?" is "pursued?"
+(Domesday 2,112 signs, Stubbs 1,007); in French the space before a
+sign no longer breaks a line; words glued at a capital ("theAvre") are
+split; and words read twice by re-reading fell (Domesday 30 to 5,
+Gierke 12 to 0).
+
+**The public-domain books**, scored against their online editions
+(galley-eval): the share of wrong words in the body fell on Stubbs from
+0.053 to 0.033 and on Domesday from 0.075 to 0.058; Haskins' notes
+whose reference is right rose from 61 to 66. Three scores fell by
+amounts beyond the plan's tolerances, none by a lost word: Mariéjol's
+paragraph precision by 0.005 (three garbled lines of that scan taken
+for headings), and two Domesday counts by 1 and 2, where galley's
+output is the same and only the scorer's alignment moved (task 7.1).
+
+**Decided in the owner's absence**, each with its measurement in the
+sections below: the epigraph's source is a field of the block, its
+dash written by the Markdown step, so Turney's sources, printed without
+a dash, get one in the EPUB as Haynes' do; group headings of the notes
+stay out of the table of contents; Stubbs' publisher's lists are left
+out of its book (config); the running heads' likeness threshold went
+from 0.75 to 0.70; the page-break rule does not cut when the next page
+goes on in lower case or the last line is a footnote's first.
+
+**Format changes**: blocks.json goes to version 4 (the epigraph, its
+source, a note's group, three new kinds of recorded word change), and
+lines.json to version 3 (re-reading records the junk words it
+replaced). Runs made before the merge must run layout and structure
+again.
+
+**Still wrong**, for later plans:
+
+- A footnote left in the main text at a page's foot still cuts the
+  sentence that runs on over the page when it resumes with a capital
+  (Gierke 156), and a few footnotes stay in the text (Gierke, Kadesh,
+  Mariéjol).
+- A note reference set after a year ("1959.²") is not linked: about 5
+  in the owner's books.
+- Turney's two newspaper pages reproduced as plates (174-175) become a
+  heading; one Haynes verse epigraph keeps a turnover line apart.
+- Gierke's section heading "II. LEGISTS." is not found; tables are not
+  handled; the OCR's own misreadings stay ("AMD" for "AND").
+- The quick tests take about 68 s against the minute asked: the four
+  new excerpts' setup costs about 10 s.
+
+**Asked of the owner:**
+
+1. The order to merge into `main`.
+2. A look at the two EPUBs, `runs/owner-books/turney/book.epub` and
+   `runs/owner-books/haynes/book.epub` in the main checkout: the table
+   of contents, a chapter opening with its epigraph, and a note
+   followed from the text to the back and back.
+3. Whether Turney's sources should keep the book's look (no dash)
+   rather than one look for every book.
+
 ## Before the first task
 
 The owner approved the scope in chat on 17 November 2026 and asked that
