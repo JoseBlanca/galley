@@ -31,6 +31,7 @@ from galley.model import (
     RenderedPage,
     TextSource,
     Word,
+    read_blocks,
     read_lines,
     read_pages,
     read_words,
@@ -578,19 +579,72 @@ _LABEL_2 = _word("Orontes", 200.0, 250.0)
 _BELOW = _word("below", 60.0, 320.0)
 
 
-def test_figure_region_holds_the_words_inside_the_box_with_the_figures_box() -> None:
-    page = _words_page((_HEAD, _ABOVE, _LABEL, _BESIDE, _LABEL_2, _BELOW), (_FIGURE,))
-    rest, regions = figure_regions(page)
-    assert rest == _words_page((_HEAD, _ABOVE, _BESIDE, _BELOW), (_FIGURE,))
-    # The label shares its row with "beside", but its line is the region's.
-    assert regions == (
-        Region(
-            _FIGURE.box,
-            (
-                Line(_LABEL.box, (_LABEL,)),
-                Line(_LABEL_2.box, (_LABEL_2,)),
-            ),
+def _line(*words: Word) -> Line:
+    return Line(
+        Box(
+            min(word.box.x0 for word in words),
+            min(word.box.top for word in words),
+            max(word.box.x1 for word in words),
+            max(word.box.bottom for word in words),
         ),
+        words,
+    )
+
+
+def _region(*lines: Line) -> Region:
+    return Region(
+        Box(
+            min(line.box.x0 for line in lines),
+            min(line.box.top for line in lines),
+            max(line.box.x1 for line in lines),
+            max(line.box.bottom for line in lines),
+        ),
+        lines,
+    )
+
+
+def _layout(*regions: Region, figures: tuple[Figure, ...]) -> PageLayout:
+    return PageLayout(25, regions, figures)
+
+
+def test_figure_region_takes_the_words_inside_the_box_out_of_the_laid_out_lines() -> (
+    None
+):
+    page = _words_page((_HEAD, _ABOVE, _LABEL, _BESIDE, _LABEL_2, _BELOW), (_FIGURE,))
+    # The page as laid out with all its words: the label joined the line of
+    # "beside", and the second label has a line of its own.
+    laid_out = _layout(
+        _region(_line(_HEAD)),
+        _region(
+            _line(_ABOVE),
+            _line(_LABEL, _BESIDE),
+            _line(_LABEL_2),
+            _line(_BELOW),
+        ),
+        figures=(_FIGURE,),
+    )
+    assert figure_regions(page, laid_out) == _layout(
+        _region(_line(_HEAD)),
+        # The line of "beside" keeps its place, with the box of its word.
+        _region(_line(_ABOVE), _line(_BESIDE), _line(_BELOW)),
+        Region(_FIGURE.box, (_line(_LABEL), _line(_LABEL_2))),
+        figures=(_FIGURE,),
+    )
+
+
+def test_figure_region_drops_a_region_left_with_no_line() -> None:
+    page = _words_page((_HEAD, _ABOVE, _LABEL, _BELOW), (_FIGURE,))
+    laid_out = _layout(
+        _region(_line(_HEAD), _line(_ABOVE)),
+        _region(_line(_LABEL)),
+        _region(_line(_BELOW)),
+        figures=(_FIGURE,),
+    )
+    assert figure_regions(page, laid_out) == _layout(
+        _region(_line(_HEAD), _line(_ABOVE)),
+        _region(_line(_BELOW)),
+        Region(_FIGURE.box, (_line(_LABEL),)),
+        figures=(_FIGURE,),
     )
 
 
@@ -604,14 +658,33 @@ def test_figure_region_leaves_a_word_of_the_first_row_with_the_page() -> None:
         kind=FigureKind.IN_PAGE,
     )
     page = _words_page((_HEAD, _LABEL, _BELOW), (figure,))
-    rest, regions = figure_regions(page)
-    assert rest.words == (_HEAD, _BELOW)
-    assert regions == (Region(figure.box, (Line(_LABEL.box, (_LABEL,)),)),)
+    laid_out = _layout(
+        _region(_line(_HEAD)), _region(_line(_LABEL), _line(_BELOW)), figures=(figure,)
+    )
+    assert figure_regions(page, laid_out) == _layout(
+        _region(_line(_HEAD)),
+        _region(_line(_BELOW)),
+        Region(figure.box, (_line(_LABEL),)),
+        figures=(figure,),
+    )
 
 
 def test_figure_region_none_for_a_figure_with_no_word_inside() -> None:
     page = _words_page((_HEAD, _ABOVE, _BELOW), (_FIGURE,))
-    assert figure_regions(page) == (page, ())
+    laid_out = _layout(
+        _region(_line(_HEAD), _line(_ABOVE), _line(_BELOW)), figures=(_FIGURE,)
+    )
+    assert figure_regions(page, laid_out) == laid_out
+
+
+def test_figure_region_none_for_a_word_a_rereading_replaced() -> None:
+    # A kept re-reading replaced the label: it is in no line, and nothing
+    # is taken for it.
+    page = _words_page((_HEAD, _ABOVE, _LABEL, _BELOW), (_FIGURE,))
+    laid_out = _layout(
+        _region(_line(_HEAD), _line(_ABOVE), _line(_BELOW)), figures=(_FIGURE,)
+    )
+    assert figure_regions(page, laid_out) == laid_out
 
 
 def test_figure_region_none_on_a_plate() -> None:
@@ -622,7 +695,10 @@ def test_figure_region_none_on_a_plate() -> None:
         kind=FigureKind.PLATE,
     )
     page = _words_page((_HEAD, _LABEL, _BELOW), (plate,))
-    assert figure_regions(page) == (page, ())
+    laid_out = _layout(
+        _region(_line(_HEAD), _line(_LABEL), _line(_BELOW)), figures=(plate,)
+    )
+    assert figure_regions(page, laid_out) == laid_out
 
 
 def test_figure_region_a_word_inside_two_boxes_goes_to_the_first_figure() -> None:
@@ -633,29 +709,100 @@ def test_figure_region_a_word_inside_two_boxes_goes_to_the_first_figure() -> Non
         kind=FigureKind.IN_PAGE,
     )
     page = _words_page((_HEAD, _LABEL, _BESIDE), (_FIGURE, second))
-    _, regions = figure_regions(page)
-    assert regions == (
-        Region(_FIGURE.box, (Line(_LABEL.box, (_LABEL,)),)),
-        Region(second.box, (Line(_BESIDE.box, (_BESIDE,)),)),
+    laid_out = _layout(
+        _region(_line(_HEAD), _line(_LABEL, _BESIDE)), figures=(_FIGURE, second)
+    )
+    assert figure_regions(page, laid_out) == _layout(
+        _region(_line(_HEAD)),
+        Region(_FIGURE.box, (_line(_LABEL),)),
+        Region(second.box, (_line(_BESIDE),)),
+        figures=(_FIGURE, second),
     )
 
 
 def test_figure_region_follows_the_pages_regions_and_keeps_the_figures() -> None:
     page = _words_page((_HEAD, _ABOVE, _LABEL, _BESIDE, _BELOW), (_FIGURE,))
     layout, records = layout_page_with_figures(page, None, None)
-    rest = Region(
-        Box(60.0, 40.0, 340.0, 330.0),
-        (
-            Line(_HEAD.box, (_HEAD,)),
-            Line(_ABOVE.box, (_ABOVE,)),
-            Line(_BESIDE.box, (_BESIDE,)),
-            Line(_BELOW.box, (_BELOW,)),
-        ),
-    )
-    assert layout == PageLayout(
-        25, (rest, Region(_FIGURE.box, (Line(_LABEL.box, (_LABEL,)),))), (_FIGURE,)
+    # Without measures the page is one region, laid out with the label,
+    # which joined the line of "beside" and is then taken out of it.
+    assert layout == _layout(
+        _region(_line(_HEAD), _line(_ABOVE), _line(_BESIDE), _line(_BELOW)),
+        Region(_FIGURE.box, (_line(_LABEL),)),
+        figures=(_FIGURE,),
     )
     assert records == ()
+
+
+# Whole Kadesh page 52: hieroglyphs printed among its footnotes, in the
+# figure box (70, 442, 408, 544). Its regions outside the figure, each as
+# its line count, first line and last line, are those layout made on main
+# (83f2754, before in-page figures) less the words read in the hieroglyphs
+# (figures spec section 5); with the figure's words taken out before the
+# layout, its 7 footnotes became 4, their text reordered.
+_KADESH_52_REGIONS = (
+    (1, "JAMES HENRY BREASTED 37", "JAMES HENRY BREASTED 37"),
+    (
+        26,
+        (
+            "another with him, and he found that 2,500 spans of chariotry had "
+            "surrounded him m in four"
+        ),
+        "30. &",
+    ),
+    (
+        10,
+        "UJ",
+        "nobles, his infantry, and his chariotry. He overthrew them",
+    ),
+    (
+        8,
+        "'>' Ramses himself repeats this statement, Poem, 1, 88.",
+        "IV and VI.",
+    ),
+    (
+        1,
+        'prostrate upon thoir faces; he hurled them, etc ." as above. 115',
+        'prostrate upon thoir faces; he hurled them, etc ." as above. 115',
+    ),
+)
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+def test_whole_kadesh_52_regions_outside_the_figure_are_those_laid_out_with_all_words(
+    whole_book_run: Callable[[str], BookFolder],
+) -> None:
+    folder = whole_book_run(_KADESH_BOOK)
+    page = read_lines(folder.lines_json).pages[52]
+    boxes = tuple(figure.box for figure in page.figures)
+    assert boxes == (Box(70.0, 442.0, 408.0, 544.0),)
+
+    def text(line: Line) -> str:
+        return " ".join(word.text for word in line.words)
+
+    assert (
+        tuple(
+            (len(region.lines), text(region.lines[0]), text(region.lines[-1]))
+            for region in page.regions
+            if region.box not in boxes
+        )
+        == _KADESH_52_REGIONS
+    )
+    # Its notes: the five printed, without the two that main made of the
+    # hieroglyphs' words.
+    notes = tuple(
+        note
+        for note in read_blocks(folder.blocks_json).notes
+        if note.id.startswith("n-p0052-")
+    )
+    assert tuple(note.blocks[0].spans[0].text[:20] for note in notes) == (
+        "; himself makes a si",
+        "l*>The omitted porti",
+        "'>' Ramses himself r",
+        'i" They will be take',
+        "l» Abn Simbel: CHAMP",
+    )
 
 
 @pytest.mark.pandoc
