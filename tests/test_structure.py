@@ -2740,6 +2740,24 @@ def _page_1_blocks(blocks: BlocksFile) -> tuple[str, ...]:
     )
 
 
+# Spec section 29: the three notes left in the body, one line each at one
+# left side and the first reading "(1)", are a list of three items.
+_NOTES_AS_LIST_ITEMS = (
+    ("list_item", "(1)", "Note (1) in small type."),
+    ("list_item", "(2)", "Note (2) in small type."),
+    ("list_item", "(3)", "Note (3) in small type."),
+)
+
+
+def _page_1_kinds(blocks: BlocksFile) -> tuple[tuple[str, str | None, str], ...]:
+    """Each block of page 1, its kind, label and text."""
+    return tuple(
+        (block.kind.value, block.label, block_text(block))
+        for block in blocks.blocks
+        if block.origin[0].page_index == 1
+    )
+
+
 def test_footnote_left_in_the_body_in_rising_order_is_taken_as_notes() -> None:
     lines = _body_notes_pages(("(1)", "(2)", "(3)"))
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
@@ -2773,11 +2791,7 @@ def test_footnote_lines_in_the_body_of_a_page_whose_band_starts_at_1_stay() -> N
         workers=1,
     )
     assert tuple(note.marker for note in blocks.notes) == ("(1)", "(1)")
-    assert _page_1_blocks(blocks)[-3:] == (
-        "(1) Note (1) in small type.",
-        "(2) Note (2) in small type.",
-        "(3) Note (3) in small type.",
-    )
+    assert _page_1_kinds(blocks)[-3:] == _NOTES_AS_LIST_ITEMS
 
 
 def test_footnote_lines_in_the_body_below_text_as_small_stay() -> None:
@@ -2787,11 +2801,7 @@ def test_footnote_lines_in_the_body_below_text_as_small_stay() -> None:
         workers=1,
     )
     assert len(blocks.notes) == 1
-    assert _page_1_blocks(blocks) == (
-        "(1) Note (1) in small type.",
-        "(2) Note (2) in small type.",
-        "(3) Note (3) in small type.",
-    )
+    assert _page_1_kinds(blocks) == _NOTES_AS_LIST_ITEMS
 
 
 def test_footnote_lines_in_the_body_of_a_book_with_digit_markers_stay() -> None:
@@ -3879,15 +3889,26 @@ def test_heading_line_ending_with_a_number_or_without_a_long_word_is_none(
     assert (_kinds_and_texts(blocks)[1][0] == "heading") is heading
 
 
-def test_heading_none_on_a_page_of_contents_pages() -> None:
+def test_heading_on_a_page_of_contents_pages_is_only_the_runs_title() -> None:
+    # Spec section 30, rule 1: the run's first line is its title, a heading
+    # of level 1; "CHAPTER III." is a lone label over its entry's title.
     lines = _lines_of(
         _around(
             _centred_line("CHAPTER III.", 130), _centred_line("THE EARLY YEARS.", 152.5)
         )
     )
     blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
-    assert not any(block.kind is BlockKind.HEADING for block in blocks.blocks)
-    assert _texts(blocks.blocks)[1:3] == ("CHAPTER III.", "THE EARLY YEARS.")
+    assert tuple(
+        (block.level, block_text(block))
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING
+    ) == ((1, "before 0 of the page"),)
+    assert _kinds_and_texts(blocks)[2] == (
+        "contents_entry",
+        1,
+        "CHAPTER III.",
+        "THE EARLY YEARS.",
+    )
 
 
 def test_heading_label_of_a_roman_numeral_joins_its_title() -> None:
@@ -4819,8 +4840,8 @@ def test_quote_never_made_of_notes_in_the_body_below_text_as_small() -> None:
         workers=1,
     )
     assert tuple(
-        block.kind.value for block in blocks.blocks if block_text(block).startswith("(")
-    ) == ("paragraph", "paragraph", "paragraph")
+        block.kind.value for block in blocks.blocks if block.origin[0].page_index == 1
+    )[-3:] == ("list_item", "list_item", "list_item")
 
 
 # Haskins' bibliographical notes (structure spec, section 16)
@@ -4967,11 +4988,7 @@ def test_bibliographical_note_pages_keep_the_notes_left_in_their_body() -> None:
     )
     blocks = make_blocks(_lines_of(page_0, *pages[1:], page_3), _NO_WORDS, workers=1)
     assert tuple(note.origin[0].page_index for note in blocks.notes) == (0, 3)
-    assert _page_1_blocks(blocks)[-3:] == (
-        "(1) Note (1) in small type.",
-        "(2) Note (2) in small type.",
-        "(3) Note (3) in small type.",
-    )
+    assert _page_1_kinds(blocks)[-3:] == _NOTES_AS_LIST_ITEMS
 
 
 @pytest.mark.parametrize(("first", "kind"), [("(2)", "paragraph"), ("Two", "quote")])

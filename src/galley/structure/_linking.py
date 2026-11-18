@@ -19,14 +19,17 @@ def _linkable(reference: Reference) -> bool:
     return not any(character.isalpha() for character in reference.reference)
 
 
-# Spec sections 13 and 17: a margin note and an index entry hold no
-# reference to a note.
-_NOT_SEARCHED = frozenset({BlockKind.MARGIN_NOTE, BlockKind.INDEX_ENTRY})
+# Spec sections 13, 17 and 30: a margin note, an index entry and a contents
+# entry hold no reference to a note.
+_NOT_SEARCHED = frozenset(
+    {BlockKind.MARGIN_NOTE, BlockKind.INDEX_ENTRY, BlockKind.CONTENTS_ENTRY}
+)
 
 
 def body_candidates(body: Sequence[Unnumbered]) -> tuple[Candidate, ...]:
-    """The candidate references of the body's blocks other than margin notes
-    and index entries (spec section 17, rule 4), in reading order: a
+    """The candidate references of the body's blocks other than margin notes,
+    index entries (spec section 17, rule 4) and contents entries (section
+    30, rule 10), in reading order: a
     heading holds them too (Kadesh's title, "STRATEGY*")."""
     return tuple(
         Candidate(block_position, word_position, page_index, reference)

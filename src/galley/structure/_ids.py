@@ -59,6 +59,7 @@ def _block(block_id: str, unnumbered: Unnumbered, note_ids: Sequence[str]) -> Bl
         figure=unnumbered.figure,
         origin=unnumbered.origin,
         source=unnumbered.source,
+        page_number=unnumbered.page_number,
     )
 
 

@@ -9,6 +9,7 @@ section 5, say which words each side holds.
 """
 
 import json
+import re
 import shutil
 import subprocess
 import unicodedata
@@ -20,6 +21,13 @@ from typing import Literal, assert_never, overload
 
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
 from galley.hyphens import LINE_END_HYPHENS
+from galley.list_markers import (
+    DASHES,
+    ListMarker,
+    MarkerKind,
+    is_bulleted,
+    marker_readings,
+)
 from galley.model import (
     Block,
     BlockKind,
@@ -58,21 +66,35 @@ class ContentsLink:
     target: str
 
 
+@dataclass(frozen=True, slots=True)
+class ShownMarker:
+    """The marker Pandoc shows for an item of a list of list items: the id
+    of the item's div; for an ordered list the item's number, its style
+    and delimiter as Pandoc's JSON names them ("Decimal", "Period"); for a
+    bullet list None and empty names."""
+
+    block_id: str | None
+    number: int | None
+    style: str
+    delimiter: str
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class MarkdownWords:
     """The words of book.md as Pandoc reads it, in order; the number of
     notes Pandoc found (its Note elements), which references to footnotes
     become; the number of links marked `epub:type="noteref"`, which
     references to endnotes become; the number of items of the lists of
-    list items, each a list item of blocks.json; and the links of the
-    contents entries, in order (structure spec section 31)."""
+    list items, each a list item of blocks.json; the marker Pandoc shows
+    for each of those items; and the links of the contents entries, in
+    order (structure spec section 31)."""
 
     words: tuple[MarkdownWord, ...]
     note_count: int
     note_link_count: int
-    # Defaults, so that a reader of book.md without lists need not name them.
-    list_item_count: int = 0
-    contents_links: tuple[ContentsLink, ...] = ()
+    list_item_count: int
+    shown_markers: tuple[ShownMarker, ...]
+    contents_links: tuple[ContentsLink, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -466,6 +488,82 @@ def _list_count_detail(blocks: BlocksFile, markdown: MarkdownWords) -> str:
     return "; ".join(detail for detail in (items_detail, links_detail) if detail)
 
 
+# Structure spec section 31: the style and delimiter Pandoc's JSON names
+# for each kind and form of an ordered list's marker.
+_PANDOC_STYLES = frozendict(
+    {
+        (MarkerKind.NUMBER, False): "Decimal",
+        (MarkerKind.LETTER, False): "LowerAlpha",
+        (MarkerKind.LETTER, True): "UpperAlpha",
+        (MarkerKind.ROMAN, False): "LowerRoman",
+        (MarkerKind.ROMAN, True): "UpperRoman",
+    }
+)
+_PANDOC_DELIMITERS = frozendict({".": "Period", ")": "OneParen", "()": "TwoParens"})
+
+
+def _shows(marker: ListMarker, shown: ShownMarker) -> bool:
+    """Whether `shown`, what Pandoc shows for an item, is the reading
+    `marker` of its label (structure spec section 31)."""
+    if is_bulleted(marker) or shown.number is None:
+        return is_bulleted(marker) and shown.number is None
+    upper = any(character.isupper() for character in marker.form)
+    sign = "".join(c for c in marker.form if not c.isalnum())
+    return (
+        shown.number == marker.value
+        and _PANDOC_STYLES.get((marker.kind, upper)) == shown.style
+        and _PANDOC_DELIMITERS.get(sign) == shown.delimiter
+    )
+
+
+def _shown_marker_problems(
+    blocks: BlocksFile, markdown: MarkdownWords
+) -> tuple[str, ...]:
+    """The items of lists whose marker in the Markdown, as Pandoc shows it,
+    is no reading of their list item's label (structure spec section 31)."""
+    labels = {
+        block.id: block.label
+        for block in _all_blocks(blocks)
+        if block.kind is BlockKind.LIST_ITEM
+    }
+    return tuple(
+        f"the list item {shown.block_id} shows the marker "
+        f"{shown.number} {shown.style} {shown.delimiter} where its label is "
+        f"{labels.get(shown.block_id or '')!r}"
+        for shown in markdown.shown_markers
+        if not any(
+            _shows(marker, shown)
+            for marker in marker_readings(labels.get(shown.block_id or "") or "")
+        )
+    )
+
+
+# Structure spec section 30, "Terms": the words of a page number, a
+# page-number form (1 to 3 digits, or a roman numeral in lower case, with
+# at most one "." or "," after it) or a range of two, with "pp." or "p."
+# before it. Written here, as the fidelity check reads no stage's code.
+_PAGE_FORM = (
+    r"(?:[0-9]{1,3}"
+    r"|(?=[ivxlcdm])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))"
+    r"[.,]?"
+)
+_PAGE_NUMBER = re.compile(
+    rf"(?:pp?\. )?(?:{_PAGE_FORM}|{_PAGE_FORM} ?[-–—] ?{_PAGE_FORM})"
+)
+
+
+def _page_number_problems(blocks: BlocksFile) -> tuple[str, ...]:
+    """The contents entries whose page number, which markdown does not
+    write, has no page number's form (structure spec section 31)."""
+    return tuple(
+        f"block {block.id} has the page number {block.page_number!r}, which "
+        "has no page number's form and would not be in the Markdown"
+        for block in _all_blocks(blocks)
+        if block.page_number is not None
+        and _PAGE_NUMBER.fullmatch(block.page_number) is None
+    )
+
+
 # Architecture section 9: a link's target in book.md is "#" and an id.
 _LINK_TARGET_PREFIX = "#"
 
@@ -666,10 +764,8 @@ _PUNCTUATION_ATTACHED_PARTS = 2
 _SPACED_SIGNS = frozenset("?;:!")
 _CASE_SPLIT_PARTS = 2
 # A list item's dash split off its first word: the dash and the word
-# (structure spec section 29, "Blocks"). Written here again, not imported
-# from structure, for the reason given for _SOURCE_DASHES.
+# (structure spec section 29, "Blocks").
 _LIST_MARKER_PARTS = 2
-_LIST_DASHES = frozenset({"\u2014", "\u2013"})
 # The changes structure makes after the joins of lost hyphens (structure
 # spec section 2, the paragraph after the steps).
 _CHANGES_AFTER_A_JOIN = frozenset(
@@ -748,7 +844,7 @@ def _change_follows_its_reason(change: WordChange) -> bool:
             return (
                 len(change.before) == 1
                 and len(change.after) == _LIST_MARKER_PARTS
-                and change.after[0] in _LIST_DASHES
+                and change.after[0] in DASHES
                 and bool(change.after[1])
                 and change.before[0] == joined_after
             )
@@ -968,7 +1064,9 @@ def check_stage(
                 stage,
                 _source_problems(before)
                 + _reference_problems(before)
-                + _contents_link_problems(before, after),
+                + _contents_link_problems(before, after)
+                + _shown_marker_problems(before, after)
+                + _page_number_problems(before),
             )
             _check_words(
                 stage,
@@ -1038,7 +1136,7 @@ class _Text:
     block_id: str | None
 
 
-type _Token = _Text | _Boundary | ContentsLink
+type _Token = _Text | _Boundary | ContentsLink | ShownMarker
 
 
 def _not_read(element: str, block_id: str | None) -> ExternalProgramError:
@@ -1151,8 +1249,19 @@ def _block_tokens(block: object, block_id: str | None) -> tuple[_Token, ...]:
             content = _blocks_tokens(blocks, block_id)
         case {"t": "BulletList", "c": list() as items}:
             content = _list_tokens(items, _ListElement.BULLET_LIST, block_id)
-        case {"t": "OrderedList", "c": [_, list() as items]}:
-            content = _list_tokens(items, _ListElement.ORDERED_LIST, block_id)
+        case {
+            "t": "OrderedList",
+            "c": [
+                [int() as start, {"t": str() as style}, {"t": str() as delimiter}],
+                list() as items,
+            ],
+        }:
+            content = _list_tokens(
+                items,
+                _ListElement.ORDERED_LIST,
+                block_id,
+                _Numbering(start, style, delimiter),
+            )
         case {
             "t": "Div",
             "c": [[str() as div_id, list() as classes, *_], list() as blocks],
@@ -1328,8 +1437,43 @@ def _item_form(item: object) -> _ItemForm | None:
             return None
 
 
+@dataclass(frozen=True, slots=True)
+class _Numbering:
+    """An ordered list's attributes in Pandoc's JSON: its start, style and
+    delimiter."""
+
+    start: int
+    style: str
+    delimiter: str
+
+
+def _shown(
+    item: object, number: int, numbering: _Numbering | None
+) -> tuple[ShownMarker, ...]:
+    """The marker Pandoc shows for `item`, the `number`-th of its list from
+    0, whose numbering is `numbering`, None for a bullet list; none when
+    the item is not one div, which _list_item_tokens refuses."""
+    match item:
+        case [{"t": "Div", "c": [[str() as div_id, *_], *_]}]:
+            if numbering is None:
+                return (ShownMarker(div_id or None, None, "", ""),)
+            return (
+                ShownMarker(
+                    div_id or None,
+                    numbering.start + number,
+                    numbering.style,
+                    numbering.delimiter,
+                ),
+            )
+        case _:
+            return ()
+
+
 def _list_tokens(
-    items: list[object], element: _ListElement, block_id: str | None
+    items: list[object],
+    element: _ListElement,
+    block_id: str | None,
+    numbering: _Numbering | None = None,
 ) -> tuple[_Token, ...]:
     """The tokens of a list's items, each between two breaks: a list item's
     div after a LIST_ITEM boundary, which counts it; a contents entry's div
@@ -1342,8 +1486,11 @@ def _list_tokens(
         case ((_ItemForm.LIST_ITEM,), _):
             return tuple(
                 token
-                for item in items
-                for token in _list_item_tokens(item, element, block_id)
+                for number, item in enumerate(items)
+                for token in (
+                    *_shown(item, number, numbering),
+                    *_list_item_tokens(item, element, block_id),
+                )
             )
         case ((_ItemForm.CONTENTS_ENTRY,), _ListElement.BULLET_LIST):
             return tuple(
@@ -1463,6 +1610,7 @@ def _token_words(tokens: tuple[_Token, ...]) -> tuple[MarkdownWord, ...]:
                 | _Boundary.NOTE_LINK
                 | _Boundary.LIST_ITEM
                 | ContentsLink()
+                | ShownMarker()
             ):
                 words.extend(_joined_words(tuple(run)))
                 run = []
@@ -1487,6 +1635,9 @@ def _words_of_pandoc_json(pandoc_json: str) -> MarkdownWords:
         note_count=sum(1 for token in tokens if token is _Boundary.NOTE),
         note_link_count=sum(1 for token in tokens if token is _Boundary.NOTE_LINK),
         list_item_count=sum(1 for token in tokens if token is _Boundary.LIST_ITEM),
+        shown_markers=tuple(
+            token for token in tokens if isinstance(token, ShownMarker)
+        ),
         contents_links=tuple(
             token for token in tokens if isinstance(token, ContentsLink)
         ),

@@ -295,6 +295,16 @@ def _words_of_book_md_and_their_expected_count(
         if span.note_ref in footnotes
     )
     words.subtract(word for span in references for word in span.text.split())
+    # A contents entry's page number and a list item's marker are not
+    # written (structure spec section 31).
+    words.subtract(
+        word
+        for block in blocks.blocks
+        for word in (
+            *(block.page_number or "").split(),
+            *((block.label or "").split() if block.kind is BlockKind.LIST_ITEM else ()),
+        )
+    )
     return (
         Counter(word.text for word in markdown.words),
         +words,
@@ -395,7 +405,13 @@ def test_each_block_div_of_the_epub_holds_the_words_of_its_block(
         note_blocks = tuple(block for note in blocks.notes for block in note.blocks)
         assert divs == {
             block.id: markers.get(block.id, [])
-            + (block.label.split() if block.label is not None else [])
+            # A list item's marker is the reader's, not written (structure
+            # spec section 31).
+            + (
+                block.label.split()
+                if block.label is not None and block.kind is not BlockKind.LIST_ITEM
+                else []
+            )
             + "".join(
                 span.text for span in block.spans if span.note_ref not in footnotes
             ).split()

@@ -290,3 +290,50 @@ def test_two_contents_links_swapped_fail_though_each_targets_a_heading() -> None
         "heading reference is '#b-p0036-001'",
     ):
         _check(CONTENTS, written)
+
+
+# The markers Pandoc shows (structure spec section 31).
+
+
+@pytest.mark.pandoc
+@pytest.mark.parametrize(
+    ("case", "printed", "written"),
+    [
+        ("numbered-list", "1.  ::: {#b-p0226-001", "7.  ::: {#b-p0226-001"),
+        ("numbered-list", "1.  ::: {#b-p0226-001", "1)  ::: {#b-p0226-001"),
+        ("capital-letters", "A.  ::: {#b-p0003-001", "a.  ::: {#b-p0003-001"),
+        ("roman-in-brackets", "(iv) ::: {#b-p0003-001", "(i)  ::: {#b-p0003-001"),
+        ("dash-list", "-   ::: {#b-p0016-002", "1.  ::: {#b-p0016-002"),
+    ],
+    ids=["start", "delimiter", "style", "roman-start", "bullet-to-number"],
+)
+def test_a_list_whose_shown_marker_is_not_the_items_label_fails(
+    case: str, printed: str, written: str
+) -> None:
+    blocks = CASES[case]
+    markdown = render_markdown(blocks, CONFIG)
+    assert printed in markdown
+
+    with pytest.raises(FidelityError, match="shows the marker"):
+        _check(blocks, markdown.replace(printed, written, 1))
+
+
+@pytest.mark.pandoc
+def test_a_page_number_without_a_page_numbers_form_fails() -> None:
+    blocks = _blocks_file(
+        tuple(
+            block
+            if block.id != "b-p0008-003"
+            else _block(
+                "b-p0008-003",
+                BlockKind.CONTENTS_ENTRY,
+                "Their workshops",
+                level=2,
+                page_number="Faustus",
+            )
+            for block in CONTENTS.blocks
+        )
+    )
+
+    with pytest.raises(FidelityError, match="'Faustus'"):
+        _check(blocks, render_markdown(CONTENTS, CONFIG))
