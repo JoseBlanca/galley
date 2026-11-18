@@ -590,6 +590,50 @@ def test_note_line_reaching_into_the_text_above_by_0_8_pt_is_a_band_region(
     )
 
 
+@pytest.mark.parametrize(("note_height", "kind"), [(8.0, "band"), (10.0, "body")])
+def test_notes_small_against_their_page_but_not_the_book_are_a_band_region(
+    note_height: float, kind: str
+) -> None:
+    # Gierke's introduction: text in 11 pt, notes in 8 pt, the book's body
+    # word height 9.0 pt (0.89). 8/11 is 0.73 of the page's median line
+    # height, at most 0.82; 10/11 is 0.91.
+    body = _region(
+        *(_line(text, 50, 70 + 15 * n, 11) for n, text in enumerate(_BODY_TEXTS))
+    )
+    notes = _region(
+        *(
+            _line("1 A note of the page in small", 50, 170 + 10 * n, note_height)
+            for n in range(2)
+        )
+    )
+    page = PageLayout(15, (body, notes), ())
+    assert region_kinds(page, 9.0, frozenset()) == (RegionKind.BODY, RegionKind(kind))
+
+
+@pytest.mark.parametrize(
+    ("text", "last", "kind"),
+    [
+        ("1 Id.", True, "band"),
+        ("2 Id.", True, "margin"),
+        ("1 id.", True, "margin"),
+        ("1 Id.", False, "margin"),
+    ],
+)
+def test_one_line_note_as_tall_as_the_body_last_on_the_page_is_a_band_region(
+    text: str, last: bool, kind: str
+) -> None:
+    # Domesday's page 163: a note of one line ("1 D. B. i. 141 b."), boxed
+    # 10 pt tall as the body, narrower than a quarter of the column, under
+    # the text and 0.9 pt into it. Not the page's last region, or with
+    # other first words, it is a margin region.
+    body = _body(70, *_BODY_TEXTS)
+    note = _region(_line(text, 90, body.box.bottom - 0.9))
+    margin = _region(_line("men.", 10, 70, 5))
+    regions = (body, margin, note) if last else (body, note, margin)
+    kinds = region_kinds(PageLayout(30, regions, ()), _WORD_HEIGHT_PT, frozenset())
+    assert kinds[regions.index(note)] is RegionKind(kind)
+
+
 @pytest.mark.parametrize(("indent", "headings"), [(3.0, 1), (10.0, 0)])
 def test_flush_left_line_lies_within_4_pt_of_the_left_edge(
     indent: float, headings: int
