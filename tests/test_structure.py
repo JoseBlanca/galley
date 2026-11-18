@@ -1841,6 +1841,43 @@ def test_caption_hyphen_is_joined_and_a_number_at_the_plate_foot_stays_caption()
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+def test_caption_gets_its_spaced_sign_attached_and_its_glued_word_split() -> None:
+    # Spec section 2, the paragraph after the steps: a figure's caption,
+    # made after the references, gets the case split (section 24) and the
+    # spaced signs (section 23). "of" is printed after a line's first word
+    # 10 times, and the book prints "Kadesh" whole.
+    plate = _plate(1, _spread("THE BATTLE ; ofKadesh AT Kadesh", 60, 300, 500))
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first")),
+        plate,
+        _body_page(2, *_five_full_lines(70, "second")),
+    )
+    lines = _lines_of(*pages)
+    known = frozenset({"the", "battle", "of", "at", "kadesh"})
+    blocks = make_blocks(lines, known, workers=1)
+    (figure,) = (block for block in blocks.blocks if block.kind is BlockKind.FIGURE)
+    assert block_text(figure) == "THE BATTLE; of Kadesh AT Kadesh"
+    assert tuple(
+        change
+        for change in blocks.word_changes
+        if change.reason in {ChangeReason.PUNCTUATION_ATTACHED, ChangeReason.CASE_SPLIT}
+    ) == (
+        WordChange(
+            page_index=1,
+            before=("BATTLE", ";"),
+            after=("BATTLE;",),
+            reason=ChangeReason.PUNCTUATION_ATTACHED,
+        ),
+        WordChange(
+            page_index=1,
+            before=("ofKadesh",),
+            after=("of", "Kadesh"),
+            reason=ChangeReason.CASE_SPLIT,
+        ),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
 def test_caption_lines_are_read_from_the_top_down_whatever_their_regions() -> None:
     # Domesday 39: layout put "17]" and the caption in a region after the
     # one of "Between pp. 16 —", which stands left of "17]" on its line.
