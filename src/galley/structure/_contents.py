@@ -7,6 +7,8 @@ Positions are PDF points, origin at the top left of the page."""
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from difflib import SequenceMatcher
+from fractions import Fraction
 
 from galley.model import Removal, RemovalReason, Word
 from galley.structure._heads import starts_with_chapter_label_word
@@ -172,7 +174,8 @@ class ContentsEntry:
     printed before the title, its words joined by single spaces, None when
     it has none; `page_number` likewise; `level` its depth, from 1; and
     `leader_dots` the removals of the leader dots before its page number,
-    one per line."""
+    one per line; `topics` whether it is a topics entry (rule 8), which is
+    never linked to a heading (rule 9)."""
 
     lines: tuple[PlacedLine, ...]
     title: tuple[PlacedLine, ...]
@@ -180,6 +183,7 @@ class ContentsEntry:
     page_number: str | None
     level: int
     leader_dots: tuple[Removal, ...]
+    topics: bool
 
 
 def _pieces(lines: Sequence[PlacedLine]) -> tuple[tuple[PlacedLine, ...], ...]:
@@ -244,7 +248,12 @@ def _raw_entries(lines: Sequence[PlacedLine]) -> tuple[_Raw, ...]:
             continue
         current: list[PlacedLine] = []
         for position, line in enumerate(piece):
-            if not line_has_letter_or_digit(line.line) and not current and raws:
+            if (
+                not line_has_letter_or_digit(line.line)
+                and not current
+                and not label
+                and raws
+            ):
                 # A line with no letter or digit joins the entry before it.
                 last = raws[-1]
                 raws[-1] = _Raw(last.label_lines, (*last.lines, line), last.summary)
@@ -371,7 +380,8 @@ def contents_entries(lines: Sequence[PlacedLine]) -> tuple[ContentsEntry, ...]:
             tuple(label.split(" ")[_marks_before(label) :])
         )
         first = (raw.label_lines + raw.lines)[0]
-        if _topics(raw, title_texts):
+        topics = _topics(raw, title_texts)
+        if topics:
             level = nearest + 1 if nearest is not None else _CHAPTER_DEPTH
         elif chapter:
             level = _CHAPTER_DEPTH
@@ -379,7 +389,7 @@ def contents_entries(lines: Sequence[PlacedLine]) -> tuple[ContentsEntry, ...]:
             level = _SECTION_DEPTH
         else:
             level = _CHAPTER_DEPTH
-        if not _topics(raw, title_texts):
+        if not topics:
             nearest = level
         chapters_seen = chapters_seen or chapter
         entries.append(
@@ -396,6 +406,7 @@ def contents_entries(lines: Sequence[PlacedLine]) -> tuple[ContentsEntry, ...]:
                 page_number=page_number,
                 level=level,
                 leader_dots=removals,
+                topics=topics,
             )
         )
     return tuple(entries)
@@ -408,3 +419,93 @@ def _marks_before(label: str) -> int:
     while marks < len(words) and not has_letter_or_digit(words[marks]):
         marks += 1
     return marks
+
+
+# Spec section 30, rule 9: a candidate's title holds at least 4 letters; two
+# plain texts match when SequenceMatcher's ratio is at least 0.7, measured
+# on the candidates of the seven books with contents pages (section 30,
+# "The thresholds").
+_CANDIDATE_MIN_LETTERS = 4
+MATCH_MIN_RATIO = Fraction(7, 10)
+
+
+def plain(text: str) -> str:
+    """`text` made plain (spec section 30, rule 9): case-folded, every
+    character that is not a letter made a space, the spaces collapsed to
+    one and stripped."""
+    return " ".join("".join(c if c.isalpha() else " " for c in text.casefold()).split())
+
+
+def is_link_candidate(title: str) -> bool:
+    """Whether a contents entry that is not a topics entry, of title
+    `title`, is a candidate for a link: its title holds at least 4
+    letters (spec section 30, rule 9)."""
+    return sum(c.isalpha() for c in title) >= _CANDIDATE_MIN_LETTERS
+
+
+def match_ratio(first: str, second: str, min_ratio: Fraction) -> Fraction | None:
+    """SequenceMatcher's ratio of two plain texts, exact, when it is at
+    least `min_ratio`; None otherwise."""
+    matcher = SequenceMatcher(None, first, second, autojunk=False)
+    if matcher.real_quick_ratio() < min_ratio or matcher.quick_ratio() < min_ratio:
+        return None
+    total = len(first) + len(second)
+    if total == 0:
+        return None
+    matched = sum(block.size for block in matcher.get_matching_blocks())
+    ratio = Fraction(2 * matched, total)
+    return ratio if ratio >= min_ratio else None
+
+
+def run_links(
+    candidates: Sequence[str],
+    headings: Sequence[str],
+    min_ratio: Fraction = MATCH_MIN_RATIO,
+) -> tuple[tuple[int, int], ...]:
+    """The links of one contents run (spec section 30, rule 9), as pairs of
+    a position in `candidates`, the candidates' titles in the run's order,
+    and a position in `headings`, the texts of the book's heading blocks
+    without their labels, in the book's order: the largest set of
+    matching pairs in which candidates and headings come in the same
+    order, each in one pair at most; among those, the one whose ratios add
+    up to the most, and then the one in which the first candidate whose
+    pairing differs has the earlier heading."""
+    plain_candidates = tuple(plain(text) for text in candidates)
+    plain_headings = tuple(plain(text) for text in headings)
+    ratios = {
+        (i, j): ratio
+        for i, candidate in enumerate(plain_candidates)
+        for j, heading in enumerate(plain_headings)
+        if (ratio := match_ratio(candidate, heading, min_ratio)) is not None
+    }
+    rows, columns = len(candidates), len(headings)
+    zero = (0, Fraction(0))
+    # best[i][j]: the most links, and the largest sum of ratios, of the
+    # candidates from i and the headings from j.
+    best = [[zero] * (columns + 1) for _ in range(rows + 1)]
+    for i in reversed(range(rows)):
+        for j in reversed(range(columns)):
+            value = max(best[i + 1][j], best[i][j + 1])
+            ratio = ratios.get((i, j))
+            if ratio is not None:
+                count, total = best[i + 1][j + 1]
+                value = max(value, (count + 1, total + ratio))
+            best[i][j] = value
+    links: list[tuple[int, int]] = []
+    j = 0
+    for i in range(rows):
+        target = best[i][j]
+        paired = next(
+            (
+                k
+                for k in range(j, columns)
+                if (i, k) in ratios
+                and (best[i + 1][k + 1][0] + 1, best[i + 1][k + 1][1] + ratios[i, k])
+                == target
+            ),
+            None,
+        )
+        if paired is not None:
+            links.append((i, paired))
+            j = paired + 1
+    return tuple(links)

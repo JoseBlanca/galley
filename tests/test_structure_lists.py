@@ -6,9 +6,30 @@ table gives for Haynes' and Domesday's lists; no text of the owner's books
 is used beyond a dash and a capital.
 """
 
+import json
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
 import pytest
 
-from galley.model import Box, Line, Word
+from galley.book_folder import BookFolder
+from galley.errors import FidelityBoundary
+from galley.fidelity import check_stage
+from galley.model import (
+    BlockKind,
+    BlocksFile,
+    Box,
+    ChangeReason,
+    Line,
+    LinesFile,
+    PageLayout,
+    Region,
+    Word,
+    block_text,
+    read_blocks,
+)
+from galley.structure import make_blocks
 from galley.structure._lines import PlacedLine
 from galley.structure._lists import (
     ItemLine,
@@ -251,3 +272,218 @@ def test_closed_page_between_two_items_ends_the_list() -> None:
     contents = StreamPage((_placed("A contents line", 40.0, 100, 1),), frozenset({0}))
     second = StreamPage((_placed("2. Second", 40.0, 100, 2),))
     assert list_items((first, contents, second), _PITCH_PT) == frozendict()
+
+
+# The blocks (spec section 29, "Blocks"), through make_blocks on lines.json
+# values written here.
+
+_NO_WORDS: frozenset[str] = frozenset()
+_RIGHT_PT = 300.0
+
+
+def _line(text: str, x0: float, top: float, x1: float | None = None) -> Line:
+    """A line of `text` from `x0`, its words 5 pt a character, spread to
+    end at `x1` when given."""
+    parts = text.split(" ")
+    natural = _CHAR_PT * (sum(len(part) for part in parts) + len(parts) - 1)
+    gap = _CHAR_PT
+    if x1 is not None and len(parts) > 1:
+        gap += (x1 - x0 - natural) / (len(parts) - 1)
+    words = []
+    left = x0
+    for part in parts:
+        right = left + _CHAR_PT * len(part)
+        words.append(Word(part, Box(left, top, right, top + _WORD_HEIGHT_PT), None))
+        left = right + gap
+    return Line(Box(x0, top, words[-1].box.x1, top + _WORD_HEIGHT_PT), tuple(words))
+
+
+def _page(index: int, *lines: Line) -> PageLayout:
+    box = Box(
+        min(line.box.x0 for line in lines),
+        min(line.box.top for line in lines),
+        max(line.box.x1 for line in lines),
+        max(line.box.bottom for line in lines),
+    )
+    return PageLayout(index, (Region(box, lines),), ())
+
+
+def _haynes_lines() -> LinesFile:
+    """Spec section 32's first unit test as lines.json: a lead-in paragraph
+    ending "…stereotypes:", 2 pitches above six dash items, the fifth over
+    the page break, and a paragraph flush at 59.3 pt 2 pitches below."""
+    lead = (
+        _line("The figures of the scientist in the stories are", 37.9, 60, _RIGHT_PT),
+        _line("many, and they come back again and again, and", 37.9, 74, _RIGHT_PT),
+        _line("are grouped around six recurrent stereotypes:", 37.9, 88, 260),
+    )
+    items: list[Line] = []
+    top = 88 + 2 * _PITCH_PT
+    for number in range(5):
+        items.append(_line(f"—The item {number} starts here and", 37.9, top, _RIGHT_PT))
+        items.append(_line("it goes on here to the end", 50.4, top + _PITCH_PT, 250))
+        top += 2 * _PITCH_PT
+    first = _page(0, *lead, *items)
+    second = _page(
+        1,
+        *(
+            _line(f"the fifth item goes on {n} on the", 72.0, 60 + n * _PITCH_PT, 322)
+            for n in range(5)
+        ),
+        _line("—The last item starts here and", 59.5, 60 + 5 * _PITCH_PT, 322),
+        _line("ends here.", 72.0, 60 + 6 * _PITCH_PT),
+        *(
+            _line(f"The paragraph after it {n} goes on", 59.3, 60 + n * _PITCH_PT, 322)
+            for n in range(8, 12)
+        ),
+    )
+    return LinesFile(source_pdf_sha256="0" * 64, rereads=(), pages=(first, second))
+
+
+def _blocks(lines: LinesFile) -> BlocksFile:
+    return make_blocks(lines, _NO_WORDS, workers=1)
+
+
+def test_dash_list_in_haynes_geometry_gives_six_list_item_blocks() -> None:
+    lines = _haynes_lines()
+    blocks = _blocks(lines)
+    assert tuple((block.kind, block.label) for block in blocks.blocks) == (
+        (BlockKind.PARAGRAPH, None),
+        *((BlockKind.LIST_ITEM, "—"),) * 6,
+        (BlockKind.PARAGRAPH, None),
+    )
+    assert block_text(blocks.blocks[1]).startswith("The item 0 starts here")
+    assert tuple(len(block.origin) for block in blocks.blocks[1:7]) == (
+        1,
+        1,
+        1,
+        1,
+        2,
+        1,
+    )
+    markers = tuple(
+        change
+        for change in blocks.word_changes
+        if change.reason is ChangeReason.LIST_MARKER
+    )
+    assert len(markers) == 6
+    assert (markers[0].before, markers[0].after) == (("—The",), ("—", "The"))
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_numbered_list_items_take_their_marker_as_label() -> None:
+    body = (
+        _line("A paragraph that leads in to the list of", 40, 60, _RIGHT_PT),
+        _line("the five things it names here:", 40, 74, 200),
+        _line("1. First thing of the list", 40, 88),
+        _line("goes on here", 54, 102),
+        _line("2. Second thing", 40, 116),
+        _line("3. Third thing", 40, 130),
+        _line("4. Fourth thing", 40, 144),
+        _line("5. Fifth thing of the list", 40, 158),
+        _line("goes on here.", 54, 172),
+    )
+    lines = LinesFile(source_pdf_sha256="0" * 64, rereads=(), pages=(_page(0, *body),))
+    blocks = _blocks(lines)
+    assert tuple(
+        (block.label, block_text(block))
+        for block in blocks.blocks
+        if block.kind is BlockKind.LIST_ITEM
+    ) == (
+        ("1.", "First thing of the list goes on here"),
+        ("2.", "Second thing"),
+        ("3.", "Third thing"),
+        ("4.", "Fourth thing"),
+        ("5.", "Fifth thing of the list goes on here."),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+# The excerpts (spec section 32, "Excerpt tests").
+
+_EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "lists_figures"
+
+
+def _expected(name: str) -> dict[str, Any]:
+    return json.loads((_EXPECTED / name).read_text(encoding="utf-8"))
+
+
+def _lists_on(blocks: BlocksFile, page: int) -> list[list[dict[str, str | None]]]:
+    """The list items that start on excerpt page `page`, a list from each
+    item whose label is "1.", as the expected files write them."""
+    lists: list[list[dict[str, str | None]]] = []
+    for block in blocks.blocks:
+        if block.kind is not BlockKind.LIST_ITEM or block.origin[0].page_index != page:
+            continue
+        if block.label == "1." or not lists:
+            lists.append([])
+        lists[-1].append({"label": block.label, "text": block_text(block)})
+    return lists
+
+
+@pytest.mark.parametrize("page", [5, 6, 7])
+def test_domesday_lists_table_rows_are_the_numbered_lists_read_on_the_page(
+    excerpt_books: frozendict[str, BookFolder], page: int
+) -> None:
+    blocks = read_blocks(excerpt_books["domesday_lists"].blocks_json)
+    expected = _expected(f"domesday_lists_page{page}.json")["expected"]
+    assert _lists_on(blocks, page) == expected["lists"]
+
+
+def test_domesday_lists_enumerations_of_page_141_stay_blocks_of_their_own(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    blocks = read_blocks(excerpt_books["domesday_lists"].blocks_json)
+    expected = _expected("domesday_lists_page1.json")["expected"]
+    assert not any(block.kind is BlockKind.LIST_ITEM for block in blocks.blocks[:20])
+    starting = tuple(
+        (block.kind.value, " ".join(block_text(block).split(" ")[:3]))
+        for block in blocks.blocks
+        if block.origin[0].page_index == 1 and block_text(block).startswith("(")
+    )
+    assert starting == tuple(
+        (expected["blocks_kind"], start) for start in expected["blocks_starting"]
+    )
+
+
+def test_kadesh_numbered_paragraphs_stay_paragraphs(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Excerpt pages 3 and 4 are the book's pages 11 and 12.
+    blocks = read_blocks(excerpt_books["kadesh_8-17"].blocks_json)
+    assert tuple(
+        (block.kind.value, block_text(block)[:6])
+        for block in blocks.blocks
+        if block.origin[0].page_index in {3, 4}
+    ) == (
+        ("paragraph", "1. Of "),
+        ("paragraph", "2. The"),
+        ("paragraph", "3. The"),
+    )
+
+
+# The whole books (spec section 32, "Whole-book tests"): list items in
+# Domesday's tables, at least 36 (the prototype found 40), and none in the
+# five other public-domain books.
+_LIST_ITEMS_AT_LEAST = {"domesdaybook00maituoft": 36}
+_NO_LISTS = (
+    "normansineuropea00hask",
+    "earlyplantagenet01stub",
+    "politicaltheorie00gieruoft",
+    "catherinedemedic00mariuoft",
+    "battleofkadeshst00breauoft",
+)
+
+
+@pytest.mark.whole_book
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize("book", [*_LIST_ITEMS_AT_LEAST, *_NO_LISTS])
+def test_whole_book_list_items(
+    whole_book_run: Callable[[str], BookFolder], book: str
+) -> None:
+    blocks = read_blocks(whole_book_run(book).blocks_json)
+    items = sum(block.kind is BlockKind.LIST_ITEM for block in blocks.blocks)
+    if book in _LIST_ITEMS_AT_LEAST:
+        assert items >= _LIST_ITEMS_AT_LEAST[book]
+    else:
+        assert items == 0

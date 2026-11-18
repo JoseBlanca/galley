@@ -9,7 +9,15 @@ from dataclasses import dataclass, replace
 from typing import assert_never
 
 from galley.config import Language
-from galley.model import Block, BlockKind, Note, NoteKind, WordChange
+from galley.model import (
+    Block,
+    BlockKind,
+    Note,
+    NoteKind,
+    Removal,
+    WordChange,
+    block_text,
+)
 from galley.structure._bibliography import (
     bibliography,
     in_bibliographical_notes,
@@ -17,6 +25,12 @@ from galley.structure._bibliography import (
 )
 from galley.structure._body_notes import take_body_notes
 from galley.structure._case_split import split_glued_words
+from galley.structure._contents import (
+    ContentsEntry,
+    contents_entries,
+    is_link_candidate,
+    run_links,
+)
 from galley.structure._endnotes import (
     NoteGroup,
     endnote_section,
@@ -28,6 +42,7 @@ from galley.structure._ids import numbered
 from galley.structure._index_entries import with_index_breaks, with_index_entries
 from galley.structure._lines import Piece, PlacedLine, first_word
 from galley.structure._linking import body_candidates, linked
+from galley.structure._lists import StreamPage, list_items
 from galley.structure._margins import (
     BesideLine,
     InNote,
@@ -52,7 +67,9 @@ from galley.structure._notes import (
 )
 from galley.structure._paragraphs import (
     BodyBlock,
+    ContentsLine,
     Entry,
+    LineRole,
     MarginNote,
     PageParts,
     body_entries,
@@ -76,6 +93,7 @@ from galley.structure._unnumbered import (
     joined_margin_note,
     merged_origin,
     piece_origin,
+    with_list_marker,
     without_marker,
 )
 
@@ -98,12 +116,15 @@ def _footnote(
 
 @dataclass(frozen=True, slots=True)
 class Assembled:
-    """The book's blocks and notes in order, with their ids, and the word
-    changes of their hyphen joins and note markers in reading order."""
+    """The book's blocks and notes in order, with their ids, the word
+    changes of their hyphen joins and note markers in reading order, and
+    what was removed across pages: the leader dots of the contents
+    entries (spec section 30, rule 6)."""
 
     blocks: tuple[Block, ...]
     notes: tuple[Note, ...]
     word_changes: tuple[WordChange, ...]
+    removals: tuple[Removal, ...]
 
 
 def _body(
@@ -154,6 +175,18 @@ def _body_block(
     text and its source apart (`_epigraph_block`)."""
     if block.epigraph is not None:
         return _epigraph_block(block.piece, block.epigraph, book_words, word_list)
+    if block.contents is not None:
+        return _contents_block(block.piece, block.contents, book_words, word_list)
+    if block.marker is not None:
+        # Spec section 29, "Blocks": joined as a paragraph, the marker its
+        # label.
+        return with_list_marker(
+            replace(
+                joined(block.piece, BlockKind.LIST_ITEM, book_words, word_list),
+                origin=piece_origin(block.piece),
+            ),
+            block.marker,
+        )
     lines = block.piece.lines
     match block.label_line:
         case LabelLine.FIRST:
@@ -169,6 +202,24 @@ def _body_block(
         origin=piece_origin(block.piece),
         level=block.level,
         label=label,
+    )
+
+
+def _contents_block(
+    piece: Piece,
+    entry: ContentsEntry,
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+) -> Unnumbered:
+    """A contents entry's block (spec section 30, rule 10): its title's
+    lines joined as a paragraph's, hyphens joined; its label, page number
+    and depth; its origin all its lines, `piece`."""
+    return replace(
+        joined(Piece(entry.title), BlockKind.CONTENTS_ENTRY, book_words, word_list),
+        origin=piece_origin(piece),
+        level=entry.level,
+        label=entry.label,
+        page_number=entry.page_number,
     )
 
 
@@ -541,6 +592,124 @@ def _links(
     )
 
 
+def contents_runs(contents_pages: frozenset[int]) -> tuple[tuple[int, ...], ...]:
+    """The contents runs of `contents_pages`, each its consecutive page
+    indices (spec section 30, "Terms")."""
+    runs: list[list[int]] = []
+    for page_index in sorted(contents_pages):
+        if runs and runs[-1][-1] == page_index - 1:
+            runs[-1].append(page_index)
+        else:
+            runs.append([page_index])
+    return tuple(tuple(run) for run in runs)
+
+
+def _run_lines(page: PageParts) -> frozenset[int]:
+    """The positions in the page's body stream of the lines of its runs of
+    section 2, step 2.3."""
+    return frozenset(
+        number for run in page.runs for number in range(run.start, run.end)
+    )
+
+
+def _contents_entries(
+    pages: Sequence[PageParts], contents_pages: frozenset[int]
+) -> tuple[ContentsEntry, ...]:
+    """The entries of every contents run of `pages`, in page order (spec
+    section 30): each run's body stream but its title."""
+    return tuple(
+        entry
+        for run in contents_runs(contents_pages)
+        for entry in contents_entries(
+            tuple(
+                line
+                for page in pages
+                if page.index in run
+                for number, line in enumerate(page.body)
+                if number not in _run_lines(page)
+            )
+        )
+    )
+
+
+def _line_roles(
+    pages: Sequence[PageParts],
+    entries: Sequence[ContentsEntry],
+    contents_pages: frozenset[int],
+    section_pages: range,
+    body_line_pitch: float,
+) -> frozendict[tuple[int, int], LineRole]:
+    """The lines of the list items and of the contents `entries`, by page
+    index and position in the page's body stream (spec section 2, step
+    3.1). The list rules take no line of a run of step 2.3, nor of a page
+    of the contents, an index or the endnote section, `section_pages`
+    (section 29); `body_line_pitch` is in points."""
+    lists = list_items(
+        tuple(
+            StreamPage(
+                page.body,
+                frozenset(range(len(page.body)))
+                if page.index in contents_pages
+                or page.index_lines
+                or page.index in section_pages
+                else _run_lines(page),
+            )
+            for page in pages
+        ),
+        body_line_pitch,
+    )
+    positions = {
+        line: (page.index, number)
+        for page in pages
+        if page.index in contents_pages
+        for number, line in enumerate(page.body)
+    }
+    contents = {
+        positions[line]: ContentsLine(entry if number == 0 else None)
+        for entry in entries
+        for number, line in enumerate(entry.lines)
+    }
+    return frozendict(lists | contents)
+
+
+def _with_contents_links(
+    blocks: Sequence[Block],
+    entries: Sequence[ContentsEntry],
+    contents_pages: frozenset[int],
+) -> tuple[Block, ...]:
+    """`blocks`, the body's in order, with each contents entry linked to the
+    heading of its chapter (spec section 30, rule 9), each run on its own;
+    `entries` are the contents entries of the blocks, in their order."""
+    entry_positions = tuple(
+        position
+        for position, block in enumerate(blocks)
+        if block.kind is BlockKind.CONTENTS_ENTRY
+    )
+    heading_positions = tuple(
+        position
+        for position, block in enumerate(blocks)
+        if block.kind is BlockKind.HEADING
+    )
+    headings = tuple(block_text(blocks[position]) for position in heading_positions)
+    refs: dict[int, str] = {}
+    for run in contents_runs(contents_pages):
+        candidates = tuple(
+            position
+            for position, entry in zip(entry_positions, entries, strict=True)
+            if entry.lines[0].page_index in run
+            and not entry.topics
+            and is_link_candidate(block_text(blocks[position]))
+        )
+        for candidate, heading in run_links(
+            tuple(block_text(blocks[position]) for position in candidates), headings
+        ):
+            refs[candidates[candidate]] = blocks[heading_positions[heading]].id
+    return tuple(
+        replace(block, heading_ref=refs[position]) if position in refs else block
+        for position, block in enumerate(blocks)
+    )
+
+
 def assemble(
     parts: Sequence[PageParts],
     book_words: frozenset[str],
@@ -599,7 +768,14 @@ def assemble(
         tuple(bool(page.body) for page in pages),
         numbering,
     )
-    entries = body_entries(pages, form, section_pages)
+    # Spec section 2, step 3.1: the list items and the contents entries.
+    contents = _contents_entries(pages, contents_pages)
+    entries = body_entries(
+        pages,
+        form,
+        section_pages,
+        _line_roles(pages, contents, contents_pages, section_pages, body_line_pitch),
+    )
     section = endnote_section(entries, contents_pages, body_line_pitch)
     if section is not None:
         entries = with_group_headings_cut(entries, section, body_line_pitch)
@@ -687,9 +863,14 @@ def assemble(
         for block in with_figures(linked_body, parts, book_words, word_list)
     )
     blocks, numbered_notes = numbered(linked_body, linked_notes)
+    # Spec section 2, step 3.4: the links of the contents entries, once
+    # every heading is known; made on the numbered blocks, whose ids they
+    # name.
+    blocks = _with_contents_links(blocks, contents, contents_pages)
     return Assembled(
         blocks=blocks,
         notes=numbered_notes,
+        removals=tuple(removal for entry in contents for removal in entry.leader_dots),
         word_changes=tuple(
             sorted(
                 changes_in_order(linked_body)

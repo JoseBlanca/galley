@@ -787,11 +787,14 @@ _HEADINGS_ON_REFERENCE_PAGES = (
     ("haskins_eval", 0, ((1, "V", "NORMANDY AND FRANCE"),)),
     ("haskins_eval", 9, ((1, None, "INDEX"),)),
     ("stubbs_51_56-64", 0, ((1, "CHAPTER III.", "THE EARLY YEARS OF HENRY II."),)),
-    # A printed contents page, named in contents_pages.
-    ("stubbs_summaries_index", 0, ()),
+    # A printed contents page, named in contents_pages: its first line is
+    # the run's title (spec section 30, rule 1), here the running head the
+    # excerpt does not remove, "Contents. vii" as the OCR read it.
+    ("stubbs_summaries_index", 0, ((1, None, "Contents. vn"),)),
     # "John." in lower case, a continuation.
     ("stubbs_summaries_index", 3, ((1, "CHAPTER VII.", "John."),)),
-    ("domesday_headings_quotes", 0, ()),
+    # The contents run's title (spec section 30, rule 1).
+    ("domesday_headings_quotes", 0, ((1, None, "CONTENTS,"),)),
     # The label 3.4 pitches above its title.
     ("domesday_headings_quotes", 1, ((1, "ESSAY I.", "DOMESDAY BOOK."),)),
     ("domesday_headings_quotes", 2, ((2, None, "§ 1. Plan of the Survey."),)),
@@ -1185,7 +1188,8 @@ def test_quote_none_on_the_domesday_contents_page(
     excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
 ) -> None:
     _, blocks = excerpt_outputs["domesday_headings_quotes"]
-    assert set(_kinds_on(blocks, 0)) == {"paragraph"}
+    # Spec section 30: the run's title and its entries.
+    assert set(_kinds_on(blocks, 0)) == {"heading", "contents_entry"}
 
 
 def test_quote_none_of_the_notes_left_in_the_body_of_mariejol_210(
