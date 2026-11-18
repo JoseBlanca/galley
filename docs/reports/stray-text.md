@@ -61,3 +61,28 @@ extract needed no change.
 - `tests/test_layout.py` changed in this stream, outside its files:
   `haskins_endpapers` is the one excerpt with no measures, since only
   its colophon is text now. Both tests still check the other excerpts.
+
+## Task 3.2: the running-head survey and reference candidates
+
+Merged from the `structure` stream: 2a16b54 (the survey compares heads
+whose letters differ by up to 14), bbc5723 (a sign followed by
+punctuation is a reference candidate), 022e957 and e5fd492 (a spec
+amendment and its code: such a sign after one letter alone is not a
+candidate, because Domesday prints "St." 28 times and its OCR reads
+"S*.").
+
+- Running heads: 3 more removed on the eight books, Gierke 16 and 84
+  and Mariéjol 158; no heading and no other removal changed.
+- Domesday references linked: 1,493 at a0a1675, 1,514 now. The 23 new
+  links of the first rule were checked on the page images: 21 right and
+  2 wrong ("S*." on pages 285 and 333), and the second rule removes
+  exactly those 2. On page 77 two references now go to the right notes,
+  one of which was wrong before. The other seven books gain no links.
+- Domesday notes without a reference: 343 at a0a1675, 322 now; the
+  whole-book test allows 328. The plan's measure of 178 unlinked
+  references came from the evaluation; this count is structure's own.
+- The one-letter rule applies only when punctuation follows the sign: a
+  "T*" with nothing after it stays a candidate, because the broader rule
+  would unlink a reference on Kadesh 39 that was not checked.
+- After the merge: ruff and ty pass; pytest 2,838 passed, 19 expected
+  failures, in 88 s with the layout stream running alongside.
