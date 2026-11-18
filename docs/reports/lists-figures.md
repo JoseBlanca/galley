@@ -36,8 +36,7 @@ What exists now:
 
 Settled for the owner while they were away, each easy to change: the
 reader's own list markers rather than the printed ones; the contents
-title as a heading; pictures without a caption kept; a dash before
-epigraph sources in every book (the owner's choice).
+title as a heading; pictures without a caption kept.
 
 Still wrong:
 
@@ -53,8 +52,8 @@ Still wrong:
   in 75 pieces, as messy as before: tables are not handled.
 - Kadesh 44's first box stops 4 pt above its last row of hieroglyphs;
   Kadesh 33's map loses a 9 pt strip of its frame.
-- The default run is 69 s, under a minute and a bit, by under a second
-  under the plan's limit.
+- The default run takes 69 s on 2,777 tests, over the minute asked for
+  and under the plan's limit of 70 s by less than a second.
 
 What is asked of the owner:
 
