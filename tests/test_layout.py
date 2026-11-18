@@ -731,6 +731,19 @@ def test_head_set_apart_by_median_top_above_a_tall_em_dash_is_a_running_head_reg
     assert len(body.lines) == 20
 
 
+def test_head_row_top_leaves_out_a_page_number_boxed_low() -> None:
+    # Domesday's page 159: "134" boxed 3 pt lower than the head's words,
+    # which lie 1.31 pitches above the body; with "134" in the median the
+    # gap is 1.18 pitches.
+    head = (_word("134", 50, 83, 65, 91), _word("HEAD", 120, 80, 180, 88))
+    result = layout_page(
+        _page(0, (*head, *_rows(20, top=80 + 1.31 * _PITCH))), _MEASURES
+    )
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("134", "HEAD"),)
+    assert len(body.lines) == 20
+
+
 def test_skewed_head_whose_last_word_is_a_row_4_pt_lower_is_one_region_of_one_line() -> (
     None
 ):
