@@ -341,7 +341,8 @@ tuple[Reread, ...])`:
   replaces, each the same printed word as one of its `ocr_words` by
   the rules of `docs/specs/reocr.md` §4),
   `ocr_words` (Tesseract's, without its junk), `layer_score` and `ocr_score`
-  (ints, known words minus unknown words of each reading), `kept`
+  (ints, known words minus unknown words of each reading, the layer's
+  as `docs/specs/reocr.md` §3 scores it), `kept`
   (whether `ocr_words` took the place of `layer_words`: `ocr_score`
   higher, or equal with more known words, and, where `layer_words` is empty, at least 2 known words or
   one sure single word, `docs/specs/reocr.md` §3), and
@@ -727,7 +728,10 @@ lists the words, with the pages they came from where the origins say.
   letters and digits it holds, or whose letters are alike to its own,
   within 16 pt, as the three rules say). One Tesseract word then
   stands for two printed words, and one of them is lost (Domesday page
-  548, review of 17 November 2026); structure,
+  548, review of 17 November 2026). The one pair allowed is the layer's
+  junk under the word, with letters unlike its own, and the layer's copy
+  of the word beside it, not under it, with its letters or letters alike
+  (`model.is_junk_beside_its_copy`; reocr §4, the exception in (a)); structure,
   lines.json against blocks.json (the text of every body and note block,
   with a note's `marker` and `group`, a heading's `label` and an
   epigraph's `source` counted as words of it); markdown, blocks.json

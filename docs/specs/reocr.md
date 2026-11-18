@@ -183,7 +183,17 @@ reading score of the layer's words that the region replaces (section 4
 says which) and of Tesseract's words, and **keeps Tesseract's words only
 when their score is higher, or equal with more known words** than the
 layer's, and they hold at least one word; on a tie with as many known
-words or fewer, or lower, the layer's words stay. A tie with more known
+words or fewer, or lower, the layer's words stay. The layer's words
+scored are those that the region replaces, but where the exception in
+(a) of section 4 pairs a Tesseract word with the layer's copy of its word
+beside it, the words under that Tesseract word are scored and the copy is
+not (`model.scored_layer_words`): the copy and the junk under the word
+are two readings of one printed word, and counting both gave the layer's
+side a point that Tesseract's has no word for. Scored with the copy, 8
+records tied and kept the layer's reading (Domesday pages 107, 114,
+451, 457, 469 and the index page 552, "Thaiiet," and "Vilhini" for
+Tesseract's "Thanet," and "Villani"; Gierke pages 63 and 273); so the exception changes which
+words a region replaces, not which reading is kept. A tie with more known
 words means as many more unknown words: Tesseract read words the layer
 lost, some misread. On Haskins' index page 267 the two tie at 250, with
 321 known words against 303; the layer, kept before, lost the printed
@@ -532,7 +542,14 @@ the others stay in the layer. A layer word is that word when
   lies within 16 pt above or below with letters and digits equal to
   the Tesseract word's, or alike to them by (c), the Tesseract word is
   paired with that word by (b) or (c), and the words under it are left
-  to the other Tesseract words, and otherwise stay in the layer, below.
+  to the other Tesseract words. Of those that no rule then matches, the
+  layer's junk is replaced too, as the same printed word read a second
+  time: a word under it that is no known word as printed (rule (d)
+  below) and whose letters are unlike its own. A known word under it
+  stays in the layer, below, since it may be another printed word that
+  the layer read rightly (on the four books, 2 words: "14." under
+  Tesseract's "146" and "18;", Gierke pages 63 and 66, in a list of page
+  numbers; owner-books plan, 18 November 2026).
   "For 3 letters or more" counts the layer word's letters, as (c) does;
   a Tesseract word over a word the layer glued is not excepted. A layer
   word "that no other rule matched" is one that rules (a) to (d) leave
@@ -674,15 +691,30 @@ other books; 55 in all. Of them, the layer words under the Tesseract
 word are unlike it for 47 (Domesday 31, Gierke 16): the junk under it,
 or a word of the next line its widened box reached ("vacant" under
 "Empire.", Gierke page 127). With the exception, those 47 are read
-once; the junk word, or the next line's word, stays in the layer's
-reading, so no printed word is lost. Of the 47, 34 are equal letters
-and 13 alike ("scat'" beside Tesseract's "seat-", Domesday page 36),
+once. The next line's word is read by its own Tesseract word; the junk
+is replaced with the copy, as rule (a) replaced it before: left in the
+layer's reading, it went back into the text, "seat- &g tered" on
+Domesday page 36 and three more on that book (pages 174, 225, 444).
+Of the 47, 34 are equal letters and 13 alike ("scat'" beside Tesseract's "seat-", Domesday page 36),
 which (c) pairs. The other 8 are not fixed: a layer word under the
 Tesseract word that is alike to it too (Stubbs' index, page 315, which
 the layer reads twice, "Eleanor" and "Eleanor,"; Domesday 4; Gierke
-1). The fidelity check, which applies the same pairing
-(`model.replaced_layer_words`), accepts the result, and its second test
-is unchanged.
+1). The fidelity check applies the same pairing
+(`model.replaced_layer_words`). Its second test lets a Tesseract word
+read both the junk under it and the copy beside it
+(`model.is_junk_beside_its_copy`), below.
+
+Measured on 18 November 2026 on whole Stubbs, Domesday, Gierke and
+Haskins, recomputing the records from the same readings with and without
+the exception: the words read twice (a layer word left within 4 pt of a
+kept record whose letters are equal or alike to those of one of its
+Tesseract words within 16 pt) go from 30 to 4 on Domesday, 12 to 0 on
+Gierke and 6 to 5 on Stubbs, none on Haskins; no record's choice changes
+(section 3); 34 copies on Domesday, 16 on Gierke and 1 on Stubbs are
+replaced, and one layer word is no longer: "14." under Tesseract's "146"
+on Gierke page 63, a known number, now left beside it. On Domesday page
+107 the copy "the" is better than Tesseract's "th", which the record
+keeps, as before.
 
 **Each word of the layer is replaced by one record at most**: a word
 already among the replaced words of a kept region of its page is not
@@ -777,7 +809,10 @@ record's `layer_words` is matched to one of its `ocr_words` by rules (a)
 to (d) above (`model.replaced_layer_words`, taking no word as known); and, by a test that does not
 use that pairing, no Tesseract word of a kept record is the only one of
 the record that may read two of its `layer_words` of different printed
-lines (architecture §13); so that a record cannot name a word the
+lines (architecture §13), unless one lies under it with letters unlike
+its own and the other, not under it, holds its letters or letters alike
+to them, the junk and the copy of the exception in (a); so that a
+record cannot name a word the
 layer never had, one another record already replaced, or one that no
 word of Tesseract's reads. Every word of the layer is then either in `lines.json` or in
 exactly one kept record, with its page and box; a record not kept
