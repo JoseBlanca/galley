@@ -612,3 +612,33 @@ def test_group_heading_above_a_speck_is_still_the_group_heading() -> None:
         f"2 {_CHAPTERS[1]}",
     )
     assert _endnotes(blocks)[8][1].endswith(" / /")
+
+
+def test_bare_number_run_starts_at_a_misread_marker_before_2_3_and_4() -> None:
+    # Turney's page 258: the second group's "1" read as "x". It starts a
+    # paragraph and a run, its marker "x" as read and its value 1 by its
+    # place: the group and its links are kept.
+    first = _turney_group(1, _CHAPTERS[0], 50.0)
+    heading_top = first[-1].box.top + 30.0
+    misread = tuple(
+        line
+        for position, number in enumerate(("x", *(str(n) for n in range(2, 10))))
+        for line in _hung_note(number, heading_top + 27.0 + 36.0 * position)
+    )
+    second = (_line(f"2 {_CHAPTERS[1]}", _HUNG_PT, heading_top), *misread)
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    markers = tuple(marker for marker, _ in _endnotes(blocks))
+    assert markers == (
+        *(str(n) for n in range(1, 10)),
+        "x",
+        *(str(n) for n in range(2, 10)),
+    )
+    assert tuple(page for page, _ in _links_by_chapter(blocks)) == (
+        *(0,) * 9,
+        *(1,) * 9,
+    )

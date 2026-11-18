@@ -27,6 +27,7 @@ from galley.structure._lines import (
     Piece,
     PlacedLine,
     first_word,
+    misread_marker_lines,
     starts_paragraph,
     text_edge,
 )
@@ -284,6 +285,8 @@ def page_parts(
         + (index.page_numbers if index is not None else ())
         + foot.page_numbers,
         body=body,
+        # Spec section 6, rule 3: a note's "1" the OCR misread starts one.
+        block_starts=misread_marker_lines(body),
         margin_notes=tuple(
             Piece(lines)
             for kind, lines in regions
