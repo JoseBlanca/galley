@@ -1734,7 +1734,52 @@ def test_page_kinds_of_each_whole_book_are_those_before_the_text_flow_and_front_
                         (index, PageKind.FRONT_MATTER)
                         for index in WHOLE_BOOK_FRONT_MATTER[book]
                     ),
+                    *(
+                        (index, PageKind.INKLESS)
+                        for index in WHOLE_BOOK_INKLESS.get(book, ())
+                    ),
                 )
             )
         ),
+    )
+
+
+# Plates spec section 2b: the inkless pages of the eight books, with the
+# configs of tests/conftest.py, are Haskins' back endpapers 277 and 278 and
+# Haynes' blank pages 9 and 421; Mariejol's back board, 459, is not caught.
+WHOLE_BOOK_INKLESS = frozendict({"normansineuropea00hask": (277, 278)})
+OWNER_BOOK_INKLESS = frozendict({"haynes": (9, 421), "turney": ()})
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.parametrize("book", sorted(WHOLE_BOOK_PAGE_KINDS_AT_9F012AC))
+def test_inkless_pages_of_each_public_domain_whole_book_are_haskins_back_endpapers(
+    book: str, whole_book_pages: frozendict[str, tuple[PageInfo, ...]]
+) -> None:
+    assert tuple(
+        page.index for page in whole_book_pages[book] if page.kind is PageKind.INKLESS
+    ) == WHOLE_BOOK_INKLESS.get(book, ())
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.parametrize("book", sorted(OWNER_BOOK_INKLESS))
+def test_inkless_pages_of_the_owners_books_are_haynes_blank_pages_9_and_421(
+    book: str, owner_book_toml: Callable[[str], str], tmp_path: Path
+) -> None:
+    folder = BookFolder(tmp_path)
+    folder.book_toml.write_text(owner_book_toml(book), encoding="utf-8")
+
+    analyze.run(folder, read_config(folder.book_toml))
+
+    assert (
+        tuple(
+            page.index
+            for page in read_pages(folder.pages_json).pages
+            if page.kind is PageKind.INKLESS
+        )
+        == OWNER_BOOK_INKLESS[book]
     )
