@@ -3,7 +3,7 @@
   "excerpt": "domesday_rereads",
   "page": 4,
   "book_page_index": 136,
-  "checks": "a list in small type; no line of the page is a heading. Task 1.6 looks at the two lines the tall branch takes for headings on the whole book",
+  "checks": "a list in small type; no line of the page is a heading, although the text layer boxes the lines under the list tall (structure spec section 14, a page with more than 6 tall lines has none)",
   "expected": {
     "removals": [
       {
@@ -15,7 +15,7 @@
     "band_first_line": "1 D. B. i. 128. 2 D. B. i. 128 b.",
     "heading_lines": []
   },
-  "known": "Structure spec section 14 records that the tall branch takes two text lines of this page for headings, a known failure that task 1.6 may fix; until then the page gives heading blocks that this file does not expect. \"Ill\" (111) is no page-number form and goes with the running head, as now.",
+  "known": "\"Ill\" (111) is no page-number form and goes with the running head, as now. Before task 1.6 of the plan owner-books, the tall branch of structure spec section 14 took the page's lower paragraph for a heading; since, a page with more than 6 tall lines has no tall line (this page has 14 on the whole book).",
   "printed": {
     "book_page_index": 136,
     "running_head": {

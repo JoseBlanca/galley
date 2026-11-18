@@ -331,17 +331,25 @@ is laid out as one region, as the skeleton did.
    running head's, step 3). Turney (structure §21) prints its notes at
    the back in two columns with each note's number hung 6 to 14 pt left
    of its text; in the left column the numbers lie left of the page's
-   usual left edge, and this step made 115 of them margin regions, a
+   usual left edge, and without this rule they were margin regions, a
    column of "1 2 3 4" read apart from the notes. The head row is left
    out because Turney prints its page number 13.4 to 15.1 pt beside the
    running head (261 pages, measured on 17 November 2026 on the
    survey's `lines.json`), which structure takes into the head line
-   instead (structure §2). Measured the same day on the clean-text
-   build of the six public-domain books, as lines of one number in a
-   region of their own within 15 pt left of a line of another region on
-   their row: Gierke 26, the numbers of the entries of its printed
-   contents (page 62 and the pages after it), which then stay with
-   their entries, and Domesday 1 (page 443); Haynes none.
+   instead (structure §2). The numbers the rule keeps in their lines,
+   counted with the rule as built on the `words.json` of the clean-text
+   build and of the owner's two books (17 November 2026; the counts
+   first given here, Gierke 26, Domesday 1 and Turney 115, were taken
+   another way, as regions of `lines.json`): Turney 99, on 13 of its
+   notes pages, each with its note (read on page 268); Gierke 30, 28 the
+   numbers of the entries of its printed contents (23 on page 62, 5 on
+   65), which then stay with their entries, and 2 specks the OCR read
+   as "6" (page 115) and "9" (160) beside a margin note, which now
+   start a body line instead of a margin region; Domesday 2, the "16"
+   of a plate's caption "[Between pp. 16—17]" (page 39), right, and a
+   speck read "6" beside a margin note (443); none in Haskins, Stubbs,
+   Mariéjol, Kadesh or Haynes. The two pages above were read on their
+   renders.
 
    Each side's margin words are grouped into lines, and the lines into
    regions: a region ends where the next line's top is more than 1.5
@@ -454,7 +462,14 @@ is laid out as one region, as the skeleton did.
    here is the median of its words' tops, not the top of its box. A
    page whose head row is not that far apart, or has no row with a
    letter or digit below it, has no such region, and the specks above
-   stay with the body.
+   stay with the body. In the region, the head row and the rows of its
+   skew are one line, their words left to right, and each row above
+   them a line of its own (step 7 does not regroup them): the head is
+   one printed line, and structure takes a head line that holds one
+   line with a letter or a digit (structure §2). Grouped by step 7,
+   Stubbs' date was a line of its own and the region no head line
+   (decided on 17 November 2026 while building the plan owner-books;
+   the spec had left it open).
 
    The three changes of 17 November 2026, each for a case measured by
    the public-domain survey on the clean-text build: a row's box top is
@@ -979,7 +994,8 @@ with their boxes, with a `BookMeasures` given in the test:
   the head region; a head row 1.6 pitches above the body by its words'
   median tops, whose next row holds an em dash boxed 10 pt taller than
   its words, still gives one; a head whose last word lies 4 pt lower, a
-  row of its own, gives one region of both rows; a row of "^ _" between
+  row of its own, gives one region whose one line holds both rows'
+  words; a row of "^ _" between
   head and body is passed over and stays with the body;
 - a left margin word "12" 9 pt left of a line's first word on a row
   below the head stays at the start of that line; at 16 pt, or on the

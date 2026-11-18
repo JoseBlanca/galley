@@ -7,6 +7,10 @@
   "expected": {
     "removals": [
       {
+        "reason": "running_head",
+        "text": "List of ~-l ntlioritics."
+      },
+      {
         "reason": "signature_mark",
         "text": "e 2"
       }
@@ -16,7 +20,7 @@
       "Century XIV."
     ]
   },
-  "known": "The head is read \"List of ~-l ntlioritics.\"; its letters are 0.74 (page 72) or 0.70 (page 78) alike to the other heads', below the 0.75 of structure spec section 3, and \"ixxiii\" is no roman numeral, so the head stays in the text under the rules as written, although the plan's deliverable 4 counts it among the running heads removed.",
+  "known": "The head is read \"List of ~-l ntlioritics.\", 0.74 alike to the other heads; since structure spec section 3 takes heads 0.70 alike (17 November 2026), it is removed as a running head.",
   "printed": {
     "book_page_index": 72,
     "running_head": {

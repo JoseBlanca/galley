@@ -219,8 +219,17 @@ inside it.
 
 - the **head line** is the first region, together with every **region
   beside it** (below), when together they lie wholly above every other
-  region and the first holds one line with a letter or a digit (and any
-  number of lines of marks above it). Its words are those of the first
+  region, which may reach up to 2 pt into them, and the first holds one
+  line with a letter or a digit (and any number of lines of marks above
+  it). The 2 pt are for a word the OCR boxed tall: Stubbs' "MAPS." (page
+  17) is boxed 18 pt tall and reaches 1 pt into the region below, and
+  without them it was no head line, and a margin region beside nothing,
+  instead of the page's heading. Measured on 17 November 2026 on the
+  eight books, they change 3 pages: that one, Domesday's page 398, whose
+  running head is then removed (layout §3, step 3, names it), and
+  Gierke's page 11, whose "ERRATA." becomes a body line, joined to the
+  contents paragraph of page 10 because it is not centred, instead of a
+  margin note. Its words are those of the first
   region's line and of the regions beside it, left to right, as one
   line. When section 3 does not make it a running head, the first
   region is the first body region and each region beside it is what
@@ -251,7 +260,7 @@ A head line is a **running head** when its top lies at most 2 body line
 pitches below the median top of the head lines of the book, and either:
 
 - its letters, lower case, with everything else dropped, are at least 4
-  letters and at least 0.75 alike (`difflib.SequenceMatcher` ratio) to
+  letters and at least 0.70 alike (`difflib.SequenceMatcher` ratio) to
   those of the head line of at least one other page within the same 2
   pitches; or
 - its first or last word is a page-number form that the book's head
@@ -265,7 +274,7 @@ pitches below the median top of the head lines of the book, and either:
 letters and is not a running head, the line below it, the topmost line of
 the page's other regions, is tested: it is a running head when its top
 lies within the 2 pitches of the median head top and its letters are at
-least 4 and 0.75 alike to those of a running head of another page. It is
+least 4 and 0.70 alike to those of a running head of another page. It is
 then removed as a running head is, with its page number, and the speck
 above stays as it is (in the text, or as a `stray_mark` when it has no
 letter or digit).
@@ -288,7 +297,7 @@ leave in the text is a running head when all three hold:
   digit or one of the letters i, v, x, l, c, d, m in either case, with at
   most one "." or "," after them ("vi", "vlil", "xiv.", "47"); and
 - the rest of the line, its letters in lower case, at least 4 of them,
-  is at least 0.75 alike, as above, to the letters of the topmost line
+  is at least 0.70 alike, as above, to the letters of the topmost line
   of one of the two pages before it.
 
 It is then removed as a running head is, below: the number-like word as
@@ -309,7 +318,12 @@ number-like word it also took Gierke's page 8. The excerpts
 `haskins_front` and `domesday_front_flow` (`docs/specs/front-matter.md`
 §6) hold both pages, whose first line their tests assert is a
 `running_head` removal; on the `whole_book` tests, the new rule's
-removals are exactly these two.
+removals are exactly these two. With the likeness at 0.70 (17 November
+2026, below) it also takes Gierke's page 58, "Analytical Snnittniry.
+liii", the running head of its analytical summary, which the rule's
+likeness, 0.70 now too, finds alike to the topmost line of a page
+before it: three lines on the six books, each a running head (measured
+on the `lines.json` of layout §3's new steps).
 
 A number alone does not make a running head: a top line that ends with
 a word that is also a roman form ("vi", "mix", "dix", "d", "c.", "i.")
@@ -339,6 +353,18 @@ Asking for 1 finds 3 more pages in Stubbs and 13 in Mariéjol, and takes
 notes) and none in the other three; it also finds Gierke's
 section heads, which run over two pages only ("The Course of
 Development.", pages 88 and 90).
+
+The likeness was 0.75 until 17 November 2026, and 0.70 since: Gierke's
+running heads of pages 72 and 78, read "List of ~-l ntlioritics." and
+"List of slnthoriti* ixxiii", are 0.74 and 0.70 alike to the others and
+stayed in the text, where the tall line of section 14 made each a
+level-1 heading. Measured on the six public-domain books and the
+owner's two with section 3's rules as built (`lines.json` of layout §3's
+new steps), 0.70 takes 13 more head lines for running heads, and each
+is one on the page image: Gierke's 58 ("Analytical Snnittniry. liii"),
+72 and 78, and 10 of Mariéjol's garbled heads (48, 63, 77, 106, 250,
+296, 300, 311, 329, 409); it loses none and changes nothing on the
+owner's books.
 
 **A short region beside the head.** Some books print the page number
 outside the body column, level with the running head. Layout then makes
@@ -2153,6 +2179,46 @@ on Gierke's endnote pages the text is smaller than the book's, and the
 book's height took 941 lines there; on the notes pages of Turney, set
 in 8 pt, the group headings (section 12) stand at 9 to 11 pt.
 
+A page whose body stream holds more than 6 lines that tall, 1.2 times
+its median line height, has no tall line: its median is then that of
+smaller type, a table, a list or notes left in the body, and its tall
+lines are its text. Domesday's page 419 sets 18 lines of text under a
+table in small type (8 pt against 10), Gierke's page 50 sets 13 above
+notes in small type, and on Domesday's page 136 the text layer boxes
+14 lines, the last rows of a list and the paragraph under it, 11 to 28
+pt tall, where the page image shows the list's small type and the
+body's; without the condition each made
+false headings of its text, the paragraph run into one heading block
+by the lines that follow a heading line. On the pages of the eight
+books where the branch finds headings, at most 4 lines are that tall
+(Turney's page 39), and Domesday's page 528, the next most, has 11
+and no heading. Any limit from 4 to 10 keeps the same lines out on
+the eight books (measured on 17 November 2026 on the `lines.json` of
+layout §3's new steps): Domesday's pages 136 and 419 and Gierke's page
+50, and no other line.
+
+For the tall line, a line of the body stream with no letter or digit
+(a speck the OCR read as "#" or "/") does not count: the line before is
+the nearest above that holds a letter or a digit, and the page's first
+line is its first that holds one. On Turney's page 134 a speck "#" lies
+0.38 pitch above the label "Chapter Six", which had then no gap above
+it and was no heading; with the speck passed over, it is the page's
+first line, and chapter six is found with its label. Measured on 17
+November 2026 on the eight books: this changes no other heading.
+
+A line whose top lies at most 2 pitches below the median top of the
+book's head lines (or above it), and whose letters, at least 4, are at
+least 0.6 alike to those of a line section 3 removed as a running head,
+is never a heading line, whatever branch takes it: it is a running head
+that section 3 left in the text. Layout makes no head region on
+Domesday's page 159, a table, so its head "134 Domesday Book." stays in
+the text, and Kadesh's page 38 has its page number "27" as head line,
+with its author's name, "JAMES HENBY BREASTED", the line below; the
+tall line made each a level-1 heading. Measured on 17 November 2026 on
+the eight books, the rule takes away 4 heading blocks, each a running
+head on its page: those two, Domesday's 552 ("Index.", under its page
+number) and Mariéjol's 121 ("rcis CATIir"), and no other.
+
 Two more kinds of line join a heading:
 
 - a **chapter label** that is centred and whose next line is a heading
@@ -2165,6 +2231,15 @@ Two more kinds of line join a heading:
   This takes Stubbs' "John." under "CHAPTER VII." (the OCR read the small
   capitals as lower case) and Mariéjol's "L'EXPÉRIENCE ET L'ÉCHEC DE LA
   POLITIQUE MODÉRÉE", which fills the column and so is not centred.
+  Below a chapter label alone, the continuation may lie up to 4.0
+  pitches below it, as a title may below its label (heading blocks,
+  below): Haynes' page 249 opens chapter fourteen's title with a line
+  in capitals 2.87 pitches below "CHAPTER FOURTEEN", 58 pt short of the
+  right edge, under a quarter of the width, and 1.09 times the page's
+  median height, so neither flush left nor tall; without the 4.0 the
+  label stood alone and the title's second line became a level-2
+  heading of its own. Measured on 17 November 2026 on the eight books:
+  this changes no other heading.
 
 **Heading blocks.** Consecutive heading lines are one heading block when
 the second is at most 2.6 pitches below the first, or at most 4.0 when
@@ -2318,12 +2393,12 @@ headings.
   stand above it; Gierke's ten numbered sections ("I. The Evolution of
   Political Theory.") are level 2 under the book's title on page 86,
   where a reader would want level 1.
-- **Tall lines that are text** (this revision): Domesday's pages 136
-  and 419, set mostly in small type, make 4 lines of ordinary text tall
-  against their page's median; they become false level-2 headings. The
-  tables' titles of Domesday (425 to 428) are taken too, and so are the
-  lines of the publisher's lists after Stubbs' text, which the owner
-  can exclude.
+- **Tall lines that are text** (this revision): the tables' titles of
+  Domesday (425 to 428) are taken, and so are the lines of the
+  publisher's lists after Stubbs' text, which its config excludes.
+  Domesday's pages 136 and 419, whose ordinary text stood tall against
+  their page's median, are kept out by the limit of 6 tall lines a page
+  (above).
 - **Title pages** give a few headings (Domesday's "THREE ESSAYS…",
   Mariéjol's "A LA MÊME LIBRAIRIE"): the owner excludes such pages, or
   names them in `contents_pages`, when they matter.
@@ -2758,7 +2833,7 @@ paragraph of pages 15 to 18).
    head that Kadesh prints on its plates stands 79 to 191 pt from the
    top, so section 3 does not find it. On a plate page, the topmost line
    is a running head when its letters are alike, by section 3's rule
-   (at least 4 letters, 0.75), to the topmost line of another plate page
+   (at least 4 letters, 0.70), to the topmost line of another plate page
    or to a running head of the book, wherever it lies. Kadesh's
    "DECENNIAL PUBLICATIONS, V" on pages 34, 42, 48, 56 and 64 is then
    removed; page 68's garbled form is 0.68 alike and stays, as a

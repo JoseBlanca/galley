@@ -6,10 +6,14 @@ Positions are PDF points, origin at the top left of the page; gaps are in
 body line pitches."""
 
 import re
+import statistics
 from collections.abc import Sequence
+from collections.abc import Set as AbstractSet
 from enum import StrEnum
 
-from galley.model import BlockKind
+from galley.body_measures import median_word_height
+from galley.model import BlockKind, Line
+from galley.structure._heads import CHAPTER_LABEL_WORDS
 from galley.structure._lines import PlacedLine, is_centred
 from galley.structure._measures import Edges
 from galley.structure._runs import CHAPTER_LEVEL, SECTION_LEVEL, BodyRun, LabelLine
@@ -30,6 +34,27 @@ _LETTERS_SHARE_MIN = 0.5
 # lines may centre a heading between its body and band lines (Haskins'
 # page 129).
 _FEW_BODY_LINES = 5
+# Spec section 14, rule 1, a flush-left line: its left side within 4 pt of
+# the left edge (Haynes' labels lie 2.9 pt left to 2.3 pt right of their
+# region's commonest edge, its bibliography's title 3.4 pt), its right side
+# a quarter of the width short of the right edge; set apart by the gaps of
+# rule 4, its last word does not end with a sign (Turney's flush-left lines
+# that introduce a block quote, pages 93, 99, 100 and 160).
+_FLUSH_LEFT_PT = 4.0
+_FLUSH_LEFT_SHORT_SHARE = 0.25
+_FLUSH_LEFT_GAP_ENDS = (".", ",", ";", ":", "?", "!")
+# Spec section 14, a tall line: its line height at least 1.2 times the
+# median of the page's body stream (Turney's labels are 1.2 to 1.4 times
+# the body's, its titles 2.2 to 2.6; no line of its running text that tall
+# but one, 0.77 pitch below the line before), and a gap above of at least
+# 1.3 pitches.
+_TALL_LINE_SHARE = 1.2
+_TALL_GAP_ABOVE_MIN_PITCHES = 1.3
+# Spec section 14: a page with more than 6 lines that tall has none, its
+# median being that of smaller type (Domesday's pages 136 and 419 and
+# Gierke's 50 have 13 to 18; pages with headings in the eight books at
+# most 4; any limit from 4 to 10 gives the same, 17 November 2026).
+_TALL_LINES_MAX = 6
 # Spec section 14, "a continuation": at most 2.6 pitches below the heading
 # line before it; when not centred, at least 0.9 of its letters upper case
 # and a gap below of at least 1.5 pitches (Mariéjol's title that fills the
@@ -45,10 +70,6 @@ _CONTINUATION_GAP_BELOW_MIN_PITCHES = 1.5
 _JOIN_MAX_PITCHES = 2.6
 _JOIN_AFTER_LABEL_MAX_PITCHES = 4.0
 
-# Spec section 14, "Terms": the words that start a chapter label.
-_LABEL_WORDS = frozenset(
-    {"chapter", "chapitre", "essay", "part", "partie", "book", "livre"}
-)
 # Spec section 14: a roman numeral alone as the OCR reads one, 1 to 5 of
 # "IVXLCl1" with an optional ".", ("II", "Ill" for III).
 _OCR_ROMAN_LABEL = re.compile(r"[IVXLCl1]{1,5}\.?")
@@ -90,7 +111,7 @@ def _starts_with_label_word(line: PlacedLine) -> bool:
     """Whether the line's first word, without the punctuation after it, is
     one of the label words, in any case."""
     texts = _texts(line)
-    return bool(texts) and texts[0].rstrip(".,:;").lower() in _LABEL_WORDS
+    return bool(texts) and texts[0].rstrip(".,:;").lower() in CHAPTER_LABEL_WORDS
 
 
 def _has_long_word(texts: Sequence[str]) -> bool:
@@ -158,43 +179,115 @@ def _gap_branch(lines: Sequence[PlacedLine], number: int, pitch: float) -> bool:
     return True
 
 
+def _is_flush_left(line: PlacedLine) -> bool:
+    """Spec section 14, rule 1: the line's left side lies within 4 pt of the
+    left edge of its centring edges, and its right side a quarter of their
+    width or more short of the right edge."""
+    edges = line.centring_edges
+    return (
+        abs(line.line.box.x0 - edges.left) <= _FLUSH_LEFT_PT
+        and edges.right - line.line.box.x1 >= _FLUSH_LEFT_SHORT_SHARE * edges.width
+    )
+
+
 def _is_heading_line(
     lines: Sequence[PlacedLine],
     number: int,
     pitch: float,
     side_edges: Edges | None,
+    kept_head: Line | None,
 ) -> bool:
     """Spec section 14, rules 1 to 4, for the line at `number` of a page's
     body stream `lines`. `side_edges` are the sides of the page's body and
-    band lines when its body holds fewer than 5 lines, else None."""
+    band lines when its body holds fewer than 5 lines, else None;
+    `kept_head` is the page's head line when section 3 left it in the text
+    within 2 pitches of the median head top, which is not flush left
+    unless it starts with a chapter label word."""
     line = lines[number]
     texts = _texts(line)
     centred = is_centred(line) or (
         side_edges is not None and _centred_between(line, side_edges)
     )
+    flush_left = (
+        not centred
+        and _is_flush_left(line)
+        and (line.line is not kept_head or _starts_with_label_word(line))
+    )
     return (
-        centred
+        (centred or flush_left)
         and _mostly_letters(texts)
         and _has_long_word(texts)
         and not _ends_with_number(texts)
         and (
             _capitals_share(line) >= _CAPITALS_SHARE_MIN
-            or _gap_branch(lines, number, pitch)
+            or (
+                _gap_branch(lines, number, pitch)
+                and not (flush_left and texts[-1].endswith(_FLUSH_LEFT_GAP_ENDS))
+            )
         )
     )
+
+
+def _line_height(line: PlacedLine) -> float:
+    """The line height (spec section 1): the median height of its words, in
+    points."""
+    return median_word_height(line.line.words)
+
+
+def _is_tall_line(
+    lines: Sequence[PlacedLine],
+    number: int,
+    pitch: float,
+    median_height: float,
+    heading_lines: AbstractSet[int],
+) -> bool:
+    """Spec section 14, a tall line: the line at `number` of a page's body
+    stream `lines` is at least 1.2 times `median_height`, the median line
+    height of the stream, has at least 4 letters, passes rules 2 and 3, and
+    lies at least 1.3 pitches below the line before, or is the page's first
+    line, or follows a heading line, one of the positions
+    `heading_lines`; a line with no letter or digit counts as no line."""
+    line = lines[number]
+    texts = _texts(line)
+    if not (
+        _line_height(line) >= _TALL_LINE_SHARE * median_height
+        and _letter_count(line) >= _WORD_MIN_LETTERS
+        and _mostly_letters(texts)
+        and _has_long_word(texts)
+        and not _ends_with_number(texts)
+    ):
+        return False
+    # A line of marks, a speck, is passed over.
+    before = next(
+        (
+            other
+            for other in range(number - 1, -1, -1)
+            if any(c.isalnum() for c in "".join(_texts(lines[other])))
+        ),
+        None,
+    )
+    if before is None or before in heading_lines:
+        return True
+    above = _pitches(lines[before], line, pitch)
+    return above is not None and above >= _TALL_GAP_ABOVE_MIN_PITCHES
 
 
 def _is_continuation(lines: Sequence[PlacedLine], number: int, pitch: float) -> bool:
     """Spec section 14, "a continuation": the line at `number` follows a
     heading line, has at least 4 letters, lies at most 2.6 pitches below
-    it, and is centred, or is in capitals (0.9) with a gap below of at
-    least 1.5 pitches."""
+    it (4.0 below a chapter label), and is centred, or is in capitals (0.9)
+    with a gap below of at least 1.5 pitches."""
     line = lines[number]
     below_heading = _pitches(lines[number - 1], line, pitch)
+    reach = (
+        _JOIN_AFTER_LABEL_MAX_PITCHES
+        if _is_chapter_label(lines[number - 1])
+        else _CONTINUATION_MAX_PITCHES
+    )
     if (
         _letter_count(line) < _WORD_MIN_LETTERS
         or below_heading is None
-        or below_heading > _CONTINUATION_MAX_PITCHES
+        or below_heading > reach
     ):
         return False
     if is_centred(line):
@@ -210,19 +303,41 @@ def _is_continuation(lines: Sequence[PlacedLine], number: int, pitch: float) -> 
 
 
 def _heading_line_numbers(
-    lines: Sequence[PlacedLine], pitch: float, side_edges: Edges | None
+    lines: Sequence[PlacedLine],
+    pitch: float,
+    side_edges: Edges | None,
+    kept_head: Line | None,
+    never: frozenset[int],
 ) -> frozenset[int]:
     """The positions in `lines`, a page's body stream, of its heading lines
-    (spec section 14, "The rule"): the lines rules 1 to 4 take, each
-    centred chapter label whose next line they take, and each continuation
-    of a line they take. `pitch` is the body line pitch; `side_edges` the
-    sides of the page's body and band lines when its body holds fewer than
-    5 lines, else None."""
-    by_rule = frozenset(
+    (spec section 14, "The rule"): the lines rules 1 to 4 take, the tall
+    lines, none on a page with more than `_TALL_LINES_MAX` lines that tall,
+    each centred chapter label whose next line they take, and each
+    continuation of a line they take. `pitch` is the body line pitch;
+    `side_edges` the sides of the page's body and band lines when its body
+    holds fewer than 5 lines, else None; `kept_head` the head line section
+    3 left in the text near the head top, or None; `never` the positions of
+    lines that are never heading lines."""
+    by_rule = {
         number
         for number in range(len(lines))
-        if _is_heading_line(lines, number, pitch, side_edges)
+        if number not in never
+        and _is_heading_line(lines, number, pitch, side_edges, kept_head)
+    }
+    median_height = (
+        statistics.median(_line_height(line) for line in lines) if lines else 0.0
     )
+    tall_lines = sum(
+        _line_height(line) >= _TALL_LINE_SHARE * median_height for line in lines
+    )
+    if lines and tall_lines <= _TALL_LINES_MAX:
+        # In order, so that a tall line below a tall heading line follows a
+        # heading line.
+        for number in range(len(lines)):
+            if number not in by_rule | never and _is_tall_line(
+                lines, number, pitch, median_height, by_rule
+            ):
+                by_rule.add(number)
     labels = frozenset(
         number
         for number in range(len(lines) - 1)
@@ -230,7 +345,7 @@ def _heading_line_numbers(
         and _is_chapter_label(lines[number])
         and is_centred(lines[number])
     )
-    taken = by_rule | labels
+    taken = frozenset(by_rule) | labels
     continuations = frozenset(
         number + 1
         for number in taken
@@ -238,7 +353,7 @@ def _heading_line_numbers(
         and number + 1 not in taken
         and _is_continuation(lines, number + 1, pitch)
     )
-    return taken | continuations
+    return (taken | continuations) - never
 
 
 class PageHead(StrEnum):
@@ -278,13 +393,21 @@ def heading_runs(
     band: Sequence[PlacedLine],
     pitch: float,
     head: PageHead,
+    kept_head: Line | None,
+    never: frozenset[int],
 ) -> tuple[BodyRun, ...]:
     """The heading blocks of `lines`, a page's body stream, in order (spec
     section 14). A block is level 1 when its first line is a chapter label
     (which a line starting with a label word is) or the first line of a page without a
     running head (`head`); level 2 otherwise. `band` are the lines of the
-    page's band regions; `pitch` is the body line pitch, in points."""
-    numbers = sorted(_heading_line_numbers(lines, pitch, _side_edges(lines, band)))
+    page's band regions; `pitch` is the body line pitch, in points;
+    `kept_head` the page's head line when section 3 left it in the text
+    within 2 pitches of the book's median head top, else None; `never` the
+    positions of the lines that are never heading lines, those of the head
+    band alike to a running head."""
+    numbers = sorted(
+        _heading_line_numbers(lines, pitch, _side_edges(lines, band), kept_head, never)
+    )
     groups: list[list[int]] = []
     for number in numbers:
         if (
