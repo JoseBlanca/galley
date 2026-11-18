@@ -449,6 +449,25 @@ is laid out as one region, as the skeleton did.
       "t" the text layer gives as a word of its own 0.2 pt away and
       outside the zone.
 
+   **No cut-in notes on a contents page.** A page the config names in
+   `contents_pages` is laid out as in a book with no cut-in inset: step
+   2b takes nothing from it. A printed contents has no margin notes, and
+   its rows can look like a cut-in zone. Turney (whose measures give a
+   left inset of 44.3 pt) prints its contents on page 10 with each
+   chapter's label, "Two", "Three", in smaller bold type at the column's
+   left edge and its title on the same baseline at 44 pt in: every
+   title row is a cut row, and six label rows were shortened by size,
+   their labels 0.69 of the page's body word height and 0.66 to 0.84 of
+   its width per character, as small as Stubbs' notes (0.79 and about
+   0.75 at the median). The labels became margin notes and the contents
+   broke. Size cannot tell them apart, and a single word of the strip
+   cannot either: asking for 2 strip words of 2 letters or more in a row
+   moves 148 fewer of Stubbs' words, on 58 pages. Measured on 19 November
+   2026 on the eight books' `words.json`: the rule changes Turney's page
+   10 alone, whose regions are then those laid out before the test by
+   size; Stubbs' contents pages (14 to 16) have no cut-in words either
+   way.
+
    On the right the same, mirrored: a word's right side within 3 pt of
    R − I, the gap after it, the words up to it spanning half the column,
    and note words whose left side lies at least R − I + 4 pt. The margin
@@ -962,6 +981,8 @@ def run(folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKER
 
 def measure_book(words: WordsFile, *, workers: int = DEFAULT_WORKERS) -> BookMeasures | None: ...
 def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout: ...
+def page_measures(measures: BookMeasures | None, page_index: int,
+                  contents_pages: frozenset[int]) -> BookMeasures | None: ...
 
 class Side(StrEnum):
     """The side of the body column a margin note stands at."""
@@ -1012,6 +1033,9 @@ the choice of each region, are in the private module
 
 `measure_book` gives `None` for a book with no page of 3 rows, and
 `layout_page` with `None` lays the page out as the skeleton did.
+`page_measures` gives the measures a page is laid out with: the book's,
+without cut-in insets on a page of `contents_pages` (section 3, step 2b,
+"No cut-in notes on a contents page"); `run` passes the config's.
 layout groups words into lines with `body_measures.group_rows`, the
 walking skeleton's rule, and keeps no copy of it under another name
 (the skeleton's `group_lines` is gone); `layout_page` takes a drop
