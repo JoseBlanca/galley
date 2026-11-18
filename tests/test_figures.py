@@ -8,9 +8,12 @@ figure regions and structure's figure text, captions and figure blocks
 import functools
 import json
 import logging
+import zipfile
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
+from xml.etree import ElementTree
 
 import pytest
 from PIL import Image
@@ -24,6 +27,7 @@ from galley.extract import _save_figures, figure_crop_px, figure_image, page_wor
 from galley.fidelity import check_stage
 from galley.layout import figure_regions, layout_page_with_figures
 from galley.model import (
+    Block,
     BlockKind,
     BlocksFile,
     Box,
@@ -1433,3 +1437,230 @@ def test_caption_label_is_found(words: tuple[str, ...]) -> None:
 )
 def test_caption_label_is_not_found(words: tuple[str, ...]) -> None:
     assert not is_caption_label(words)
+
+
+# structure on the excerpt kadesh_29-38 (figures spec section 10, the table
+# of the reference pages): the expected output of each page is that of its
+# file in tests/fixtures/expected/lists_figures/, checked against the page
+# rendered at 300 dpi.
+
+
+def _expected_page(index: int) -> dict[str, Any]:
+    return json.loads(
+        (_EXPECTED / f"{_KADESH}_page{index}.json").read_text(encoding="utf-8")
+    )["expected"]
+
+
+def _in_page_blocks(blocks: BlocksFile) -> dict[int, list[Block]]:
+    """The figure blocks of in-page figures, by excerpt page."""
+    found: dict[int, list[Block]] = {}
+    for block in blocks.blocks:
+        if block.kind is BlockKind.FIGURE and "/figure-" in (block.figure or ""):
+            found.setdefault(block.origin[0].page_index, []).append(block)
+    return found
+
+
+def _excerpt_blocks(folder: BookFolder) -> BlocksFile:
+    return read_blocks(folder.blocks_json)
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+def test_kadesh_29_38_each_reference_page_has_its_figures_with_their_captions(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    blocks = _excerpt_blocks(excerpt_books[_KADESH])
+    found = _in_page_blocks(blocks)
+    expected = {
+        index: tuple(
+            figure["caption"]
+            for figure in _expected_page(index)["figures"]
+            if figure["kind"] == "in_page"
+        )
+        for index in range(10)
+    }
+    assert {
+        index: tuple(block_text(block) or None for block in found.get(index, ()))
+        for index in range(10)
+    } == expected
+    # The plates of pages 34 and 35 stay plates' figure blocks.
+    assert tuple(
+        block.figure
+        for block in blocks.blocks
+        if block.kind is BlockKind.FIGURE and "/plate-" in (block.figure or "")
+    ) == ("images/plate-0005.png", "images/plate-0006.png")
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+def test_kadesh_29_38_figure_text_is_the_words_read_inside_each_figure(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    removals = _excerpt_blocks(excerpt_books[_KADESH]).removals
+    assert {
+        index: tuple(
+            word
+            for removal in removals
+            if removal.page_index == index
+            and removal.reason is RemovalReason.FIGURE_TEXT
+            for word in removal.text.split(" ")
+        )
+        for index in range(10)
+    } == {
+        index: tuple(
+            word
+            for figure in _expected_page(index)["figures"]
+            for word in figure.get("figure_text") or ()
+        )
+        for index in range(10)
+    }
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+@pytest.mark.parametrize("index", [0, 4, 7, 8, 9])
+def test_kadesh_29_38_figure_follows_the_block_of_the_line_printed_above_it(
+    index: int, excerpt_books: frozendict[str, BookFolder]
+) -> None:
+    blocks = _excerpt_blocks(excerpt_books[_KADESH]).blocks
+    expected = _expected_page(index)
+    above = expected.get("figure_after_the_paragraph_holding") or expected.get(
+        "figure_after_the_block_holding"
+    )
+    assert isinstance(above, str)
+    (figure,) = _in_page_blocks(_excerpt_blocks(excerpt_books[_KADESH]))[index]
+    position = blocks.index(figure)
+    # The block before it, past the figure blocks placed after the same one.
+    before = next(
+        block
+        for block in reversed(blocks[:position])
+        if block.kind is not BlockKind.FIGURE
+    )
+    assert above in " ".join(span.text for span in before.spans)
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+def test_kadesh_29_38_the_paragraph_cut_by_a_map_is_one_block(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    blocks = _excerpt_blocks(excerpt_books[_KADESH]).blocks
+    expected = _expected_page(0)
+    before, after = expected["one_paragraph_across_the_figure"]
+    (paragraph,) = (block for block in blocks if before in block_text(block))
+    assert paragraph.kind is BlockKind.PARAGRAPH
+    text = block_text(paragraph)
+    # The junk read on the scale bar, outside the box, stays text between.
+    assert after in text
+    assert f"{before} {' '.join(expected['stay_text'])} {after}" in text
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+def test_kadesh_29_38_text_on_a_captions_row_stays_where_it_is(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    blocks = _excerpt_blocks(excerpt_books[_KADESH])
+    texts = tuple(
+        (block.kind, block_text(block), block.origin[0].page_index)
+        for block in blocks.blocks
+    )
+    # 36: the caption on the row of a footnote; the footnote keeps its words.
+    footnotes = tuple(
+        " ".join(block_text(block) for block in note.blocks)
+        for note in blocks.notes
+        if note.origin[0].page_index == 7
+    )
+    assert any(_expected_page(7)["kept_in_footnote"] in note for note in footnotes)
+    # 38: the caption on one line with the text set beside the map.
+    assert any(
+        kind is BlockKind.PARAGRAPH
+        and page == 9
+        and _expected_page(9)["stays_in_its_paragraph"] in text
+        for kind, text, page in texts
+    )
+    # 37: the "Var." outside the hieroglyphs' box.
+    assert (BlockKind.PARAGRAPH, "Var.", 8) in texts
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+@pytest.mark.epubcheck
+@pytest.mark.thread_unsafe
+def test_kadesh_29_38_epub_shows_each_figure_with_its_caption_and_passes_epubcheck(
+    excerpt_books: frozendict[str, BookFolder], check_epubs: Callable[..., None]
+) -> None:
+    folder = excerpt_books[_KADESH]
+    figures = tuple(
+        block
+        for blocks in _in_page_blocks(_excerpt_blocks(folder)).values()
+        for block in blocks
+    )
+    assert len(figures) == 5
+    xhtml = "{http://www.w3.org/1999/xhtml}"
+    with zipfile.ZipFile(folder.book_epub) as epub:
+        divs = {
+            div.get("id"): div
+            for name in sorted(epub.namelist())
+            if name.startswith("EPUB/text/") and name.endswith(".xhtml")
+            for div in ElementTree.fromstring(epub.read(name)).iter(f"{xhtml}div")
+        }
+    for block in figures:
+        div = divs[block.id]
+        assert len(tuple(div.iter(f"{xhtml}img"))) == 1, block.id
+        captions = tuple(div.iter(f"{xhtml}figcaption"))
+        assert tuple("".join(caption.itertext()) for caption in captions) == (
+            (block_text(block),) if block.spans else ()
+        ), block.id
+    check_epubs(folder.book_epub)
+
+
+# Whole books (figures spec section 10, "Whole-book tests", structure's
+# part): a figure block for each in-page figure analyze finds, by page; the
+# fidelity check passes on each book.
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.parametrize("book", sorted(_WHOLE_BOOK_FIGURES))
+def test_whole_book_figure_blocks_are_one_for_each_in_page_figure(
+    book: str, whole_book_run: Callable[[str], BookFolder]
+) -> None:
+    folder = whole_book_run(book)
+    blocks = read_blocks(folder.blocks_json)
+    check_stage(FidelityBoundary.STRUCTURE, read_lines(folder.lines_json), blocks)
+    found = _in_page_blocks(blocks)
+    assert {index: len(figures) for index, figures in found.items()} == (
+        _WHOLE_BOOK_FIGURES[book]
+    )
+
+
+# Figures spec section 2: Kadesh's maps "MAP III." to "MAP VIII.", the
+# first two words of each caption as the OCR read them.
+_KADESH_MAP_CAPTIONS = frozendict(
+    {
+        29: ("MAP", "111."),
+        33: ("MAP", "IV."),
+        36: ("MAP", "V."),
+        38: ("MAP", "vi."),
+        41: ("MAP", "VII."),
+        45: ("MAP", "VIII."),
+    }
+)
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+def test_whole_kadesh_caption_of_each_map_and_none_of_the_hieroglyphs(
+    whole_book_run: Callable[[str], BookFolder],
+) -> None:
+    found = _in_page_blocks(read_blocks(whole_book_run(_KADESH_BOOK).blocks_json))
+    captions = {
+        index: tuple(block_text(block).split(" ")[:2])
+        for index, figures in found.items()
+        for block in figures
+        if block.spans
+    }
+    assert captions == _KADESH_MAP_CAPTIONS
