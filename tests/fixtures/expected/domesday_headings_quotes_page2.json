@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image.",
   "excerpt_only": "What the excerpt gives, not what the whole book gives: footnote 3 runs on to the next text page of the excerpt, page 42, and ends with the words of a table's head there; on the whole book its continuation, if any, is on page 31.",
   "excerpt": "domesday_headings_quotes",
   "page": 2,
@@ -81,7 +81,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "To this we must add that, unless we have mistaken the general drift of legal history, the law implied in Domesday Book ought to be for us very difficult law, far more difficult than the law of the thirteenth century, for the thirteenth century is nearer to us than is the eleventh. The grown man will find it easier to think the thoughts of the school-boy than to think the thoughts of the baby. And yet the doctrine that our remote forefathers being simple folk had simple law dies hard. Too often we allow ourselves to suppose that, could we but get back to the beginning, we should find that all was intelligible and should then be able to watch the process whereby simple ideas were smothered under subtleties and technicalities. But it is not so. Simplicity is the outcome of technical subtlety ; it is the goal not the starting point. As we go backwards the familiar outlines become blurred ; the ideas become fluid, and instead of the simple we find the indefinite. But difficult though our task may be, we must turn to it.",
+      "text": "To this we must add that, unless we have mistaken the general drift of legal history, the law implied in Domesday Book ought to be for us very difficult law, far more difficult than the law of the thirteenth century, for the thirteenth century is nearer to us than is the eleventh. The grown man will find it easier to think the thoughts of the school-boy than to think the thoughts of the baby. And yet the doctrine that our remote forefathers being simple folk had simple law dies hard. Too often we allow ourselves to suppose that, could we but get back to the beginning, we should find that all was intelligible and should then be able to watch the process whereby simple ideas were smothered under subtleties and technicalities. But it is not so. Simplicity is the outcome of technical subtlety; it is the goal not the starting point. As we go backwards the familiar outlines become blurred; the ideas become fluid, and instead of the simple we find the indefinite. But difficult though our task may be, we must turn to it.",
       "pages": [
         2
       ]
@@ -116,7 +116,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "D. B. ii. 109 b : ' Hundret de Grenehou 14 letis.' Ib. 212 b : ' Hundret et Dim. de Clakelosa de 10 leitis.' Bound, Feudal England, 101."
+          "text": "D. B. ii. 109 b: ' Hundret de Grenehou 14 letis.' Ib. 212 b: ' Hundret et Dim. de Clakelosa de 10 leitis.' Bound, Feudal England, 101."
         }
       ],
       "pages": [
@@ -140,7 +140,7 @@
       "blocks": [
         {
           "kind": "paragraph",
-          "text": "D. B. i. 184 b : ' Haec terra non geldat nee consuetudinem dat nee in aliquo hundredo iacet ' ; i. 157 ' Haec terra nunquatn geldavit nee alicui Non-servile Servi Total 19 population 19 0"
+          "text": "D. B. i. 184 b: ' Haec terra non geldat nee consuetudinem dat nee in aliquo hundredo iacet ' ; i. 157 ' Haec terra nunquatn geldavit nee alicui Non-servile Servi Total 19 population 19 0"
         }
       ],
       "pages": [
@@ -156,6 +156,26 @@
     }
   ],
   "word_changes": [
+    {
+      "before": [
+        "subtlety",
+        ";"
+      ],
+      "after": [
+        "subtlety;"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "blurred",
+        ";"
+      ],
+      "after": [
+        "blurred;"
+      ],
+      "reason": "punctuation_attached"
+    },
     {
       "before": [
         "geo-",
@@ -208,6 +228,36 @@
         ","
       ],
       "reason": "note_marker"
+    },
+    {
+      "before": [
+        "b",
+        ":"
+      ],
+      "after": [
+        "b:"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "b",
+        ":"
+      ],
+      "after": [
+        "b:"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "b",
+        ":"
+      ],
+      "after": [
+        "b:"
+      ],
+      "reason": "punctuation_attached"
     }
   ],
   "page_numbers": []

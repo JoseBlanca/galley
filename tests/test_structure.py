@@ -5185,11 +5185,16 @@ def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
         lines: LinesFile,
         word_list: frozenset[str],
         *,
+        language: Language,
         contents_pages: frozenset[int],
         workers: int,
     ) -> BlocksFile:
         blocks = make_blocks(
-            lines, word_list, contents_pages=contents_pages, workers=workers
+            lines,
+            word_list,
+            language=language,
+            contents_pages=contents_pages,
+            workers=workers,
         )
         first = blocks.blocks[0]
         shorter = replace(
@@ -5912,8 +5917,8 @@ def test_reread_whole_stubbs_index_pages_312_to_321_are_read_whole_and_kept(
     # ten index pages are small-print pages of the whole book, read whole
     # below their running heads and kept. The running head keeps the
     # layer's words. Page 312's entry "Acre, siege of, 116; the English at,
-    # 118;" has both ";" (Tesseract read "116 ;"), and structure cuts it in
-    # two after the first. Its guide words, and the book's 935 index
+    # 118;" has both ";" (Tesseract read "116 ;", which structure attaches,
+    # spec section 23), and structure cuts it in two after the first. Its guide words, and the book's 935 index
     # entries, are tested above (test_whole_book_stubbs_guide_words_on_
     # each_of_its_ten_index_pages).
     words = read_words(whole_book_run("earlyplantagenet01stub").words_json)
@@ -5953,7 +5958,7 @@ def test_reread_whole_stubbs_index_pages_312_to_321_are_read_whole_and_kept(
     acre = next(
         position
         for position, entry in enumerate(entries)
-        if entry.endswith("Acre, siege of, 116 ;")
+        if entry.endswith("Acre, siege of, 116;")
     )
     assert entries[acre + 1] == "the English at, 118;"
 

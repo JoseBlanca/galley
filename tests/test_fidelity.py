@@ -383,6 +383,55 @@ def _margin_note(text: str) -> Block:
     )
 
 
+def test_structure_hyphen_lost_whose_word_a_sign_was_attached_to_passes() -> None:
+    # Structure spec section 5: Domesday page 461's margin note "popula-
+    # tion ?" gives "population" by the join, then "population?" by the
+    # spaced sign (section 23), which is the word of the margin note.
+    lines = _lines_file((("Unity of the popula",), ("tion ? here",)))
+    blocks = _blocks_file(
+        (_margin_note("Unity of the population? here"),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=("popula", "tion"),
+                after=("population",),
+                reason=ChangeReason.HYPHEN_LOST,
+            ),
+            WordChange(
+                page_index=0,
+                before=("population", "?"),
+                after=("population?",),
+                reason=ChangeReason.PUNCTUATION_ATTACHED,
+            ),
+        ),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_structure_hyphen_lost_whose_word_was_split_at_its_case_passes() -> None:
+    lines = _lines_file((("Unity of theWil",), ("liam here",)))
+    blocks = _blocks_file(
+        (_margin_note("Unity of the William here"),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=("theWil", "liam"),
+                after=("theWilliam",),
+                reason=ChangeReason.HYPHEN_LOST,
+            ),
+            WordChange(
+                page_index=0,
+                before=("theWilliam",),
+                after=("the", "William"),
+                reason=ChangeReason.CASE_SPLIT,
+            ),
+        ),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
 def test_structure_hyphen_lost_outside_a_margin_note_fails() -> None:
     # Structure spec section 5: the join is made in margin notes only.
     blocks = _blocks_file(

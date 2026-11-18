@@ -11,8 +11,12 @@ from galley.wordlist import is_known_word
 
 # Spec section 24: the left part has at least 2 letters ("aWilliam" stays).
 _MIN_LEFT_LETTERS = 2
-# Spec section 24: the capital is followed by at least 2 lower-case letters.
-_MIN_RIGHT_LOWER_LETTERS = 2
+# Spec section 24: the capital is followed by at least 3 lower-case
+# letters. With 2, the rule split Domesday's Old English "forSon" and
+# "forSan" (printed "forðon", "forðan", page 339) and 4 of Mariéjol's
+# misreadings ("ttOat"), and no split that 3 drops looked right (six
+# public-domain books, 18 November 2026).
+_MIN_RIGHT_LOWER_LETTERS = 3
 # Spec section 24: the capitals the OCR gives for "li" ("poUtique",
 # "estabHshed"), at which a word is never split.
 _MISREAD_CAPITALS = frozenset("UH")
@@ -32,7 +36,7 @@ def _letters_span(word: str) -> tuple[int, int]:
 
 def _capital_position(core: str) -> int | None:
     """The position of the capital in `core` when it is a run of lower-case
-    letters, one capital and at least 2 lower-case letters, and nothing
+    letters, one capital and at least 3 lower-case letters, and nothing
     else; None otherwise."""
     capitals = [position for position, letter in enumerate(core) if letter.isupper()]
     if len(capitals) != 1:
@@ -59,7 +63,7 @@ def split_at_case(
     the punctuation at each end going with its side: "theAvre" gives
     ("the", "Avre"), "ofWilliam," gives ("of", "William,") (spec section
     24). None unless all of these hold: the word without the punctuation
-    at its ends is lower-case letters, one capital and at least 2
+    at its ends is lower-case letters, one capital and at least 3
     lower-case letters; the capital is not "U" or "H"; the left part has
     at least 2 letters, is a known word of `lower_case_words`, the word
     list in lower case, and is among `common_inner_words`

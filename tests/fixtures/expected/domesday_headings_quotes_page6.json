@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image.",
   "known": "The owner: they are three tables. galley makes each a verse block (structure spec section 9).",
   "excerpt": "domesday_headings_quotes",
   "page": 6,
@@ -64,42 +64,42 @@
   "blocks": [
     {
       "kind": "verse",
-      "text": "South -Western Group : 49,155\nMid- Western Group: 33,191\nEastern Group: 72,883",
+      "text": "South -Western Group: 49,155\nMid- Western Group: 33,191\nEastern Group: 72,883",
       "pages": [
         6
       ]
     },
     {
       "kind": "paragraph",
-      "text": "These figures are so emphatic that they may cause us for a moment to doubt their value, and on details we must lay no stress. But we have materials which enable us to check the general effect. In 1297 Edward I. levied a lay subsidy of a ninth1. The sums borne by our three groups of counties were these : — £",
+      "text": "These figures are so emphatic that they may cause us for a moment to doubt their value, and on details we must lay no stress. But we have materials which enable us to check the general effect. In 1297 Edward I. levied a lay subsidy of a ninth1. The sums borne by our three groups of counties were these: — £",
       "pages": [
         6
       ]
     },
     {
       "kind": "verse",
-      "text": "South- Western Group : 4,038\nMid-Western Group: 3,514\nEastern Group : 7,329",
+      "text": "South- Western Group: 4,038\nMid-Western Group: 3,514\nEastern Group: 7,329",
       "pages": [
         6
       ]
     },
     {
       "kind": "paragraph",
-      "text": "There is a curious resemblance between these two sets of figures. Then in 1377 and 1381 returns were made for a poll-tax2. The number of polls returned in our three groups were these : — 1377 1381",
+      "text": "There is a curious resemblance between these two sets of figures. Then in 1377 and 1381 returns were made for a poll-tax2. The number of polls returned in our three groups were these: — 1377 1381",
       "pages": [
         6
       ]
     },
     {
       "kind": "verse",
-      "text": "South- Western Group : 183,842 106,086\nMid- Western Group : 158,245 115,679\nEastern Group : 255,498 182,830",
+      "text": "South- Western Group: 183,842 106,086\nMid- Western Group: 158,245 115,679\nEastern Group: 255,498 182,830",
       "pages": [
         6
       ]
     },
     {
       "kind": "paragraph",
-      "text": "No doubt all inferences drawn from medieval statistics are exceedingly precarious ; but, unless a good many figures have conspired to deceive us, Lincolnshire, Norfolk and Suffolk were at the time of the Conquest and for three centuries afterwards vastly richer and more populous than any tract of equal area in the West.",
+      "text": "No doubt all inferences drawn from medieval statistics are exceedingly precarious; but, unless a good many figures have conspired to deceive us, Lincolnshire, Norfolk and Suffolk were at the time of the Conquest and for three centuries afterwards vastly richer and more populous than any tract of equal area in the West.",
       "pages": [
         6
       ]
@@ -113,7 +113,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "Another distinction between the eastern counties and the r TT> i j • T rest ot England is apparent. In many shires we shall find that the name of each vill is mentioned once and no more. This is so because the land of each vill belongs in its entirety to some one tenant in chief. We may go further : we may say, though at present in an untechnical sense, that each vill is a manor. Such is the general rule, though there will be exceptions to it. On the other hand, in the eastern counties this rule will become the exception. For example, of the fourteen vills in the Armingford hundred of Cambridgeshire there is but one of Two free men, of whom .^Elfwin had not even the commendation1.",
+      "text": "Another distinction between the eastern counties and the r TT> i j • T rest ot England is apparent. In many shires we shall find that the name of each vill is mentioned once and no more. This is so because the land of each vill belongs in its entirety to some one tenant in chief. We may go further: we may say, though at present in an untechnical sense, that each vill is a manor. Such is the general rule, though there will be exceptions to it. On the other hand, in the eastern counties this rule will become the exception. For example, of the fourteen vills in the Armingford hundred of Cambridgeshire there is but one of Two free men, of whom .^Elfwin had not even the commendation1.",
       "pages": [
         6,
         7
@@ -159,6 +159,16 @@
   "word_changes": [
     {
       "before": [
+        "Group",
+        ":"
+      ],
+      "after": [
+        "Group:"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
         "ninth1."
       ],
       "after": [
@@ -167,6 +177,36 @@
         "."
       ],
       "reason": "note_marker"
+    },
+    {
+      "before": [
+        "these",
+        ":"
+      ],
+      "after": [
+        "these:"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "Group",
+        ":"
+      ],
+      "after": [
+        "Group:"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "Group",
+        ":"
+      ],
+      "after": [
+        "Group:"
+      ],
+      "reason": "punctuation_attached"
     },
     {
       "before": [
@@ -181,6 +221,56 @@
     },
     {
       "before": [
+        "these",
+        ":"
+      ],
+      "after": [
+        "these:"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "Group",
+        ":"
+      ],
+      "after": [
+        "Group:"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "Group",
+        ":"
+      ],
+      "after": [
+        "Group:"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "Group",
+        ":"
+      ],
+      "after": [
+        "Group:"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "precarious",
+        ";"
+      ],
+      "after": [
+        "precarious;"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
         "non-",
         "manorial"
       ],
@@ -188,6 +278,16 @@
         "non-manorial"
       ],
       "reason": "hyphen_kept"
+    },
+    {
+      "before": [
+        "further",
+        ":"
+      ],
+      "after": [
+        "further:"
+      ],
+      "reason": "punctuation_attached"
     }
   ],
   "page_numbers": [

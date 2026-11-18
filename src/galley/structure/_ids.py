@@ -8,9 +8,13 @@ from collections.abc import Sequence
 from galley.model import Block, BlockKind, Emphasis, Note, Span, note_places
 from galley.structure._unnumbered import Unnumbered, UnnumberedNote, first_page
 
+# Spec section 23: the space before a spaced sign in a French book.
+_NO_BREAK_SPACE = "\u00a0"
+
 
 def _spans(unnumbered: Unnumbered, note_ids: Sequence[str]) -> tuple[Span, ...]:
-    """The block's words joined by single spaces, or in a verse block and
+    """The block's words joined by single spaces, or by a no-break space
+    before the words of its `no_break` (section 23), or in a verse block and
     a verse epigraph by a line feed where a printed line starts, each note reference a span
     of its own with the id of its note; the spaces stay with the spans
     around it (spec section 11, "What is changed"). A figure block without
@@ -26,6 +30,8 @@ def _spans(unnumbered: Unnumbered, note_ids: Sequence[str]) -> tuple[Span, ...]:
         # A verse block keeps its printed lines (spec section 16).
         if verse and position in unnumbered.line_starts:
             space = "\n"
+        elif position in unnumbered.no_break:
+            space = _NO_BREAK_SPACE
         else:
             space = " " if position > 0 else ""
         link = unnumbered.links.get(position)
