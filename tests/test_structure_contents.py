@@ -538,84 +538,155 @@ def _contents_of(
 def test_haskins_front_contents_title_and_nine_entries(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    # Excerpt page 7 is the book's page 14.
-    contents = _contents_of(excerpt_books, "haskins_front", 7)
-    assert contents[0] == ("heading", 1, None, "CONTENTS", None, None)
-    assert tuple(entry[1:5] for entry in contents[1:]) == (
-        (1, None, "-^1. NORMANDY AND ITS PLACE IN HISTORY", "i"),
-        (1, None, "_ II, THE COMING OF THE NORTHMEN", "26"),
-        (1, None, '"HI. NORMANDY AND ENGLAND', "52"),
-        (1, "IV.", "THE NORMAN EMPIRE", "85"),
-        (1, "V.", "NORMANDY AND FRANCE", "116"),
-        (1, "^ VI.", "NORMAN LIFE AND CULTURE", "148"),
-        (1, "VII.", "THE NORMANS IN THE SOUTH", "192"),
-        (1, "VIII.", "THE NORMAN KINGDOM OF SICILY", "218"),
-        (1, None, "INDEX", "251"),
+    # Excerpt page 7 is the book's page 14. None is linked: chapter I's
+    # heading holds the half-title in the excerpt (spec section 32).
+    assert _contents_of(excerpt_books, "haskins_front", 7) == (
+        ("heading", 1, None, "CONTENTS", None, None),
+        _entry(1, None, "-^1. NORMANDY AND ITS PLACE IN HISTORY", "i"),
+        _entry(1, None, "_ II, THE COMING OF THE NORTHMEN", "26"),
+        _entry(1, None, '"HI. NORMANDY AND ENGLAND', "52"),
+        _entry(1, "IV.", "THE NORMAN EMPIRE", "85"),
+        _entry(1, "V.", "NORMANDY AND FRANCE", "116"),
+        _entry(1, "^ VI.", "NORMAN LIFE AND CULTURE", "148"),
+        _entry(1, "VII.", "THE NORMANS IN THE SOUTH", "192"),
+        _entry(1, "VIII.", "THE NORMAN KINGDOM OF SICILY", "218"),
+        _entry(1, None, "INDEX", "251"),
     )
+
+
+def _entry(
+    level: int,
+    label: str | None,
+    title: str,
+    page_number: str | None,
+    heading: str | None = None,
+) -> tuple[str, int | None, str | None, str, str | None, str | None]:
+    return ("contents_entry", level, label, title, page_number, heading)
 
 
 def test_stubbs_summaries_contents_chapters_topics_and_index_linked(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    contents = _contents_of(excerpt_books, "stubbs_summaries_index", 0)
-    entries = tuple(entry for entry in contents if entry[0] == "contents_entry")
-    assert tuple(entry[1:3] for entry in entries) == (
-        (1, "CHAPTER IX."),
-        (2, None),
-        (1, "CHAPTER X."),
-        (2, None),
-        (1, "CHAPTER XI."),
-        (2, None),
-        (1, "CHAPTER XII."),
-        (2, None),
-        (1, None),
+    # The title is page 16's running head, which the excerpt keeps.
+    assert _contents_of(excerpt_books, "stubbs_summaries_index", 0) == (
+        ("heading", 1, None, "Contents. vn", None, None),
+        _entry(1, "CHAPTER IX.", "SIMON DE MONTFORT.", None),
+        _entry(
+            2,
+            None,
+            "Ltelay of the Crisis — Simon de Montfort — Parliament of 1258 "
+            "Provisions of Oxford — Political troubles — Award of St. Lewis — "
+            "Battle of Lewes — Baronial government — Battle of Evesham —Closing "
+            "years . Page",
+            "189",
+        ),
+        _entry(1, "CHAPTER X.", "EDWARD I.", None),
+        _entry(
+            2,
+            None,
+            "Position and character of Edward — The Crusade — The accession — "
+            "The conquest of Wales — Edward's legal reforms — Financial system "
+            "— Growth of Parliament",
+            "212",
+        ),
+        _entry(1, "CHAPTER XI.", "THE CONFIRMATION OF THE CHARTERS.", None),
+        _entry(
+            2,
+            None,
+            "Punishment of the Judges — Banishment of the Jews — Scottish "
+            "succession — The French quarrel — The Ecclesiastical quarrel — The "
+            "Constitutional crisis — The Confirmation of the Charters — "
+            "Parliament of Lincoln — Its sequel — War of Scottish Independence "
+            "— Edward's death",
+            "238",
+        ),
+        _entry(1, "CHAPTER XII.", "EDWARD II.", None),
+        _entry(
+            2,
+            None,
+            "Character of Edward II. — Piers Gaveston — The Ordinances — Thomas "
+            "of Lancaster — The Despensers — The King's ruin anil death.",
+            "263",
+        ),
+        _entry(1, None, "Index", "291", "INDEX."),
     )
-    assert tuple(entry[4] for entry in entries) == (
-        *(None, "189", None, "212", None, "238", None, "263"),
-        "291",
-    )
-    assert tuple(entry[5] for entry in entries) == (*(None,) * 8, "INDEX.")
 
 
 def test_domesday_headings_contents_essay_sections_and_their_topics(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    contents = _contents_of(excerpt_books, "domesday_headings_quotes", 0)
-    assert tuple(entry[1:3] + entry[4:] for entry in contents[:9]) == (
-        (1, None, None, None),
-        (1, None, None, None),
-        (1, None, "v", None),
-        (1, None, "vii", None),
-        (1, None, "xiv", None),
-        (1, "ESSAY I.", None, "DOMESDAY BOOK."),
-        (2, None, None, None),
-        (2, "§ 1.", "pp. 9 — 26.", "§ 1. Plan of the Survey."),
-        (3, None, None, None),
+    assert _contents_of(excerpt_books, "domesday_headings_quotes", 0) == (
+        ("heading", 1, None, "CONTENTS,", None, None),
+        _entry(1, None, "PAGE", None),
+        _entry(1, None, "PREFACE *.", "v"),
+        _entry(1, None, "TABLE OF CONTEXTS", "vii"),
+        _entry(1, None, "LIST OF ABBREVIATIONS", "xiv"),
+        _entry(1, "ESSAY I.", "DOMESDAY BOOK.", None, "DOMESDAY BOOK."),
+        _entry(
+            2,
+            None,
+            "Domesday Book and its satellites, 1. Domesday and legal history, 2. "
+            "Domesday a geld book,. 3. The danegeld, 3. The inquest and the geld "
+            "system, 5. Importance of the geld, 7. Unstable terminology of the "
+            "record, 8. The legal ideas of century xi. 9.",
+            None,
+        ),
+        _entry(
+            2, "§ 1.", "Plan of the Survey,", "pp. 9 — 26.", "§ 1. Plan of the Survey."
+        ),
+        _entry(
+            3,
+            None,
+            "The geographical basis, 9. The vill as the unit, 10. Modern and "
+            "ancient vills, 12. Omission of vills, 13. Fission of vills, 14. The "
+            "nucleated village and the vill of scattered steads, 15. Illustration "
+            "by maps, 16. Size of the vill, 17. Population of the vill, 19. "
+            "Contrasts between east and west, 20. Small vills, 20. Importance of "
+            "the east, 21. Manorial and non-manorial vills, 22. Distribution of "
+            "free men and serfs, 23. The classification of men, 23. The classes "
+            "of men and the geld system, 24. Our course, 25.",
+            None,
+        ),
+        _entry(2, "§ 2.", "The Serfs,", "pp. 26—36."),
+        _entry(
+            3,
+            None,
+            "The servus of Domesday, 26. Legal position of the serf, 27. Degrees "
+            "of serfdom, 27. Predial element in serfdom, 28. The serf and "
+            "criminal law, 29. Serf and villein, 30. The serf of the Leges, 30. "
+            "Return to the servus of Domesday, 33. Disappearance of servi, 35.",
+            None,
+        ),
+        _entry(2, "§ 3.", "The Villeins,", "pp. 36—66."),
+        _entry(
+            3,
+            None,
+            "The boors or coliberts, 36. The continental colibert, 37. The "
+            "English boor, 37. Villani, bordarii, cotarii, 38. The villein's "
+            "tenement, 40. Villeins and cottiers, 41. Freedom and unfreedom of "
+            "the villani, 41. Meaning of freedom, 42. The villein as free, 43. "
+            "The villein as",
+            None,
+        ),
     )
-    assert contents[8][3].startswith("The geographical basis, 9.")
 
 
 def test_gierke_front_contents_page_numbers_taken_and_misread_ones_left(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    # Excerpt page 5 is the book's page 10.
-    entries = tuple(
-        entry
-        for entry in _contents_of(excerpt_books, "gierke_front_flow", 5)
-        if entry[0] == "contents_entry"
+    # Excerpt page 5 is the book's page 10: the misread page numbers stay in
+    # their titles with their dots, and no entry is linked.
+    assert _contents_of(excerpt_books, "gierke_front_flow", 5) == (
+        ("heading", 1, None, "CONTENTS.", None, None),
+        _entry(1, None, "PA'.R", None),
+        _entry(1, None, "TRANSLATOR'S INTRODUCTION", "vii"),
+        _entry(1, None, "ANALYTICAL SUMMARY", "xlvii"),
+        _entry(1, None, "SUBJECT MATTER OF THE NOTES . .... Ivi", None),
+        _entry(1, None, "LIST OF AUTHORITIES ... .... Ixiii", None),
+        _entry(1, None, "INDEX TO LIST OF AUTHORITIES Ixxviii", None),
+        _entry(1, None, "POLITICAL THEORIES OF THE MIDDLE AGE", "i"),
+        _entry(1, None, "NOTES . . • lor", None),
     )
-    assert len(entries) == 8
-    assert tuple(entry[4] for entry in entries) == (
-        *(None, "vii", "xlvii", None, None, None, "i", None),
-    )
-    assert tuple(entry[3].split(" ")[-1] for entry in entries if entry[4] is None) == (
-        "PA'.R",
-        "Ivi",
-        "Ixiii",
-        "Ixxviii",
-        "lor",
-    )
-    assert all(entry[5] is None for entry in entries)
 
 
 def test_contents_entry_is_not_searched_for_note_references() -> None:

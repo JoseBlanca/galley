@@ -535,7 +535,11 @@ def test_domesday_lists_enumerations_of_page_141_stay_blocks_of_their_own(
 ) -> None:
     blocks = read_blocks(excerpt_books["domesday_lists"].blocks_json)
     expected = _expected("domesday_lists_page1.json")["expected"]
-    assert not any(block.kind is BlockKind.LIST_ITEM for block in blocks.blocks[:20])
+    assert not any(
+        block.kind is BlockKind.LIST_ITEM
+        for block in blocks.blocks
+        if block.origin[0].page_index == 1
+    )
     starting = tuple(
         (block.kind.value, " ".join(block_text(block).split(" ")[:3]))
         for block in blocks.blocks
@@ -544,6 +548,15 @@ def test_domesday_lists_enumerations_of_page_141_stay_blocks_of_their_own(
     assert starting == tuple(
         (expected["blocks_kind"], start) for start in expected["blocks_starting"]
     )
+
+
+def test_domesday_lists_enumeration_without_its_first_value_is_no_list(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Page 2 prints "(iv)" to "(viii)", whose "(i)" is on the page before.
+    blocks = read_blocks(excerpt_books["domesday_lists"].blocks_json)
+    expected = _expected("domesday_lists_page2.json")["expected"]
+    assert _lists_on(blocks, 2) == expected["list_items"]
 
 
 def test_kadesh_numbered_paragraphs_stay_paragraphs(
