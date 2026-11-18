@@ -107,30 +107,79 @@ def is_lone_label(line: PlacedLine) -> bool:
 _LONE_LABEL_MAX_WORDS = 2
 
 
-def page_number_length(texts: Sequence[str]) -> int:
-    """How many of the last words of `texts` are a page number (spec
-    section 30, "Terms"): a page-number form, a range of two in one word
-    or in three, with "pp." or "p." before it; 0 when the last word is
-    none."""
+# Spec section 30, "Terms": a range of page numbers in three words.
+_RANGE_WORDS = 3
+# Spec section 30, "Terms": a page number is set apart by a space of 11 to
+# 20 pt before it (Haynes 11.5 to 12.5 pt, Turney 13.4 to 14.9; the other
+# spaces of Turney's entries reach 10.2), or ends within 4 pt of the
+# right side of the longest contents line of its page (Haskins, Stubbs and
+# Gierke within 1.2 pt, Domesday 3.7). Measured on 18 November 2026.
+_APART_MIN_PT = 11.0
+_APART_MAX_PT = 20.0
+_RIGHT_EDGE_PT = 4.0
+
+
+def _number_form_length(texts: Sequence[str]) -> tuple[int, bool]:
+    """How many of the last words of `texts` have a page number's form
+    (spec section 30, "Terms"): a page-number form, a range of two in one
+    word or in three, with "pp." or "p." before it; 0 when the last word
+    is none; and whether it is a range or has "pp." or "p." before it."""
     if not texts:
-        return 0
+        return 0, False
     if (
         len(texts) >= _RANGE_WORDS
         and texts[-2] in _RANGE_DASHES
         and is_page_number_form(texts[-3])
         and is_page_number_form(texts[-1])
     ):
-        length = _RANGE_WORDS
-    elif is_page_number_form(texts[-1]) or _RANGE_WORD.fullmatch(texts[-1]):
-        length = 1
+        length, ranged = _RANGE_WORDS, True
+    elif _RANGE_WORD.fullmatch(texts[-1]):
+        length, ranged = 1, True
+    elif is_page_number_form(texts[-1]):
+        length, ranged = 1, False
     else:
-        return 0
+        return 0, False
     if len(texts) > length and texts[-length - 1] in _PAGES_WORDS:
-        length += 1
-    return length
+        return length + 1, True
+    return length, ranged
 
 
-_RANGE_WORDS = 3
+def page_number_length(words: Sequence[Word], right_edge: float) -> int:
+    """How many of the last words of `words`, an entry's or a line's, are
+    its page number (spec section 30, "Terms"): words of a page number's
+    form that are a range or have "pp." or "p." before them, or that are
+    set apart, by leader dots before them, by a space of 11 to 20 pt, or
+    by ending within 4 pt of `right_edge`, the right side of the longest
+    contents line of their page, in points; 0 otherwise."""
+    texts = tuple(word.text for word in words)
+    length, ranged = _number_form_length(texts)
+    if not length:
+        return 0
+    first, last = words[-length], words[-1]
+    before = words[-length - 1] if len(words) > length else None
+    apart = (
+        ranged
+        or right_edge - last.box.x1 <= _RIGHT_EDGE_PT
+        or (
+            before is not None
+            and (
+                _is_leader_dots(before.text)
+                or _APART_MIN_PT <= first.box.x0 - before.box.x1 <= _APART_MAX_PT
+            )
+        )
+    )
+    return length if apart else 0
+
+
+def right_edges(lines: Sequence[PlacedLine]) -> frozendict[int, float]:
+    """The right side of the longest of `lines` on each page, by page
+    index, in points."""
+    edges: dict[int, float] = {}
+    for line in lines:
+        edges[line.page_index] = max(
+            edges.get(line.page_index, line.line.box.x1), line.line.box.x1
+        )
+    return frozendict(edges)
 
 
 def _is_leader_dots(text: str) -> bool:
@@ -166,7 +215,12 @@ def contents_title(lines: Sequence[PlacedLine]) -> ContentsTitle:
     if first is None:
         return ContentsTitle(tuple(range(len(lines))), None)
     line = lines[first]
-    title = None if page_number_length(_texts(line)) or is_lone_label(line) else first
+    edge = right_edges(lines)[line.page_index]
+    title = (
+        None
+        if page_number_length(line.line.words, edge) or is_lone_label(line)
+        else first
+    )
     return ContentsTitle(tuple(range(first)), title)
 
 
@@ -232,7 +286,9 @@ class _Raw:
     summary: bool
 
 
-def _raw_entries(lines: Sequence[PlacedLine]) -> tuple[_Raw, ...]:
+def _raw_entries(
+    lines: Sequence[PlacedLine], edges: frozendict[int, float]
+) -> tuple[_Raw, ...]:
     """The run's lines cut into entries (spec section 30, rules 2 to 5),
     each lone label joined to the entry after it; a lone label at the end
     of the run is an entry of its own with no other line."""
@@ -266,7 +322,7 @@ def _raw_entries(lines: Sequence[PlacedLine]) -> tuple[_Raw, ...]:
             after = piece[position + 1] if position + 1 < len(piece) else None
             if (
                 after is None
-                or page_number_length(_texts(line)) > 0
+                or page_number_length(line.line.words, edges[line.page_index]) > 0
                 or (
                     after.line.box.x0 - current[0].line.box.x0 < _RUN_ON_MIN_PT
                     and line_has_letter_or_digit(after.line)
@@ -322,7 +378,7 @@ def _topics(raw: _Raw, title: Sequence[str]) -> bool:
 
 
 def _parts(
-    raw: _Raw,
+    raw: _Raw, edges: frozendict[int, float]
 ) -> tuple[str | None, tuple[_Placed, ...], str | None, tuple[Removal, ...]]:
     """An entry's label, title words, page number and leader-dot removals
     (spec section 30, rules 5 to 7)."""
@@ -335,7 +391,14 @@ def _parts(
         label = _joined(raw.label_lines) if raw.label_lines else None
         return label, placed, None, ()
     texts = tuple(item.word.text for item in placed)
-    number_length = page_number_length(texts)
+    number_length = (
+        page_number_length(
+            tuple(item.word for item in placed),
+            edges[raw.lines[placed[-1].line].page_index],
+        )
+        if placed
+        else 0
+    )
     page_number = None
     dots: tuple[_Placed, ...] = ()
     words_before = len(placed) - number_length
@@ -377,8 +440,9 @@ def contents_entries(lines: Sequence[PlacedLine]) -> tuple[ContentsEntry, ...]:
     # label word.
     nearest: int | None = None
     chapters_seen = False
-    for raw in _raw_entries(lines):
-        label, placed, page_number, removals = _parts(raw)
+    edges = right_edges(lines)
+    for raw in _raw_entries(lines, edges):
+        label, placed, page_number, removals = _parts(raw, edges)
         title_texts = tuple(item.word.text for item in placed)
         chapter = label is not None and starts_with_chapter_label_word(
             tuple(label.split(" ")[_marks_before(label) :])
