@@ -247,26 +247,26 @@ shorter.
   each page read from its 300-dpi render by a subagent. Spec: structure
   §26, "Excerpt tests", and the paragraph after its table; layout §8,
   the paragraph naming them. Plan's branch. Deliverable 1.
-- [ ] 1.2 layout §3, step 2 (a hanging number stays in its line), step
+- [x] 1.2 layout §3, step 2 (a hanging number stays in its line), step
   3 (the head row by its words' median top, with the rows of a skewed
   head, passing rows of marks) and step 4 (the band's gapless start),
   with the unit tests; the changed reference pages. Spec: layout §3,
   steps 2 to 4, and §8, "Unit tests". Stream `edges`. Deliverable 2.
-- [ ] 1.3 The head line with the short regions beside it; a chapter
+- [x] 1.3 The head line with the short regions beside it; a chapter
   label never a running head; a page number at the foot by its value
   and the local offset (`BookSurvey.head_numbers`); with the unit
   tests. Spec: structure §2, "What each region is"; §3, "A short region
   beside the head" and "A chapter label is never a running head"; §4,
   "A page number by its value"; §8; §26, "Unit tests", its first three
   bullets. Needs 1.2. Stream `edges`. Deliverable 3.
-- [ ] 1.4 The flush-left and tall branches of the heading rule, with
+- [x] 1.4 The flush-left and tall branches of the heading rule, with
   the unit tests; Stubbs' pages 322 to 337 added to its `exclude_pages`
   in `WHOLE_BOOK_CONFIGS` and `evaluation/books.toml` (structure §27,
   point 4, settled). The levels' sentence on endnote sections is WP 3's.
   Spec: structure §1, "Line height"; §14, "The rule" and "The
   flush-left and tall branches"; §26, the headings bullet. Needs 1.3.
   Stream `edges`. Deliverable 3.
-- [ ] 1.5 The excerpt tests of this work package; `tests/test_owner_books.py`
+- [x] 1.5 The excerpt tests of this work package; `tests/test_owner_books.py`
   with its fixture (each book found in `samples/` by its pattern, run
   to `blocks.json` once per session with the configs of structure §21,
   `ocr = "trust"`, and a placeholder title and author, so that no title
@@ -274,7 +274,7 @@ shorter.
   whole-book tests of deliverable 6, with any literal that changes
   named. Spec: structure §26, "Excerpt tests" and "Whole-book tests".
   Needs 1.4. Stream `edges`. Deliverables 4 to 6.
-- [ ] 1.6 Domesday's 4 text lines taken as tall headings (pages 136
+- [x] 1.6 Domesday's 4 text lines taken as tall headings (pages 136
   and 419): read on the renders why the tall branch takes them, and
   look for a condition that keeps them out and changes nothing else on
   the eight books (measured on all eight). If one is found, it goes
