@@ -1,0 +1,52 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"); the frames and ink extents in points were measured on that render (the outermost rule of a map's frame, 300 pixels to 72 pt). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/specs/figures.md, sections 3 and 5 and the table of section 10. Compared with galley's output on 18 November 2026 by the excerpt tests of tests/test_figures.py (task 3.4 of the lists-figures plan); where the rules of docs/specs/figures.md as written differ from the first reading, \"known\" says why.",
+  "excerpt": "kadesh_29-38",
+  "page": 9,
+  "book_page_index": 38,
+  "checks": "a map set beside the text, its caption on the row of the text beside it",
+  "printed": {
+    "running_head": {
+      "words": "James Henry Breasted",
+      "page_number": "27",
+      "number_side": "right"
+    },
+    "figures": [
+      {
+        "what": "map of the third positions, framed, two scale bars under the frame",
+        "frame_pt": [
+          59.5,
+          289.9,
+          181.9,
+          551.3
+        ],
+        "scale_bars_bottom_pt": 577.0,
+        "caption": "MAP VI. Third Positions"
+      }
+    ],
+    "hieroglyphs": "quotations \"10.\", \"11.\" (two rows), \"12.\" and \"13.\" (two rows), each with its translation",
+    "caption_row": "the caption lies on the row of \"Shabtuna and the position of the Asiatics (No. 7):\", the last line of the text beside the map",
+    "footnotes": [
+      "93 This coming is here stated in connection with Ramses's arrival at Kadesh",
+      "94 This is repeated by the Poem (l. 20)"
+    ],
+    "page_number_at_foot": "105"
+  },
+  "expected": {
+    "figures": [
+      {
+        "kind": "in_page",
+        "box_within_6_pt_of": [
+          59.5,
+          289.9,
+          181.9,
+          551.3
+        ],
+        "caption": "MAP vi. Third Positions",
+        "figure_text": []
+      }
+    ],
+    "figure_after_the_paragraph_holding": "THIBD POSITIONS (Map VI). — Ramses had evidently",
+    "stays_in_its_paragraph": "Shabtuna and the position of the Asiatics (No. 7):"
+  },
+  "known": "Layout makes one line of \"MAP vi. Third Positions\" and \"Shabtuna and the position of the Asiatics (No. 7) :\" (figures spec section 5, rule 2). The whole book makes paragraphs of \"A/VWW AAAAAA\" and \"His majesty arrived at the city…\"; the excerpt makes them quotes, its survey measuring otherwise. The spaced colon after \"(No. 7)\" is attached to the word before it (structure spec section 23)."
+}

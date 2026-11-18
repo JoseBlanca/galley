@@ -46,7 +46,8 @@ How the spec is read here, where it leaves a choice:
   reference block is the one that holds most of those tokens, the first
   seen on a tie.
 - `kinds_right` counts, per part, the reference blocks held by a galley
-  block of the same kind; a table is never right.
+  block of the same kind, and the paragraphs and quotes held by a
+  contents entry; a table is never right.
 - The headings of the body range are those of the body stream. A galley
   heading is right when it holds a reference heading, in the range or
   not.
@@ -187,6 +188,8 @@ class GalleyKind(StrEnum):
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"
+    LIST_ITEM = "list_item"
+    CONTENTS_ENTRY = "contents_entry"
     NONE = "none"
 
 
@@ -626,19 +629,29 @@ def _holder(
     return holders.most_common(1)[0][0] if holders else None
 
 
+# The reference kinds a galley contents entry is right on: Gutenberg sets a
+# printed contents' entries as paragraphs or a block quote, and galley makes
+# contents entries only on the config's contents pages (spec section 6,
+# "Block kinds").
+_CONTENTS_ENTRY_RIGHT_ON = frozenset((ReferenceKind.PARAGRAPH, ReferenceKind.QUOTE))
+
+
+def _is_right(count: KindCount) -> bool:
+    if count.galley is GalleyKind.CONTENTS_ENTRY:
+        return count.reference in _CONTENTS_ENTRY_RIGHT_ON
+    return count.reference.value == count.galley.value
+
+
 def kinds_right(
     kinds: frozendict[Part, tuple[KindCount, ...]],
 ) -> frozendict[Part, int]:
     """For every part, the reference blocks held by a galley block of the
     same kind (spec section 6, "Block kinds"): a quote by a quote, verse by
-    verse, a chapter summary by a chapter summary; a table never."""
+    verse, a chapter summary by a chapter summary; a paragraph or a quote
+    also by a contents entry; a table never."""
     return frozendict(
         {
-            part: sum(
-                count.count
-                for count in counts
-                if count.reference.value == count.galley.value
-            )
+            part: sum(count.count for count in counts if _is_right(count))
             for part, counts in kinds.items()
         }
     )

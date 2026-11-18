@@ -9,10 +9,14 @@ common git directory. `scripts/fetch_samples.py` downloads them.
 `excerpt_books` runs `galley2epub run` once per session on a book folder
 for each excerpt, so that the excerpt tests of every stage read the files of
 one run; `whole_book_run` does the same for the whole books, up to
-structure, the first time a test asks for a book.
+structure, the first time a test asks for a book, and `owner_book_run` for
+the owner's two books, which tests of several modules count on. `lists_book`
+and `lists_book_epub` hold the lists book that the markdown tests of lists
+read and whose EPUB the epub tests validate.
 """
 
 import functools
+import hashlib
 import json
 import os
 import shutil
@@ -20,12 +24,31 @@ import subprocess
 import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from galley import epub, markdown
 from galley.book_folder import BookFolder
 from galley.cli import main
+from galley.config import BookConfig, Language
+from galley.model import (
+    Block,
+    BlockKind,
+    BlocksFile,
+    Box,
+    Emphasis,
+    Origin,
+    PageInfo,
+    PageKind,
+    PagesFile,
+    Span,
+    TextSource,
+    read_blocks,
+    write_blocks,
+    write_pages,
+)
 
 EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 
@@ -151,6 +174,20 @@ EXCERPT_CONFIGS = frozendict(
             'language = "en"\n'
         ),
         "domesday_rereads": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+        ),
+        # The excerpts of the plan lists-figures: Kadesh's reference pages
+        # of docs/specs/figures.md section 10, with the whole book's config,
+        # which excludes none of its pages and names none a plate; and
+        # Domesday's tables of structure spec section 32.
+        "kadesh_29-38": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["J. H. Breasted"]\n'
+            'language = "en"\n'
+        ),
+        "domesday_lists": (
             'title = "Domesday Book and Beyond"\n'
             'authors = ["Frederic William Maitland"]\n'
             'language = "en"\n'
@@ -389,6 +426,78 @@ def whole_book_run(
     return run
 
 
+# The owner's two books, which are copyrighted: their whole_book tests
+# count what galley gives and never quote their text.
+# Structure spec section 21, "Their configs", as the survey of 17 November
+# 2026 ran them; the pattern finds each PDF in the samples folder.
+_OWNER_BOOK_PATTERNS = {"turney": "*Turney*.pdf", "haynes": "*Haynes*.pdf"}
+_OWNER_BOOK_CONFIGS = {
+    "turney": (
+        "exclude_pages = [2, 3, 5, 9, 165, 168, 171, 306, 307, 308, 309]\n"
+        "contents_pages = [10]\n"
+    ),
+    "haynes": (
+        "exclude_pages = [0, 1, 3, 7, 11, 13, 329, 389, 431, 432, 434]\n"
+        "contents_pages = [8]\n"
+    ),
+}
+
+
+@pytest.fixture(scope="session")
+def owner_book_toml(samples_dir: Path) -> Callable[[str], str]:
+    """A function that gives the `book.toml` of one of the owner's books,
+    by the name "turney" or "haynes": its PDF in the samples folder, its
+    config of _OWNER_BOOK_CONFIGS, a made-up title and author, and `ocr =
+    "trust"`. Skips the test when the book's PDF is not in the samples
+    folder. Every whole_book test of the owner's books takes its config
+    from here."""
+
+    def toml(book: str) -> str:
+        pdfs = sorted(samples_dir.glob(_OWNER_BOOK_PATTERNS[book]))
+        if not pdfs:
+            pytest.skip(
+                f"no PDF matching {_OWNER_BOOK_PATTERNS[book]} in {samples_dir}"
+            )
+        return (
+            f"pdf = {json.dumps(str(pdfs[0]))}\n"
+            'title = "An owner\'s book"\n'
+            'authors = ["An Author"]\n'
+            'language = "en"\n'
+            'ocr = "trust"\n'
+            f"{_OWNER_BOOK_CONFIGS[book]}"
+        )
+
+    return toml
+
+
+@pytest.fixture(scope="session")
+def owner_book_run(
+    owner_book_toml: Callable[[str], str], tmp_path_factory: pytest.TempPathFactory
+) -> Callable[[str], BlocksFile]:
+    """A function that gives blocks.json of one of the owner's books, by
+    the name "turney" or "haynes", run from its PDF to structure the first
+    time a test asks for it and kept for the session. Skips the test when
+    the book's PDF is not in the samples folder. A book's run holds its
+    lock, so that two threads asking for it share one run."""
+    roots = {book: tmp_path_factory.mktemp(book) for book in _OWNER_BOOK_PATTERNS}
+    locks = {book: threading.Lock() for book in _OWNER_BOOK_PATTERNS}
+
+    def run(book: str) -> BlocksFile:
+        toml = owner_book_toml(book)
+        with locks[book]:
+            return run_once(book, toml)
+
+    @functools.cache
+    def run_once(book: str, toml: str) -> BlocksFile:
+        folder = BookFolder(roots[book])
+        folder.book_toml.write_text(toml, encoding="utf-8")
+        for stage in ("analyze", "extract", "layout", "structure"):
+            main([stage, str(folder.root)])
+        return read_blocks(folder.blocks_json)
+
+    return run
+
+
 @pytest.fixture(scope="session")
 def check_epubs() -> Callable[..., None]:
     """A function that runs epubcheck on each EPUB it is given, all at once,
@@ -466,3 +575,206 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     for program in ("tesseract", "pandoc", "epubcheck"):
         if item.get_closest_marker(program) is not None:
             _require_program(program)
+
+
+# The lists book of the markdown tests (structure spec sections 31 and 32):
+# a printed contents with depths 1 and 2, a numbered list in its first
+# chapter and a dash list, in the geometry of the owner's book, in its
+# second. test_markdown_lists.py reads its parts and its EPUB, and
+# test_epub.py validates the EPUB with epubcheck in one call with its own:
+# a call of its own started Java again, about 1.5 s of the default run (18
+# November 2026).
+_LISTS_PDF_BYTES = b"%PDF-1.4 a stand-in: markdown reads only its hash"
+
+LISTS_CONFIG = BookConfig(
+    pdf=Path("/books/lists.pdf"),
+    title="A Book",
+    authors=("A. Author",),
+    language=Language.EN,
+)
+
+
+def _lists_block(
+    block_id: str,
+    kind: BlockKind,
+    text: str,
+    *,
+    level: int | None = None,
+    label: str | None = None,
+    page_number: str | None = None,
+    heading_ref: str | None = None,
+) -> Block:
+    return Block(
+        id=block_id,
+        kind=kind,
+        level=level,
+        label=label,
+        page_number=page_number,
+        heading_ref=heading_ref,
+        spans=(Span(text, Emphasis.NONE, None),),
+        figure=None,
+        origin=(Origin(int(block_id[3:7]), Box(10.0, 20.0, 300.0, 400.0)),),
+    )
+
+
+def _lists_file(blocks: tuple[Block, ...]) -> BlocksFile:
+    return BlocksFile(
+        source_pdf_sha256=hashlib.sha256(_LISTS_PDF_BYTES).hexdigest(),
+        blocks=blocks,
+        notes=(),
+        removals=(),
+        word_changes=(),
+        page_numbers=(),
+    )
+
+
+def _lists_book_parts() -> frozendict[str, BlocksFile]:
+    dash_list = _lists_file(
+        (
+            _lists_block(
+                "b-p0016-001", BlockKind.PARAGRAPH, "The figure comes in six kinds:"
+            ),
+            *(
+                _lists_block(
+                    f"b-p0016-{number:03d}",
+                    BlockKind.LIST_ITEM,
+                    f"The kind {number}, as it stands.",
+                    label="—",
+                )
+                for number in range(2, 8)
+            ),
+            _lists_block(
+                "b-p0017-001", BlockKind.PARAGRAPH, "After the list, the text goes on."
+            ),
+        )
+    )
+    # A numbered list "1." to "5." whose third and fourth items have one line.
+    numbered_list = _lists_file(
+        (
+            _lists_block("b-p0226-001", BlockKind.PARAGRAPH, "The steps are these:"),
+            *(
+                _lists_block(
+                    f"b-p0226-{number + 1:03d}",
+                    BlockKind.LIST_ITEM,
+                    f"Step {number} is done.",
+                    label=f"{number}.",
+                )
+                for number in range(1, 6)
+            ),
+        )
+    )
+    chapter_one = _lists_block(
+        "b-p0036-001", BlockKind.HEADING, "The Old Masters", level=1
+    )
+    chapter_two = _lists_block(
+        "b-p0050-001", BlockKind.HEADING, "New Scientists", level=1
+    )
+    contents_entries = (
+        _lists_block("b-p0008-001", BlockKind.HEADING, "CONTENTS", level=1),
+        _lists_block(
+            "b-p0008-002",
+            BlockKind.CONTENTS_ENTRY,
+            "The Old Masters",
+            level=1,
+            label="1.",
+            page_number="9",
+            heading_ref="b-p0036-001",
+        ),
+        _lists_block(
+            "b-p0008-003",
+            BlockKind.CONTENTS_ENTRY,
+            "Their workshops",
+            level=2,
+            page_number="12",
+        ),
+        _lists_block(
+            "b-p0008-004",
+            BlockKind.CONTENTS_ENTRY,
+            "New Scientists",
+            level=1,
+            label="2.",
+            page_number="23",
+            heading_ref="b-p0050-001",
+        ),
+    )
+    contents = _lists_file(
+        (
+            *contents_entries,
+            chapter_one,
+            _lists_block(
+                "b-p0036-002", BlockKind.PARAGRAPH, "The masters worked alone."
+            ),
+            chapter_two,
+            _lists_block(
+                "b-p0050-002", BlockKind.PARAGRAPH, "The scientists worked together."
+            ),
+        )
+    )
+    epub_book = _lists_file(
+        (
+            *contents_entries,
+            chapter_one,
+            *numbered_list.blocks,
+            chapter_two,
+            *dash_list.blocks,
+        )
+    )
+    return frozendict(
+        {
+            "dash_list": dash_list,
+            "numbered_list": numbered_list,
+            "contents": contents,
+            "epub_book": epub_book,
+        }
+    )
+
+
+@pytest.fixture(scope="session")
+def lists_book() -> frozendict[str, BlocksFile]:
+    """The parts of the lists book, by name: "dash_list", "numbered_list",
+    "contents" (the printed contents and the two chapters it links to, a
+    paragraph each), and "epub_book", the contents with the numbered list
+    in the first chapter and the dash list in the second."""
+    return _lists_book_parts()
+
+
+@pytest.fixture(scope="session")
+def lists_book_epub(
+    tmp_path_factory: pytest.TempPathFactory, lists_book: frozendict[str, BlocksFile]
+) -> BookFolder:
+    """A book folder holding the lists book's "epub_book", with book.pdf,
+    pages.json of 300 text pages, and the book.md and book.epub markdown
+    and epub wrote from it. Built once per session; a test reads it and
+    never writes in it. Skips every test that uses it when Pandoc is
+    missing."""
+    _require_program("pandoc")
+    root = tmp_path_factory.mktemp("lists_book")
+    pdf = root / "book.pdf"
+    pdf.write_bytes(_LISTS_PDF_BYTES)
+    folder = BookFolder(root)
+    write_pages(
+        folder.pages_json,
+        PagesFile(
+            source_pdf_sha256=hashlib.sha256(_LISTS_PDF_BYTES).hexdigest(),
+            pages=tuple(
+                PageInfo(
+                    index=index,
+                    width_pt=432.0,
+                    height_pt=648.0,
+                    kind=PageKind.TEXT,
+                    text_source=TextSource.TEXT_LAYER,
+                    text_layer_score=None,
+                    exclude_regions=(),
+                    figure_boxes=(),
+                    blank_checked_by_ocr=False,
+                )
+                for index in range(300)
+            ),
+            ocr_audit=None,
+        ),
+    )
+    write_blocks(folder.blocks_json, lists_book["epub_book"])
+    config = replace(LISTS_CONFIG, pdf=pdf)
+    markdown.run(folder, config)
+    epub.run(folder, config)
+    return folder

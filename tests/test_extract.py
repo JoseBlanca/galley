@@ -23,6 +23,7 @@ from galley.extract import page_words, plate_image
 from galley.model import (
     Box,
     Figure,
+    FigureKind,
     PageInfo,
     PageKind,
     PagesFile,
@@ -60,6 +61,7 @@ KADESH_PLATE_FIGURE = frozendict(
             box=Box(0.0, 0.0, 508.32, 728.16),
             image=f"images/plate-{index:04d}.png",
             dpi=300,
+            kind=FigureKind.PLATE,
         )
         for index in (8, 9)
     }
@@ -79,6 +81,7 @@ def page(
         text_source=text_source,
         text_layer_score=None,
         exclude_regions=exclude_regions,
+        figure_boxes=(),
         blank_checked_by_ocr=False,
     )
 
@@ -207,7 +210,10 @@ def test_blank_page_has_no_words_and_no_removals() -> None:
 # A plate page (plates spec section 3)
 
 PLATE_FIGURE = Figure(
-    box=Box(0.0, 0.0, 400.0, 600.0), image="images/plate-0004.png", dpi=300
+    box=Box(0.0, 0.0, 400.0, 600.0),
+    image="images/plate-0004.png",
+    dpi=300,
+    kind=FigureKind.PLATE,
 )
 
 
@@ -445,15 +451,20 @@ def test_haskins_front_page_12_gives_its_words_exactly(
 # The plates of the excerpts (plates spec section 6), by page index in the
 # excerpt: Kadesh 17 (16, the scan of a cover, is excluded); Kadesh 64, 65
 # (the back of plate 64) and 68;
-# Domesday's maps 39 and 40. Each has its image, and nothing else is in
-# images/ but the cover.
+# Domesday's maps 39 and 40; Kadesh 34 and 35, the back of plate 34.
+# Each has its image, and nothing else is in
+# images/ but the cover and the in-page figures' images.
 EXCERPT_PLATES = frozendict(
     {
         "kadesh_8-17": (9,),
         "kadesh_59-68": (5, 6, 9),
         "domesday_headings_quotes": (3, 4),
+        "kadesh_29-38": (5, 6),
     }
 )
+# The text pages with one in-page figure (figures spec section 10): Kadesh
+# 29, 33, 36, 37 and 38. tests/test_figures.py checks them.
+EXCERPT_IN_PAGE_FIGURES = frozendict({"kadesh_29-38": (0, 4, 7, 8, 9)})
 
 
 def test_each_excerpt_plate_has_its_whole_page_figure_and_its_image_alone(
@@ -461,24 +472,30 @@ def test_each_excerpt_plate_has_its_whole_page_figure_and_its_image_alone(
 ) -> None:
     for name, folder in excerpt_books.items():
         plates = EXCERPT_PLATES.get(name, ())
+        in_page = EXCERPT_IN_PAGE_FIGURES.get(name, ())
         pages = read_pages(folder.pages_json).pages
         words = read_words(folder.words_json)
         assert tuple(
             page_words.index for page_words in words.pages if page_words.figures
-        ) == (plates), name
+        ) == tuple(sorted((*plates, *in_page))), name
         for index in plates:
             assert words.pages[index].figures == (
                 Figure(
                     box=Box(0.0, 0.0, pages[index].width_pt, pages[index].height_pt),
                     image=f"images/plate-{index:04d}.png",
                     dpi=300,
+                    kind=FigureKind.PLATE,
                 ),
             ), name
             with Image.open(folder.root / words.pages[index].figures[0].image) as plate:
                 assert (plate.format, plate.mode) == ("PNG", "L"), name
         cover = ("cover.png",) if name == KADESH else ()
         assert sorted(path.name for path in folder.images_dir.iterdir()) == sorted(
-            (*cover, *(f"plate-{index:04d}.png" for index in plates))
+            (
+                *cover,
+                *(f"plate-{index:04d}.png" for index in plates),
+                *(f"figure-{index:04d}-1.png" for index in in_page),
+            )
         ), name
 
 
@@ -718,6 +735,7 @@ def test_kadesh_plates_8_and_9_get_their_images_and_figures_and_8_keeps_its_word
                 box=Box(0.0, 0.0, 508.32, 728.16),
                 image="images/plate-0008.png",
                 dpi=300,
+                kind=FigureKind.PLATE,
             ),
         ),
     )
@@ -736,6 +754,7 @@ def test_kadesh_plates_8_and_9_get_their_images_and_figures_and_8_keeps_its_word
                 box=Box(0.0, 0.0, 508.32, 728.16),
                 image="images/plate-0009.png",
                 dpi=300,
+                kind=FigureKind.PLATE,
             ),
         ),
     )

@@ -822,7 +822,17 @@ These are scored at blocks and markdown.
   | reference kind | right galley kinds |
   |---|---|
   | every kind but table | the same kind |
+  | paragraph, quote | also `contents_entry` |
   | table | none: galley has no table kind yet |
+
+  The reference has no kind of a printed contents' entry: Gutenberg
+  sets the entries as paragraphs (Stubbs', Mariéjol's), as a block quote
+  (two of Stubbs') or as a table (Haskins', Domesday's), and galley makes
+  a `contents_entry` only on the config's `contents_pages`
+  (`docs/specs/structure.md` §30). Without the second row, the 41 and 15
+  entries galley made of Stubbs' and Mariéjol's contents in the plan
+  lists-figures counted as wrong kinds where the paragraphs they were
+  before had counted right (18 November 2026).
 
   A galley `verse` block is right only on the reference's verse, a
   `quote` only on its prose quotes, a `chapter_summary` only on Stubbs'

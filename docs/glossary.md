@@ -7,7 +7,7 @@ this list lacks is added here.
 
 **block**: a unit of the book's text after structure: a heading, a
 paragraph, a quote, verse, a chapter summary, an epigraph, a figure, a
-margin note or an index entry. Its kind says what the text is, never how it looks. It
+margin note, an index entry, a list item or a contents entry. Its kind says what the text is, never how it looks. It
 has an id,
 `b-p0012-003`, which is its anchor in the EPUB and what an edit names.
 Not a "chunk" or an "element".
@@ -26,6 +26,12 @@ stages write, and the edits.
 
 **caption**: the text printed with a picture to name it ("THE MODERN
 MOUND OF KADESH"). On a plate it is the text of the plate's figure block.
+On a text page, the lines next to an in-page figure that open with a
+**caption label** ("figure 2.", "MAP vi."), and the rows that follow
+them; they too are the text of the figure block, never a paragraph, a
+list item or a contents entry.
+
+**caption label**: see caption.
 
 **chapter label**: the line that gives a chapter's number, "CHAPTER
 III.", "CHAPITRE II", "ESSAY I.", a spelled number, "Chapter One", or a
@@ -37,9 +43,20 @@ from chapter to chapter near the top of the page.
 heading, separated by dashes, as Stubbs prints them ("Terms of Henry's
 accession — His character — …"). A block kind of its own, not a quote.
 
+**contents entry**: one entry of a book's printed table of contents, a
+block kind: the chapter's number as printed, its **label** ("2.",
+"One", "CHAPTER II."), its title, its printed page number, which is
+kept and not shown in the EPUB, and its depth, 1 for a chapter and more
+for what the contents prints under it, a section or its topics. It is
+linked to the heading of the chapter it names when its title matches
+one. Its page number is set apart from the title by space or by
+**leader dots**, the dots that lead the eye from one to the other,
+which structure removes with a record.
+
 **contents pages**: the pages of a book's printed table of contents,
-named in its config (`contents_pages`), on which structure makes no
-heading.
+named in its config (`contents_pages`). structure makes their entries
+contents entries, and no heading of them but the title of the contents
+("CONTENTS").
 
 **cut-in inset**: how far inside the body column's edge the body lines
 beside a cut-in note start or end; Stubbs' is about 60 pt.
@@ -73,7 +90,12 @@ made, once its word changes and edits are applied: nothing lost, nothing
 invented.
 
 **figure**: a picture in the book, cut from the page render into
-`images/`. A **plate** is a page that is mostly a figure.
+`images/`. A **plate** is a page that is mostly a figure. An **in-page
+figure** is one printed on a text page among its lines.
+
+**figure text**: the words the OCR read inside an in-page figure's
+picture: its lettering, its labels and the marks of its shading. The
+picture's image shows them, so structure removes them, with a record.
 
 **footnote band**: the footnotes at the foot of a page, set in smaller
 type below the body, in one column or two. A region found by layout.
@@ -114,10 +136,21 @@ quoted, 234."), is an index entry of its own, of depth 2.
 number; `wordlist.is_known_word` decides. An **unknown word** holds a
 letter or a digit and is not known.
 
+**leader dots**: see contents entry.
+
 **line**: a line of one region of a page, as layout groups the words, left
 to right. Not what pdfplumber calls a line, which runs across columns.
 Once structure has joined hyphens and paragraphs, the book has no lines,
 only blocks.
+
+**list item**: one item of a list that the book prints, a block kind.
+Its **list marker**, a dash, a bullet, a number or a letter ("—",
+"•", "1.", "(a)"), is kept apart from its text, as its label, so that
+the EPUB can show a list. The items of a list are set apart from the
+running text by a hanging indent, each marker line at the left and its
+continuation lines further in; a paragraph that starts with a number
+and is indented as any paragraph is a numbered paragraph, not a list
+item.
 
 **margin note**: a short heading printed in the margin beside a paragraph,
 as Gierke has on most pages. A block kind. An **outer margin note** is
@@ -172,8 +205,9 @@ layout; what each region is, structure decides.
 
 **removal**: text a stage took out of the book on purpose, with its page,
 box and reason: a running head, a page number, a signature mark, a stray
-mark, guide words, a plate's stray words, an excluded page or region,
-a page of the front matter.
+mark, guide words, a plate's stray words, the figure text of an in-page
+figure, the leader dots of a contents entry, an excluded page or
+region, a page of the front matter.
 
 **re-reading**: reading a region of a page again with Tesseract, from a
 300-dpi render, and keeping Tesseract's words only where their reading
@@ -205,8 +239,8 @@ note reference.
 **stage**: one of analyze, extract, layout, structure, correct, markdown,
 epub. A subpackage of `src/galley/`.
 
-**stray mark**: a line with no letter or digit above the running head, a
-speck of the scan that the OCR read as text (";", "^"). Removed by
+**stray mark**: a line with no letter or digit above the running head
+or above the title of a printed contents, a speck of the scan that the OCR read as text (";", "^"). Removed by
 structure, with a record.
 
 **text layer**: the invisible words an OCR program placed over the page
@@ -228,5 +262,6 @@ used by the `whole_book` tests.
 letter, recorded for the fidelity check: a hyphen join, a note marker
 split off the word it was glued to ("Greece,1" into "Greece," and "1"),
 a spaced sign attached, a word glued at a case change split ("theAvre"
-into "the" and "Avre"), or the dash before an epigraph's source
-dropped.
+into "the" and "Avre"), the dash before an epigraph's source dropped,
+or a list item's dash split off its first word ("—The" into "—" and
+"The").

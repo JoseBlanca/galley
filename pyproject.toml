@@ -94,6 +94,9 @@ strict = true
 # A unit test takes milliseconds and an excerpt test about a second; a test
 # that needs more is a whole_book test or a defect.
 timeout = "30"
+# The limit is for a test's own body: the session fixture that runs every
+# excerpt through the pipeline takes about 30 s alone, more under load.
+timeout_func_only = true
 # Every warning is an error, and with it the RuntimeWarning that CPython
 # prints when an extension turns the GIL back on.
 filterwarnings = ["error"]

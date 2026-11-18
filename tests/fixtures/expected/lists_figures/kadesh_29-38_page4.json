@@ -1,0 +1,55 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"); the frames and ink extents in points were measured on that render (the outermost rule of a map's frame, 300 pixels to 72 pt). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/specs/figures.md, sections 3 and 5 and the table of section 10. Compared with galley's output on 18 November 2026 by the excerpt tests of tests/test_figures.py (task 3.4 of the lists-figures plan); where the rules of docs/specs/figures.md as written differ from the first reading, \"known\" says why.",
+  "excerpt": "kadesh_29-38",
+  "page": 4,
+  "book_page_index": 33,
+  "checks": "a map set beside the text, its caption under it",
+  "printed": {
+    "running_head": {
+      "words": "The Battle of Kadesh",
+      "page_number": "24",
+      "number_side": "left"
+    },
+    "figures": [
+      {
+        "what": "map of the first positions, framed, two scale bars (kilometres and miles) under the frame",
+        "frame_pt": [
+          56.4,
+          134.9,
+          290.4,
+          533.8
+        ],
+        "scale_bars_bottom_pt": 565.4,
+        "caption": "MAP IV. First Positions"
+      }
+    ],
+    "text_beside_figure": "on its right, from \"positions of the two armies.\" to \"at the locality south of the town of\"",
+    "starts_mid_paragraph": true,
+    "footnotes": [
+      "85 Robinson thus describes the journey from the Kamû'a",
+      "86 From \"the highland south of Kadesh.\""
+    ],
+    "page_number_at_foot": "102"
+  },
+  "expected": {
+    "figures": [
+      {
+        "kind": "in_page",
+        "box_within_6_pt_of": [
+          56.4,
+          134.9,
+          290.4,
+          533.8
+        ],
+        "caption": "MAP IV. Fint Portions",
+        "figure_text": [
+          "JO",
+          "Km.",
+          "icM"
+        ]
+      }
+    ],
+    "figure_after_the_paragraph_holding": "of forect in the plain around Kmlesh. We are now prepared to take up the successive"
+  },
+  "known": "The figure's box takes in the two scale bars under the frame, whose picture squares touch the frame's (figures spec section 3, step 2), and so the words read on them, \"JO Km.\" and \"icM\", which are figure text. The box's top is 144 pt, 9.1 pt inside the frame's top rule at 134.9: the line of text above ends 2.1 pt over the frame, and its words, grown by 2 pt, touch every square of the frame's top row (figures spec section 1, \"picture square\")."
+}

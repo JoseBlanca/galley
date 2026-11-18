@@ -1,0 +1,18 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"); the frames and ink extents in points were measured on that render (the outermost rule of a map's frame, 300 pixels to 72 pt). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/specs/figures.md, sections 3 and 5 and the table of section 10. Compared with galley's output on 18 November 2026 by the excerpt tests of tests/test_figures.py (task 3.4 of the lists-figures plan); where the rules of docs/specs/figures.md as written differ from the first reading, \"known\" says why.",
+  "excerpt": "kadesh_29-38",
+  "page": 6,
+  "book_page_index": 35,
+  "checks": "the back of the plate, without a text layer: a plate, as analyze takes it",
+  "printed": {
+    "plate": "the back of the fold-out of page index 34, the relief seen through the paper",
+    "figures": []
+  },
+  "expected": {
+    "figures": [
+      {
+        "kind": "plate"
+      }
+    ]
+  }
+}

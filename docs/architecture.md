@@ -23,10 +23,22 @@ the owner's two modern books (`docs/specs/structure.md` §21 to §27):
 it adds the block kind `epigraph` with `Block.source`, `Note.group`,
 and the word change reasons `source_dash`, `punctuation_attached` and
 `case_split`, which take `blocks.json` to version 4; no other file
-changes format.
+changes format. Revised on 18 November 2026 for lists and the printed
+table of contents (`docs/specs/structure.md` §29 to §33): the block
+kinds `list_item` and `contents_entry`, `Block.page_number` and
+`Block.heading_ref`, the change reason `list_marker` and the removal
+reason `leader_dots` take `blocks.json` to version 5, and markdown
+writes lists and links (sections 9 and 13). Revised the same day for
+the figures printed inside text pages (`docs/specs/figures.md`):
+`PageInfo.figure_boxes` takes `pages.json` to version 3, `Figure.kind`
+takes `words.json` to 3 and `lines.json` to 4, and the removal reason
+`figure_text` goes into `blocks.json` version 5 with the lists' changes,
+one version for both.
 
 Decisions marked "owner", with a date from 14 to 17 November 2026,
-were taken by the owner in chat. The others were taken while writing,
+were taken by the owner in chat; those of 18 November 2026 were taken
+for the owner, who asked the work to go on without waiting, and are
+listed in section 17. The others were taken while writing,
 from what the committed excerpts show (section 2), and can be questioned.
 
 ## 1. The scanned books galley reads
@@ -127,7 +139,8 @@ kadesh/
   pages.json           analyze
   words.json           extract
   images/              extract: figures, grayscale PNG at 300 dpi
-                       (plate-<page index, 4 digits>.png), and cover.png
+                       (plate-<page index, 4 digits>.png,
+                       figure-<page index, 4 digits>-<n>.png), and cover.png
   lines.json           layout
   blocks.json          structure
   edits/
@@ -165,7 +178,7 @@ An unknown key or a wrong type is an error.
 | `exclude_regions` | list of `{page, box}`, `[]` | a library stamp, a label |
 | `cover_page` | page index, none | rendered as the EPUB's cover |
 | `plate_pages` | list of page indices, `[]` | pages analyze makes plates whatever its rule finds, for a plate the rule misses (Kadesh's faint relief on page 23); a page in `exclude_pages` is never a plate, so a page in both lists is accepted and excluded: `exclude_pages` wins (`docs/specs/plates.md` §2) |
-| `contents_pages` | list of page indices, `[]` | the pages of the book's printed table of contents: structure makes no heading on them, so that the EPUB's table of contents does not list each chapter twice; their lines stay paragraphs (owner, 15 November 2026). Without it, the contents' lines that pass the heading rule become headings, and the EPUB lists those chapters twice (Domesday's three essays). analyze checks its page indices as it checks those of the other keys |
+| `contents_pages` | list of page indices, `[]` | the pages of the book's printed table of contents: structure makes no heading on them but the title of each run of consecutive contents pages, a level-1 heading (`docs/specs/structure.md` §30, rule 1; settled for the owner on 18 November 2026), so that the EPUB's table of contents does not list each chapter twice (owner, 15 November 2026); their lines are contents entries, linked to the chapters' headings (`docs/specs/structure.md` §30; 18 November 2026). Without it, the contents' lines that pass the heading rule become headings, and the EPUB lists those chapters twice (Domesday's three essays). analyze checks its page indices as it checks those of the other keys |
 | `front_matter_end` | page index, found by analyze | the first page after the front matter: the pages before it that would be text pages are dropped, each word recorded as a removal (owner, 17 November 2026: "drop the pages before the preface, with a record of what was dropped"). Without the key, analyze finds it: the first preface page or contents page among the book's first pages, else the first page of running text (`docs/specs/front-matter.md` §2). 0 keeps every page |
 | `reread_footnotes` | bool, `false` | whether layout re-reads each page's footnote band with Tesseract (`docs/specs/reocr.md` §3); off by default because Tesseract misreads note markers and loses note links (Domesday) |
 
@@ -251,7 +264,7 @@ but was fitted on 16 books only.
 The formats are frozen dataclasses in `src/galley/model.py`, with tuples
 for sequences, `frozendict` (a built-in type of Python 3.15) for
 mappings, `StrEnum` for finite sets, and floats for positions. Each file
-has a `format_version` int: 4 for `blocks.json`, 3 for `lines.json`, 2
+has a `format_version` int: 5 for `blocks.json`, 4 for `lines.json`, 3
 for `pages.json` and `words.json`, 1 for the others.
 `blocks.json` went to 2 with the second plan of structure (16 November
 2026), which added `Note.kind`, `Block.label`, the block kinds `verse`
@@ -269,7 +282,15 @@ owner-books, with the block kind `epigraph`, `Block.source`,
 `punctuation_attached` and `case_split` (`docs/specs/structure.md` §7);
 the owner reruns structure. `lines.json` went to 3 on 18 November 2026,
 with `Reread.junk_words` (`docs/specs/reocr.md` §4, the review of work
-package 2 of the plan owner-books); the owner reruns layout. Each has
+package 2 of the plan owner-books); the owner reruns layout.
+`blocks.json` went to 5 the same day, with the block kinds `list_item`
+and `contents_entry`, `Block.page_number`, `Block.heading_ref`, the
+change reason `list_marker` and the removal reason `leader_dots`
+(`docs/specs/structure.md` §7), and the removal reason `figure_text`
+(`docs/specs/figures.md` §7); the owner reruns structure. `pages.json`
+went to 3 the same day, with `PageInfo.figure_boxes`, and `words.json`
+to 3 and `lines.json` to 4, with `Figure.kind` (`docs/specs/figures.md`
+§7); the owner reruns analyze, which deletes every later file. Each has
 one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
@@ -286,7 +307,10 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
 
 - `PageInfo`: `index`, `width_pt`, `height_pt`, `kind: PageKind`,
   `text_source: TextSource`, `text_layer_score: float | None`,
-  `exclude_regions: tuple[Box, ...]`.
+  `exclude_regions: tuple[Box, ...]`, `figure_boxes: tuple[Box, ...]`:
+  the boxes of the figures analyze finds inside a text page, in points,
+  from the top down and then from the left; empty on any other page
+  (`docs/specs/figures.md` §3).
 - `PageKind`: `blank`, `text`, `plate` (mostly a picture), `excluded`,
   `front_matter` (a page before the book's text that would otherwise be
   a text page: `docs/specs/front-matter.md`). analyze recognises a plate
@@ -317,10 +341,14 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
   region layout re-read; `None` for the text layer). In the order the source gave them:
   for the text layer, the order in which the PDF draws the characters,
   as `text_layer.layer_words` reads them (`docs/specs/extract.md`).
-- `Figure`: `box`, `image` (path relative to the book folder), `dpi`. For
-  now figures are cut from plate pages only, one per plate, and its box
-  is the whole page; figures inside text pages are not detected yet. A
-  plate page with a text layer also has the words of that layer, which
+- `Figure`: `box`, `image` (path relative to the book folder), `dpi`,
+  `kind: FigureKind`. A plate page has one figure, whose box is the
+  whole page (`docs/specs/plates.md`); a text page has one for each box
+  of its `figure_boxes`, cut to that box (`docs/specs/figures.md`).
+  `kind: FigureKind` says which, `plate` or `in_page`: extract sets it
+  when it cuts the image, layout copies it to lines.json, and structure
+  reads it to send a plate's page to the plate rules and an in-page
+  figure to those of `docs/specs/figures.md` §5. A plate page with a text layer also has the words of that layer, which
   structure sorts into its caption and stray words.
 - A word inside an excluded region is a removal, one per word, with reason
   `excluded_region`; the words of an excluded page likewise, with
@@ -335,7 +363,11 @@ tuple[Reread, ...])`:
 - `Region`: `box`, `lines: tuple[Line, ...]`. A region is a part of the
   page whose lines are read one after the other: the body column, a
   margin, a column of footnotes, the running head. layout does not say
-  what a region is; structure does.
+  what a region is; structure does. On a page with in-page figures, the
+  words whose middle lies inside a figure's box, but for those of the
+  page's first row, which may be its running head, are taken out of the
+  regions the page's layout made with them and are a region of their
+  own whose box is the figure's box (`docs/specs/figures.md` §5).
 - `Line`: `box`, `words: tuple[Word, ...]`, left to right.
 
 - `Reread`: a region of a page that layout read again with Tesseract
@@ -375,19 +407,33 @@ page_numbers)`:
 - `Block`: `id`, `kind: BlockKind`, `level: int | None` (a heading's
   level, 1 or 2; an index entry's depth, 1 for an entry and 2 for a
   sub-entry printed inside it, more if a book prints deeper ones, so that
-  the EPUB can indent it as printed (owner, 16 November 2026); `None` for
-  every other kind: reading a blocks.json where an index entry has no
-  depth from 1, or a block that is neither a heading nor an index entry
-  has a level, is an error that names the file and the block. The format stays at
-  version 2: a file written before the depth has index entries without
+  the EPUB can indent it as printed (owner, 16 November 2026); a contents
+  entry's depth, 1 for a chapter and more for what the contents prints
+  under it; `None` for every other kind: reading a blocks.json where an
+  index entry or a contents entry has no depth from 1, or a block of
+  another kind than these and a heading has a level, is an error that
+  names the file and the block. The depth was added without a new
+  version, at version 2: a file written before it has index entries without
   one, and the error says to run structure again), `label: str | None` (headings: the chapter label as printed,
-  "CHAPTER III.", "V"; `None` for a heading without one and for every
-  other kind: reading a blocks.json where a block that is not a heading
-  has a label is an error that names the file and the block),
+  "CHAPTER III.", "V"; list items: the list marker as printed, "—",
+  "1.", "(a)", never `None`; contents entries: the chapter's number as
+  printed before the title, "2.", "One", "CHAPTER II."; `None` for a
+  heading or a contents entry without one and for every other kind:
+  reading a blocks.json where a block of another kind has a label, or a
+  list item has none, is an error that names the file and the block),
   `source: str | None` (epigraphs: the source line as printed, without
   its leading dash, words joined by single spaces; `None` for every
   other kind: reading a blocks.json where a block that is not an
   epigraph has a source is an error that names the file and the block),
+  `page_number: str | None` (contents entries: the page number printed
+  after the title, words joined by single spaces, "23", "pp. 9 — 26.",
+  kept and not shown in the EPUB; `None` when the entry has none and for
+  every other kind), `heading_ref: str | None` (contents entries: the id
+  of the heading block of the chapter the entry names, so that markdown
+  links the entry to it; `None` when no heading matches and for every
+  other kind; a blocks.json where another kind has one of these two
+  fields, or a `heading_ref` names a block that is not a heading, is an
+  error that names the file and the block),
   `spans: tuple[Span, ...]`, `figure: str | None` (figure blocks),
   `origin: tuple[Origin, ...]`.
 - `BlockKind`, each value what the text is:
@@ -413,7 +459,13 @@ page_numbers)`:
     it has none) and its image in `figure`;
   - `margin_note`: a short heading printed beside the text (section 17);
   - `index_entry`: one entry of the book's printed index, or one
-    sub-entry of it, its depth in `level` (section 11).
+    sub-entry of it, its depth in `level` (section 11);
+  - `list_item`: one item of a list the book prints, its marker in
+    `label` (`docs/specs/structure.md` §29);
+  - `contents_entry`: one entry of the book's printed table of contents:
+    its number in `label`, its title in the spans, its page number in
+    `page_number`, its depth in `level` and the heading it names in
+    `heading_ref` (`docs/specs/structure.md` §30).
 - `Span`: `text`, `emphasis: Emphasis`, `note_ref: str | None`. A span
   with a `note_ref` is a note reference: `note_ref` is the id of the
   note, and its `text` is the reference as printed, or as the OCR read
@@ -468,7 +520,9 @@ page_numbers)`:
   ("subjection", ";") becomes ("subjection;",), a spaced sign attached
   in a book not in French. `case_split`: ("theAvre",) becomes ("the",
   "Avre"), a word the OCR glued at a case change
-  (`docs/specs/structure.md` §22 to §24). A spec
+  (`docs/specs/structure.md` §22 to §24). `list_marker`: ("—The",)
+  becomes ("—", "The"), a list item's dash split off its first word,
+  the dash going to the item's `label` (§29 of the same spec). A spec
   adds a reason when it needs one.
 - `PageNumber`: `page_index`, `text`, `position: head | foot`.
   `page_numbers: tuple[PageNumber, ...]`, taken from the removals; the
@@ -482,10 +536,15 @@ rule or the config's `front_matter_end` puts the end of the front
 matter; a reason apart from `excluded_page`, whose pages the owner names
 one by one),
 `running_head`, `page_number`, `signature_mark`, `plate_text`,
-`stray_mark` (a line with no letter or digit above a running head, a
-speck of the scan), `guide_words` (the first letters of the first and
-last entries that Stubbs prints under the running head of an index
-page, "BUR CON"). A stage spec adds a
+`stray_mark` (a line with no letter or digit above a running head or
+above the title of a printed contents, a speck of the scan),
+`guide_words` (the first letters of the first and last entries that
+Stubbs prints under the running head of an index page, "BUR CON"),
+`leader_dots` (the dots printed between a contents entry's title and
+its page number, `docs/specs/structure.md` §30), `figure_text` (the
+words the OCR read inside a figure printed on a text page: its
+lettering, labels and shading, which its image shows;
+`docs/specs/figures.md` §5). A stage spec adds a
 reason when it removes a new kind of text, and the reason names what the
 text is, never "noise": a plate's stray text-layer characters are removed
 as `plate_text` by structure, which the owner can review.
@@ -522,7 +581,9 @@ ends and makes the text pages before it `front_matter`
 a render of each page at 36 dpi, as a large area of ink that no word
 covers on a page of few known words, or, on a page without a text
 layer, as a large area of faint ink; such a page does not stop the run
-(`docs/specs/plates.md`).
+(`docs/specs/plates.md`). On a text page it also finds the figures
+printed among the lines, from the same render, as groups of ink that no
+word covers (`docs/specs/figures.md`).
 
 **extract** gives every page its words. Text-layer pages are read with
 pdfplumber, one document per worker thread, by
@@ -534,32 +595,47 @@ turned into points. A plate page is rendered whole at 300 dpi into
 `images/`; its text layer, when it has one, is read as a text page's
 is, so that structure can keep the caption and remove the rest. The
 `cover_page` of the config is rendered whole, as `images/cover.png`,
-and is never a plate.
+and is never a plate. A figure inside a text page is cut from a render
+at 300 dpi to its box.
 
 **layout** groups each page's words into regions and lines, and orders
 them for reading: a column, then the next; the margin beside the body,
 and the notes Stubbs cuts into the body column; the footnote columns at
 the foot. Where small print reads better with Tesseract than in the text
 layer, it re-reads it, region by region, with renders from `pdfium.py`
-(`docs/specs/reocr.md`). It copies the page's figures through.
+(`docs/specs/reocr.md`). It copies the page's figures through, and
+keeps the words read inside a figure in a region of their own.
 
 **structure** turns regions and lines into blocks and notes. It first
 reads the whole book to find what repeats: running heads, page numbers,
 signature marks, the line heights of body and notes. Then, per page, it
 removes those, decides what each region is, finds headings, chapter
 summaries and verse, groups lines into paragraphs, keeps a plate's
-caption and removes its stray words, and joins hyphenated words
+caption and removes its stray words; removes the words read inside a
+figure on a text page, keeps its caption as the figure block's text,
+and places the block after the paragraph printed before it, or after
+the whole list when the text before it is a list item
+(`docs/specs/figures.md` §5); and joins hyphenated words
 (dropping the hyphen where the word list or the book's own words allow
 it, keeping it in a compound the book prints, and dropping it as a
 recorded guess where neither decides; `docs/specs/structure.md` §5);
 finds the epigraphs under a chapter's heading and splits words glued at
-a case change. It attaches a spaced "?", ";", ":" or "!" to the word
+a case change. On the pages of `contents_pages` it makes each entry of
+the printed contents a block, with its number, title, page number and
+depth (`docs/specs/structure.md` §30). It attaches a spaced "?", ";", ":" or "!" to the word
 before it, or, in French, puts a no-break space before it, each change
-recorded (§22 to §24 of the same spec).
+recorded (§22 to §24 of the same spec). A figure's caption is taken
+out of the body stream before headings, list items and contents
+entries are looked for, so a caption that opens like a numbered item
+("13. The…") is never one, and a list goes on across a figure printed
+between two of its items (`docs/specs/structure.md` §2, step 2.2, and
+§29, rule 5).
 Last, over the whole book, it joins paragraphs that run over a page
-break; cuts the notes, joins those that run over a page break, finds
+break and finds the items of lists, since an item too can run over a
+page break (§29 of the same spec); cuts the notes, joins those that run over a page break, finds
 the endnotes, and matches each note reference to its note, splitting it
-off the word it is glued to; makes the index's entries; finds quotes,
+off the word it is glued to; makes the index's entries and links each contents entry to the
+heading of its chapter, found by its title; finds quotes,
 after the notes, so that a note left in the body is not taken for one;
 and places each margin note just before the paragraph whose line it
 sits beside (`docs/specs/structure.md` §2 gives the order).
@@ -588,7 +664,13 @@ quotation, with hard line breaks when it is verse, and a div of class
 `epigraph-source` holding a dash and its source, the dash written as text;
 a note group's heading as a div of class `note-group` before its first
 note, not a heading (`docs/specs/structure.md` §25); a margin note inside a note within that
-note; figures as images with their caption. How each kind is written and
+note; figures as images with their caption; consecutive list items as
+a Pandoc list, bullet for dashes and bullets and ordered for numbers
+and letters, each item the div of its block, the printed marker not
+written; the entries of a printed contents as a bullet list inside a
+div of class `contents`, nested by depth, each entry's title a link to
+its heading when it has one, its page number not written (§31 of the
+same spec). How each kind is written and
 styled is the markdown and epub specs' to decide. Pandoc runs with
 `--fail-if-warnings`, so that a note it would drop is an error (checked
 with Pandoc 3.13: an unused note definition is dropped with only a
@@ -665,6 +747,7 @@ A stage imports these and nothing else of galley.
 | `wordlist.py` | `is_known_word(word, lower_case_words)`, whether a word counts as known on a plate (`docs/specs/plates.md` §2); `lower_case_word_list(language, cache_dir)`, the word list in lower case, made once per language and list folder, which structure, analyze and layout take; `word_list(language, cache_dir) -> frozenset[str]`, with the dictionary's case, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`), layout (re-reading, `docs/specs/reocr.md`) and structure |
 | `ocr.py` | Tesseract: `read_image(image, origin, dpi, psm, language)`, the words of an image cropped from a page, with boxes in points and Tesseract's confidence, and `words_of_tsv`, its pure part; `read_image_lines` and `lines_of_tsv`, the same words grouped by Tesseract's lines; `point_box(box, origin, dpi)`, a box in pixels of a crop as a box in points on the page; `OCR_DPI` (300). Tesseract runs with `OMP_THREAD_LIMIT=1`, one core each, so that the parallelism is galley's; output without Tesseract's tsv header is an `ExternalProgramError` (`docs/specs/reocr.md` §5). layout uses it now, analyze's audit and extract's OCR pages later |
 | `fidelity.py` | the fidelity check, section 13 |
+| `list_markers.py` | the readings of a list marker (`docs/specs/structure.md` §29, "Terms"): `marker_readings(word)`, its kind, form and value, a roman numeral before a letter; `starts_a_list`, `follows` and `is_bulleted`; and `DASHES`, which structure's list rules, markdown's lists and the fidelity check share, so that the three read a marker alike |
 | `hyphens.py` | `LINE_END_HYPHENS`, "-" and "¬", the hyphens that end a printed line in the OCR's text, which layout's reading score, structure's hyphen joins and the fidelity check share (`docs/specs/structure.md` §5) |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
 | `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`) and stops naming any that is missing |
@@ -743,8 +826,9 @@ lists the words, with the pages they came from where the origins say.
   `layer_words`: a word under such a Tesseract word that the record does
   not name is matched by no rule, and the check fails; structure,
   lines.json against blocks.json (the text of every body and note block,
-  with a note's `marker` and `group`, a heading's `label` and an
-  epigraph's `source` counted as words of it); markdown, blocks.json
+  with a note's `marker` and `group`, a block's `label`, an epigraph's
+  `source` and a contents entry's `page_number` counted as words of
+  it); markdown, blocks.json
   with the edits applied against `book.md` as Pandoc reads it (`pandoc -f
   markdown-smart -t json`): a reference to a footnote is matched to
   Pandoc's note element and its marker is not compared as a word, because
@@ -756,7 +840,8 @@ lists the words, with the pages they came from where the origins say.
   is found; an element galley's Markdown does not make is an error inside
   a link as anywhere else. The number of such links must equal the number
   of references to endnotes, as the number of Pandoc's notes must equal
-  the number of references to footnotes. Any other link is an element
+  the number of references to footnotes. A link from a contents entry
+  to its heading is the one other link (below). Any other link is an element
   galley's Markdown does not make, and an error. An endnote stays where it was printed, so its
   `marker` is written there and counted, referenced or not (section 9).
   A heading's `label` is written in `book.md`, in the form the markdown
@@ -764,6 +849,18 @@ lists the words, with the pages they came from where the origins say.
   `source`, in its `epigraph-source` div after the dash markdown writes
   there, which is not compared, and a note's `group`, in the
   `note-group` div before the note (`docs/specs/structure.md` §25).
+  A list in `book.md` is read item by item, each item's blocks as
+  blocks, and holds only the forms markdown writes: an item of one div
+  of a list item, or of one div of a contents entry followed by a
+  nested list of the same form. A list item's `label` is not written
+  and not compared, as a referenced footnote's marker is not, and the
+  items of the lists of list items must number the list items of
+  blocks.json. A contents entry's `label` is written and counted; its
+  `page_number` is not written and not compared. A link inside a
+  contents entry's div, with no attributes, whose target is the id of
+  a heading block, is read as its text, compared as words of the
+  entry; such links must number the entries with a `heading_ref`
+  (§31 of the same spec).
 - A figure's image is the one place `book.md` holds an image. Pandoc
   reads a figure block with a caption as a `Figure` element whose
   caption holds the caption's words and whose body is one `Image`, and
@@ -910,6 +1007,34 @@ On 17 November 2026:
   heading is not in the table of contents, and markdown writes the
   dash as text, not the style sheet (§27 of the same spec, settled by
   the plan's orchestrator the same day).
+
+On 18 November 2026, taken for the owner, who asked the work to go on
+without waiting (`docs/specs/structure.md` §29 to §33 and
+`docs/specs/figures.md`; the last four by the orchestrator of the plan
+lists-figures):
+
+- **A list item is a block kind of its own**, `list_item`, its marker
+  apart from its text in `label`; markdown writes an unordered list for
+  dashes and bullets and an ordered one for numbers and letters.
+- **An entry of a printed contents is a block kind of its own**,
+  `contents_entry`: its number in `label`, as a heading's, its title,
+  its depth in `level`, as an index entry's, and its printed page
+  number, kept and not shown in the EPUB. markdown writes the contents
+  as a list, an entry per line, each linked to its chapter's heading
+  when its title matches one, OCR errors allowed.
+- **A list shows the reader's own markers**: a dash list is a bullet
+  list, an ordered list shows Pandoc's numbers ("i." for a printed
+  "(i)"), and the printed marker is kept in `label`, not written
+  (`docs/specs/structure.md` §33, open point 1).
+- **The title of a printed contents is a level-1 heading**, so the
+  EPUB's table of contents opens the printed one (§33, open point 2).
+- **A figure inside a text page without a caption is kept**, as an
+  image, when it is large enough to be found: 11 of Kadesh's
+  quotations in hieroglyphs or Arabic become images
+  (`docs/specs/figures.md` §11, open point 1).
+- **The four format changes of figures are accepted**, with an explicit
+  `Figure.kind` rather than a figure's kind read from its box
+  (`docs/specs/figures.md` §11, open point 2).
 
 ## 18. Not in this document
 

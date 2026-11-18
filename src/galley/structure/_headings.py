@@ -14,7 +14,7 @@ from enum import StrEnum
 from galley.body_measures import median_word_height
 from galley.model import BlockKind
 from galley.structure._heads import starts_with_chapter_label_word
-from galley.structure._lines import PlacedLine, is_centred
+from galley.structure._lines import PlacedLine, is_centred, line_texts
 from galley.structure._measures import Edges, line_has_letter_or_digit
 from galley.structure._runs import CHAPTER_LEVEL, SECTION_LEVEL, BodyRun, LabelLine
 
@@ -72,7 +72,7 @@ _JOIN_AFTER_LABEL_MAX_PITCHES = 4.0
 
 # Spec section 14: a roman numeral alone as the OCR reads one, 1 to 5 of
 # "IVXLCl1" with an optional ".", ("II", "Ill" for III).
-_OCR_ROMAN_LABEL = re.compile(r"[IVXLCl1]{1,5}\.?")
+OCR_ROMAN_LABEL = re.compile(r"[IVXLCl1]{1,5}\.?")
 # Spec section 14, rule 2: a word whose letters are a well-formed roman
 # numeral, in any case ("(VIII)"), is not the long word a heading needs.
 _ROMAN_NUMERAL = re.compile(
@@ -82,14 +82,10 @@ _ROMAN_NUMERAL = re.compile(
 _NUMBER_OR_RANGE = re.compile(r"[0-9]+(?:[-–—][0-9]+)?")
 
 
-def _texts(line: PlacedLine) -> tuple[str, ...]:
-    return tuple(word.text for word in line.line.words)
-
-
 def _capitals_share(line: PlacedLine) -> float:
     """The share of the line's letters (`str.isalpha`) that are upper case;
     0 for a line without a letter."""
-    letters = [c for text in _texts(line) for c in text if c.isalpha()]
+    letters = [c for text in line_texts(line) for c in text if c.isalpha()]
     if not letters:
         return 0.0
     return sum(c.isupper() for c in letters) / len(letters)
@@ -99,18 +95,18 @@ def _is_chapter_label(line: PlacedLine) -> bool:
     """Whether the line is a chapter label (spec section 14): it starts with
     CHAPTER, CHAPITRE, ESSAY, PART, PARTIE, BOOK or LIVRE in any case, or
     it is one word, a roman numeral as the OCR reads one ("V", "Ill.")."""
-    texts = _texts(line)
+    texts = line_texts(line)
     if not texts:
         return False
     if _starts_with_label_word(line):
         return True
-    return len(texts) == 1 and _OCR_ROMAN_LABEL.fullmatch(texts[0]) is not None
+    return len(texts) == 1 and OCR_ROMAN_LABEL.fullmatch(texts[0]) is not None
 
 
 def _starts_with_label_word(line: PlacedLine) -> bool:
     """Whether the line's first word is a chapter label word (spec section
     3)."""
-    return starts_with_chapter_label_word(_texts(line))
+    return starts_with_chapter_label_word(line_texts(line))
 
 
 def _has_long_word(texts: Sequence[str]) -> bool:
@@ -143,7 +139,7 @@ def _ends_with_number(texts: Sequence[str]) -> bool:
 
 
 def _letter_count(line: PlacedLine) -> int:
-    return sum(c.isalpha() for text in _texts(line) for c in text)
+    return sum(c.isalpha() for text in line_texts(line) for c in text)
 
 
 def _top(line: PlacedLine) -> float:
@@ -203,7 +199,7 @@ def _is_heading_line(
     section 3 left it in the text in its band of the head lines, which is
     not flush left unless it starts with a chapter label word."""
     line = lines[number]
-    texts = _texts(line)
+    texts = line_texts(line)
     centred = is_centred(line) or (
         side_edges is not None and _centred_between(line, side_edges)
     )
@@ -247,7 +243,7 @@ def _is_tall_line(
     line, or follows a heading line, one of the positions
     `heading_lines`; a line with no letter or digit counts as no line."""
     line = lines[number]
-    texts = _texts(line)
+    texts = line_texts(line)
     if not (
         _line_height(line) >= _TALL_LINE_SHARE * median_height
         and _letter_count(line) >= _WORD_MIN_LETTERS

@@ -9,10 +9,10 @@ margin notes after the paragraph in which its body ends.
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from typing import assert_never
 
 from galley.model import (
     BlockKind,
-    Box,
     Line,
     PageLayout,
     PageNumber,
@@ -20,7 +20,14 @@ from galley.model import (
     Removal,
     RemovalReason,
 )
+from galley.structure._contents import ContentsEntry, contents_title
 from galley.structure._epigraphs import epigraph_run, page_epigraphs
+from galley.structure._figures import (
+    PageFigure,
+    page_figures,
+    split_figure_regions,
+    without_taken,
+)
 from galley.structure._foot import body_column
 from galley.structure._headings import PageHead, heading_runs
 from galley.structure._index import IndexPage, index_page
@@ -33,6 +40,7 @@ from galley.structure._lines import (
     starts_paragraph,
     text_edge,
 )
+from galley.structure._lists import ItemLine
 from galley.structure._markers import MarkerForm, marker_form
 from galley.structure._measures import (
     Edges,
@@ -44,7 +52,7 @@ from galley.structure._measures import (
 )
 from galley.structure._regions import RegionKind, head_line, region_kinds
 from galley.structure._removals import foot_removals, head_removals
-from galley.structure._runs import BodyRun, EpigraphParts, LabelLine
+from galley.structure._runs import CHAPTER_LEVEL, BodyRun, EpigraphParts, LabelLine
 from galley.structure._summaries import summary_run
 from galley.structure._survey import (
     BookSurvey,
@@ -52,17 +60,6 @@ from galley.structure._survey import (
     like_a_running_head,
 )
 from galley.structure._verse import verse_runs
-
-
-@dataclass(frozen=True, slots=True)
-class PageFigure:
-    """A plate page's figure (spec section 18): the path of its image, its
-    box on the page, and its caption lines from the top down, none when it
-    has no caption."""
-
-    image: str
-    box: Box
-    caption: Piece
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,7 +75,8 @@ class PageParts:
     in the body"), none until they are taken. On an index page,
     `index_lines` are the lines of its columns, left then right, and
     `index_starts` the positions of those that start an entry (spec
-    section 17)."""
+    section 17). `in_page_figures` are the page's in-page figures, each
+    with its caption (`docs/specs/figures.md` §5)."""
 
     index: int
     removals: tuple[Removal, ...]
@@ -93,6 +91,7 @@ class PageParts:
     body_notes: tuple[PlacedLine, ...] = ()
     index_lines: tuple[PlacedLine, ...] = ()
     index_starts: frozenset[int] = frozenset()
+    in_page_figures: tuple[PageFigure, ...] = ()
 
 
 def _pieces(lines: tuple[PlacedLine, ...]) -> tuple[Piece, ...]:
@@ -140,12 +139,30 @@ def _runs(
     """The runs of the body stream that are blocks of their own (spec
     section 2, step 2.3), in order: the headings, the chapter summary under
     a heading, the epigraphs under a level-1 heading or the page's one
-    epigraph, and the verse; none on a page of the printed table of
-    contents. `kept_head` is the position in `body` of the page's head line
+    epigraph, and the verse; on a page of the printed table of contents,
+    only the title of a contents run on the run's first page, a heading of
+    level 1, with the stray marks above it (spec section 30, rule 1).
+    `kept_head` is the position in `body` of the page's head line
     that section 3 left in the text near the book's head lines
     (`_kept_head_line`), or None; `column` the page's body column."""
     if page_index in contents_pages:
-        return _PageRuns((), ())
+        if page_index - 1 in contents_pages:
+            return _PageRuns((), ())
+        title = contents_title(body)
+        start = None if title.title is None else title.title - len(title.stray_marks)
+        return _PageRuns(
+            ()
+            if start is None
+            else (
+                BodyRun(
+                    start=start,
+                    end=start + 1,
+                    kind=BlockKind.HEADING,
+                    level=CHAPTER_LEVEL,
+                ),
+            ),
+            title.stray_marks,
+        )
     band_lines = tuple(line for region in band_regions for line in region)
     headings = heading_runs(
         body,
@@ -227,8 +244,13 @@ def page_parts(
     page: PageLayout, survey: BookSurvey, contents_pages: frozenset[int] = frozenset()
 ) -> PageParts:
     """The per-page work on `page` (spec section 2, step 2). `contents_pages`
-    are the page indices of the printed table of contents, on which no
-    heading is found."""
+    are the page indices of the printed table of contents, on which the
+    only heading is a contents run's title (spec section 30, rule 1). On a
+    page with in-page figures, their regions take no part in it: their
+    words are removed as `figure_text`, but for their captions', and so is
+    a head line printed inside a figure (`docs/specs/figures.md` §5)."""
+    split = split_figure_regions(page)
+    page = split.text
     kinds = region_kinds(page, survey.body_word_height, survey.running_heads)
     head = head_removals(page, survey)
     foot = foot_removals(page, kinds, survey)
@@ -240,6 +262,8 @@ def page_parts(
     if index is not None:
         removed |= index.removed_lines
     column = body_column(page, kinds)
+    figures = page_figures(split, removed, taken)
+    removed |= figures.head_places
 
     def centring_edges(region: Region, kind: RegionKind, edges: Edges) -> Edges:
         if kind is RegionKind.BODY and is_short(region) and column is not None:
@@ -260,7 +284,7 @@ def page_parts(
             tuple(
                 PlacedLine(
                     page.index,
-                    line,
+                    kept,
                     edges,
                     centring_edges(region, kind, edges),
                     text_edges[region_number],
@@ -268,6 +292,12 @@ def page_parts(
                 for line_number, line in enumerate(region.lines)
                 if (region_number, line_number) not in removed
                 and region_number not in taken
+                and (
+                    kept := without_taken(
+                        line, (region_number, line_number), figures.taken
+                    )
+                )
+                is not None
             ),
         )
         for region_number, (region, kind, edges) in enumerate(
@@ -330,6 +360,7 @@ def page_parts(
         removals=head.removals
         + (index.removals if index is not None else ())
         + foot.removals
+        + figures.removals
         + stray_removals,
         page_numbers=head.page_numbers
         + (index.page_numbers if index is not None else ())
@@ -347,6 +378,7 @@ def page_parts(
         runs=page_runs.runs,
         index_lines=index_lines,
         index_starts=index.starts if index is not None else frozenset(),
+        in_page_figures=figures.figures,
     )
 
 
@@ -365,16 +397,19 @@ def _index_lines(page_index: int, index: IndexPage | None) -> tuple[PlacedLine, 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class BodyBlock:
-    """A block of the body stream, as a piece: a paragraph, or a run of
-    section 2, step 2.3, with its kind, a heading's level and whether its
-    first line is its chapter label, and an epigraph's quotation and
-    source."""
+    """A block of the body stream, as a piece: a paragraph, a run of
+    section 2, step 2.3, a list item or a contents entry, with its kind, a
+    heading's level and whether its first line is its chapter label, an
+    epigraph's quotation and source, a list item's marker as printed
+    (spec section 29), and a contents entry's parts (section 30)."""
 
     piece: Piece
     kind: BlockKind = BlockKind.PARAGRAPH
     level: int | None = None
     label_line: LabelLine = LabelLine.NONE
     epigraph: EpigraphParts | None = None
+    marker: str | None = None
+    contents: ContentsEntry | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -455,8 +490,25 @@ def _note_led(line: PlacedLine) -> bool:
     return len(line.line.words) > 1 and marker_form(first_word(line)) is not None
 
 
-def _block(lines: Sequence[PlacedLine], run: BodyRun | None) -> BodyBlock:
+def _block(
+    lines: Sequence[PlacedLine], run: BodyRun | None, role: LineRole | None
+) -> BodyBlock:
+    """The block of `lines`, made by `run` when it is one of section 2,
+    step 2.3, else by `role`, the role of its first line, when it is a
+    list item or a contents entry, else a paragraph."""
     piece = Piece(tuple(lines))
+    match role:
+        case ItemLine(marker=marker) if marker is not None:
+            return BodyBlock(piece=piece, kind=BlockKind.LIST_ITEM, marker=marker.text)
+        case ContentsLine(entry=entry) if entry is not None:
+            return BodyBlock(
+                piece=piece,
+                kind=BlockKind.CONTENTS_ENTRY,
+                level=entry.level,
+                contents=entry,
+            )
+        case _:
+            pass
     if run is None:
         return BodyBlock(piece=piece)
     return BodyBlock(
@@ -468,10 +520,36 @@ def _block(lines: Sequence[PlacedLine], run: BodyRun | None) -> BodyBlock:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class ContentsLine:
+    """A line of a contents entry: `entry` is the entry on its first line,
+    None on its other lines (spec section 30)."""
+
+    entry: ContentsEntry | None
+
+
+type LineRole = ItemLine | ContentsLine
+
+
+def _starts_by_role(role: LineRole, current_role: LineRole | None) -> bool:
+    """Whether a line of `role` starts a block after a line of
+    `current_role`, None for a line of a paragraph or a run: an item's
+    marker line and an entry's first line do, and so does any line after
+    a paragraph or run (spec sections 29 and 30)."""
+    match role:
+        case ItemLine(marker=marker):
+            return marker is not None or not isinstance(current_role, ItemLine)
+        case ContentsLine(entry=entry):
+            return entry is not None or not isinstance(current_role, ContentsLine)
+        case _:
+            assert_never(role)
+
+
 def body_entries(
     pages: Sequence[PageParts],
     form: MarkerForm | None = None,
     section_pages: range = range(0),
+    roles: frozendict[tuple[int, int], LineRole] = frozendict(),
 ) -> tuple[Entry, ...]:
     """The blocks of the book's body stream in order, each followed by the
     margin notes of the pages whose body ends in it; the margin notes of a
@@ -484,17 +562,27 @@ def body_entries(
     endnote section (spec section 12): the first line of its first page,
     and the first body line after its last page, start a paragraph. A
     page's last line that ends short with a sentence's end ends its
-    paragraph, but on an index page (spec section 6)."""
+    paragraph, but on an index page (spec section 6). `roles` gives the
+    lines of the list items and contents entries by their page index and
+    position in their page's body stream (spec sections 29 and 30): each
+    item and entry is a block, whose lines the paragraph rules do not
+    look at, and the line after the last starts a block."""
     entries: list[Entry] = []
     current: list[PlacedLine] = []
     current_run: BodyRun | None = None
+    current_role: LineRole | None = None
     pending: list[MarginNote] = []
     before: PlacedLine | None = None
     before_page: PageParts | None = None
     for page in pages:
         for number, line in enumerate(page.body):
             run = _run_at(page.runs, number)
-            if _continues_verse(current_run, run, number):
+            role = roles.get((page.index, number))
+            if role is not None:
+                starts = _starts_by_role(role, current_role)
+            elif current_role is not None:
+                starts = True
+            elif _continues_verse(current_run, run, number):
                 starts = False
             elif run is not None or current_run is not None:
                 # A run is a block of its own, and so is what follows it.
@@ -512,11 +600,12 @@ def body_entries(
                 )
             if starts:
                 if current:
-                    entries.append(_block(current, current_run))
+                    entries.append(_block(current, current_run, current_role))
                     entries.extend(pending)
                     pending = []
                 current = []
                 current_run = run
+                current_role = role
             current.append(line)
             before = line
             before_page = page
@@ -526,6 +615,6 @@ def body_entries(
         else:
             entries.extend(notes)
     if current:
-        entries.append(_block(current, current_run))
+        entries.append(_block(current, current_run, current_role))
     entries.extend(pending)
     return tuple(entries)

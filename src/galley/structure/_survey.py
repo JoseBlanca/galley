@@ -5,12 +5,13 @@ and the book's own words."""
 
 import statistics
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 
 from galley.body_measures import body_measures, group_rows, median_word_height
 from galley.model import Line, LinesFile, PageLayout
 from galley.parallel import DEFAULT_WORKERS, map_pages
+from galley.structure._figures import text_page
 from galley.structure._foot import line_at, line_below_head, signature_candidate
 from galley.structure._heads import (
     EndNumber,
@@ -502,7 +503,9 @@ def _body_height_and_pitch(
 def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurvey:
     """What structure learns from the whole book before the per-page work
     (spec sections 2 and 3), the pages measured in a pool of `workers`
-    threads. The result does not depend on `workers`."""
+    threads. The result does not depend on `workers`. The regions of the
+    in-page figures take no part in it (`docs/specs/figures.md` §5)."""
+    lines = replace(lines, pages=tuple(text_page(page) for page in lines.pages))
     measures = map_pages(_page_measures, lines.pages, workers)
     body_word_height, pitch = _body_height_and_pitch(measures)
     heads = tuple(
