@@ -22,6 +22,7 @@ from galley.model import (
     NoteKind,
     PageLayout,
     RemovalReason,
+    RereadKind,
     block_text,
     read_blocks,
     read_lines,
@@ -46,10 +47,6 @@ _STRUCTURE_PAGE_BAND = (
     "structure's band region is small against the book's body word height "
     "(structure spec section 2), not the page's; no task of "
     "docs/plans/stray-text.md changes it"
-)
-_TASK_4_1 = (
-    "task 4.1 of docs/plans/stray-text.md: the shortened-row test by size in "
-    "the cut-in zones"
 )
 # A margin region of Stubbs is a column of a note, at most about 60 pt wide;
 # a body region spans the text column, 268 pt.
@@ -191,17 +188,30 @@ def test_gierke_introduction_footnotes_are_footnotes_from_the_first(
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.xfail(strict=True, reason=_TASK_4_1)
 @pytest.mark.parametrize("page", [0, 2])
 def test_cut_in_note_on_the_body_baselines_is_taken_into_the_margin(
     excerpt_books: frozendict[str, BookFolder], page: int
 ) -> None:
-    layout = _page_layout(excerpt_books["stubbs_cut_in"], page)
+    # The expected words are the layer's. A cut-in note's crop may be
+    # re-read with Tesseract (docs/specs/reocr.md, section 3, kind 3),
+    # whose kept reading replaces the layer's words in the margin: page 0's
+    # "efoch" is then "eroch" (printed "epoch"). Such a word counts as in
+    # the margin.
+    lines = read_lines(excerpt_books["stubbs_cut_in"].lines_json)
+    layout = lines.pages[page]
     expected = _expected("stubbs_cut_in", page)
     margin_words = {
         word for line in _line_texts(layout, margin=True) for word in line.split(" ")
     }
-    assert set(expected["in_margin"]) <= margin_words
+    replaced_in_margin = {
+        word.text
+        for record in lines.rereads
+        if record.kept
+        and record.page_index == page
+        and record.kind is RereadKind.CUT_IN_NOTE
+        for word in record.layer_words
+    }
+    assert set(expected["in_margin"]) <= margin_words | replaced_in_margin
     assert _in_body_lines(expected["body_lines"], layout)
 
 

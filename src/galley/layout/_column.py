@@ -449,6 +449,20 @@ _CUT_IN_CHAIN_ROWS: Final[int] = 2
 _CUT_IN_STRIP_PT: Final[float] = 4.0
 _CUT_IN_ZONE_PT: Final[float] = 1.0
 _CUT_IN_BODY_GAP_PT: Final[float] = 5.0
+# Simulated on Stubbs' whole book on 18 November 2026 with this code, its
+# zones changed in a copy (layout spec section 3, step 2b, rule 2, and
+# section 9): a cut row is shortened also when its strip words of 2
+# letters or more are at most 0.9 of the page's body word height and 0.9
+# of its width per character, the page's measures taken on the column's
+# words of 3 letters or more, on a page of 50 words or more (guessed). It
+# moves 590 more words on 120 pages: 365 note words by the evaluation's
+# alignment, 143 of at most 2 letters, 82 others (perhaps 10 body words);
+# with no test of size, 30 more clear body words move.
+_STRIP_WORD_LETTERS: Final[int] = 2
+_PAGE_SIZE_WORD_LETTERS: Final[int] = 3
+_PAGE_SIZE_LEAST_WORDS: Final[int] = 50
+_SHORTENED_HEIGHT_SHARE: Final[float] = 0.9
+_SHORTENED_CHARACTER_SHARE: Final[float] = 0.9
 
 
 @dataclass(frozen=True, slots=True)
@@ -524,14 +538,83 @@ def _is_cut_row(row: tuple[_SideWord, ...], at: float, least_span: float) -> boo
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _PageSize:
+    """The size of a page's body type, in points: the median height of its
+    words' boxes and their width per character (step 2b, rule 2)."""
+
+    word_height: float
+    point_per_character: float
+
+
+def _letters(word: Word) -> int:
+    return sum(char.isalpha() for char in word.text)
+
+
+def _size_of(words: tuple[Word, ...]) -> _PageSize:
+    """The size of `words`, which are not empty: the median height of their
+    boxes, and the sum of their box widths over the characters of their
+    texts."""
+    return _PageSize(
+        median_word_height(words),
+        sum(word.box.x1 - word.box.x0 for word in words)
+        / sum(len(word.text) for word in words),
+    )
+
+
+def _page_size(column: tuple[Word, ...]) -> _PageSize | None:
+    """The size of the body type of a page whose column holds `column`'s
+    words (step 2b, rule 2), taken on its words of
+    `_PAGE_SIZE_WORD_LETTERS` letters or more. None on a page of fewer
+    than `_PAGE_SIZE_LEAST_WORDS` words, or with no such word."""
+    measured = tuple(
+        word for word in column if _letters(word) >= _PAGE_SIZE_WORD_LETTERS
+    )
+    if len(column) < _PAGE_SIZE_LEAST_WORDS or not measured:
+        return None
+    return _size_of(measured)
+
+
+def _is_shortened(
+    row: tuple[_SideWord, ...],
+    strip_end: float,
+    column: tuple[Word, ...],
+    page_size: _PageSize | None,
+) -> bool:
+    """Whether the cut row `row`, seen from its side, is shortened (step 2b,
+    rule 2): no word of it ends at or before `strip_end`, or, on a page
+    of `page_size`, its strip words, those that do and hold
+    `_STRIP_WORD_LETTERS` letters, are none or set smaller than the page's
+    body type. `column` gives a word by its index."""
+    strip = tuple(column[word.index] for word in row if word.end <= strip_end)
+    if not strip:
+        return True
+    if page_size is None:
+        return False
+    strip_words = tuple(word for word in strip if _letters(word) >= _STRIP_WORD_LETTERS)
+    if not strip_words:
+        return True
+    size = _size_of(strip_words)
+    return (
+        size.word_height <= _SHORTENED_HEIGHT_SHARE * page_size.word_height
+        and size.point_per_character
+        <= _SHORTENED_CHARACTER_SHARE * page_size.point_per_character
+    )
+
+
 def _cut_in_zones(
-    rows: tuple[tuple[_SideWord, ...], ...], at: float, least_span: float, pitch: float
+    rows: tuple[tuple[_SideWord, ...], ...],
+    at: float,
+    least_span: float,
+    pitch: float,
+    column: tuple[Word, ...],
 ) -> tuple[tuple[float, float], ...]:
     """The cut-in zones of a page's `rows`, seen from one side, as (top,
     bottom) in points (step 2b, rule 2): each chain of at least
     `_CUT_IN_CHAIN_ROWS` cut rows, each within `_CUT_IN_CHAIN_PITCHES`
-    pitches of the one before, that holds a shortened row, trimmed to its
-    first and last shortened rows."""
+    pitches of the one before, that holds a shortened row
+    (`_is_shortened`), trimmed to its first and last shortened rows.
+    `column` gives a word by its index."""
     chains: list[list[tuple[_SideWord, ...]]] = []
     for row in rows:
         if not _is_cut_row(row, at, least_span):
@@ -544,12 +627,13 @@ def _cut_in_zones(
         else:
             chains.append([row])
     strip_end = at - _CUT_IN_STRIP_PT
+    page_size = _page_size(column)
     zones = []
     for chain in chains:
         shortened = tuple(
             position
             for position, row in enumerate(chain)
-            if all(word.end > strip_end for word in row)
+            if _is_shortened(row, strip_end, column, page_size)
         )
         if len(chain) < _CUT_IN_CHAIN_ROWS or not shortened:
             continue
@@ -603,7 +687,11 @@ def _cut_in(
     rows = tuple(_side_words(row, side, index_of) for row in group_rows(column))
     at = _seen_from(side, edge) + inset
     zones = _cut_in_zones(
-        rows, at, _CUT_ROW_SPAN_SHARE * measures.column_width, measures.body_line_pitch
+        rows,
+        at,
+        _CUT_ROW_SPAN_SHARE * measures.column_width,
+        measures.body_line_pitch,
+        column,
     )
     in_zones = frozenset(
         word.index
