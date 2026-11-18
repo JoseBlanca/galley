@@ -53,7 +53,7 @@ for them at both boundaries. Changed beyond the task's files, with the
 orchestrator's leave: the epigraph kind in markdown's two `match`
 statements (a plain div until task 6.1) and in galley-eval's two kinds,
 whose tests failed and which would have crashed on a real epigraph.
-`source` and `group` default to empty, so no other stream's code had
+`source` and `group` default to None, so no other stream's code had
 to change. Default run 60.4 s, measured while other streams ran pytest
 on the same machine.
 
@@ -189,3 +189,35 @@ owner's report; pages 2, 6, 8 and 10 lose their doubled words.
 Known: Gierke 63 keeps the layer's "14." beside Tesseract's "146", and
 Domesday 107 keeps Tesseract's "th" for the layer's right "the".
 Default run 69.4 s while the notes stream ran its tests.
+
+## Review 2: work package 2
+
+Of c928f76, by two reviewers (fidelity; spec, tests and conventions).
+What mattered, all fixed (c09fc7c to 2305891):
+
+- **A printed word lost**, Domesday page 90: the layer glued the body's
+  last "of" to the margin note's "demesne", and the new pairing replaced
+  the glued word whole. An alike layer word with 2 or more letters more
+  than the Tesseract word is no longer paired that way ("ofdemesne-"
+  and Domesday 333's "imgmen." stay in the layer beside Tesseract's
+  reading, as before the plan).
+- **The fidelity check could not tell junk from a word**: it accepted a
+  known word ("the", "Ælfric", Gierke's "vacant") dropped as junk. Each
+  record now names the layer words it replaced as junk (`Reread.junk_words`;
+  **lines.json goes to version 3**, so layout must run again on older
+  runs), and the check accepts only those.
+- The check did not tie a `source_dash` change to an epigraph's source,
+  a group on a footnote gave a misleading error, and 8 guards had no
+  test that failed when broken.
+- Gierke 63's junk "14." beside Tesseract's "146" is now replaced (a
+  layer number whose digits begin the Tesseract number's).
+- The count of words read twice is defined in reocr §4 and counted by
+  `scripts/count_read_twice.py`: Domesday 30 → 5, Gierke 12 → 0, Stubbs
+  6 → 5, Haskins 0 (4d9f1e9 → 2305891). A wider definition (any box
+  within 4 pt) gives 40 → 11, 32 → 18, 11 → 10: its extra words are
+  mostly body words at the column's edge beside the same word in a
+  note.
+
+Checks at 2305891: 2,382 passed and 8 xfailed in 66.8 s; whole_book 80
+passed in 644 s. No record's choice of reading changed on the four
+books.
