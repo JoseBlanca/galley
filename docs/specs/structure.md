@@ -153,7 +153,9 @@ there; these are used in several:
   1,269), Haskins and Stubbs (its index and lists), sign in Kadesh (24
   of its band blocks start with a sign, 14 with digits and 142 with
   neither, measured on 16 November 2026). A book whose band blocks start
-  with no such word, as Gierke's 11, has none.
+  with no such word has none. Gierke had none until its introduction's
+  notes became band regions (section 2); it now has digits, 56 of its 66
+  band blocks (measured on 19 November 2026).
 
 ## 2. What structure does, in order
 
@@ -295,12 +297,38 @@ the references, gets both too.
   above that region's bottom. Margin notes are about 30
   pt wide against columns of 266 to 317 pt; each column of an index is
   about half the width, so it is not a margin region;
-- a **band region** is any other region, not the head line, whose
-  median word height (over its words) is at most 0.85 of the body word
-  height and whose top is at or below the bottom of another region,
+- a **band region** is any other region, not the head line, that is in
+  **small type**, its median word height (over its words) at most 0.85
+  of the body word height or at most 0.82 of the page's **median line
+  height**, and whose top is at or below the bottom of another region,
   or above it by at most 2 pt, neither the head line nor a margin
-  region, whose median word height is above that (layout's threshold
-  for the footnote band, layout §3, step 4). The 2 pt are for a note
+  region, whose median word height is above that (layout's two
+  thresholds for the footnote band, layout §3, step 4). The page's
+  median line height is the median, over the lines of the page's
+  regions other than the head line's that are at least a quarter as
+  wide as the widest of them (so that no margin region counts), of
+  each line's median word height: layout's median row height, taken on
+  structure's lines.
+
+  The test against the page is for notes set small against their own
+  page but not against the book. Gierke's introduction (pages 13 to 49)
+  is set in 10 to 11 pt, its notes in 8 pt, and the book's body word
+  height is 9.0 pt, set by the translation: the notes are 0.89 of it,
+  so layout made them a band (layout §3, step 4, "Small against the
+  page") and structure, with the book's measure alone, made them body
+  regions, their text paragraphs between the text's. Measured on 19
+  November 2026 on the eight books laid out at 8c18e68, the test
+  against the page makes band regions on Gierke's 31 pages 15 to 18, 23
+  to 31, 34 to 45, 48 and 49 (the introduction's footnotes) and 109,
+  146, 147 and 156 (the translator's notes marked "*"), and on
+  Mariéjol's 25, 34, 159, 245 and 323, the pages where layout's test
+  against the page made or moved a band; no other region of the eight
+  books changes kind. Gierke gets 67 more footnotes (2 before, 69
+  after), Mariéjol 6, and the paragraphs before and after them now run
+  on over the page break; on Mariéjol's 34, 159 and 323 the notes were
+  already taken from the body (section 11) and no block changes.
+
+  The 2 pt are for a note
   that layout starts close under the text (layout §3, step 4, the
   gapless start): Domesday's note "1 See above, p. 359." on page 535,
   one line 66 pt wide, reaches 0.8 pt into the text above it and was a
@@ -308,6 +336,26 @@ the references, gets both too.
   eight books: with them, Domesday's pages 443 and 535 get their notes
   (443's two lines were paragraphs), and Kadesh's 40, on the layout of
   before the review, three; no other block changes;
+- a **one-line note region** is a band region whatever its height and
+  width, and whether or not it is narrow enough to be a margin region:
+  the page's last region, not the head line, that holds one line whose
+  first word is "1" and whose second word starts with a capital letter,
+  and whose top lies below, as above (2 pt), the bottom of every other
+  region that is neither the head line nor a margin region, of which
+  there is at least one. Layout makes such a line a region of its own,
+  after the body's and the margins', only when it is the page's band
+  (layout §3, step 4, "A note of one line boxed as tall as the body"):
+  the text layer boxes the line as tall as the body, 9 to 10 pt in
+  Domesday, so no test of height can find it, and on Domesday's page
+  163 the line, "1 D. B. i. 141 b.", is 55 pt wide, centred, and was a
+  margin region. Structure does not repeat layout's test of width per
+  character: measured on 19 November 2026 on the eight books laid out
+  at 8c18e68, the regions this rule takes are exactly the 11 lines of
+  layout's rule, Domesday's pages 163, 174, 185, 278, 303, 308, 315,
+  347, 472 and 485 and Gierke's 61, and no other region of the eight
+  books has the rule's form. Domesday gets 10 more footnotes (472's was
+  already one, taken from the body by section 11), each linked to its
+  reference, and its notes without a reference stay 323;
 - every other region is a **body region**, in layout's order.
 
 ## 3. Running heads and page numbers in the head
@@ -2791,6 +2839,13 @@ is never made a quote by these rules: it is a note that section 11 did
 not take (Mariéjol's page 210), and stays a paragraph; such a block
 never runs on into the next page's body (section 6 is not applied to
 it), and the paragraph the next page starts is a block of its own.
+Inside the endnote section (section 12) the rule of running on is not
+applied: there every note starts with digits, and one that runs over a
+page break is one paragraph. Gierke's endnotes start with digits ("13.")
+and its marker form is digits since its introduction's notes are band
+regions (section 1); with the rule applied inside the section, 79 of
+its 299 endnotes were cut at a page break in mid-sentence (measured on
+19 November 2026).
 Measured on 16 November 2026 on the first plan's blocks of Domesday's
 and Mariéjol's body ranges, against the reference text: of the quotes
 rules 1 to 3 make there, the exclusion takes 28 of Domesday's 30 notes
