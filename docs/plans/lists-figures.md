@@ -23,8 +23,8 @@ contents; cited "structure §n") and `docs/specs/figures.md` (cited
 "figures §n"), and the formats they give in `docs/architecture.md` §8
 and §13 ("architecture §n") and `docs/glossary.md`, all reconciled in
 commit 2ec7143 of branch `plan/lists-figures`. Dated 18 November 2026.
-State: under way since 18 November 2026; approved (the owner said to go
-on without waiting) the same day.
+State: done on 18 November 2026; approved (the owner said to go on
+without waiting) the same day.
 
 Page means page index of the whole PDF, from 0.
 
