@@ -219,8 +219,17 @@ inside it.
 
 - the **head line** is the first region, together with every **region
   beside it** (below), when together they lie wholly above every other
-  region and the first holds one line with a letter or a digit (and any
-  number of lines of marks above it). Its words are those of the first
+  region, which may reach up to 2 pt into them, and the first holds one
+  line with a letter or a digit (and any number of lines of marks above
+  it). The 2 pt are for a word the OCR boxed tall: Stubbs' "MAPS." (page
+  17) is boxed 18 pt tall and reaches 1 pt into the region below, and
+  without them it was no head line, and a margin region beside nothing,
+  instead of the page's heading. Measured on 17 November 2026 on the
+  eight books, they change 3 pages: that one, Domesday's page 398, whose
+  running head is then removed (layout §3, step 3, names it), and
+  Gierke's page 11, whose "ERRATA." becomes a body line, joined to the
+  contents paragraph of page 10 because it is not centred, instead of a
+  margin note. Its words are those of the first
   region's line and of the regions beside it, left to right, as one
   line. When section 3 does not make it a running head, the first
   region is the first body region and each region beside it is what
