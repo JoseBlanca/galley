@@ -24,13 +24,21 @@ _LINE_FEED_KINDS = frozenset({BlockKind.VERSE, BlockKind.EPIGRAPH})
 
 def attach_spaced_sign(before: str, word: str) -> str | None:
     """The word made of `before` and `word` when `word` is a spaced sign,
-    a word that starts with "?", ";", ":" or "!" ("?", ";^", "?'"), and
+    a word that starts with "?", ";", ":" or "!" and has no letter after
+    it ("?", ";^", ";13", "?'"; not ";is,"), and
     `before` ends with a letter, a digit, ")" or "]": "subjection" and ";"
     give "subjection;" (spec section 23). None when the sign stays apart,
     after a dash, a quotation mark or other punctuation; when `word` holds
     a note reference and the word made would hold none ("14)" and ";13");
     and when `word` is not a spaced sign."""
-    if not (word[:1] in _SPACED_SIGNS and before):
+    # Spec section 23: what follows the sign holds no letter (";", ";^",
+    # ";13", "?'"); a sign followed by letters (";is,") is a speck the OCR
+    # read before a word, which would be glued to the word before it.
+    if not (
+        word[:1] in _SPACED_SIGNS
+        and before
+        and not any(character.isalpha() for character in word[1:])
+    ):
         return None
     last = before[-1]
     if not (last.isalnum() or last in _CLOSING_BRACKETS):

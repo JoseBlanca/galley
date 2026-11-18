@@ -100,6 +100,11 @@ def test_spaced_sign_after_a_letter_digit_or_bracket_is_attached(
         # reference 13, which "14);13" would not.
         ("14)", ";13"),
         ("1854", ";7"),
+        # A speck the OCR read as a sign before a word: Gierke page 29's
+        # "universitas ;is," and Stubbs' "on ?uer" print no sign there.
+        ("universitas", ";is,"),
+        ("on", "?uer"),
+        ("m", ";s."),
     ],
 )
 def test_sign_after_a_dash_or_quotation_mark_or_a_word_not_a_sign_stays(
@@ -230,6 +235,13 @@ def test_spaced_sign_in_french_takes_a_no_break_space_and_no_change() -> None:
     )
 
     assert no_break_positions(block) == frozenset({1, 3, 7})
+
+
+def test_no_break_space_is_not_put_before_a_sign_followed_by_letters() -> None:
+    # Mariéjol's "landgrave !e": a speck read as a sign, glued to a word.
+    block = _block(("landgrave", "!e", "duc", ";"))
+
+    assert no_break_positions(block) == frozenset({3})
 
 
 def test_no_break_space_is_not_put_at_a_line_feed_of_verse_or_a_block_start() -> None:
