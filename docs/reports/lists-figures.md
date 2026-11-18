@@ -58,3 +58,35 @@ The default run grew past a minute while three streams ran tests at once
 (78 to 89 s at a load of 9 to 13, with the shared excerpt fixture
 passing its 30 s timeout); the base commit did the same under that
 load. It is measured again on an idle machine at the end.
+
+## Tasks 2.1 to 2.3 and 3.1 (stream `figures`)
+
+Done and merged at a14924e. analyze finds exactly the spec's 56 in-page
+figures on the eight books, and nothing else: Kadesh 17 (6 maps, 11
+blocks of hieroglyphs or Arabic), Haynes 25, Turney 14; none in Haskins,
+Stubbs, Domesday, Mariéjol or Gierke (whole_book tests, 9 passed in
+71 s). The search adds 6.8 s on one thread to Haynes' 436 pages, as the
+spec measured, so WP 2's decision point holds. extract cuts each figure
+at 300 dpi; layout keeps the words inside a figure's box in a region of
+their own, never re-read.
+
+Two files outside the stream's list, approved by the orchestrator: a
+one-line guard in `structure/__init__.py` (the plate rules run only on a
+page whose figure is a plate; without it five Kadesh text pages became
+plates and lost their paragraphs, and structure stopped on whole Kadesh
+and Turney), and the hook in `layout/__init__.py` that calls the new
+`layout/_figures.py`.
+
+Settled by the rule as written, against what the expected files of
+`kadesh_29-38` guessed: the boxes of the maps on pages 33 and 36 take in
+their scale bars and the words on them ("JO Km.", "icM", "SM."); on page
+37 one of three "Var." labels falls inside the box of its hieroglyphs (its
+middle 0.5 pt inside), so it is removed from the text with a record and
+still shows in the picture. On page 33 the box starts 9.1 pt below the
+map's frame, because the line of text just above hides the frame's top
+row from the 12 pt squares; the picture loses a strip of its frame. Left
+as it is, and listed among the known defects. The expected files are
+updated in task 3.4.
+
+The default run, at the merge, under the load of the lists stream: 2,613
+passed in 79 s with a 120 s per-test limit.
