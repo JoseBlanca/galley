@@ -2073,8 +2073,13 @@ their four words); at 0.70 or 0.75 a group whose chapter
 heading the body lacked would take that other chapter. A
 group's candidates are the glued numbers of the body, from the pages
 after `contents_pages` and not taken by a footnote, as above, from its
-chapter's heading up to the heading of the next group's chapter, or up
-to the endnote section for the last group. Only the group heading loses
+chapter's heading up to the chapter heading of the next group after it
+that has a chapter, or up to the endnote section when no later group
+has one: a group without a chapter between them does not stretch the
+reach of the group before it over the chapters after (with groups
+"alpha", two without a chapter and "betagamma", the first reached to
+the section's start, over "betagamma"'s chapter, before the review of
+the plan's work package 3). Only the group heading loses
 its first word; a body heading is compared by its spans, which never
 hold its label. Before this revision the
 whole book was one range and Haynes' 633 endnotes were matched in order
