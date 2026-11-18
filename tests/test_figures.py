@@ -17,15 +17,21 @@ from galley.analyze import figure_boxes
 from galley.book_folder import BookFolder
 from galley.config import read_config
 from galley.extract import figure_crop_px, figure_image, page_words
+from galley.layout import figure_regions, layout_page_with_figures
 from galley.model import (
     Box,
     Figure,
     FigureKind,
+    Line,
     PageInfo,
     PageKind,
+    PageLayout,
+    PageWords,
+    Region,
     RenderedPage,
     TextSource,
     Word,
+    read_lines,
     read_pages,
     read_words,
 )
@@ -541,3 +547,167 @@ def test_whole_book_analyze_finds_the_in_page_figures_of_section_2_and_no_other(
         page.index: len(page.figure_boxes) for page in pages if page.figure_boxes
     } == _WHOLE_BOOK_FIGURES[book]
     assert all(page.kind is PageKind.TEXT for page in pages if page.figure_boxes)
+
+
+# layout's figure regions (figures spec section 5, "layout: the figure's
+# words kept apart").
+
+_FIGURE = Figure(
+    box=Box(100.0, 100.0, 300.0, 300.0),
+    image="images/figure-0025-1.png",
+    dpi=300,
+    kind=FigureKind.IN_PAGE,
+)
+
+
+def _word(text: str, x0: float, top: float) -> Word:
+    return Word(text, Box(x0, top, x0 + 20.0, top + 10.0), None)
+
+
+def _words_page(words: tuple[Word, ...], figures: tuple[Figure, ...]) -> PageWords:
+    return PageWords(
+        index=25, text_source=TextSource.TEXT_LAYER, words=words, figures=figures
+    )
+
+
+_HEAD = _word("Head", 200.0, 40.0)
+_ABOVE = _word("above", 60.0, 80.0)
+_LABEL = _word("Kadesh", 150.0, 200.0)
+_BESIDE = _word("beside", 320.0, 200.0)
+_LABEL_2 = _word("Orontes", 200.0, 250.0)
+_BELOW = _word("below", 60.0, 320.0)
+
+
+def test_figure_region_holds_the_words_inside_the_box_with_the_figures_box() -> None:
+    page = _words_page((_HEAD, _ABOVE, _LABEL, _BESIDE, _LABEL_2, _BELOW), (_FIGURE,))
+    rest, regions = figure_regions(page)
+    assert rest == _words_page((_HEAD, _ABOVE, _BESIDE, _BELOW), (_FIGURE,))
+    # The label shares its row with "beside", but its line is the region's.
+    assert regions == (
+        Region(
+            _FIGURE.box,
+            (
+                Line(_LABEL.box, (_LABEL,)),
+                Line(_LABEL_2.box, (_LABEL_2,)),
+            ),
+        ),
+    )
+
+
+def test_figure_region_leaves_a_word_of_the_first_row_with_the_page() -> None:
+    # The figure's box reaches the top of the page: its first row, inside
+    # the box, may be the head line.
+    figure = Figure(
+        box=Box(100.0, 20.0, 300.0, 300.0),
+        image=_FIGURE.image,
+        dpi=300,
+        kind=FigureKind.IN_PAGE,
+    )
+    page = _words_page((_HEAD, _LABEL, _BELOW), (figure,))
+    rest, regions = figure_regions(page)
+    assert rest.words == (_HEAD, _BELOW)
+    assert regions == (Region(figure.box, (Line(_LABEL.box, (_LABEL,)),)),)
+
+
+def test_figure_region_none_for_a_figure_with_no_word_inside() -> None:
+    page = _words_page((_HEAD, _ABOVE, _BELOW), (_FIGURE,))
+    assert figure_regions(page) == (page, ())
+
+
+def test_figure_region_none_on_a_plate() -> None:
+    plate = Figure(
+        box=Box(0.0, 0.0, 432.0, 648.0),
+        image="images/plate-0025.png",
+        dpi=300,
+        kind=FigureKind.PLATE,
+    )
+    page = _words_page((_HEAD, _LABEL, _BELOW), (plate,))
+    assert figure_regions(page) == (page, ())
+
+
+def test_figure_region_a_word_inside_two_boxes_goes_to_the_first_figure() -> None:
+    second = Figure(
+        box=Box(140.0, 190.0, 400.0, 400.0),
+        image="images/figure-0025-2.png",
+        dpi=300,
+        kind=FigureKind.IN_PAGE,
+    )
+    page = _words_page((_HEAD, _LABEL, _BESIDE), (_FIGURE, second))
+    _, regions = figure_regions(page)
+    assert regions == (
+        Region(_FIGURE.box, (Line(_LABEL.box, (_LABEL,)),)),
+        Region(second.box, (Line(_BESIDE.box, (_BESIDE,)),)),
+    )
+
+
+def test_figure_region_follows_the_pages_regions_and_keeps_the_figures() -> None:
+    page = _words_page((_HEAD, _ABOVE, _LABEL, _BESIDE, _BELOW), (_FIGURE,))
+    layout, records = layout_page_with_figures(page, None, None)
+    rest = Region(
+        Box(60.0, 40.0, 340.0, 330.0),
+        (
+            Line(_HEAD.box, (_HEAD,)),
+            Line(_ABOVE.box, (_ABOVE,)),
+            Line(_BESIDE.box, (_BESIDE,)),
+            Line(_BELOW.box, (_BELOW,)),
+        ),
+    )
+    assert layout == PageLayout(
+        25, (rest, Region(_FIGURE.box, (Line(_LABEL.box, (_LABEL,)),))), (_FIGURE,)
+    )
+    assert records == ()
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+def test_kadesh_29_38_figure_regions_hold_the_words_read_on_the_pictures(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    folder = excerpt_books[_KADESH]
+    lines = read_lines(folder.lines_json)
+    regions = {
+        page.index: tuple(
+            word.text
+            for region in page.regions
+            if region.box in tuple(figure.box for figure in page.figures)
+            for line in region.lines
+            for word in line.words
+        )
+        for page in lines.pages
+        if page.index in _KADESH_BOXES
+    }
+    # Each figure with words has one region, whose box is the figure's.
+    assert {
+        page.index: sum(
+            region.box in tuple(figure.box for figure in page.figures)
+            for region in page.regions
+        )
+        for page in lines.pages
+        if page.index in _KADESH_BOXES
+    } == {index: 1 if words else 0 for index, words in _KADESH_WORDS_INSIDE.items()}
+    assert {index: sorted(words) for index, words in regions.items()} == {
+        index: sorted(words) for index, words in _KADESH_WORDS_INSIDE.items()
+    }
+    # The figures go through with their kind; no figure's region is re-read.
+    assert {
+        page.index: tuple(figure.kind for figure in page.figures)
+        for page in lines.pages
+        if page.figures
+    } == {
+        **{index: (FigureKind.IN_PAGE,) for index in _KADESH_BOXES},
+        5: (FigureKind.PLATE,),
+        6: (FigureKind.PLATE,),
+    }
+    figure_words = {
+        (page.index, word.box)
+        for page in lines.pages
+        for region in page.regions
+        if region.box in tuple(figure.box for figure in page.figures)
+        for line in region.lines
+        for word in line.words
+    }
+    assert not any(
+        (record.page_index, word.box) in figure_words
+        for record in lines.rereads
+        for word in record.layer_words
+    )
