@@ -1901,15 +1901,18 @@ reading order:
   Gierke 22, Haskins 4, Stubbs and Turney 1 each, Haynes none, and
   Mariéjol 413, where the book's reference form, the bracketed number,
   leaves signs out of the matching (below). Structure run on copies of
-  those runs with the form (spec review, 18 November 2026): Domesday's
-  linked references go from 1,493 to 1,516, 23 notes gained and none
-  lost, though on page 77 note 2's reference moves to a "*" and note
-  3 takes the "8"; Kadesh, Gierke and Haskins do not change. A word
-  with punctuation after the sign whose part before the sign holds one
-  letter alone, "S*.", is no candidate: Domesday prints "St." with a
-  raised "t", which the OCR reads "S*." 28 times, and checked on the
-  page images, 21 of those 23 new links were right and the 2 wrong were
-  "S*." on pages 285 and 333 (18 November 2026). A sign at the end of a
+  those runs with the form (spec review, 18 November 2026), before the
+  exclusion of "S*." below: Domesday's linked references go from 1,493
+  to 1,516, 23 notes gained and none lost, though on page 77 note 2's
+  reference moves to a "*" and note 3 takes the "8"; Kadesh, Gierke and
+  Haskins do not change. A word with punctuation after the sign whose
+  part before the sign holds one letter alone, "S*.", is no candidate:
+  Domesday prints "St." with a raised "t", which the OCR reads "S*." 28
+  times, and checked on the page images, 21 of those 23 new links were
+  right and the 2 wrong were "S*." on pages 285 and 333 (18 November
+  2026). With that exclusion, Domesday's linked references go from
+  1,493 to 1,514: 21 notes gained, none lost, and one reference moved,
+  on page 77, to the right note. A sign at the end of a
   word of one letter, "T*", stays a candidate: the rule changed on all
   eight books would also unlink a reference of Kadesh's page 39.
 
