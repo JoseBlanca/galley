@@ -29,6 +29,7 @@ from galley.model import (
     read_blocks,
 )
 from galley.structure import make_blocks, survey_book
+from galley.structure._regions import RegionKind, region_kinds
 
 _HASH = "a" * 64
 _NO_WORDS: frozenset[str] = frozenset()
@@ -515,6 +516,21 @@ def test_head_line_boxed_tall_into_the_region_below_by_1_pt_is_a_heading() -> No
         )
         blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
         assert (_headings(blocks) == ((1, None, "MAPS."),)) is heading
+
+
+@pytest.mark.parametrize(("reach", "kind"), [(0.8, "band"), (2.5, "margin")])
+def test_note_line_reaching_into_the_text_above_by_0_8_pt_is_a_band_region(
+    reach: float, kind: str
+) -> None:
+    # Domesday's page 535: a note of one line in small type, narrow,
+    # under the text, whose top lies 0.8 pt above the text's bottom.
+    body = _body(70, *_BODY_TEXTS)
+    note = _region(_line("1 Id.", 90, body.box.bottom - reach, 7))
+    page = PageLayout(30, (body, note), ())
+    assert region_kinds(page, _WORD_HEIGHT_PT, frozenset()) == (
+        RegionKind.BODY,
+        RegionKind(kind),
+    )
 
 
 # On the six public-domain books (spec section 26, "Whole-book tests"), from
