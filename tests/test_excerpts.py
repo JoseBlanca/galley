@@ -918,12 +918,13 @@ def test_chapter_summary_stubbs_51_is_one_block_and_very_few_starts_a_paragraph(
         for block in blocks.blocks
         if block.origin[0].page_index == 0
     )
-    # "accession.", the end of the cut-in note beside "Very few…", goes
-    # before that paragraph (section 13).
+    # The cut-in note beside "Very few…", "Importance attached by
+    # contemporaries to Henry's accession.", goes before that paragraph
+    # (section 13).
     assert kinds[1:5] == (
         (BlockKind.HEADING, "THE"),
         (BlockKind.CHAPTER_SUMMARY, "Terms"),
-        (BlockKind.MARGIN_NOTE, "accession."),
+        (BlockKind.MARGIN_NOTE, "Importance"),
         (BlockKind.PARAGRAPH, "Very"),
     )
 
