@@ -421,7 +421,7 @@ sentence's end ends its paragraph.
    pytest tests/test_structure_epigraphs.py -k "page_break"
    --collect-only -q` lists at least 3 (0 at 6b8c54d).
 3. On the owner's books, structure §26's rows: `epigraph` blocks and
-   those with line feeds (Turney 11 and 0, Haynes 21 and 8),
+   those with line feeds (Turney 13 and 0, Haynes 21 and 8),
    `source_dash` changes (0 and 21), and Turney's page 13 the origin of
    an epigraph block and of no other block: `uv run pytest -m whole_book
    tests/test_owner_books.py -k "epigraph or source_dash"
@@ -439,7 +439,7 @@ sentence's end ends its paragraph.
 **What could go wrong.** Rule 5, a page of its own, was not measured on
 the public-domain books; deliverable 4 shows what it takes.
 
-- [ ] 4.1 The epigraph rule as a function of a page's body lines after
+- [x] 4.1 The epigraph rule as a function of a page's body lines after
   its heading lines (rules 1 to 5, the source line, verse), giving the
   epigraph runs, their sources and the dash to remove; with the unit
   tests. Spec: structure §22, "The rule", "Verse". Stream `epigraphs`.
