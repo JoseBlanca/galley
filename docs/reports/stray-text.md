@@ -147,3 +147,18 @@ The stream changed `tests/test_excerpts.py` and the expected files of
 `stubbs_51_56-64` pages 0 and 9 outside its files, with leave: the rule
 takes whole notes out of the body lines of Stubbs 51 and 64, and the
 new expected text was compared with the page images at 200 dpi.
+
+## Task 4.3: re-read words at a cut-in crop's edge
+
+Merged: 2b0700e (`docs/specs/reocr.md` §3 and §8, where layout's spec
+puts the cut-in crop's filters) and 5552d40. The crop on Stubbs 56 ended
+at 150.5 pt, through the tops of the body line below; Tesseract read
+them as "[dy" (confidence 5), which overlapped no body word's box. A
+re-read word within 3 pt of a cut-in crop's top or bottom is now
+dropped. On whole Stubbs, 5 words came within 1.6 pt of an edge, each
+the top of a cut body line on the page image (pages 56, 102, 127, 177,
+283); the nearest real word is 10.7 pt inside. Re-read words kept:
+Stubbs 6,387 to 6,373 (the 5 junk words, and 9 words of two notes on
+pages 102 and 177 that the text layer now gives with the same text);
+Domesday 4,955, unchanged. pytest: 2,885 passed, 9 expected failures;
+`pytest -m whole_book -k stubbs`: 8 passed.
