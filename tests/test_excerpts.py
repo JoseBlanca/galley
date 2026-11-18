@@ -51,7 +51,7 @@ EXPECTED_EXCERPT_PAGES = {
     "haskins_front": 11,
     "domesday_front_flow": 10,
     "gierke_front_flow": 10,
-    "haskins_heads_notes": 13,
+    "haskins_heads_notes": 14,
     "stubbs_heads": 18,
     "gierke_intro_heads": 13,
     "domesday_rereads": 11,
@@ -311,17 +311,6 @@ OWNER_BOOKS_WP1_DIR = EXPECTED_DIR / "owner_books_wp1"
 OWNER_BOOKS_WP1_PAGES = tuple(
     sorted(path.stem for path in OWNER_BOOKS_WP1_DIR.glob("*.json"))
 )
-# What an excerpt cannot give that its whole book does, by file, with the
-# key left out here and the reason; tests/test_structure_heads.py checks
-# it on the whole book.
-_OWNER_BOOKS_WP1_WHOLE_BOOK_ONLY = frozendict(
-    {
-        # Haskins' page 195 follows page 66's "BIBLIOGRAPHICAL NOTE" in the
-        # excerpt with no chapter heading between, so its band is taken for
-        # that note's paragraphs (structure spec section 16).
-        "haskins_heads_notes_page11": "notes",
-    }
-)
 
 
 @functools.cache
@@ -385,10 +374,7 @@ def test_owner_books_wp1_page_gives_its_removals_numbers_headings_and_notes(
     )
     lines, blocks = excerpt_outputs[case["excerpt"]]
     actual = _owner_books_wp1_page(lines, blocks, case["page"])
-    keys = set(case["expected"]) - {_OWNER_BOOKS_WP1_WHOLE_BOOK_ONLY.get(name)}
-    assert {key: actual[key] for key in keys} == {
-        key: case["expected"][key] for key in keys
-    }
+    assert {key: actual[key] for key in case["expected"]} == case["expected"]
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_EXCERPT_PAGES))
