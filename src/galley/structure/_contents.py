@@ -26,11 +26,15 @@ from galley.structure._summaries import dash_count
 # (the indent of section 6, rule 1, and of the index).
 _RUN_ON_MIN_PT = 5.0
 # Spec section 30, rule 3: an analytical summary has at least 2 lines and
-# 2 inline page references, and at least one for every two of its lines
-# (guessed; it changes nothing on the eight books).
+# 2 inline page references, and at least one for every five of its lines.
+# Measured on 18 November 2026 on Gierke's pages 52 to 60, whose
+# references often end a line or read "(n)" for "(11)": one for every two
+# lines cut 2 of their 34 summaries into an entry per line (72 entries
+# instead of 52); four cut some too; five keeps all, and changes no other
+# book (structure spec section 30, "The thresholds").
 _SUMMARY_MIN_LINES = 2
 _SUMMARY_MIN_REFERENCES = 2
-_SUMMARY_LINES_PER_REFERENCE = 2
+_SUMMARY_LINES_PER_REFERENCE = 5
 # Spec section 30, rule 8: a topics entry of at least 2 lines holds at
 # least 2 dashes (the test of a chapter summary, section 15, rule 4).
 _TOPICS_MIN_LINES = 2
@@ -202,7 +206,7 @@ def _pieces(lines: Sequence[PlacedLine]) -> tuple[tuple[PlacedLine, ...], ...]:
 
 def is_analytical_summary(piece: Sequence[PlacedLine]) -> bool:
     """Spec section 30, rule 3: at least 2 lines, at least 2 inline page
-    references, and at least one for every two lines. An inline page
+    references, and at least one for every five lines. An inline page
     reference is neither the first nor the last word of its line."""
     references = sum(
         1

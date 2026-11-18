@@ -221,6 +221,23 @@ def test_domesday_layout_gives_depths_1_to_3_and_keeps_a_summary_whole() -> None
     )
 
 
+def test_summary_whose_references_mostly_end_their_lines_is_kept_whole() -> None:
+    # Gierke's page 53: six lines, two inline references, the others at a
+    # line's end or read "(n)"; one for every five lines makes a summary.
+    lines = _lines(
+        ("The postulate of an external unity of Mankind (10). Mankind", 60, 340),
+        ("as a mystical body, Ecclesia universalis (10).", 60, 340),
+        ("The divinely appointed severance of this body into two", 60, 340),
+        ("the Spiritual and the Temporal (10). Each of these a", 60, 340),
+        ("external realm (n). This dualism cannot be final, but", 60, 340),
+        ("ciliation in some higher unity (n).", 60, None),
+    )
+    entries = contents_entries(lines)
+    assert len(entries) == 1
+    assert entries[0].topics
+    assert entries[0].page_number is None
+
+
 def test_chapitre_11_over_a_title_is_one_entry_with_that_label_and_no_page() -> None:
     # Mariéjol's page 450: "CHAPITRE II", read "CHAPITRE 11", over its title.
     lines = (_centred("CHAPITRE 11", 100), _centred("DAUPHINE ET REINE", 114))
