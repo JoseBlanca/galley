@@ -307,6 +307,7 @@ def _heading_line_numbers(
     pitch: float,
     side_edges: Edges | None,
     kept_head: Line | None,
+    never: frozenset[int],
 ) -> frozenset[int]:
     """The positions in `lines`, a page's body stream, of its heading lines
     (spec section 14, "The rule"): the lines rules 1 to 4 take, the tall
@@ -315,11 +316,13 @@ def _heading_line_numbers(
     continuation of a line they take. `pitch` is the body line pitch;
     `side_edges` the sides of the page's body and band lines when its body
     holds fewer than 5 lines, else None; `kept_head` the head line section
-    3 left in the text near the head top, or None."""
+    3 left in the text near the head top, or None; `never` the positions of
+    lines that are never heading lines."""
     by_rule = {
         number
         for number in range(len(lines))
-        if _is_heading_line(lines, number, pitch, side_edges, kept_head)
+        if number not in never
+        and _is_heading_line(lines, number, pitch, side_edges, kept_head)
     }
     median_height = (
         statistics.median(_line_height(line) for line in lines) if lines else 0.0
@@ -331,7 +334,7 @@ def _heading_line_numbers(
         # In order, so that a tall line below a tall heading line follows a
         # heading line.
         for number in range(len(lines)):
-            if number not in by_rule and _is_tall_line(
+            if number not in by_rule | never and _is_tall_line(
                 lines, number, pitch, median_height, by_rule
             ):
                 by_rule.add(number)
@@ -350,7 +353,7 @@ def _heading_line_numbers(
         and number + 1 not in taken
         and _is_continuation(lines, number + 1, pitch)
     )
-    return taken | continuations
+    return (taken | continuations) - never
 
 
 class PageHead(StrEnum):
@@ -391,6 +394,7 @@ def heading_runs(
     pitch: float,
     head: PageHead,
     kept_head: Line | None,
+    never: frozenset[int],
 ) -> tuple[BodyRun, ...]:
     """The heading blocks of `lines`, a page's body stream, in order (spec
     section 14). A block is level 1 when its first line is a chapter label
@@ -398,9 +402,11 @@ def heading_runs(
     running head (`head`); level 2 otherwise. `band` are the lines of the
     page's band regions; `pitch` is the body line pitch, in points;
     `kept_head` the page's head line when section 3 left it in the text
-    within 2 pitches of the book's median head top, else None."""
+    within 2 pitches of the book's median head top, else None; `never` the
+    positions of the lines that are never heading lines, those of the head
+    band alike to a running head."""
     numbers = sorted(
-        _heading_line_numbers(lines, pitch, _side_edges(lines, band), kept_head)
+        _heading_line_numbers(lines, pitch, _side_edges(lines, band), kept_head, never)
     )
     groups: list[list[int]] = []
     for number in numbers:
