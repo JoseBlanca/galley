@@ -2334,6 +2334,39 @@ def test_unlike_broken_number_under_an_ocr_word_paired_by_digits_is_replaced() -
         ) == (copy,)
 
 
+def test_unlike_word_under_an_ocr_word_the_layer_glued_over_stays_its_pair() -> None:
+    # reocr spec, section 4: a Tesseract word over a word the layer glued
+    # is not excepted. "of,96" lies over Tesseract's "of," and "96", with
+    # the known "the" under "of," too, and a copy "of" below: "of," keeps
+    # the words under it, the copy stays.
+    glued = Word("of,96", Box(10, 100, 42, 108), None)
+    under = Word("the", Box(12, 101, 20, 107), None)
+    copy = _layer("of", 10, 110)
+    ocr = (
+        Word("of,", Box(10, 100, 30, 108), 90.0),
+        Word("96", Box(32, 100, 42, 108), 90.0),
+    )
+    assert model.replaced_layer_words(
+        (glued, under, copy), ocr, is_known=_in(frozenset({"the"}))
+    ) == (glued, under)
+
+
+def test_unlike_exception_takes_no_copy_another_ocr_word_already_reads() -> None:
+    # The layer's "tem" lies nearer Tesseract's first "tem," than its
+    # second, but the first has junk under it, so (b) pairs "tem" with the
+    # second; the first keeps its junk, and "tem" counts in the score.
+    junk, copy = _layer("~", 10, 101), _layer("tem", 10, 110)
+    ocr = (_tesseract("tem,", 10, 100), _tesseract("tem,", 10, 124))
+    assert model.matched_ocr_positions((junk, copy), ocr, is_known=_unknown) == {
+        0,
+        1,
+    }
+    assert model.scored_layer_words((junk, copy), ocr, is_known=_unknown) == (
+        junk,
+        copy,
+    )
+
+
 def test_unlike_known_word_under_an_ocr_word_paired_by_letters_stays() -> None:
     # A known word under it may be another printed word the layer read
     # rightly ("14." under Tesseract's "146", Gierke page 63).

@@ -2252,6 +2252,39 @@ def test_structure_case_split_with_its_word_change_passes() -> None:
                 reason=ChangeReason.SOURCE_DASH,
             ),
         ),
+        # The first of two words is more than dashes: it is dropped.
+        (
+            ("—Thomas Hobbes",),
+            "Hobbes",
+            WordChange(
+                page_index=0,
+                before=("—Thomas", "Hobbes"),
+                after=("Hobbes",),
+                reason=ChangeReason.SOURCE_DASH,
+            ),
+        ),
+        # An empty first word is no dash.
+        (
+            ("Hobbes",),
+            "Hobbes",
+            WordChange(
+                page_index=0,
+                before=("", "Hobbes"),
+                after=("Hobbes",),
+                reason=ChangeReason.SOURCE_DASH,
+            ),
+        ),
+        # A word of dashes alone becomes no word.
+        (
+            ("—",),
+            "",
+            WordChange(
+                page_index=0,
+                before=("—",),
+                after=("",),
+                reason=ChangeReason.SOURCE_DASH,
+            ),
+        ),
         # A dash inside the word taken out too.
         (
             ("—1873—1881",),
@@ -2318,6 +2351,28 @@ def test_structure_case_split_with_its_word_change_passes() -> None:
                 reason=ChangeReason.CASE_SPLIT,
             ),
         ),
+        # A second word of before dropped.
+        (
+            ("theAvre x",),
+            "the Avre",
+            WordChange(
+                page_index=0,
+                before=("theAvre", "x"),
+                after=("the", "Avre"),
+                reason=ChangeReason.CASE_SPLIT,
+            ),
+        ),
+        # An empty part.
+        (
+            ("the",),
+            "the",
+            WordChange(
+                page_index=0,
+                before=("the",),
+                after=("the", ""),
+                reason=ChangeReason.CASE_SPLIT,
+            ),
+        ),
         # Three parts.
         (
             ("ofTheAvre",),
@@ -2334,12 +2389,17 @@ def test_structure_case_split_with_its_word_change_passes() -> None:
         "source_dash-drops-a-letter",
         "source_dash-without-a-dash",
         "source_dash-glues-two-words",
+        "source_dash-drops-the-first-word",
+        "source_dash-empty-first-word",
+        "source_dash-leaves-no-word",
         "source_dash-inside-the-word",
         "punctuation_attached-no-sign",
         "punctuation_attached-changed-sign",
         "punctuation_attached-three-words",
         "case_split-other-letters",
         "case_split-lower-case",
+        "case_split-drops-a-word",
+        "case_split-empty-part",
         "case_split-three-parts",
     ],
 )
@@ -2487,6 +2547,20 @@ def test_walk_of_another_div_inside_an_epigraph_raises(inner_div: str) -> None:
     epigraph = _classed_div("b-p0000-002", "epigraph", f"{_para('The')},{inner_div}")
 
     with pytest.raises(ExternalProgramError, match="Div element in block b-p0000-002"):
+        _words_of_pandoc_json(_pandoc_document(epigraph))
+
+
+def test_walk_of_an_epigraph_source_holding_a_note_reference_raises() -> None:
+    link = _link('["epub:type","noteref"]', _str("1"))
+    paragraph = f'{{"t":"Para","c":[{_str(_SOURCE_START)},{link}]}}'
+    source = _classed_div("", "epigraph-source", paragraph)
+    epigraph = _classed_div("b-p0000-002", "epigraph", f"{_para('The')},{source}")
+
+    with pytest.raises(
+        ExternalProgramError,
+        match="epigraph-source div in block b-p0000-002 holds a note or a note "
+        "reference",
+    ):
         _words_of_pandoc_json(_pandoc_document(epigraph))
 
 
