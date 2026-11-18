@@ -383,6 +383,7 @@ def test_cut_the_box_is_rounded_outwards_to_whole_pixels() -> None:
     assert figure_crop_px(Box(0.1, 0.1, 0.2, 0.2), 72) == (0, 0, 1, 1)
 
 
+@pytest.mark.thread_unsafe
 def test_cut_a_box_past_the_render_is_clipped_with_a_warning_naming_the_page(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -405,6 +406,7 @@ def test_cut_a_box_past_the_render_is_clipped_with_a_warning_naming_the_page(
     ]
 
 
+@pytest.mark.thread_unsafe
 def test_cut_a_box_inside_the_render_logs_no_warning(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
