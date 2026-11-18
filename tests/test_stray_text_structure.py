@@ -31,7 +31,6 @@ def _expected(excerpt: str, page: int) -> dict[str, Any]:
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.xfail(strict=True, reason=_TASK_3_2)
 @pytest.mark.parametrize("page", [2, 8])
 def test_head_damaged_beyond_eight_letters_is_removed_as_a_running_head(
     excerpt_books: frozendict[str, BookFolder], page: int

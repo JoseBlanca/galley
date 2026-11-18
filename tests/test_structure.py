@@ -1317,14 +1317,14 @@ def test_head_below_the_median_by_pitches(pitches: float, running: bool) -> None
         (
             (
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDE",
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLM",
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRS",
             ),
             True,
         ),
         (
             (
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDE",
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMN",
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRST",
             ),
             False,
         ),
@@ -1335,8 +1335,8 @@ def test_head_below_the_median_by_pitches(pitches: float, running: bool) -> None
         "0.65 alike",
         "4 letters",
         "3 letters",
-        "31 and 39 letters",
-        "31 and 40 letters",
+        "31 and 45 letters",
+        "31 and 46 letters",
     ],
 )
 def test_heads_alike_at_the_bounds(heads: tuple[str, str], running: bool) -> None:
