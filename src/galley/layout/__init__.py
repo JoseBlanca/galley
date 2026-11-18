@@ -26,8 +26,9 @@ crops and choices in `_reread`, and its rendering, reading and laying out
 again in `_rereading`. `run` measures the
 book, then lays out its pages in parallel, re-reading unless the config's
 `ocr` is `trust` or `redo`. On a page with in-page figures, the words
-inside each figure's box are first set apart as its region
-(`figure_regions`, docs/specs/figures.md section 5), never re-read.
+inside each figure's box are then moved from the regions the page was
+laid out into to the figure's own region (`figure_regions`,
+docs/specs/figures.md section 5), never re-read.
 """
 
 import bisect
@@ -276,8 +277,8 @@ def run(
 
     Only text pages whose words are the text layer's are re-read (reocr
     spec, section 3), and never the words inside an in-page figure, which
-    are the figure's region (`figure_regions`); a render is made in the one PDFium thread, and
-    Tesseract runs in the worker threads. lines.json and every later
+    are the figure's region (`figure_regions`); a render is made in the
+    one PDFium thread, and Tesseract runs in the worker threads. lines.json and every later
     stage's file (blocks.json, book.md, book.epub) are deleted first.
     pages.json must have been made from `config.pdf` and words.json from
     the same PDF, or InputFileError names the stage to run again. When the
