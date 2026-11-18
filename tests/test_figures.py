@@ -547,11 +547,22 @@ def _frame(index: int) -> tuple[Box, float]:
     return Box(x0, top, x1, bottom), float(under)
 
 
+def _excerpt_boxes(folder: BookFolder) -> dict[int, tuple[Box, ...]]:
+    """The figure boxes analyze gave the excerpt's pages, by page index."""
+    return {
+        page.index: page.figure_boxes
+        for page in read_pages(folder.pages_json).pages
+        if page.figure_boxes
+    }
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
 @pytest.mark.parametrize("index", [0, 4, 7, 9])
 def test_kadesh_29_38_boxes_hold_each_maps_frame_and_its_scale_bars(
-    index: int,
+    index: int, excerpt_books: frozendict[str, BookFolder]
 ) -> None:
-    (box,) = _KADESH_BOXES[index]
+    (box,) = _excerpt_boxes(excerpt_books[_KADESH])[index]
     frame, under = _frame(index)
     assert abs(box.x0 - frame.x0) <= 6.0
     assert abs(box.x1 - frame.x1) <= 6.0
@@ -561,8 +572,12 @@ def test_kadesh_29_38_boxes_hold_each_maps_frame_and_its_scale_bars(
     assert frame.bottom < box.bottom <= under + 4.0
 
 
-def test_kadesh_29_38_box_of_the_hieroglyphs_lies_within_their_ink() -> None:
-    (box,) = _KADESH_BOXES[8]
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+def test_kadesh_29_38_box_of_the_hieroglyphs_lies_within_their_ink(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    (box,) = _excerpt_boxes(excerpt_books[_KADESH])[8]
     ink, _ = _frame(8)
     assert ink.x0 + 9.0 <= box.x0 <= ink.x0 + 11.0
     assert abs(box.top - ink.top) <= 4.0
@@ -610,11 +625,12 @@ def test_kadesh_29_38_boxes_each_have_an_in_page_figure_and_its_image(
     pages = read_pages(folder.pages_json).pages
     words = read_words(folder.words_json).pages
     for page, page_of_words in zip(pages, words, strict=True):
-        assert tuple(figure.box for figure in page_of_words.figures) == (
-            page.figure_boxes
-            if page.kind is PageKind.TEXT
-            else tuple(figure.box for figure in page_of_words.figures)
-        )
+        # A text page's in-page figures are its boxes; no other page has one.
+        assert tuple(
+            figure.box
+            for figure in page_of_words.figures
+            if figure.kind is FigureKind.IN_PAGE
+        ) == (page.figure_boxes if page.kind is PageKind.TEXT else ())
         for number, figure in enumerate(
             (
                 figure
@@ -673,10 +689,6 @@ _WHOLE_BOOK_FIGURES = frozendict(
         "politicaltheorie00gieruoft": frozendict(),
     }
 )
-
-
-def test_the_whole_book_figures_are_17_all_of_kadesh() -> None:
-    assert sum(sum(pages.values()) for pages in _WHOLE_BOOK_FIGURES.values()) == 17
 
 
 @pytest.fixture(scope="module")

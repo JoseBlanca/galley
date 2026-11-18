@@ -8,10 +8,8 @@ file name and skips, with the reason, when the PDF is absent.
 """
 
 import functools
-import json
 import threading
 from collections.abc import Callable
-from pathlib import Path
 
 import pytest
 
@@ -21,20 +19,6 @@ from galley.config import read_config
 from galley.model import PageInfo, PageKind, read_pages
 
 pytestmark = [pytest.mark.whole_book, pytest.mark.timeout(900)]
-
-# The configs of tests/conftest.py's owner_book_run (structure spec section
-# 21), and the patterns that find each PDF in the samples folder.
-_PATTERNS = {"turney": "*Turney*.pdf", "haynes": "*Haynes*.pdf"}
-_CONFIGS = {
-    "turney": (
-        "exclude_pages = [2, 3, 5, 9, 165, 168, 171, 306, 307, 308, 309]\n"
-        "contents_pages = [10]\n"
-    ),
-    "haynes": (
-        "exclude_pages = [0, 1, 3, 7, 11, 13, 329, 389, 431, 432, 434]\n"
-        "contents_pages = [8]\n"
-    ),
-}
 
 # Figures spec section 2: the in-page figures of each book, by page index
 # and count. Haynes has one on each of 25 pages; Turney 14 on 11 pages, the
@@ -63,41 +47,26 @@ _FIGURES = {
 }
 
 
-def test_the_owner_books_figures_are_25_and_14() -> None:
-    assert sum(_FIGURES["haynes"].values()) == 25
-    assert sum(_FIGURES["turney"].values()) == 14
-
-
 @pytest.fixture(scope="module")
 def owner_book_analyzed(
-    samples_dir: Path, tmp_path_factory: pytest.TempPathFactory
+    owner_book_toml: Callable[[str], str], tmp_path_factory: pytest.TempPathFactory
 ) -> Callable[[str], tuple[PageInfo, ...]]:
     """A function that gives the pages of one of the owner's books, "turney"
-    or "haynes", as analyze finds them, run the first time a test asks for
-    the book. Skips the test when the book's PDF is not in the samples
-    folder."""
-    roots = {book: tmp_path_factory.mktemp(book) for book in _PATTERNS}
-    locks = {book: threading.Lock() for book in _PATTERNS}
+    or "haynes", as analyze finds them with the config of tests/conftest.py,
+    run the first time a test asks for the book. Skips the test when the
+    book's PDF is not in the samples folder."""
+    roots = {book: tmp_path_factory.mktemp(book) for book in ("turney", "haynes")}
+    locks = {book: threading.Lock() for book in roots}
 
     def analyzed(book: str) -> tuple[PageInfo, ...]:
-        pdfs = sorted(samples_dir.glob(_PATTERNS[book]))
-        if not pdfs:
-            pytest.skip(f"no PDF matching {_PATTERNS[book]} in {samples_dir}")
+        toml = owner_book_toml(book)
         with locks[book]:
-            return analyzed_once(book, pdfs[0])
+            return analyzed_once(book, toml)
 
     @functools.cache
-    def analyzed_once(book: str, pdf: Path) -> tuple[PageInfo, ...]:
+    def analyzed_once(book: str, toml: str) -> tuple[PageInfo, ...]:
         folder = BookFolder(roots[book])
-        folder.book_toml.write_text(
-            f"pdf = {json.dumps(str(pdf))}\n"
-            'title = "An owner\'s book"\n'
-            'authors = ["An Author"]\n'
-            'language = "en"\n'
-            'ocr = "trust"\n'
-            f"{_CONFIGS[book]}",
-            encoding="utf-8",
-        )
+        folder.book_toml.write_text(toml, encoding="utf-8")
         analyze.run(folder, read_config(folder.book_toml))
         return read_pages(folder.pages_json).pages
 
