@@ -301,7 +301,7 @@ Tasks (stream `layout`, after 3.4):
 - [x] 4.1 The shortened-row test of item 4 in the cut-in zones, and the
   tests of deliverables 1 and 3. Spec: layout §9 as amended.
 - [x] 4.2 The whole-book counts of deliverable 2.
-- [ ] 4.3 (added after 4.2) Re-reading on Stubbs 56: the new cut-in
+- [x] 4.3 (added after 4.2) Re-reading on Stubbs 56: the new cut-in
   zone lets Tesseract read the tops of body letters as "[dy" in the
   margin. Find why the re-reading filter (layout §3, "Re-reading small
   print") lets it through, fix it, and pass the strict xfail that asserts
