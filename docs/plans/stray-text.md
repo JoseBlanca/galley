@@ -273,7 +273,7 @@ Tasks:
   174, 278. Spec: layout §3 as amended.
 - [x] 3.4 (stream `layout`, after 3.3) The whole-book counts of
   deliverable 3, with the counts of the starting commit beside them.
-- [ ] 3.5 (added after 3.4) structure's band-region test (structure §2)
+- [x] 3.5 (added after 3.4) structure's band-region test (structure §2)
   measured against the page, as layout's footnote band now is: layout
   makes Gierke's introduction notes and Domesday's one-line notes into
   bands, and structure still refuses them because their words are above
