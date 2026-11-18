@@ -243,15 +243,24 @@ inside it.
   left or wholly right of
   it, or overlaps vertically a region wider than itself (a note that
   Stubbs cuts into the body column, which layout takes out of the body
-  lines into a region of its own: layout §3, step 2b). Margin notes are about 30
+  lines into a region of its own: layout §3, step 2b), unless it is in
+  small type (as a band region below) and its top lies at most 2 pt
+  above that region's bottom. Margin notes are about 30
   pt wide against columns of 266 to 317 pt; each column of an index is
   about half the width, so it is not a margin region;
 - a **band region** is any other region, not the head line, whose
   median word height (over its words) is at most 0.85 of the body word
   height and whose top is at or below the bottom of another region,
-  neither the head line nor a margin region, whose median word height is
-  above that (layout's threshold for the footnote band, layout §3,
-  step 4);
+  or above it by at most 2 pt, neither the head line nor a margin
+  region, whose median word height is above that (layout's threshold
+  for the footnote band, layout §3, step 4). The 2 pt are for a note
+  that layout starts close under the text (layout §3, step 4, the
+  gapless start): Domesday's note "1 See above, p. 359." on page 535,
+  one line 66 pt wide, reaches 0.8 pt into the text above it and was a
+  margin region, its note lost. Measured on 18 November 2026 on the
+  eight books: with them, Domesday's pages 443 and 535 get their notes
+  (443's two lines were paragraphs), and Kadesh's 40, on the layout of
+  before the review, three; no other block changes;
 - every other region is a **body region**, in layout's order.
 
 ## 3. Running heads and page numbers in the head
@@ -393,8 +402,10 @@ speck). Gierke's page 167 has a speck 12 pt below its head's top,
 which is not taken; the head stays as now.
 
 **A chapter label is never a running head.** A head line whose first
-word, without a "." or "," after it, is CHAPTER, CHAPITRE, ESSAY,
-PART, PARTIE, BOOK or LIVRE, in any case, is no running head, whatever
+word starts with a **chapter label word**, CHAPTER, CHAPITRE, ESSAY,
+PART, PARTIE, BOOK or LIVRE, in any case, the whole word but for one
+or more ".", ",", ":" or ";" after it (the same test as section 14's
+chapter label), is no running head, whatever
 the rules above find: it is the first line of a chapter's heading
 (section 14). Haynes (section 21) sets its chapter label at a top of 56
 to 74 pt, 1.5 to 2.7 pitches below the median top of its heads (34.8
@@ -2122,8 +2133,10 @@ Terms: a line's **capitals share** is the share of its letters
 from the top of the line before it in the page's body stream to its own
 top, in pitches, and its **gap below** the distance to the top of the
 line after; a page's first line has no gap above, its last none below.
-A **chapter label** is a line that starts with CHAPTER, CHAPITRE, ESSAY,
-PART, PARTIE, BOOK or LIVRE, in any case, or is a roman numeral alone as
+A **chapter label** is a line whose first word is a chapter label word
+(section 3: CHAPTER, CHAPITRE, ESSAY, PART, PARTIE, BOOK or LIVRE, in
+any case, with ".", ",", ":" or ";" after it or not), or is a roman
+numeral alone as
 the OCR reads one: 1 to 5 of the characters `IVXLCl1`, with an optional
 ".", ("II", "Ill" for III).
 
@@ -2142,9 +2155,10 @@ when all of these hold:
    region's, or the page's body column for a line of a region of fewer
    than 5 lines, section 6, rule 2), and its right side at least a
    quarter of that width short of the right edge, and it is not a
-   head line that section 3 left in the text within 2 pitches of the
-   median top of the book's head lines, unless it starts with a chapter
-   label word; for a flush-left line, rule 4's second branch also asks that its last word not end
+   head line that section 3 left in the text in the band where it looks
+   for running heads (at most 2 pitches below the median top of the
+   book's head lines, or anywhere above it), unless it starts with a
+   chapter label word; for a flush-left line, rule 4's second branch also asks that its last word not end
    with ".", ",", ";", ":", "?" or "!" (Turney introduces a block quote
    with a flush-left line set apart by 2.0 pitches above and below on
    its pages 93, 99, 100 and 160, each ending with such a sign);
@@ -2163,7 +2177,14 @@ A **tall line** is a body line whose line height (section 1) is at
 least 1.2 times the median line height of the page's body stream, that
 has at least 4 letters, that passes rules 2 and 3, and whose gap above
 is at least 1.3 pitches, or that is the page's first line or follows a
-heading line: whatever its alignment, it is a heading line. Turney
+heading line: whatever its alignment, it is a heading line. The line
+after a heading line needs no gap: Turney sets section headings on two
+lines, the second as tall as the first and less than 1.3 pitches below
+it (pages 80 and 85), and a group heading of its notes so (page 258);
+without the clause the second line was a paragraph (measured on 18
+November 2026: those three headings lose their last line, and
+Domesday's false heading on page 481 one line, and nothing else
+changes on the eight books). Turney
 (section 21) sets its chapter titles flush left at 2.2 to 2.6 times the
 body's line height, its chapter labels, indented 42 to 46 pt, at 1.2 to
 1.4 times, and its section headings, indented the same, at 1.2 to 1.56
@@ -2365,9 +2386,9 @@ flush-left line is measured against the body column when its region
 has fewer than 5 lines, as centring is: measured against its own
 region's box, a title that is a region of one line is never short of
 its own right edge, and Haynes' Index was missed. And a line whose top
-is a head line that section 3 left in the text within 2 pitches of
-the median top of the book's head lines (the band where section 3
-looks for running heads) is not flush left unless it starts with a
+is a head line that section 3 left in the text in the band where
+section 3 looks for running heads (at most 2 pitches below the median
+top of the book's head lines, or above it) is not flush left unless it starts with a
 chapter label word: Mariéjol's running heads, too garbled for section
 3 to find alike ("CATHI IlDICIS"), are set flush left on even pages and
 became 13 false headings without it. The condition names the head line,
