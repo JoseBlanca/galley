@@ -214,6 +214,17 @@ inside it.
    7. put the side text, figures and notes in reading order, and number
       the blocks (section 6).
 
+The case split of step 2.4 and the spaced signs of step 3.2 change only
+the words of a block, which no step between them and the matching of
+references reads: the rules of those steps look at lines and their
+boxes. So both are made on each block once its words are joined, over
+page breaks too, and once a note's marker is taken off its first block,
+the case split first, and before the references are matched: a word
+joined at a page break is split too, a sign at the top of a page is
+attached to the last word of the page before, and a sign that follows a
+note's marker starts its block and stays. A figure's caption, made after
+the references, gets both too.
+
 **What each region is.** lines.json says nothing of it (architecture
 §8), so structure decides from where each region lies, per page:
 
@@ -3484,8 +3495,9 @@ word's page: ("ofWilliam,",) to ("of", "William,"), the punctuation
 going with its side. The fidelity check verifies that `before` is one
 word and `after` two whose concatenation is it, the second starting
 with a capital. It is made in each block once hyphens are joined
-(section 2, step 2.4), so that a word joined at a line end is split
-too, and before references are looked for.
+(section 2, step 2.4, and the paragraph after the steps), so that a
+word joined at a line end or a page break is split too, and before
+references are looked for.
 
 The left part must be in lower case: in the owner's modern books every
 glued word with a capital left part is a name ("McGibbon", "LaFollette",
