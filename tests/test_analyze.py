@@ -9,6 +9,7 @@ analyze on a folder of its own is marked thread_unsafe, so that the
 
 import logging
 import tomllib
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -16,12 +17,14 @@ import pytest
 
 from galley import analyze
 from galley.analyze import (
+    InkRule,
     PageStart,
     PictureArea,
     PlateRule,
     check_config_pages,
     classify_page,
     front_matter_end,
+    is_inkless,
     is_plate,
     picture_area,
     require_text_layer,
@@ -80,7 +83,14 @@ def page(index: int, kind: PageKind, text_source: TextSource) -> PageInfo:
 
 def test_page_with_layer_words_is_text_with_its_regions_in_config_order() -> None:
     assert classify_page(
-        3, 400.0, 600.0, 12, CONFIG, plate_rule=PlateRule.NOT_PLATE, front_matter_end=0
+        3,
+        400.0,
+        600.0,
+        12,
+        CONFIG,
+        plate_rule=PlateRule.NOT_PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=0,
     ) == PageInfo(
         index=3,
         width_pt=400.0,
@@ -98,7 +108,14 @@ def test_page_in_exclude_pages_is_excluded_although_it_has_layer_words() -> None
     config = replace(CONFIG, exclude_pages=(1, 3))
 
     assert classify_page(
-        3, 400.0, 600.0, 12, config, plate_rule=PlateRule.NOT_PLATE, front_matter_end=0
+        3,
+        400.0,
+        600.0,
+        12,
+        config,
+        plate_rule=PlateRule.NOT_PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=0,
     ) == PageInfo(
         index=3,
         width_pt=400.0,
@@ -123,6 +140,7 @@ def test_page_in_exclude_pages_without_layer_words_is_excluded_not_blank() -> No
             0,
             config,
             plate_rule=PlateRule.NOT_PLATE,
+            ink_rule=InkRule.NOT_INKLESS,
             front_matter_end=0,
         ).kind
         is PageKind.EXCLUDED
@@ -131,7 +149,14 @@ def test_page_in_exclude_pages_without_layer_words_is_excluded_not_blank() -> No
 
 def test_page_without_layer_words_is_blank_with_no_text_source() -> None:
     assert classify_page(
-        4, 400.0, 600.0, 0, CONFIG, plate_rule=PlateRule.NOT_PLATE, front_matter_end=0
+        4,
+        400.0,
+        600.0,
+        0,
+        CONFIG,
+        plate_rule=PlateRule.NOT_PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=0,
     ) == PageInfo(
         index=4,
         width_pt=400.0,
@@ -150,7 +175,14 @@ def test_page_without_layer_words_is_blank_with_no_text_source() -> None:
 
 def test_page_the_plate_rule_takes_is_a_plate_read_from_its_layer() -> None:
     page = classify_page(
-        3, 400.0, 600.0, 4, CONFIG, plate_rule=PlateRule.PLATE, front_matter_end=0
+        3,
+        400.0,
+        600.0,
+        4,
+        CONFIG,
+        plate_rule=PlateRule.PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=0,
     )
 
     assert (page.kind, page.text_source) == (PageKind.PLATE, TextSource.TEXT_LAYER)
@@ -159,7 +191,14 @@ def test_page_the_plate_rule_takes_is_a_plate_read_from_its_layer() -> None:
 
 def test_page_without_a_layer_the_plate_rule_takes_is_a_plate_with_no_source() -> None:
     page = classify_page(
-        4, 400.0, 600.0, 0, CONFIG, plate_rule=PlateRule.PLATE, front_matter_end=0
+        4,
+        400.0,
+        600.0,
+        0,
+        CONFIG,
+        plate_rule=PlateRule.PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=0,
     )
 
     assert (page.kind, page.text_source) == (PageKind.PLATE, TextSource.NONE)
@@ -182,6 +221,7 @@ def test_page_in_plate_pages_is_a_plate_whatever_the_rule_finds(
         layer_word_count,
         config,
         plate_rule=PlateRule.NOT_PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
         front_matter_end=0,
     )
 
@@ -192,7 +232,14 @@ def test_cover_page_the_plate_rule_takes_is_never_a_plate() -> None:
     config = replace(CONFIG, cover_page=0)
 
     page = classify_page(
-        0, 400.0, 600.0, 12, config, plate_rule=PlateRule.PLATE, front_matter_end=0
+        0,
+        400.0,
+        600.0,
+        12,
+        config,
+        plate_rule=PlateRule.PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=0,
     )
 
     assert page.kind is PageKind.TEXT
@@ -202,10 +249,88 @@ def test_excluded_page_the_plate_rule_takes_is_excluded() -> None:
     config = replace(CONFIG, exclude_pages=(3,))
 
     page = classify_page(
-        3, 400.0, 600.0, 12, config, plate_rule=PlateRule.PLATE, front_matter_end=0
+        3,
+        400.0,
+        600.0,
+        12,
+        config,
+        plate_rule=PlateRule.PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=0,
     )
 
     assert (page.kind, page.text_source) == (PageKind.EXCLUDED, TextSource.NONE)
+
+
+# classify_page with the inkless rule (plates spec section 2b)
+
+
+def test_page_the_inkless_rule_takes_is_inkless_with_no_text_source() -> None:
+    page = classify_page(
+        3,
+        400.0,
+        600.0,
+        6,
+        CONFIG,
+        plate_rule=PlateRule.NOT_PLATE,
+        ink_rule=InkRule.INKLESS,
+        front_matter_end=0,
+    )
+
+    assert (page.kind, page.text_source) == (PageKind.INKLESS, TextSource.NONE)
+    assert page.exclude_regions == (REGION_A, REGION_B)
+
+
+def test_page_the_inkless_and_plate_rules_both_take_is_inkless() -> None:
+    page = classify_page(
+        3,
+        400.0,
+        600.0,
+        6,
+        CONFIG,
+        plate_rule=PlateRule.PLATE,
+        ink_rule=InkRule.INKLESS,
+        front_matter_end=0,
+    )
+
+    assert (page.kind, page.text_source) == (PageKind.INKLESS, TextSource.NONE)
+
+
+@pytest.mark.parametrize("plate_rule", [PlateRule.PLATE, PlateRule.NOT_PLATE])
+def test_inkless_page_before_front_matter_end_stays_front_matter(
+    plate_rule: PlateRule,
+) -> None:
+    # Haskins' front endpapers, pages 1 and 2 (plates spec section 2b).
+    page = classify_page(
+        2,
+        400.0,
+        600.0,
+        20,
+        CONFIG,
+        plate_rule=plate_rule,
+        ink_rule=InkRule.INKLESS,
+        front_matter_end=12,
+    )
+
+    assert (page.kind, page.text_source) == (PageKind.FRONT_MATTER, TextSource.NONE)
+
+
+def test_inkless_page_in_exclude_pages_or_plate_pages_keeps_the_configs_kind() -> None:
+    config = replace(CONFIG, exclude_pages=(3,), plate_pages=(4,))
+
+    assert tuple(
+        classify_page(
+            index,
+            400.0,
+            600.0,
+            6,
+            config,
+            plate_rule=PlateRule.NOT_PLATE,
+            ink_rule=InkRule.INKLESS,
+            front_matter_end=0,
+        ).kind
+        for index in (3, 4)
+    ) == (PageKind.EXCLUDED, PageKind.PLATE)
 
 
 # is_plate, on renders of 30 by 40 squares of 24 pt (12 px at 36 dpi), made
@@ -356,6 +481,99 @@ def test_is_plate_without_a_layer_leaves_out_the_binding_columns() -> None:
     assert not is_plate(page, None, 0)
 
 
+# is_inkless, on renders of 100 by 100 pixels (200 by 200 pt at 36 dpi), made
+# in the test (plates spec section 6, "The inkless page").
+
+INK_PAGE_PX = 100
+# Four word boxes of 40 by 10 pt, 40 pt apart down the page.
+INK_WORD_BOXES = tuple(
+    Box(40.0, 30.0 + 40.0 * line, 80.0, 40.0 + 40.0 * line) for line in range(4)
+)
+
+
+def ink_render(
+    gray_at: Callable[[int, int], int], width_px: int = INK_PAGE_PX
+) -> RenderedPage:
+    """A page of `width_px` by 100 pixels at 36 dpi whose pixel at (across,
+    down) has the gray `gray_at(across, down)`."""
+    return RenderedPage(
+        page_index=0,
+        dpi=36,
+        width_px=width_px,
+        height_px=INK_PAGE_PX,
+        pixels=bytes(
+            gray_at(across, down)
+            for down in range(INK_PAGE_PX)
+            for across in range(width_px)
+        ),
+    )
+
+
+def with_bars(
+    boxes: tuple[Box, ...], bar: int, ground: int
+) -> Callable[[int, int], int]:
+    """A page of gray `ground` with a bar of gray `bar`, 1 pixel high, across
+    the middle of each of `boxes`."""
+    rows = frozenset(round((box.top + box.bottom) / 2 / 2) for box in boxes)
+    columns = range(20, 40)  # 40 to 80 pt, the boxes' width
+
+    def gray_at(across: int, down: int) -> int:
+        return bar if down in rows and across in columns else ground
+
+    return gray_at
+
+
+def test_is_inkless_for_a_white_page_with_4_word_boxes() -> None:
+    assert is_inkless(ink_render(lambda _across, _down: WHITE), INK_WORD_BOXES)
+
+
+@pytest.mark.parametrize(
+    ("words_with_ink", "inkless"), [(2, True), (3, False)], ids=["half", "a_quarter"]
+)
+def test_is_inkless_when_at_least_half_the_words_have_no_ink(
+    words_with_ink: int, inkless: bool
+) -> None:
+    page = ink_render(with_bars(INK_WORD_BOXES[:words_with_ink], BLACK, WHITE))
+
+    assert is_inkless(page, INK_WORD_BOXES) is inkless
+
+
+def test_is_inkless_false_for_white_print_on_a_black_page() -> None:
+    page = ink_render(with_bars(INK_WORD_BOXES, WHITE, BLACK))
+
+    assert not is_inkless(page, INK_WORD_BOXES)
+
+
+def test_is_inkless_for_a_page_darkening_from_200_to_120_across() -> None:
+    # 400 pt wide: the gray falls 0.4 levels a pixel, about 9 across a
+    # word's box grown by 3 pt.
+    width_px = 200
+    page = ink_render(
+        lambda across, _down: 200 - round(80 * across / (width_px - 1)), width_px
+    )
+
+    assert is_inkless(page, INK_WORD_BOXES)
+
+
+def test_is_inkless_false_without_word_boxes() -> None:
+    assert not is_inkless(ink_render(lambda _across, _down: WHITE), ())
+
+
+def test_word_box_2_pt_left_of_a_black_line_has_ink() -> None:
+    # A line 1 pixel wide at pixel 60, 120 to 122 pt; the box ends at 118 pt.
+    page = ink_render(lambda across, _down: BLACK if across == 60 else WHITE)
+
+    assert not is_inkless(page, (Box(78.0, 30.0, 118.0, 40.0),))
+    assert is_inkless(page, (Box(70.0, 30.0, 110.0, 40.0),))
+
+
+def test_word_box_wholly_off_the_page_has_no_ink() -> None:
+    # Domesday 481's "Cotton" starts at 422 pt on a page 393 pt wide.
+    page = ink_render(lambda across, _down: BLACK if across % 2 else WHITE)
+
+    assert is_inkless(page, (Box(210.0, 30.0, 250.0, 40.0),))
+
+
 # require_text_layer
 
 
@@ -420,7 +638,14 @@ def test_page_in_plate_pages_and_exclude_pages_is_accepted_and_excluded() -> Non
 
     check_config_pages(config, 24)
     page = classify_page(
-        23, 612.0, 792.0, 40, config, plate_rule=PlateRule.NOT_PLATE, front_matter_end=0
+        23,
+        612.0,
+        792.0,
+        40,
+        config,
+        plate_rule=PlateRule.NOT_PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=0,
     )
 
     assert page.kind is PageKind.EXCLUDED
@@ -778,7 +1003,14 @@ def test_text_page_before_front_matter_end_is_front_matter_with_no_text_source()
     None
 ):
     page = classify_page(
-        3, 400.0, 600.0, 12, CONFIG, plate_rule=PlateRule.NOT_PLATE, front_matter_end=4
+        3,
+        400.0,
+        600.0,
+        12,
+        CONFIG,
+        plate_rule=PlateRule.NOT_PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=4,
     )
 
     assert (page.kind, page.text_source) == (PageKind.FRONT_MATTER, TextSource.NONE)
@@ -787,7 +1019,14 @@ def test_text_page_before_front_matter_end_is_front_matter_with_no_text_source()
 
 def test_text_page_at_front_matter_end_stays_text() -> None:
     page = classify_page(
-        3, 400.0, 600.0, 12, CONFIG, plate_rule=PlateRule.NOT_PLATE, front_matter_end=3
+        3,
+        400.0,
+        600.0,
+        12,
+        CONFIG,
+        plate_rule=PlateRule.NOT_PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=3,
     )
 
     assert (page.kind, page.text_source) == (PageKind.TEXT, TextSource.TEXT_LAYER)
@@ -806,6 +1045,7 @@ def test_excluded_plate_and_blank_pages_before_front_matter_end_keep_their_kind(
             word_count,
             config,
             plate_rule=PlateRule.NOT_PLATE,
+            ink_rule=InkRule.NOT_INKLESS,
             front_matter_end=10,
         ).kind
         for index, word_count in ((1, 12), (2, 12), (3, 0))
@@ -892,6 +1132,10 @@ EXCERPT_FRONT_MATTER = frozendict(
         "gierke_front_flow": (0, 1, 2, 3, 4),
     }
 )
+# The inkless pages of each excerpt (plates spec section 6, "The inkless
+# page"): Haskins' back endpapers 277 and 278. Its front endpapers, pages 1
+# and 2 of `haskins_front`, are inkless too but stay front matter.
+EXCERPT_INKLESS = frozendict({"haskins_endpapers": (2, 3)})
 
 
 def test_the_excerpts_plates_and_front_matter_are_the_specs_and_other_pages_text(
@@ -901,6 +1145,7 @@ def test_the_excerpts_plates_and_front_matter_are_the_specs_and_other_pages_text
         pages = read_pages(folder.pages_json).pages
         plates = EXCERPT_PLATES.get(name, ())
         front_matter = EXCERPT_FRONT_MATTER.get(name, ())
+        inkless = EXCERPT_INKLESS.get(name, ())
         # Haskins' blank page before the index and Kadesh's scan of a cover
         # are excluded by their configs, and so is Haskins' page index 276
         # in `haskins_endpapers`.
@@ -913,10 +1158,13 @@ def test_the_excerpts_plates_and_front_matter_are_the_specs_and_other_pages_text
         assert tuple(
             page.index for page in pages if page.kind is PageKind.FRONT_MATTER
         ) == (front_matter), name
+        assert tuple(page.index for page in pages if page.kind is PageKind.INKLESS) == (
+            inkless
+        ), name
         assert all(
             page.kind is PageKind.TEXT
             for page in pages
-            if page.index not in (*plates, *excluded, *front_matter)
+            if page.index not in (*plates, *excluded, *front_matter, *inkless)
         ), name
 
 
@@ -1008,6 +1256,35 @@ def test_each_page_the_plate_rule_takes_is_logged_at_warning_with_its_measures(
                 "squares, 0 known words; add it to `exclude_pages` if it is not one"
             ),
         )
+    ]
+
+
+@pytest.mark.thread_unsafe
+def test_each_inkless_page_is_logged_at_warning_with_its_share_without_ink(
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Haskins' back endpapers 277 and 278, pages 2 and 3 of the excerpt,
+    # 1.00 and 0.88 of their words without ink (plates spec section 2b);
+    # the excerpt's config has front_matter_end = 0.
+    folder = BookFolder(tmp_path)
+    folder.book_toml.write_text(
+        excerpt_book_toml["haskins_endpapers"], encoding="utf-8"
+    )
+
+    with caplog.at_level(logging.WARNING, logger="galley.analyze"):
+        analyze.run(folder, read_config(folder.book_toml))
+
+    assert [(record.levelno, record.getMessage()) for record in caplog.records] == [
+        (
+            logging.WARNING,
+            (
+                f"analyze: page index {index} is inkless, its words removed: "
+                f"{share} of its words have no ink under them"
+            ),
+        )
+        for index, share in ((2, "1.00"), (3, "0.88"))
     ]
 
 
@@ -1457,7 +1734,52 @@ def test_page_kinds_of_each_whole_book_are_those_before_the_text_flow_and_front_
                         (index, PageKind.FRONT_MATTER)
                         for index in WHOLE_BOOK_FRONT_MATTER[book]
                     ),
+                    *(
+                        (index, PageKind.INKLESS)
+                        for index in WHOLE_BOOK_INKLESS.get(book, ())
+                    ),
                 )
             )
         ),
+    )
+
+
+# Plates spec section 2b: the inkless pages of the eight books, with the
+# configs of tests/conftest.py, are Haskins' back endpapers 277 and 278 and
+# Haynes' blank pages 9 and 421; Mariejol's back board, 459, is not caught.
+WHOLE_BOOK_INKLESS = frozendict({"normansineuropea00hask": (277, 278)})
+OWNER_BOOK_INKLESS = frozendict({"haynes": (9, 421), "turney": ()})
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.parametrize("book", sorted(WHOLE_BOOK_PAGE_KINDS_AT_9F012AC))
+def test_inkless_pages_of_each_public_domain_whole_book_are_haskins_back_endpapers(
+    book: str, whole_book_pages: frozendict[str, tuple[PageInfo, ...]]
+) -> None:
+    assert tuple(
+        page.index for page in whole_book_pages[book] if page.kind is PageKind.INKLESS
+    ) == WHOLE_BOOK_INKLESS.get(book, ())
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.parametrize("book", sorted(OWNER_BOOK_INKLESS))
+def test_inkless_pages_of_the_owners_books_are_haynes_blank_pages_9_and_421(
+    book: str, owner_book_toml: Callable[[str], str], tmp_path: Path
+) -> None:
+    folder = BookFolder(tmp_path)
+    folder.book_toml.write_text(owner_book_toml(book), encoding="utf-8")
+
+    analyze.run(folder, read_config(folder.book_toml))
+
+    assert (
+        tuple(
+            page.index
+            for page in read_pages(folder.pages_json).pages
+            if page.kind is PageKind.INKLESS
+        )
+        == OWNER_BOOK_INKLESS[book]
     )

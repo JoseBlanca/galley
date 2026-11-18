@@ -1,9 +1,7 @@
 """Excerpt tests of the plan stray-text for the stream analyze: the
 inkless page (docs/specs/plates.md, section 2b). The expected output of
 each page is that of its file in tests/fixtures/expected/stray_text/,
-transcribed from the page rendered at 300 dpi. A test whose work package
-has not landed is a strict xfail naming it; the task that makes it pass
-removes the mark."""
+transcribed from the page rendered at 300 dpi."""
 
 import json
 from pathlib import Path
@@ -15,11 +13,6 @@ from galley.book_folder import BookFolder
 from galley.model import PageKind, RemovalReason, read_pages, read_words
 
 _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "stray_text"
-
-_WORK_PACKAGE_2 = (
-    "work package 2 of docs/plans/stray-text.md: analyze marks the inkless "
-    "page and extract removes its words"
-)
 
 
 def _expected(excerpt: str, page: int) -> dict[str, Any]:
@@ -48,7 +41,6 @@ def test_haskins_colophon_is_a_text_page_with_its_words(
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.xfail(strict=True, reason=_WORK_PACKAGE_2)
 @pytest.mark.parametrize("page", [2, 3])
 def test_haskins_back_endpaper_is_inkless_and_every_word_a_removal(
     excerpt_books: frozendict[str, BookFolder], page: int
