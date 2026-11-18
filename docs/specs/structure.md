@@ -438,7 +438,10 @@ main a0a1675, over every head line within the 2 pitches that section 3
 did not take: with 14 the rule takes Gierke's 16 and 84 and Mariéjol's
 158, each a running head on the page image, and no other line. The
 test of section 14 that keeps a line alike to a running head from
-being a heading keeps its limit of 8, which was not measured at 14.
+being a heading keeps its limit of 8, which was not measured at 14, and
+so do the two other tests that compare by this likeness: the head of a
+short section, below, and the topmost line of a plate page (section 18,
+rule 1).
 
 **A short region beside the head.** Some books print the page number
 outside the body column, level with the running head. Layout then makes
