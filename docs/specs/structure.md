@@ -3221,7 +3221,11 @@ first word ("—Hobbes,") or the dash word and the word after it ("—",
 "Hobbes,"), and whose `after` is the one word without its leading
 dashes ("Hobbes,"). The fidelity check verifies it: `before` is one or
 two words, the first starts with a dash, and `after` is one word, the
-words of `before` joined with every dash at their start dropped. A
+words of `before` joined with every dash at their start dropped; and,
+as for `hyphen_lost`, the word of `after` is the first word of the
+`source` of an epigraph with a part on the change's page, so that the
+reason cannot take a dash off a word of the body (review of work
+package 2 of the plan owner-books, 18 November 2026). A
 dash anywhere else in the source ("1873—1881") stays. Turney's sources
 have no dash, and no change.
 
