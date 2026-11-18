@@ -72,14 +72,18 @@ def _marker_of(
 
 def _runs(
     entries: Sequence[Entry], contents_pages: frozenset[int]
-) -> tuple[tuple[tuple[int, NoteMarker], ...], ...]:
-    """The runs of paragraphs with endnote markers whose values rise, any
-    paragraphs without such a marker between them; a marker that does not
-    rise starts a new run, except a bare number that does not read 1,
-    which is no marker. Each run is the positions of its marked paragraphs
-    with their markers."""
-    runs: list[list[tuple[int, NoteMarker]]] = []
-    last_value: int | None = None
+) -> tuple[tuple[bool, tuple[tuple[int, NoteMarker], ...]], ...]:
+    """The runs of paragraphs with endnote markers of one form whose values
+    rise, any paragraphs without such a marker between them, in the order
+    of their first paragraphs, each with whether its markers are bare
+    numbers: a marker that does not rise above the last of its form starts
+    a new run, except a bare number that does not read 1, which is no
+    marker. The two forms make runs of their own (spec section 12): a bare
+    number does not go on with, or end, a run of "N." markers. Each run is
+    the positions of its marked paragraphs with their markers."""
+    runs: list[tuple[bool, list[tuple[int, NoteMarker]]]] = []
+    current: dict[bool, list[tuple[int, NoteMarker]]] = {}
+    last_value: dict[bool, int] = {}
     for position, entry in enumerate(entries):
         found = _marker_of(entry, contents_pages)
         if found is None:
@@ -88,13 +92,14 @@ def _runs(
         value = marker.value
         if value is None:
             continue
-        if last_value is None or value <= last_value:
+        if bare not in last_value or value <= last_value[bare]:
             if bare and value != 1:
                 continue
-            runs.append([])
-        runs[-1].append((position, marker))
-        last_value = value
-    return tuple(tuple(run) for run in runs)
+            current[bare] = []
+            runs.append((bare, current[bare]))
+        current[bare].append((position, marker))
+        last_value[bare] = value
+    return tuple((bare, tuple(run)) for bare, run in runs)
 
 
 def is_group_heading(
@@ -148,11 +153,17 @@ def endnote_section(
     pages of the printed table of contents, where a bare number is no
     marker; `body_line_pitch` is in points."""
     runs = _runs(entries, contents_pages)
-    long_runs = tuple(run for run in runs if len(run) >= _SECTION_MIN_MARKERS)
+    long_runs = tuple(
+        (bare, run) for bare, run in runs if len(run) >= _SECTION_MIN_MARKERS
+    )
     if not long_runs:
         return None
-    first, last = long_runs[0][0][0], long_runs[-1][-1][0]
-    marked = tuple(item for run in runs for item in run)
+    first = min(run[0][0] for _, run in long_runs)
+    last = max(run[-1][0] for _, run in long_runs)
+    # Spec section 12: the section's markers are those of the forms of its
+    # long runs, so that a margin note's "1" in Gierke's "N." notes is none.
+    forms = frozenset(bare for bare, _ in long_runs)
+    marked = tuple(sorted(item for bare, run in runs if bare in forms for item in run))
     # Spec section 12, "Note groups": a section with a marker reading 1
     # after its first is cut into groups, and only then has group headings.
     grouped = any(
