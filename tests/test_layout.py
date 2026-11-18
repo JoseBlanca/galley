@@ -38,6 +38,7 @@ from galley.layout import (
     layout_page_with_figures,
     layout_page_with_rereads,
     measure_book,
+    page_measures,
 )
 from galley.layout._reread import RegionReading, page_rereads
 from galley.model import (
@@ -1763,6 +1764,7 @@ def test_cut_in_zone_keeps_a_word_ending_3_pt_short_of_the_inset() -> None:
 def _size_page(
     strip: tuple[tuple[str, float, float], ...],
     body_rows: int = 20,
+    measures: BookMeasures | None = _CUT_IN_MEASURES,
 ) -> tuple[tuple[tuple[str, ...], ...], ...]:
     """The regions' texts of a page of `body_rows` rows of words of 8
     characters, 8 pt high and 8 pt a character, but for rows 10 and 11,
@@ -1787,7 +1789,7 @@ def _size_page(
             ),
         )
     )
-    return _region_texts(layout_page(_page(0, (*full, *cut)), _CUT_IN_MEASURES))
+    return _region_texts(layout_page(_page(0, (*full, *cut)), measures))
 
 
 def test_cut_in_note_set_smaller_on_the_body_baselines_is_a_margin_region() -> None:
@@ -1822,6 +1824,29 @@ def test_cut_in_page_of_fewer_than_50_words_has_no_test_of_size() -> None:
     # 14 rows: 12 full ones of 3 words and the two cut rows, 42 words.
     (body,) = _size_page((("Coinage", 7.0, 5.0), ("debased.", 7.0, 5.0)), 14)
     assert body[10:12] == (("Coinage", "d10", "e10"), ("debased.", "d11", "e11"))
+
+
+@pytest.mark.parametrize(
+    ("contents_pages", "margin_regions"), [(frozenset({0}), 0), (frozenset({3}), 1)]
+)
+def test_cut_in_labels_on_a_contents_page_stay_in_the_body(
+    contents_pages: frozenset[int], margin_regions: int
+) -> None:
+    # Turney's contents, page 10: each chapter's label set smaller than its
+    # title, on the title's baseline, left of a title that starts at the
+    # inset. On page 0, a contents page, they stay; on another page they
+    # are a cut-in note.
+    regions = _size_page(
+        (("Two", 7.0, 5.0), ("Three", 7.0, 5.0)),
+        measures=page_measures(_CUT_IN_MEASURES, 0, contents_pages),
+    )
+    assert len(regions) == 1 + margin_regions
+    if not margin_regions:
+        assert regions[0][10:12] == (("Two", "d10", "e10"), ("Three", "d11", "e11"))
+
+
+def test_page_measures_without_measures_are_none() -> None:
+    assert page_measures(None, 0, frozenset({0})) is None
 
 
 def test_cut_in_note_at_the_right_is_a_margin_region() -> None:
