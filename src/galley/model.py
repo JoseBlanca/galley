@@ -1572,8 +1572,8 @@ def read_blocks(path: Path) -> BlocksFile:
     """Reads blocks.json as write_blocks wrote it. Raises InputFileError,
     naming the file and the block, also when a block that is not a heading
     has a label, one that is not an epigraph has a source, an index entry
-    has no depth from 1, or a block that is neither a heading nor an index
-    entry has a level."""
+    has no depth from 1, a block that is neither a heading nor an index
+    entry has a level, or a note that is not an endnote has a group."""
     blocks = _read_json(path, BlocksFile, BLOCKS_FORMAT_VERSION, "structure")
     for block in (
         *blocks.blocks,
@@ -1603,6 +1603,13 @@ def read_blocks(path: Path) -> BlocksFile:
             message = (
                 f"{path}: block {block.id} is a {block.kind.value} and has the "
                 f"level {block.level!r}; only a heading and an index entry have one"
+            )
+            raise InputFileError(message)
+    for note in blocks.notes:
+        if note.group is not None and note.kind is not NoteKind.ENDNOTE:
+            message = (
+                f"{path}: note {note.id} is a {note.kind.value} and has the "
+                f"group {note.group!r}; only an endnote has a group"
             )
             raise InputFileError(message)
     return blocks

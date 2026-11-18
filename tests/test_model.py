@@ -1575,6 +1575,22 @@ def test_source_on_a_block_that_is_not_an_epigraph_names_the_file_and_block(
     )
 
 
+def test_group_on_a_footnote_names_the_file_and_note(tmp_path: Path) -> None:
+    # Architecture section 8: a note group heads notes of an endnote
+    # section; markdown writes it before an endnote only.
+    assert BLOCKS.notes[0].kind is NoteKind.FOOTNOTE
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _set(tmp_path / "blocks.json", ("notes", 0, "group"), "Chapter 1.")
+
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+
+    assert str(caught.value) == (
+        f"{tmp_path / 'blocks.json'}: note {BLOCKS.notes[0].id} is a footnote and "
+        "has the group 'Chapter 1.'; only an endnote has a group"
+    )
+
+
 def test_note_group_is_written_after_referenced_and_read_back(
     tmp_path: Path,
 ) -> None:
