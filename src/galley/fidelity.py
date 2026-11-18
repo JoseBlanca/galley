@@ -71,9 +71,8 @@ class MarkdownWords:
     words: tuple[MarkdownWord, ...]
     note_count: int
     note_link_count: int
-    # Defaults, so that a reader of book.md without lists need not name them.
-    list_item_count: int = 0
-    contents_links: tuple[ContentsLink, ...] = ()
+    list_item_count: int
+    contents_links: tuple[ContentsLink, ...]
 
 
 @dataclass(frozen=True, slots=True)
