@@ -733,10 +733,13 @@ undoes every change, finds it; and it checks that the change does no
 more: the first word, less one final ".", followed by the second, is
 the joined word, and the joined word is a word of a margin-note block
 that starts on the change's page, the only blocks where the join is
-made, or the word of `before` of a `punctuation_attached` or
-`case_split` change on that page whose words are (sections 23 and 24,
-made after the join: Domesday's margin note "popula- tion ?" on page
-461 gives "population", then "population?"). Tried after `join_hyphen`, which a line ending with a
+made, or a word that a chain of `punctuation_attached` and
+`case_split` changes on that page turns into such words (sections 23
+and 24, made after the join: Domesday's margin note "popula- tion ?" on
+page 461 gives "population", then "population?"; a join may be split
+and a sign then attached to its second part). The chain is followed
+back from the margin note's words, so a join is admitted only when the
+words its chain ends in are words of a margin note of its page. Tried after `join_hyphen`, which a line ending with a
 hyphen goes to.
 
 Measured on 17 November 2026 on the lines of whole Stubbs, Domesday and
