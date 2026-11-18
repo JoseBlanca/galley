@@ -8,7 +8,7 @@ margin notes after the paragraph in which its body ends.
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from galley.model import (
     BlockKind,
@@ -20,12 +20,14 @@ from galley.model import (
     Removal,
     RemovalReason,
 )
+from galley.structure._epigraphs import epigraph_run, page_epigraphs
 from galley.structure._foot import body_column
 from galley.structure._headings import PageHead, heading_runs
 from galley.structure._index import IndexPage, index_page
 from galley.structure._lines import (
     Piece,
     PlacedLine,
+    ends_page_paragraph,
     first_word,
     misread_marker_lines,
     starts_paragraph,
@@ -37,11 +39,12 @@ from galley.structure._measures import (
     is_short,
     letters,
     region_edges,
+    words_removal,
     words_text,
 )
 from galley.structure._regions import RegionKind, head_line, region_kinds
 from galley.structure._removals import foot_removals, head_removals
-from galley.structure._runs import BodyRun, LabelLine
+from galley.structure._runs import BodyRun, EpigraphParts, LabelLine
 from galley.structure._summaries import summary_run
 from galley.structure._survey import (
     BookSurvey,
@@ -113,6 +116,17 @@ def _edges(region: Region, kind: RegionKind) -> Edges:
     return region_edges(region)
 
 
+@dataclass(frozen=True, slots=True)
+class _PageRuns:
+    """The runs of a page's body stream that are blocks of their own, by
+    their positions in the stream without `stray_marks`, the positions of
+    the lines with no letter or digit an epigraph passed over, which are
+    removed (spec section 22, rule 2)."""
+
+    runs: tuple[BodyRun, ...]
+    stray_marks: tuple[int, ...]
+
+
 def _runs(
     page_index: int,
     body: Sequence[PlacedLine],
@@ -121,15 +135,17 @@ def _runs(
     kept_head: int | None,
     survey: BookSurvey,
     contents_pages: frozenset[int],
-) -> tuple[BodyRun, ...]:
+    column: Edges | None,
+) -> _PageRuns:
     """The runs of the body stream that are blocks of their own (spec
     section 2, step 2.3), in order: the headings, the chapter summary under
-    a heading, and the verse; none on a page of the printed table of
+    a heading, the epigraphs under a level-1 heading or the page's one
+    epigraph, and the verse; none on a page of the printed table of
     contents. `kept_head` is the position in `body` of the page's head line
     that section 3 left in the text near the book's head lines
-    (`_kept_head_line`), or None."""
+    (`_kept_head_line`), or None; `column` the page's body column."""
     if page_index in contents_pages:
-        return ()
+        return _PageRuns((), ())
     band_lines = tuple(line for region in band_regions for line in region)
     headings = heading_runs(
         body,
@@ -146,14 +162,26 @@ def _runs(
         for number, heading in enumerate(headings)
         if (summary := summary_run(body, heading.end, limits[number])) is not None
     )
+    epigraphs = page_epigraphs(body, headings, summaries, column)
+    stray_marks = tuple(
+        number for epigraph in epigraphs for number in epigraph.stray_marks
+    )
+
+    def shift(number: int) -> int:
+        return number - sum(1 for stray in stray_marks if stray < number)
+
     taken = frozenset(
         number for run in headings + summaries for number in range(run.start, run.end)
+    ) | frozenset(
+        number
+        for epigraph in epigraphs
+        for number in range(epigraph.start, epigraph.end)
     )
-    return tuple(
-        sorted(
-            headings + summaries + verse_runs(body, taken), key=lambda run: run.start
-        )
-    )
+    shifted = tuple(
+        replace(run, start=shift(run.start), end=shift(run.end))
+        for run in headings + summaries + verse_runs(body, taken)
+    ) + tuple(epigraph_run(epigraph, shift) for epigraph in epigraphs)
+    return _PageRuns(tuple(sorted(shifted, key=lambda run: run.start)), stray_marks)
 
 
 def _kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
@@ -278,11 +306,31 @@ def page_parts(
         )
         else PageHead.NO_RUNNING_HEAD
     )
+    # Spec section 17, rule 4: the index columns are the page's body or
+    # band lines for the title's centring (section 14, rule 1).
+    page_runs = _runs(
+        page.index,
+        body,
+        (*band_regions, index_lines),
+        page_head,
+        kept_head,
+        survey,
+        contents_pages,
+        column,
+    )
+    # Spec section 22, rule 2: the specks an epigraph passed over.
+    strays = frozenset(page_runs.stray_marks)
+    stray_removals = tuple(
+        words_removal(page.index, body[number].line.words, RemovalReason.STRAY_MARK)
+        for number in page_runs.stray_marks
+    )
+    body = tuple(line for number, line in enumerate(body) if number not in strays)
     return PageParts(
         index=page.index,
         removals=head.removals
         + (index.removals if index is not None else ())
-        + foot.removals,
+        + foot.removals
+        + stray_removals,
         page_numbers=head.page_numbers
         + (index.page_numbers if index is not None else ())
         + foot.page_numbers,
@@ -296,17 +344,7 @@ def page_parts(
         ),
         band_regions=band_regions,
         band_blocks=tuple(piece for lines in band_regions for piece in _pieces(lines)),
-        # Spec section 17, rule 4: the index columns are the page's body or
-        # band lines for the title's centring (section 14, rule 1).
-        runs=_runs(
-            page.index,
-            body,
-            (*band_regions, index_lines),
-            page_head,
-            kept_head,
-            survey,
-            contents_pages,
-        ),
+        runs=page_runs.runs,
         index_lines=index_lines,
         index_starts=index.starts if index is not None else frozenset(),
     )
@@ -329,12 +367,14 @@ def _index_lines(page_index: int, index: IndexPage | None) -> tuple[PlacedLine, 
 class BodyBlock:
     """A block of the body stream, as a piece: a paragraph, or a run of
     section 2, step 2.3, with its kind, a heading's level and whether its
-    first line is its chapter label."""
+    first line is its chapter label, and an epigraph's quotation and
+    source."""
 
     piece: Piece
     kind: BlockKind = BlockKind.PARAGRAPH
     level: int | None = None
     label_line: LabelLine = LabelLine.NONE
+    epigraph: EpigraphParts | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -390,12 +430,32 @@ def _continues_verse(
     )
 
 
+def _short_page_end(
+    before: PlacedLine | None, before_page: PageParts | None, page: PageParts
+) -> bool:
+    """Whether `before`, the last body line of `before_page`, a page before
+    `page`, ends the paragraph at the page break (spec section 6, "A short
+    last line at a page break"): not on an index page, either side
+    (section 17)."""
+    return (
+        before is not None
+        and before_page is not None
+        and not before_page.index_lines
+        and not page.index_lines
+        and ends_page_paragraph(before)
+    )
+
+
 def _block(lines: Sequence[PlacedLine], run: BodyRun | None) -> BodyBlock:
     piece = Piece(tuple(lines))
     if run is None:
         return BodyBlock(piece=piece)
     return BodyBlock(
-        piece=piece, kind=run.kind, level=run.level, label_line=run.label_line
+        piece=piece,
+        kind=run.kind,
+        level=run.level,
+        label_line=run.label_line,
+        epigraph=run.epigraph,
     )
 
 
@@ -413,12 +473,15 @@ def body_entries(
     the book's marker form `form` does not run on into the next page, and
     no paragraph runs on into or out of `section_pages`, the pages of the
     endnote section (spec section 12): the first line of its first page,
-    and the first body line after its last page, start a paragraph."""
+    and the first body line after its last page, start a paragraph. A
+    page's last line that ends short with a sentence's end ends its
+    paragraph, but on an index page (spec section 6)."""
     entries: list[Entry] = []
     current: list[PlacedLine] = []
     current_run: BodyRun | None = None
     pending: list[MarginNote] = []
     before: PlacedLine | None = None
+    before_page: PageParts | None = None
     for page in pages:
         for number, line in enumerate(page.body):
             run = _run_at(page.runs, number)
@@ -431,6 +494,7 @@ def body_entries(
                 note_break = number == 0 and (
                     _marker_led(current, form)
                     or _crosses_section_edge(before, line, section_pages)
+                    or _short_page_end(before, before_page, page)
                 )
                 starts = (
                     number in page.block_starts
@@ -446,6 +510,7 @@ def body_entries(
                 current_run = run
             current.append(line)
             before = line
+            before_page = page
         notes = tuple(MarginNote(piece) for piece in page.margin_notes)
         if current:
             pending.extend(notes)

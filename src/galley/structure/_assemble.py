@@ -63,7 +63,7 @@ from galley.structure._references import (
     match_endnotes,
     match_footnotes,
 )
-from galley.structure._runs import LabelLine
+from galley.structure._runs import EpigraphParts, LabelLine, QuotationForm
 from galley.structure._unnumbered import (
     Unnumbered,
     UnnumberedNote,
@@ -131,7 +131,10 @@ def _body_block(
     """A block of the body stream with its hyphens joined; a heading whose
     first line is its chapter label has that line's words, joined by single
     spaces, as its label, and the lines after it as its text (spec section
-    14, "Heading blocks")."""
+    14, "Heading blocks"); an epigraph has its quotation's lines as its
+    text and its source apart (`_epigraph_block`)."""
+    if block.epigraph is not None:
+        return _epigraph_block(block.piece, block.epigraph, book_words, word_list)
     lines = block.piece.lines
     match block.label_line:
         case LabelLine.FIRST:
@@ -147,6 +150,44 @@ def _body_block(
         origin=piece_origin(block.piece),
         level=block.level,
         label=label,
+    )
+
+
+def _epigraph_block(
+    piece: Piece,
+    parts: EpigraphParts,
+    book_words: frozenset[str],
+    word_list: frozenset[str],
+) -> Unnumbered:
+    """An epigraph block (spec section 22, "The block"): its text the
+    quotation's lines joined as a paragraph's, hyphens joined, with a line
+    feed between them when it is verse; its source apart, with the record
+    of its dash's removal after the quotation's word changes; its origin
+    the quotation's and the source's lines."""
+    quotation = joined(
+        Piece(piece.lines[: parts.quotation_lines]),
+        BlockKind.EPIGRAPH,
+        book_words,
+        word_list,
+    )
+    match parts.form:
+        case QuotationForm.VERSE:
+            line_starts = quotation.line_starts
+        case QuotationForm.PROSE:
+            line_starts = frozenset()
+        case _:
+            assert_never(parts.form)
+    dash = (
+        ((len(quotation.words), parts.source_dash),)
+        if parts.source_dash is not None
+        else ()
+    )
+    return replace(
+        quotation,
+        origin=piece_origin(piece),
+        changes=quotation.changes + dash,
+        line_starts=line_starts,
+        source=parts.source,
     )
 
 

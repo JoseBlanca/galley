@@ -8,15 +8,21 @@ without the leading dash, and the record of that dash's removal.
 """
 
 import statistics
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import assert_never
 
 from galley.body_measures import median_word_height
-from galley.model import ChangeReason, WordChange
+from galley.model import BlockKind, ChangeReason, WordChange
 from galley.structure._lines import PlacedLine
 from galley.structure._measures import Edges, line_has_letter_or_digit
+from galley.structure._runs import (
+    CHAPTER_LEVEL,
+    BodyRun,
+    EpigraphParts,
+    QuotationForm,
+)
 
 # Spec section 22, rule 2: every line of an epigraph run starts at least
 # 20 pt right of the body column's left edge (Turney's quotations 32 to
@@ -54,14 +60,6 @@ _VERSE_MIN_LINES = 2
 # Spec section 22, "Verse": passed over at a line's start before its
 # first letter is looked at: quotation marks, full stops, ellipses, spaces.
 _VERSE_START_PASSED = "\"'‘’“”«»„.… "
-
-
-class QuotationForm(StrEnum):
-    """Whether an epigraph's quotation is prose, its lines joined as a
-    paragraph's, or verse, its line breaks kept (spec section 22, "Verse")."""
-
-    PROSE = "prose"
-    VERSE = "verse"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -407,3 +405,55 @@ def page_epigraph(lines: Sequence[PlacedLine], column: Edges) -> Epigraph | None
     ):
         return None
     return _epigraph(lines, 0, run, column)
+
+
+def epigraph_run(epigraph: Epigraph, shift: Callable[[int], int]) -> BodyRun:
+    """The run of `epigraph`'s quotation and source lines, which are
+    consecutive once its stray marks are taken out of the body stream:
+    `shift` gives a line's position in the stream without them."""
+    return BodyRun(
+        start=shift(epigraph.quotation[0]),
+        end=shift(epigraph.end),
+        kind=BlockKind.EPIGRAPH,
+        epigraph=EpigraphParts(
+            quotation_lines=len(epigraph.quotation),
+            form=epigraph.form,
+            source=epigraph.source,
+            source_dash=epigraph.source_dash,
+        ),
+    )
+
+
+def page_epigraphs(
+    lines: Sequence[PlacedLine],
+    headings: Sequence[BodyRun],
+    summaries: Sequence[BodyRun],
+    column: Edges | None,
+) -> tuple[Epigraph, ...]:
+    """The epigraphs of `lines`, a page's body stream whose heading blocks
+    are `headings` and chapter summaries `summaries` (spec section 22):
+    those after each level-1 heading and its summary, up to the next
+    heading; on a page with no heading line, the whole stream when it is
+    one epigraph (rule 5). `column` is the page's body column, None when
+    it has no body region."""
+    if column is None:
+        return ()
+    if not headings:
+        found = page_epigraph(lines, column)
+        return () if found is None else (found,)
+    heading_lines = frozenset(
+        number for run in headings for number in range(run.start, run.end)
+    )
+    edges = epigraph_column(lines, heading_lines, column)
+    if edges is None:
+        return ()
+    summary_ends = {run.start: run.end for run in summaries}
+    limits = (*(run.start for run in headings[1:]), len(lines))
+    return tuple(
+        epigraph
+        for heading, limit in zip(headings, limits, strict=True)
+        if heading.level == CHAPTER_LEVEL
+        for epigraph in epigraphs_after_heading(
+            lines, summary_ends.get(heading.end, heading.end), limit, edges
+        )
+    )

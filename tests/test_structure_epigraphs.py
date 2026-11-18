@@ -8,7 +8,25 @@ column runs from 50 to 400 pt; a quotation is indented 30 pt, as Haynes'
 are, or 44 pt, as Turney's.
 """
 
-from galley.model import Box, ChangeReason, Line, Word, WordChange
+import pytest
+
+from galley.errors import FidelityBoundary
+from galley.fidelity import check_stage
+from galley.model import (
+    BlockKind,
+    BlocksFile,
+    Box,
+    ChangeReason,
+    Line,
+    LinesFile,
+    PageLayout,
+    Region,
+    RemovalReason,
+    Word,
+    WordChange,
+    block_text,
+)
+from galley.structure import make_blocks
 from galley.structure._epigraphs import (
     QuotationForm,
     epigraph_column,
@@ -30,7 +48,7 @@ _TURNEY_LEFT = 94.0
 _BODY = "the text of the chapter runs on here from the left edge to the right ."
 
 
-def _line(text: str, x0: float, row: int, height: float = _HEIGHT_PT) -> PlacedLine:
+def _line(text: str, x0: float, row: float, height: float = _HEIGHT_PT) -> PlacedLine:
     """A line of `text` starting at `x0`, on the row `row` of the page."""
     top = 100.0 + row * _PITCH_PT
     words = []
@@ -388,3 +406,252 @@ def test_page_of_10_lines_and_a_speck_is_an_epigraph() -> None:
 def test_page_with_lines_after_the_source_is_no_epigraph() -> None:
     lines = (*_page_of_its_own(3), _line(_BODY, _COLUMN.left, 5))
     assert page_epigraph(lines, _COLUMN) is None
+
+
+# The rule wired into structure (spec section 2, step 2.3; section 22, "The
+# block" and "The dash is look, not text"), through make_blocks. A chapter
+# opens as in tests/test_structure_heads.py: a label 1.3 times the body's
+# height indented 45 pt, a title 2.4 times, flush left, 1.5 pitches below
+# it, and a region of the epigraph and the text 2 pitches under the title.
+
+_NO_WORDS: frozenset[str] = frozenset()
+_HASH = "a" * 64
+
+
+def _region(*lines: PlacedLine) -> Region:
+    boxes = tuple(line.line.box for line in lines)
+    box = Box(
+        min(box.x0 for box in boxes),
+        min(box.top for box in boxes),
+        max(box.x1 for box in boxes),
+        max(box.bottom for box in boxes),
+    )
+    return Region(box, tuple(line.line for line in lines))
+
+
+def _chapter_page(index: int, *epigraph: PlacedLine) -> PageLayout:
+    """A chapter's first page: its label and title on rows -6 and -4.5, and
+    `epigraph`, lines placed from row 0, before 8 lines of text set flush
+    left two rows under the last of them."""
+    label = _line("Chapter Twelve", _COLUMN.left + 45, -6, 1.3 * _HEIGHT_PT)
+    title = _line("The Long Title", _COLUMN.left, -4.5, 2.4 * _HEIGHT_PT)
+    first_text_row = int(max(line.line.box.top for line in epigraph) - 100) // 15 + 2
+    text = tuple(_line(_BODY, _COLUMN.left, first_text_row + row) for row in range(8))
+    return PageLayout(
+        index, (_region(label), _region(title), _region(*epigraph, *text)), ()
+    )
+
+
+def _blocks(*pages: PageLayout) -> BlocksFile:
+    lines = LinesFile(source_pdf_sha256=_HASH, pages=pages, rereads=())
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+    return blocks
+
+
+def _kinds(blocks: BlocksFile) -> tuple[BlockKind, ...]:
+    return tuple(block.kind for block in blocks.blocks)
+
+
+_HAYNES_EPIGRAPH = (
+    _line(_PROSE[0], _HAYNES_LEFT, 0),
+    _line(_PROSE[1], _HAYNES_LEFT, 1),
+    _line("it was the season of light", _HAYNES_LEFT, 2),
+    _line("—Hobbes", _HAYNES_LEFT, 3, _SOURCE_HEIGHT_PT),
+)
+
+
+def test_dashed_source_under_a_chapter_heading_makes_an_epigraph_block() -> None:
+    blocks = _blocks(_chapter_page(30, *_HAYNES_EPIGRAPH))
+    assert _kinds(blocks) == (
+        BlockKind.HEADING,
+        BlockKind.EPIGRAPH,
+        BlockKind.PARAGRAPH,
+    )
+    epigraph = blocks.blocks[1]
+    assert block_text(epigraph) == " ".join((*_PROSE, "it was the season of light"))
+    assert epigraph.source == "Hobbes"
+    assert tuple(origin.page_index for origin in epigraph.origin) == (30,)
+    assert epigraph.origin[0].box.bottom == _HAYNES_EPIGRAPH[3].line.box.bottom
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=30,
+            before=("—Hobbes",),
+            after=("Hobbes",),
+            reason=ChangeReason.SOURCE_DASH,
+        ),
+    )
+
+
+def test_source_set_flush_right_under_a_chapter_heading_has_no_change() -> None:
+    source = "Hobbes, Leviathan"
+    lines = (
+        _line(_PROSE[0], _TURNEY_LEFT, 0),
+        _line(_PROSE[1], _TURNEY_LEFT, 1),
+        _flush_right(source, _line(_PROSE[1], _TURNEY_LEFT, 1).line.box.x1, 2),
+    )
+    assert lines[2].line.box.x0 - _TURNEY_LEFT >= 150
+    blocks = _blocks(_chapter_page(30, *lines))
+    assert _kinds(blocks) == (
+        BlockKind.HEADING,
+        BlockKind.EPIGRAPH,
+        BlockKind.PARAGRAPH,
+    )
+    assert blocks.blocks[1].source == source
+    assert blocks.word_changes == ()
+
+
+def test_two_epigraphs_under_a_chapter_heading_are_two_blocks() -> None:
+    lines = (
+        _line(_PROSE[0], _HAYNES_LEFT, 0),
+        _line("—Hobbes", _HAYNES_LEFT, 1, _SOURCE_HEIGHT_PT),
+        _line(_PROSE[1], _HAYNES_LEFT, 3),
+        _line("—Locke", _HAYNES_LEFT, 4, _SOURCE_HEIGHT_PT),
+    )
+    blocks = _blocks(_chapter_page(30, *lines))
+    assert _kinds(blocks) == (
+        BlockKind.HEADING,
+        BlockKind.EPIGRAPH,
+        BlockKind.EPIGRAPH,
+        BlockKind.PARAGRAPH,
+    )
+    assert (blocks.blocks[1].source, blocks.blocks[2].source) == ("Hobbes", "Locke")
+
+
+def test_indented_lines_without_a_source_under_a_chapter_heading_stay_text() -> None:
+    lines = (
+        _line(_PROSE[0], _HAYNES_LEFT, 0),
+        _line(_PROSE[1], _HAYNES_LEFT, 1),
+    )
+    blocks = _blocks(_chapter_page(30, *lines))
+    assert BlockKind.EPIGRAPH not in _kinds(blocks)
+    assert all(block.source is None for block in blocks.blocks)
+
+
+def test_speck_between_title_and_epigraph_is_removed_as_a_stray_mark() -> None:
+    speck = _line("/", 200.0, 0)
+    lines = tuple(
+        _line(
+            " ".join(word.text for word in line.line.words),
+            line.line.box.x0,
+            row + 1,
+            line.line.box.bottom - line.line.box.top,
+        )
+        for row, line in enumerate(_HAYNES_EPIGRAPH)
+    )
+    blocks = _blocks(_chapter_page(30, speck, *lines))
+    assert _kinds(blocks) == (
+        BlockKind.HEADING,
+        BlockKind.EPIGRAPH,
+        BlockKind.PARAGRAPH,
+    )
+    assert block_text(blocks.blocks[1]).split()[0] == "it"
+    assert tuple(
+        (removal.reason, removal.text)
+        for removal in blocks.removals
+        if removal.page_index == 30
+    ) == ((RemovalReason.STRAY_MARK, "/"),)
+
+
+_TYGER = (
+    "Tyger Tyger burning bright",
+    "In the forests of the night",
+    "What immortal hand or eye",
+)
+
+
+def test_verse_epigraph_keeps_its_line_breaks() -> None:
+    lines = (
+        *(_line(text, _HAYNES_LEFT, row) for row, text in enumerate(_TYGER)),
+        _line("—Blake", _HAYNES_LEFT, 3, _SOURCE_HEIGHT_PT),
+    )
+    blocks = _blocks(_chapter_page(30, *lines))
+    assert block_text(blocks.blocks[1]) == "\n".join(_TYGER)
+    assert blocks.blocks[1].source == "Blake"
+
+
+def test_prose_epigraph_joins_its_lines() -> None:
+    blocks = _blocks(_chapter_page(30, *_HAYNES_EPIGRAPH))
+    assert "\n" not in block_text(blocks.blocks[1])
+
+
+def test_page_holding_only_an_epigraph_is_an_epigraph_block() -> None:
+    quotation = (
+        _line(_PROSE[0], _COLUMN.left, 0),
+        _line(_PROSE[1], _COLUMN.left, 1),
+    )
+    source = _flush_right("Hobbes", quotation[1].line.box.x1, 2)
+    page = PageLayout(13, (_region(*quotation, source),), ())
+    blocks = _blocks(page)
+    assert _kinds(blocks) == (BlockKind.EPIGRAPH,)
+    assert blocks.blocks[0].source == "Hobbes"
+
+
+# A short last line at a page break (spec section 6). Each page is one
+# region of 6 lines, its right edge at 400 pt, the edge of its full lines.
+
+
+def _text_page(index: int, *lines: PlacedLine) -> PageLayout:
+    return PageLayout(index, (_region(*lines),), ())
+
+
+def _page_ending_with(index: int, last: str) -> PageLayout:
+    full = tuple(_line(_BODY, _COLUMN.left, row) for row in range(5))
+    return _text_page(index, *full, _line(last, _COLUMN.left, 5))
+
+
+def _flush_left_page(index: int) -> PageLayout:
+    return _text_page(index, *(_line(_BODY, _COLUMN.left, row) for row in range(6)))
+
+
+def _ending(text: str, short_pt: float) -> str:
+    """A line of words that ends with `text`, `short_pt` short of 400 pt."""
+    characters = round((_COLUMN.right - _COLUMN.left - short_pt) / _CHAR_PT)
+    filler = "x" * (characters - len(text) - 1)
+    return f"{filler} {text}"
+
+
+@pytest.mark.parametrize("end", ["it.", "it?", "it!", "it:", "it.”", "it.)", "it.43"])
+def test_page_break_after_a_short_last_line_ending_a_sentence_starts_a_paragraph(
+    end: str,
+) -> None:
+    blocks = _blocks(_page_ending_with(20, _ending(end, 30.0)), _flush_left_page(21))
+    assert _kinds(blocks) == (BlockKind.PARAGRAPH, BlockKind.PARAGRAPH)
+    assert blocks.blocks[1].origin[0].page_index == 21
+
+
+@pytest.mark.parametrize(
+    ("end", "short_pt"), [("it,", 30.0), ("it.", 15.0), ("it.4321", 30.0)]
+)
+def test_page_break_after_a_comma_or_a_line_15_pt_short_continues_the_paragraph(
+    end: str, short_pt: float
+) -> None:
+    blocks = _blocks(
+        _page_ending_with(20, _ending(end, short_pt)), _flush_left_page(21)
+    )
+    assert _kinds(blocks) == (BlockKind.PARAGRAPH,)
+
+
+def test_page_break_inside_a_verse_block_keeps_it_one_block() -> None:
+    # Verse lines inset at least 30 pt from both edges (spec section 16,
+    # rule 4), the last of page 20 ending a sentence.
+    verse_left = _COLUMN.left + 60
+    page_20 = _text_page(
+        20,
+        *(_line(_BODY, _COLUMN.left, row) for row in range(5)),
+        _line(_TYGER[0], verse_left, 6),
+        _line(_TYGER[1] + ".", verse_left, 7),
+    )
+    page_21 = _text_page(
+        21,
+        _line(_TYGER[2], verse_left, 0),
+        _line("Could frame thy fearful symmetry", verse_left, 1),
+        *(_line(_BODY, _COLUMN.left, row) for row in range(3, 8)),
+    )
+    blocks = _blocks(page_20, page_21)
+    assert _kinds(blocks) == (
+        BlockKind.PARAGRAPH,
+        BlockKind.VERSE,
+        BlockKind.PARAGRAPH,
+    )
+    assert tuple(origin.page_index for origin in blocks.blocks[1].origin) == (20, 21)
