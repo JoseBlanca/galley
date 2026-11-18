@@ -166,12 +166,28 @@ def _opens_with_note_marker(row: Line) -> bool:
     )
 
 
+def _after_small_row(
+    rows: tuple[Line, ...], small: tuple[bool, ...], index: int
+) -> bool:
+    """Whether the nearest row above `rows[index]` that holds a letter or a
+    digit is small, `small` saying which rows are (step 4); a row of marks
+    above it, a speck, is passed over."""
+    return next(
+        (
+            small[before]
+            for before in range(index - 1, -1, -1)
+            if has_letter_or_digit(rows[before])
+        ),
+        False,
+    )
+
+
 def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
     """The index in `rows` of the first row of the footnote band (step 4),
     or len(rows) when there is no band: the first small row, not the
     first of `rows`, from which on two thirds of the rows are small, and
     which lies `_BAND_GAP_PITCHES` below the row before or opens with a
-    note marker."""
+    note marker below a row that is not small (`_after_small_row`)."""
     small = tuple(is_small_row(row, measures) for row in rows)
     if all(small):
         return len(rows)
@@ -184,7 +200,10 @@ def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
             and (
                 rows[index].box.top - rows[index - 1].box.top
                 >= _BAND_GAP_PITCHES * measures.body_line_pitch
-                or _opens_with_note_marker(rows[index])
+                or (
+                    not _after_small_row(rows, small, index)
+                    and _opens_with_note_marker(rows[index])
+                )
             )
         ),
         len(rows),
