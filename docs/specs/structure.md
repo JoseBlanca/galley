@@ -1921,7 +1921,10 @@ A **group heading** is the block of the section right before a group's
 first note, when it holds at most 3 lines and its first line lies at
 least 1.5 body line pitches below the line before it in the body
 stream, or is the first line of its region: a heading set apart, at
-the top of a column too. It may be a paragraph, a heading block
+the top of a column too. The first line of a region is told by
+position: a line on a later page than the line before it, or whose top
+lies above that line's, as the top of a right column lies above the
+foot of the left one. It may be a paragraph, a heading block
 (section 14 makes some, such as Turney's first group heading, an
 unindented "Introduction" 8 pitches below the title "Notes") or what
 section 11 would make a note, since Turney's starts with a number. It
@@ -1929,6 +1932,18 @@ is no note, starts no group (Turney's chapter One heading starts with a
 bare "1", page 253) and is no block of the note before it: its text, its lines
 joined by single spaces, becomes the `group` of the group's first note
 (section 7), and the fidelity check counts it as words of that note.
+A group heading that no paragraph rule starts ends the block before
+the group's first note, after that note's last line: Haynes sets four
+of its eighteen (chapters 5, 6, 10 and 12, pages 343, 344, 362 and
+370) flush left under the note before, which section 6's rules 1 and 2
+do not cut, and section 14 does not take them for headings. So, in a section of several
+groups, when the block right before a group's first note is no group
+heading, its last lines from the last of them that is set apart (1.5
+pitches below the line before, or the first of its region), when that
+line is not the block's first and at most 3 lines remain, are cut off
+into a paragraph of their own, which is then the group heading. With
+it Haynes has its 18 group headings, without it 14 (measured on 18
+November 2026 with the configs of section 21).
 Measured by the survey: Haynes' group headings stand about 30 pt (2.1
 pitches of 14.4 pt) below the last line of the note before; Turney's
 30 to 32 pt (1.8 to 1.9 pitches of 16.8 pt) or at the top of a column;
@@ -1960,7 +1975,7 @@ to 64; they were not studied, and stay where they are now.
 after the config's `contents_pages` and before the endnote section,
 found from the group heading: the heading whose spans' letters, in
 lower case, are the most alike (`difflib.SequenceMatcher` ratio, at
-least 0.75 as for running heads) to the group heading's letters in
+least 0.85) to the group heading's letters in
 lower case, once a first word that is a chapter label word or a
 number, and a number after a label word, are dropped ("Chapter 1." and
 Turney's leading "2"); a group without a heading, or whose heading is
@@ -1968,7 +1983,14 @@ alike to none, takes the first level-1 heading after the chapter of
 the group before (the first after `contents_pages` for the first
 group). A label is not compared: Haynes' body heading has "CHAPTER ONE"
 in its label and its group heading "Chapter 1.", and the titles match
-("AMD" for "AND" in the body's OCR still gives a ratio above 0.9). A
+("AMD" for "AND" in the body's OCR still gives a ratio above 0.9). The
+0.85 is not the running heads' 0.70 (section 3), since it is set
+between what was measured on 18 November 2026 on the 26 group headings
+the two books' notes give (Turney 8, Haynes 18): each is 0.94 to 1.00
+alike to its own chapter's heading, and at most 0.76 to another's
+(Haynes' chapter 9, "The Scientist as Adventurer", to chapter 11's
+"The Scientist as Hero"); at 0.70 or 0.75 a group whose chapter
+heading the body lacked would take that other chapter. A
 group's candidates are the glued numbers of the body, from the pages
 after `contents_pages` and not taken by a footnote, as above, from its
 chapter's heading up to the heading of the next group's chapter, or up
