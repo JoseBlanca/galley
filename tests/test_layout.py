@@ -473,13 +473,13 @@ def test_word_reaching_left_stays_when_the_next_word_is_less_than_a_pitch_inside
 def test_word_reaching_left_stays_beside_a_margin_word_of_fewer_than_2_letters() -> (
     None
 ):
-    # A list number hung outside the column, as Gierke's "44" on page 62,
-    # which then stays in the line as a hanging number (step 2).
+    # A list number hung outside the column, as Gierke's "44" on page 62.
     result = _page_with_row_3_reaching_left(
         _word("land.", 30, 136, 57, 144), 67, _word("44", 5, 136, 25, 144)
     )
-    (body,) = _region_texts(result)
-    assert body[3] == ("44", "land.", "The", "idea")
+    body, margin = _region_texts(result)
+    assert body[3] == ("land.", "The", "idea")
+    assert margin == (("44",),)
 
 
 def test_word_reaching_left_stays_when_its_middle_is_1_pt_outside() -> None:
@@ -757,23 +757,66 @@ def test_marks_row_between_head_and_body_is_passed_over_and_stays_in_the_body() 
     assert len(body.lines) == 21
 
 
+def _hanging(text: str, row: int, gap: float = 9.0) -> Word:
+    """A number 10 pt wide ending `gap` pt left of the column's edge, 50,
+    beside row `row` of `_rows`."""
+    top = 100 + row * _PITCH
+    return _word(text, 50 - gap - 10, top, 50 - gap, top + 8)
+
+
 def test_hanging_number_9_pt_left_of_a_line_stays_at_the_start_of_that_line() -> None:
-    number = _word("12", 31, 136, 41, 144)  # beside row 3, 9 pt left of 50
-    result = layout_page(_page(0, (*_rows(20), number)), _MEASURES)
+    numbers = (_hanging("12", 3), _hanging("13", 4))
+    result = layout_page(_page(0, (*_rows(20), *numbers)), _MEASURES)
     (body,) = result.regions
-    assert _texts(body.lines)[3] == ("12", "a3", "b3", "c3")
+    assert _texts(body.lines)[3:5] == (
+        ("12", "a3", "b3", "c3"),
+        ("13", "a4", "b4", "c4"),
+    )
 
 
 def test_hanging_number_16_pt_left_of_a_line_is_a_margin_word() -> None:
-    number = _word("12", 24, 136, 34, 144)
-    result = layout_page(_page(0, (*_rows(20), number)), _MEASURES)
-    assert _region_texts(result)[1:] == ((("12",),),)
+    numbers = (_hanging("12", 3), _hanging("13", 4), _hanging("14", 5, 16.0))
+    result = layout_page(_page(0, (*_rows(20), *numbers)), _MEASURES)
+    assert _region_texts(result)[1:] == ((("14",),),)
+
+
+def test_hanging_number_alone_on_its_page_is_a_margin_word() -> None:
+    # A speck read as a digit beside a margin note (Gierke's page 160).
+    result = layout_page(_page(0, (*_rows(20), _hanging("9", 3))), _MEASURES)
+    assert _region_texts(result)[1:] == ((("9",),),)
+
+
+def test_hanging_number_with_a_margin_word_before_its_line_is_a_margin_word() -> None:
+    # A margin "—" between the number and the line (Domesday's page 39).
+    dash = _word("—", 44, 124 + 3 * _PITCH - 24, 48, 124 + 3 * _PITCH - 16)
+    numbers = (
+        _word("16", 30, 136, 40, 144),
+        _hanging("17", 4),
+        _hanging("18", 5),
+    )
+    result = layout_page(_page(0, (*_rows(20), dash, *numbers)), _MEASURES)
+    (body, *margins) = _region_texts(result)
+    assert body[3] == ("a3", "b3", "c3")
+    assert body[4][0] == "17"
+    assert ("16", "—") in tuple(line for region in margins for line in region)
+
+
+def test_hanging_number_split_by_the_ocr_hangs_whole() -> None:
+    numbers = (
+        _word("5", 33, 136, 36, 144),
+        _word("1", 37, 136, 41, 144),
+        _hanging("52", 4),
+    )
+    result = layout_page(_page(0, (*_rows(20), *numbers)), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[3] == ("5", "1", "a3", "b3", "c3")
 
 
 def test_hanging_number_on_the_head_row_is_a_margin_word() -> None:
     head = _word("HEAD", 50, 80, 110, 88)
     number = _word("12", 31, 80, 41, 88)
-    result = layout_page(_page(0, (head, number, *_rows(20))), _MEASURES)
+    numbers = (_hanging("13", 3), _hanging("14", 4))
+    result = layout_page(_page(0, (head, number, *numbers, *_rows(20))), _MEASURES)
     assert _region_texts(result)[0] == (("HEAD",),)
     assert _region_texts(result)[2:] == ((("12",),),)
 

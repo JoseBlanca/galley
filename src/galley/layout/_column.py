@@ -145,10 +145,13 @@ _HEAD_SKEW_PITCHES: Final[float] = 0.5
 # Measured on 17 November 2026 (layout spec section 3, step 2): Turney's
 # notes at the back hang their numbers 6 to 14 pt left of their text, left
 # of the page's left edge; a number up to 15 pt from the word right of it
-# stays in that word's line. So kept: Turney 99, Gierke 30 (its contents,
-# pages 62 and 65, and 2 others), Domesday 2, none in the other books.
+# stays in that word's line, on a page where 2 numbers do (18 November
+# 2026, after review: one alone was an OCR speck read as a digit, on
+# Gierke's 115 and 160 and Domesday's 443). So kept: Turney 99, Gierke 28
+# (its contents, pages 62 and 65), none in the other books.
 _HANGING_NUMBER = re.compile(r"[0-9]{1,3}")
 _HANGING_NUMBER_GAP_PT: Final[float] = 15.0
+_HANGING_NUMBERS_LEAST: Final[int] = 2
 
 
 def _column_edges(
@@ -301,41 +304,61 @@ def split_at_column(
     )
 
 
+def _hanging_number(
+    number: Word, left_margin: tuple[Word, ...], column: tuple[Word, ...]
+) -> bool:
+    """Whether `number`, a word of `left_margin`, hangs before a line of
+    `column`'s words (step 2): 1 to 3 digits, on a row that is not the
+    first with a letter or a digit (the head row of step 3), whose next
+    word right of it starts at most `_HANGING_NUMBER_GAP_PT` right of the
+    number's right side, with no other margin word between them but
+    digits."""
+    if _HANGING_NUMBER.fullmatch(number.text) is None:
+        return False
+    rows = group_rows((*column, number))
+    place = next(
+        place
+        for place, row in enumerate(rows)
+        if any(word is number for word in row.words)
+    )
+    head = next(
+        (place for place, row in enumerate(rows) if has_letter_or_digit(row)), None
+    )
+    right = tuple(
+        word
+        for word in rows[place].words
+        if word is not number and word.box.x0 > number.box.x0
+    )
+    if place == head or not right:
+        return False
+    start = min(word.box.x0 for word in right)
+    row = rows[place].box
+    # A number the OCR split ("5" "1") hangs whole: digits between count
+    # as none.
+    between = any(
+        other is not number
+        and _HANGING_NUMBER.fullmatch(other.text) is None
+        and other.box.x0 >= number.box.x1
+        and other.box.x1 <= start
+        and other.box.top < row.bottom
+        and other.box.bottom > row.top
+        for other in left_margin
+    )
+    return start - number.box.x1 <= _HANGING_NUMBER_GAP_PT and not between
+
+
 def _hanging_numbers(
     left_margin: tuple[Word, ...], column: tuple[Word, ...]
 ) -> frozenset[int]:
     """The identities of the words of `left_margin` that stay in the column
-    as hanging numbers (step 2): 1 to 3 digits, on a row of `column`'s
-    words that is not its first with a letter or a digit (the head row of
-    step 3), whose next word right of it starts at most
-    `_HANGING_NUMBER_GAP_PT` right of the number's right side."""
-    hanging = set()
-    for number in left_margin:
-        if _HANGING_NUMBER.fullmatch(number.text) is None:
-            continue
-        rows = group_rows((*column, number))
-        place = next(
-            place
-            for place, row in enumerate(rows)
-            if any(word is number for word in row.words)
-        )
-        head = next(
-            (place for place, row in enumerate(rows) if has_letter_or_digit(row)),
-            None,
-        )
-        right = tuple(
-            word
-            for word in rows[place].words
-            if word is not number and word.box.x0 > number.box.x0
-        )
-        if (
-            place != head
-            and right
-            and min(word.box.x0 for word in right) - number.box.x1
-            <= _HANGING_NUMBER_GAP_PT
-        ):
-            hanging.add(id(number))
-    return frozenset(hanging)
+    as hanging numbers (step 2): those `_hanging_number` takes, when it
+    takes at least `_HANGING_NUMBERS_LEAST` on the page."""
+    hanging = frozenset(
+        id(number)
+        for number in left_margin
+        if _hanging_number(number, left_margin, column)
+    )
+    return hanging if len(hanging) >= _HANGING_NUMBERS_LEAST else frozenset()
 
 
 # Measured on Stubbs' whole book on 16 November 2026 (layout spec section
