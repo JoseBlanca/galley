@@ -27,7 +27,9 @@ from galley.structure._lines import (
     Piece,
     PlacedLine,
     first_word,
+    misread_marker_lines,
     starts_paragraph,
+    text_edge,
 )
 from galley.structure._markers import MarkerForm, marker_form
 from galley.structure._measures import (
@@ -216,11 +218,23 @@ def page_parts(
             return column
         return edges
 
+    # Spec section 6, rule 3: a hanging number starts a paragraph only in
+    # the body stream.
+    text_edges = tuple(
+        text_edge(region.lines) if kind is RegionKind.BODY else None
+        for region, kind in zip(page.regions, kinds, strict=True)
+    )
     regions = tuple(
         (
             kind,
             tuple(
-                PlacedLine(page.index, line, edges, centring_edges(region, kind, edges))
+                PlacedLine(
+                    page.index,
+                    line,
+                    edges,
+                    centring_edges(region, kind, edges),
+                    text_edges[region_number],
+                )
                 for line_number, line in enumerate(region.lines)
                 if (region_number, line_number) not in removed
                 and region_number not in taken
@@ -271,6 +285,8 @@ def page_parts(
         + (index.page_numbers if index is not None else ())
         + foot.page_numbers,
         body=body,
+        # Spec section 6, rule 3: a note's "1" the OCR misread starts one.
+        block_starts=misread_marker_lines(body),
         margin_notes=tuple(
             Piece(lines)
             for kind, lines in regions

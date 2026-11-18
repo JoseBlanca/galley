@@ -38,13 +38,15 @@ class Unnumbered:
 
 @dataclass(frozen=True, slots=True)
 class UnnumberedNote:
-    """A note before it has its id."""
+    """A note before it has its id; `group` is the group heading on a note
+    group's first endnote, else None (spec section 12)."""
 
     kind: NoteKind
     marker: str
     blocks: tuple[Unnumbered, ...]
     origin: tuple[Origin, ...]
     referenced: bool
+    group: str | None = None
 
 
 def piece_origin(piece: Piece) -> tuple[Origin, ...]:
