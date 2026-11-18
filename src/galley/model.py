@@ -307,6 +307,13 @@ _SAME_TEXT_REACH_PT = 16.0
 # Tesseract missed but numbers, which rule (c) leaves to (a) and (b); from
 # 0.5 to 0.6, 10 copies and 4 body words at the column's edge ("for" beside
 # "lord", Domesday page 310).
+_ALIKE_LEAST_LETTERS = 3
+_ALIKE_LEAST_RATIO = 0.6
+# A layer word glued over two or three Tesseract words is the same printed
+# words as they ("of,96" where Tesseract read "of," "96", Stubbs' index page
+# 312): each Tesseract word's middle lies inside its box widened by 1 pt.
+_GLUED_WORD_COUNTS = (2, 3)
+_GLUED_WIDEN_PT = 1.0
 # The exception in (a): a Tesseract word whose layer words under it are all
 # unlike it, with a layer word of its letters left unmatched within 16 pt,
 # pairs with that word by (b) or (c), and replaces the junk under it too
@@ -314,16 +321,9 @@ _SAME_TEXT_REACH_PT = 16.0
 # a known word under it stays, as another printed word may. Counted on the
 # clean-text build of 17 November 2026, 55 layer words of Stubbs, Domesday
 # and Gierke stayed beside a kept record's word of their letters, 47 of them
-# over junk or a word of the next line.
-# A layer word glued over two or three Tesseract words is the same printed
-# words as they ("of,96" where Tesseract read "of," "96", Stubbs' index page
-# 312): each Tesseract word's middle lies inside its box widened by 1 pt.
-_GLUED_WORD_COUNTS = (2, 3)
-_GLUED_WIDEN_PT = 1.0
-_ALIKE_LEAST_LETTERS = 3
-_ALIKE_LEAST_RATIO = 0.6
-# The exception in (a) takes no alike layer word of 2 letters or more than
-# the Tesseract word: the layer may have glued another printed word to it.
+# over junk or a word of the next line. It takes no alike layer word of 2
+# letters or more than the Tesseract word: the layer may have glued another
+# printed word to it.
 # Of the 16 alike words it took on whole Stubbs, Domesday, Gierke and
 # Haskins (18 November 2026), 2 had 2 letters more or over, both glued
 # ("ofdemesne-", Domesday page 90; "imgmen.", page 333); the others at most
@@ -542,7 +542,7 @@ def _distance(word: Word, ocr_word: Word) -> float:
     )
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
 class _Paired:
     """The pairing of a region's layer words with its Tesseract words.
 
@@ -571,20 +571,20 @@ def _pairing(
     `replaced_layer_words`: the rules applied once, then again with the
     Tesseract words of the exception in (a) freed, when there are any."""
     first = _pairing_freeing(layer_words, ocr_words, is_known, is_junk, frozenset())
-    freed = _unlike_over_free_letters(layer_words, ocr_words, first.matched)
+    freed = _excepted_ocr_positions(layer_words, ocr_words, first.matched)
     if not freed:
         return first
     return _pairing_freeing(layer_words, ocr_words, is_known, is_junk, freed)
 
 
-def _unlike_over_free_letters(
+def _excepted_ocr_positions(
     layer_words: Sequence[Word], ocr_words: Sequence[Word], matched: Sequence[bool]
 ) -> frozenset[int]:
     """The positions in `ocr_words` of the exception in (a): a Tesseract
     word with layer words of its line under it, not glued, whose letters
     and digits are all unlike its own, and a layer word that `matched`
-    leaves unmatched within 16 pt above or below whose letters and digits
-    are equal or alike to its own."""
+    leaves unmatched within 16 pt above or below that is the layer's copy
+    of its word (`_is_copy`)."""
     glued = {
         position for word in layer_words for position in _glued_over(word, ocr_words)
     }
@@ -703,11 +703,13 @@ def _pairing_freeing(
     }
     junk = _junk_under(layer_words, ocr_words, is_junk, under_freed)
     return _Paired(
-        tuple(is_matched or index in junk for index, is_matched in enumerate(matched)),
-        frozenset(taken),
-        frozenset(copies),
-        frozenset(under_freed),
-        frozenset(index for index in junk if not matched[index]),
+        matched=tuple(
+            is_matched or index in junk for index, is_matched in enumerate(matched)
+        ),
+        taken=frozenset(taken),
+        copies=frozenset(copies),
+        under_freed=frozenset(under_freed),
+        junk=frozenset(index for index in junk if not matched[index]),
     )
 
 
