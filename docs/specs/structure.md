@@ -1860,7 +1860,17 @@ of bare numbers whose first value is 1 and outside the config's
 `contents_pages`: the first because each of Turney's groups (below)
 starts at 1, the second because Gierke's printed contents, pages 63 to
 66, start 13 lines with rising bare numbers from 139 (section 6, rule
-3), which would otherwise begin its section 120 pages early. The
+3), which would otherwise begin its section 120 pages early. A bare
+number that does not rise above the marker before it is no marker
+unless it reads 1, so it neither starts a run nor ends one: Turney's
+chapter Three opens its notes with a "1" the OCR read as "x" (page
+258), and its notes 2 to 48 do not rise above chapter Two's last, 48:
+they are later blocks of that note, not the starts of 47 runs too short
+for a section (a loss of 47 of Turney's notes, measured on 18 November
+2026 on the survey's configs; reading "x" as 1 is not done, since no
+other book shows it). Within a run
+the two forms are not told apart: any marker that rises goes on with
+it. The
 section runs from the first marker of the first run of at least 8 to
 the last marker of the last such run, so that a damaged marker that
 reads lower does not cut it in two. On its first page it reaches back
