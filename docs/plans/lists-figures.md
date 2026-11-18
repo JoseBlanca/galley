@@ -179,7 +179,7 @@ new values yet.
 body measures (structure §32); Domesday's body pages near 156 are
 tables, so the body pages to add may lie further away.
 
-- [ ] 1.1 The two excerpts and their configs. `kadesh_29-38`: Kadesh's
+- [x] 1.1 The two excerpts and their configs. `kadesh_29-38`: Kadesh's
   pages 29 to 38, with the whole book's config; its expected output as
   figures §10's table gives it, each page read from its 300-dpi render
   by a subagent. `domesday_lists`: Domesday's pages 141, 156, 157 and
@@ -191,7 +191,7 @@ tables, so the body pages to add may lie further away.
   use it. Spec: figures §10, "Reference pages"; structure §32,
   "Excerpt tests" and the paragraph after its table. Plan's branch.
   Deliverable 1.
-- [ ] 1.2 The formats of architecture §8 in `model.py` (`PageInfo.figure_boxes`,
+- [x] 1.2 The formats of architecture §8 in `model.py` (`PageInfo.figure_boxes`,
   `FigureKind` and `Figure.kind`, the two block kinds, `Block.page_number`
   and `heading_ref`, the change and removal reasons, the four versions,
   the readers' errors); every writer of these files that exists sets

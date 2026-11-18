@@ -18,3 +18,18 @@ kept; the format changes of the figures spec, with `Figure.kind`.
 Starting point: `main` at 83f2754, 2,494 tests passing in 62 to 64 s.
 The evaluation baseline is `runs/owner-books-final/` of the main
 checkout (same code).
+
+## Tasks 1.1 and 1.2
+
+Done as planned: two excerpts, `kadesh_29-38` (10 pages) and
+`domesday_lists` (11 pages, 7 of them body pages for its measures), with
+15 expected files transcribed from the page images at 300 dpi; the
+formats at pages.json 3, words.json 3, lines.json 4, blocks.json 5.
+Checks at 49abd8c: 2,535 passed in 64.25 s, and with 8 threads in 102.6 s
+(orchestrator's run). Changes outside the listed files: per-excerpt
+literals in five test files; markdown refuses list items and contents
+entries until work package 6 rather than dropping their labels;
+galley-eval's kind enums. The excerpts differ from their whole books in
+small ways that the test literals record: on `domesday_lists` a few table
+numbers of pages 157 and 158 become margin notes; on `kadesh_29-38` two
+blocks of page 38 are quotes.
