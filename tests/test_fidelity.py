@@ -432,6 +432,66 @@ def test_structure_hyphen_lost_whose_word_was_split_at_its_case_passes() -> None
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+def test_structure_hyphen_lost_followed_by_a_split_then_a_sign_passes() -> None:
+    # Review of work package 5: a chain of changes after the join, the
+    # case split and then the sign attached to the split's second part.
+    lines = _lines_file((("Unity of theWil",), ("liam ; here",)))
+    blocks = _blocks_file(
+        (_margin_note("Unity of the William; here"),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=("theWil", "liam"),
+                after=("theWilliam",),
+                reason=ChangeReason.HYPHEN_LOST,
+            ),
+            WordChange(
+                page_index=0,
+                before=("theWilliam",),
+                after=("the", "William"),
+                reason=ChangeReason.CASE_SPLIT,
+            ),
+            WordChange(
+                page_index=0,
+                before=("William", ";"),
+                after=("William;",),
+                reason=ChangeReason.PUNCTUATION_ATTACHED,
+            ),
+        ),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_structure_hyphen_lost_whose_changed_word_is_in_the_body_only_fails() -> None:
+    # The join, then a sign attached, both in a body paragraph: the word
+    # they end in, "movement;", is in no margin note of the page.
+    lines = _lines_file((("Unity of the move.",), ("ment ; here",)))
+    blocks = _blocks_file(
+        (
+            _block("b-p0000-001", (0, 1), (_span("Unity of the movement; here"),)),
+            _margin_note("A note"),
+        ),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=("move.", "ment"),
+                after=("movement",),
+                reason=ChangeReason.HYPHEN_LOST,
+            ),
+            WordChange(
+                page_index=0,
+                before=("movement", ";"),
+                after=("movement;",),
+                reason=ChangeReason.PUNCTUATION_ATTACHED,
+            ),
+        ),
+    )
+
+    with pytest.raises(FidelityError, match="not in a margin note"):
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
 def test_structure_hyphen_lost_outside_a_margin_note_fails() -> None:
     # Structure spec section 5: the join is made in margin notes only.
     blocks = _blocks_file(
