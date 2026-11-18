@@ -604,8 +604,17 @@ def _page_ending_with(index: int, last: str) -> PageLayout:
     return _text_page(index, *full, _line(last, _COLUMN.left, 5))
 
 
-def _flush_left_page(index: int) -> PageLayout:
-    return _text_page(index, *(_line(_BODY, _COLUMN.left, row) for row in range(6)))
+# The body line above with a capital to start it.
+_SENTENCE_START = "The" + _BODY.removeprefix("the")
+
+
+def _flush_left_page(index: int, first: str = _SENTENCE_START) -> PageLayout:
+    """A page of 6 full lines, flush left, the first `first`."""
+    return _text_page(
+        index,
+        _line(first, _COLUMN.left, 0),
+        *(_line(_BODY, _COLUMN.left, row) for row in range(1, 6)),
+    )
 
 
 def _ending(text: str, short_pt: float) -> str:
@@ -632,6 +641,19 @@ def test_page_break_after_a_comma_or_a_line_15_pt_short_continues_the_paragraph(
 ) -> None:
     blocks = _blocks(
         _page_ending_with(20, _ending(end, short_pt)), _flush_left_page(21)
+    )
+    assert _kinds(blocks) == (BlockKind.PARAGRAPH,)
+
+
+@pytest.mark.parametrize("first", [_BODY, "‘" + _BODY[1:], "“" + _BODY[1:]])
+def test_page_break_before_a_line_starting_in_lower_case_continues_the_paragraph(
+    first: str,
+) -> None:
+    # A note left in the body ends the page short with a full stop; the
+    # sentence it interrupts runs on at the next page (spec section 6).
+    blocks = _blocks(
+        _page_ending_with(20, _ending("1 D. B. i. 141.", 30.0)),
+        _flush_left_page(21, first),
     )
     assert _kinds(blocks) == (BlockKind.PARAGRAPH,)
 
