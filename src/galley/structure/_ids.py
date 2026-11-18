@@ -103,6 +103,7 @@ def numbered(
                 blocks=note_blocks[note_number],
                 origin=note.origin,
                 referenced=note.referenced,
+                group=note.group,
             )
         )
     return tuple(body), tuple(numbered_notes)
