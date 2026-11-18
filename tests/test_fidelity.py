@@ -1891,6 +1891,52 @@ def test_layout_with_one_ocr_word_the_only_reading_of_two_lines_words_fails() ->
     assert "the only ocr word that can read 'Domini'" in raised.value.detail
 
 
+def test_layout_with_one_ocr_word_reading_the_junk_under_it_and_its_copy_passes() -> (
+    None
+):
+    # Domesday page 36: the layer's junk "&g" lies under Tesseract's "seat-"
+    # and its copy "scat'" 6 pt below, out of the widened box; both are
+    # readings of the printed "scat-" (reocr spec, section 4, the exception
+    # in (a)).
+    junk = Word("&g", Box(10.0, 101.0, 30.0, 109.0), None)
+    copy = Word("scat'", Box(10.0, 107.0, 30.0, 115.0), None)
+    ocr = (Word("seat-", Box(10.0, 100.0, 30.0, 108.0), 80.0),)
+    words = WordsFile(
+        source_pdf_sha256=_SHA,
+        pages=(
+            PageWords(
+                index=0,
+                text_source=TextSource.TEXT_LAYER,
+                words=(junk, copy),
+                figures=(),
+            ),
+        ),
+        removals=(),
+    )
+    reread = Reread(
+        page_index=0,
+        kind=RereadKind.MARGIN_NOTE,
+        box=Box(0.0, 90.0, 40.0, 120.0),
+        layer_words=(junk, copy),
+        ocr_words=ocr,
+        layer_score=-1,
+        ocr_score=-1,
+        kept=True,
+        dropped_junk_count=0,
+    )
+    lines = LinesFile(
+        source_pdf_sha256=_SHA,
+        pages=(
+            PageLayout(
+                index=0, regions=(Region(_BOX, (Line(_BOX, ocr),)),), figures=()
+            ),
+        ),
+        rereads=(reread,),
+    )
+
+    check_stage(FidelityBoundary.LAYOUT, words, lines)
+
+
 # The plan owner-books (structure spec sections 22 to 25, architecture
 # section 13): an epigraph's source and a note's group are words of their
 # block and note; the dash before a source, a spaced sign and a word glued

@@ -2268,22 +2268,48 @@ def test_ocr_word_matched_by_its_text_is_not_alike_to_another_layer_word() -> No
 # Tesseract word whose letters are unlike (reocr spec, section 4).
 
 
-def test_unlike_junk_under_an_ocr_word_stays_and_its_letters_word_is_replaced() -> None:
+def test_unlike_junk_under_an_ocr_word_is_replaced_with_its_letters_word() -> None:
     # Domesday page 26: the layer's junk '^"i' lies under Tesseract's
-    # "tem," and its own "tem<" 7 pt below, out of the widened box.
+    # "tem," and its own "tem<" 7 pt below, out of the widened box. Both
+    # are readings of the printed "tem.", which Tesseract's word replaces.
     junk, beside = _layer('^"i', 10, 101), _layer("tem<", 10, 107)
     ocr = (_tesseract("tem,", 10, 100),)
     assert model.replaced_layer_words((junk, beside), ocr, is_known=_unknown) == (
+        junk,
         beside,
     )
 
 
+def test_unlike_known_word_under_an_ocr_word_paired_by_letters_stays() -> None:
+    # A known word under it may be another printed word the layer read
+    # rightly ("14." under Tesseract's "146", Gierke page 63).
+    under, beside = _layer("of", 10, 101), _layer("tem<", 10, 107)
+    ocr = (_tesseract("tem,", 10, 100),)
+    assert model.replaced_layer_words(
+        (under, beside), ocr, is_known=_in(frozenset({"of"}))
+    ) == (beside,)
+
+
+def test_unlike_junk_is_scored_in_place_of_the_letters_word_beside_it() -> None:
+    # reocr spec, section 3: the copy and the junk are two readings of one
+    # printed word, and the junk is the one rule (a) alone would score.
+    junk, beside = _layer('^"i', 10, 101), _layer("tem<", 10, 107)
+    ocr = (_tesseract("tem,", 10, 100),)
+    assert model.scored_layer_words((junk, beside), ocr, is_known=_unknown) == (junk,)
+    # A known word under it, left in the layer, is scored too, as before.
+    under = _layer("of", 10, 101)
+    assert model.scored_layer_words(
+        (under, beside), ocr, is_known=_in(frozenset({"of"}))
+    ) == (under,)
+
+
 def test_unlike_word_under_an_ocr_word_gives_way_to_an_alike_word_by_c() -> None:
     # Domesday page 36: "scat'" beside Tesseract's "seat-", alike by (c)'s
-    # ratio (0.75), and junk under it.
-    junk, beside = _layer("~", 10, 101), _layer("scat'", 10, 107)
+    # ratio (0.75), and the junk "&g" under it.
+    junk, beside = _layer("&g", 10, 101), _layer("scat'", 10, 107)
     ocr = (_tesseract("seat-", 10, 100),)
     assert model.replaced_layer_words((junk, beside), ocr, is_known=_unknown) == (
+        junk,
         beside,
     )
 
@@ -2324,14 +2350,15 @@ def test_unlike_word_under_an_ocr_word_with_no_word_of_its_letters_stays_paired(
 
 
 def test_unlike_ocr_word_left_unpaired_keeps_the_words_under_it() -> None:
-    # Two of Tesseract's "tem," with junk under each, and one "tem" of the
-    # layer between them, nearer the second: the first keeps its junk.
-    first_junk, second_junk = _layer("~", 10, 101), _layer("^", 10, 121)
+    # Two of Tesseract's "tem," with a word under each, and one "tem" of
+    # the layer between them, nearer the second: the first keeps the word
+    # under it, though known; the second's known word stays in the layer.
+    first_under, second_under = _layer("of", 10, 101), _layer("of", 10, 121)
     beside = _layer("tem", 10, 113)
     ocr = (_tesseract("tem,", 10, 100), _tesseract("tem,", 10, 120))
     assert model.replaced_layer_words(
-        (first_junk, beside, second_junk), ocr, is_known=_unknown
-    ) == (first_junk, beside)
+        (first_under, beside, second_under), ocr, is_known=_in(frozenset({"of"}))
+    ) == (first_under, beside)
 
 
 def _rereads_record(

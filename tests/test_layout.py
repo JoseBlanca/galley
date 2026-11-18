@@ -38,6 +38,7 @@ from galley.layout import (
     layout_page_with_rereads,
     measure_book,
 )
+from galley.layout._reread import RegionReading, page_rereads
 from galley.model import (
     BlockKind,
     Box,
@@ -2608,6 +2609,35 @@ def _margin_notes_of_page(blocks_json: Path, page: int) -> tuple[str, ...]:
     )
 
 
+def test_reread_scores_the_junk_under_a_word_not_its_copy_beside_it() -> None:
+    # reocr spec, section 3: Domesday page 469, "Produce and value.", where
+    # the layer holds junk under Tesseract's "value." and its copy "value."
+    # 7 pt below. Counted with the copy, the layer's reading tied and was
+    # kept; with the junk, Tesseract's is kept, and both are replaced.
+    produce = Word("Produce", Box(10, 100, 34, 108), None)
+    conjunction = Word("and", Box(40, 100, 52, 108), None)
+    junk = Word("^x", Box(10, 111, 30, 119), None)
+    copy = Word("value.", Box(10, 117, 30, 125), None)
+    ocr = (
+        Word("Produce", Box(10, 100, 34, 108), 90.0),
+        Word("and", Box(40, 100, 52, 108), 90.0),
+        Word("value.", Box(10, 110, 30, 118), 90.0),
+    )
+    reading = RegionReading(
+        kind=RereadKind.MARGIN_NOTE,
+        side=Side.LEFT,
+        box=Box(8, 98, 56, 128),
+        ocr_words=ocr,
+        layer_words=(produce, conjunction, junk, copy),
+    )
+    (record,) = page_rereads(
+        0, (reading,), frozenset({"produce", "and", "value"}), page_words=()
+    )
+    assert record.kept
+    assert record.layer_words == (produce, conjunction, junk, copy)
+    assert (record.layer_score, record.ocr_score) == (1, 3)
+
+
 # domesday_rereads: excerpt pages 0, 2, 6, 8 and 10 are book page indices
 # 26, 36, 139, 150 and 160. The text layer holds, beside a margin note's
 # last word, its own reading a few points off and junk under Tesseract's
@@ -2644,6 +2674,23 @@ def test_reread_domesday_margin_note_word_of_the_layer_beside_is_read_once(
         for line in region.lines
         for word in line.words
         if word.ocr_confidence is None
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_domesday_junk_under_a_note_word_read_once_is_replaced_too(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Excerpt page 2, book page index 36: the layer's "&g" lies under
+    # Tesseract's "seat-", whose copy "scat'" the record replaces; left in
+    # the text, it fell between "seat-" and "tered".
+    lines = read_lines(excerpt_books[_DOMESDAY_REREADS].lines_json)
+    assert any(
+        word.text == "&g"
+        for reread in lines.rereads
+        if reread.kept and reread.page_index == 2
+        for word in reread.layer_words
     )
 
 

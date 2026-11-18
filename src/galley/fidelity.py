@@ -33,6 +33,7 @@ from galley.model import (
     Word,
     WordChange,
     WordsFile,
+    is_junk_beside_its_copy,
     may_read,
     replaced_layer_words,
     take_out_once,
@@ -166,7 +167,9 @@ def _one_reading_of_two_lines(reread: Reread) -> tuple[str, ...]:
     """A problem for each Tesseract word of `reread` that is the only one
     of its `ocr_words` that may read two of its `layer_words` of different
     printed lines (`model.may_read`): it would stand for two printed words.
-    Independent of `model.replaced_layer_words`, the pairing layout made."""
+    Independent of `model.replaced_layer_words`, the pairing layout made.
+    The layer's junk under it beside the layer's copy of its word is no
+    such pair (`model.is_junk_beside_its_copy`)."""
     sole_readings: dict[int, list[Word]] = {}
     for word in reread.layer_words:
         readings = tuple(
@@ -185,6 +188,10 @@ def _one_reading_of_two_lines(reread: Reread) -> tuple[str, ...]:
         for index, first in enumerate(layer_words)
         for second in layer_words[index + 1 :]
         if not _share_a_line(first, second)
+        # The layer's junk under the word and its copy of the word beside
+        # it: one printed word read twice (reocr spec, section 4).
+        and not is_junk_beside_its_copy(first, second, ocr_word)
+        and not is_junk_beside_its_copy(second, first, ocr_word)
     )
 
 
