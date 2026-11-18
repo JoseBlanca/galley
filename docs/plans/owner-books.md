@@ -343,7 +343,7 @@ checked on the render.
   owner-books' part; §22, "The dash is look, not text"; §23 and §24,
   the records; §25, its last paragraph. Plan's branch. Deliverables 1,
   2, 4. A commit of its own.
-- [ ] 2.2 The pairing exception in `model.py`'s pairing, which layout
+- [x] 2.2 The pairing exception in `model.py`'s pairing, which layout
   and the fidelity check share, with the unit tests and the excerpt
   test; the changed reference pages. Spec: reocr §4, the exception in
   (a) and "A pairing by letters wins over a word under it whose letters

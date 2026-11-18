@@ -170,3 +170,22 @@ Not fixed, known:
 
 Checks at ef1d766: 2,342 passed and 8 xfailed in 61.0 s (58.6 s on the
 stream's tree); whole_book 80 passed in 487 s.
+
+## Task 2.2: re-reading's pairing
+
+e4c04ed, fe90c37, c710589, 5e0a27f. A Tesseract word whose letters
+match a layer word (equal or alike) pairs with it even when an unlike
+junk word lies under it too; that junk is then replaced with the rest,
+and a layer word duplicated under one Tesseract word counts once in the
+layer's score. Words read twice, before → after, recomputed from the
+same Tesseract readings: Domesday 30 → 4, Gierke 12 → 0, Stubbs 6 → 5,
+Haskins 0 → 0; no record changed its choice of reading on the four
+books. The first version (fe90c37) had left junk in the text on four
+Domesday pages and flipped eight records to the layer's worse reading
+through a tie; the second commit put both right. Reference page
+domesday_rereads page 0 (book page 26) loses the "tem<" of the
+owner's report; pages 2, 6, 8 and 10 lose their doubled words.
+
+Known: Gierke 63 keeps the layer's "14." beside Tesseract's "146", and
+Domesday 107 keeps Tesseract's "th" for the layer's right "the".
+Default run 69.4 s while the notes stream ran its tests.
