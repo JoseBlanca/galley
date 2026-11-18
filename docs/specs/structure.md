@@ -402,8 +402,10 @@ speck). Gierke's page 167 has a speck 12 pt below its head's top,
 which is not taken; the head stays as now.
 
 **A chapter label is never a running head.** A head line whose first
-word, without a "." or "," after it, is CHAPTER, CHAPITRE, ESSAY,
-PART, PARTIE, BOOK or LIVRE, in any case, is no running head, whatever
+word starts with a **chapter label word**, CHAPTER, CHAPITRE, ESSAY,
+PART, PARTIE, BOOK or LIVRE, in any case, the whole word but for one
+or more ".", ",", ":" or ";" after it (the same test as section 14's
+chapter label), is no running head, whatever
 the rules above find: it is the first line of a chapter's heading
 (section 14). Haynes (section 21) sets its chapter label at a top of 56
 to 74 pt, 1.5 to 2.7 pitches below the median top of its heads (34.8
@@ -2131,8 +2133,10 @@ Terms: a line's **capitals share** is the share of its letters
 from the top of the line before it in the page's body stream to its own
 top, in pitches, and its **gap below** the distance to the top of the
 line after; a page's first line has no gap above, its last none below.
-A **chapter label** is a line that starts with CHAPTER, CHAPITRE, ESSAY,
-PART, PARTIE, BOOK or LIVRE, in any case, or is a roman numeral alone as
+A **chapter label** is a line whose first word is a chapter label word
+(section 3: CHAPTER, CHAPITRE, ESSAY, PART, PARTIE, BOOK or LIVRE, in
+any case, with ".", ",", ":" or ";" after it or not), or is a roman
+numeral alone as
 the OCR reads one: 1 to 5 of the characters `IVXLCl1`, with an optional
 ".", ("II", "Ill" for III).
 
