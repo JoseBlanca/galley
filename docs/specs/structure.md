@@ -243,15 +243,24 @@ inside it.
   left or wholly right of
   it, or overlaps vertically a region wider than itself (a note that
   Stubbs cuts into the body column, which layout takes out of the body
-  lines into a region of its own: layout §3, step 2b). Margin notes are about 30
+  lines into a region of its own: layout §3, step 2b), unless it is in
+  small type (as a band region below) and its top lies at most 2 pt
+  above that region's bottom. Margin notes are about 30
   pt wide against columns of 266 to 317 pt; each column of an index is
   about half the width, so it is not a margin region;
 - a **band region** is any other region, not the head line, whose
   median word height (over its words) is at most 0.85 of the body word
   height and whose top is at or below the bottom of another region,
-  neither the head line nor a margin region, whose median word height is
-  above that (layout's threshold for the footnote band, layout §3,
-  step 4);
+  or above it by at most 2 pt, neither the head line nor a margin
+  region, whose median word height is above that (layout's threshold
+  for the footnote band, layout §3, step 4). The 2 pt are for a note
+  that layout starts close under the text (layout §3, step 4, the
+  gapless start): Domesday's note "1 See above, p. 359." on page 535,
+  one line 66 pt wide, reaches 0.8 pt into the text above it and was a
+  margin region, its note lost. Measured on 18 November 2026 on the
+  eight books: with them, Domesday's pages 443 and 535 get their notes
+  (443's two lines were paragraphs), and Kadesh's 40, on the layout of
+  before the review, three; no other block changes;
 - every other region is a **body region**, in layout's order.
 
 ## 3. Running heads and page numbers in the head
