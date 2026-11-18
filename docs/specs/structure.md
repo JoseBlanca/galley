@@ -2172,7 +2172,14 @@ A **tall line** is a body line whose line height (section 1) is at
 least 1.2 times the median line height of the page's body stream, that
 has at least 4 letters, that passes rules 2 and 3, and whose gap above
 is at least 1.3 pitches, or that is the page's first line or follows a
-heading line: whatever its alignment, it is a heading line. Turney
+heading line: whatever its alignment, it is a heading line. The line
+after a heading line needs no gap: Turney sets section headings on two
+lines, the second as tall as the first and less than 1.3 pitches below
+it (pages 80 and 85), and a group heading of its notes so (page 258);
+without the clause the second line was a paragraph (measured on 18
+November 2026: those three headings lose their last line, and
+Domesday's false heading on page 481 one line, and nothing else
+changes on the eight books). Turney
 (section 21) sets its chapter titles flush left at 2.2 to 2.6 times the
 body's line height, its chapter labels, indented 42 to 46 pt, at 1.2 to
 1.4 times, and its section headings, indented the same, at 1.2 to 1.56
