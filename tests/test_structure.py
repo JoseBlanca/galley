@@ -2835,6 +2835,8 @@ def test_footnote_lines_in_the_body_of_a_book_with_digit_markers_stay() -> None:
         ("*.", None),
         ("^,", None),
         ("land*£", None),
+        ("S*.", None),
+        ("S.*", Reference("S.", "*", "", ReferenceForm.SIGN, None)),
         ("p.12", None),
         ("pp.3", None),
         ("vol.3", None),
