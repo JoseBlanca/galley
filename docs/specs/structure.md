@@ -4503,7 +4503,7 @@ page images:
 
 | excerpt | page indices | what it checks |
 |---|---|---|
-| `haskins_front` | 14, 16 | the title "CONTENTS" a heading; 9 entries of depth 1, labels from "IV." to "VIII." ("^ VI." with its mark), none on the first three, whose numbers are glued to marks or read "II,", page numbers "i" to "251"; the first entry linked to chapter I's heading on page 16 and the others unlinked, their chapters being outside the excerpt |
+| `haskins_front` | 14, 16 | the title "CONTENTS" a heading; 9 entries of depth 1, labels from "IV." to "VIII." ("^ VI." with its mark), none on the first three, whose numbers are glued to marks or read "II,", page numbers "i" to "251"; none linked: the others' chapters are outside the excerpt, and the excerpt's heading on page 16 holds the half-title before chapter I's title ("THE NORMANS IN EUROPEAN HISTORY I NORMANDY AND ITS PLACE IN HISTORY", section 14), which matches the first entry at 0.66 only; the whole book links it at 1.00 |
 | `stubbs_summaries_index` | 16, 312 | chapters IX to XII as entries of depth 1 with their labels, unlinked; their topics of depth 2 with pages "189", "212", "238" and "263"; "Index" with page "291" linked to the index's heading on page 312 |
 | `domesday_headings_quotes` | 14, 22, 30 | the front matter's entries and leader dots; "ESSAY I." with "DOMESDAY BOOK." linked to page 22's heading; the essay's topics an analytical summary of depth 2; "§ 1." with "Plan of the Survey," and page "pp. 9 — 26.", depth 2, linked to page 30's heading; its topics of depth 3 |
 | `gierke_front_flow` | 10 | 8 entries; page numbers "vii", "xlvii" and "i" taken and the leader dots before them removed; "Ivi", "Ixiii" and "lor" left in their titles with their dots; none linked |
