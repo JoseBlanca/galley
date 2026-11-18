@@ -616,15 +616,16 @@ def test_truncated_file_names_the_line_and_column(tmp_path: Path, name: str) -> 
 
 
 # For each file, a format_version this galley does not read, and the one it
-# reads: pages.json, words.json and lines.json at 2 since the plan
-# clean-text, blocks.json at 4 since the plan owner-books's epigraphs, note
-# groups and word change reasons; the version before is the case the owner
-# meets (architecture section 8).
+# reads: pages.json and words.json at 2 since the plan clean-text,
+# blocks.json at 4 since the plan owner-books's epigraphs, note groups and
+# word change reasons, lines.json at 3 since its records of the layer's
+# junk; the version before is the case the owner meets (architecture
+# section 8).
 UNSUPPORTED_VERSION: frozendict[str, tuple[int, int]] = frozendict(
     {
         "pages.json": (1, 2),
         "words.json": (1, 2),
-        "lines.json": (1, 2),
+        "lines.json": (2, 3),
         "blocks.json": (3, 4),
     }
 )
@@ -1032,7 +1033,7 @@ def test_top_level_key_given_twice_is_an_error(tmp_path: Path) -> None:
     path = _written(tmp_path, "lines.json")
     text = path.read_text(encoding="utf-8")
     text = text.replace(
-        '"format_version": 2,', '"format_version": 2,\n "format_version": 2,', 1
+        '"format_version": 3,', '"format_version": 3,\n "format_version": 3,', 1
     )
     path.write_text(text, encoding="utf-8")
     with pytest.raises(InputFileError, match="format_version") as caught:
@@ -1732,16 +1733,16 @@ def test_note_places_counts_the_blocks_written_before_each_note(
 # the re-reading of small print (reocr spec, section 4, "The record").
 
 
-def test_pages_words_and_lines_json_are_format_version_2() -> None:
+def test_pages_and_words_json_are_format_version_2_and_lines_json_3() -> None:
     assert (
         model.PAGES_FORMAT_VERSION,
         model.WORDS_FORMAT_VERSION,
         model.LINES_FORMAT_VERSION,
-    ) == (2, 2, 2)
+    ) == (2, 2, 3)
     assert (PAGES.format_version, WORDS.format_version, LINES.format_version) == (
         2,
         2,
-        2,
+        3,
     )
 
 
@@ -1791,8 +1792,9 @@ def test_front_matter_or_reread_file_of_version_1_names_the_stage_to_run_again(
     with pytest.raises(InputFileError) as caught:
         READERS[name](path)
 
+    current = UNSUPPORTED_VERSION[name][1]
     assert str(caught.value) == (
-        f"{path}: is format version 1; this galley reads format version 2; "
+        f"{path}: is format version 1; this galley reads format version {current}; "
         f"run `galley2epub {WRITING_STAGE[name]}` again"
     )
 
@@ -1823,9 +1825,23 @@ def test_reread_is_written_with_its_fields_in_order_and_read_back(
             "ocr_score": 1,
             "kept": True,
             "dropped_junk_count": 0,
+            "junk_words": [],
         }
     ]
     assert read_lines(tmp_path / "lines.json") == LINES
+
+
+def test_reread_junk_words_are_written_and_read_back(tmp_path: Path) -> None:
+    (reread,) = LINES.rereads
+    with_junk = replace(reread, junk_words=reread.layer_words)
+    lines = replace(LINES, rereads=(with_junk,))
+    write_lines(tmp_path / "lines.json", lines)
+
+    content = json.loads((tmp_path / "lines.json").read_text(encoding="utf-8"))
+    assert content["rereads"][0]["junk_words"] == [
+        {"text": "Ra-", "box": [12.0, 82.0, 30.0, 90.0], "ocr_confidence": None}
+    ]
+    assert read_lines(tmp_path / "lines.json") == lines
 
 
 def test_reread_of_every_kind_kept_or_not_is_read_back_equal(tmp_path: Path) -> None:

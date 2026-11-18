@@ -151,7 +151,12 @@ def _unmatched(reread: Reread) -> tuple[Word, ...]:
         # accepts every glued misreading layout matched (reocr spec,
         # section 4).
         replaced_layer_words(
-            reread.layer_words, reread.ocr_words, is_known=_NO_KNOWN_WORDS.__contains__
+            reread.layer_words,
+            reread.ocr_words,
+            is_known=_NO_KNOWN_WORDS.__contains__,
+            # The junk under a word paired with its copy is the junk layout
+            # named, by its word list, which this check has not.
+            is_junk=lambda word, _ocr_word: word in reread.junk_words,
         ),
     )
     return unmatched
@@ -190,8 +195,14 @@ def _one_reading_of_two_lines(reread: Reread) -> tuple[str, ...]:
         if not _share_a_line(first, second)
         # The layer's junk under the word and its copy of the word beside
         # it: one printed word read twice (reocr spec, section 4).
-        and not is_junk_beside_its_copy(first, second, ocr_word)
-        and not is_junk_beside_its_copy(second, first, ocr_word)
+        and not (
+            first in reread.junk_words
+            and is_junk_beside_its_copy(first, second, ocr_word)
+        )
+        and not (
+            second in reread.junk_words
+            and is_junk_beside_its_copy(second, first, ocr_word)
+        )
     )
 
 
@@ -203,7 +214,8 @@ def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
     record's `ocr_words`, by `model.replaced_layer_words` (reocr spec,
     section 4); or a Tesseract word that is the only one of its record
     that may read two of its layer words of different printed lines
-    (architecture section 13)."""
+    (architecture section 13); or a word of its `junk_words` that is not
+    among its `layer_words`."""
     on_pages = Counter(
         (page.index, word.text, word.box) for page in words.pages for word in page.words
     )
@@ -222,6 +234,12 @@ def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
         problem
         for reread in _kept_rereads(lines)
         for problem in _one_reading_of_two_lines(reread)
+    )
+    problems.extend(
+        f"a kept reread on page {reread.page_index} names {word.text!r} at "
+        f"{_box_text(word.box)} as junk, which is not among its layer words"
+        for reread in _kept_rereads(lines)
+        for word in take_out_once((reread.junk_words,), reread.layer_words)[0]
     )
     for (page_index, text, box), count in named.items():
         where = f"{text!r} at {_box_text(box)}"

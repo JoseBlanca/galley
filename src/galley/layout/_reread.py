@@ -48,6 +48,7 @@ from galley.model import (
     Word,
     folded_letters_and_digits,
     is_under_ocr_word,
+    junk_layer_words,
     matched_ocr_positions,
     may_read,
     replaced_layer_words,
@@ -917,6 +918,7 @@ def page_rereads(
                 ocr_score=ocr_score,
                 kept=kept,
                 dropped_junk_count=len(read) - len(not_junk) + stripped_count,
+                junk_words=junk_layer_words(replaceable, ocr_words, is_known=is_known),
             )
         )
     return tuple(records)
