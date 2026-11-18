@@ -733,7 +733,10 @@ undoes every change, finds it; and it checks that the change does no
 more: the first word, less one final ".", followed by the second, is
 the joined word, and the joined word is a word of a margin-note block
 that starts on the change's page, the only blocks where the join is
-made. Tried after `join_hyphen`, which a line ending with a
+made, or the word of `before` of a `punctuation_attached` or
+`case_split` change on that page whose words are (sections 23 and 24,
+made after the join: Domesday's margin note "popula- tion ?" on page
+461 gives "population", then "population?"). Tried after `join_hyphen`, which a line ending with a
 hyphen goes to.
 
 Measured on 17 November 2026 on the lines of whole Stubbs, Domesday and
@@ -3443,7 +3446,13 @@ sign that starts a block stays as it is.
 "hides4 ;" (Domesday 27 times, Mariéjol 9, Gierke 2), is attached to
 that word before references are looked for, "hides4;", which section
 11 then splits into "hides", the reference "4" and ";": the sign
-follows the reference, as print sets it. Its two changes are recorded,
+follows the reference, as print sets it. A sign that holds a reference
+itself, glued after it (";13", a candidate of section 11's glued form),
+is attached only when the word it makes is still a candidate: "land"
+";13" give "land;13", but Kadesh's "(Nos. 1, 2, 13, 14) ;13" (page 10)
+stays apart, since "14);13" is no candidate and its note would lose its
+link (3 such signs in the six public-domain books, 18 November 2026:
+that one and Domesday's "£21 ;...2" and "1500 ?]9"). Its two changes are recorded,
 `punctuation_attached` then `note_marker`; the fidelity check, which
 undoes every change, balances. A sign glued to a reference, "subjection
 ;^" (Haskins page 28, a sign "^" for a superscript 1), becomes
@@ -3478,7 +3487,7 @@ touch and extract's rule for glued words, which cuts at a gap
 is split in two at a lower-to-upper case change when all of these hold:
 
 - the word, with punctuation stripped from both ends, is a run of
-  lower-case letters followed by a capital and at least 2 lower-case
+  lower-case letters followed by a capital and at least 3 lower-case
   letters, and nothing else ("theAvre", "ofWilliam");
 - the left part has at least 2 letters, is a known word (the word
   list, `wordlist.is_known_word`) and its key is among the book's
@@ -3522,19 +3531,25 @@ the plan measures again):
 |---|---|---|---|
 | Haskins | 2 | "theAvre", "theAngevin" | 7 misreadings ("deUver") |
 | Stubbs | 10 | "ofWilliam", "ofJohn", "ofLancaster", "heBarons" (the "t" of "the" lost) | 1 |
-| Domesday | 3 | "ofChatteris", "forSon", "forSan" | 9 |
+| Domesday | 1 | "ofChatteris" | 11 |
 | Kadesh, Gierke | 0 | | 12, 6 ("inSyrienund", "outsideVhe") |
-| Mariéjol | 12 | "desMédicis", "deChambord", "laLigue" | the rest |
+| Mariéjol | 8 | "desMédicis", "deChambord", "laLigue" | the rest |
 | Turney | 0 | | 0 |
 | Haynes | 3 | names after "of" | 2 |
 
 The Haskins, Stubbs, Domesday and Mariéjol rows are of the rule as it
 now stands, on `lines.json`; Turney's and Haynes' are of the first rule
-and were not measured again. Of Mariéjol's 12, 6 look wrong from the
-words alone, misreadings split into misreadings: "paJais", "•oaSat",
-"fiMent", "ttOat", "ftOom)", "tuAiu". They are an accepted cost: the
-scan is not worth more effort (owner, on unreadable scans), and the
-fidelity check holds, since a split loses no letter.
+and were not measured again. The capital must be followed by 3
+lower-case letters, not 2 (task 5.2 of the plan owner-books, 18
+November 2026): with 2, Domesday's "forSon" and "forSan" were split,
+which page 339 prints "forðon" and "forðan", one Old English word each
+whose "ð" the OCR read as "S", and 4 of Mariéjol's 12 splits looked
+wrong ("•oaSat", "ttOat", "ftOom)", "tuAiu"); no split that the 3
+letters drop looked right on the six public-domain books. Of Mariéjol's
+8, 2 still look wrong from the words alone, misreadings split into
+misreadings: "paJais" and "fiMent". They are an accepted cost: the scan
+is not worth more effort (owner, on unreadable scans), and the fidelity
+check holds, since a split loses no letter.
 
 A lower-case pair glued without a case change ("ofone") is not found:
 a test on the word list alone splits 860 to 6,600 words per book
