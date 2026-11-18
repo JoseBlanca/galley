@@ -247,11 +247,14 @@ _BRACKETED_REFERENCE = re.compile(
     rf"(?P<reference>[(\[{{](?P<inner>[0-9A-Za-z]{{1,2}})[)\]}}])"
     rf"(?P<after>{_PUNCTUATION}*)"
 )
-# The word "^", "*" or "•", or a letter, any punctuation and one of them
-# at the word's end ("rulers.^"). A lone "'" or "t" is none: in Domesday
-# such a match was right 28 times in 82.
+# The word "^", "*" or "•", or a letter, any punctuation and one of them,
+# then only punctuation ("rulers.^", "servus*."). A lone "'" or "t" is
+# none: in Domesday such a match was right 28 times in 82. The punctuation
+# after the sign was added on 18 November 2026: 20 of the 178 notes of
+# Domesday then not linked had such a reference.
 _SIGN_REFERENCE = re.compile(
     rf"(?P<before>(?:.*[^\W\d_]{_PUNCTUATION}*)?)(?P<reference>[\^*•])"
+    rf"(?P<after>{_PUNCTUATION}*)"
 )
 
 
@@ -302,7 +305,8 @@ def reference_candidate(word: str) -> Reference | None:
     spec section 11, "References", or None: a glued number ("land3."
     gives ("land", "3", ".")), unless the word starts with a citation's
     abbreviation and has no other letter ("p.12"); a bracketed number
-    ("(i)." gives ("", "(i)", ".") of value 1); or a sign ("rulers.^")."""
+    ("(i)." gives ("", "(i)", ".") of value 1); or a sign ("rulers.^", and
+    "servus*." gives ("servus", "*", "."))."""
     bracketed = _BRACKETED_REFERENCE.fullmatch(word)
     if bracketed is not None and _is_punctuation(bracketed.group("after")):
         value = read_number(bracketed.group("inner"), in_brackets=True)
@@ -320,10 +324,18 @@ def reference_candidate(word: str) -> Reference | None:
         return glued
     sign = _SIGN_REFERENCE.fullmatch(word)
     if sign is not None and (
-        not sign.group("before")
-        or _is_punctuation(_after_last_letter(sign.group("before")))
+        (not sign.group("before") and not sign.group("after"))
+        or (
+            sign.group("before")
+            and _is_punctuation(_after_last_letter(sign.group("before")))
+            and _is_punctuation(sign.group("after"))
+        )
     ):
         return Reference(
-            sign.group("before"), sign.group("reference"), "", ReferenceForm.SIGN, None
+            sign.group("before"),
+            sign.group("reference"),
+            sign.group("after"),
+            ReferenceForm.SIGN,
+            None,
         )
     return None
