@@ -193,7 +193,8 @@ def test_bare_number_run_on_a_contents_page_makes_no_endnote_section() -> None:
         _lines_of(page), _NO_WORDS, contents_pages=frozenset({0}), workers=1
     )
     assert not blocks.notes
-    assert len(blocks.blocks) == 9
+    # No hanging number starts a paragraph there either (spec section 6).
+    assert len(blocks.blocks) == 1
 
 
 def test_bare_number_that_does_not_rise_is_a_later_block_of_its_note() -> None:
@@ -779,3 +780,28 @@ def test_endnote_reference_standing_for_a_lost_note_stays_unlinked() -> None:
         ("word17.", 17),
         ("word20.", 20),
     )
+
+
+def test_hanging_number_before_a_number_starts_no_paragraph() -> None:
+    # A table's column of numbers, "1 10", "3 0)": no note text after it.
+    lines = tuple(
+        line
+        for number in ("8", "9", "10", "11")
+        for line in (
+            _line(f"{number} 10 4", _HUNG_PT, 70.0 + 36 * int(number)),
+            _line("on over a full line of the", _TEXT_EDGE_PT, 82.0 + 36 * int(number)),
+            _line("note ends here.", _TEXT_EDGE_PT, 94.0 + 36 * int(number)),
+        )
+    )
+    blocks = make_blocks(
+        _lines_of(PageLayout(0, (_region(*lines),), ())), _NO_WORDS, workers=1
+    )
+    assert len(blocks.blocks) == 1
+
+
+def test_hanging_number_on_a_contents_page_starts_no_paragraph() -> None:
+    page = PageLayout(0, (_region(*_hung_notes(("8", "9", "10", "11"))),), ())
+    blocks = make_blocks(
+        _lines_of(page), _NO_WORDS, contents_pages=frozenset({0}), workers=1
+    )
+    assert len(blocks.blocks) == 1
