@@ -845,16 +845,12 @@ def test_kadesh_29_38_figure_regions_hold_the_words_read_on_the_pictures(
         5: (FigureKind.PLATE,),
         6: (FigureKind.PLATE,),
     }
-    figure_words = {
-        (page.index, word.box)
-        for page in lines.pages
-        for region in page.regions
-        if region.box in tuple(figure.box for figure in page.figures)
-        for line in region.lines
-        for word in line.words
-    }
+    # No record reads or replaces a word whose middle lies in a figure.
+    boxes = {page.index: tuple(f.box for f in page.figures) for page in lines.pages}
     assert not any(
-        (record.page_index, word.box) in figure_words
+        box.x0 <= (word.box.x0 + word.box.x1) / 2 <= box.x1
+        and box.top <= (word.box.top + word.box.bottom) / 2 <= box.bottom
         for record in lines.rereads
-        for word in record.layer_words
+        for word in (*record.layer_words, *record.ocr_words)
+        for box in boxes[record.page_index]
     )
