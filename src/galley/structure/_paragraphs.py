@@ -219,9 +219,11 @@ def page_parts(
         return edges
 
     # Spec section 6, rule 3: a hanging number starts a paragraph only in
-    # the body stream.
+    # the body stream, and not on a page of the printed contents.
     text_edges = tuple(
-        text_edge(region.lines) if kind is RegionKind.BODY else None
+        text_edge(region.lines)
+        if kind is RegionKind.BODY and page.index not in contents_pages
+        else None
         for region, kind in zip(page.regions, kinds, strict=True)
     )
     regions = tuple(

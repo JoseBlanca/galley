@@ -34,6 +34,9 @@ _HANGING_NUMBER = re.compile(r"[0-9]{1,3}")
 _HANG_MIN_PT = 5.0
 _HANG_MAX_PT = 20.0
 _TEXT_EDGE_MIN_LINES = 3
+# Spec section 6, rule 3: a note's text after its hanging number starts
+# with a letter or one of these ("‘Only an", Turney's page 253).
+_QUOTATION_MARKS = frozenset("‘“'\"«")
 # Spec section 6, rule 3, and section 12: a misread marker is followed by
 # lines hung with 2, 3 and 4.
 MISREAD_FOLLOWERS = (2, 3, 4)
@@ -103,10 +106,17 @@ def text_edge(lines: Sequence[Line]) -> float | None:
 
 
 def has_hanging_number(line: PlacedLine) -> bool:
-    """Spec section 6, rule 3: the line's first word is a bare number, it
-    has a second word, and its left side lies 5 to 20 pt left of its
-    region's text edge."""
-    return is_hung(line) and is_bare_number(line.line.words[0].text)
+    """Spec section 6, rule 3: the line's first word is a bare number, its
+    second word starts with a letter or a quotation mark, and its left
+    side lies 5 to 20 pt left of its region's text edge. A second word
+    that does not is a cell of a table's row of numbers (Domesday's pages
+    158, 425 and 479)."""
+    second = line.line.words[1].text if len(line.line.words) > 1 else ""
+    return (
+        is_hung(line)
+        and is_bare_number(line.line.words[0].text)
+        and (second[:1].isalpha() or second[:1] in _QUOTATION_MARKS)
+    )
 
 
 def is_misread_marker(word: str) -> bool:
