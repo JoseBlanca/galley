@@ -423,7 +423,9 @@ def test_each_figure_block_div_of_the_epub_holds_one_image(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     # The owner's decision: plates go into the EPUB as pictures with their
-    # caption. Pandoc renames the images it packs, so they are counted.
+    # caption, and so do the figures printed inside text pages
+    # (docs/specs/figures.md): kadesh_29-38 has 2 plates and 5 in-page
+    # figures. Pandoc renames the images it packs, so they are counted.
     figure_counts = {}
     for name, folder in excerpt_books.items():
         figures = tuple(
@@ -444,7 +446,7 @@ def test_each_figure_block_div_of_the_epub_holds_one_image(
         "kadesh_8-17": 1,
         "kadesh_59-68": 3,
         "domesday_headings_quotes": 2,
-        "kadesh_29-38": 2,
+        "kadesh_29-38": 7,
     }
 
 

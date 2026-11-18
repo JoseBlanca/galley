@@ -1,6 +1,8 @@
 """Plates (spec section 18): a plate page's running head, its caption
 lines and its stray words, and the figure block placed as side text of
-its page.
+its page; and the figure blocks of the figures printed inside text pages,
+each placed after the block that holds the body line printed above it
+(`docs/specs/figures.md` §5).
 
 A plate page is a page with a figure (`docs/specs/plates.md`). Its lines
 never reach the body stream: section 3 removes its running head as on any
@@ -24,7 +26,12 @@ from galley.model import (
     Removal,
     RemovalReason,
 )
-from galley.structure._figures import text_page
+from galley.structure._figures import (
+    InPageFigure,
+    figure_position,
+    place_line,
+    text_page,
+)
 from galley.structure._foot import LinePlace, line_at
 from galley.structure._lines import Piece, PlacedLine
 from galley.structure._measures import (
@@ -256,4 +263,48 @@ def with_figures(
         ):
             position += 1
         result.insert(position, figure)
+    return tuple(result)
+
+
+def _in_page_figure_block(
+    page_index: int,
+    figure: InPageFigure,
+    book_words: frozenset[str],
+    lower_case_words: frozenset[str],
+) -> Unnumbered:
+    """The figure block of an in-page figure: its caption with its hyphens
+    joined, its image, and as its origin the box that holds the figure and
+    its caption (`docs/specs/figures.md` §5)."""
+    return replace(
+        joined(figure.caption, BlockKind.FIGURE, book_words, lower_case_words),
+        origin=(Origin(page_index, figure.origin_box),),
+        figure=figure.image,
+    )
+
+
+def with_in_page_figures(
+    body: Sequence[Unnumbered],
+    parts: Sequence[PageParts],
+    book_words: frozenset[str],
+    lower_case_words: frozenset[str],
+) -> tuple[Unnumbered, ...]:
+    """The book's body blocks with the figure block of each in-page figure
+    of `parts`, in page order and on a page in the order of pages.json,
+    placed after the block that holds the last body line printed above it,
+    after the whole list or contents run that block is in, and before the
+    side text placed after it (`docs/specs/figures.md` §5, "structure:
+    where the figure block goes")."""
+    result = list(body)
+    pages_body = tuple((page.index, page.body) for page in parts)
+    for page in parts:
+        for figure in page.in_page_figures:
+            position = figure_position(
+                tuple(block.kind for block in result),
+                tuple(block.origin for block in result),
+                place_line(pages_body, page.index, figure.box),
+            )
+            result.insert(
+                position,
+                _in_page_figure_block(page.index, figure, book_words, lower_case_words),
+            )
     return tuple(result)
