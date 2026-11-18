@@ -371,3 +371,33 @@ a sign is attached to it. The reference literals changed only by
 attached signs (73) and no-break spaces (16). Haskins 22's "theAvre" is
 split on the whole book; its excerpt never prints "Avre" whole, so the
 excerpt's test stays a strict xfail.
+
+## Review 5: work packages 5 and 6
+
+Of caa422c, by two reviewers. The text of the six public-domain books,
+read without white space, is the same before and after; Domesday's
+1,493 note links are the same set before and after task 5.2, so its
+notes whose reference is right, 1,279 → 1,277, is the scorer's
+alignment of a reference word with a sign now attached, not a link
+lost. Haynes' EPUB was read: 21 epigraphs with their sources, 8 in
+verse, 18 note-group headings each before its own endnote. What
+mattered, fixed (0f07802 to 1611288):
+
+- **Two printed words glued into one** where the OCR read a speck as a
+  sign before a word (Gierke 29 "universitas;is,"; 6 in the six books):
+  a sign is attached, or given a no-break space, only when no letter
+  follows it. Counts now: signs attached Haskins 89, Stubbs 1,007,
+  Domesday 2,112, Gierke 885, Kadesh 97; Mariéjol 1,036 no-break spaces.
+- Four rules had no test that failed when broken (the H half of the case
+  split, captions, the order checks of both passes); the fidelity check
+  followed only one change after a lost-hyphen join; a rule written
+  twice; a stale count.
+
+The default run is 67.9 s (2,494 tests) against 51.7 s at the plan's
+base: the four new excerpts of task 1.1, whose setup runs every stage
+on each, grew the excerpt fixture from 14.6 s to about 25 s; the rules
+of this plan cost about 2 s.
+
+Turney's epigraph sources are printed without a dash; the EPUB writes
+one before every source (structure §25), so all epigraphs look the
+same.
