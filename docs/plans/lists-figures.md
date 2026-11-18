@@ -366,20 +366,20 @@ paragraphs, notes and dashes inside sentences stay as they were.
 pitches come from a prototype on the body streams of `page_parts`; the
 code's body stream may differ at page breaks.
 
-- [ ] 4.1 The list rules as a function of the body stream across pages:
+- [x] 4.1 The list rules as a function of the body stream across pages:
   the marker, its kind, form and value; rules 1 to 6; with the unit
   tests on lines written in the test. Spec: structure §29, "Terms" and
   "The rules". Stream `lists`. Deliverable 1.
-- [ ] 4.2 The rules wired into step 3.1: the pages and runs they skip;
+- [x] 4.2 The rules wired into step 3.1: the pages and runs they skip;
   the `list_item` blocks, their labels, the `list_marker` change, the
   origins over a page break; a list item as a paragraph for notes,
   margin notes and the word rules, never a quote; with the excerpt
   tests. Spec: structure §2, step 3.1; §29, "Blocks". Needs 4.1. Stream
   `lists`. Deliverable 2.
-- [ ] 4.3 The whole-book tests of deliverable 3 and the counts in the
+- [x] 4.3 The whole-book tests of deliverable 3 and the counts in the
   report. Spec: structure §29, "What the rules give"; §32,
   "Whole-book tests". Needs 4.2. Stream `lists`. Deliverable 3.
-- [ ] Review of work package 4.
+- [x] Review of work package 4.
 
 ## 5. Contents entries
 
@@ -430,24 +430,24 @@ a wrong link, the orchestrator writes the measurement into structure
 the options; meanwhile the rule stays as written, and the plan goes
 on.
 
-- [ ] 5.1 The contents rules 1 to 8 on a run's body stream: the title,
+- [x] 5.1 The contents rules 1 to 8 on a run's body stream: the title,
   the pieces, analytical summaries, entries, lone labels, page numbers
   and leader dots, labels, depth; with the unit tests. Spec: structure
   §30, "Terms" and "The rules", rules 1 to 8. Stream `lists`.
   Deliverable 1.
-- [ ] 5.2 The links of rule 9 in step 3.4, the blocks of rule 10, the
+- [x] 5.2 The links of rule 9 in step 3.4, the blocks of rule 10, the
   title as a heading in step 2.3, the `stray_mark` and `leader_dots`
   removals; with the unit tests of links. Spec: structure §2, steps
   2.3, 3.1 and 3.4; §30, rules 9 and 10. Needs 5.1 and 4.2. Stream
   `lists`. Deliverable 1.
-- [ ] 5.3 The excerpt tests of deliverable 2, with the reference pages
+- [x] 5.3 The excerpt tests of deliverable 2, with the reference pages
   they change checked on the renders; the whole-book tests of
   deliverable 3. Spec: structure §32. Needs 5.2. Stream `lists`.
   Deliverables 2, 3.
-- [ ] 5.4 The re-check of deliverable 4. Spec: structure §30, "The
+- [x] 5.4 The re-check of deliverable 4. Spec: structure §30, "The
   thresholds" and "What the rules give, and where they fail". Needs
   5.3. Stream `lists`. Deliverable 4.
-- [ ] Review of work package 5.
+- [x] Review of work package 5.
 
 ## 6. Lists and contents in Markdown and the EPUB
 
@@ -490,7 +490,7 @@ blocks.json values.
   contents and their links; with the tests. Spec: structure §31, "The
   fidelity check at the markdown boundary"; architecture §13. Needs
   6.1. Stream `markdown`. Deliverable 2.
-- [ ] Review of work package 6.
+- [x] Review of work package 6.
 
 ## 7. The measurement and the EPUBs
 

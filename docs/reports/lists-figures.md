@@ -127,3 +127,53 @@ map's frame (the spec's table now says so).
 
 Checks at afc757d: 2,633 passed in 88 s with a 120 s per-test limit, the
 machine loaded by the lists stream; figure whole_book tests 10 passed.
+
+## Work packages 4 and 5 (stream `lists`), and the review of 4 to 6
+
+Done and merged. Haynes has 11 list items in 2 lists (the six dash
+descriptions and a numbered list of five); Domesday 40 items in 8 lists
+on pages 156 to 159 (its tables, as lists until tables are handled); no
+other book has a list. Every printed contents page is cut into entries,
+linked to their chapters: 72 links on the public-domain books, all right
+but Gierke's "NOTE" → "NOTES.", as the spec expects; Haynes 22, Turney 16.
+
+**Decision point of WP 5.** The re-check of task 5.4 failed on Gierke's
+analytical summaries (pages 52 to 60): the rule of one reference per two
+lines cut 2 of its 34 summaries into one entry per line, worse than the
+paragraph a reader had before. The rule is now one per five lines, the
+smallest value that keeps all 34 whole; no other book changes. Gierke's
+pages 61 to 67, a two-column table of the titles of its notes, stay
+messy: margin notes cut them into 75 pieces and page numbers sit out of
+place. That is no worse than before, and is left with tables.
+
+**Review** (four reviewers on 1f9b89a, all findings held and were fixed):
+
+- **A title's last word could be taken for its page number** ("Maldon,
+  991"), and page numbers are not shown or checked, so the word would be
+  lost silently. A page number is now taken only when it is a range,
+  follows "p."/"pp.", leader dots or a space of 11 to 20 pt, or ends
+  within 4 pt of the page's longest contents line (measured: Haynes and
+  Turney print 11.5 to 14.9 pt spaces, other spaces in entries reach
+  10.2; the other books' numbers end within 3.7 pt of the edge). Domesday
+  keeps one "290." in its title; Gierke's table loses 43 doubtful page
+  numbers, which stay in the text. The rise check the reviewer suggested
+  was not added: Gierke's two-column table gives numbers out of order.
+- **Nothing checked the numbers a numbered list shows**: the check now
+  compares each Pandoc list's start, style and delimiter with its first
+  item's label.
+- Contents entries are no longer searched for note references; a figure
+  between two items no longer ends a list; the list-marker rules live in
+  one module, `src/galley/list_markers.py`, used by structure, markdown
+  and the fidelity check; tests that pinned nothing now fail when their
+  rule breaks (each seen to fail), and the whole-book tests assert exact
+  counts.
+- The four contents pages whose expected output changed were checked
+  against their images by a second subagent: all match.
+
+**The per-test time limit** now counts a test's own body only
+(`timeout_func_only`): the session fixture that runs every excerpt takes
+about 30 s alone, and under the load of parallel streams it errored
+hundreds of tests on setup.
+
+Checks after the merge: 2,723 passed in 71.6 s, and with 8 threads in
+114 s (120 s limit).
