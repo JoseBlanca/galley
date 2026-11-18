@@ -4424,11 +4424,23 @@ blocks as blocks, in the forms above only: an item holding one div of a
 a bullet list of the same form; any other content of a list is an
 element galley's Markdown does not make, and an error. An empty div of
 class `list-break` holds no words and is passed over. A `list_item`'s
-label is not written and not compared, as the marker of a referenced
-footnote is not, and the number of items of all lists of `list_item`
-divs must equal the number of `list_item` blocks. A `contents_entry`'s
-label is written and compared as words of its block; its `page_number`
-is not written and not compared. A link inside a `contents_entry` div,
+label is not written as text, as the marker of a referenced footnote is
+not, and the number of items of all lists of `list_item` divs must equal
+the number of `list_item` blocks. The marker Pandoc shows for each item
+is compared with its block's label instead: a `BulletList`'s item must
+have a dash or a bullet as its label, and an `OrderedList`'s item, the
+list's start plus its place in the list, in the list's style and
+delimiter, a label that reads so (section 29, "Terms": `Decimal` for a
+number, `LowerAlpha` or `UpperAlpha` for a letter, `LowerRoman` or
+`UpperRoman` for a roman numeral; `Period` for "1.", `OneParen` for
+"1)", `TwoParens` for "(1)"), so that a list that starts at "7." where
+the book printed "1." is an error (review of 18 November 2026). A
+`contents_entry`'s label is written and compared as words of its block;
+its `page_number` is not written and not compared as words, but it must
+have a page number's form (section 30, "Terms"), so that no title word
+leaves the book unseen. A page number's rise through a run is not
+checked: Gierke's table of pages 61 to 67, read across its two columns,
+gives numbers out of order. A link inside a `contents_entry` div,
 with no attributes, whose target is `#` and the id of a heading block,
 is read as its text, compared as words of the block; the number of
 such links must equal the number of entries with a `heading_ref`. Any
