@@ -1289,6 +1289,31 @@ def test_each_inkless_page_is_logged_at_warning_with_its_share_without_ink(
 
 
 @pytest.mark.thread_unsafe
+def test_words_in_an_excluded_region_are_left_out_of_the_share_without_ink(
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Haskins 278, page 3 of the excerpt: 21 of its 24 words have no ink,
+    # 0.88. The region holds the middles of its 3 words with ink and of 3
+    # without, so that the 18 words left have none: 1.00.
+    folder = BookFolder(tmp_path)
+    folder.book_toml.write_text(
+        excerpt_book_toml["haskins_endpapers"]
+        + "exclude_regions = [{page = 3, box = [200, 549, 265, 584]}]\n",
+        encoding="utf-8",
+    )
+
+    with caplog.at_level(logging.WARNING, logger="galley.analyze"):
+        analyze.run(folder, read_config(folder.book_toml))
+
+    assert [record.getMessage() for record in caplog.records][-1] == (
+        "analyze: page index 3 is inkless, its words removed: 1.00 of its words "
+        "have no ink under them"
+    )
+
+
+@pytest.mark.thread_unsafe
 def test_a_plate_without_a_layer_is_logged_with_its_share_of_the_page(
     tmp_path: Path,
     excerpt_pdf: frozendict[str, Path],
