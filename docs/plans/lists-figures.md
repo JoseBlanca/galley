@@ -482,11 +482,11 @@ file.
 **Stands on:** WP 1. It needs no structure code: its tests write
 blocks.json values.
 
-- [ ] 6.1 markdown's lists and contents, the `list-break` div, the
+- [x] 6.1 markdown's lists and contents, the `list-break` div, the
   indents Pandoc needs, and the style sheet's rules; with the tests.
   Spec: structure §31, "A list" and "A contents"; §33, points 1 and 2
   (settled). Stream `markdown`. Deliverables 1, 3.
-- [ ] 6.2 The fidelity check at the markdown boundary for lists,
+- [x] 6.2 The fidelity check at the markdown boundary for lists,
   contents and their links; with the tests. Spec: structure §31, "The
   fidelity check at the markdown boundary"; architecture §13. Needs
   6.1. Stream `markdown`. Deliverable 2.
