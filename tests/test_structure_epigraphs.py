@@ -9,6 +9,7 @@ are, or 44 pt, as Turney's.
 """
 
 from collections.abc import Callable
+from dataclasses import replace
 
 import pytest
 
@@ -36,9 +37,12 @@ from galley.structure._epigraphs import (
     epigraph_column,
     epigraphs_after_heading,
     page_epigraph,
+    page_epigraphs,
 )
 from galley.structure._lines import PlacedLine
 from galley.structure._measures import Edges
+from galley.structure._paragraphs import PageParts, body_entries
+from galley.structure._runs import BodyRun
 
 _PAGE = 22
 _CHAR_PT = 5.0
@@ -681,6 +685,177 @@ def test_page_break_inside_a_verse_block_keeps_it_one_block() -> None:
         BlockKind.PARAGRAPH,
     )
     assert tuple(origin.page_index for origin in blocks.blocks[1].origin) == (20, 21)
+
+
+# Rules that only a test of their own shows (review of work package 4).
+
+
+def test_lines_set_less_than_20_pt_in_are_no_epigraph_run() -> None:
+    # Spec section 22, rule 2: two lines of text flush left and a line
+    # signed flush right under them make no epigraph.
+    signature = _flush_right("Hobbes", _COLUMN.right, 4)
+    lines = (
+        _heading(0),
+        _line(_BODY, _COLUMN.left, 2),
+        _line(_BODY, _COLUMN.left, 3),
+        signature,
+        _line(_BODY, _COLUMN.left, 6),
+    )
+    assert epigraphs_after_heading(lines, 1, len(lines), _COLUMN) == ()
+
+
+@pytest.mark.parametrize(("level", "found"), [(1, 1), (2, 0)])
+def test_epigraphs_are_looked_for_under_a_level_1_heading_only(
+    level: int, found: int
+) -> None:
+    lines = _haynes_page("—Dickens")
+    heading = BodyRun(start=0, end=1, kind=BlockKind.HEADING, level=level)
+    assert len(page_epigraphs(lines, (heading,), (), _COLUMN)) == found
+
+
+def test_epigraph_is_looked_for_after_the_chapter_summary() -> None:
+    # Spec section 22, rule 1: a summary's first line lies at the left
+    # edge, so a run looked for at the heading's end would find none.
+    lines = (
+        _heading(0),
+        _line("Topics of the chapter — the first — the second", _COLUMN.left, 1),
+        _line("— the third — the fourth", _COLUMN.left + 10, 2),
+        *(
+            _line(
+                " ".join(word.text for word in line.line.words),
+                line.line.box.x0,
+                row + 4,
+                line.line.box.bottom - line.line.box.top,
+            )
+            for row, line in enumerate(_haynes_page("—Dickens")[1:])
+        ),
+    )
+    heading = BodyRun(start=0, end=1, kind=BlockKind.HEADING, level=1)
+    summary = BodyRun(start=1, end=3, kind=BlockKind.CHAPTER_SUMMARY)
+    (epigraph,) = page_epigraphs(lines, (heading,), (summary,), _COLUMN)
+    assert (epigraph.quotation, epigraph.source_lines) == ((3, 4), (5,))
+
+
+def test_dashed_line_after_a_dashed_source_does_not_continue_it() -> None:
+    lines = (
+        _heading(0),
+        _line(_PROSE[0], _HAYNES_LEFT, 2),
+        _line(_PROSE[1], _HAYNES_LEFT, 3),
+        _line("—Dickens,", _HAYNES_LEFT, 4, _SOURCE_HEIGHT_PT),
+        _line("—Locke", _HAYNES_LEFT, 5, _SOURCE_HEIGHT_PT),
+        _line(_BODY, _COLUMN.left, 7),
+    )
+    (epigraph,) = epigraphs_after_heading(lines, 1, len(lines), _COLUMN)
+    assert (epigraph.source_lines, epigraph.source) == ((3,), "Dickens,")
+
+
+def test_smaller_line_4_pt_left_of_a_dashed_source_does_not_continue_it() -> None:
+    lines = (
+        _heading(0),
+        _line(_PROSE[0], _HAYNES_LEFT, 2),
+        _line(_PROSE[1], _HAYNES_LEFT, 3),
+        _line("—Dickens,", _HAYNES_LEFT, 4, _SOURCE_HEIGHT_PT),
+        _line("A Tale", _HAYNES_LEFT - 4.0, 5, _SOURCE_HEIGHT_PT),
+        _line(_BODY, _COLUMN.left, 7),
+    )
+    (epigraph,) = epigraphs_after_heading(lines, 1, len(lines), _COLUMN)
+    assert (epigraph.source_lines, epigraph.source) == ((3,), "Dickens,")
+
+
+def test_source_line_starting_left_of_the_run_s_bound_does_not_continue_it() -> None:
+    # The run's lines start exactly 20 pt in; a smaller line 2 pt left of
+    # the source keeps its shape but lies left of the bound of rule 2.
+    left = _COLUMN.left + 20.0
+    lines = (
+        _heading(0),
+        _line(_BODY, _COLUMN.left, 1),
+        _line(_PROSE[0], left, 2),
+        _line(_PROSE[1], left, 3),
+        _line("—Dickens,", left, 4, _SOURCE_HEIGHT_PT),
+        _line("A Tale", left - 2.0, 5, _SOURCE_HEIGHT_PT),
+    )
+    (epigraph,) = epigraphs_after_heading(lines, 2, len(lines), _COLUMN)
+    assert (epigraph.source_lines, epigraph.source) == ((4,), "Dickens,")
+
+
+def test_last_quotation_line_set_in_but_ending_short_stays_in_the_quotation() -> None:
+    # Spec section 22, rule 3: a source's first lines are set flush right;
+    # a quotation's last line set 26 pt in but ending 50 pt short is not.
+    lines = (
+        _heading(0),
+        _line(_JUSTIFIED, _TURNEY_LEFT, 2),
+        _line(_JUSTIFIED, _TURNEY_LEFT, 3),
+        _line("the end of it all", _TURNEY_LEFT + 26.0, 4),
+        _flush_right("Quoted in French", _JUSTIFIED_RIGHT, 5),
+        _line(_BODY, _COLUMN.left, 7),
+    )
+    (epigraph,) = epigraphs_after_heading(lines, 1, len(lines), _COLUMN)
+    assert (epigraph.quotation, epigraph.source_lines) == ((1, 2, 3), (4,))
+
+
+def test_short_lines_one_starting_in_lower_case_are_prose() -> None:
+    lines = (
+        _heading(0),
+        _line(_VERSE[0], _HAYNES_LEFT, 2),
+        _line("in the forests of the night ;", _HAYNES_LEFT, 3),
+        _line("—Blake", _HAYNES_LEFT, 4, _SOURCE_HEIGHT_PT),
+        _line(_BODY, _COLUMN.left, 6),
+    )
+    (epigraph,) = epigraphs_after_heading(lines, 1, len(lines), _COLUMN)
+    assert epigraph.form is QuotationForm.PROSE
+
+
+def _on_page(index: int, *lines: PlacedLine) -> tuple[PlacedLine, ...]:
+    return tuple(replace(line, page_index=index) for line in lines)
+
+
+def _parts(index: int, body: tuple[PlacedLine, ...], *, index_page: bool) -> PageParts:
+    return PageParts(
+        index=index,
+        removals=(),
+        page_numbers=(),
+        body=body,
+        margin_notes=(),
+        band_regions=(),
+        band_blocks=(),
+        index_lines=body[:1] if index_page else (),
+    )
+
+
+@pytest.mark.parametrize("index_page", [20, 21])
+def test_page_break_on_an_index_page_keeps_the_paragraph(index_page: int) -> None:
+    # Spec section 6: the rule does not apply on the index pages
+    # (section 17), on either side of the break.
+    page_20 = _on_page(
+        20,
+        *(_line(_BODY, _COLUMN.left, row) for row in range(5)),
+        _line(_ending("it.", 30.0), _COLUMN.left, 5),
+    )
+    page_21 = _on_page(
+        21, *(_line(_SENTENCE_START, _COLUMN.left, row) for row in range(6))
+    )
+    entries = body_entries(
+        (
+            _parts(20, page_20, index_page=index_page == 20),
+            _parts(21, page_21, index_page=index_page == 21),
+        )
+    )
+    assert len(entries) == 1
+
+
+def test_page_break_off_the_index_pages_ends_the_paragraph() -> None:
+    page_20 = _on_page(
+        20,
+        *(_line(_BODY, _COLUMN.left, row) for row in range(5)),
+        _line(_ending("it.", 30.0), _COLUMN.left, 5),
+    )
+    page_21 = _on_page(
+        21, *(_line(_SENTENCE_START, _COLUMN.left, row) for row in range(6))
+    )
+    entries = body_entries(
+        (_parts(20, page_20, index_page=False), _parts(21, page_21, index_page=False))
+    )
+    assert len(entries) == 2
 
 
 # Structure spec section 26, "Whole-book tests": none of the six
