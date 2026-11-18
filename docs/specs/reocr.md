@@ -550,6 +550,18 @@ the others stay in the layer. A layer word is that word when
   the layer read rightly (on the four books, 2 words: "14." under
   Tesseract's "146" and "18;", Gierke pages 63 and 66, in a list of page
   numbers; owner-books plan, 18 November 2026).
+  A layer word alike, not equal, to the Tesseract word is not taken by
+  the exception when it has 2 letters or more than the Tesseract word:
+  the layer may have glued another printed word to it. On Domesday page
+  90 the layer glued the body's last word "of" to the note's "demesne"
+  as "ofdemesne-", and (c), pairing it with Tesseract's "demesne.",
+  replaced it whole and lost "of" (review of 18 November 2026). Of the 16
+  alike words the exception took on the four books, two have 2 letters
+  or more: that one, and "imgmen." beside Tesseract's "men" (Domesday
+  page 333, "riding men." glued); both are again left in the layer, and
+  their Tesseract word reads the words under it as before. The others
+  have at most one letter more ("the" for Tesseract's "th", Domesday
+  page 107) or fewer ("rough." for "borough.", page 215).
   "For 3 letters or more" counts the layer word's letters, as (c) does;
   a Tesseract word over a word the layer glued is not excepted. A layer
   word "that no other rule matched" is one that rules (a) to (d) leave
