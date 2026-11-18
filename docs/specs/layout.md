@@ -326,9 +326,11 @@ is laid out as one region, as the skeleton did.
    **A hanging number stays in its line.** A margin word of the left
    side that is 1 to 3 digits with nothing after them stays in the
    column, in the line of the word right of it on its row, when the gap
-   from its right side to that word's left side is at most 15 pt and
-   the row is not the page's first row with a letter or digit (the
-   running head's, step 3). Turney (structure §21) prints its notes at
+   from its right side to that word's left side is at most 15 pt, no
+   other margin word but digits lies between them, and the row is not
+   the page's first row with a letter or digit (the running head's,
+   step 3); and only on a page where at least 2 numbers hang so: a
+   column of numbers, not a speck. Turney (structure §21) prints its notes at
    the back in two columns with each note's number hung 6 to 14 pt left
    of its text; in the left column the numbers lie left of the page's
    usual left edge, and without this rule they were margin regions, a
@@ -337,19 +339,20 @@ is laid out as one region, as the skeleton did.
    running head (261 pages, measured on 17 November 2026 on the
    survey's `lines.json`), which structure takes into the head line
    instead (structure §2). The numbers the rule keeps in their lines,
-   counted with the rule as built on the `words.json` of the clean-text
-   build and of the owner's two books (17 November 2026; the counts
-   first given here, Gierke 26, Domesday 1 and Turney 115, were taken
-   another way, as regions of `lines.json`): Turney 99, on 13 of its
-   notes pages, each with its note (read on page 268); Gierke 30, 28 the
-   numbers of the entries of its printed contents (23 on page 62, 5 on
-   65), which then stay with their entries, and 2 specks the OCR read
-   as "6" (page 115) and "9" (160) beside a margin note, which now
-   start a body line instead of a margin region; Domesday 2, the "16"
-   of a plate's caption "[Between pp. 16—17]" (page 39), right, and a
-   speck read "6" beside a margin note (443); none in Haskins, Stubbs,
-   Mariéjol, Kadesh or Haynes. The two pages above were read on their
-   renders.
+   counted with the rule as built on the `words.json` of the eight
+   books (18 November 2026): Turney 99, on 13 of its notes pages, each
+   with its note (read on page 268); Gierke 28, the numbers of the
+   entries of its printed contents (23 on page 62, among them "5" of a
+   "51" the OCR split, 5 on 65), which then stay with their entries;
+   none in the other six books. The last two conditions were added
+   after the review of work package 1 (18 November 2026): without
+   them the rule also took three specks the OCR read as digits beside a
+   margin note, into a sentence (Gierke's "9" on page 160 and "6" on
+   115, Domesday's "6" on 443), and split a plate's caption "[Between
+   pp. 16—17]" on Domesday's page 39, where a margin "—" lay between
+   the "16" and the column's word. Each condition alone keeps Turney's
+   and Gierke's contents numbers: the margin word between drops the
+   caption's number, the page's 2 numbers the three specks.
 
    Each side's margin words are grouped into lines, and the lines into
    regions: a region ends where the next line's top is more than 1.5
