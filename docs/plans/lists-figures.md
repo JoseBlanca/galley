@@ -308,14 +308,14 @@ not making that row a running head.
   re-read; `kind` copied through; with the unit tests. Spec: figures
   §5, "layout: the figure's words kept apart". Needs 2.2. Stream
   `figures`. Deliverable 1.
-- [ ] 3.2 structure's figure regions out of the survey and of the
+- [x] 3.2 structure's figure regions out of the survey and of the
   column and margin finding; the plate rules on a page whose figure is
   of kind `plate` only; the figure's lines and a head line inside a box
   removed as `figure_text`. Spec: figures §5, "Which figures are
   in-page" and "structure: removing the figure text"; structure §2,
   steps 1, 2.1 and 2.2; §18, its first line. Stream `figure-blocks`.
   Deliverable 2.
-- [ ] 3.3 `is_caption_label` and the caption rows (label row below,
+- [x] 3.3 `is_caption_label` and the caption rows (label row below,
   above or beside; the words of the label row; the rows after it), the
   caption taken out of the body stream in step 2.2; the figure block,
   its text, origin and place, after the paragraph, or after the whole
@@ -324,7 +324,7 @@ not making that row a running head.
   "structure: the caption" and "structure: where the figure block
   goes"; §6, `is_caption_label`; structure §2, steps 2.2 and 3.7; §29,
   rule 5. Needs 3.2. Stream `figure-blocks`. Deliverable 2.
-- [ ] 3.4 The excerpt tests of `kadesh_29-38` and the whole-book tests
+- [x] 3.4 The excerpt tests of `kadesh_29-38` and the whole-book tests
   of deliverable 4; the report gives each book's figure blocks and
   captions beside figures §5's "Measured" counts. Spec: figures §10.
   Needs 3.3. Stream `figure-blocks`. Deliverables 3, 4.
