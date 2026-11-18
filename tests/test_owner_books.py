@@ -30,7 +30,7 @@ from galley.model import (
     read_blocks,
 )
 
-pytestmark = pytest.mark.whole_book
+pytestmark = [pytest.mark.whole_book, pytest.mark.timeout(900)]
 
 # Structure spec section 21, "Their configs", as the survey of 17 November
 # 2026 ran them; the pattern finds each PDF in the samples folder.
