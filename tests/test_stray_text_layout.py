@@ -10,6 +10,7 @@ The whole-book tests at the end hold the counts of work package 3,
 deliverable 3, that layout gives."""
 
 import json
+import re
 import shutil
 from collections.abc import Callable
 from pathlib import Path
@@ -42,24 +43,6 @@ from galley_eval.stages import StageOutput
 
 _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "stray_text"
 
-# Layout makes the one-line note the page's band (step 4), but structure
-# takes a region as a band region only when its words are at most 0.85 of
-# the body word height (structure spec section 2), which a note boxed as
-# tall as the body is not: it becomes a paragraph or a margin note. No task
-# of the plan changes that rule.
-_STRUCTURE_FULL_HEIGHT_BAND = (
-    "structure's band region needs small words (structure spec section 2); "
-    "no task of docs/plans/stray-text.md takes a full-height band"
-)
-# Layout makes a band of the notes of Gierke's introduction, small against
-# their page (step 4), but structure takes a region as a band region only
-# when its words are at most 0.85 of the book's body word height
-# (structure spec section 2): the notes are 8 pt against the book's 9.
-_STRUCTURE_PAGE_BAND = (
-    "structure's band region is small against the book's body word height "
-    "(structure spec section 2), not the page's; no task of "
-    "docs/plans/stray-text.md changes it"
-)
 # A margin region of Stubbs is a column of a note, at most about 60 pt wide;
 # a body region spans the text column, 268 pt.
 _MARGIN_REGION_MOST_PT = 120.0
@@ -161,7 +144,6 @@ def test_one_line_note_boxed_as_tall_as_the_body_is_the_last_region_alone(
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.xfail(strict=True, reason=_STRUCTURE_FULL_HEIGHT_BAND)
 @pytest.mark.parametrize("page", [4, 5, 6])
 def test_one_line_note_boxed_as_tall_as_the_body_is_a_footnote(
     excerpt_books: frozendict[str, BookFolder], page: int
@@ -289,7 +271,6 @@ _GIERKE_INTRODUCTION_NOTE_PAGES = frozenset(
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(900)
-@pytest.mark.xfail(strict=True, reason=_STRUCTURE_PAGE_BAND)
 def test_whole_gierke_introduction_footnotes_are_footnotes(
     whole_book_run: Callable[[str], BookFolder],
 ) -> None:
@@ -300,6 +281,10 @@ def test_whole_gierke_introduction_footnotes_are_footnotes(
 # The one-line notes boxed as tall as the body (step 4): at a0a1675 each
 # but Domesday's 472 is a paragraph opening "1 ", and only 472 has a
 # footnote.
+# A note left in the body: a block opening "1" and a word with a capital.
+# Gierke's 61 is a printed contents page, whose page number "116" the text
+# layer reads "1 1 6", a block of its own that is no note.
+_NOTE_LEFT_IN_THE_BODY = re.compile(r"1 [A-Z]")
 _ONE_LINE_NOTE_PAGES = {
     "domesdaybook00maituoft": frozenset(
         (163, 174, 185, 278, 303, 308, 315, 347, 472, 485)
@@ -311,7 +296,6 @@ _ONE_LINE_NOTE_PAGES = {
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(900)
-@pytest.mark.xfail(strict=True, reason=_STRUCTURE_FULL_HEIGHT_BAND)
 @pytest.mark.parametrize("book", sorted(_ONE_LINE_NOTE_PAGES))
 def test_whole_one_line_notes_are_footnotes_and_no_paragraph(
     whole_book_run: Callable[[str], BookFolder], book: str
@@ -320,7 +304,8 @@ def test_whole_one_line_notes_are_footnotes_and_no_paragraph(
     pages = _ONE_LINE_NOTE_PAGES[book]
     assert pages <= _footnote_pages(blocks)
     assert not any(
-        block.origin[0].page_index in pages and block_text(block).startswith("1 ")
+        block.origin[0].page_index in pages
+        and _NOTE_LEFT_IN_THE_BODY.match(block_text(block))
         for block in blocks.blocks
     )
 
@@ -328,9 +313,12 @@ def test_whole_one_line_notes_are_footnotes_and_no_paragraph(
 # The number of pages with a footnote at a0a1675, by book, which may not
 # fall: no page loses its band. Gierke had 3, but its page 40's footnote
 # was a speck, "£ 2", above the notes, where step 4 now starts the band at
-# their first; that page is not counted.
+# their first; that page is not counted. Haskins had 65, but its page 277
+# is an endpaper whose pattern the text layer read as words, "f. t/>. *v a
+# <?* V W", one of them a footnote; work package 2 removes the words of
+# that inkless page, so that page is not counted either.
 _FOOTNOTE_PAGES_AT_START = {
-    "normansineuropea00hask": 65,
+    "normansineuropea00hask": 64,
     "earlyplantagenet01stub": 2,
     "catherinedemedic00mariuoft": 334,
     "domesdaybook00maituoft": 480,
