@@ -10,7 +10,13 @@ from difflib import SequenceMatcher
 
 from galley.model import BlockKind
 from galley.structure._heads import starts_with_chapter_label_word
-from galley.structure._lines import Piece, PlacedLine, first_word, is_bare_number
+from galley.structure._lines import (
+    Piece,
+    PlacedLine,
+    first_word,
+    is_bare_number,
+    is_misread_marker,
+)
 from galley.structure._markers import NoteMarker, endnote_marker
 from galley.structure._measures import letters
 from galley.structure._paragraphs import BodyBlock, Entry
@@ -30,6 +36,8 @@ _GROUP_HEADING_GAP_PITCHES = 1.5
 # 26 group headings of Turney and Haynes, 18 November 2026: 0.94 to 1.00 to
 # their own chapter's, at most 0.76 to another's.
 _CHAPTER_ALIKE_RATIO = 0.85
+# Spec section 12: a misread marker is followed by bare numbers 2, 3, 4.
+_MISREAD_FOLLOWERS = 3
 # A number dropped from the start of a group heading: "1.", "2", "10".
 _NUMBER_WORD = re.compile(r"[0-9]{1,3}[.:]?")
 
@@ -70,6 +78,32 @@ def _marker_of(
             return None
 
 
+def _misread_markers(
+    entries: Sequence[Entry], contents_pages: frozenset[int]
+) -> dict[int, tuple[NoteMarker, bool]]:
+    """The misread markers among the entries (spec section 12), by position:
+    a paragraph whose first word is one character that is not a digit,
+    with a word after it, when the next three paragraphs that start with
+    a bare number read 2, 3 and 4. Its marker is that character, its
+    value 1, a bare number's."""
+    bare = tuple(
+        (position, found[0].value)
+        for position, entry in enumerate(entries)
+        if (found := _marker_of(entry, contents_pages)) is not None and found[1]
+    )
+    found_misread: dict[int, tuple[NoteMarker, bool]] = {}
+    for position, entry in enumerate(entries):
+        if not isinstance(entry, BodyBlock):
+            continue
+        words = entry.piece.lines[0].line.words
+        if len(words) <= 1 or not is_misread_marker(words[0].text):
+            continue
+        following = tuple(value for later, value in bare if later > position)
+        if following[:_MISREAD_FOLLOWERS] == (2, 3, 4):
+            found_misread[position] = (NoteMarker(words[0].text, "", 1), True)
+    return found_misread
+
+
 def _runs(
     entries: Sequence[Entry], contents_pages: frozenset[int]
 ) -> tuple[tuple[bool, tuple[tuple[int, NoteMarker], ...]], ...]:
@@ -84,8 +118,9 @@ def _runs(
     runs: list[tuple[bool, list[tuple[int, NoteMarker]]]] = []
     current: dict[bool, list[tuple[int, NoteMarker]]] = {}
     last_value: dict[bool, int] = {}
+    misread = _misread_markers(entries, contents_pages)
     for position, entry in enumerate(entries):
-        found = _marker_of(entry, contents_pages)
+        found = misread.get(position) or _marker_of(entry, contents_pages)
         if found is None:
             continue
         marker, bare = found

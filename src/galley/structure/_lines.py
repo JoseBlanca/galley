@@ -34,6 +34,9 @@ _HANGING_NUMBER = re.compile(r"[0-9]{1,3}")
 _HANG_MIN_PT = 5.0
 _HANG_MAX_PT = 20.0
 _TEXT_EDGE_MIN_LINES = 3
+# Spec section 6, rule 3, and section 12: a misread marker is followed by
+# lines hung with 2, 3 and 4.
+_MISREAD_FOLLOWERS = 3
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,10 +106,42 @@ def has_hanging_number(line: PlacedLine) -> bool:
     """Spec section 6, rule 3: the line's first word is a bare number, it
     has a second word, and its left side lies 5 to 20 pt left of its
     region's text edge."""
-    words = line.line.words
-    if line.text_edge is None or len(words) <= 1 or not is_bare_number(words[0].text):
-        return False
-    return _HANG_MIN_PT <= line.text_edge - line.line.box.x0 <= _HANG_MAX_PT
+    return _is_hung(line) and is_bare_number(line.line.words[0].text)
+
+
+def is_misread_marker(word: str) -> bool:
+    """Whether `word` may be a note's "1" the OCR misread: one character
+    that is not a digit, Turney's "x" (spec section 12, the misread
+    marker)."""
+    return len(word) == 1 and not word.isdigit()
+
+
+def _is_hung(line: PlacedLine) -> bool:
+    return (
+        line.text_edge is not None
+        and len(line.line.words) > 1
+        and _HANG_MIN_PT <= line.text_edge - line.line.box.x0 <= _HANG_MAX_PT
+    )
+
+
+def misread_marker_lines(lines: Sequence[PlacedLine]) -> frozenset[int]:
+    """The positions in `lines`, a page's body stream, of the lines that
+    start a paragraph with a misread marker (spec section 6, rule 3): the
+    first word one character that is not a digit, a second word, hung 5 to
+    20 pt left of the text edge, and the next three lines that start with
+    a hanging number reading 2, 3 and 4."""
+    return frozenset(
+        number
+        for number, line in enumerate(lines)
+        if _is_hung(line)
+        and is_misread_marker(line.line.words[0].text)
+        and tuple(
+            later.line.words[0].text
+            for later in lines[number + 1 :]
+            if has_hanging_number(later)
+        )[:_MISREAD_FOLLOWERS]
+        == ("2", "3", "4")
+    )
 
 
 def is_indented(line: PlacedLine, before: PlacedLine) -> bool:
