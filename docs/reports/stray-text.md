@@ -42,3 +42,22 @@ Done in three commits: be06218 (specs), 5141c9f (formats), b54be14
 - **For the owner:** the quick tests take 80 s, from 70 s; task 5.3 is
   to bring them back. Haskins 277 holds a printed conservator's label
   without text-layer words, so removing the page's words loses no print.
+
+## Work package 2: inkless pages
+
+Done in three commits, merged from the `analyze` stream: b84b80c
+corrects the spec's share for Haskins 278 from 0.92 to 0.88 (21 of 24
+words without ink; the margin below the lowest inkless page is 0.38);
+30ff1c7 marks the page in analyze; 3a36c9a tests the eight books.
+extract needed no change.
+
+- `uv run pytest -m whole_book -k inkless`: 8 passed, the owner's books
+  included. The inkless pages of the eight books are exactly Haskins 277
+  and 278 and Haynes 9 and 421; Haskins' endpapers 1 and 2 stay front
+  matter.
+- After the merge: ruff and ty pass; pytest 2,826 passed, 22 expected
+  failures, in 106 s while two other streams were running tests on the
+  same machine.
+- `tests/test_layout.py` changed in this stream, outside its files:
+  `haskins_endpapers` is the one excerpt with no measures, since only
+  its colophon is text now. Both tests still check the other excerpts.
