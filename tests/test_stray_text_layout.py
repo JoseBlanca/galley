@@ -5,9 +5,12 @@ tall as the body (step 4), and Stubbs' cut-in notes on the body's
 baselines (step 2b and section 9). The expected output of each page is
 that of its file in tests/fixtures/expected/stray_text/, transcribed from
 the page rendered at 300 dpi. A test whose work package has not landed is
-a strict xfail naming it; the task that makes it pass removes the mark."""
+a strict xfail naming it; the task that makes it pass removes the mark.
+The whole-book tests at the end hold the counts of work package 3,
+deliverable 3, that layout gives."""
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +18,7 @@ import pytest
 
 from galley.book_folder import BookFolder
 from galley.model import (
+    BlocksFile,
     NoteKind,
     PageLayout,
     RemovalReason,
@@ -33,6 +37,15 @@ _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "stray_text"
 _STRUCTURE_FULL_HEIGHT_BAND = (
     "structure's band region needs small words (structure spec section 2); "
     "no task of docs/plans/stray-text.md takes a full-height band"
+)
+# Layout makes a band of the notes of Gierke's introduction, small against
+# their page (step 4), but structure takes a region as a band region only
+# when its words are at most 0.85 of the book's body word height
+# (structure spec section 2): the notes are 8 pt against the book's 9.
+_STRUCTURE_PAGE_BAND = (
+    "structure's band region is small against the book's body word height "
+    "(structure spec section 2), not the page's; no task of "
+    "docs/plans/stray-text.md changes it"
 )
 _TASK_4_1 = (
     "task 4.1 of docs/plans/stray-text.md: the shortened-row test by size in "
@@ -200,3 +213,116 @@ def test_body_line_beside_a_cut_in_note_keeps_every_word(
 ) -> None:
     layout = _page_layout(excerpt_books["stubbs_cut_in"], page)
     assert _in_body_lines(_expected("stubbs_cut_in", page)["body_lines"], layout)
+
+
+# Whole books (plan stray-text, work package 3, deliverable 3), each count
+# beside that of the starting commit a0a1675, measured on the runs of
+# 18 November 2026 (runs/lists-figures/ of the main checkout).
+
+
+def _whole_blocks(whole_book_run: Callable[[str], BookFolder], book: str) -> BlocksFile:
+    return read_blocks(whole_book_run(book).blocks_json)
+
+
+def _footnote_pages(blocks: BlocksFile) -> frozenset[int]:
+    return frozenset(
+        note.origin[0].page_index
+        for note in blocks.notes
+        if note.kind is NoteKind.FOOTNOTE
+    )
+
+
+# The heads whose page number the text layer boxes apart (step 3): none
+# removed at a0a1675, all three now. Gierke's 16 and 84 are structure's
+# (task 3.2), and Gierke's 167 is left (the plan's "Out").
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize(
+    ("book", "page"),
+    [
+        ("battleofkadeshst00breauoft", 38),
+        ("domesdaybook00maituoft", 200),
+        ("domesdaybook00maituoft", 428),
+    ],
+)
+def test_whole_head_with_its_page_number_boxed_apart_is_removed(
+    whole_book_run: Callable[[str], BookFolder], book: str, page: int
+) -> None:
+    removals = _whole_blocks(whole_book_run, book).removals
+    assert any(
+        removal.page_index == page and removal.reason is RemovalReason.RUNNING_HEAD
+        for removal in removals
+    )
+
+
+# The pages of Gierke's introduction that print footnotes (layout spec,
+# section 3, step 4, "Small against the page"), page 40 among them: at
+# a0a1675 only page 40 had a footnote, a speck "£ 2" read as one.
+_GIERKE_INTRODUCTION_NOTE_PAGES = frozenset(
+    (*range(15, 19), *range(23, 32), *range(34, 46), 48, 49)
+)
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+@pytest.mark.xfail(strict=True, reason=_STRUCTURE_PAGE_BAND)
+def test_whole_gierke_introduction_footnotes_are_footnotes(
+    whole_book_run: Callable[[str], BookFolder],
+) -> None:
+    blocks = _whole_blocks(whole_book_run, "politicaltheorie00gieruoft")
+    assert _GIERKE_INTRODUCTION_NOTE_PAGES <= _footnote_pages(blocks)
+
+
+# The one-line notes boxed as tall as the body (step 4): at a0a1675 each
+# but Domesday's 472 is a paragraph opening "1 ", and only 472 has a
+# footnote.
+_ONE_LINE_NOTE_PAGES = {
+    "domesdaybook00maituoft": frozenset(
+        (163, 174, 185, 278, 303, 308, 315, 347, 472, 485)
+    ),
+    "politicaltheorie00gieruoft": frozenset((61,)),
+}
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+@pytest.mark.xfail(strict=True, reason=_STRUCTURE_FULL_HEIGHT_BAND)
+@pytest.mark.parametrize("book", sorted(_ONE_LINE_NOTE_PAGES))
+def test_whole_one_line_notes_are_footnotes_and_no_paragraph(
+    whole_book_run: Callable[[str], BookFolder], book: str
+) -> None:
+    blocks = _whole_blocks(whole_book_run, book)
+    pages = _ONE_LINE_NOTE_PAGES[book]
+    assert pages <= _footnote_pages(blocks)
+    assert not any(
+        block.origin[0].page_index in pages and block_text(block).startswith("1 ")
+        for block in blocks.blocks
+    )
+
+
+# The number of pages with a footnote at a0a1675, by book, which may not
+# fall: no page loses its band. Gierke had 3, but its page 40's footnote
+# was a speck, "£ 2", above the notes, where step 4 now starts the band at
+# their first; that page is not counted.
+_FOOTNOTE_PAGES_AT_START = {
+    "normansineuropea00hask": 65,
+    "earlyplantagenet01stub": 2,
+    "catherinedemedic00mariuoft": 334,
+    "domesdaybook00maituoft": 480,
+    "politicaltheorie00gieruoft": 2,
+    "battleofkadeshst00breauoft": 40,
+}
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize("book", sorted(_FOOTNOTE_PAGES_AT_START))
+def test_whole_no_page_loses_its_footnotes(
+    whole_book_run: Callable[[str], BookFolder], book: str
+) -> None:
+    pages = _footnote_pages(_whole_blocks(whole_book_run, book))
+    assert len(pages) >= _FOOTNOTE_PAGES_AT_START[book]
