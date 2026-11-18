@@ -495,12 +495,20 @@ def test_only_the_kadesh_epub_has_the_cover_extract_rendered(
 
 
 # Java starts in about a second; the 8-thread run would start it 8 times.
+# One call checks every excerpt EPUB a test validates: kadesh_29-38's, with
+# its in-page figures (docs/specs/figures.md, section 10), checked here
+# rather than in a call of its own saved 1.1 s of the default run (18
+# November 2026).
 @pytest.mark.thread_unsafe
 @pytest.mark.epubcheck
-def test_the_excerpt_epubs_of_kadesh_and_gierke_pass_epubcheck(
+def test_the_excerpt_epubs_of_kadesh_its_figures_and_gierke_pass_epubcheck(
     excerpt_books: frozendict[str, BookFolder], check_epubs: Callable[..., None]
 ) -> None:
-    check_epubs(excerpt_books[KADESH].book_epub, excerpt_books[GIERKE].book_epub)
+    check_epubs(
+        excerpt_books[KADESH].book_epub,
+        excerpt_books["kadesh_29-38"].book_epub,
+        excerpt_books[GIERKE].book_epub,
+    )
 
 
 # The configs of the six whole books (tests/conftest.py, WHOLE_BOOK_CONFIGS)

@@ -1963,12 +1963,12 @@ def test_kadesh_29_38_text_on_a_captions_row_stays_where_it_is(
     assert (BlockKind.PARAGRAPH, "Var.", 8) in texts
 
 
+# epubcheck validates this EPUB in test_end_to_end.py, in one call with the
+# other excerpt EPUBs: Java starts in about a second and a half.
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.epubcheck
-@pytest.mark.thread_unsafe
-def test_kadesh_29_38_epub_shows_each_figure_with_its_caption_and_passes_epubcheck(
-    excerpt_books: frozendict[str, BookFolder], check_epubs: Callable[..., None]
+def test_kadesh_29_38_epub_shows_each_figure_with_its_caption(
+    excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     folder = excerpt_books[_KADESH]
     figures = tuple(
@@ -1992,7 +1992,6 @@ def test_kadesh_29_38_epub_shows_each_figure_with_its_caption_and_passes_epubche
         assert tuple("".join(caption.itertext()) for caption in captions) == (
             (block_text(block),) if block.spans else ()
         ), block.id
-    check_epubs(folder.book_epub)
 
 
 # Whole books (figures spec section 10, "Whole-book tests", structure's
