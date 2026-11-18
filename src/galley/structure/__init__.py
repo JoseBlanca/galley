@@ -80,9 +80,9 @@ def make_blocks(
     `language` the config's, by which a spaced sign is attached to its word
     or, in French, takes a no-break space (spec section 23);
     `contents_pages` the page indices of the printed table of contents
-    (the config's), whose lines stay paragraphs (spec section 14) and
-    after the last of which the references to endnotes are taken (spec
-    section 12)."""
+    (the config's), whose lines are its title and its entries (spec
+    section 30) and after the last of which the references to endnotes
+    are taken (spec section 12)."""
     survey = survey_book(lines, workers=workers)
     plates = plate_survey(lines, survey)
     pages = map_pages(
@@ -108,7 +108,17 @@ def make_blocks(
         source_pdf_sha256=lines.source_pdf_sha256,
         blocks=assembled.blocks,
         notes=assembled.notes,
-        removals=tuple(removal for page in pages for removal in page.removals),
+        # The leader dots removed across pages go after their page's
+        # removals; the sort is stable.
+        removals=tuple(
+            sorted(
+                (
+                    *(removal for page in pages for removal in page.removals),
+                    *assembled.removals,
+                ),
+                key=lambda removal: removal.page_index,
+            )
+        ),
         word_changes=assembled.word_changes,
         page_numbers=tuple(number for page in pages for number in page.page_numbers),
     )

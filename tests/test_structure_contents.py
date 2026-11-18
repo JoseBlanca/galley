@@ -7,12 +7,33 @@ contents; of the owner's books no more than a few words of a title are
 used.
 """
 
-from galley.model import Box, Line, RemovalReason, Word
+from collections.abc import Callable
+
+import pytest
+
+from galley.book_folder import BookFolder
+from galley.errors import FidelityBoundary
+from galley.fidelity import check_stage
+from galley.model import (
+    BlockKind,
+    Box,
+    Line,
+    LinesFile,
+    PageLayout,
+    Region,
+    RemovalReason,
+    Word,
+    block_text,
+    read_blocks,
+)
+from galley.structure import make_blocks
 from galley.structure._contents import (
     ContentsEntry,
     ContentsTitle,
     contents_entries,
     contents_title,
+    plain,
+    run_links,
 )
 from galley.structure._lines import PlacedLine
 from galley.structure._measures import Edges
@@ -237,3 +258,288 @@ def test_entry_keeps_every_line_for_its_origin_with_its_label_line() -> None:
     lines = (_centred("CHAPTER IX.", 100), _centred("THE REIGN OF JOHN.", 114))
     (entry,) = contents_entries(lines)
     assert entry.lines == lines
+
+
+# The links (spec section 30, rule 9).
+
+
+def test_plain_text_is_case_folded_letters_with_single_spaces() -> None:
+    assert plain(" (TjDark Chemists,  and-Master ") == "tjdark chemists and master"
+
+
+def test_entries_link_to_their_headings_in_order() -> None:
+    assert run_links(
+        ("(TjDark Chemists and Master Wagner", "EDWARD I.", "EDWARD II."),
+        ("DARK CHEMISTS AMD MASTER WAGNER", "EDWARD I.", "EDWARD II."),
+    ) == ((0, 0), (1, 1), (2, 2))
+
+
+def test_entry_with_no_heading_alike_has_no_link() -> None:
+    assert run_links(
+        ("EDWARD I.", "STATISTICAL TABLES", "EDWARD II."),
+        ("EDWARD I.", "EDWARD II."),
+    ) == ((0, 0), (2, 1))
+
+
+def test_two_entries_in_the_order_opposite_to_their_headings_give_one_link() -> None:
+    links = run_links(
+        ("THE CHURCH AND THE STATE", "THE NORMAN CONQUEST"),
+        ("THE NORMAN CONQUEST", "THE CHURCH AND THE STATE"),
+    )
+    assert len(links) == 1
+
+
+def test_link_goes_to_the_earlier_of_two_headings_alike() -> None:
+    # Among sets of one size and sum, the first candidate whose pairing
+    # differs takes the earlier heading.
+    assert run_links(("INDEX",), ("INDEX", "INDEX")) == ((0, 0),)
+
+
+def test_ratio_below_the_threshold_gives_no_link() -> None:
+    # "TRANSLATOR'S INTRODUCTION" against "INTRODUCTION." is 0.65.
+    assert run_links(("TRANSLATOR'S INTRODUCTION",), ("INTRODUCTION.",)) == ()
+
+
+# The blocks (spec section 30, rule 10), through make_blocks.
+
+_NO_WORDS: frozenset[str] = frozenset()
+
+
+def _region_of(*lines: PlacedLine) -> Region:
+    raw = tuple(line.line for line in lines)
+    return Region(
+        Box(
+            min(line.box.x0 for line in raw),
+            min(line.box.top for line in raw),
+            max(line.box.x1 for line in raw),
+            max(line.box.bottom for line in raw),
+        ),
+        raw,
+    )
+
+
+def _text_page(index: int, heading: str) -> PageLayout:
+    """A chapter's first page: its centred heading and five full lines."""
+    return PageLayout(
+        index,
+        (
+            _region_of(
+                _centred(heading, 100),
+                *(
+                    _line(f"Text of the chapter {n} goes on", 60, 140 + 14 * n, 340)
+                    for n in range(5)
+                ),
+            ),
+        ),
+        (),
+    )
+
+
+def _contents_book() -> LinesFile:
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("PREFACE . . . . . . . v", 60, 100, _RIGHT_PT),
+                _line("I. THE NORMAN CONQUEST . . . 1", 60, 114, _RIGHT_PT),
+                _line("II. THE CHURCH AND THE STATE . . 23", 60, 128, _RIGHT_PT),
+                _line("INDEX . . . . . . . . . 301", 60, 142, _RIGHT_PT),
+            ),
+        ),
+        (),
+    )
+    return LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(
+            contents,
+            _text_page(1, "THE NORMAN CONQUEST."),
+            _text_page(2, "THE CHURCH AND THE STATE."),
+        ),
+    )
+
+
+def test_contents_page_gives_its_title_a_heading_and_entries_linked() -> None:
+    lines = _contents_book()
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    headings = {
+        block.id: block_text(block)
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING
+    }
+    assert tuple(
+        (
+            block.kind.value,
+            block.level,
+            block.label,
+            block_text(block),
+            block.page_number,
+            headings.get(block.heading_ref or ""),
+        )
+        for block in blocks.blocks
+        if block.origin[0].page_index == 0
+    ) == (
+        ("heading", 1, None, "CONTENTS", None, None),
+        ("contents_entry", 1, None, "PREFACE", "v", None),
+        ("contents_entry", 1, "I.", "THE NORMAN CONQUEST", "1", "THE NORMAN CONQUEST."),
+        (
+            "contents_entry",
+            1,
+            "II.",
+            "THE CHURCH AND THE STATE",
+            "23",
+            "THE CHURCH AND THE STATE.",
+        ),
+        ("contents_entry", 1, None, "INDEX", "301", None),
+    )
+    assert (
+        sum(removal.reason is RemovalReason.LEADER_DOTS for removal in blocks.removals)
+        == 4
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_paragraph_after_a_contents_page_starts_a_block() -> None:
+    blocks = make_blocks(
+        _contents_book(), _NO_WORDS, contents_pages=frozenset({0}), workers=1
+    )
+    assert blocks.blocks[5].origin[0].page_index == 1
+    assert blocks.blocks[5].kind is BlockKind.HEADING
+
+
+# The whole books (spec section 32, "Whole-book tests"): contents entries
+# linked to a heading, at least.
+_LINKED_AT_LEAST = {
+    "normansineuropea00hask": 9,
+    "earlyplantagenet01stub": 13,
+    "domesdaybook00maituoft": 23,
+    "politicaltheorie00gieruoft": 13,
+    "catherinedemedic00mariuoft": 9,
+}
+
+
+@pytest.mark.whole_book
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize("book", list(_LINKED_AT_LEAST))
+def test_whole_book_contents_entries_linked_to_headings(
+    whole_book_run: Callable[[str], BookFolder], book: str
+) -> None:
+    blocks = read_blocks(whole_book_run(book).blocks_json)
+    headings = frozenset(b.id for b in blocks.blocks if b.kind is BlockKind.HEADING)
+    refs = tuple(
+        block.heading_ref
+        for block in blocks.blocks
+        if block.kind is BlockKind.CONTENTS_ENTRY and block.heading_ref is not None
+    )
+    assert len(refs) >= _LINKED_AT_LEAST[book]
+    assert all(ref in headings for ref in refs)
+
+
+# The excerpts (spec section 32, "Excerpt tests").
+
+
+def _contents_of(
+    excerpt_books: frozendict[str, BookFolder], name: str, page: int
+) -> tuple[tuple[str, int | None, str | None, str, str | None, str | None], ...]:
+    """The headings and contents entries that start on excerpt page `page`:
+    kind, level, label, text, page number and the text of the heading the
+    entry is linked to."""
+    blocks = read_blocks(excerpt_books[name].blocks_json)
+    texts = {block.id: block_text(block) for block in blocks.blocks}
+    return tuple(
+        (
+            block.kind.value,
+            block.level,
+            block.label,
+            block_text(block),
+            block.page_number,
+            texts[block.heading_ref] if block.heading_ref is not None else None,
+        )
+        for block in blocks.blocks
+        if block.origin[0].page_index == page
+        and block.kind in {BlockKind.HEADING, BlockKind.CONTENTS_ENTRY}
+    )
+
+
+def test_haskins_front_contents_title_and_nine_entries(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Excerpt page 7 is the book's page 14.
+    contents = _contents_of(excerpt_books, "haskins_front", 7)
+    assert contents[0] == ("heading", 1, None, "CONTENTS", None, None)
+    assert tuple(entry[1:5] for entry in contents[1:]) == (
+        (1, None, "-^1. NORMANDY AND ITS PLACE IN HISTORY", "i"),
+        (1, None, "_ II, THE COMING OF THE NORTHMEN", "26"),
+        (1, None, '"HI. NORMANDY AND ENGLAND', "52"),
+        (1, "IV.", "THE NORMAN EMPIRE", "85"),
+        (1, "V.", "NORMANDY AND FRANCE", "116"),
+        (1, "^ VI.", "NORMAN LIFE AND CULTURE", "148"),
+        (1, "VII.", "THE NORMANS IN THE SOUTH", "192"),
+        (1, "VIII.", "THE NORMAN KINGDOM OF SICILY", "218"),
+        (1, None, "INDEX", "251"),
+    )
+
+
+def test_stubbs_summaries_contents_chapters_topics_and_index_linked(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    contents = _contents_of(excerpt_books, "stubbs_summaries_index", 0)
+    entries = tuple(entry for entry in contents if entry[0] == "contents_entry")
+    assert tuple(entry[1:3] for entry in entries) == (
+        (1, "CHAPTER IX."),
+        (2, None),
+        (1, "CHAPTER X."),
+        (2, None),
+        (1, "CHAPTER XI."),
+        (2, None),
+        (1, "CHAPTER XII."),
+        (2, None),
+        (1, None),
+    )
+    assert tuple(entry[4] for entry in entries) == (
+        *(None, "189", None, "212", None, "238", None, "263"),
+        "291",
+    )
+    assert tuple(entry[5] for entry in entries) == (*(None,) * 8, "INDEX.")
+
+
+def test_domesday_headings_contents_essay_sections_and_their_topics(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    contents = _contents_of(excerpt_books, "domesday_headings_quotes", 0)
+    assert tuple(entry[1:3] + entry[4:] for entry in contents[:9]) == (
+        (1, None, None, None),
+        (1, None, None, None),
+        (1, None, "v", None),
+        (1, None, "vii", None),
+        (1, None, "xiv", None),
+        (1, "ESSAY I.", None, "DOMESDAY BOOK."),
+        (2, None, None, None),
+        (2, "§ 1.", "pp. 9 — 26.", "§ 1. Plan of the Survey."),
+        (3, None, None, None),
+    )
+    assert contents[8][3].startswith("The geographical basis, 9.")
+
+
+def test_gierke_front_contents_page_numbers_taken_and_misread_ones_left(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Excerpt page 5 is the book's page 10.
+    entries = tuple(
+        entry
+        for entry in _contents_of(excerpt_books, "gierke_front_flow", 5)
+        if entry[0] == "contents_entry"
+    )
+    assert len(entries) == 8
+    assert tuple(entry[4] for entry in entries) == (
+        *(None, "vii", "xlvii", None, None, None, "i", None),
+    )
+    assert tuple(entry[3].split(" ")[-1] for entry in entries if entry[4] is None) == (
+        "PA'.R",
+        "Ivi",
+        "Ixiii",
+        "Ixxviii",
+        "lor",
+    )
+    assert all(entry[5] is None for entry in entries)

@@ -25,7 +25,8 @@ class Unnumbered:
     a verse epigraph too (section 22); a figure block's image path
     (section 18); an epigraph's source (section 22); and, in a French
     book, the positions of the words that take a no-break space, U+00A0,
-    before them instead of a space (section 23)."""
+    before them instead of a space (section 23); a contents entry's page
+    number as printed (section 30)."""
 
     kind: BlockKind
     words: tuple[str, ...]
@@ -39,6 +40,7 @@ class Unnumbered:
     figure: str | None = None
     source: str | None = None
     no_break: frozenset[int] = frozenset()
+    page_number: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +167,38 @@ def without_marker(
         words=(rest, *block.words[1:]),
         changes=((-1, change), *block.changes),
     ), marker.marker
+
+
+def with_list_marker(block: Unnumbered, marker: str) -> Unnumbered:
+    """The list item `block` with its first word, or the dash glued to it,
+    as its label (spec section 29, "Blocks"): a marker that is the whole
+    first word leaves the text; a dash glued to the item's first word is
+    split off it by a list_marker word change on the item's page, "—The"
+    to "—" "The"."""
+    first = block.words[0]
+    if first == marker:
+        return replace(
+            block,
+            label=marker,
+            words=block.words[1:],
+            word_pages=block.word_pages[1:],
+            line_starts=frozenset(
+                start - 1 for start in block.line_starts if start > 1
+            ),
+            changes=tuple((position - 1, change) for position, change in block.changes),
+        )
+    change = WordChange(
+        page_index=block.word_pages[0],
+        before=(first,),
+        after=(marker, first[len(marker) :]),
+        reason=ChangeReason.LIST_MARKER,
+    )
+    return replace(
+        block,
+        label=marker,
+        words=(first[len(marker) :], *block.words[1:]),
+        changes=((-1, change), *block.changes),
+    )
 
 
 def changes_in_order(blocks: Sequence[Unnumbered]) -> tuple[WordChange, ...]:
