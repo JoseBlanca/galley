@@ -23,6 +23,10 @@ _SMALL_WORD_SHARE = 0.85
 # within 4 pt of the head's (Turney's numbers 0 to 0.8 pt, Gierke's 0 to
 # 3.9 pt, measured on 17 November 2026).
 _BESIDE_MAX_CHARACTERS = 5
+# Spec section 2: the head line lies above every other region, which may
+# reach 2 pt into it; Stubbs' "MAPS." (page 17), boxed 18 pt tall, reaches
+# 1 pt into the region below it.
+_HEAD_OVERLAP_PT = 2.0
 _BESIDE_TOP_PT = 4.0
 
 
@@ -91,7 +95,7 @@ def head_line(page: PageLayout) -> HeadLine | None:
     )
     head_bottom = max(page.regions[number].box.bottom for number in (0, *beside))
     if any(
-        region.box.top < head_bottom
+        region.box.top < head_bottom - _HEAD_OVERLAP_PT
         for number, region in enumerate(page.regions)
         if number != 0 and number not in beside
     ):

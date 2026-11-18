@@ -505,6 +505,18 @@ def test_line_of_the_head_band_0_6_alike_to_a_running_head_is_no_heading(
     assert _headings(blocks) == headings
 
 
+def test_head_line_boxed_tall_into_the_region_below_by_1_pt_is_a_heading() -> None:
+    # Stubbs' page 17: "MAPS.", centred, boxed 18 pt tall, its box 1 pt
+    # into the region below it; 3 pt would make it a margin region.
+    maps = _line("MAPS.", 115 - _CHAR_PT * 5 / 2, 100, 18)
+    for reach, heading in ((1.0, True), (3.0, False)):
+        page = PageLayout(
+            20, (_region(maps), _region(*_running_text(118 - reach, 12))), ()
+        )
+        blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+        assert (_headings(blocks) == ((1, None, "MAPS."),)) is heading
+
+
 # On the six public-domain books (spec section 26, "Whole-book tests"), from
 # the session's run of each whole book (tests/conftest.py).
 
