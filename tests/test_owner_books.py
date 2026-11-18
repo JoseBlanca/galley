@@ -142,7 +142,7 @@ def test_no_running_head_removed_starts_with_a_chapter_label_word(
     )
     assert heads
     assert not any(
-        head.split()[0].rstrip(".,").lower() in _LABEL_WORDS for head in heads
+        head.split()[0].rstrip(".,:;").lower() in _LABEL_WORDS for head in heads
     )
 
 
