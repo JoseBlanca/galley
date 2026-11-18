@@ -462,7 +462,13 @@ is laid out as one region, as the skeleton did.
    when the next row that holds a letter or a digit has its top at
    least 1.3 body line pitches below the head row's top; rows of marks
    between them (no letter or digit) go with the body. A row's **top**
-   here is the median of its words' tops, not the top of its box. A
+   here is the median of its words' tops, not the top of its box. The
+   head row's top leaves out its words of a page-number form
+   (structure §1), which the OCR may box lower than the head's words:
+   Domesday's page 159 boxes its "134" 3 pt low, which put the gap at
+   15.67 pt against the 15.78 of 1.3 pitches, and the head stayed in
+   the text (found by the review of 18 November 2026). Measured that
+   day on the eight books' `words.json`, this changes no other page. A
    page whose head row is not that far apart, or has no row with a
    letter or digit below it, has no such region, and the specks above
    stay with the body. In the region, the head row and the rows of its
