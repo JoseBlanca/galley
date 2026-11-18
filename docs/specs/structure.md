@@ -3577,7 +3577,7 @@ the plan measures again):
 | book | split | examples | kept, glued |
 |---|---|---|---|
 | Haskins | 2 | "theAvre", "theAngevin" | 7 misreadings ("deUver") |
-| Stubbs | 10 | "ofWilliam", "ofJohn", "ofLancaster", "heBarons" (the "t" of "the" lost) | 1 |
+| Stubbs | 9 | "ofWilliam", "ofJohn", "ofLancaster", "heBarons" (the "t" of "the" lost) | 1 |
 | Domesday | 1 | "ofChatteris" | 11 |
 | Kadesh, Gierke | 0 | | 12, 6 ("inSyrienund", "outsideVhe") |
 | Mariéjol | 8 | "desMédicis", "deChambord", "laLigue" | the rest |
@@ -3586,7 +3586,13 @@ the plan measures again):
 
 The Haskins, Stubbs, Domesday and Mariéjol rows are of the rule as it
 now stands, on `lines.json`; Turney's and Haynes' are of the first rule
-and were not measured again. The capital must be followed by 3
+and were not measured again. Stubbs' row said 10 before the review of work
+package 5 (18 November 2026): `make_blocks` on this branch's
+`lines.json` gives 9, the same 9 with 2 letters after the capital as
+with 3, so the 3-letter rule below dropped none of Stubbs' splits; the
+10 was counted on the clean-text build's lines, which the reading
+order and re-reading have changed since, and its tenth word was not
+recorded. The capital must be followed by 3
 lower-case letters, not 2 (task 5.2 of the plan owner-books, 18
 November 2026): with 2, Domesday's "forSon" and "forSan" were split,
 which page 339 prints "forðon" and "forðan", one Old English word each
