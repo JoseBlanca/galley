@@ -33,3 +33,10 @@ galley-eval's kind enums. The excerpts differ from their whole books in
 small ways that the test literals record: on `domesday_lists` a few table
 numbers of pages 157 and 158 become margin notes; on `kadesh_29-38` two
 blocks of page 38 are quotes.
+
+The 15 expected files were checked against the pages rendered at 300 dpi
+by a second subagent: 14 match. In the file of Domesday page 143 the
+description of the printed page listed an item "(iii)" that the page
+does not print; it is removed. The files leave out, by design, text
+their tests do not measure (page 143's margin note and footnotes, page
+156's opening paragraph, the engraver's credit on Kadesh page 34).
