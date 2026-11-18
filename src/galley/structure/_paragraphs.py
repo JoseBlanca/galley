@@ -30,12 +30,18 @@ from galley.structure._lines import (
     starts_paragraph,
 )
 from galley.structure._markers import MarkerForm, marker_form
-from galley.structure._measures import Edges, is_short, region_edges
+from galley.structure._measures import (
+    Edges,
+    is_short,
+    letters,
+    region_edges,
+    words_text,
+)
 from galley.structure._regions import RegionKind, head_line, region_kinds
 from galley.structure._removals import foot_removals, head_removals
 from galley.structure._runs import BodyRun, LabelLine
 from galley.structure._summaries import summary_run
-from galley.structure._survey import BookSurvey
+from galley.structure._survey import BookSurvey, like_a_running_head
 from galley.structure._verse import verse_runs
 
 
@@ -118,7 +124,14 @@ def _runs(
     if page_index in contents_pages:
         return ()
     band_lines = tuple(line for region in band_regions for line in region)
-    headings = heading_runs(body, band_lines, survey.body_line_pitch, head, kept_head)
+    headings = heading_runs(
+        body,
+        band_lines,
+        survey.body_line_pitch,
+        head,
+        kept_head,
+        _like_running_heads(body, survey),
+    )
     # Each heading's summary ends at the next heading at the latest.
     limits = (*(run.start for run in headings[1:]), len(body))
     summaries = tuple(
@@ -160,6 +173,26 @@ def kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
         <= _HEAD_TOP_PITCHES * survey.body_line_pitch
     )
     return line if within else None
+
+
+def _like_running_heads(
+    body: Sequence[PlacedLine], survey: BookSurvey
+) -> frozenset[int]:
+    """The positions in `body`, a page's body stream, of the lines that are
+    never headings (spec section 14): those whose top lies at most 2
+    pitches below the median top of the book's head lines, or above it,
+    and whose letters are at least 0.6 alike to a running head's."""
+    if survey.median_head_top is None:
+        return frozenset()
+    limit = survey.median_head_top + _HEAD_TOP_PITCHES * survey.body_line_pitch
+    return frozenset(
+        number
+        for number, line in enumerate(body)
+        if line.line.box.top <= limit
+        and like_a_running_head(
+            letters(words_text(line.line.words)), survey.running_head_letters
+        )
+    )
 
 
 def page_parts(

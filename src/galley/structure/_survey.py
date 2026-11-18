@@ -81,7 +81,9 @@ class BookSurvey:
     indices of the printed indexes (section 17); `head_numbers` the arabic
     page number of each page whose running head has one, by page index
     (section 4, the local offset); `median_head_top` the median top of the
-    book's head lines, in points, None when it has none (section 3).
+    book's head lines, in points, None when it has none (section 3);
+    `running_head_letters` the letters of each line removed as a running
+    head, each once, sorted (section 14).
     """
 
     running_heads: frozenset[int]
@@ -96,6 +98,7 @@ class BookSurvey:
     index_pages: frozenset[int]
     head_numbers: frozendict[int, int]
     median_head_top: float | None
+    running_head_letters: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -217,6 +220,23 @@ def _alike_to_any(line_letters: str, others: tuple[str, ...], alike: _Alike) -> 
     return False
 
 
+# Spec section 14: a line in the head band at least 0.6 alike to a running
+# head is never a heading (Domesday's page 159, Kadesh's 38).
+_LIKE_A_HEAD_RATIO = 0.6
+_LIKE_A_HEAD = _Alike(
+    min_letters=_HEAD_MIN_LETTERS,
+    ratio=_LIKE_A_HEAD_RATIO,
+    max_length_difference=_HEAD_LENGTH_DIFFERENCE,
+)
+
+
+def like_a_running_head(line_letters: str, running_letters: tuple[str, ...]) -> bool:
+    """Whether `line_letters`, the letters of a line, are at least 0.6 alike
+    to the letters of one of the book's running heads, `running_letters`,
+    with at least 4 letters (spec section 14)."""
+    return _alike_to_any(line_letters, running_letters, _LIKE_A_HEAD)
+
+
 def alike_to_a_head(line_letters: str, others: tuple[str, ...]) -> bool:
     """Whether `line_letters`, the letters of a line, are alike to any of
     `others` by section 3's rule for running heads: at least 4 letters,
@@ -258,6 +278,7 @@ class _HeadSurvey:
     heads_below_specks: frozenset[int]
     head_numbers: frozendict[int, int]
     median_top: float | None
+    running_letters: tuple[str, ...]
 
 
 def _texts(line: Line) -> tuple[str, ...]:
@@ -324,7 +345,7 @@ def _head_survey(
     head lines, (page index, head line, line below it), and `top_letters`,
     the letters of each page's topmost line (spec section 3)."""
     if not heads:
-        return _HeadSurvey(frozenset(), None, None, frozenset(), frozendict(), None)
+        return _HeadSurvey(frozenset(), None, None, frozenset(), frozendict(), None, ())
     median_top = statistics.median(line.box.top for _, line, _ in heads)
     limit = _HEAD_PITCHES * pitch
     near = tuple(
@@ -423,6 +444,7 @@ def _head_survey(
         below_specks,
         head_numbers,
         median_top,
+        tuple(sorted({_line_letters(line) for _, line in removed_heads})),
     )
 
 
@@ -524,4 +546,5 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
         index_pages=index_pages(lines.pages, kinds),
         head_numbers=head_survey.head_numbers,
         median_head_top=head_survey.median_top,
+        running_head_letters=head_survey.running_letters,
     )

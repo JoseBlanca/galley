@@ -479,6 +479,32 @@ def test_title_line_in_capitals_continues_up_to_4_pitches_below_a_chapter_label(
         )
 
 
+@pytest.mark.parametrize(
+    ("line", "headings"),
+    [("A BOOK OF WINTERS", ()), ("A NEW BEGINNING", ((1, None, "A NEW BEGINNING"),))],
+)
+def test_line_of_the_head_band_0_6_alike_to_a_running_head_is_no_heading(
+    line: str, headings: tuple[tuple[int, None, str], ...]
+) -> None:
+    # Pages 10 to 13 have the running head "THE BOOK OF THINGS" at 36 pt;
+    # page 14's head line, centred in capitals at 40 pt, is 0.62 alike to
+    # it ("A BOOK OF WINTERS"), under the 0.70 of a running head.
+    page = PageLayout(
+        14,
+        (
+            _region(_line(line, 115 - _CHAR_PT * len(line) / 2, 40)),
+            _region(*_running_text(100, 12)),
+        ),
+        (),
+    )
+    lines = _lines_of(
+        *(_page_with_head(index, "THE BOOK OF THINGS") for index in range(10, 14)),
+        page,
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _headings(blocks) == headings
+
+
 # On the six public-domain books (spec section 26, "Whole-book tests"), from
 # the session's run of each whole book (tests/conftest.py).
 
