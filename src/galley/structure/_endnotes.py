@@ -23,8 +23,9 @@ from galley.structure._measures import letters
 from galley.structure._paragraphs import BodyBlock, Entry
 
 # Spec section 12: a run of at least 8 rising endnote markers makes the
-# section; the six books hold one run of 6 outside it (Kadesh, pages 20 to
-# 40), and the Gierke excerpt 12 endnotes, 291 to 302.
+# section; the six public-domain books hold one run of 6 outside it
+# (Kadesh, pages 20 to 40), and the Gierke excerpt 12 endnotes, 291 to
+# 302.
 _SECTION_MIN_MARKERS = 8
 # Spec section 12, "Note groups": a group heading holds at most 3 lines and
 # lies at least 1.5 body line pitches below the line before it; the survey
@@ -34,8 +35,9 @@ _GROUP_HEADING_MAX_LINES = 3
 _GROUP_HEADING_GAP_PITCHES = 1.5
 # Spec section 12, "The chapter of a group": a group heading's title is
 # alike to its chapter's heading by at least this ratio of difflib. On the
-# 26 group headings of Turney and Haynes, 18 November 2026: 0.94 to 1.00 to
-# their own chapter's, at most 0.76 to another's.
+# 29 group headings of Turney (11) and Haynes (18), 18 November 2026:
+# Turney's 1.00 to their own chapter's and at most 0.46 to another's,
+# Haynes' 0.94 to 1.00 and at most 0.76.
 _CHAPTER_ALIKE_RATIO = 0.85
 
 
