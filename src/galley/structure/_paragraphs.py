@@ -14,7 +14,6 @@ from typing import assert_never
 from galley.model import (
     BlockKind,
     Box,
-    FigureKind,
     Line,
     PageLayout,
     PageNumber,
@@ -24,7 +23,12 @@ from galley.model import (
 )
 from galley.structure._contents import ContentsEntry, contents_title
 from galley.structure._epigraphs import epigraph_run, page_epigraphs
-from galley.structure._foot import body_column
+from galley.structure._figures import (
+    SplitPage,
+    in_any_figure,
+    split_figure_regions,
+)
+from galley.structure._foot import LinePlace, body_column, line_at
 from galley.structure._headings import PageHead, heading_runs
 from galley.structure._index import IndexPage, index_page
 from galley.structure._lines import (
@@ -46,7 +50,7 @@ from galley.structure._measures import (
     words_removal,
     words_text,
 )
-from galley.structure._regions import RegionKind, head_line, region_kinds
+from galley.structure._regions import HeadLine, RegionKind, head_line, region_kinds
 from galley.structure._removals import foot_removals, head_removals
 from galley.structure._runs import CHAPTER_LEVEL, BodyRun, EpigraphParts, LabelLine
 from galley.structure._summaries import summary_run
@@ -252,7 +256,12 @@ def page_parts(
 ) -> PageParts:
     """The per-page work on `page` (spec section 2, step 2). `contents_pages`
     are the page indices of the printed table of contents, on which the
-    only heading is a contents run's title (spec section 30, rule 1)."""
+    only heading is a contents run's title (spec section 30, rule 1). On a
+    page with in-page figures, their regions take no part in it: their
+    words are removed as `figure_text`, and so is a head line printed
+    inside a figure (`docs/specs/figures.md` §5)."""
+    split = split_figure_regions(page)
+    page = split.text
     kinds = region_kinds(page, survey.body_word_height, survey.running_heads)
     head = head_removals(page, survey)
     foot = foot_removals(page, kinds, survey)
@@ -264,6 +273,9 @@ def page_parts(
     if index is not None:
         removed |= index.removed_lines
     column = body_column(page, kinds)
+    figure_boxes = tuple(figure.box for figure in split.figures)
+    head_inside = _head_inside_figures(head_line(page), removed, figure_boxes)
+    removed |= frozenset(head_inside)
 
     def centring_edges(region: Region, kind: RegionKind, edges: Edges) -> Edges:
         if kind is RegionKind.BODY and is_short(region) and column is not None:
@@ -354,6 +366,13 @@ def page_parts(
         removals=head.removals
         + (index.removals if index is not None else ())
         + foot.removals
+        + tuple(
+            words_removal(
+                page.index, line_at(page, place).words, RemovalReason.FIGURE_TEXT
+            )
+            for place in head_inside
+        )
+        + _figure_text(split)
         + stray_removals,
         page_numbers=head.page_numbers
         + (index.page_numbers if index is not None else ())
@@ -371,9 +390,37 @@ def page_parts(
         runs=page_runs.runs,
         index_lines=index_lines,
         index_starts=index.starts if index is not None else frozenset(),
-        in_page_figures=tuple(
-            figure.box for figure in page.figures if figure.kind is FigureKind.IN_PAGE
-        ),
+        in_page_figures=tuple(figure.box for figure in split.figures),
+    )
+
+
+def _head_inside_figures(
+    head: HeadLine | None, removed: frozenset[LinePlace], boxes: tuple[Box, ...]
+) -> tuple[LinePlace, ...]:
+    """The places of the lines of the page's head line `head` when each of
+    its words lies inside an in-page figure of `boxes` and section 3 did
+    not remove it (`removed`): lettering printed at a picture's top, which
+    is removed as `figure_text` (`docs/specs/figures.md` §5); none
+    otherwise."""
+    if head is None or not boxes:
+        return ()
+    places = (
+        (0, len(head.region.lines) - 1),
+        *((number, 0) for number in head.beside),
+    )
+    if any(place in removed for place in places) or not in_any_figure(head.line, boxes):
+        return ()
+    return places
+
+
+def _figure_text(split: SplitPage) -> tuple[Removal, ...]:
+    """The removals of the lines of the page's figure regions, one per
+    line, as `figure_text`."""
+    return tuple(
+        words_removal(split.text.index, line.words, RemovalReason.FIGURE_TEXT)
+        for region in split.regions
+        if region is not None
+        for line in region.lines
     )
 
 

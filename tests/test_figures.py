@@ -1,7 +1,8 @@
 """Tests of the figures printed inside text pages (docs/specs/figures.md):
-analyze's figure boxes (section 3), extract's cut (section 4) and layout's
-figure regions (section 5), on values made in the test and on the excerpt
-kadesh_29-38 (section 10).
+analyze's figure boxes (section 3), extract's cut (section 4), layout's
+figure regions and structure's figure text, captions and figure blocks
+(section 5), on values made in the test and on the excerpt kadesh_29-38
+(section 10).
 """
 
 import functools
@@ -18,18 +19,24 @@ from galley import analyze
 from galley.analyze import figure_boxes
 from galley.book_folder import BookFolder
 from galley.config import read_config
+from galley.errors import FidelityBoundary
 from galley.extract import _save_figures, figure_crop_px, figure_image, page_words
+from galley.fidelity import check_stage
 from galley.layout import figure_regions, layout_page_with_figures
 from galley.model import (
+    BlockKind,
+    BlocksFile,
     Box,
     Figure,
     FigureKind,
     Line,
+    LinesFile,
     PageInfo,
     PageKind,
     PageLayout,
     PageWords,
     Region,
+    RemovalReason,
     RenderedPage,
     TextSource,
     Word,
@@ -38,6 +45,7 @@ from galley.model import (
     read_pages,
     read_words,
 )
+from galley.structure import make_blocks
 
 # Figures spec section 10: a page of white, 300 by 450 pixels at 36 dpi,
 # where a pixel is 2 pt and a square of 12 pt is 6 pixels.
@@ -1067,3 +1075,151 @@ def test_kadesh_29_38_figure_regions_hold_the_words_read_on_the_pictures(
         for word in (*record.layer_words, *record.ocr_words)
         for box in boxes[record.page_index]
     )
+
+
+# structure: the figure text, the caption and the figure block's place
+# (figures spec section 5; the unit tests of section 10), on lines.json
+# made here. A word is 5 pt a character and 10 pt tall, one character
+# apart, and a line 14 pt below the one before.
+
+_CHARACTER_PT = 5.0
+_WORD_TALL_PT = 10.0
+_NO_WORD_LIST: frozenset[str] = frozenset()
+
+
+def _text_words(text: str, x0: float, top: float) -> tuple[Word, ...]:
+    words = []
+    left = x0
+    for part in text.split(" "):
+        right = left + _CHARACTER_PT * len(part)
+        words.append(Word(part, Box(left, top, right, top + _WORD_TALL_PT), None))
+        left = right + _CHARACTER_PT
+    return tuple(words)
+
+
+def _text_line(text: str, x0: float, top: float, x1: float | None = None) -> Line:
+    """A line of `text` from `x0`, its words spread to end at `x1` when
+    given."""
+    words = _text_words(text, x0, top)
+    if x1 is not None and len(words) > 1:
+        spare = (x1 - words[-1].box.x1) / (len(words) - 1)
+        words = tuple(
+            Word(
+                word.text,
+                Box(
+                    word.box.x0 + number * spare,
+                    top,
+                    word.box.x1 + number * spare,
+                    top + _WORD_TALL_PT,
+                ),
+                None,
+            )
+            for number, word in enumerate(words)
+        )
+    return _line(*words)
+
+
+def _in_page(index: int, box: Box, number: int = 1) -> Figure:
+    return Figure(
+        box=box,
+        image=f"images/figure-{index:04d}-{number}.png",
+        dpi=300,
+        kind=FigureKind.IN_PAGE,
+    )
+
+
+def _lines_file(*pages: PageLayout) -> LinesFile:
+    return LinesFile(source_pdf_sha256="0" * 64, pages=pages, rereads=())
+
+
+def _structure(
+    lines: LinesFile, word_list: frozenset[str] = _NO_WORD_LIST
+) -> BlocksFile:
+    blocks = make_blocks(lines, word_list, workers=1)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+    return blocks
+
+
+_MAP_BOX = Box(100.0, 145.0, 320.0, 290.0)
+_ABOVE_THE_MAP = (
+    _text_line("The text of the paragraph begins here and", 75.0, 100.0, 360.0),
+    _text_line("goes on along the line to the very end of", 60.0, 114.0, 360.0),
+    _text_line("the line before the figure printed in it, the", 60.0, 128.0, 360.0),
+)
+_BELOW_THE_MAP = (
+    _text_line("picture, and then it goes on after it as it", 60.0, 330.0, 360.0),
+    _text_line("did, to its end.", 60.0, 344.0),
+)
+_CAPTION_UNDER_THE_MAP = (
+    _text_line("figure 2. A picture of the", 100.0, 296.0),
+    _text_line("place.", 100.0, 309.0),
+)
+_MAP_REGION = _region(_line(_word("Orontes", 150.0, 200.0)))
+
+
+def _map_page(
+    above: tuple[Line, ...] = _ABOVE_THE_MAP, below: tuple[Line, ...] = _BELOW_THE_MAP
+) -> PageLayout:
+    """A page whose paragraph the map cuts, the caption under the map and a
+    word read on it, laid out as layout gives it: the body region with the
+    caption among its lines, then the map's region, whose box is the
+    map's."""
+    return PageLayout(
+        0,
+        (
+            _region(*above, *_CAPTION_UNDER_THE_MAP, *below),
+            Region(_MAP_BOX, _MAP_REGION.lines),
+        ),
+        (_in_page(0, _MAP_BOX),),
+    )
+
+
+def test_figure_text_the_words_of_a_figures_region_are_removed_one_per_line() -> None:
+    blocks = _structure(_lines_file(_map_page()))
+    assert tuple(
+        (removal.reason, removal.text)
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.FIGURE_TEXT
+    ) == ((RemovalReason.FIGURE_TEXT, "Orontes"),)
+
+
+def test_figure_text_a_head_line_inside_a_figure_is_removed() -> None:
+    # Turney 174: the lettering at the top of a cover is the page's first
+    # row, which layout keeps out of the figure's region.
+    box = Box(40.0, 34.0, 272.0, 356.0)
+    head = _text_line("Inside: Crisis", 85.0, 43.0)
+    caption = (
+        _text_line("14 (a) A cover", 280.0, 185.0),
+        _text_line("and (b) another.", 280.0, 199.0),
+    )
+    page = PageLayout(
+        0,
+        (_region(head), _region(*caption), Region(box, _MAP_REGION.lines)),
+        (_in_page(0, box),),
+    )
+    blocks = _structure(_lines_file(page))
+    assert BlockKind.HEADING not in tuple(block.kind for block in blocks.blocks)
+    assert tuple(
+        removal.text
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.FIGURE_TEXT
+    ) == ("Inside: Crisis", "Orontes")
+
+
+def test_figure_text_a_figures_region_is_not_the_pages_widest_region() -> None:
+    # Text set right of a wide picture, 90 pt wide: narrower than a quarter
+    # of the picture's 440 pt, it would be a margin note; it is a quarter
+    # of the body region's 300 pt or more, and is body text.
+    box = Box(40.0, 420.0, 480.0, 600.0)
+    beside = _text_line("set right of the", 490.0, 500.0, 580.0)
+    page = PageLayout(
+        0,
+        (
+            _region(*_ABOVE_THE_MAP),
+            _region(beside),
+            Region(box, (_line(_word("Orontes", 150.0, 500.0)),)),
+        ),
+        (_in_page(0, box),),
+    )
+    blocks = _structure(_lines_file(page))
+    assert BlockKind.MARGIN_NOTE not in tuple(block.kind for block in blocks.blocks)

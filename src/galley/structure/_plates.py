@@ -17,12 +17,14 @@ from galley.body_measures import rows_of
 from galley.errors import InputFileError
 from galley.model import (
     BlockKind,
+    FigureKind,
     LinesFile,
     Origin,
     PageLayout,
     Removal,
     RemovalReason,
 )
+from galley.structure._figures import text_page
 from galley.structure._foot import LinePlace, line_at
 from galley.structure._lines import Piece, PlacedLine
 from galley.structure._measures import (
@@ -79,12 +81,13 @@ def plate_survey(lines: LinesFile, survey: BookSurvey) -> PlateSurvey:
     topmost = {
         page.index: tuple(word.text for word in line_at(page, place).words)
         for page in lines.pages
-        if page.figures and (place := _topmost(page)) is not None
+        if any(figure.kind is FigureKind.PLATE for figure in page.figures)
+        and (place := _topmost(page)) is not None
     }
     heads = {
         head
         for page in lines.pages
-        if (head := _running_head_letters(page, survey)) is not None
+        if (head := _running_head_letters(text_page(page), survey)) is not None
     }
     return PlateSurvey(frozendict(topmost), tuple(sorted(heads)))
 
