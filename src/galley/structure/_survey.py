@@ -36,6 +36,16 @@ from galley.wordlist import word_key
 # of the head lines (Haskins' title page 16 is 2.85 below; Kadesh's article
 # title on page 8 about 2.7).
 _HEAD_PITCHES = 2.0
+
+
+def in_head_band(top: float, median_head_top: float, pitch: float) -> bool:
+    """Whether a line whose top is `top`, in points, lies in the band where
+    running heads are looked for (spec section 3): at most 2 pitches of
+    `pitch` below `median_head_top`, the median top of the book's head
+    lines, or anywhere above it."""
+    return top - median_head_top <= _HEAD_PITCHES * pitch
+
+
 # Spec section 3: heads alike by at least 0.70 of their letters, which are
 # at least 4; heads whose letters differ in length by more than 8 are not
 # compared (spec section 9, for speed). 0.70, not 0.75 (17 November 2026):
@@ -347,11 +357,10 @@ def _head_survey(
     if not heads:
         return _HeadSurvey(frozenset(), None, None, frozenset(), frozendict(), None, ())
     median_top = statistics.median(line.box.top for _, line, _ in heads)
-    limit = _HEAD_PITCHES * pitch
     near = tuple(
         (page_index, line)
         for page_index, line, _ in heads
-        if line.box.top - median_top <= limit
+        if in_head_band(line.box.top, median_top, pitch)
     )
     offset = _commonest_offset(
         tuple(
@@ -404,7 +413,7 @@ def _head_survey(
         if page_index not in running
         and below is not None
         and len(_line_letters(line)) < _HEAD_MIN_LETTERS
-        and below.box.top - median_top <= limit
+        and in_head_band(below.box.top, median_top, pitch)
         and not starts_with_chapter_label_word(_texts(below))
         and _alike_to_any(_line_letters(below), running_letters, _HEADS_ALIKE)
     )
