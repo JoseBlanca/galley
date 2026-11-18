@@ -7,6 +7,7 @@ rendered at 300 dpi. A test whose work package has not landed is a strict
 xfail naming it; the task that makes it pass removes the mark."""
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -17,11 +18,6 @@ from galley.model import BlockKind, RemovalReason, block_text, read_blocks
 
 _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "stray_text"
 
-_TASK_3_2 = (
-    "task 3.2 of docs/plans/stray-text.md: the survey's length limit and the "
-    "reference candidates"
-)
-
 
 def _expected(excerpt: str, page: int) -> dict[str, Any]:
     return json.loads(
@@ -31,7 +27,6 @@ def _expected(excerpt: str, page: int) -> dict[str, Any]:
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.xfail(strict=True, reason=_TASK_3_2)
 @pytest.mark.parametrize("page", [2, 8])
 def test_head_damaged_beyond_eight_letters_is_removed_as_a_running_head(
     excerpt_books: frozendict[str, BookFolder], page: int
@@ -52,7 +47,6 @@ def test_head_damaged_beyond_eight_letters_is_removed_as_a_running_head(
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.xfail(strict=True, reason=_TASK_3_2)
 def test_sign_followed_by_punctuation_is_linked_to_its_note(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
@@ -68,3 +62,22 @@ def test_sign_followed_by_punctuation_is_linked_to_its_note(
     ]
     assert len(linked) == 1
     assert linked[0][1].startswith(expected["note_text_starts"])
+
+
+# Spec section 11, "References": the notes of Domesday whose reference is
+# not linked. 343 on the starting commit of the plan (a0a1675, 18 November
+# 2026); 322 with the sign followed by punctuation, which links 21 more,
+# each checked on the page image.
+# The plan asks for a fall of at least 15: at most 328.
+_DOMESDAY_UNREFERENCED_NOTES_AT_MOST = 328
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+def test_whole_book_domesday_signs_followed_by_punctuation_link_their_notes(
+    whole_book_run: Callable[[str], BookFolder],
+) -> None:
+    blocks = read_blocks(whole_book_run("domesdaybook00maituoft").blocks_json)
+    unreferenced = sum(1 for note in blocks.notes if not note.referenced)
+    assert unreferenced <= _DOMESDAY_UNREFERENCED_NOTES_AT_MOST
