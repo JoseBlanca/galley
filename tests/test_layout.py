@@ -781,6 +781,77 @@ def test_marks_row_between_head_and_body_is_passed_over_and_stays_in_the_body() 
     assert len(body.lines) == 21
 
 
+# A page number boxed apart above its head (step 3): the head's words at
+# top 76, 2 pitches above the body.
+_HEAD_WORDS_TOP = 100 - 2 * _PITCH
+
+
+def _head_words(top: float = _HEAD_WORDS_TOP) -> tuple[Word, ...]:
+    return (
+        _word("The", 100, top, 125, top + 8),
+        _word("Boroughs.", 130, top, 180, top + 8),
+    )
+
+
+@pytest.mark.parametrize("number_above_pt", [7.2, 20.0])
+def test_page_number_boxed_above_the_head_is_one_head_line_with_it(
+    number_above_pt: float,
+) -> None:
+    # Domesday's page 200, "175" 7.2 pt above "TJie Boroughs.", and
+    # Kadesh's 38, "27" 20 pt above its head.
+    number_top = _HEAD_WORDS_TOP - number_above_pt
+    number = _word("175", 230, number_top, 250, number_top + 8)
+    result = layout_page(_page(0, (number, *_head_words(), *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("The", "Boroughs.", "175"),)
+    assert len(body.lines) == 20
+
+
+def test_page_number_boxed_apart_keeps_a_speck_above_it_a_line_of_its_own() -> None:
+    speck = _word(";", 140, 40, 144, 46)
+    number = _word("175", 230, 60, 250, 68)
+    result = layout_page(
+        _page(0, (speck, number, *_head_words(), *_rows(20))), _MEASURES
+    )
+    assert _region_texts(result)[0] == ((";",), ("The", "Boroughs.", "175"))
+
+
+def test_page_number_boxed_apart_takes_the_skew_of_the_head_below_it() -> None:
+    number = _word("175", 230, 60, 250, 68)
+    skew = _word("1170", 190, _HEAD_WORDS_TOP + 4, 220, _HEAD_WORDS_TOP + 11)
+    result = layout_page(
+        _page(0, (number, *_head_words(), skew, *_rows(20))), _MEASURES
+    )
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("The", "Boroughs.", "1170", "175"),)
+    assert len(body.lines) == 20
+
+
+@pytest.mark.parametrize("number", ["1", "6", "xii", "1234"])
+def test_head_row_of_another_number_form_takes_no_head_below_it(number: str) -> None:
+    # Stubbs' specks above the head read "1" or "6": one digit is no page
+    # number of this rule, nor a roman one or 4 digits.
+    speck = _word(number, 230, _HEAD_WORDS_TOP - 20, 250, _HEAD_WORDS_TOP - 12)
+    result = layout_page(_page(0, (speck, *_head_words(), *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == ((number,),)
+    assert _texts(body.lines)[0] == ("The", "Boroughs.")
+
+
+def test_page_number_boxed_apart_above_a_head_close_to_the_body_is_a_head_alone() -> (
+    None
+):
+    # The head's words 1.2 pitches above the body: the rule as before.
+    head_top = 100 - 1.2 * _PITCH
+    number = _word("27", 230, head_top - 20, 250, head_top - 12)
+    result = layout_page(
+        _page(0, (number, *_head_words(head_top), *_rows(20))), _MEASURES
+    )
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("27",),)
+    assert _texts(body.lines)[0] == ("The", "Boroughs.")
+
+
 def _hanging(text: str, row: int, gap: float = 9.0) -> Word:
     """A number 10 pt wide ending `gap` pt left of the column's edge, 50,
     beside row `row` of `_rows`."""

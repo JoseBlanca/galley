@@ -149,6 +149,13 @@ _HEAD_SKEW_PITCHES: Final[float] = 0.5
 _PAGE_NUMBER_FORM = re.compile(
     r"(?:[0-9]{1,3}|(?=[ivxlcdm])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))[.,]?"
 )
+# Layout spec section 3, step 3, "A page number boxed apart": a head row
+# that is one word of 2 or 3 digits, with or without a "." or "," (measured
+# on the eight books' words.json on 18 November 2026: it joins the head of
+# Kadesh's page 38 and Domesday's 200, 428 and 552; with any page-number
+# form it also read specks above six of Stubbs' heads, "1", "6", "d", as
+# page numbers).
+_BOXED_APART_NUMBER = re.compile(r"[0-9]{2,3}[.,]?")
 # Measured on 17 November 2026 (layout spec section 3, step 2): Turney's
 # notes at the back hang their numbers 6 to 14 pt left of their text, left
 # of the page's left edge; a number up to 15 pt from the word right of it
@@ -222,6 +229,33 @@ def _head_row_top(row: Line) -> float:
     return statistics.median(word.box.top for word in kept or row.words)
 
 
+def _set_apart_head_end(
+    rows: tuple[Line, ...], head: int, head_top: float, pitch: float
+) -> int | None:
+    """The end, in `rows`, of the head whose row is `rows[head]`, of top
+    `head_top`, and of the rows of its skew below it, those whose tops lie
+    less than `_HEAD_SKEW_PITCHES` times `pitch` below `head_top`, when
+    the next row with a letter or a digit has its top at least
+    `_RUNNING_HEAD_GAP_PITCHES` times `pitch` below `head_top` (step 3).
+    None when it is nearer or there is no such row."""
+    end = head + 1
+    while (
+        end < len(rows)
+        and _median_top(rows[end]) - head_top < _HEAD_SKEW_PITCHES * pitch
+    ):
+        end += 1
+    below = next((row for row in rows[end:] if has_letter_or_digit(row)), None)
+    if below is None or _median_top(below) - head_top < (
+        _RUNNING_HEAD_GAP_PITCHES * pitch
+    ):
+        return None
+    return end
+
+
+def _has_letter(row: Line) -> bool:
+    return any(char.isalpha() for word in row.words for char in word.text)
+
+
 def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
     """How many of the column's `rows`, from the top, form the running-head
     region (step 3): the head row, the first with a letter or a digit, the
@@ -231,24 +265,38 @@ def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
     `_RUNNING_HEAD_GAP_PITCHES` times `pitch` below the head row's. A
     row's top is the median of its words' tops, the head row's of its
     words that are no page-number form (`_head_row_top`). 0 when there is
-    no such region."""
+    no such region.
+
+    When the head row is a page number boxed apart, one word of
+    `_BOXED_APART_NUMBER`'s form, and the next row with a letter, with the
+    rows of its skew, is set apart so from the rows below it, the region
+    runs down to them instead ("A page number boxed apart")."""
     first = next(
         (index for index, row in enumerate(rows) if has_letter_or_digit(row)), None
     )
     if first is None:
         return 0
-    head_top = _head_row_top(rows[first])
-    end = first + 1
-    while (
-        end < len(rows)
-        and _median_top(rows[end]) - head_top < _HEAD_SKEW_PITCHES * pitch
+    head_row = rows[first]
+    if (
+        len(head_row.words) == 1
+        and _BOXED_APART_NUMBER.fullmatch(head_row.words[0].text) is not None
     ):
-        end += 1
-    below = next((row for row in rows[end:] if has_letter_or_digit(row)), None)
-    if below is None:
-        return 0
-    gap = _median_top(below) - head_top
-    return end if gap >= _RUNNING_HEAD_GAP_PITCHES * pitch else 0
+        head_words = next(
+            (
+                index
+                for index in range(first + 1, len(rows))
+                if _has_letter(rows[index])
+            ),
+            None,
+        )
+        if head_words is not None:
+            end = _set_apart_head_end(
+                rows, head_words, _median_top(rows[head_words]), pitch
+            )
+            if end is not None:
+                return end
+    end = _set_apart_head_end(rows, first, _head_row_top(head_row), pitch)
+    return 0 if end is None else end
 
 
 # Measured: the median height of a line's words over the book's is at

@@ -25,9 +25,6 @@ from galley.model import (
 
 _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "stray_text"
 
-_TASK_3_1 = (
-    "task 3.1 of docs/plans/stray-text.md: the head row with a page number boxed apart"
-)
 _TASK_3_3 = "task 3.3 of docs/plans/stray-text.md: the footnote band and one-line notes"
 _TASK_4_1 = (
     "task 4.1 of docs/plans/stray-text.md: the shortened-row test by size in "
@@ -71,7 +68,6 @@ def _in_body_lines(texts: list[str], layout: PageLayout) -> bool:
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.xfail(strict=True, reason=_TASK_3_1)
 @pytest.mark.parametrize(
     ("excerpt", "page"),
     [("kadesh_29-38", 9), ("domesday_front_flow", 9), ("domesday_notes", 7)],
@@ -87,7 +83,6 @@ def test_page_number_boxed_above_the_head_is_one_head_line_with_it(
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.xfail(strict=True, reason=_TASK_3_1)
 @pytest.mark.parametrize(
     ("excerpt", "page"),
     [("kadesh_29-38", 9), ("domesday_notes", 7), ("domesday_notes", 8)],
