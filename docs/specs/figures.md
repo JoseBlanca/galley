@@ -149,10 +149,29 @@ groups of picture squares; nothing more is rendered.
    (spec review, 18 November 2026). They never count as squares of the
    group. The box can then take in a strip of the scan's dark edge,
    24 pt at most.
-3. A group is a **figure** when both hold:
+3. A group is **cut at a rule**: where a band of at least **6 pt**
+   (3 pixel rows) without ink runs across all its squares, and one of
+   the two pixel rows next to the band, above or below it, holds a run
+   of ink pixels side by side, in the group's squares, at least **72 pt**
+   long, a rule or a frame's edge. Each square goes to the side of the
+   cut that holds most of its ink, the upper on a tie; the squares on
+   each side that touch side by side are a group, measured by step 2
+   with the ink on its side of the cut only. Without the cut, the rule
+   under the running heads of Kadesh 40, 44 and 53 joined the
+   hieroglyphs below it, and the hieroglyphs above Kadesh 41's map
+   joined the map's frame, whose box then took in the quotation number
+   "19." and the left third of three rows of hieroglyphs (review, 18
+   November 2026).
+4. A group is a **figure** when both hold:
    - it has at least **120 squares**;
    - at most **12 known words** have the middle of their box inside the
      group's box (the box before it is grown into the band).
+5. A group that is not a figure and whose box has its middle inside a
+   figure's box, edges included, grows the figure's box to hold its own:
+   the words read on a picture stop the squares they touch, and can cut
+   a part of it off, as the right ends of hieroglyph rows on Kadesh 50
+   and 51 and a corner of the photograph on Turney 173. The figure's
+   squares and known words are its own, as step 4 counted them.
 
 pages.json gives each `text` page its figures' boxes, from the top down
 and, at the same top, from the left (section 7). A page of any other
@@ -172,7 +191,7 @@ words.json:
 | Kadesh 74, the library's card pocket on the last page | 130 | 17 |
 | Domesday 553, a library stamp at the top of the page | 100 | 0 |
 | Mariéjol 92, a running head printed as a picture, the layer holding no word of it | 68 | 0 |
-| Kadesh's rules under the running heads | fewer than 40 | |
+| Kadesh's rules under the running heads | fewer than 40, or 8 to 16 once cut from the hieroglyphs below (step 3) | |
 
 | threshold | value | from |
 |---|---|---|
@@ -181,6 +200,7 @@ words.json:
 | outer band | 24 pt | measured: with 12 pt, the dark edges of the scan made groups on 7 pages (Mariéjol 181, 375, 381, 429, 452; Domesday 427; Stubbs 248) |
 | ink, inked square, word box grown | 25 levels, 6%, 2 pt | plates §2's, for pages with a text layer |
 | group | at least 120 squares | measured: the smallest figure is Kadesh 38's map, 132; the largest group that is not a picture and has few known words is Domesday 553's stamp, 100 |
+| cut: band, line | 6 pt, 72 pt | measured: in the 56 figures, the bands without ink across a group are 6 to 12 pt (between rows of hieroglyphs, Kadesh 53's 12 pt as wide as the one above Kadesh 41's map), so the band alone does not tell a rule from a row; the runs of ink next to them are 30 pt at most (Kadesh 53), the rules and the frame 96 to 154 pt (Kadesh 53, 44, 41 and 40). On the eight books the cut changes the box of these four figures only, and the count of none |
 | known words in the box | at most 12 | measured: the figures hold 7 or fewer (Haynes 53); of the groups of 120 squares or more that are not pictures, Kadesh 74's card pocket holds 17 and Mariéjol 265 and 57 hold 29 and 52 |
 
 The two thresholds leave margins of 12 squares below the smallest map
@@ -592,7 +612,7 @@ the test:
 
 | page | expected |
 |---|---|
-| 29 | one figure, its box within 6 pt of the map's frame; caption "MAP 111. The OrootH V«llt-> In tbo Vicimljr of Kadc>.li. 1:500,000 (after Blmekwhorn)" as read; "<•" and "/ifr,yrafex*^Tx" removed as `figure_text`; the paragraph before and after the map one block if the text runs on |
+| 29 | one figure, its box within 6 pt of the map's frame at the top and sides, and at the foot reaching the scale bars printed under the frame (step 2: their squares touch the frame's); caption "MAP 111. The OrootH V«llt-> In tbo Vicimljr of Kadc>.li. 1:500,000 (after Blmekwhorn)" as read; "<•" and "/ifr,yrafex*^Tx" removed as `figure_text`; the paragraph before and after the map one block if the text runs on |
 | 33 | one figure, caption "MAP IV. Fint Portions" |
 | 36 | the map a figure with caption "MAP V. Second Positions", the footnote's words on its row kept in the footnote; the two lines of hieroglyphs (85 and 82 squares) no figure |
 | 37 | the block of hieroglyphs a figure without caption (371 squares) |
@@ -604,7 +624,7 @@ their order, the removed words; by kind, the blocks in order.
 
 **Whole-book tests**, `whole_book`:
 
-- Kadesh: the 17 figures of section 2, on pages 20, 27 (two), 29, 33, 36, 37, 38, 40, 41, 44 (two), 45, 50, 51, 52 and 53, by page and count, the 6 maps with their captions' first two words.
+- Kadesh: the 17 figures of section 2, on pages 20, 27 (two), 29, 33, 36, 37, 38, 40, 41, 44 (two), 45, 50, 51, 52 and 53, by page and count, the 6 maps with their captions' first two words; the boxes of 40, 41, 44, 50, 51 and 53 to 1 pt, the cases of steps 3 and 5.
 - Haynes and Turney, each skipped when its PDF is absent from
   `samples/`: Haynes has 25 figures, one on each page of section 2,
   each with a caption whose first words are "figure" (any case) and its
