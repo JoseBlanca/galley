@@ -279,3 +279,25 @@ No word was lost or added on the eight books. What mattered, all fixed
 Checks: 2,423 passed and 8 xfailed in 62 s; whole_book 88 passed;
 galley-eval's notes scores unchanged (Domesday 1,279, Haskins 65,
 Mariéjol 567).
+
+## Tasks 4.2 and 4.3: epigraphs and page breaks in structure
+
+1e7c2b7, 36f1561. Epigraphs are found after each level-1 heading, or
+as a page of their own. On the owner's books: Turney 13 epigraph blocks
+(page 13 holds only one), Haynes 21, 8 of them verse, each with its
+source and the dash recorded; none on the public-domain books. A page
+break now ends a paragraph after a short last line that ends a
+sentence: Haskins 0, Stubbs 2, Domesday 10, Gierke 32, Mariéjol 24 such
+cuts. Of 10 read against the page images, 5 are right paragraph ends,
+1 is inside a table, and 4 follow a footnote that structure left in the
+body, where the text above the note runs on to the next page: the
+continuation, before glued to the note, is now a paragraph of its own.
+Neither is right; taking those notes out of the body is structure §11's
+work, not this plan's.
+
+galley-eval's paragraph precision / recall, before → after: Haskins
+0.908 / 0.902 unchanged; Stubbs 0.809 / 0.632 → 0.805 / 0.632 (its 2
+cuts are right on the page); Domesday 0.860 / 0.891 → 0.859 / 0.897;
+Mariéjol 0.729 / 0.753 → 0.721 / 0.754 (footnotes its OCR left in the
+body). Stubbs' recall had already fallen from the baseline's 0.733 in
+the earlier work packages: being looked into.
