@@ -316,6 +316,13 @@ _GLUED_WORD_COUNTS = (2, 3)
 _GLUED_WIDEN_PT = 1.0
 _ALIKE_LEAST_LETTERS = 3
 _ALIKE_LEAST_RATIO = 0.6
+# The exception in (a) takes no alike layer word of 2 letters or more than
+# the Tesseract word: the layer may have glued another printed word to it.
+# Of the 16 alike words it took on whole Stubbs, Domesday, Gierke and
+# Haskins (18 November 2026), 2 had 2 letters more or over, both glued
+# ("ofdemesne-", Domesday page 90; "imgmen.", page 333); the others at most
+# one ("the" for Tesseract's "th", page 107).
+_GLUED_LEAST_MORE_LETTERS = 2
 
 
 def word_middle(word: Word) -> tuple[float, float]:
@@ -474,6 +481,18 @@ def _letters_read_by(word: Word, ocr_word: Word) -> bool:
     )
 
 
+def _is_copy(word: Word, ocr_word: Word) -> bool:
+    """Whether `word`, a layer word, may be the layer's copy of the word
+    `ocr_word` reads, for the exception in (a): its letters and digits
+    equal, or alike with fewer than 2 letters more ("ofdemesne-" beside
+    "demesne." glues the printed "of" to it, Domesday page 90)."""
+    return _letters_read_by(word, ocr_word) and (
+        folded_letters_and_digits(word.text) == folded_letters_and_digits(ocr_word.text)
+        or _letter_count(word.text) - _letter_count(ocr_word.text)
+        < _GLUED_LEAST_MORE_LETTERS
+    )
+
+
 def _within_reach(word: Word, ocr_word: Word) -> bool:
     """Whether the middles of `word` and `ocr_word` lie within 16 pt of
     each other up or down."""
@@ -497,7 +516,7 @@ def is_junk_beside_its_copy(junk: Word, copy: Word, ocr_word: Word) -> bool:
     layer words, as the exception in (a) of `replaced_layer_words` lets it:
     `junk` lies under it with letters and digits unlike its own (neither
     equal nor alike), and `copy` does not lie under it but lies within 16
-    pt above or below with letters and digits equal or alike to its own.
+    pt above or below as the layer's copy of its word (`_is_copy`).
     The layer read the one printed word twice, as junk over the ink and a
     few points off."""
     return (
@@ -505,7 +524,7 @@ def is_junk_beside_its_copy(junk: Word, copy: Word, ocr_word: Word) -> bool:
         and not _letters_read_by(junk, ocr_word)
         and not _is_under(copy, ocr_word)
         and _within_reach(copy, ocr_word)
-        and _letters_read_by(copy, ocr_word)
+        and _is_copy(copy, ocr_word)
     )
 
 
@@ -569,7 +588,7 @@ def _unlike_over_free_letters(
         and any(
             not matched[index]
             and _within_reach(word, ocr_word)
-            and _letters_read_by(word, ocr_word)
+            and _is_copy(word, ocr_word)
             for index, word in enumerate(layer_words)
         )
     )
@@ -642,6 +661,7 @@ def _pairing_freeing(
         if position not in taken
         and _within_reach(word, ocr_word)
         and _are_alike(word.text, ocr_word.text)
+        and (position not in freed or _is_copy(word, ocr_word))
     )
     for _, index, position in alike_pairs:
         if not matched[index] and position not in taken:
