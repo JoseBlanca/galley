@@ -2191,6 +2191,19 @@ it and was no heading; with the speck passed over, it is the page's
 first line, and chapter six is found with its label. Measured on 17
 November 2026 on the eight books: this changes no other heading.
 
+A line whose top lies at most 2 pitches below the median top of the
+book's head lines (or above it), and whose letters, at least 4, are at
+least 0.6 alike to those of a line section 3 removed as a running head,
+is never a heading line, whatever branch takes it: it is a running head
+that section 3 left in the text. Layout makes no head region on
+Domesday's page 159, a table, so its head "134 Domesday Book." stays in
+the text, and Kadesh's page 38 has its page number "27" as head line,
+with its author's name, "JAMES HENBY BREASTED", the line below; the
+tall line made each a level-1 heading. Measured on 17 November 2026 on
+the eight books, the rule takes away 4 heading blocks, each a running
+head on its page: those two, Domesday's 552 ("Index.", under its page
+number) and Mariéjol's 121 ("rcis CATIir"), and no other.
+
 Two more kinds of line join a heading:
 
 - a **chapter label** that is centred and whose next line is a heading
