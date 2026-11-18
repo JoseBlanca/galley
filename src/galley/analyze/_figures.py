@@ -6,13 +6,17 @@ outer band of two squares, which holds the dark edges of the scan, and a
 partial square at the right or the foot are left out. A picture square
 is an inked square that no word box touches, as for the plate rule, but
 a word inside one of the page's excluded regions does not stop one. Each
-group of picture squares that touch side by side is measured: its box
-holds every ink pixel of its squares, and of the two band squares beyond
-each of its squares that touches the band. A group of at least 120
-squares with at most 12 known words inside its box is a figure.
+group of picture squares that touch side by side is cut where a band
+without ink runs across it beside a rule or a frame's edge, and each part
+is measured: its box holds every ink pixel of its squares on its side of
+the cut, and of the two band squares beyond each of its squares that
+touches the band. A group of at least 120 squares with at most 12 known
+words inside its box is a figure, and its box grows to hold the groups
+that are no figures and have their middle inside it.
 """
 
-from dataclasses import dataclass
+import itertools
+from dataclasses import dataclass, replace
 from typing import Final
 
 from galley import wordlist
@@ -40,6 +44,14 @@ _LEAST_SQUARES: Final[int] = 120
 # Figures spec section 3, "known words in the box": measured; the figures
 # hold 7 or fewer (Haynes 53), Kadesh 74's card pocket 17.
 _MOST_KNOWN_WORDS: Final[int] = 12
+# Figures spec section 3, step 3, "cut": measured; the bands across the
+# 56 figures are 6 to 12 pt, the runs of ink beside them 30 pt at most, the
+# rules and the frame cut 96 to 154 pt (Kadesh 53, 44, 41, 40). A line is
+# looked for in the two pixel rows on each side of the band, as the frame
+# of Kadesh 41's map is two pixels high and fills the second.
+_RULE_GAP_PT: Final[float] = 6.0
+_LINE_PT: Final[float] = 72.0
+_LINE_ROWS: Final[int] = 2
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -110,8 +122,8 @@ def picture_groups(
     )
     scale = POINTS_PER_INCH / page.dpi
 
-    def measured(group: frozenset[Square]) -> PictureGroup:
-        own = _ink_box_px(ink, page.width_px, group, square_px)
+    def measured(group: frozenset[Square], rows: _PixelRows) -> PictureGroup:
+        own = _ink_box_px(ink, page.width_px, group, square_px, rows)
         band = tuple(
             beyond
             for row, column in group
@@ -138,7 +150,7 @@ def picture_groups(
                 ),
             )
         )
-        grown = _ink_box_px(ink, page.width_px, (*group, *band), square_px)
+        grown = _ink_box_px(ink, page.width_px, (*group, *band), square_px, rows)
         # A group's squares are inked, so `own`, and with it `grown`, is a box.
         assert own is not None
         assert grown is not None
@@ -156,10 +168,150 @@ def picture_groups(
             is_figure=len(group) >= _LEAST_SQUARES and known <= _MOST_KNOWN_WORDS,
         )
 
+    gap_px = max(1, round(_RULE_GAP_PT * page.dpi / POINTS_PER_INCH))
+    line_px = round(_LINE_PT * page.dpi / POINTS_PER_INCH)
+    groups = tuple(
+        measured(part, rows)
+        for group in _groups(pictures)
+        for part, rows in _cut_at_rules(
+            group, ink, page.width_px, square_px, gap_px, line_px
+        )
+    )
     return tuple(
         sorted(
-            (measured(group) for group in _groups(pictures)),
-            key=lambda group: (group.box.top, group.box.x0),
+            _with_parts_inside(groups), key=lambda group: (group.box.top, group.box.x0)
+        )
+    )
+
+
+def _with_parts_inside(groups: tuple[PictureGroup, ...]) -> tuple[PictureGroup, ...]:
+    """`groups` with each figure's box grown to hold the groups that are no
+    figures and whose box has its middle inside the figure's box, edges
+    included: parts of the same picture that the words read on it cut off
+    (Kadesh 51). The squares and known words of a figure are its own."""
+    figures = tuple(group for group in groups if group.is_figure)
+    others = tuple(group for group in groups if not group.is_figure)
+
+    def grown(figure: PictureGroup) -> PictureGroup:
+        inside = tuple(
+            other.box for other in others if _middle_inside(other.box, (figure.box,))
+        )
+        if not inside:
+            return figure
+        return replace(figure, box=_enclosing((figure.box, *inside)))
+
+    return (*(grown(figure) for figure in figures), *others)
+
+
+def _enclosing(boxes: tuple[Box, ...]) -> Box:
+    return Box(
+        min(box.x0 for box in boxes),
+        min(box.top for box in boxes),
+        max(box.x1 for box in boxes),
+        max(box.bottom for box in boxes),
+    )
+
+
+type _PixelRows = tuple[int, int]  # top, bottom, in pixels; the bottom excluded
+
+
+def _cut_at_rules(
+    group: frozenset[Square],
+    ink: bytes,
+    width_px: int,
+    square_px: int,
+    gap_px: int,
+    least_line_px: int,
+) -> tuple[tuple[frozenset[Square], _PixelRows], ...]:
+    """The parts of `group`, each with the pixel rows its ink is taken from:
+    the group is cut in the middle of each band of at least `gap_px` pixel
+    rows without ink across all its squares when one of the `_LINE_ROWS`
+    pixel rows next to the band, on either side, holds a run of at least
+    `least_line_px` ink pixels side by side in the group's squares (a rule
+    under a running head, or a map's frame). Each square goes to the part
+    between two cuts that holds most of its ink, the upper on a tie, and a
+    part's squares that do not touch side by side are parts of their own.
+    The first part's rows start at the top of the page and the last's end
+    at its foot."""
+    top = min(row for row, _ in group) * square_px
+    bottom = (max(row for row, _ in group) + 1) * square_px
+    columns: dict[int, list[int]] = {}
+    for row, column in group:
+        columns.setdefault(row, []).append(column)
+
+    def inked_in_row(y: int) -> int:
+        start = y * width_px
+        return sum(
+            ink.count(1, start + column * square_px, start + (column + 1) * square_px)
+            for column in columns.get(y // square_px, ())
+        )
+
+    def longest_run(y: int) -> int:
+        """The longest run of ink pixels side by side in pixel row `y`,
+        counting only the pixels of the group's squares."""
+        in_group = frozenset(columns.get(y // square_px, ()))
+        longest = run = 0
+        for x in range(width_px):
+            if x // square_px in in_group and ink[y * width_px + x]:
+                run += 1
+                longest = max(longest, run)
+            else:
+                run = 0
+        return longest
+
+    counts = tuple(inked_in_row(y) for y in range(top, bottom))
+    inked = tuple(index for index, count in enumerate(counts) if count > 0)
+
+    def has_line(indices: range) -> bool:
+        return any(
+            0 <= index < len(counts) and longest_run(top + index) >= least_line_px
+            for index in indices
+        )
+
+    cuts = []
+    start = None
+    for index in range(inked[0], inked[-1] + 1):
+        if counts[index] == 0:
+            start = index if start is None else start
+            continue
+        if (
+            start is not None
+            and index - start >= gap_px
+            and (
+                has_line(range(start - _LINE_ROWS, start))
+                or has_line(range(index, index + _LINE_ROWS))
+            )
+        ):
+            cuts.append(top + (start + index) // 2)
+        start = None
+    # The first part reaches the top of the page and the last its foot, so
+    # that the band squares beyond them count for their boxes.
+    page_bottom = len(ink) // width_px
+    if not cuts:
+        return ((group, (0, page_bottom)),)
+    bounds = (0, *cuts, page_bottom)
+    slabs = tuple(itertools.pairwise(bounds))
+
+    def slab_of(square: Square) -> int:
+        row, column = square
+        left = column * square_px
+        inks = tuple(
+            sum(
+                ink.count(1, y * width_px + left, y * width_px + left + square_px)
+                for y in range(
+                    max(upper, row * square_px), min(lower, (row + 1) * square_px)
+                )
+            )
+            for upper, lower in slabs
+        )
+        return inks.index(max(inks))
+
+    owners = {square: slab_of(square) for square in group}
+    return tuple(
+        (part, slab)
+        for position, slab in enumerate(slabs)
+        for part in _groups(
+            frozenset(square for square, owner in owners.items() if owner == position)
         )
     )
 
@@ -208,13 +360,14 @@ def _ink_box_px(
     width_px: int,
     squares: tuple[Square, ...] | frozenset[Square],
     square_px: int,
+    rows: _PixelRows,
 ) -> _PixelBox | None:
     """The smallest box, in pixels, that holds every ink pixel of
-    `squares`; None when they hold none."""
+    `squares` in the pixel rows `rows`; None when they hold none."""
     boxes = tuple(
         box
         for square in squares
-        if (box := _square_ink_box(ink, width_px, square, square_px)) is not None
+        if (box := _square_ink_box(ink, width_px, square, square_px, rows)) is not None
     )
     if not boxes:
         return None
@@ -227,17 +380,17 @@ def _ink_box_px(
 
 
 def _square_ink_box(
-    ink: bytes, width_px: int, square: Square, square_px: int
+    ink: bytes, width_px: int, square: Square, square_px: int, rows: _PixelRows
 ) -> _PixelBox | None:
-    """The smallest box, in pixels, that holds the ink pixels of `square`;
-    None when it has none."""
+    """The smallest box, in pixels, that holds the ink pixels of `square`
+    in the pixel rows `rows`; None when it has none."""
     row, column = square
     top = row * square_px
     left = column * square_px
     lines = tuple(
-        (top + line, ink[start : start + square_px])
-        for line in range(square_px)
-        if 1 in ink[(start := (top + line) * width_px + left) : start + square_px]
+        (y, ink[start : start + square_px])
+        for y in range(max(top, rows[0]), min(top + square_px, rows[1]))
+        if 1 in ink[(start := y * width_px + left) : start + square_px]
     )
     if not lines:
         return None
