@@ -66,7 +66,8 @@ def test_sign_followed_by_punctuation_is_linked_to_its_note(
 
 # Spec section 11, "References": the notes of Domesday whose reference is
 # not linked. 343 on the starting commit of the plan (a0a1675, 18 November
-# 2026); 320 with the sign followed by punctuation, which links 23 more.
+# 2026); 322 with the sign followed by punctuation, which links 21 more,
+# each checked on the page image.
 # The plan asks for a fall of at least 15: at most 328.
 _DOMESDAY_UNREFERENCED_NOTES_AT_MOST = 328
 

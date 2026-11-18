@@ -251,7 +251,10 @@ _BRACKETED_REFERENCE = re.compile(
 # then only punctuation ("rulers.^", "servus*."). A lone "'" or "t" is
 # none: in Domesday such a match was right 28 times in 82. The punctuation
 # after the sign was added on 18 November 2026: 20 of the 178 notes of
-# Domesday then not linked had such a reference.
+# Domesday then not linked had such a reference. Such a word whose part
+# before the sign holds one letter alone is none: Domesday's "St.", read
+# "S*." 28 times, made 2 wrong links of those 23 new ones (pages 285 and
+# 333). Without punctuation after, a word of one letter stays a candidate.
 _SIGN_REFERENCE = re.compile(
     rf"(?P<before>(?:.*[^\W\d_]{_PUNCTUATION}*)?)(?P<reference>[\^*•])"
     rf"(?P<after>{_PUNCTUATION}*)"
@@ -327,6 +330,10 @@ def reference_candidate(word: str) -> Reference | None:
         (not sign.group("before") and not sign.group("after"))
         or (
             sign.group("before")
+            and (
+                not sign.group("after")
+                or sum(character.isalpha() for character in sign.group("before")) > 1
+            )
             and _is_punctuation(_after_last_letter(sign.group("before")))
             and _is_punctuation(sign.group("after"))
         )
