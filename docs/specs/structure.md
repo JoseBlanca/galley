@@ -2155,9 +2155,10 @@ when all of these hold:
    region's, or the page's body column for a line of a region of fewer
    than 5 lines, section 6, rule 2), and its right side at least a
    quarter of that width short of the right edge, and it is not a
-   head line that section 3 left in the text within 2 pitches of the
-   median top of the book's head lines, unless it starts with a chapter
-   label word; for a flush-left line, rule 4's second branch also asks that its last word not end
+   head line that section 3 left in the text in the band where it looks
+   for running heads (at most 2 pitches below the median top of the
+   book's head lines, or anywhere above it), unless it starts with a
+   chapter label word; for a flush-left line, rule 4's second branch also asks that its last word not end
    with ".", ",", ";", ":", "?" or "!" (Turney introduces a block quote
    with a flush-left line set apart by 2.0 pitches above and below on
    its pages 93, 99, 100 and 160, each ending with such a sign);
@@ -2385,9 +2386,9 @@ flush-left line is measured against the body column when its region
 has fewer than 5 lines, as centring is: measured against its own
 region's box, a title that is a region of one line is never short of
 its own right edge, and Haynes' Index was missed. And a line whose top
-is a head line that section 3 left in the text within 2 pitches of
-the median top of the book's head lines (the band where section 3
-looks for running heads) is not flush left unless it starts with a
+is a head line that section 3 left in the text in the band where
+section 3 looks for running heads (at most 2 pitches below the median
+top of the book's head lines, or above it) is not flush left unless it starts with a
 chapter label word: Mariéjol's running heads, too garbled for section
 3 to find alike ("CATHI IlDICIS"), are set flush left on even pages and
 became 13 false headings without it. The condition names the head line,
