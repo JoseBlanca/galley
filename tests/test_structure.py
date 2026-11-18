@@ -28,6 +28,7 @@ from galley.model import (
     ChangeReason,
     Emphasis,
     Figure,
+    FigureKind,
     Line,
     LinesFile,
     NoteKind,
@@ -1471,7 +1472,14 @@ def test_paragraph_runs_on_over_a_plate_and_a_blank_page() -> None:
     plate = PageLayout(
         1,
         (_region(_spread(", ' ..", 60, 90, 300)),),
-        (Figure(Box(0, 0, 400, 600), "images/plate-0001.png", 300),),
+        (
+            Figure(
+                box=Box(0, 0, 400, 600),
+                image="images/plate-0001.png",
+                dpi=300,
+                kind=FigureKind.PLATE,
+            ),
+        ),
     )
     pages = (
         _body_page(0, *_five_full_lines(70, "first")),
@@ -1735,7 +1743,14 @@ def _plate(index: int, *lines: Line) -> PageLayout:
     return PageLayout(
         index,
         (_region(*lines),) if lines else (),
-        (Figure(_PLATE_BOX, f"images/plate-{index:04d}.png", 300),),
+        (
+            Figure(
+                box=_PLATE_BOX,
+                image=f"images/plate-{index:04d}.png",
+                dpi=300,
+                kind=FigureKind.PLATE,
+            ),
+        ),
     )
 
 
@@ -1890,7 +1905,14 @@ def test_caption_lines_are_read_from_the_top_down_whatever_their_regions() -> No
                 _spread("17]", 84, 90, 626),
             ),
         ),
-        (Figure(_PLATE_BOX, "images/plate-0001.png", 300),),
+        (
+            Figure(
+                box=_PLATE_BOX,
+                image="images/plate-0001.png",
+                dpi=300,
+                kind=FigureKind.PLATE,
+            ),
+        ),
     )
     pages = (_body_page(0, *_five_full_lines(70, "first")), plate)
     known = frozenset({"between", "land", "of", "villages", "a", "pp"})
@@ -5130,6 +5152,7 @@ def _book(root: Path) -> tuple[BookFolder, BookConfig]:
                 text_source=TextSource.TEXT_LAYER,
                 text_layer_score=None,
                 exclude_regions=(),
+                figure_boxes=(),
                 blank_checked_by_ocr=False,
             )
             for index in range(3)
@@ -6282,7 +6305,14 @@ def test_plate_running_head_of_section_3_is_removed_and_rule_1_takes_no_more() -
             _region(_line("31 THE BOOK", 50, 36)),
             _region(_line("THE BOOK", 50, 120), _line("THE CAMP", 50, 500)),
         ),
-        (Figure(_PLATE_BOX, "images/plate-0016.png", 300),),
+        (
+            Figure(
+                box=_PLATE_BOX,
+                image="images/plate-0016.png",
+                dpi=300,
+                kind=FigureKind.PLATE,
+            ),
+        ),
     )
     blocks = make_blocks(
         _lines_of(*_numbered_heads(), plate),
@@ -6341,8 +6371,18 @@ def test_plate_page_with_two_figures_is_refused_naming_the_page() -> None:
     plate = replace(
         _plate(1, _spread("THE CAMP", 60, 300, 520)),
         figures=(
-            Figure(_PLATE_BOX, "images/plate-0001.png", 300),
-            Figure(_PLATE_BOX, "images/plate-0001b.png", 300),
+            Figure(
+                box=_PLATE_BOX,
+                image="images/plate-0001.png",
+                dpi=300,
+                kind=FigureKind.PLATE,
+            ),
+            Figure(
+                box=_PLATE_BOX,
+                image="images/plate-0001b.png",
+                dpi=300,
+                kind=FigureKind.PLATE,
+            ),
         ),
     )
     with pytest.raises(InputFileError, match="page 1 has 2 figures"):

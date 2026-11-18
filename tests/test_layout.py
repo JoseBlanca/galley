@@ -43,6 +43,7 @@ from galley.model import (
     BlockKind,
     Box,
     Figure,
+    FigureKind,
     Line,
     LinesFile,
     PageInfo,
@@ -111,7 +112,14 @@ def test_page_with_no_words_has_no_region() -> None:
 
 
 def test_layout_page_copies_the_figures() -> None:
-    figures = (Figure(Box(10, 20, 300, 400), "images/p0002-01.png", 300),)
+    figures = (
+        Figure(
+            box=Box(10, 20, 300, 400),
+            image="images/p0002-01.png",
+            dpi=300,
+            kind=FigureKind.PLATE,
+        ),
+    )
     page = replace(_page(2, _PAGE_WORDS[:1]), figures=figures)
     assert layout_page(page, None).figures == figures
     assert layout_page(page, _MEASURES).figures == figures
@@ -1997,6 +2005,7 @@ def _book(root: Path) -> tuple[BookFolder, BookConfig]:
                 text_source=TextSource.TEXT_LAYER,
                 text_layer_score=None,
                 exclude_regions=(),
+                figure_boxes=(),
                 blank_checked_by_ocr=False,
             )
             for index in range(_PAGE_COUNT)
