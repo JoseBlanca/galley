@@ -7,6 +7,7 @@ Positions are PDF points from the page's top left.
 
 import math
 import re
+import statistics
 from dataclasses import dataclass
 from enum import StrEnum
 from itertools import groupby
@@ -14,6 +15,7 @@ from typing import Final, assert_never
 
 from galley.body_measures import (
     group_rows,
+    median_word_height,
 )
 from galley.layout._column import (
     HANGING_NUMBER,
@@ -101,6 +103,23 @@ _BAND_GAP_PITCHES: Final[float] = 1.1
 # Kadesh 3, Haynes 1), none in Stubbs, Mariéjol, Gierke or Turney.
 _NOTE_MARKER = re.compile(r"[0-9]{1,3}\.?|[*^•†‡§]{1,2}")
 _MARKER_ROW_WORDS: Final[int] = 2
+# Measured on 18 November 2026 on the eight books' words.json (layout spec
+# section 3, step 4, "Small against the page"): a row at most 0.82 of the
+# page's median row height is small, which gains the band of 30 of
+# Gierke's pages (its introduction is set larger than the book) and 4 of
+# Mariéjol's, and loses none; at 0.85 the last rows of two printed
+# contents (Haskins 14, Turney 10) became a band.
+_BAND_PAGE_ROW_HEIGHT_SHARE: Final[float] = 0.82
+# Measured the same day (step 4, "A note of one line boxed as tall as the
+# body"): the last row of a page with no band, opening "1" and a capital,
+# at most 0.9 of the median width per character of the rows above it of
+# 20 characters (20 guessed, to leave out short rows), begins the band.
+# The rule takes Domesday's 163, 174, 185, 278, 303, 308, 315, 347, 472 and
+# 485 (0.70 to 0.854) and Gierke's 61 (0.83), and no other row of the
+# eight books; none lies between 0.854 and 1.05.
+_ONE_LINE_NOTE_MARKER: Final[str] = "1"
+_ONE_LINE_NOTE_CHARACTER_SHARE: Final[float] = 0.9
+_ONE_LINE_NOTE_ROW_CHARACTERS: Final[int] = 20
 # Measured on the six books (layout spec section 3, "Where the thresholds
 # come from"): a gutter is a strip 6 pt wide in the middle third of the
 # column; a word across it whose middle is more than 6 pt from the strip's
@@ -193,15 +212,91 @@ def _after_small_row(
     )
 
 
+def _is_small_on_page(
+    row: Line, measures: BookMeasures, page_row_height: float
+) -> bool:
+    """Whether `row` is small for the footnote band (step 4): small against
+    the book (`is_small_row`), or its median word height at most
+    `_BAND_PAGE_ROW_HEIGHT_SHARE` of `page_row_height`, the page's median
+    row height."""
+    return (
+        is_small_row(row, measures)
+        or median_word_height(row.words)
+        <= _BAND_PAGE_ROW_HEIGHT_SHARE * page_row_height
+    )
+
+
+def _point_per_character(row: Line) -> float:
+    """The width per character of `row`, in points: the sum of its words'
+    box widths over the characters of their texts."""
+    characters = sum(len(word.text) for word in row.words)
+    return sum(word.box.x1 - word.box.x0 for word in row.words) / characters
+
+
+def _one_line_note_start(rows: tuple[Line, ...]) -> int | None:
+    """The index in `rows` of a footnote of one line boxed as tall as the
+    body (step 4), when there is one: the last row with a letter or a
+    digit, not the first of `rows`, whose first word is "1", whose second
+    starts with a capital, and whose width per character is at most
+    `_ONE_LINE_NOTE_CHARACTER_SHARE` of the median of the rows above it
+    that hold `_ONE_LINE_NOTE_ROW_CHARACTERS` characters. None otherwise,
+    and when no row above holds so many."""
+    last = next(
+        (
+            index
+            for index in range(len(rows) - 1, -1, -1)
+            if has_letter_or_digit(rows[index])
+        ),
+        None,
+    )
+    if last is None or last == 0:
+        return None
+    words = sorted(rows[last].words, key=lambda word: word.box.x0)
+    if (
+        len(words) < _MARKER_ROW_WORDS
+        or words[0].text != _ONE_LINE_NOTE_MARKER
+        or not words[1].text[:1].isupper()
+    ):
+        return None
+    above = tuple(
+        _point_per_character(row)
+        for row in rows[:last]
+        if sum(len(word.text) for word in row.words) >= _ONE_LINE_NOTE_ROW_CHARACTERS
+    )
+    if not above:
+        return None
+    narrow = _point_per_character(
+        rows[last]
+    ) <= _ONE_LINE_NOTE_CHARACTER_SHARE * statistics.median(above)
+    return last if narrow else None
+
+
 def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
     """The index in `rows` of the first row of the footnote band (step 4),
-    or len(rows) when there is no band: the first small row, not the
-    first of `rows`, from which on two thirds of the rows are small, and
-    which lies `_BAND_GAP_PITCHES` below the row before or opens with a
-    note marker below a row that is not small (`_after_small_row`)."""
-    small = tuple(is_small_row(row, measures) for row in rows)
+    or len(rows) when there is no band: the first small row
+    (`_is_small_on_page`), not the first of `rows`, from which on two
+    thirds of the rows are small, and which lies `_BAND_GAP_PITCHES` below
+    the row before or opens with a note marker below a row that is not
+    small (`_after_small_row`). Without such a row, a footnote of one line
+    boxed as tall as the body (`_one_line_note_start`)."""
+    if not rows:
+        return 0
+    page_row_height = statistics.median(median_word_height(row.words) for row in rows)
+    small = tuple(_is_small_on_page(row, measures, page_row_height) for row in rows)
     if all(small):
         return len(rows)
+    start = _gap_or_marker_band_start(rows, small, measures)
+    if start < len(rows):
+        return start
+    one_line_note = _one_line_note_start(rows)
+    return len(rows) if one_line_note is None else one_line_note
+
+
+def _gap_or_marker_band_start(
+    rows: tuple[Line, ...], small: tuple[bool, ...], measures: BookMeasures
+) -> int:
+    """`_band_start` by its small rows, `small` saying which rows are, or
+    len(rows) when they give no band."""
     return next(
         (
             index
