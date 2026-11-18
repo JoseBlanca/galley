@@ -1,0 +1,269 @@
+"""Epigraphs (spec section 22): the quotations set under a chapter's
+heading, each ending at its source line, and a page that holds only one.
+
+The rule is found per page on its body stream, after the heading lines
+(spec section 2, step 2.3). It gives, for each epigraph, the positions of
+its lines in the stream, whether its quotation is verse, its source
+without the leading dash, and the record of that dash's removal.
+"""
+
+import statistics
+from collections.abc import Sequence
+from dataclasses import dataclass
+from enum import StrEnum
+
+from galley.body_measures import median_word_height
+from galley.model import ChangeReason, WordChange
+from galley.structure._lines import PlacedLine
+from galley.structure._measures import Edges, line_has_letter_or_digit
+
+# Spec section 22, rule 2: every line of an epigraph run starts at least
+# 20 pt right of the body column's left edge (Turney's quotations 32 to
+# 46 pt, Haynes' 26.6 to 31).
+_RUN_INDENT_MIN_PT = 20.0
+# Spec section 22, rule 2: the next run's first line starts within 3 pt of
+# the left side of the run before.
+_NEXT_RUN_LEFT_PT = 3.0
+# Spec section 22, rule 3: the dashes that may start a source line, alone
+# or several ("—-" in Haynes' OCR).
+_SOURCE_DASHES = "—–-"
+# Spec section 22, rule 3: a dashed source line's height is at most 0.92 of
+# the quotation's median line height (Haynes: 0.73 to 0.90, on all 21).
+_DASHED_SOURCE_HEIGHT_SHARE = 0.92
+# Spec section 22, rule 3: a source set flush right starts at least 60 pt
+# right of the quotation's leftmost left side (Turney: 100.3 to 244.6; a
+# verse turnover line lies 32 pt right in Haynes' page 87) and ends no
+# more than 3 pt left of its rightmost right side.
+_FLUSH_RIGHT_SOURCE_LEFT_PT = 60.0
+_FLUSH_RIGHT_SOURCE_RIGHT_PT = 3.0
+# Spec section 22, rule 5: a page of its own holds at most 10 lines (a
+# preface's last page signed at the right has more; Turney's has 6).
+_PAGE_OF_ITS_OWN_MAX_LINES = 10
+# Spec section 22, "Verse": a turnover line lies at least 15 pt right of
+# the quotation's leftmost left side; verse lines end at least 80 pt short
+# of the body column's right edge (Haynes 94 to 186, prose 0 to 67).
+_TURNOVER_PT = 15.0
+_VERSE_SHORT_PT = 80.0
+_VERSE_MIN_LINES = 2
+# Spec section 22, "Verse": passed over at a line's start before its
+# first letter is looked at: quotation marks, full stops, ellipses, spaces.
+_VERSE_START_PASSED = "\"'‘’“”«»„.… "
+
+
+class QuotationForm(StrEnum):
+    """Whether an epigraph's quotation is prose, its lines joined as a
+    paragraph's, or verse, its line breaks kept (spec section 22, "Verse")."""
+
+    PROSE = "prose"
+    VERSE = "verse"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Epigraph:
+    """One epigraph of a page's body stream, by the positions of its lines
+    in the stream: `start`, its first line, which is a stray mark when one
+    comes before the quotation; `quotation`, the quotation's lines;
+    `stray_marks`, the lines with no letter or digit passed over in it, to
+    be removed as stray marks; `source_line`, the last. `source` is the
+    source line's words joined by single spaces, without its leading dash,
+    and `source_dash` the record of that dash's removal, None when the
+    source starts with none."""
+
+    start: int
+    quotation: tuple[int, ...]
+    stray_marks: tuple[int, ...]
+    source_line: int
+    form: QuotationForm
+    source: str
+    source_dash: WordChange | None
+
+    @property
+    def end(self) -> int:
+        """The position of the line after the source line."""
+        return self.source_line + 1
+
+
+def _line_height(line: PlacedLine) -> float:
+    """The line height (spec section 1): the median height of its words."""
+    return median_word_height(line.line.words)
+
+
+def _starts_with_dash(line: PlacedLine) -> bool:
+    return bool(line.line.words) and line.line.words[0].text[:1] in _SOURCE_DASHES
+
+
+def _is_source_line(line: PlacedLine, quotation: Sequence[PlacedLine]) -> bool:
+    """Spec section 22, rule 3: `line`, after the lines `quotation` of its
+    run, starts with a dash and is set in smaller type, or is set flush
+    right under them."""
+    if not quotation:
+        return False
+    if _starts_with_dash(line):
+        quotation_height = statistics.median(_line_height(other) for other in quotation)
+        if _line_height(line) <= _DASHED_SOURCE_HEIGHT_SHARE * quotation_height:
+            return True
+    leftmost = min(other.line.box.x0 for other in quotation)
+    rightmost = max(other.line.box.x1 for other in quotation)
+    return (
+        line.line.box.x0 >= leftmost + _FLUSH_RIGHT_SOURCE_LEFT_PT
+        and line.line.box.x1 >= rightmost - _FLUSH_RIGHT_SOURCE_RIGHT_PT
+    )
+
+
+def _starts_line(line: PlacedLine) -> str:
+    """The line's text from its first character that is not passed over by
+    the verse test: a quotation mark, a full stop, an ellipsis or a space."""
+    text = " ".join(word.text for word in line.line.words)
+    return text.lstrip(_VERSE_START_PASSED)
+
+
+def _form(quotation: Sequence[PlacedLine], column: Edges) -> QuotationForm:
+    """Spec section 22, "Verse": a quotation of at least 2 lines is verse
+    when every line after its first starts with a capital or is a turnover
+    line, and every line ends at least 80 pt short of the column's right
+    edge or one of them is a turnover line."""
+    if len(quotation) < _VERSE_MIN_LINES:
+        return QuotationForm.PROSE
+    leftmost = min(line.line.box.x0 for line in quotation)
+    turnovers = tuple(
+        line.line.box.x0 >= leftmost + _TURNOVER_PT for line in quotation[1:]
+    )
+    starts = all(
+        _starts_line(line)[:1].isupper() or turnover
+        for line, turnover in zip(quotation[1:], turnovers, strict=True)
+    )
+    short = all(
+        line.line.box.x1 <= column.right - _VERSE_SHORT_PT for line in quotation
+    )
+    return (
+        QuotationForm.VERSE
+        if starts and (short or any(turnovers))
+        else QuotationForm.PROSE
+    )
+
+
+def _source(line: PlacedLine) -> tuple[str, WordChange | None]:
+    """The source line's words joined by single spaces without its leading
+    dashes, and the record of their removal (spec section 22, "The dash is
+    look, not text"): the first word, or a word of dashes alone and the
+    word after it, become the one word without its leading dashes."""
+    texts = tuple(word.text for word in line.line.words)
+    if not texts or texts[0][:1] not in _SOURCE_DASHES:
+        return " ".join(texts), None
+    count = 2 if not texts[0].strip(_SOURCE_DASHES) and len(texts) > 1 else 1
+    before = texts[:count]
+    after = "".join(before).lstrip(_SOURCE_DASHES)
+    change = WordChange(
+        page_index=line.page_index,
+        before=before,
+        after=(after,),
+        reason=ChangeReason.SOURCE_DASH,
+    )
+    return " ".join((after, *texts[count:])), change
+
+
+@dataclass(frozen=True, slots=True)
+class _Run:
+    """The positions of a run's lines up to its source line."""
+
+    quotation: tuple[int, ...]
+    stray_marks: tuple[int, ...]
+    source_line: int
+
+
+def _run(
+    lines: Sequence[PlacedLine],
+    start: int,
+    end: int,
+    left_min: float | None,
+) -> _Run | None:
+    """The run of `lines` from `start` that ends at a source line before
+    `end` (spec section 22, rules 2 and 3), passing over lines with no
+    letter or digit; None when a line before its source starts left of
+    `left_min` (None for no bound, rule 5) or `end` comes first."""
+    quotation: list[int] = []
+    stray_marks: list[int] = []
+    for number in range(start, end):
+        line = lines[number]
+        if not line_has_letter_or_digit(line.line):
+            stray_marks.append(number)
+            continue
+        if left_min is not None and line.line.box.x0 < left_min:
+            return None
+        if _is_source_line(line, tuple(lines[other] for other in quotation)):
+            return _Run(tuple(quotation), tuple(stray_marks), number)
+        quotation.append(number)
+    return None
+
+
+def _epigraph(
+    lines: Sequence[PlacedLine], start: int, run: _Run, column: Edges
+) -> Epigraph:
+    source, source_dash = _source(lines[run.source_line])
+    return Epigraph(
+        start=start,
+        quotation=run.quotation,
+        stray_marks=run.stray_marks,
+        source_line=run.source_line,
+        form=_form(tuple(lines[number] for number in run.quotation), column),
+        source=source,
+        source_dash=source_dash,
+    )
+
+
+def _first_line(lines: Sequence[PlacedLine], start: int, end: int) -> int | None:
+    """The position of the first line from `start` before `end` with a
+    letter or digit, None when there is none."""
+    return next(
+        (
+            number
+            for number in range(start, end)
+            if line_has_letter_or_digit(lines[number].line)
+        ),
+        None,
+    )
+
+
+def epigraphs_after_heading(
+    lines: Sequence[PlacedLine], start: int, end: int, column: Edges
+) -> tuple[Epigraph, ...]:
+    """The epigraphs of `lines`, a page's body stream, from `start`, the
+    position right after a level-1 heading block (and its chapter
+    summary), to `end` at the latest, the position of the next heading line
+    or the stream's end (spec section 22, rules 1 to 4). `column` is the
+    page's body column. Each run of lines at least 20 pt right of the
+    column's left edge that ends at a source line is an epigraph; the next
+    run starts within 3 pt of the left side of the one before; the first
+    line that starts no run ends them, and a run without a source line is
+    none."""
+    epigraphs: list[Epigraph] = []
+    left_min = column.left + _RUN_INDENT_MIN_PT
+    run_start = start
+    while (first := _first_line(lines, run_start, end)) is not None:
+        if epigraphs:
+            before_left = min(
+                lines[number].line.box.x0 for number in epigraphs[-1].quotation
+            )
+            if abs(lines[first].line.box.x0 - before_left) > _NEXT_RUN_LEFT_PT:
+                break
+        run = _run(lines, run_start, end, left_min)
+        if run is None:
+            break
+        epigraphs.append(_epigraph(lines, run_start, run, column))
+        run_start = run.source_line + 1
+    return tuple(epigraphs)
+
+
+def page_epigraph(lines: Sequence[PlacedLine], column: Edges) -> Epigraph | None:
+    """The epigraph that is the whole of `lines`, the body stream of a page
+    with no heading line, or None (spec section 22, rule 5): one run of at
+    most 10 lines, a quotation of at least 1 line and a source line by rule
+    3 last, at any indent. `column` is the page's body column."""
+    run = _run(lines, 0, len(lines), None)
+    if (
+        run is None
+        or run.source_line != len(lines) - 1
+        or len(run.quotation) + 1 > _PAGE_OF_ITS_OWN_MAX_LINES
+    ):
+        return None
+    return _epigraph(lines, 0, run, column)
