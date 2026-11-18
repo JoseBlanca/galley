@@ -195,3 +195,38 @@ line cut three captions short (Haynes 310, Turney 174 and 176).
 
 The default run: 72.3 s on 2,761 tests (orchestrator's run, idle
 machine), past the plan's 70 s. It is dealt with in work package 7.
+
+## Review of work package 3
+
+Four reviewers on 3d272e1; fixed in 8818d42 to e5c58ea, spec commits
+first. What mattered:
+
+- **Turney's captions beside its newspaper pages (175, 176) were cut
+  short**, because layout put a caption's last row in one line with the
+  picture's lettering; the leftover words then ran across pages into page
+  180's first paragraph, and the figures of pages 175 to 179 were placed
+  after it. Beside a figure, each next row now gives the caption only its
+  words on the caption's side. Captions 15 and 17 are whole (41 and 33
+  words). Left: the cartoon's lettering under figure 17 lies 3.7 pt below
+  the figure's box, so it stays text and still opens page 180's first
+  paragraph; no structure rule separates it, an `exclude_regions` entry
+  in Turney's config would.
+- A number printed beside the first row of a figure (Kadesh 40, "18.")
+  came after the image: a line beside a figure now counts as above it
+  when it is the only body line beside it (the wider rule moved Kadesh
+  33's map after its side paragraph, which the page contradicts).
+- Words of a caption's label row past the figure's side now join the
+  caption (none in the three books).
+- Nine rules that no test guarded have tests, each seen to fail with its
+  rule removed; the whole-book tests assert each caption's word count.
+- One figure type, one block builder, figure placement in a module of its
+  own.
+- Not fixed: the head-line comparison that a caption could upset; no
+  caption takes words from a head line in the three books.
+
+Whole books against 3d272e1: Kadesh one block moved (page 40); Haynes
+identical; Turney captions 15 and 17 whole. epubcheck passes on the
+three EPUBs; all 56 figures have their image and caption.
+
+Checks at e5c58ea: 2,776 passed in 72.9 s; with 8 threads in 116 s;
+figure whole_book tests 21 passed.
