@@ -6,6 +6,7 @@ kadesh_29-38 (section 10).
 
 import functools
 import json
+import logging
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -426,6 +427,49 @@ _KADESH_WORDS_INSIDE = {
     8: ("Var.",),
     9: (),
 }
+
+
+@pytest.mark.thread_unsafe
+def test_analyze_gives_a_front_matter_page_no_box_and_logs_each_page_with_figures(
+    excerpt_book_toml: frozendict[str, str],
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # The excerpt's page 0, Kadesh 29's map, made front matter by the
+    # config: only a text page has figures (figures spec section 3).
+    folder = BookFolder(tmp_path)
+    folder.book_toml.write_text(
+        f"{excerpt_book_toml[_KADESH]}front_matter_end = 1\n", encoding="utf-8"
+    )
+    with caplog.at_level(logging.INFO, logger="galley.analyze"):
+        analyze.run(folder, read_config(folder.book_toml))
+    pages = read_pages(folder.pages_json).pages
+    assert pages[0].kind is PageKind.FRONT_MATTER
+    assert {page.index: page.figure_boxes for page in pages if page.figure_boxes} == {
+        index: boxes for index, boxes in _KADESH_BOXES.items() if index != 0
+    }
+    assert [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno == logging.INFO and "in-page figures" in record.getMessage()
+    ] == [
+        (
+            "analyze: page index 4 has 1 in-page figures: box (56.0, 144.0, 288.0, "
+            "568.0) pt, 445 squares, 3 known words"
+        ),
+        (
+            "analyze: page index 7 has 1 in-page figures: box (50.0, 348.0, 178.0, "
+            "624.0) pt, 144 squares, 1 known words"
+        ),
+        (
+            "analyze: page index 8 has 1 in-page figures: box (100.0, 148.0, 408.0, "
+            "396.0) pt, 371 squares, 1 known words"
+        ),
+        (
+            "analyze: page index 9 has 1 in-page figures: box (58.0, 288.0, 180.0, "
+            "580.0) pt, 132 squares, 0 known words"
+        ),
+    ]
 
 
 def _near(box: Box, expected: Box) -> bool:
