@@ -42,7 +42,12 @@ _EDGES = Edges(37.9, 340.0)
 
 
 def _placed(
-    text: str, x0: float, top: float, page_index: int = 0, x1: float | None = None
+    text: str,
+    x0: float,
+    top: float,
+    page_index: int = 0,
+    x1: float | None = None,
+    text_edge: float | None = None,
 ) -> PlacedLine:
     """A line of `text` whose left side is `x0` and top `top`, its words
     5 pt a character with one character between them; it ends at `x1`
@@ -58,7 +63,7 @@ def _placed(
         width = last.box.x1 - last.box.x0
         words[-1] = Word(last.text, Box(x1 - width, top, x1, last.box.bottom), None)
     box = Box(x0, top, words[-1].box.x1, top + _WORD_HEIGHT_PT)
-    return PlacedLine(page_index, Line(box, tuple(words)), _EDGES, _EDGES)
+    return PlacedLine(page_index, Line(box, tuple(words)), _EDGES, _EDGES, text_edge)
 
 
 def _starts(found: frozendict[tuple[int, int], ItemLine]) -> tuple[str, ...]:
@@ -271,6 +276,91 @@ def test_in_page_figure_between_two_items_does_not_end_the_list() -> None:
     without = StreamPage((*first.lines, after))
     assert _starts(list_items((with_figure,), _PITCH_PT)) == ("1.", "2.")
     assert list_items((without,), _PITCH_PT) == frozendict()
+
+
+def _over_a_break(
+    second: tuple[PlacedLine, ...],
+) -> tuple[frozendict[tuple[int, int], ItemLine], int]:
+    """Items "1." and "2." at 40 pt with their hang at 54 pt on page 0, then
+    page 1's lines `second`; the found lines and how many of page 1's."""
+    first = _numbered((("1. First", "goes on"), ("2. Second", "goes on")))
+    found = list_items((first, StreamPage(second)), _PITCH_PT)
+    return found, sum(1 for page_index, _ in found if page_index == 1)
+
+
+def test_page_with_no_marker_line_and_no_text_edge_ends_the_list() -> None:
+    # Spec section 29, rule 6: without a marker line to find the column by,
+    # the text edge of the page's first body region; without one, the list
+    # ends at the page break.
+    lines = tuple(
+        _placed("goes on still", 54.0, 60 + n * _PITCH_PT, 1) for n in range(2)
+    )
+    assert _over_a_break(lines)[1] == 0
+
+
+def test_page_with_a_text_edge_continues_the_item_at_the_hang() -> None:
+    lines = tuple(
+        _placed("goes on still", 64.0, 60 + n * _PITCH_PT, 1, text_edge=50.0)
+        for n in range(2)
+    )
+    assert _over_a_break(lines)[1] == 2
+
+
+def test_lines_before_the_marker_line_at_two_left_sides_take_the_text_edge() -> None:
+    # Rule 6: the lines before the page's first marker line lie at 72 and
+    # 80 pt, not within 3 pt of one left side, so the marker column is the
+    # text edge, which the page lacks: the list ends.
+    lines = (
+        _placed("goes on still", 72.0, 60, 1),
+        _placed("and still", 80.0, 74, 1),
+        _placed("3. Third", 59.5, 88, 1),
+    )
+    assert _over_a_break(lines)[1] == 0
+
+
+def test_line_after_a_hyphen_goes_on_with_the_item_wherever_it_lies() -> None:
+    # Rule 2: inside a list, the hyphen rule holds.
+    page = StreamPage(
+        (
+            _placed("1. First item cut by a hy-", 40.0, 100),
+            _placed("phen at the column's edge", 40.0, 114),
+            _placed("2. Second", 40.0, 128),
+            _placed("goes on", 54.0, 142),
+        )
+    )
+    found = list_items((page,), _PITCH_PT)
+    assert _starts(found) == ("1.", "2.")
+    assert found[0, 1] == ItemLine(None)
+
+
+def test_closed_line_at_the_hang_ends_the_list() -> None:
+    # A verse run's line, closed, at the hang of the item before.
+    page = _numbered((("1. First", "goes on"), ("2. Second", "goes on")))
+    verse = _placed("A verse line at the hang", 54.0, 156)
+    found = list_items((StreamPage((*page.lines, verse), frozenset({4})),), _PITCH_PT)
+    assert (0, 4) not in found
+
+
+def test_marker_line_with_no_word_after_its_marker_starts_no_list() -> None:
+    page = _numbered((("1.", "goes on"), ("2. Second", "goes on")))
+    assert list_items((page,), _PITCH_PT) == frozendict()
+
+
+def test_next_marker_of_another_form_is_no_next_item() -> None:
+    page = _numbered((("1. First", "goes on"), ("2) Second", "goes on")))
+    assert list_items((page,), _PITCH_PT) == frozendict()
+
+
+def test_next_marker_more_than_3_pt_left_of_the_column_is_no_next_item() -> None:
+    page = StreamPage(
+        (
+            _placed("1. First", 40.0, 100),
+            _placed("goes on", 54.0, 114),
+            _placed("2. Second", 30.0, 128),
+            _placed("goes on", 44.0, 142),
+        )
+    )
+    assert list_items((page,), _PITCH_PT) == frozendict()
 
 
 def test_closed_page_between_two_items_ends_the_list() -> None:
