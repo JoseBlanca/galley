@@ -2065,9 +2065,10 @@ same. A label is not compared: Haynes' body heading has "CHAPTER ONE"
 in its label and its group heading "Chapter 1.", and the titles match
 ("AMD" for "AND" in the body's OCR still gives a ratio above 0.9). The
 0.85 is not the running heads' 0.70 (section 3), since it is set
-between what was measured on 18 November 2026 on the 26 group headings
-the two books' notes give (Turney 8, Haynes 18): each is 0.94 to 1.00
-alike to its own chapter's heading, and at most 0.76 to another's
+between what was measured on 18 November 2026 on the 29 group headings
+the two books' notes give (Turney 11, Haynes 18): Turney's are 1.00
+alike to their own chapter's heading and at most 0.46 to another's,
+Haynes' 0.94 to 1.00 to their own and at most 0.76 to another's
 (Haynes' chapter 9 to chapter 11, two titles that share three of
 their four words); at 0.70 or 0.75 a group whose chapter
 heading the body lacked would take that other chapter. A
