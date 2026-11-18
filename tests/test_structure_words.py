@@ -302,7 +302,8 @@ def test_word_glued_at_a_case_change_is_split_when_the_book_prints_the_right_par
         ("poUtique", _BOOK_WORDS, _LOWER_CASE_WORDS),
         ("jiEthelbert", _BOOK_WORDS, _LOWER_CASE_WORDS),
         ("ofUtique", _BOOK_WORDS, _LOWER_CASE_WORDS),
-        ("theHit", _BOOK_WORDS, _LOWER_CASE_WORDS),
+        # "Hits" has 3 letters after its capital, so only the H rule refuses it.
+        ("theHits", _BOOK_WORDS | {"hits"}, _LOWER_CASE_WORDS),
     ],
 )
 def test_word_not_glued_at_a_case_change_or_without_evidence_stays(
