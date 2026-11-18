@@ -19,6 +19,7 @@ from galley.model import (
     Box,
     Line,
     LinesFile,
+    Origin,
     PageLayout,
     Region,
     RemovalReason,
@@ -36,7 +37,9 @@ from galley.structure._contents import (
     run_links,
 )
 from galley.structure._lines import PlacedLine
+from galley.structure._linking import body_candidates
 from galley.structure._measures import Edges
+from galley.structure._unnumbered import Unnumbered
 
 _CHAR_PT = 5.0
 _WORD_HEIGHT_PT = 10.0
@@ -612,3 +615,20 @@ def test_gierke_front_contents_page_numbers_taken_and_misread_ones_left(
         "lor",
     )
     assert all(entry[5] is None for entry in entries)
+
+
+def test_contents_entry_is_not_searched_for_note_references() -> None:
+    # Spec section 30, rule 10, as an index entry (section 17, rule 4): a
+    # pencil mark glued to a title is no note reference.
+    def block(kind: BlockKind) -> Unnumbered:
+        return Unnumbered(
+            kind=kind,
+            words=("NORMANDY,^", "AND", "FRANCE"),
+            word_pages=(0, 0, 0),
+            origin=(Origin(0, Box(50, 300, 300, 307)),),
+            changes=(),
+            level=1 if kind is BlockKind.CONTENTS_ENTRY else None,
+        )
+
+    assert len(body_candidates((block(BlockKind.PARAGRAPH),))) == 1
+    assert body_candidates((block(BlockKind.CONTENTS_ENTRY),)) == ()
