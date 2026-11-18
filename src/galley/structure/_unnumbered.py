@@ -21,8 +21,9 @@ class Unnumbered:
     its note references: for the position of a word, the reference it
     holds and the position of its note among the notes; a heading's level
     and chapter label; the positions of the words that start a printed
-    line after the first, which a verse block keeps (spec section 16); and
-    a figure block's image path (section 18)."""
+    line after the first, which a verse block keeps (spec section 16), and
+    a verse epigraph too (section 22); a figure block's image path
+    (section 18); and an epigraph's source (section 22)."""
 
     kind: BlockKind
     words: tuple[str, ...]
@@ -34,6 +35,7 @@ class Unnumbered:
     label: str | None = None
     line_starts: frozenset[int] = frozenset()
     figure: str | None = None
+    source: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

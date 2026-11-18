@@ -37,6 +37,14 @@ _TEXT_EDGE_MIN_LINES = 3
 # Spec section 6, rule 3: a note's text after its hanging number starts
 # with a letter or one of these ("‘Only an", Turney's page 253).
 _QUOTATION_MARKS = frozenset("‘“'\"«")
+# Spec section 6, "A short last line at a page break": the last line of a
+# page ends more than 20 pt short of its region's right edge (the survey's
+# value, not varied; the owner's books' justified lines end within about
+# 1.3 pt) with a sentence's end, after which closing quotation marks or
+# brackets, then 1 to 3 digits of a note reference ("tendency.43"), may
+# follow.
+_PAGE_END_SHORT_PT = 20.0
+_SENTENCE_END = re.compile(r"[.?!:][\"'’”»)\]]*[0-9]{0,3}$")
 # Spec section 6, rule 3, and section 12: a misread marker is followed by
 # lines hung with 2, 3 and 4.
 MISREAD_FOLLOWERS = (2, 3, 4)
@@ -188,6 +196,18 @@ def hyphen_between(before: PlacedLine, line: PlacedLine) -> bool:
     last = before.line.words[-1].text
     return is_hyphen_first_part(last) and not (
         bool(line.line.words) and is_number_before_word(last, line.line.words[0].text)
+    )
+
+
+def ends_page_paragraph(line: PlacedLine) -> bool:
+    """Whether `line`, the last line of a page's body stream, ends its
+    paragraph (spec section 6, "A short last line at a page break"): it
+    ends more than 20 pt short of its region's right edge, and its last
+    word ends a sentence."""
+    return (
+        bool(line.line.words)
+        and line.edges.right - line.line.box.x1 > _PAGE_END_SHORT_PT
+        and _SENTENCE_END.search(line.line.words[-1].text) is not None
     )
 
 
