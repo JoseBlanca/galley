@@ -3147,6 +3147,35 @@ def test_endnote_section_does_not_run_on_over_blank_pages() -> None:
     assert block_text(blocks.blocks[-1]) == "PLEASE DO NOT REMOVE CARDS"
 
 
+def test_endnote_runs_on_over_a_page_break_in_a_book_of_digit_markers() -> None:
+    # A footnote "1 …" in small type on page 0 makes the book's marker form
+    # digits (Gierke once its introduction's notes are band regions); the
+    # section's endnote "12. …" ends page 1 with a full line and runs on
+    # into page 2 as one paragraph (structure spec, section 16).
+    section = _endnote_pages(1, 12)
+    first = section.pages[0]
+    band = _region(_spread("1 A note in small type.", 50, 300, 300, height=7.0))
+    last = section.pages[1]
+    region = last.regions[0]
+    full_end = replace(region, lines=(*region.lines[:-1], _full("and runs on", 640)))
+    lines = _lines_of(
+        replace(first, regions=(*first.regions, band)),
+        replace(last, regions=(full_end,)),
+        _body_page(
+            2,
+            _short("over the page.", 70),
+            _indented("13. The note 13 which", 85),
+            _full("goes on over a full line", 100),
+            _short("ends.", 115),
+        ),
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _endnotes_of(blocks)[-2] == (
+        "12.",
+        ("The note 12 which goes on over a full line and runs on over the page.",),
+    )
+
+
 def test_endnote_section_of_12_paragraphs_gives_12_endnotes() -> None:
     lines = _endnote_pages(291, 12, between=True)
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
