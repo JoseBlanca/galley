@@ -272,7 +272,7 @@ The front-matter pages were not in this count, their words being
 removals in `words.json` (spec review, 18 November 2026: Haskins' pages
 1 and 2, above). Of the 1,099,520 words of the pages that are not
 inkless, 339 have ink
-below 20 levels; of the 43 words of the four inkless pages, 41:
+below 20 levels; of the 43 words of the four inkless pages, 40:
 
 | words | how many | ink below 20 | ink at the 1st percentile | median ink |
 |---|---|---|---|---|
@@ -280,7 +280,7 @@ below 20 levels; of the 43 words of the four inkless pages, 41:
 | words of 1 or 2 characters | 232,695 | 48 | 38 | 70 |
 | punctuation only | 23,634 | 182 | 23 | 57 |
 | 1 to 3 digits | 15,738 | 36 | 35 | 68 |
-| the words of the four inkless pages | 43 | 41 | | 10 |
+| the words of the four inkless pages | 43 | 40 | | 10 |
 
 The share of a page's words without ink:
 
@@ -288,13 +288,19 @@ The share of a page's words without ink:
 |---|---|---|
 | Haynes 9 and 421 | 1.00 | blank pages, another page faintly showing through |
 | Haskins 277 | 1.00 | the back endpaper, patterned |
-| Haskins 278 | 0.92 | the back endpaper, patterned |
+| Haskins 278 | 0.88 | the back endpaper, patterned |
 | Domesday 481 | 0.10 | a table whose column heads are printed sideways, each boxed across instead of along its print |
 | Turney 176 | 0.07 | a newspaper page reproduced as a figure |
 | Gierke 63 and 66 | 0.03 | contents pages whose layer boxes sit 5 to 20 pt off the print |
 | every other page | 0.02 or less | |
 
-So half leaves a margin of 0.42 below the lowest inkless page and 0.40
+Haskins 278's share, and the count of its words without ink, are those
+analyze gives (21 of its 24 words), measured again on 18 November 2026:
+the first measurement, 0.92, came from a render that the investigation's
+own script does not reproduce in the project's environment; the other
+counts above were not measured again.
+
+So half leaves a margin of 0.38 below the lowest inkless page and 0.40
 above the highest page of print. The rule takes Haynes 9 and 421 and
 Haskins 277 and 278, and no other page of the eight books that the
 configs do not exclude.
@@ -302,9 +308,9 @@ configs do not exclude.
 | threshold | value | from |
 |---|---|---|
 | render | 36 dpi, the plate rule's | decided: no second render. At 72 dpi Haskins 278's share falls to 0.58, because the endpaper's pattern is then resolved into ink, and Domesday 481 stays at 0.10 |
-| box grown | 3 pt | measured: the layer's boxes sit a few points off the print; of the real words, 2,573 have no ink with the box not grown, 972 grown by 1 pt and 339 by 3 pt, while the four inkless pages keep their shares (Haskins 278 0.92 with each) |
+| box grown | 3 pt | measured: the layer's boxes sit a few points off the print; of the real words, 2,573 have no ink with the box not grown, 972 grown by 1 pt and 339 by 3 pt, while the four inkless pages keep their shares (Haskins 278 0.88 with each) |
 | local background | median of the box grown by 6 pt | guessed, and kept because it absorbs Haynes 9's gradient; the page's median gray, as the plate rule's ink uses, was not tried |
-| no ink | below 20 levels | measured, above: 41 of the 43 junk words, 339 of 1.1 million real ones |
+| no ink | below 20 levels | measured, above: 40 of the 43 junk words, 339 of 1.1 million real ones |
 | inkless page | at least 0.5 of its words | measured, above |
 
 **A rule per word was measured and dropped.** Removing each word
