@@ -218,7 +218,7 @@ books do not hold.
    `uv run pytest -m whole_book` passes. The report gives each book's
    heading blocks before and after beside structure §14's table, and
    the lines layout's hanging-number step keeps in their line (layout
-   §3, step 2: Gierke 26, Domesday 1).
+   §3, step 2: Turney 99, Gierke 28, Domesday 0 after review 1).
 
 **Decision point.** If deliverable 5's heading rows miss on either
 book, the orchestrator finds the cause on that book's pages. When no
@@ -283,7 +283,7 @@ shorter.
   with it; if none is, the report says what was tried and the lines
   stay a known failure. Spec: structure §14, "Where it fails"; §27,
   point 4. Needs 1.5. Stream `edges`. Deliverable 4.
-- [ ] Review of work package 1 (the `reviewing-code` skill), after
+- [x] Review of work package 1 (the `reviewing-code` skill), after
   `edges` is merged.
 
 ## 2. The format, the fidelity check and re-reading's pairing

@@ -134,3 +134,39 @@ the text; a source may end 5 pt short of the quotation (3 pt before);
 a source may run over several lines, each ending within 5 pt of the
 first's right side (without that, Turney's back cover was an epigraph).
 The plan's and §26's count for Turney goes from 11 to 13.
+
+## Review 1: work package 1
+
+Of 11f3afe, by three reviewers (fidelity; spec and tests; conventions),
+the fidelity one against ee36969, the commit before work package 1.
+Structure's fidelity check passed on all eight books: no word was lost
+without a record. What mattered, all fixed (merged at ef1d766):
+
+- **Notes cut in the wrong place.** Starting a note band at a marker row
+  without a gap cut Kadesh's two-column bands (pages 14, 28, 40), so a
+  note's continuation ended another note. Now only when the row above
+  is not small print (a speck passed over: Domesday 406 keeps its note).
+- **A footnote taken for a margin note**, Domesday 535 and 443: a small
+  region may reach 2 pt into the one above and stay a band.
+- **Specks moved into sentences** by the hanging-number rule (Domesday
+  443 "6", Gierke 160 "9", Domesday 39's plate caption): a number is
+  kept in its line only with no margin word between and on a page with
+  at least 2 hanging numbers. Turney's 99 and Gierke's 28 contents
+  numbers stay.
+- **Domesday 159's running head back in the text**, from a low page
+  number: the head row's top leaves out page-number words.
+- The new whole-book tests timed out run alone; four conditions had no
+  test that failed when broken; one chapter-label rule was written twice
+  with different punctuation; other names and constants.
+
+Not fixed, known:
+
+- Gierke 66: the contents number "279" sits in a line the 0.70 rule
+  takes as a running head, and is removed with it (recorded).
+- Gierke's section heading "II. LEGISTS." (page 78, damaged in the
+  scan) is not found, so deliverable 4's list of that book's section
+  headings misses one; no text is lost.
+- Stubbs 186 and Gierke 73 record wrong page numbers ("5", "xviii").
+
+Checks at ef1d766: 2,342 passed and 8 xfailed in 61.0 s (58.6 s on the
+stream's tree); whole_book 80 passed in 487 s.
