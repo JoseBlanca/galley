@@ -3,7 +3,6 @@ start with endnote markers ("1." to "345." in Gierke, or bare numbers
 from 1, as Turney marks its notes) in rising order, which become notes of
 kind endnote."""
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -38,8 +37,6 @@ _GROUP_HEADING_GAP_PITCHES = 1.5
 # 26 group headings of Turney and Haynes, 18 November 2026: 0.94 to 1.00 to
 # their own chapter's, at most 0.76 to another's.
 _CHAPTER_ALIKE_RATIO = 0.85
-# A number dropped from the start of a group heading: "1.", "2", "10".
-_NUMBER_WORD = re.compile(r"[0-9]{1,3}[.:]?")
 
 
 @dataclass(frozen=True, slots=True)
@@ -365,15 +362,11 @@ def note_groups(
 
 def _title_letters(group_heading: str) -> str:
     """The letters of a group heading in lower case once a first word that
-    is a chapter label word or a number, and a number after a label word,
-    are dropped ("Chapter 1." and Turney's leading "2"; spec section 12,
-    "The chapter of a group")."""
+    is a chapter label word is dropped ("Chapter" of "Chapter 1."); its
+    number falls out with the other characters that are not letters
+    (spec section 12, "The chapter of a group")."""
     words = group_heading.split(" ")
-    if words and starts_with_chapter_label_word(words[:1]):
-        words = words[1:]
-        if words and _NUMBER_WORD.fullmatch(words[0]):
-            words = words[1:]
-    elif words and _NUMBER_WORD.fullmatch(words[0]):
+    if starts_with_chapter_label_word(words[:1]):
         words = words[1:]
     return letters(" ".join(words))
 
