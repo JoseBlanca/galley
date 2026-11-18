@@ -115,3 +115,35 @@ h6 .label {
   text-indent: 0;
   margin: 1.2em 0 0.4em 0;
 }
+
+/* A list the book prints: the reader's own bullets and numbers
+   (structure spec section 33, open point 1), each item's text without the
+   paragraph's first-line indent and a little apart from the next. */
+.list-item p {
+  text-indent: 0;
+  margin: 0.2em 0;
+}
+
+/* A printed contents: an entry per line, without bullets, each depth set
+   in from the one above; the entry's label before its title, and its
+   page number not written (structure spec section 31). The Kindle's
+   handling of list-style was not tried. */
+.contents ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+
+.contents ul ul {
+  padding-left: 1.5em;
+}
+
+.contents-entry p {
+  text-indent: 0;
+  text-align: left;
+  margin: 0.2em 0;
+}
+
+.contents-entry .label {
+  margin-right: 0.3em;
+}
