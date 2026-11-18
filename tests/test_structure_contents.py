@@ -33,6 +33,7 @@ from galley.structure._contents import (
     ContentsTitle,
     contents_entries,
     contents_title,
+    is_link_candidate,
     plain,
     run_links,
 )
@@ -632,3 +633,71 @@ def test_contents_entry_is_not_searched_for_note_references() -> None:
 
     assert len(body_candidates((block(BlockKind.PARAGRAPH),))) == 1
     assert body_candidates((block(BlockKind.CONTENTS_ENTRY),)) == ()
+
+
+def test_titles_alike_at_a_ratio_between_0_7_and_0_8_are_linked() -> None:
+    # Mariéjol's misread title against its heading, 0.75.
+    assert run_links(
+        ("I A jeuiMaM d« Catherine de Médid». .",),
+        ("LA JEUNESSE DE CATHERINE DE MÉDICIS",),
+    ) == ((0, 0),)
+
+
+def test_title_of_fewer_than_4_letters_is_no_candidate() -> None:
+    assert not is_link_candidate("A B C")
+    assert is_link_candidate("A B C D")
+
+
+def test_topics_entry_is_never_linked_though_a_heading_reads_alike() -> None:
+    topics = "THE KING — THE CHURCH — THE STATE"
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("THE KING — THE CHURCH — THE", 60, 100, _RIGHT_PT),
+                _line("STATE . . . . . . . . . 5", 73, 114, _RIGHT_PT),
+            ),
+        ),
+        (),
+    )
+    lines = LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(contents, _text_page(1, topics)),
+    )
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    (entry,) = (b for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY)
+    assert block_text(entry) == topics
+    assert entry.level == 1
+    assert any(
+        b.kind is BlockKind.HEADING and block_text(b) == topics for b in blocks.blocks
+    )
+    assert entry.heading_ref is None
+
+
+def test_entry_of_fewer_than_4_letters_is_not_linked_to_a_heading_alike() -> None:
+    # "IND" and "INDE" match at 0.86, but a candidate needs 4 letters.
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("IND . . . . . . . . . . . 5", 60, 100, _RIGHT_PT),
+                _line("SECOND ENTRY . . . . . . 9", 60, 114, _RIGHT_PT),
+            ),
+        ),
+        (),
+    )
+    lines = LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(contents, _text_page(1, "INDE")),
+    )
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    entry = next(b for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY)
+    assert block_text(entry) == "IND"
+    assert any(
+        b.kind is BlockKind.HEADING and block_text(b) == "INDE" for b in blocks.blocks
+    )
+    assert entry.heading_ref is None
