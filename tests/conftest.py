@@ -192,6 +192,36 @@ EXCERPT_CONFIGS = frozendict(
             'authors = ["Frederic William Maitland"]\n'
             'language = "en"\n'
         ),
+        # The excerpts of the plan stray-text (docs/plans/stray-text.md):
+        # Haskins' excerpt page 1 is its page index 276, which the whole
+        # book's config excludes; Gierke's excerpt page 6 is its page index
+        # 63, a printed contents page. Both begin with pages after the front
+        # matter, which the front-matter rule would otherwise find later in
+        # the excerpt (at its contents page, for Gierke).
+        "haskins_endpapers": (
+            'title = "The Normans in European History"\n'
+            'authors = ["Charles Homer Haskins"]\n'
+            'language = "en"\n'
+            "exclude_pages = [1]\n"
+            "front_matter_end = 0\n"
+        ),
+        "domesday_notes": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+        ),
+        "gierke_notes_heads": (
+            'title = "Political Theories of the Middle Age"\n'
+            'authors = ["O. Gierke", "F. W. Maitland"]\n'
+            'language = "en"\n'
+            "contents_pages = [6]\n"
+            "front_matter_end = 0\n"
+        ),
+        "stubbs_cut_in": (
+            'title = "The Early Plantagenets"\n'
+            'authors = ["William Stubbs"]\n'
+            'language = "en"\n'
+        ),
     }
 )
 

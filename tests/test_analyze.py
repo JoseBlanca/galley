@@ -902,8 +902,11 @@ def test_the_excerpts_plates_and_front_matter_are_the_specs_and_other_pages_text
         plates = EXCERPT_PLATES.get(name, ())
         front_matter = EXCERPT_FRONT_MATTER.get(name, ())
         # Haskins' blank page before the index and Kadesh's scan of a cover
-        # are excluded by their configs.
-        excluded = (8,) if name in ("haskins_eval", KADESH) else ()
+        # are excluded by their configs, and so is Haskins' page index 276
+        # in `haskins_endpapers`.
+        excluded = {"haskins_eval": (8,), KADESH: (8,), "haskins_endpapers": (1,)}.get(
+            name, ()
+        )
         assert tuple(page.index for page in pages if page.kind is PageKind.PLATE) == (
             plates
         ), name

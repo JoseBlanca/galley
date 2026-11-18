@@ -1,0 +1,26 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/plans/stray-text.md with the specs it amends (docs/specs/layout.md, section 3, step 2b, \"shortened by size\", and section 9). Compared with galley's output at be06218 (the starting commit's code): not as expected: \"The efoch , to be now\" stays in the body lines beside it.",
+  "excerpt": "stubbs_cut_in",
+  "page": 0,
+  "book_page_index": 19,
+  "checks": "a cut-in note whose lines share the body's baselines",
+  "printed": {
+    "margin_notes": [
+      "The epoch to be now treated.",
+      "France."
+    ]
+  },
+  "expected": {
+    "in_margin": [
+      "The",
+      "efoch",
+      "to",
+      "be",
+      "now"
+    ],
+    "body_lines": [
+      "death of Edward II.; that is, from the"
+    ]
+  },
+  "known": "\"treated.\" and \"France.\" are margin regions already."
+}

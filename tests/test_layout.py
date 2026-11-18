@@ -2208,7 +2208,9 @@ def test_cut_in_insets_of_the_excerpts_are_stubbs_and_domesday_tables_only(
     # right inset is 58.0 pt (scripts/fetch_samples.py; 17 November 2026),
     # and `domesday_lists`, whose tables of page indices 156 to 158 end
     # their rows 58.8 pt inside the column, a peak the whole book's other
-    # rows drown (18 November 2026).
+    # rows drown (18 November 2026). `stubbs_cut_in` has Stubbs' insets, and
+    # `domesday_notes` a left one from the table of its page index 428 (16
+    # rows at 43.2 pt), as `domesday_lists` has (18 November 2026).
     insets = {}
     for name, folder in excerpt_books.items():
         measures = measure_book(read_words(folder.words_json))
@@ -2218,9 +2220,11 @@ def test_cut_in_insets_of_the_excerpts_are_stubbs_and_domesday_tables_only(
         "stubbs_51_56-64": (60.3, 58.2),
         "stubbs_heads": (None, 58.0),
         "domesday_lists": (None, 58.8),
+        "stubbs_cut_in": (61.1, 58.6),
+        "domesday_notes": (43.2, None),
     }
     assert insets == {name: found.get(name, (None, None)) for name in excerpt_books}
-    assert len(insets) == 20
+    assert len(insets) == 24
 
 
 def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(

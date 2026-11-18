@@ -1,0 +1,19 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/plans/stray-text.md with the specs it amends (docs/specs/plates.md, section 2b). Compared with galley's output at be06218 (the starting commit's code): as expected.",
+  "excerpt": "domesday_notes",
+  "page": 9,
+  "book_page_index": 481,
+  "checks": "a page of print with words without ink: the county hidage, whose column heads are printed sideways",
+  "printed": {
+    "running_head": {
+      "words": "The Hide.",
+      "page_number": "456",
+      "number_side": "left"
+    },
+    "table": "THE COUNTY HIDAGE, counties down the left and five columns of figures, their heads (\"Cotton, Claudius, B. vii.\", \"Gale, Scriptores xv.\" …) printed sideways"
+  },
+  "expected": {
+    "kind": "text",
+    "no_removal_reason": "inkless_page"
+  }
+}

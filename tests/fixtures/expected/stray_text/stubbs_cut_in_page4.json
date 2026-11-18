@@ -1,0 +1,13 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/plans/stray-text.md with the specs it amends (docs/specs/layout.md, section 3, step 2b, \"shortened by size\", and section 9). Compared with galley's output at be06218 (the starting commit's code): as expected.",
+  "excerpt": "stubbs_cut_in",
+  "page": 4,
+  "book_page_index": 125,
+  "checks": "body lines beside a cut-in note keep every word in the body",
+  "expected": {
+    "body_lines": [
+      "open war. Henry was the head of the house of Anjou,"
+    ]
+  },
+  "known": "\"The house of Anjou at Jerusalem.\": the rule takes \"The house of\", now in the body line beside it."
+}

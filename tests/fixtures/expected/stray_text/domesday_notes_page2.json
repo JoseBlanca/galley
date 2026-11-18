@@ -1,0 +1,25 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/plans/stray-text.md with the specs it amends (docs/specs/structure.md, section 11, \"References\"). Compared with galley's output at be06218 (the starting commit's code): not as expected: \"servus*.\" stays one word and note 4 is unreferenced.",
+  "excerpt": "domesday_notes",
+  "page": 2,
+  "book_page_index": 55,
+  "checks": "a reference followed by punctuation, \"servus*.\" in the text layer, linked to its note",
+  "printed": {
+    "text": "Every man is either a liber homo or a servus⁴.",
+    "footnotes": [
+      "1 Cnut, ii. 45-6.",
+      "2 Schmid, Appendix v. (Of Ranks); Pseudoleges Canuti, 60 (Schmid, p. 431).",
+      "3 Leg. Hen. 76 § 7: 'Differentia tamen weregildi multa est in Cantia villanorum et baronum.'",
+      "4 Leg. Hen. 76 § 2."
+    ]
+  },
+  "expected": {
+    "reference_word": "servus*.",
+    "split": [
+      "servus",
+      "*",
+      "."
+    ],
+    "note_text_starts": "Leg. Hen. 7G § 2."
+  }
+}
