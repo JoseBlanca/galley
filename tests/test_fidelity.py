@@ -2773,18 +2773,19 @@ def _removal(text: str, reason: RemovalReason) -> Removal:
     return Removal(page_index=0, box=_BOX, text=text, reason=reason)
 
 
-def test_structure_list_marker_split_off_its_word_with_the_dash_as_label_passes() -> (
-    None
-):
-    lines = _lines_file((("—The alchemist, who reappears",),))
+@pytest.mark.parametrize("dash", ["\u2014", "\u2013"], ids=["em-dash", "en-dash"])
+def test_structure_list_marker_split_off_its_word_with_the_dash_as_label_passes(
+    dash: str,
+) -> None:
+    lines = _lines_file(((f"{dash}The alchemist, who reappears",),))
     change = WordChange(
         page_index=0,
-        before=("—The",),
-        after=("—", "The"),
+        before=(f"{dash}The",),
+        after=(dash, "The"),
         reason=ChangeReason.LIST_MARKER,
     )
     blocks = _blocks_file(
-        (_list_item("—", "The alchemist, who reappears"),), word_changes=(change,)
+        (_list_item(dash, "The alchemist, who reappears"),), word_changes=(change,)
     )
 
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
@@ -2801,10 +2802,20 @@ def test_structure_list_marker_split_off_its_word_with_the_dash_as_label_passes(
         ("—The King", "—T", "he King", ("—T", "he")),
         # Nothing left after the dash.
         ("— King", "—", "King", ("—", "")),
+        # The word after the dash is not the word the dash was split off.
+        ("—The King", "—", "Cat King", ("—", "Cat")),
+        ("–The King", "–", "Cat King", ("–", "Cat")),
     ],
-    ids=["number", "hyphen", "dash-with-a-letter", "empty-word"],
+    ids=[
+        "number",
+        "hyphen",
+        "dash-with-a-letter",
+        "empty-word",
+        "em-dash-another-word",
+        "en-dash-another-word",
+    ],
 )
-def test_structure_list_marker_whose_first_word_is_not_a_dash_fails(
+def test_structure_list_marker_not_a_dash_split_off_its_own_word_fails(
     line: str, label: str, text: str, after: tuple[str, ...]
 ) -> None:
     # The change accounts for the words exactly, so only its rule can make

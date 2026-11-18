@@ -35,6 +35,7 @@ from galley.layout import (
     Rereading,
     Side,
     layout_page,
+    layout_page_with_figures,
     layout_page_with_rereads,
     measure_book,
 )
@@ -1917,6 +1918,49 @@ def test_reread_footnote_band_kept_takes_the_band_place() -> None:
     body, band = _region_texts(layout_of_page)
     assert len(body) == 20
     assert band == (("First",), ("second",), ("third.",))
+    _assert_fidelity(page, result)
+
+
+def test_reread_footnote_band_across_a_figure_neither_reads_nor_replaces_its_words() -> (
+    None
+):
+    # An in-page figure over the band's third row: the band's crop runs
+    # across it, and Tesseract reads a word there (figures spec section 5).
+    figure = Figure(
+        box=Box(40.0, 362.0, 260.0, 380.0),
+        image="images/figure-0000-1.png",
+        dpi=300,
+        kind=FigureKind.IN_PAGE,
+    )
+    page = replace(_page_with_band(), figures=(figure,))
+    read = tuple(
+        replace(word, text=text, ocr_confidence=90.0)
+        for word, text in zip(
+            _small_rows(3, _LAST_BODY_TOP + 1.5 * _PITCH),
+            ("First", "second", "third."),
+            strict=True,
+        )
+    )
+    result = layout_page_with_figures(
+        page,
+        _MEASURES,
+        _rereading(
+            _reader(read),
+            render=_render_with_ink(),
+            words=frozenset({"first", "second", "third"}),
+            footnote_bands=True,
+        ),
+    )
+    layout_of_page, (record,) = result
+    assert (record.kind, record.kept) == (RereadKind.FOOTNOTE_BAND, True)
+    assert tuple(word.text for word in record.ocr_words) == ("First", "second")
+    assert tuple(word.text for word in record.layer_words) == ("n0", "n1")
+    body, band, figure_region = _region_texts(layout_of_page)
+    assert len(body) == 20
+    assert band == (("First",), ("second",))
+    # The layer's word in the figure is the figure's region, not re-read.
+    assert figure_region == (("n2",),)
+    assert layout_of_page.regions[2].box == figure.box
     _assert_fidelity(page, result)
 
 

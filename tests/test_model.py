@@ -51,6 +51,7 @@ from galley.model import (
     WordsFile,
     block_sha256,
     block_text,
+    box_holds_middle,
     check_source_pdf,
     pdf_sha256,
     read_blocks,
@@ -2733,3 +2734,20 @@ def test_leader_dots_and_figure_text_removals_of_a_contents_entry_or_figure_are_
 
     assert content["removals"][0]["reason"] == reason.value
     assert read_blocks(tmp_path / "blocks.json") == blocks
+
+
+@pytest.mark.parametrize(
+    ("inner", "held"),
+    [
+        (Box(10.0, 10.0, 20.0, 20.0), True),
+        # Its middle on the box's right side and bottom: edges included.
+        (Box(90.0, 40.0, 110.0, 60.0), True),
+        (Box(90.0, 90.0, 110.0, 110.0), True),
+        # Most of it inside, its middle 0.5 pt outside.
+        (Box(60.0, 10.0, 141.0, 20.0), False),
+    ],
+)
+def test_box_holds_middle_by_the_middle_of_the_inner_box_edges_included(
+    inner: Box, held: bool
+) -> None:
+    assert box_holds_middle(Box(0.0, 0.0, 100.0, 100.0), inner) is held

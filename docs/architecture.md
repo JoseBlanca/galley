@@ -365,8 +365,9 @@ tuple[Reread, ...])`:
   margin, a column of footnotes, the running head. layout does not say
   what a region is; structure does. On a page with in-page figures, the
   words whose middle lies inside a figure's box, but for those of the
-  page's first row, which may be its running head, are a region of their own whose box is the figure's
-  box (`docs/specs/figures.md` §5).
+  page's first row, which may be its running head, are taken out of the
+  regions the page's layout made with them and are a region of their
+  own whose box is the figure's box (`docs/specs/figures.md` §5).
 - `Line`: `box`, `words: tuple[Word, ...]`, left to right.
 
 - `Reread`: a region of a page that layout read again with Tesseract

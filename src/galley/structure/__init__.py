@@ -24,6 +24,7 @@ from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage
 from galley.model import (
     BlocksFile,
+    FigureKind,
     LinesFile,
     read_checked_input,
     read_lines,
@@ -88,7 +89,10 @@ def make_blocks(
     pages = map_pages(
         lambda page: (
             plate_parts(page, survey, plates, lower_case_words)
-            if page.figures
+            # Figures spec section 5: the plate rules on a plate's page only;
+            # a page with in-page figures is laid out as a text page, its
+            # figures not yet placed as blocks.
+            if any(figure.kind is FigureKind.PLATE for figure in page.figures)
             else page_parts(page, survey, contents_pages)
         ),
         lines.pages,

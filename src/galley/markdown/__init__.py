@@ -142,7 +142,7 @@ from galley.model import (
     NoteKind,
     Span,
     block_text,
-    has_index_depth,
+    has_entry_depth,
     note_places,
     read_blocks,
     read_checked_input,
@@ -568,12 +568,12 @@ def _check_well_formed(blocks: BlocksFile) -> None:
     depthless = tuple(
         f"index entry {block.id} has the depth {block.level}"
         for block in _every_block(blocks)
-        if block.kind is BlockKind.INDEX_ENTRY and not has_index_depth(block)
+        if block.kind is BlockKind.INDEX_ENTRY and not has_entry_depth(block)
     )
     contents_depthless = tuple(
         f"contents entry {block.id} has the depth {block.level}"
         for block in _every_block(blocks)
-        if block.kind is BlockKind.CONTENTS_ENTRY and not has_index_depth(block)
+        if block.kind is BlockKind.CONTENTS_ENTRY and not has_entry_depth(block)
     )
     labelless = tuple(
         f"list item {block.id} has no label, its marker"
