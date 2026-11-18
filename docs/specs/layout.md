@@ -584,7 +584,25 @@ is laid out as one region, as the skeleton did.
    on either side of the middle; Domesday's short notes printed side by
    side in a row are not, and must be read row by row, 1, 2, 3, 4, not 1,
    3, 2, 4). A cut run becomes two regions: each word goes
-   left or right of the strip's middle by its own middle. The rows
+   left or right of the strip's middle by its own middle, but for a
+   **number hung before the right column**: the last word left of the
+   middle on its row, 1 to 3 digits, whose next word, the first right
+   of the middle, holds a letter, starts at most 15 pt right of the
+   number and nearer than the word before it on the row ends, goes
+   right, when the run holds at least 2 such numbers (step 2's 15 pt
+   and 2). Turney prints its notes at the back in two columns, each
+   note's number hung 6 to 14 pt left of its text (structure §21); on
+   its page 262 the left column ends at 202.8 pt, the right column's
+   numbers lie at 217 to 225 and its text starts at 233, and rows that
+   hold only a right-column number and its text, beside the left
+   column's chapter heading, put the gutter between the numbers and
+   their text: notes 12 to 31 were read as words at the ends of the
+   left column's lines, and the heading "4 Creating Life in the
+   Laboratory" ran into three of them. The letter is for Gierke's
+   printed contents (pages 63, 65 and 66), where a left entry's page
+   number lies as near the right entry's number. Laid out with and
+   without the rule on 18 November 2026, the eight books' `lines.json`
+   differ on Turney's page 262 alone. The rows
    before and after it stay regions of their own: an index page whose
    title spans the column gives the title, then the left column, then
    the right.
