@@ -489,6 +489,13 @@ INK_PAGE_PX = 100
 INK_WORD_BOXES = tuple(
     Box(40.0, 30.0 + 40.0 * line, 80.0, 40.0 + 40.0 * line) for line in range(4)
 )
+# The word list of the inkless tests, in lower case.
+INK_WORD_LIST = frozenset({"handbound", "press"})
+
+
+def junk(*boxes: Box) -> tuple[tuple[str, Box], ...]:
+    """Words of `boxes` whose text, "^v./v", is not a known word."""
+    return tuple(("^v./v", box) for box in boxes)
 
 
 def ink_render(
@@ -524,7 +531,9 @@ def with_bars(
 
 
 def test_is_inkless_for_a_white_page_with_4_word_boxes() -> None:
-    assert is_inkless(ink_render(lambda _across, _down: WHITE), INK_WORD_BOXES)
+    assert is_inkless(
+        ink_render(lambda _across, _down: WHITE), junk(*INK_WORD_BOXES), INK_WORD_LIST
+    )
 
 
 @pytest.mark.parametrize(
@@ -535,13 +544,13 @@ def test_is_inkless_when_at_least_half_the_words_have_no_ink(
 ) -> None:
     page = ink_render(with_bars(INK_WORD_BOXES[:words_with_ink], BLACK, WHITE))
 
-    assert is_inkless(page, INK_WORD_BOXES) is inkless
+    assert is_inkless(page, junk(*INK_WORD_BOXES), INK_WORD_LIST) is inkless
 
 
 def test_is_inkless_false_for_white_print_on_a_black_page() -> None:
     page = ink_render(with_bars(INK_WORD_BOXES, WHITE, BLACK))
 
-    assert not is_inkless(page, INK_WORD_BOXES)
+    assert not is_inkless(page, junk(*INK_WORD_BOXES), INK_WORD_LIST)
 
 
 def test_is_inkless_for_a_page_darkening_from_200_to_120_across() -> None:
@@ -552,26 +561,46 @@ def test_is_inkless_for_a_page_darkening_from_200_to_120_across() -> None:
         lambda across, _down: 200 - round(80 * across / (width_px - 1)), width_px
     )
 
-    assert is_inkless(page, INK_WORD_BOXES)
+    assert is_inkless(page, junk(*INK_WORD_BOXES), INK_WORD_LIST)
 
 
 def test_is_inkless_false_without_word_boxes() -> None:
-    assert not is_inkless(ink_render(lambda _across, _down: WHITE), ())
+    assert not is_inkless(ink_render(lambda _across, _down: WHITE), (), INK_WORD_LIST)
+
+
+@pytest.mark.parametrize(
+    ("known_words", "inkless"), [(2, False), (1, True)], ids=["half", "a_quarter"]
+)
+def test_is_inkless_false_when_at_least_half_the_words_without_ink_are_known(
+    known_words: int, inkless: bool
+) -> None:
+    # Gierke's page 1, a binder's label, has "HANDBOUND" and "OF" without
+    # ink (plates spec section 2b); here the 4 words have none.
+    texts = ("HANDBOUND", "PRESS", "^v./v", "t/>.")
+    words = tuple(
+        (text if position < known_words else "^v./v", box)
+        for position, (text, box) in enumerate(zip(texts, INK_WORD_BOXES, strict=True))
+    )
+
+    assert (
+        is_inkless(ink_render(lambda _across, _down: WHITE), words, INK_WORD_LIST)
+        is inkless
+    )
 
 
 def test_word_box_2_pt_left_of_a_black_line_has_ink() -> None:
     # A line 1 pixel wide at pixel 60, 120 to 122 pt; the box ends at 118 pt.
     page = ink_render(lambda across, _down: BLACK if across == 60 else WHITE)
 
-    assert not is_inkless(page, (Box(78.0, 30.0, 118.0, 40.0),))
-    assert is_inkless(page, (Box(70.0, 30.0, 110.0, 40.0),))
+    assert not is_inkless(page, junk(Box(78.0, 30.0, 118.0, 40.0)), INK_WORD_LIST)
+    assert is_inkless(page, junk(Box(70.0, 30.0, 110.0, 40.0)), INK_WORD_LIST)
 
 
 def test_word_box_wholly_off_the_page_has_no_ink() -> None:
     # Domesday 481's "Cotton" starts at 422 pt on a page 393 pt wide.
     page = ink_render(lambda across, _down: BLACK if across % 2 else WHITE)
 
-    assert is_inkless(page, (Box(210.0, 30.0, 250.0, 40.0),))
+    assert is_inkless(page, junk(Box(210.0, 30.0, 250.0, 40.0)), INK_WORD_LIST)
 
 
 # require_text_layer
