@@ -533,6 +533,72 @@ def test_note_line_reaching_into_the_text_above_by_0_8_pt_is_a_band_region(
     )
 
 
+@pytest.mark.parametrize(("indent", "headings"), [(3.0, 1), (10.0, 0)])
+def test_flush_left_line_lies_within_4_pt_of_the_left_edge(
+    indent: float, headings: int
+) -> None:
+    line = _line("A NEW SECTION", _BODY_LEFT_PT + indent, 175 + 2.4 * _PITCH_PT)
+    page = _page_with_a_line_among_the_text(20, line, 2.0)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert len(_headings(blocks)) == headings
+
+
+def test_chapter_label_below_a_speck_is_no_running_head() -> None:
+    # Pages 10 to 13 have the running head "THE CHAPTER BOOK"; page 14's
+    # head line is a speck "d", and the line below it, "CHAPTER BOOK",
+    # 0.88 alike to the head, starts with a chapter label word.
+    page = PageLayout(
+        14,
+        (
+            _region(_line("d", 120, 20)),
+            _body(36, "CHAPTER BOOK", *_BODY_TEXTS),
+        ),
+        (),
+    )
+    lines = _lines_of(
+        *(_page_with_head(index, "THE CHAPTER BOOK") for index in range(10, 14)),
+        page,
+    )
+    survey = survey_book(lines, workers=1)
+    assert survey.running_heads == frozenset(range(10, 14))
+    assert 14 not in survey.heads_below_specks
+
+
+def test_short_region_overlapping_the_head_across_is_not_beside_it() -> None:
+    # "22" lies under the end of "THE BOOK", 1 pt lower: not wholly left or
+    # right of it, so the page has no head line.
+    page = PageLayout(
+        10,
+        (
+            _region(_line("THE BOOK", _BODY_LEFT_PT, 36)),
+            _body(70, *_BODY_TEXTS),
+            _region(_line("22", 80, 37)),
+        ),
+        (),
+    )
+    lines = _lines_of(
+        page, *(_page_with_head(index, "THE BOOK") for index in range(11, 14))
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _removed(blocks, 10) == ()
+
+
+def test_local_offset_of_a_page_between_two_takes_the_one_before_on_a_tie() -> None:
+    # Page 180 prints 167 in its head (offset 13), page 184 155 (offset
+    # 29); page 182, 2 pages from each, prints "169" at the foot.
+    lines = _lines_of(
+        _page_with_head(180, "THE BOOK 167"),
+        _page_with_number_at_the_foot(182, "169"),
+        _page_with_head(184, "THE BOOK 155"),
+        *(
+            _page_with_head(index, f"THE BOOK {index - 29}")
+            for index in range(185, 188)
+        ),
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _removed(blocks, 182) == (("page_number", "169"),)
+
+
 # On the six public-domain books (spec section 26, "Whole-book tests"), from
 # the session's run of each whole book (tests/conftest.py).
 
