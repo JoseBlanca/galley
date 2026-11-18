@@ -5,13 +5,16 @@
   "book_page_index": 78,
   "checks": "a running head the text layer misreads; the list's section heading, taken by the tall branch",
   "expected": {
-    "removals": [],
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "List of slnthoriti* ixxiii"
+      }
+    ],
     "page_numbers": [],
-    "heading_lines": [
-      "II. Li.oisTS1."
-    ]
+    "heading_lines": []
   },
-  "known": "The head is read \"List of slnthoriti* ixxiii\"; its letters are 0.74 (page 72) or 0.70 (page 78) alike to the other heads', below the 0.75 of structure spec section 3, and \"ixxiii\" is no roman numeral, so the head stays in the text under the rules as written, although the plan's deliverable 4 counts it among the running heads removed.",
+  "known": "The head is read \"List of slnthoriti* ixxiii\", 0.70 alike to the other heads; since structure spec section 3 takes heads 0.70 alike (17 November 2026), it is removed as a running head, with \"ixxiii\", which is no well-formed roman numeral. The list's section heading \"II. Li.oisTS1.\" (LEGISTS) is no heading: its line is as tall as the list's lines (9 pt on the whole book), and it is neither centred (89 and 123 pt from the column's edges) nor flush left.",
   "printed": {
     "book_page_index": 78,
     "running_head": {

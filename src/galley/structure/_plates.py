@@ -33,7 +33,7 @@ from galley.structure._measures import (
     words_text,
 )
 from galley.structure._paragraphs import PageFigure, PageParts
-from galley.structure._removals import head_removals, running_head_place
+from galley.structure._removals import head_removals, running_head_line
 from galley.structure._survey import BookSurvey, alike_to_a_head
 from galley.structure._unnumbered import Unnumbered, first_page, joined
 from galley.wordlist import is_known_word
@@ -69,8 +69,8 @@ def _topmost(page: PageLayout) -> LinePlace | None:
 def _running_head_letters(page: PageLayout, survey: BookSurvey) -> str | None:
     """The letters of the line section 3 makes the page's running head,
     None when it has none."""
-    place = running_head_place(page, survey)
-    return None if place is None else letters(words_text(line_at(page, place).words))
+    line = running_head_line(page, survey)
+    return None if line is None else letters(words_text(line.words))
 
 
 def plate_survey(lines: LinesFile, survey: BookSurvey) -> PlateSurvey:

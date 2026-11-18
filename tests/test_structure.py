@@ -1307,7 +1307,8 @@ def test_head_below_the_median_by_pitches(pitches: float, running: bool) -> None
     ("heads", "running"),
     [
         (("ABCDEFGH", "ABCDEFXY"), True),
-        (("ABCDEFGHIJ", "ABCDEFGXYZ"), False),
+        (("ABCDEFGHIJ", "ABCDEFGXYZ"), True),
+        (("ABCDEFGHIJKLMNOPQRST", "ABCDEFGHIJKLMVWXYZVW"), False),
         (("ABCD", "ABCD"), True),
         (("ABC", "ABC"), False),
         (
@@ -1328,6 +1329,7 @@ def test_head_below_the_median_by_pitches(pitches: float, running: bool) -> None
     ids=[
         "0.75 alike",
         "0.70 alike",
+        "0.65 alike",
         "4 letters",
         "3 letters",
         "31 and 39 letters",
@@ -4080,17 +4082,26 @@ def test_heading_starting_with_a_label_word_is_level_1_with_its_words() -> None:
 
 
 @pytest.mark.parametrize(
-    ("distance", "gap_after", "continued"),
-    [(39.0, 33.0, True), (39.5, 33.0, False), (33.0, 22.5, True), (33.0, 22.0, False)],
+    ("above", "distance", "gap_after", "continued"),
+    [
+        ("THE OPENING TITLE", 39.0, 33.0, True),
+        ("THE OPENING TITLE", 39.5, 33.0, False),
+        ("THE OPENING TITLE", 33.0, 22.5, True),
+        ("THE OPENING TITLE", 33.0, 22.0, False),
+        # Below a chapter label alone, 4.0 pitches (the plan owner-books,
+        # structure spec section 14).
+        ("CHAPITRE V", 60.0, 33.0, True),
+        ("CHAPITRE V", 60.5, 33.0, False),
+    ],
 )
 def test_heading_continuation_in_capitals_within_2_6_pitches_and_1_5_above_the_text(
-    distance: float, gap_after: float, continued: bool
+    above: str, distance: float, gap_after: float, continued: bool
 ) -> None:
     title = "L'EXPERIENCE ET L'ECHEC DE LA POLITIQUE MODEREE"
     blocks = make_blocks(
         _lines_of(
             _around(
-                _centred_line("CHAPITRE V", 130),
+                _centred_line(above, 130),
                 _full(title, 130 + distance),
                 gap_after=gap_after,
             )
@@ -4098,7 +4109,8 @@ def test_heading_continuation_in_capitals_within_2_6_pitches_and_1_5_above_the_t
         _NO_WORDS,
         workers=1,
     )
-    assert (_kinds_and_texts(blocks)[1][3] == title) is continued
+    # The title is the heading's text, after the label or the line above.
+    assert _kinds_and_texts(blocks)[1][3].endswith(title) is continued
 
 
 @pytest.mark.parametrize(
@@ -5335,8 +5347,9 @@ def test_whole_book_haskins_quotes_and_bibliographical_notes(
 
 
 # The head of a short section on the six whole books (structure spec,
-# section 3, its last paragraph): the rule takes exactly two head lines,
-# Haskins' page index 13 "vlil PREFACE" and Domesday's "vi Preface.". The
+# section 3, its last paragraph): the rule takes three head lines,
+# Haskins' page index 13 "vlil PREFACE", Domesday's "vi Preface." and
+# Gierke's 58 "Analytical Snnittniry. liii". The
 # pages it takes are those whose head line is a running head with the rule
 # and not without it.
 
@@ -5384,7 +5397,9 @@ def test_whole_book_short_section_rule_removes_only_the_haskins_and_domesday_hea
         "domesdaybook00maituoft": (13,),
         "earlyplantagenet01stub": (),
         "normansineuropea00hask": (13,),
-        "politicaltheorie00gieruoft": (),
+        # With the likeness at 0.70, the running head of Gierke's
+        # analytical summary (spec section 3).
+        "politicaltheorie00gieruoft": (58,),
     }
     assert all(without_rule[book] <= with_rule[book] for book in _WHOLE_BOOKS)
     haskins_blocks = outputs["normansineuropea00hask"][1]

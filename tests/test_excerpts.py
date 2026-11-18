@@ -2,6 +2,7 @@
 and the reference pages of the layout and structure specs are checked on
 them exactly."""
 
+import functools
 import json
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
@@ -30,6 +31,8 @@ from galley.model import (
     read_pages,
     read_words,
 )
+from galley.structure import survey_book
+from galley.structure._regions import RegionKind, region_kinds
 from galley.text_layer import layer_words, open_pdf
 
 # The excerpts that scripts/fetch_samples.py cuts, with their page counts.
@@ -48,7 +51,7 @@ EXPECTED_EXCERPT_PAGES = {
     "haskins_front": 11,
     "domesday_front_flow": 10,
     "gierke_front_flow": 10,
-    "haskins_heads_notes": 13,
+    "haskins_heads_notes": 14,
     "stubbs_heads": 18,
     "gierke_intro_heads": 13,
     "domesday_rereads": 11,
@@ -294,6 +297,84 @@ def test_reference_page_break_pair_gives_the_blocks_and_joins_across_the_break(
         "word_changes": _structure_of_page(blocks, first)["word_changes"]
     }
     assert actual == {key: expected[key] for key in actual}
+
+
+# The pages of the four excerpts of the plan owner-books (structure spec
+# section 26, "Excerpt tests"): each file of
+# tests/fixtures/expected/owner_books_wp1/ gives, in "expected", what the
+# rules of the plan's work package 1 give on a page that holds one of its
+# cases, its removals and page numbers, and where the case needs them its
+# heading blocks ("heading_lines", their texts; "headings", with level and
+# label), its notes, and the first line of its footnote band.
+
+OWNER_BOOKS_WP1_DIR = EXPECTED_DIR / "owner_books_wp1"
+OWNER_BOOKS_WP1_PAGES = tuple(
+    sorted(path.stem for path in OWNER_BOOKS_WP1_DIR.glob("*.json"))
+)
+
+
+@functools.cache
+def _band_kinds(lines: LinesFile) -> frozendict[int, tuple[RegionKind, ...]]:
+    """The kind of each region of each page of `lines`, by page index, as
+    structure decides them from its survey of the excerpt."""
+    survey = survey_book(lines, workers=1)
+    return frozendict(
+        {
+            page.index: region_kinds(
+                page, survey.body_word_height, survey.running_heads
+            )
+            for page in lines.pages
+        }
+    )
+
+
+def _owner_books_wp1_page(
+    lines: LinesFile, blocks: BlocksFile, page: int
+) -> dict[str, Any]:
+    """What the excerpt gives on `page`, in the keys of the files of
+    tests/fixtures/expected/owner_books_wp1/."""
+    structure = _structure_of_page(blocks, page)
+    layout = next(layout for layout in lines.pages if layout.index == page)
+    headings = tuple(
+        block
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING and block.origin[0].page_index == page
+    )
+    band_lines = tuple(
+        " ".join(word.text for word in region.lines[0].words)
+        for region, kind in zip(layout.regions, _band_kinds(lines)[page], strict=True)
+        if kind is RegionKind.BAND
+    )
+    return {
+        "removals": structure["removals"],
+        "page_numbers": structure["page_numbers"],
+        "heading_lines": [block_text(block) for block in headings],
+        "headings": [
+            {"level": block.level, "label": block.label, "text": block_text(block)}
+            for block in headings
+        ],
+        "notes": [
+            {
+                "marker": note.marker,
+                "text": " ".join(block_text(block) for block in note.blocks),
+            }
+            for note in blocks.notes
+            if note.origin[0].page_index == page
+        ],
+        "band_first_line": band_lines[0] if band_lines else None,
+    }
+
+
+@pytest.mark.parametrize("name", OWNER_BOOKS_WP1_PAGES)
+def test_owner_books_wp1_page_gives_its_removals_numbers_headings_and_notes(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]], name: str
+) -> None:
+    case = json.loads(
+        (OWNER_BOOKS_WP1_DIR / f"{name}.json").read_text(encoding="utf-8")
+    )
+    lines, blocks = excerpt_outputs[case["excerpt"]]
+    actual = _owner_books_wp1_page(lines, blocks, case["page"])
+    assert {key: actual[key] for key in case["expected"]} == case["expected"]
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_EXCERPT_PAGES))
@@ -1048,9 +1129,11 @@ def test_caption_kadesh_64_and_68_kept_and_the_back_of_plate_65_removed(
     assert figures[1][2] == ""
     assert _plate_removals(blocks, 6) == (("plate_text", "a"), ("plate_text", "t I"))
     assert figures[2][2].endswith("THE MODERN MODND OF KADESH")
-    # "V", the end of the garbled series head, is on the head's row, which
-    # is caption (spec section 18, rule 2, by row).
-    assert "PLATE VIII V THE MODERN" in figures[2][2]
+    # "V", the end of the garbled series head, lies a row lower than the
+    # rest of the head, which layout makes one line with it, left to right
+    # (layout spec section 3, step 3); the line is caption (spec section
+    # 18, rule 2, by row).
+    assert "PUBLICATIONS, V PLATE VIII THE MODERN" in figures[2][2]
     assert _plate_removals(blocks, 9) == ()
     # The paragraph of page 63 runs on over the plates 64 and 65.
     assert any(_pages(block.origin) == [4, 7] for block in blocks.blocks)
@@ -1072,7 +1155,9 @@ def test_caption_domesday_39_and_40_kept_and_their_stray_words_removed(
     )
     assert ("plate_text", '--,. ^X.^ MoulslVl^rf /\\"?') in _plate_removals(blocks, 3)
     assert {reason for reason, _ in _plate_removals(blocks, 4)} == {"plate_text"}
-    assert len(_plate_removals(blocks, 4)) == 8
+    # The map's first two rows of specks are one line of the head region
+    # (layout spec section 3, step 3).
+    assert len(_plate_removals(blocks, 4)) == 7
 
 
 # Index entries and guide words (structure spec, section 17).
