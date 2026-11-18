@@ -165,9 +165,11 @@ inside it.
    line pitch, the offset between page index and printed page number,
    the pages whose lowest line is a signature line (section 4), the
    index pages (section 17), the plate pages (the pages that have a
-   figure; section 18), the book's marker form (section 1) and the
-   endnote section (section 12), which is found from the lines that
-   start a paragraph by section 6's rules. The body word height and body line pitch are
+   figure of kind `plate`; section 18), the book's marker form (section
+   1) and the endnote section (section 12), which is found from the
+   lines that start a paragraph by section 6's rules. The region of an
+   in-page figure takes no part in the survey (`docs/specs/figures.md`
+   §5). The body word height and body line pitch are
    measured as layout measures them, by `body_measures.body_measures`
    (architecture §12) on the rows that `body_measures.group_rows` makes
    of each page's words from every region. A book for which it gives
@@ -179,11 +181,20 @@ inside it.
    both. The two stages kept a copy each until the second plan, which
    moves the rule to the shared module.)
 2. **Per page**:
-   1. decide what each region is (below; on an index page, section 17);
+   1. decide what each region is (below; on an index page, section 17),
+      a region whose box is an in-page figure's being that figure's
+      region (`docs/specs/figures.md` §5);
    2. remove the running head, page numbers, signature marks and stray
       marks (sections 3 and 4), the guide words of an index page
       (section 17), and on a plate page its running head and stray
-      words, keeping its caption (section 18);
+      words, keeping its caption (section 18); then, on a text page with
+      in-page figures, find each figure's caption, take it out of the
+      body stream, and remove the rest of the figure's region as
+      `figure_text` (`docs/specs/figures.md` §5). The captions are taken
+      here, before step 2.3 and step 3.1, so that a caption line is
+      never a heading, a list item or a contents entry: Turney's
+      captions open with "13." and Haynes' contents entries with "2.",
+      and both look like a list's marker line;
    3. in the body stream, find the heading lines (section 14), except on
       the config's `contents_pages`, where only a contents run's title is
       one (section 30, rule 1), then the chapter summary under a
@@ -226,7 +237,9 @@ inside it.
       are still paragraphs;
    6. place the margin notes (section 13);
    7. put the side text, figures and notes in reading order, and number
-      the blocks (section 6).
+      the blocks (section 6); an in-page figure goes after the block
+      that holds the last body line printed above it
+      (`docs/specs/figures.md` §5, "Where the figure block goes").
 
 The case split of step 2.4 and the spaced signs of step 3.2 change only
 the words of a block, which no step between them and the matching of
@@ -1097,7 +1110,11 @@ again):
 - `ChangeReason.list_marker`: a dash split off the word it was glued to
   ("—The" into "—" and "The"), the dash going to `label`;
 - `RemovalReason.leader_dots`: the dots printed between a contents
-  entry's title and its page number.
+  entry's title and its page number;
+- `RemovalReason.figure_text`: the words the OCR read inside a figure
+  printed on a text page (`docs/specs/figures.md` §5). It comes from
+  the figures spec, written the same day, and goes into the same
+  version 5, so that the owner reruns structure once.
 
 `label` may now be set on a heading, a list item (always) and a
 contents entry; `level` on a heading, an index entry and a contents
@@ -1124,7 +1141,7 @@ class BookSurvey:
     common_inner_words: frozenset[str]     # keys printed after a line's first word more than 8 times (section 5)
     signature_lines: frozenset[int]        # pages whose lowest line is a signature line
     index_pages: frozenset[int]            # section 17, rule 1
-    plate_pages: frozenset[int]            # pages with a figure (section 18)
+    plate_pages: frozenset[int]            # pages with a figure of kind plate (section 18)
     head_numbers: frozendict[int, int]     # page index -> its arabic head page number (section 4, local offset)
 
 class HyphenJoin(NamedTuple):
@@ -3055,7 +3072,8 @@ picture's lines and shading ("^U;L", "/•-„"). In the first plan they
 ran into the paragraph around the plate (Kadesh's page 16 into the
 paragraph of pages 15 to 18).
 
-**The rules**, on a page that has a figure:
+**The rules**, on a page that has a figure of kind `plate`; a text
+page's in-page figures follow `docs/specs/figures.md` §5:
 
 1. **Its running head.** Layout makes no head line on a page whose first
    row is its only row or is not set apart (layout §3, step 3), and the
@@ -3881,8 +3899,8 @@ over a word under a Tesseract word whose letters are unlike
   against its notes, one heading block against the two headings Stubbs'
   and Mariéjol's reference texts make of a label and its title): a change
   to `docs/specs/evaluation.md`, before the plan's scores are taken.
-- Removing specks read as margin notes, figures inside text pages,
-  tables as tables: later. Domesday's tables (its pages 28, 42 to 44,
+- Removing specks read as margin notes, and tables as tables: later.
+  Figures inside text pages are `docs/specs/figures.md`. Domesday's tables (its pages 28, 42 to 44,
   156 to 158, 425 to 428 and others) stay as the paragraph, verse and
   note rules make them, and section 6's rule 3 cuts some of their rows
   into paragraphs; since 18 November 2026 the rows of pages 156 to 159
@@ -3996,7 +4014,11 @@ line, or such a page, ends a list.
 5. **The list ends** at the first line that is neither, or whose top
    lies more than 1.5 body line pitches below the top of the line before
    it on the same page. The line that ends a list starts a block, as
-   the first marker line ends the block before it.
+   the first marker line ends the block before it. Across an in-page
+   figure, whose lines and caption are out of the body stream
+   (`docs/specs/figures.md` §5), the gap is not tested, as it is not
+   across a page break: a figure printed between two items does not
+   end the list. The eight books print none so.
 6. **Over a page break** the list goes on with the first line of the
    next page that has a body stream, and the marker column is found
    again, since it moves with the page. It is the left side of the
@@ -4136,7 +4158,7 @@ kinds, as on any page.
    Stubbs' "CONTENTS"). That first line is the run's title, unless it
    ends with a page number or is a lone label, in which case it is a
    line like the others: a `heading` of level 1, without a label
-   (**Open 2**, below).
+   (section 33, open point 2, settled).
    This changes section 14, which made no heading on a contents page,
    for this one line, so that the printed contents has an entry in the
    EPUB's table of contents, and Gierke's "ANALYTICAL SUMMARY." a heading
@@ -4318,7 +4340,8 @@ The marker is not written as text: the EPUB shows the reader's bullet
 for a dash list, and Pandoc's numbers for an ordered one, which equal
 the printed ones because section 29 takes only markers in sequence;
 Pandoc writes `<ol type="i">` for "(i)", so the brackets are lost
-(checked with Pandoc 3.14 on 18 November 2026; **Open 1**, below). A
+(checked with Pandoc 3.14 on 18 November 2026; section 33, open point
+1, settled). A
 block between two items of a list, a margin note or a note that
 markdown places there (section 6, "Order"), ends the list; the next item
 starts a new one, whose start is its own value. Two lists with nothing
@@ -4466,10 +4489,10 @@ not fall (section 9's targets).
 
 ## 33. Open points of the lists and contents revision
 
-The owner decides these; until then the implementer does what each
-"meanwhile" says.
+Both are settled; the options are kept for whoever reopens them.
 
-1. **How a list's markers look in the EPUB.** (a) As written: a dash
+1. **How a list's markers look in the EPUB.** Settled: (a), the
+   reader's own markers (orchestrator for the owner, 18 November 2026). (a) As written: a dash
    or bullet list is a bullet list, which shows the reader's bullet,
    not a dash; an ordered list shows Pandoc's numbers, which equal the
    printed ones, with "." for every form ("i." for "(i)"); the Kindle
@@ -4481,9 +4504,10 @@ The owner decides these; until then the implementer does what each
    and the indent, which was not tried, and the fidelity check then
    compares the label. Recommended: (a), the decision taken for the
    owner on 18 November 2026, since it uses the reader's own list
-   layout. Meanwhile: (a). Changing to (b) later is a change to
-   markdown and the style sheet only.
-2. **The title of a printed contents as a heading.** (a) As written
+   layout. Changing to (b) later is a change to markdown and the style
+   sheet only.
+2. **The title of a printed contents as a heading.** Settled: (a), a
+   level-1 heading (orchestrator for the owner, 18 November 2026). (a) As written
    (section 30, rule 1): "CONTENTS" becomes a level-1 heading, so the
    EPUB's own table of contents gains an entry "CONTENTS" that opens the
    printed one, and Gierke's "ANALYTICAL SUMMARY", which page 10 lists,
@@ -4493,8 +4517,8 @@ The owner decides these; until then the implementer does what each
    heading, whose reason, each chapter listed twice in the EPUB's table
    of contents, it does not touch. (b) The title stays a paragraph, as
    now; the printed contents is then reached only by paging, and
-   Gierke's page 10 has one link fewer. Recommended: (a). Meanwhile:
-   (a); (b) is a one-line change of rule 1.
+   Gierke's page 10 has one link fewer. Recommended: (a); (b) is a
+   one-line change of rule 1.
 
 Decided while writing, with the reasons in their sections: lists
 printed as paragraphs stay paragraphs (section 29); an analytical summary

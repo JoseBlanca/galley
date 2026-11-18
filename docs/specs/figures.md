@@ -23,7 +23,8 @@ cover's lettering; on page 175 the two pictures with their captions,
 but the newspaper's masthead and headline, printed above its photograph,
 still as text and a heading unless the owner marks them in the config
 (section 8). In Kadesh, its 6 maps with their captions, and 11 of its
-quotations printed in hieroglyphs or Arabic as pictures (**Open 1**).
+quotations printed in hieroglyphs or Arabic as pictures (section 11,
+open point 1, settled).
 
 galley runs as stages, each writing one file for the next: **analyze**
 says what each page is (`pages.json`), **extract** reads each page's
@@ -44,9 +45,10 @@ Dated 18 November 2026. No code exists for it. It builds on
 `docs/specs/plates.md` (plates §n), `docs/specs/layout.md` (layout §n)
 and `docs/specs/structure.md` (structure §n). It changes four formats:
 pages.json gains the figures' boxes, words.json and lines.json a kind
-for each figure, and blocks.json a removal reason
-(section 7, which also gives the wording, for whoever edits them, for
-the architecture and the glossary). markdown and epub already write a figure block, with its
+for each figure, and blocks.json a removal reason, in the version 5
+that structure §29 to §33 (lists and the printed contents) also make
+(section 7; its wording is applied to the architecture and the
+glossary). markdown and epub already write a figure block, with its
 image and caption (architecture §9), and do not change.
 
 The numbers were measured on 18 November 2026 with pypdfium2 on an
@@ -216,8 +218,8 @@ a page may have two in-page figures (Turney 174, 175 and 176).
 
 extract writes each `Figure` with its **kind**, a new field: `plate`
 for a plate's (plates §3) and `in_page` for one cut by section 4, and
-layout copies it to lines.json (**Open 2**, below: it changes words.json
-and lines.json). layout and structure need it because lines.json has no
+layout copies it to lines.json (section 11, open point 2, settled: it
+changes words.json and lines.json). layout and structure need it because lines.json has no
 page kind: structure today sends every page that has a figure to the
 plate rules of structure §18 (`src/galley/structure/__init__.py`, where
 `page.figures` is tested), which make the whole page a caption and stray
@@ -338,6 +340,18 @@ text of the figure block; their hyphens are joined as in any block, and
 their words are not searched for note references. They are taken out of
 the body stream, so they never reach a paragraph.
 
+The caption is found in structure's step 2.2 (structure §2), after the
+running heads are removed and before the heading lines (step 2.3), the
+list items and the contents entries (step 3.1) are found. So a caption
+row is never a heading, a list item or a contents entry, although a
+Turney caption "13. The…" has the form of a numbered list's marker
+line. A row that opens with a caption label and lies next to no figure
+stays in the body stream, and the rules of structure see it as any
+line: Turney 166's captions of the facing page (section 8) are tested
+by the list rules (structure §29) as any line is. Whether one of them
+starts a list was not measured; the whole-book count of Turney's list
+items (structure §32: none) shows it.
+
 ### structure: where the figure block goes
 
 A figure's **place** is between the body lines printed above it and
@@ -345,7 +359,12 @@ those below: the last line of the body stream, in reading order, whose
 top lies above the figure's top, on its page or, when the page has none,
 the last body line of the pages before. The figure block goes after the
 paragraph that holds that line: when the figure is printed in the
-middle of a paragraph, after the whole paragraph, never inside it. A
+middle of a paragraph, after the whole paragraph, never inside it. When
+that line is in a list item (structure §29), the block goes after the
+list's last item, as after a paragraph, so that the EPUB does not cut
+the list in two; when it is in a contents entry (structure §30), after
+the run's last entry. A list goes on across a figure printed between
+two of its items (structure §29, rule 5). A
 paragraph cut by the figure, its
 lines above and below, is one paragraph, as across a page break: the
 figure's lines and its caption are out of the body stream, so the
@@ -394,23 +413,26 @@ epub spec's work, as for plates.
 
 ## 7. The format changes, and the wording for the architecture
 
-Four formats change, which other stages read, so they are the owner's
-to approve (**Open 2**); after them the owner reruns analyze, which
-deletes every later file:
+Four formats change, which other stages read; they were accepted for
+the owner (section 11, open point 2). After them the owner reruns
+analyze, which deletes every later file:
 
 - **pages.json, version 3**: `PageInfo.figure_boxes: tuple[Box, ...]`,
   the boxes of the page's in-page figures in points, from the top down
   and then from the left; empty on a page that is not `text`.
 - **words.json, version 3**, and **lines.json, version 4**:
   `Figure.kind: FigureKind`, `plate` or `in_page` (section 5).
-- **blocks.json, the next version** (5 when this spec is the first to
-  change it): the removal reason `figure_text`.
+- **blocks.json, version 5**: the removal reason `figure_text`. The
+  revision of structure §29 to §33, written the same day, takes
+  blocks.json to 5 too, with lists and contents entries; the two
+  changes make one version 5, not two.
 
 Reading a file of an earlier version is the error of architecture §8.
 A region whose box is a figure's is a value lines.json already holds.
 
-The wording below is for whoever edits the architecture and the
-glossary with this spec's plan; the owner need not read it.
+The wording below was applied to the architecture and the glossary on
+18 November 2026, with the lists revision's; it is kept as the record
+of what this spec changed there.
 
 - §8, `PageInfo`: add "`figure_boxes: tuple[Box, ...]`: the boxes of the
   figures analyze finds inside a text page, in points, from the top down
@@ -428,7 +450,7 @@ glossary with this spec's plan; the owner need not read it.
   page's first row, are a region of their own whose box is the figure's
   box (`docs/specs/figures.md` §5)."
 - §8, the versions: pages.json 3, words.json 3, lines.json 4, blocks.json
-  the next, with the sentence on what each change added.
+  5, with the sentence on what each change added.
 - §8, `RemovalReason`: add "`figure_text` (the words the OCR read
   inside a figure printed on a text page: its lettering, labels and
   shading, which its image shows; `docs/specs/figures.md` §5)".
@@ -455,8 +477,8 @@ glossary with this spec's plan; the owner need not read it.
   (Kadesh's groups of hieroglyphs).
 - **Hieroglyph and Arabic blocks** (Kadesh): figures from 120 squares,
   so 11 groups become images and the smaller ones, 43 to 115 squares,
-  stay as today, lost with their junk in the paragraphs (**Open 1**,
-  below).
+  stay as today, lost with their junk in the paragraphs (section 11,
+  open point 1, settled).
 - **Lettering outside the box** (Turney 175 and 167): words printed as
   part of a picture stop its picture squares, so lettering at its edge
   stays outside the group. The Daily Mail's masthead and headline lie
@@ -580,7 +602,12 @@ recorded, and each caption word is in its figure block.
 
 ## 11. Open points
 
-1. **Pictures without a caption, and Kadesh's hieroglyphs.** The
+Both are settled; the options are kept for whoever reopens them.
+
+1. **Pictures without a caption, and Kadesh's hieroglyphs.** Settled:
+   (a), a picture without a caption is kept, so 11 of Kadesh's blocks
+   of hieroglyphs or Arabic become images (orchestrator for the owner,
+   18 November 2026). The
    question is whether a smaller picture with no caption next to it is
    kept. Kadesh is where it shows. In the owner's books the pictures
    without a caption, Turney's second cover of page 174, its film still
@@ -603,9 +630,11 @@ recorded, and each caption word is in its figure block.
 
    Recommendation: (a), because each image kept is text a reader can
    see that the EPUB otherwise loses, and the groups left out are lost
-   today too. Meanwhile the implementer builds (a).
+   today too.
 
-2. **The format changes** of section 7: pages.json gains the in-page
+2. **The format changes** of section 7. Settled: the four changes are
+   accepted, with the explicit field `Figure.kind`, option (a)
+   (orchestrator for the owner, 18 November 2026). pages.json gains the in-page
    figures' boxes, `Figure` its kind in words.json and lines.json, and
    blocks.json the removal reason `figure_text`. Other stages and the
    evaluation tool read these files. The options for the kind:
@@ -617,9 +646,7 @@ recorded, and each caption word is in its figure block.
      to a coordinate that the growth into the band (section 3) brings
      within 24 pt of it.
 
-   Recommendation: (a). Meanwhile the implementer builds (a), and the
-   plan's first work package waits for the owner's word on this point
-   before changing `model.py`.
+   Recommendation: (a).
 
 ## 12. Not in this spec
 

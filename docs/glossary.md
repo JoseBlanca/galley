@@ -26,6 +26,12 @@ stages write, and the edits.
 
 **caption**: the text printed with a picture to name it ("THE MODERN
 MOUND OF KADESH"). On a plate it is the text of the plate's figure block.
+On a text page, the lines next to an in-page figure that open with a
+**caption label** ("figure 2.", "MAP vi."), and the rows that follow
+them; they too are the text of the figure block, never a paragraph, a
+list item or a contents entry.
+
+**caption label**: see caption.
 
 **chapter label**: the line that gives a chapter's number, "CHAPTER
 III.", "CHAPITRE II", "ESSAY I.", a spelled number, "Chapter One", or a
@@ -84,7 +90,12 @@ made, once its word changes and edits are applied: nothing lost, nothing
 invented.
 
 **figure**: a picture in the book, cut from the page render into
-`images/`. A **plate** is a page that is mostly a figure.
+`images/`. A **plate** is a page that is mostly a figure. An **in-page
+figure** is one printed on a text page among its lines.
+
+**figure text**: the words the OCR read inside an in-page figure's
+picture: its lettering, its labels and the marks of its shading. The
+picture's image shows them, so structure removes them, with a record.
 
 **footnote band**: the footnotes at the foot of a page, set in smaller
 type below the body, in one column or two. A region found by layout.
@@ -194,8 +205,9 @@ layout; what each region is, structure decides.
 
 **removal**: text a stage took out of the book on purpose, with its page,
 box and reason: a running head, a page number, a signature mark, a stray
-mark, guide words, a plate's stray words, an excluded page or region,
-a page of the front matter.
+mark, guide words, a plate's stray words, the figure text of an in-page
+figure, the leader dots of a contents entry, an excluded page or
+region, a page of the front matter.
 
 **re-reading**: reading a region of a page again with Tesseract, from a
 300-dpi render, and keeping Tesseract's words only where their reading
