@@ -5276,11 +5276,13 @@ def test_whole_book_gierke_endnote_section_runs_from_186_to_282(
 ) -> None:
     # Structure spec, section 12: 299 endnotes on pages 186 to 282, the
     # library card of page 288 (excluded) not among them, and "NOTES."
-    # a heading of the body (section 14).
+    # a heading of the body (section 14). Numbered through the book, they
+    # are one note group, without a group heading.
     endnotes = tuple(
         note for note in gierke_blocks.notes if note.kind is NoteKind.ENDNOTE
     )
     assert len(endnotes) == 299
+    assert not any(note.group is not None for note in endnotes)
     pages = {origin.page_index for note in endnotes for origin in note.origin}
     assert (min(pages), max(pages)) == (186, 282)
     assert endnotes[0].marker == "1."
