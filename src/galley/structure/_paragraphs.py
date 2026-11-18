@@ -27,7 +27,7 @@ from galley.structure._index import IndexPage, index_page
 from galley.structure._lines import (
     Piece,
     PlacedLine,
-    ends_page_paragraph,
+    ends_paragraph_at_page_break,
     first_word,
     misread_marker_lines,
     starts_paragraph,
@@ -434,15 +434,16 @@ def _short_page_end(
     before: PlacedLine | None, before_page: PageParts | None, page: PageParts
 ) -> bool:
     """Whether `before`, the last body line of `before_page`, a page before
-    `page`, ends the paragraph at the page break (spec section 6, "A short
-    last line at a page break"): not on an index page, either side
-    (section 17)."""
+    `page`, ends the paragraph at the page break before the first body
+    line of `page` (spec section 6, "A short last line at a page break"):
+    not on an index page, either side (section 17)."""
     return (
         before is not None
         and before_page is not None
         and not before_page.index_lines
         and not page.index_lines
-        and ends_page_paragraph(before)
+        and bool(page.body)
+        and ends_paragraph_at_page_break(before, page.body[0])
     )
 
 
