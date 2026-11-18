@@ -28,8 +28,10 @@ What exists now:
   the words the OCR read inside it leave the text, with a record. Haynes
   25 figures, all whole, captioned and in place; Kadesh 17 (6 maps with
   captions, 11 blocks of hieroglyphs or Arabic as images); Turney 14.
-- **Scores** of the four public-domain books: no fall beyond the plan's
-  tolerances; Stubbs' and Mariéjol's paragraph scores rose slightly.
+- **Scores** of the four public-domain books, measured by galley-eval
+  against their Project Gutenberg editions: no score fell by more than
+  the plan allowed (for paragraphs, 0.005; for the share of wrong words,
+  0.002); Stubbs' and Mariéjol's paragraph scores rose slightly.
   Every test passes: 2,777 in 69 s, and 144 on whole books. The eight
   EPUBs in `runs/lists-figures/` of the main checkout pass epubcheck with
   no error or warning.
@@ -41,27 +43,28 @@ title as a heading; pictures without a caption kept.
 Still wrong:
 
 - **Turney's insert of reproduced pages (164 to 179).** A reproduced
-  newspaper page or cartoon is full of printed words, and the rule finds
-  a picture as ink with no words: three pictures are cut short, one
+  newspaper page or cartoon is full of printed words, and galley finds a
+  picture as a patch of ink that no word of the text layer touches: three pictures are cut short, one
   caption is merged into a paragraph, two figures are placed after page
   180's first paragraph, which gains 9 words of a cartoon. Until a rule
-  for such pages exists, `exclude_regions` in Turney's config fixes them.
+  for such pages exists, they can be fixed by hand: `exclude_regions` in
+  the book's `book.toml` lists boxes of a page (page index and four
+  coordinates in points) whose words galley leaves out, with a record.
 - Haynes' contents: pen circles on the scan cost two entries their
   chapter number; one page number misread "3x3" stays in its title.
 - Gierke's table of the titles of its notes (pages 61 to 67) comes out
   in 75 pieces, as messy as before: tables are not handled.
 - Kadesh 44's first box stops 4 pt above its last row of hieroglyphs;
-  Kadesh 33's map loses a 9 pt strip of its frame.
+  Kadesh 33's map loses a 9 pt strip (about 3 mm) of its frame.
 - The default run takes 69 s on 2,777 tests, over the minute asked for
   and under the plan's limit of 70 s by less than a second.
 
 What is asked of the owner:
 
 1. The order to merge `plan/lists-figures` into `main`. After it, runs
-   made before must redo analyze and the stages after it: four file
-   formats changed (pages.json 3, words.json 3, lines.json 4,
-   blocks.json 5), and galley refuses the old files, naming the stage to
-   run.
+   made before must redo analyze and every stage after it, because the
+   formats of four of the files passed between stages changed. galley
+   refuses an old file and names the stage to run; nothing is deleted.
 2. A look on the Kindle at `runs/lists-figures/haynes/book.epub`: the
    list of six stereotypes in the introduction, the contents with each
    entry opening its chapter, and two figures (one with its caption below,
