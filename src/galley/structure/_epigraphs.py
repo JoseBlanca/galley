@@ -93,6 +93,8 @@ def _line_height(line: PlacedLine) -> float:
 
 
 def _starts_with_dash(line: PlacedLine) -> bool:
+    """Whether the first word of `line` starts with a dash, "—", "–" or
+    "-" (spec section 22, rule 3)."""
     return bool(line.line.words) and line.line.words[0].text[:1] in _SOURCE_DASHES
 
 
@@ -191,7 +193,7 @@ def _source_first_lines(lines: Sequence[PlacedLine], quotation: tuple[int, ...])
     return count
 
 
-def _starts_line(line: PlacedLine) -> str:
+def _text_past_opening_marks(line: PlacedLine) -> str:
     """The line's text from its first character that is not passed over by
     the verse test: a quotation mark, a full stop, an ellipsis or a space."""
     text = " ".join(word.text for word in line.line.words)
@@ -210,7 +212,7 @@ def _form(quotation: Sequence[PlacedLine], column: Edges) -> QuotationForm:
         line.line.box.x0 >= leftmost + _TURNOVER_PT for line in quotation[1:]
     )
     starts = all(
-        _starts_line(line)[:1].isupper() or turnover
+        _text_past_opening_marks(line)[:1].isupper() or turnover
         for line, turnover in zip(quotation[1:], turnovers, strict=True)
     )
     short = all(
@@ -321,6 +323,10 @@ def _run(
 def _epigraph(
     lines: Sequence[PlacedLine], start: int, run: _Run, column: Edges
 ) -> Epigraph:
+    """The epigraph of `run`, whose lines are among `lines` and whose first
+    line, a stray mark or the quotation's, is at `start`: its source
+    without the leading dash and that dash's removal, and its quotation's
+    form against `column`, the edges the rule measures against."""
     source, source_dash = _source(tuple(lines[number] for number in run.source_lines))
     return Epigraph(
         start=start,
