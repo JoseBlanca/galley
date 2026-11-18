@@ -221,3 +221,29 @@ What mattered, all fixed (c09fc7c to 2305891):
 Checks at 2305891: 2,382 passed and 8 xfailed in 66.8 s; whole_book 80
 passed in 644 s. No record's choice of reading changed on the four
 books.
+
+## Tasks 3.1 to 3.3: notes collected at the back (stream `notes`)
+
+Merged at 74253e2 (9b375a2 to 887685e). A hanging number starts a
+paragraph; a bare number is an endnote marker in a run from 1; notes
+are grouped per chapter, numbering restarting, each group's heading
+kept as `Note.group`, and references matched within their chapter's
+group. On the owner's books:
+
+| | endnotes | groups with a heading | linked | linked to the wrong chapter |
+|---|---|---|---|---|
+| Turney | 613 (target 580) | 11 of 11 | 530 (target 450; 0 before) | 0 |
+| Haynes | 632 | 18 | 584 (127 before) | 0 (120 before) |
+
+Decided by the orchestrator on the stream's measurements: the group
+headings' likeness to their chapter's title is 0.85, not 0.75 (a heading
+is 0.94 to 1.00 alike to its own chapter, up to 0.76 to another); a
+group without a heading takes the chapter after the previous group's;
+three Turney causes fixed with rules that fire nowhere else on the
+eight books: page 262, where the right column's note numbers fell into
+the left column's lines; page 258, where the OCR read the first "1" as
+"x" (a misread marker takes value 1 from its place, keeping its printed
+reading); page 268, a stray "/" under a heading. The public-domain
+books' notes scores did not change (Domesday 1,279, Haskins 65, Mariéjol
+567); §12's count of Gierke's linked endnotes was corrected to 215, the
+number before this work.

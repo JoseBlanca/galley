@@ -386,19 +386,19 @@ task 2.1 (`Note.group`).
 they are cut (structure §12); its two columns per page and group
 headings at the top of a column are the case to watch.
 
-- [ ] 3.1 A hanging number starts a paragraph (rule 3), also at a page
+- [x] 3.1 A hanging number starts a paragraph (rule 3), also at a page
   break; a bare number as an endnote marker in a run from 1 outside
   `contents_pages`; the section's reach back stopping at the first
   heading block that is not a group heading; with the unit tests.
   Spec: structure §6, rule 3 and "At a page break"; §12, its first
   changed paragraph. Stream `notes`. Deliverable 1.
-- [ ] 3.2 Note groups, their headings as `Note.group` and the other
+- [x] 3.2 Note groups, their headings as `Note.group` and the other
   heading blocks of the section made paragraphs; the chapter of a
   group; references matched per group; with the unit tests. Spec:
   structure §12, "Note groups", "References", "The chapter of a
   group"; §14, "Levels", its sentence on the endnote section. Needs
   3.1. Stream `notes`. Deliverable 1.
-- [ ] 3.3 The whole-book tests of deliverables 2 and 3, and the counts
+- [x] 3.3 The whole-book tests of deliverables 2 and 3, and the counts
   in the report. Spec: structure §26, "Whole-book tests". Needs 3.2.
   Stream `notes`. Deliverables 2, 3.
 - [ ] Review of work package 3.
