@@ -782,6 +782,13 @@ than a note's short line does; so the rule is for margin notes only.
    its `contents_pages`), 3 of Mariéjol's notes and 1 line of Stubbs'
    index; none of Haynes'. A start inside a table cuts the table into
    more paragraphs than before; galley has no table kind (section 28).
+   A line whose first word is one character that is not a digit, with
+   a second word, hung so (5 to 20 pt left of the text edge), starts a
+   paragraph too when the next three lines of its page that start with
+   a hanging number read 2, 3 and 4: a note's "1" the OCR misread
+   (section 12, the misread marker; Turney's "x", page 258). Measured on
+   18 November 2026 on the eight books' `lines.json`, it starts that
+   line and no other.
 
 A line after a line that ends with a hyphen (its last word ends as
 section 5 asks of a first part, "-" after a letter or digit), unless
@@ -1862,13 +1869,18 @@ starts at 1, the second because Gierke's printed contents, pages 63 to
 66, start 13 lines with rising bare numbers from 139 (section 6, rule
 3), which would otherwise begin its section 120 pages early. A bare
 number that does not rise above the marker before it is no marker
-unless it reads 1, so it neither starts a run nor ends one: Turney's
-chapter Three opens its notes with a "1" the OCR read as "x" (page
-258), and its notes 2 to 48 do not rise above chapter Two's last, 48:
-they are later blocks of that note, not the starts of 47 runs too short
-for a section (a loss of 47 of Turney's notes, measured on 18 November
-2026 on the survey's configs; reading "x" as 1 is not done, since no
-other book shows it). The two forms make runs of their own: a bare
+unless it reads 1, so it neither starts a run nor ends one. A run of
+bare numbers may start with one **misread marker**: a paragraph whose
+first word is one character that is not a digit, with a word after it,
+when the next three paragraphs that start with a bare number read 2, 3
+and 4. Its marker is that character as the OCR read it, taken out as
+any marker (section 11), and its value is 1, given by its place before
+2, 3 and 4, as a note numbered per page takes its value from its place
+(section 11, "Its value"); no word is changed. Turney's chapter Three
+opens its notes with a "1" the OCR read as "x" (page 258): without this
+its notes 2 to 48, which do not rise above chapter Two's last, 48, were
+later blocks of that note, and its group was lost. Section 6, rule 3,
+starts such a paragraph. The two forms make runs of their own: a bare
 number neither goes on with nor ends a run of "N." markers, and the
 section's markers are those of the forms of its runs of at least 8.
 Gierke prints a bare "1" before some of the margin notes that layout
