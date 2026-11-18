@@ -119,13 +119,27 @@ def is_group_heading(
         return False
     before = next(
         (
-            earlier.piece.lines[-1]
+            line
             for earlier in reversed(entries[:position])
             if isinstance(earlier, BodyBlock)
+            for line in reversed(earlier.piece.lines)
+            if _has_letter_or_digit(line)
         ),
         None,
     )
     return before is None or _set_apart(entry.piece.lines[0], before, body_line_pitch)
+
+
+def _has_letter_or_digit(line: PlacedLine) -> bool:
+    """Whether a word of `line` holds a letter or a digit: a line without
+    one, a speck the OCR read as "/", is passed over (spec section 12)."""
+    return any(
+        character.isalnum() for word in line.line.words for character in word.text
+    )
+
+
+def _piece_has_letter_or_digit(piece: Piece) -> bool:
+    return any(_has_letter_or_digit(line) for line in piece.lines)
 
 
 def _set_apart(line: PlacedLine, before: PlacedLine, body_line_pitch: float) -> bool:
@@ -268,16 +282,31 @@ def note_groups(
         if number in dropped or number == 0:
             continue
         before = endnotes[number - 1]
-        heading = before.paragraphs[-1]
-        if not is_group_heading(entries, heading, body_line_pitch):
+        # A block with no letter or digit, a speck, is passed over.
+        place = next(
+            (
+                place
+                for place in range(len(before.paragraphs) - 1, -1, -1)
+                if _piece_has_letter_or_digit(entries[before.paragraphs[place]].piece)
+            ),
+            None,
+        )
+        rest = (
+            before.paragraphs[:place] + before.paragraphs[place + 1 :]
+            if place is not None
+            else ()
+        )
+        if (
+            place is None
+            or (place == 0 and rest)
+            or not is_group_heading(entries, before.paragraphs[place], body_line_pitch)
+        ):
             continue
-        headings[number] = heading
-        if len(before.paragraphs) == 1:
+        headings[number] = before.paragraphs[place]
+        if not rest:
             dropped.add(number - 1)
         else:
-            endnotes[number - 1] = EndnoteParagraphs(
-                before.marker, before.paragraphs[:-1]
-            )
+            endnotes[number - 1] = EndnoteParagraphs(before.marker, rest)
     kept_starts = tuple(number for number in starts if number not in dropped)
     groups: list[NoteGroup] = []
     for number, endnote in enumerate(endnotes):
@@ -379,7 +408,19 @@ def _heading_lines_start(piece: Piece, body_line_pitch: float) -> int | None:
             number
             for number in range(len(lines) - 1, 0, -1)
             if len(lines) - number <= _GROUP_HEADING_MAX_LINES
-            and _set_apart(lines[number], lines[number - 1], body_line_pitch)
+            and _has_letter_or_digit(lines[number])
+            and (
+                before := next(
+                    (
+                        line
+                        for line in reversed(lines[:number])
+                        if _has_letter_or_digit(line)
+                    ),
+                    None,
+                )
+            )
+            is not None
+            and _set_apart(lines[number], before, body_line_pitch)
         ),
         None,
     )
@@ -427,7 +468,14 @@ def with_group_headings_cut(
     cuts: dict[int, int] = {}
     for number, position in enumerate(paragraphs[1:], start=1):
         marker = section.markers.get(position)
-        before = paragraphs[number - 1]
+        before = next(
+            (
+                earlier
+                for earlier in reversed(paragraphs[:number])
+                if _piece_has_letter_or_digit(entries[earlier].piece)
+            ),
+            paragraphs[number - 1],
+        )
         entry = entries[before]
         if (
             marker is None

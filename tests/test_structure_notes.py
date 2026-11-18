@@ -590,3 +590,25 @@ def test_bare_number_in_a_section_of_dotted_markers_is_no_marker() -> None:
         f"{n}." for n in range(1, 10)
     )
     assert not any(note.group for note in blocks.notes)
+
+
+def test_group_heading_above_a_speck_is_still_the_group_heading() -> None:
+    # Turney's page 268: a "/" 5 pt high under the second heading, between
+    # it and note 1, is passed over; it stays a block of the note before.
+    first = _turney_group(1, _CHAPTERS[0], 50.0)
+    second = _turney_group(2, _CHAPTERS[1], first[-1].box.top + 30.0)
+    top = second[0].box.top + 14.0
+    speck = Line(
+        Box(310, top, 313, top + 5), (Word("/", Box(310, top, 313, top + 5), None),)
+    )
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, second[0], speck, *second[1:]),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(note.group for note in blocks.notes if note.group is not None) == (
+        f"1 {_CHAPTERS[0]}",
+        f"2 {_CHAPTERS[1]}",
+    )
+    assert _endnotes(blocks)[8][1].endswith(" / /")
