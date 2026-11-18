@@ -1990,7 +1990,10 @@ table of contents, refers to its own notes, and its glued numbers took
 endnotes 1 to 7 from Gierke's "Law1" (page 88), "communities2." (93)
 and the rest (decided in the review of 16 November 2026). Gierke's markers end with "." ("1.") and its
 references do not ("Law1"), so none reads as its marker; linked as
-section 11 says, 205 of them are, 186 by an exact value. Maitland's
+section 11 says, 215 of them are, 193 by an exact value (measured on
+18 November 2026 on the layout of the plan owner-books at 4d9f1e9, the
+same as the clean-text build's; the 205 and 186 written before were of
+an earlier build). Maitland's
 introduction (pages 0 to 85) has notes of its own, printed on pages 62
 to 64; they were not studied, and stay where they are now.
 
@@ -2001,10 +2004,28 @@ lower case, are the most alike (`difflib.SequenceMatcher` ratio, at
 least 0.85) to the group heading's letters in
 lower case, once a first word that is a chapter label word or a
 number, and a number after a label word, are dropped ("Chapter 1." and
-Turney's leading "2"); a group without a heading, or whose heading is
-alike to none, takes the first level-1 heading after the chapter of
-the group before (the first after `contents_pages` for the first
-group). A label is not compared: Haynes' body heading has "CHAPTER ONE"
+Turney's leading "2"). The groups follow the chapters' order, so a
+group without a heading, or whose heading is alike to none, takes its
+chapter by counting from the nearest group before it that found its
+chapter by its heading: the n-th level-1 heading after that chapter,
+for the n-th group after that group; when there is no such group
+before it, or that heading would not lie before the chapter of the
+nearest group after it found by its heading, it counts back from that
+one instead, the n-th heading before it for the n-th group before;
+with neither, it counts from the first level-1 heading after
+`contents_pages`, the first group's. A count that falls outside the
+chapters, or back onto or before the chapter of the group before,
+gives the group no chapter, and it reaches no block. Before this revision a group
+without a heading took the heading after the chapter of the group
+before, so a first group whose heading was lost took the first
+level-1 heading after the contents (a preface, say) even when the
+group after it named its chapter. Counting cannot tell which chapter a
+group takes when another group between the counted ones was lost as
+well: on Turney, before the fixes of layout §3, step 5, and of the
+misread marker above, chapter Three's group was lost and chapter
+Four's heading too, and chapter Four's notes took chapter Three's
+references, 40 links in the wrong chapter, and the counting gives the
+same. A label is not compared: Haynes' body heading has "CHAPTER ONE"
 in its label and its group heading "Chapter 1.", and the titles match
 ("AMD" for "AND" in the body's OCR still gives a ratio above 0.9). The
 0.85 is not the running heads' 0.70 (section 3), since it is set
