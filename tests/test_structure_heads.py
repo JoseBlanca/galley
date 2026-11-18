@@ -592,9 +592,8 @@ def test_whole_book_running_heads_of_the_reference_pages_are_removed(
 def test_whole_book_haskins_195_notes_set_close_under_the_text_are_notes(
     whole_book_blocks: Callable[[str], BlocksFile],
 ) -> None:
-    # The excerpt cannot give them: its page 195 follows page 66's
-    # "BIBLIOGRAPHICAL NOTE" with no chapter heading between, so its band
-    # is taken for that note's paragraphs (spec section 16).
+    # Set close under the text, 1.06 pitches below it (layout spec
+    # section 3, step 4).
     blocks = whole_book_blocks("normansineuropea00hask")
     assert tuple(
         (note.marker, note.origin[0].page_index)

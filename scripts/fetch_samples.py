@@ -203,8 +203,26 @@ EVALUATION_EXCERPTS = frozendict(
                 # pitch of 15.09 pt and the marker form digits, and page
                 # 55's note row, 16.6 pt below the row above, then falls
                 # within 1.1 pitches and makes a band the book does not
-                # have.
-                page_indices=(22, 23, 24, 27, 28, 29, 30, 31, 55, 64, 66, 195, 235),
+                # have. And 163, the first page of chapter VI: without a
+                # chapter heading between page 66's "BIBLIOGRAPHICAL NOTE"
+                # and page 195, structure took 195's footnotes for that
+                # note's paragraphs (structure spec section 16).
+                page_indices=(
+                    22,
+                    23,
+                    24,
+                    27,
+                    28,
+                    29,
+                    30,
+                    31,
+                    55,
+                    64,
+                    66,
+                    163,
+                    195,
+                    235,
+                ),
                 covers=(
                     "the cases of docs/specs/structure.md, section 26: a "
                     'word glued at a case change, "theAvre" (page index '
