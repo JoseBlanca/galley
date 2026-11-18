@@ -120,3 +120,17 @@ so that page 195's notes find their chapter.
 Checks at 11f3afe: 2,300 passed, 8 xfailed in 60.3 s; the whole-book
 set gave 79 passed and 1 failed, a test fixed in 39e14a8 and rerun
 alone.
+
+## Task 4.1: the epigraph rule (stream `epigraphs`)
+
+96339c7, 21914ae, 1d0aaa0, merged. The rule as pure functions over a
+page's body lines, not yet wired into structure (task 4.2). It finds
+Haynes' 21 epigraphs (8 of them verse, all 21 with a dash) and Turney's
+13 (three on one page; the survey had counted 12), and none on the six
+public-domain books. Changed in the spec by the orchestrator's decision
+(21914ae): the page's left edge is its leftmost body line that is not a
+heading, because on two Turney pages the epigraph has more lines than
+the text; a source may end 5 pt short of the quotation (3 pt before);
+a source may run over several lines, each ending within 5 pt of the
+first's right side (without that, Turney's back cover was an epigraph).
+The plan's and §26's count for Turney goes from 11 to 13.
