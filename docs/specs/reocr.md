@@ -545,11 +545,14 @@ the others stay in the layer. A layer word is that word when
   to the other Tesseract words. Of those that no rule then matches, the
   layer's junk is replaced too, as the same printed word read a second
   time: a word under it that is no known word as printed (rule (d)
-  below) and whose letters are unlike its own. A known word under it
-  stays in the layer, below, since it may be another printed word that
-  the layer read rightly (on the four books, 2 words: "14." under
-  Tesseract's "146" and "18;", Gierke pages 63 and 66, in a list of page
-  numbers; owner-books plan, 18 November 2026).
+  below) and whose letters are unlike its own, or a number whose digits
+  are the first digits of the Tesseract word's number, fewer: the
+  layer's broken reading of it ("14." under Tesseract's "146" and "18;"
+  under "185", Gierke pages 63 and 66, in the lists of page numbers,
+  where the page image of page 63 shows "146" only; review of 18
+  November 2026). Another known word under it stays in the layer, below,
+  since it may be another printed word that the layer read rightly (none
+  on the four books).
   A layer word alike, not equal, to the Tesseract word is not taken by
   the exception when it has 2 letters or more than the Tesseract word:
   the layer may have glued another printed word to it. On Domesday page
@@ -724,7 +727,8 @@ Tesseract words within 16 pt) go from 30 to 4 on Domesday, 12 to 0 on
 Gierke and 6 to 5 on Stubbs, none on Haskins; no record's choice changes
 (section 3); 34 copies on Domesday, 16 on Gierke and 1 on Stubbs are
 replaced, and one layer word is no longer: "14." under Tesseract's "146"
-on Gierke page 63, a known number, now left beside it. On Domesday page
+on Gierke page 63, a known number, left beside it until the broken
+number was taken as junk too (above). On Domesday page
 107 the copy "the" is better than Tesseract's "th", which the record
 keeps, as before.
 
