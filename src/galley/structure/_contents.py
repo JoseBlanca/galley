@@ -11,8 +11,15 @@ from difflib import SequenceMatcher
 from fractions import Fraction
 
 from galley.model import Removal, RemovalReason, Word
+from galley.structure._headings import OCR_ROMAN_LABEL
 from galley.structure._heads import starts_with_chapter_label_word
-from galley.structure._lines import PlacedLine, is_centred, starts_paragraph, with_words
+from galley.structure._lines import (
+    PlacedLine,
+    is_centred,
+    line_texts,
+    starts_paragraph,
+    with_words,
+)
 from galley.structure._measures import (
     has_letter_or_digit,
     is_page_number_form,
@@ -56,10 +63,6 @@ _RANGE_WORD = re.compile(
 _PAGES_WORDS = frozenset({"pp.", "p."})
 # Leader dots are words made only of these.
 _LEADER_CHARACTERS = frozenset(".•·…")
-# Spec section 14: a roman numeral alone as the OCR reads one; rule 7 of
-# section 30 asks for its ".".
-_OCR_ROMAN = re.compile(r"[IVXLCl1]{1,5}\.?")
-_OCR_ROMAN_WITH_DOT = re.compile(r"[IVXLCl1]{1,5}\.")
 # Spec section 30, rule 7: a number of 1 or 2 digits with ".", and the
 # English number words.
 _NUMBER_LABEL = re.compile(r"[0-9]{1,2}\.")
@@ -90,21 +93,27 @@ _NUMBER_WORDS = frozenset(
 _SECTION_SIGN = "§"
 
 
-def _texts(line: PlacedLine) -> tuple[str, ...]:
-    return tuple(word.text for word in line.line.words)
+# Spec section 30, "Terms": a lone label is a chapter label word and at
+# most one word more ("CHAPTER II.").
+_LONE_LABEL_MAX_WORDS = 2
 
 
-def is_lone_label(line: PlacedLine) -> bool:
+def _is_lone_label(line: PlacedLine) -> bool:
     """Spec section 30, "Terms": the line's first word is a chapter label
     word and it has at most one more word ("CHAPTER II.", "ESSAY I."), or
-    it is a roman numeral alone as the OCR reads one."""
-    texts = _texts(line)
+    it is a roman numeral alone as the OCR reads one (section 14)."""
+    texts = line_texts(line)
     if starts_with_chapter_label_word(texts):
         return len(texts) <= _LONE_LABEL_MAX_WORDS
-    return len(texts) == 1 and _OCR_ROMAN.fullmatch(texts[0]) is not None
+    return len(texts) == 1 and OCR_ROMAN_LABEL.fullmatch(texts[0]) is not None
 
 
-_LONE_LABEL_MAX_WORDS = 2
+def _marks(texts: Sequence[str]) -> int:
+    """How many of the first words of `texts` hold no letter or digit."""
+    marks = 0
+    while marks < len(texts) and not has_letter_or_digit(texts[marks]):
+        marks += 1
+    return marks
 
 
 # Spec section 30, "Terms": a range of page numbers in three words.
@@ -144,7 +153,7 @@ def _number_form_length(texts: Sequence[str]) -> tuple[int, bool]:
     return length, ranged
 
 
-def page_number_length(words: Sequence[Word], right_edge: float) -> int:
+def _page_number_length(words: Sequence[Word], right_edge: float) -> int:
     """How many of the last words of `words`, an entry's or a line's, are
     its page number (spec section 30, "Terms"): words of a page number's
     form that are a range or have "pp." or "p." before them, or that are
@@ -171,7 +180,7 @@ def page_number_length(words: Sequence[Word], right_edge: float) -> int:
     return length if apart else 0
 
 
-def right_edges(lines: Sequence[PlacedLine]) -> frozendict[int, float]:
+def _right_edges(lines: Sequence[PlacedLine]) -> frozendict[int, float]:
     """The right side of the longest of `lines` on each page, by page
     index, in points."""
     edges: dict[int, float] = {}
@@ -215,10 +224,10 @@ def contents_title(lines: Sequence[PlacedLine]) -> ContentsTitle:
     if first is None:
         return ContentsTitle(tuple(range(len(lines))), None)
     line = lines[first]
-    edge = right_edges(lines)[line.page_index]
+    edge = _right_edges(lines)[line.page_index]
     title = (
         None
-        if page_number_length(line.line.words, edge) or is_lone_label(line)
+        if _page_number_length(line.line.words, edge) or _is_lone_label(line)
         else first
     )
     return ContentsTitle(tuple(range(first)), title)
@@ -251,14 +260,14 @@ def _pieces(lines: Sequence[PlacedLine]) -> tuple[tuple[PlacedLine, ...], ...]:
     pieces: list[list[PlacedLine]] = []
     before: PlacedLine | None = None
     for line in lines:
-        if not pieces or starts_paragraph(line, before) or is_lone_label(line):
+        if not pieces or starts_paragraph(line, before) or _is_lone_label(line):
             pieces.append([])
         pieces[-1].append(line)
         before = line
     return tuple(tuple(piece) for piece in pieces)
 
 
-def is_analytical_summary(piece: Sequence[PlacedLine]) -> bool:
+def _is_analytical_summary(piece: Sequence[PlacedLine]) -> bool:
     """Spec section 30, rule 3: at least 2 lines, at least 2 inline page
     references, and at least one for every five lines. An inline page
     reference is neither the first nor the last word of its line."""
@@ -295,14 +304,14 @@ def _raw_entries(
     raws: list[_Raw] = []
     label: tuple[PlacedLine, ...] = ()
     for piece in _pieces(lines):
-        if is_lone_label(piece[0]):
+        if _is_lone_label(piece[0]):
             if label:
                 raws.append(_Raw(label, (), summary=False))
             label = (piece[0],)
             piece = piece[1:]
             if not piece:
                 continue
-        if is_analytical_summary(piece):
+        if _is_analytical_summary(piece):
             raws.append(_Raw(label, piece, summary=True))
             label = ()
             continue
@@ -322,7 +331,7 @@ def _raw_entries(
             after = piece[position + 1] if position + 1 < len(piece) else None
             if (
                 after is None
-                or page_number_length(line.line.words, edges[line.page_index]) > 0
+                or _page_number_length(line.line.words, edges[line.page_index]) > 0
                 or (
                     after.line.box.x0 - current[0].line.box.x0 < _RUN_ON_MIN_PT
                     and line_has_letter_or_digit(after.line)
@@ -349,16 +358,14 @@ def _label_length(texts: Sequence[str]) -> int:
     """How many of the first words of `texts` are an entry's label by rule
     7 of spec section 30, the words with no letter or digit before it
     among them; 0 when it has none or no word follows it."""
-    marks = 0
-    while marks < len(texts) and not has_letter_or_digit(texts[marks]):
-        marks += 1
+    marks = _marks(texts)
     rest = texts[marks:]
     if not rest:
         return 0
     first = rest[0]
     if (
         _NUMBER_LABEL.fullmatch(first)
-        or _OCR_ROMAN_WITH_DOT.fullmatch(first)
+        or (OCR_ROMAN_LABEL.fullmatch(first) and first.endswith("."))
         or first.rstrip(".").lower() in _NUMBER_WORDS
     ):
         length = 1
@@ -392,7 +399,7 @@ def _parts(
         return label, placed, None, ()
     texts = tuple(item.word.text for item in placed)
     number_length = (
-        page_number_length(
+        _page_number_length(
             tuple(item.word for item in placed),
             edges[raw.lines[placed[-1].line].page_index],
         )
@@ -440,12 +447,12 @@ def contents_entries(lines: Sequence[PlacedLine]) -> tuple[ContentsEntry, ...]:
     # label word.
     nearest: int | None = None
     chapters_seen = False
-    edges = right_edges(lines)
+    edges = _right_edges(lines)
     for raw in _raw_entries(lines, edges):
         label, placed, page_number, removals = _parts(raw, edges)
         title_texts = tuple(item.word.text for item in placed)
         chapter = label is not None and starts_with_chapter_label_word(
-            tuple(label.split(" ")[_marks_before(label) :])
+            tuple(label.split(" ")[_marks(label.split(" ")) :])
         )
         first = (raw.label_lines + raw.lines)[0]
         topics = _topics(raw, title_texts)
@@ -480,24 +487,15 @@ def contents_entries(lines: Sequence[PlacedLine]) -> tuple[ContentsEntry, ...]:
     return tuple(entries)
 
 
-def _marks_before(label: str) -> int:
-    """How many of the label's first words hold no letter or digit."""
-    words = label.split(" ")
-    marks = 0
-    while marks < len(words) and not has_letter_or_digit(words[marks]):
-        marks += 1
-    return marks
-
-
 # Spec section 30, rule 9: a candidate's title holds at least 4 letters; two
 # plain texts match when SequenceMatcher's ratio is at least 0.7, measured
 # on the candidates of the seven books with contents pages (section 30,
 # "The thresholds").
 _CANDIDATE_MIN_LETTERS = 4
-MATCH_MIN_RATIO = Fraction(7, 10)
+_MATCH_MIN_RATIO = Fraction(7, 10)
 
 
-def plain(text: str) -> str:
+def _plain(text: str) -> str:
     """`text` made plain (spec section 30, rule 9): case-folded, every
     character that is not a letter made a space, the spaces collapsed to
     one and stripped."""
@@ -511,9 +509,10 @@ def is_link_candidate(title: str) -> bool:
     return sum(c.isalpha() for c in title) >= _CANDIDATE_MIN_LETTERS
 
 
-def match_ratio(first: str, second: str, min_ratio: Fraction) -> Fraction | None:
-    """SequenceMatcher's ratio of two plain texts, exact, when it is at
-    least `min_ratio`; None otherwise."""
+def _match_ratio(first: str, second: str) -> Fraction | None:
+    """SequenceMatcher's ratio of two plain texts, exact, when they match:
+    when it is at least 0.7; None otherwise."""
+    min_ratio = _MATCH_MIN_RATIO
     matcher = SequenceMatcher(None, first, second, autojunk=False)
     if matcher.real_quick_ratio() < min_ratio or matcher.quick_ratio() < min_ratio:
         return None
@@ -526,9 +525,7 @@ def match_ratio(first: str, second: str, min_ratio: Fraction) -> Fraction | None
 
 
 def run_links(
-    candidates: Sequence[str],
-    headings: Sequence[str],
-    min_ratio: Fraction = MATCH_MIN_RATIO,
+    candidates: Sequence[str], headings: Sequence[str]
 ) -> tuple[tuple[int, int], ...]:
     """The links of one contents run (spec section 30, rule 9), as pairs of
     a position in `candidates`, the candidates' titles in the run's order,
@@ -538,13 +535,13 @@ def run_links(
     order, each in one pair at most; among those, the one whose ratios add
     up to the most, and then the one in which the first candidate whose
     pairing differs has the earlier heading."""
-    plain_candidates = tuple(plain(text) for text in candidates)
-    plain_headings = tuple(plain(text) for text in headings)
+    plain_candidates = tuple(_plain(text) for text in candidates)
+    plain_headings = tuple(_plain(text) for text in headings)
     ratios = {
         (i, j): ratio
         for i, candidate in enumerate(plain_candidates)
         for j, heading in enumerate(plain_headings)
-        if (ratio := match_ratio(candidate, heading, min_ratio)) is not None
+        if (ratio := _match_ratio(candidate, heading)) is not None
     }
     rows, columns = len(candidates), len(headings)
     zero = (0, Fraction(0))

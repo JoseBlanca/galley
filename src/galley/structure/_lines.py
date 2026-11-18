@@ -78,6 +78,11 @@ class Piece:
     unjoined: frozenset[int] = frozenset()
 
 
+def line_texts(line: PlacedLine) -> tuple[str, ...]:
+    """The texts of the line's words, in order."""
+    return tuple(word.text for word in line.line.words)
+
+
 def first_word(line: PlacedLine) -> str:
     """The text of the line's first word, "" when it has none."""
     return line.line.words[0].text if line.line.words else ""
