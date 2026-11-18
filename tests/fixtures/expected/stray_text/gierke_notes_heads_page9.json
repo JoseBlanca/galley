@@ -1,0 +1,20 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/plans/stray-text.md with the specs it amends (docs/specs/layout.md, section 3, step 4, \"Small against the page\"). Compared with galley's output at be06218 (the starting commit's code): as expected: in this excerpt the body word height is the introduction's (most of its pages), so the notes are small already; the whole book, whose body height the translation sets, is where they are not (the whole-book test of work package 3).",
+  "excerpt": "gierke_notes_heads",
+  "page": 9,
+  "book_page_index": 146,
+  "checks": "the page's footnotes, 8 pt under a body of 10 to 11 pt, are notes, from the first",
+  "printed": {
+    "footnotes": [
+      "* In other, and to Englishmen more familiar …"
+    ]
+  },
+  "expected": {
+    "footnotes": [
+      {
+        "marker": "*",
+        "text_starts": "In other, and to Englishmen more familiar"
+      }
+    ]
+  }
+}
