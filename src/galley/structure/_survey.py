@@ -254,11 +254,24 @@ def like_a_running_head(line_letters: str, running_letters: tuple[str, ...]) -> 
     return _alike_to_any(line_letters, running_letters, _LIKE_A_HEAD)
 
 
+# Spec section 3: the head of a short section and a plate's topmost line
+# (section 18, rule 1) compare letters only within 8 of each other, the
+# limit of section 3 before it was raised to 14 on 18 November 2026 for the
+# survey's head lines alone; these two tests were not measured at 14.
+_OTHER_HEAD_LENGTH_DIFFERENCE = 8
+_OTHER_HEADS_ALIKE = _Alike(
+    min_letters=_HEAD_MIN_LETTERS,
+    ratio=_HEAD_ALIKE_RATIO,
+    max_length_difference=_OTHER_HEAD_LENGTH_DIFFERENCE,
+)
+
+
 def alike_to_a_head(line_letters: str, others: tuple[str, ...]) -> bool:
     """Whether `line_letters`, the letters of a line, are alike to any of
     `others` by section 3's rule for running heads: at least 4 letters,
-    0.70 alike."""
-    return _alike_to_any(line_letters, others, _HEADS_ALIKE)
+    0.70 alike, compared only with letters at most 8 more or fewer, as the
+    head of a short section and a plate's topmost line are."""
+    return _alike_to_any(line_letters, others, _OTHER_HEADS_ALIKE)
 
 
 def _alike_pages(
