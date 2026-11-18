@@ -14,7 +14,7 @@ from dataclasses import replace
 import pytest
 
 from galley.book_folder import BookFolder
-from galley.errors import FidelityBoundary
+from galley.errors import FidelityBoundary, FidelityError
 from galley.fidelity import check_stage
 from galley.model import (
     BlockKind,
@@ -856,6 +856,54 @@ def test_page_break_off_the_index_pages_ends_the_paragraph() -> None:
         (_parts(20, page_20, index_page=False), _parts(21, page_21, index_page=False))
     )
     assert len(entries) == 2
+
+
+# A source's dash and the fidelity check (spec section 22, "The dash is
+# look, not text").
+
+
+def test_line_of_dashes_alone_is_no_source_line() -> None:
+    lines = _haynes_page("—")
+    assert epigraphs_after_heading(lines, 1, len(lines), _COLUMN) == ()
+
+
+def test_dash_removal_leaving_no_word_is_refused_by_the_fidelity_check() -> None:
+    page = _chapter_page(30, *_HAYNES_EPIGRAPH)
+    lines = LinesFile(source_pdf_sha256=_HASH, pages=(page,), rereads=())
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    emptied = replace(
+        blocks,
+        word_changes=(
+            WordChange(
+                page_index=30,
+                before=("—",),
+                after=("",),
+                reason=ChangeReason.SOURCE_DASH,
+            ),
+        ),
+    )
+    with pytest.raises(FidelityError, match="is not a source_dash"):
+        check_stage(FidelityBoundary.STRUCTURE, lines, emptied)
+
+
+def test_source_dash_comes_after_the_quotation_s_hyphen_join() -> None:
+    # The dash's removal is placed after the quotation's last word, so
+    # that blocks.json lists the block's changes in the order of its words.
+    lines = (
+        _line(
+            "it was the best of times and the worst of times , the fool-",
+            _HAYNES_LEFT,
+            0,
+        ),
+        _line("ishness of the age of wisdom and the epoch of belief", _HAYNES_LEFT, 1),
+        _line("—Dickens", _HAYNES_LEFT, 2, _SOURCE_HEIGHT_PT),
+    )
+    blocks = _blocks(_chapter_page(30, *lines))
+    assert blocks.blocks[1].kind is BlockKind.EPIGRAPH
+    assert tuple(change.reason for change in blocks.word_changes) == (
+        ChangeReason.HYPHEN_JOIN_GUESSED,
+        ChangeReason.SOURCE_DASH,
+    )
 
 
 # Structure spec section 26, "Whole-book tests": none of the six
