@@ -511,6 +511,31 @@ def test_flush_left_head_line_above_the_head_top_is_no_heading(
     assert len(_headings(blocks)) == headings
 
 
+def test_head_line_9_letters_longer_than_a_running_head_and_0_6_alike_is_a_heading() -> (
+    None
+):
+    # Spec section 3, "Heads of different lengths": section 14's test of a
+    # line alike to a running head keeps its limit of 8 letters. Page 14's
+    # head line, centred in capitals at 40 pt, has the 8 letters of the
+    # running head "MY THINGS" and 9 more, 0.64 alike to it: under the 0.70
+    # of a running head, and 9 letters apart, so it is a heading.
+    line = "MY THINGS ABCDEFGHI"
+    page = PageLayout(
+        14,
+        (
+            _region(_line(line, 122.5 - _CHAR_PT * len(line) / 2, 40)),
+            _region(*_running_text(100, 12)),
+        ),
+        (),
+    )
+    lines = _lines_of(
+        *(_page_with_head(index, "MY THINGS") for index in range(10, 14)),
+        page,
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _headings(blocks) == ((1, None, line),)
+
+
 @pytest.mark.parametrize(
     ("line", "headings"),
     [("A BOOK OF WINTERS", ()), ("A NEW BEGINNING", ((1, None, "A NEW BEGINNING"),))],
