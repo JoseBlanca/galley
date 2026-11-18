@@ -300,6 +300,13 @@ _SAME_TEXT_REACH_PT = 16.0
 # Tesseract missed but numbers, which rule (c) leaves to (a) and (b); from
 # 0.5 to 0.6, 10 copies and 4 body words at the column's edge ("for" beside
 # "lord", Domesday page 310).
+# The exception in (a): a Tesseract word whose layer words under it are all
+# unlike it, with a layer word of its letters left unmatched within 16 pt,
+# pairs with that word by (b) or (c), and the junk under it stays in the
+# layer ("tem<" beside Tesseract's "tem," over the junk '^"i', Domesday page
+# 26). Counted on the clean-text build of 17 November 2026, 55 layer words
+# of Stubbs, Domesday and Gierke stayed beside a kept record's word of their
+# letters, 47 of them over junk or a word of the next line.
 # A layer word glued over two or three Tesseract words is the same printed
 # words as they ("of,96" where Tesseract read "of," "96", Stubbs' index page
 # 312): each Tesseract word's middle lies inside its box widened by 1 pt.
@@ -450,17 +457,11 @@ def _middle_inside(ocr_word: Word, word: Word) -> bool:
     )
 
 
-def may_read(word: Word, ocr_word: Word) -> bool:
-    """Whether `ocr_word`, Tesseract's, may be a reading of the printed
-    word that `word`, a word of the text layer, reads, by one of the rules
-    of `replaced_layer_words` taken alone, whatever other words match:
-    `word` lies under it, or, within 16 pt above or below, its letters and
-    digits are those of `word`, or its letters are alike to those of a
-    `word` of 3 letters or more. Boxes in points."""
-    if _is_under(word, ocr_word):
-        return True
-    if abs(word_middle(ocr_word)[1] - word_middle(word)[1]) > _SAME_TEXT_REACH_PT:
-        return False
+def _letters_read_by(word: Word, ocr_word: Word) -> bool:
+    """Whether the letters and digits of `word`, a layer word, equal those
+    of `ocr_word`, Tesseract's, or, for a `word` of 3 letters or more, its
+    letters are alike to those of `ocr_word`: what (b) and (c) pair, without
+    the distance."""
     return (
         bool(folded_letters_and_digits(word.text))
         and folded_letters_and_digits(word.text)
@@ -471,17 +472,92 @@ def may_read(word: Word, ocr_word: Word) -> bool:
     )
 
 
+def _within_reach(word: Word, ocr_word: Word) -> bool:
+    """Whether the middles of `word` and `ocr_word` lie within 16 pt of
+    each other up or down."""
+    return abs(word_middle(ocr_word)[1] - word_middle(word)[1]) <= _SAME_TEXT_REACH_PT
+
+
+def may_read(word: Word, ocr_word: Word) -> bool:
+    """Whether `ocr_word`, Tesseract's, may be a reading of the printed
+    word that `word`, a word of the text layer, reads, by one of the rules
+    of `replaced_layer_words` taken alone, whatever other words match:
+    `word` lies under it, or, within 16 pt above or below, its letters and
+    digits are those of `word`, or its letters are alike to those of a
+    `word` of 3 letters or more. Boxes in points."""
+    return _is_under(word, ocr_word) or (
+        _within_reach(word, ocr_word) and _letters_read_by(word, ocr_word)
+    )
+
+
+def _distance(word: Word, ocr_word: Word) -> float:
+    """The distance of the middles of `word` and `ocr_word`, across plus up
+    or down."""
+    return abs(word_middle(ocr_word)[0] - word_middle(word)[0]) + abs(
+        word_middle(ocr_word)[1] - word_middle(word)[1]
+    )
+
+
 def _pairing(
     layer_words: Sequence[Word],
     ocr_words: Sequence[Word],
     is_known: Callable[[str], bool],
 ) -> tuple[tuple[bool, ...], frozenset[int]]:
     """Which of `layer_words` the rules of `replaced_layer_words` match,
-    and the positions in `ocr_words` of the Tesseract words they match."""
+    and the positions in `ocr_words` of the Tesseract words they match:
+    the rules applied once, then again with the Tesseract words of the
+    exception in (a) freed, when there are any."""
+    matched, taken = _pairing_freeing(layer_words, ocr_words, is_known, frozenset())
+    freed = _unlike_over_free_letters(layer_words, ocr_words, matched)
+    if not freed:
+        return matched, taken
+    return _pairing_freeing(layer_words, ocr_words, is_known, freed)
+
+
+def _unlike_over_free_letters(
+    layer_words: Sequence[Word], ocr_words: Sequence[Word], matched: Sequence[bool]
+) -> frozenset[int]:
+    """The positions in `ocr_words` of the exception in (a): a Tesseract
+    word with layer words of its line under it, not glued, whose letters
+    and digits are all unlike its own, and a layer word that `matched`
+    leaves unmatched within 16 pt above or below whose letters and digits
+    are equal or alike to its own."""
+    glued = {
+        position for word in layer_words for position in _glued_over(word, ocr_words)
+    }
+    return frozenset(
+        position
+        for position, ocr_word in enumerate(ocr_words)
+        if position not in glued
+        and (line := _under_line(layer_words, ocr_word))
+        and not any(_letters_read_by(layer_words[index], ocr_word) for index in line)
+        and any(
+            not matched[index]
+            and _within_reach(word, ocr_word)
+            and _letters_read_by(word, ocr_word)
+            for index, word in enumerate(layer_words)
+        )
+    )
+
+
+def _pairing_freeing(
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    is_known: Callable[[str], bool],
+    freed: frozenset[int],
+) -> tuple[tuple[bool, ...], frozenset[int]]:
+    """Which of `layer_words` the rules of `replaced_layer_words` match,
+    and the positions in `ocr_words` of the Tesseract words they match,
+    with the Tesseract words at `freed` left out of (a) and paired by (b)
+    or (c); one that neither pairs takes the words under it by (a) after
+    all."""
     # (a): a Tesseract word with layer words under it reads the printed
     # words of one line, whatever the texts, and pairs with no other.
     under_line = {
-        index for ocr_word in ocr_words for index in _under_line(layer_words, ocr_word)
+        index
+        for position, ocr_word in enumerate(ocr_words)
+        if position not in freed
+        for index in _under_line(layer_words, ocr_word)
     }
     # (a) also: a layer word glued over two or three Tesseract words, which
     # read it and pair with no other.
@@ -496,24 +572,20 @@ def _pairing(
     taken = {
         position
         for position, ocr_word in enumerate(ocr_words)
-        if any(_is_under(word, ocr_word) for word in layer_words)
+        if position not in freed
+        and any(_is_under(word, ocr_word) for word in layer_words)
     } | {position for positions in glued.values() for position in positions}
     # (b): the pairs of a layer word and a Tesseract word of its text, the
     # nearest first, each word in one pair at most.
     pairs = sorted(
-        (
-            abs(word_middle(ocr_word)[0] - word_middle(word)[0])
-            + abs(word_middle(ocr_word)[1] - word_middle(word)[1]),
-            index,
-            position,
-        )
+        (_distance(word, ocr_word), index, position)
         for index, word in enumerate(layer_words)
         if not under[index] and folded_letters_and_digits(word.text)
         for position, ocr_word in enumerate(ocr_words)
         if position not in taken
         and folded_letters_and_digits(ocr_word.text)
         == folded_letters_and_digits(word.text)
-        and abs(word_middle(ocr_word)[1] - word_middle(word)[1]) <= _SAME_TEXT_REACH_PT
+        and _within_reach(word, ocr_word)
     )
     matched = list(under)
     for _, index, position in pairs:
@@ -524,23 +596,24 @@ def _pairing(
     # word whose letters are alike, the nearest first, each word in one
     # pair at most.
     alike_pairs = sorted(
-        (
-            abs(word_middle(ocr_word)[0] - word_middle(word)[0])
-            + abs(word_middle(ocr_word)[1] - word_middle(word)[1]),
-            index,
-            position,
-        )
+        (_distance(word, ocr_word), index, position)
         for index, word in enumerate(layer_words)
         if not matched[index] and _letter_count(word.text) >= _ALIKE_LEAST_LETTERS
         for position, ocr_word in enumerate(ocr_words)
         if position not in taken
-        and abs(word_middle(ocr_word)[1] - word_middle(word)[1]) <= _SAME_TEXT_REACH_PT
+        and _within_reach(word, ocr_word)
         and _are_alike(word.text, ocr_word.text)
     )
     for _, index, position in alike_pairs:
         if not matched[index] and position not in taken:
             matched[index] = True
             taken.add(position)
+    # A freed Tesseract word that (b) and (c) did not pair reads the words
+    # under it, as (a) would have had it.
+    for position in sorted(freed - taken):
+        for index in _under_line(layer_words, ocr_words[position]):
+            matched[index] = True
+        taken.add(position)
     # (d): a layer word not known, over two or three Tesseract words of its
     # line left free, whatever the texts: the layer glued and misread them
     # ("lo/.," over "10" "f.,").
@@ -584,7 +657,13 @@ def replaced_layer_words(
     left unmatched whose middles lie inside its box, widened by 1 pt
     across only, are two or three consecutive words of one line, a word
     the layer glued and misread. A Tesseract word is matched in (a) by any layer word under
-    it, whatever its text, and by a layer word glued over it; in (b) and (c) the pairs of a layer word and a
+    it, whatever its text, and by a layer word glued over it, but for one
+    exception: when the letters and digits of every layer word of its line
+    under it are unlike its own (neither equal nor alike as in (b) and
+    (c)), and a layer word that the rules leave unmatched lies within 16 pt
+    above or below with letters equal or alike to its own, it is left to
+    (b) and (c), and the words under it to the other `ocr_words`; if
+    neither pairs it, it reads the words under it after all. In (b) and (c) the pairs of a layer word and a
     Tesseract word are taken nearest first, by the distance of their
     middles across plus up or down, each word in one pair at most. A layer
     word matched by none stays in the layer. Boxes in points.

@@ -54,6 +54,7 @@ from galley.model import (
     TextSource,
     Word,
     WordsFile,
+    folded_letters_and_digits,
     read_blocks,
     read_lines,
     read_words,
@@ -2605,6 +2606,71 @@ def _margin_notes_of_page(blocks_json: Path, page: int) -> tuple[str, ...]:
         for block in read_blocks(blocks_json).blocks
         if block.kind is BlockKind.MARGIN_NOTE and block.origin[0].page_index == page
     )
+
+
+# domesday_rereads: excerpt pages 0, 2, 6, 8 and 10 are book page indices
+# 26, 36, 139, 150 and 160. The text layer holds, beside a margin note's
+# last word, its own reading a few points off and junk under Tesseract's
+# word (reocr spec, section 4, "A pairing by letters wins over a word under
+# it whose letters are unlike"). The printed notes are those the assistant
+# read on the 300-dpi renders (tests/fixtures/expected/owner_books_wp1/).
+_DOMESDAY_REREADS = "domesday_rereads"
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+@pytest.mark.parametrize(
+    ("page", "layer_word"),
+    [(0, "tem<"), (2, "scat'"), (6, "midlands."), (8, "taxes>"), (10, "Justice-")],
+)
+def test_reread_domesday_margin_note_word_of_the_layer_beside_is_read_once(
+    page: int, layer_word: str, excerpt_books: frozendict[str, BookFolder]
+) -> None:
+    # The layer's second reading of the note's last word is replaced by
+    # Tesseract's reading, not left beside it.
+    lines = read_lines(excerpt_books[_DOMESDAY_REREADS].lines_json)
+    assert any(
+        word.text == layer_word
+        for reread in lines.rereads
+        if reread.kept and reread.page_index == page
+        for word in reread.layer_words
+    )
+    # Tesseract's words have a confidence; the text layer's have none.
+    assert layer_word not in (
+        word.text
+        for page_layout in lines.pages
+        if page_layout.index == page
+        for region in page_layout.regions
+        for line in region.lines
+        for word in line.words
+        if word.ocr_confidence is None
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+@pytest.mark.parametrize(
+    ("page", "printed"),
+    [
+        # Tesseract reads the final full stop as a comma.
+        (0, "The survey and the geld system."),
+        (6, "Large manors in the midlands."),
+        (8, "The lord and his man's taxes."),
+        (10, "The sokeman and seignorial justice."),
+    ],
+)
+def test_reread_domesday_margin_note_read_once_has_the_printed_words(
+    page: int, printed: str, excerpt_books: frozendict[str, BookFolder]
+) -> None:
+    def letters(text: str) -> tuple[str, ...]:
+        return tuple(
+            folded
+            for word in text.split()
+            if (folded := folded_letters_and_digits(word))
+        )
+
+    notes = _margin_notes_of_page(excerpt_books[_DOMESDAY_REREADS].blocks_json, page)
+    assert letters(printed) in tuple(letters(note) for note in notes), notes
 
 
 @pytest.mark.whole_book

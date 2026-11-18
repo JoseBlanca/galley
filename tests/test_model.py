@@ -2264,6 +2264,76 @@ def test_ocr_word_matched_by_its_text_is_not_alike_to_another_layer_word() -> No
     )
 
 
+# The exception in (a): a pairing by letters wins over a word under a
+# Tesseract word whose letters are unlike (reocr spec, section 4).
+
+
+def test_unlike_junk_under_an_ocr_word_stays_and_its_letters_word_is_replaced() -> None:
+    # Domesday page 26: the layer's junk '^"i' lies under Tesseract's
+    # "tem," and its own "tem<" 7 pt below, out of the widened box.
+    junk, beside = _layer('^"i', 10, 101), _layer("tem<", 10, 107)
+    ocr = (_tesseract("tem,", 10, 100),)
+    assert model.replaced_layer_words((junk, beside), ocr, is_known=_unknown) == (
+        beside,
+    )
+
+
+def test_unlike_word_under_an_ocr_word_gives_way_to_an_alike_word_by_c() -> None:
+    # Domesday page 36: "scat'" beside Tesseract's "seat-", alike by (c)'s
+    # ratio (0.75), and junk under it.
+    junk, beside = _layer("~", 10, 101), _layer("scat'", 10, 107)
+    ocr = (_tesseract("seat-", 10, 100),)
+    assert model.replaced_layer_words((junk, beside), ocr, is_known=_unknown) == (
+        beside,
+    )
+
+
+def test_word_under_an_ocr_word_not_unlike_it_keeps_it() -> None:
+    # Stubbs' index page 315: the layer read "Eleanor" twice, under
+    # Tesseract's word and beside it; the one under it stays its pair.
+    under, beside = _layer("Eleanor", 10, 101), _layer("Eleanor,", 10, 107)
+    ocr = (_tesseract("Eleanor,", 10, 100),)
+    assert model.replaced_layer_words((under, beside), ocr, is_known=_unknown) == (
+        under,
+    )
+    # Alike, not equal, keeps it too.
+    alike = _layer("Elcanor", 10, 101)
+    assert model.replaced_layer_words((alike, beside), ocr, is_known=_unknown) == (
+        alike,
+    )
+
+
+def test_unlike_word_of_the_next_line_is_left_to_its_own_ocr_word() -> None:
+    # Gierke page 127: the layer's "vacant", of the next line, lies under
+    # Tesseract's "Empire." and under Tesseract's "vacant"; the layer's
+    # "Empire." lies 8 pt above, out of the widened box.
+    empire, vacant = _layer("Empire.", 10, 92), _layer("vacant", 10, 105)
+    ocr = (_tesseract("Empire.", 10, 100), _tesseract("vacant", 10, 109))
+    assert model.replaced_layer_words((empire, vacant), ocr, is_known=_unknown) == (
+        empire,
+        vacant,
+    )
+
+
+def test_unlike_word_under_an_ocr_word_with_no_word_of_its_letters_stays_paired() -> (
+    None
+):
+    junk, other = _layer('^"i', 10, 101), _layer("land", 10, 107)
+    ocr = (_tesseract("tem,", 10, 100),)
+    assert model.replaced_layer_words((junk, other), ocr, is_known=_unknown) == (junk,)
+
+
+def test_unlike_ocr_word_left_unpaired_keeps_the_words_under_it() -> None:
+    # Two of Tesseract's "tem," with junk under each, and one "tem" of the
+    # layer between them, nearer the second: the first keeps its junk.
+    first_junk, second_junk = _layer("~", 10, 101), _layer("^", 10, 121)
+    beside = _layer("tem", 10, 113)
+    ocr = (_tesseract("tem,", 10, 100), _tesseract("tem,", 10, 120))
+    assert model.replaced_layer_words(
+        (first_junk, beside, second_junk), ocr, is_known=_unknown
+    ) == (first_junk, beside)
+
+
 def _rereads_record(
     layer_words: tuple[Word, ...], ocr_words: tuple[Word, ...], *, kept: bool
 ) -> Reread:
