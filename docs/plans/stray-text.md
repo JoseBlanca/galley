@@ -104,6 +104,22 @@ Out:
   paragraph (page 23) and the Haskins footnote of page 28, both reported
   by the owner on 17 November.
 
+**Changed by work package 1**, measured with layout's own code on the
+eight books; the specs hold the rules and these numbers win over items
+1 to 4 above: the footnote band is 0.82 of the page's median row height
+(at 0.85 of the larger height, the last rows of two contents pages,
+Haskins 14 and Turney 10, became footnotes); one-line notes take a
+limit of 0.9 (10 Domesday pages and Gierke 61; 0.85 missed Domesday
+185); the head row joins only after a head row that is one word of 2 or
+3 digits (any page-number form changed six Stubbs pages with specks);
+an inkless page before the end of the front matter stays front matter
+(Haskins' endpapers 1 and 2); `domesday_notes` gains page 430 and
+`gierke_notes_heads` takes page 78 for 83, a title page with no head;
+the rule of item 4 moves nothing on Stubbs 34 and 143, whose tests
+check only that no body word moves. Gierke's introduction notes are
+already notes in the excerpt, whose body height is the introduction's,
+so only the whole-book count shows that fix.
+
 Decided without the owner, who said not to wait, each to be said in the
 report: pages.json gains the mark of item 1, so its format version
 rises by one, and the removal reasons gain one value
@@ -184,11 +200,11 @@ Deliverables:
 
 Tasks:
 
-- [ ] 1.1 The spec amendments of deliverable 1, in a commit of their
+- [x] 1.1 The spec amendments of deliverable 1, in a commit of their
   own, then the `first-reader` and `spec-reviewer` subagents.
-- [ ] 1.2 The formats of deliverable 2. Spec: architecture §8 as 1.1
+- [x] 1.2 The formats of deliverable 2. Spec: architecture §8 as 1.1
   amends it.
-- [ ] 1.3 The excerpts of deliverable 3 and their expected files under
+- [x] 1.3 The excerpts of deliverable 3 and their expected files under
   `tests/fixtures/expected/stray_text/`, each with how it was read, as
   `tests/fixtures/expected/lists_figures/` does. The expected files
   are tests marked to fail (`xfail` with `strict = true`) until their
@@ -233,11 +249,12 @@ Deliverables:
    `domesday_front_flow` page 200, `domesday_notes` 428,
    `gierke_notes_heads` 16 and 84).
 2. The excerpt tests of the footnotes pass: Gierke 15 to 18, 40 and 146
-   have their notes as notes; Domesday 163, 174 and 278 their one-line
-   note; Domesday 55 links "servus*." to its note.
+   have their notes as notes (already so in the excerpt, see "Changed
+   by work package 1"); Domesday 163, 174 and 278 their one-line note; Domesday 55 links "servus*." to its note.
 3. Whole-book counts, in the report and as tolerances in the whole-book
    tests: Gierke's notes left in the body on pages 15 to 49 at 0
-   (today all); Domesday's one-line notes in the body at 0 of the 8;
+   (today all); Domesday's one-line notes in the body at 0 of the 10,
+   and Gierke 61's;
    Domesday's unlinked references fall by at least 15 of the 20; no
    page of the eight books loses its footnote band; the running-head
    lines left in the body of Kadesh, Domesday and Gierke fall from 5
@@ -265,8 +282,8 @@ come out as margin notes.
 
 Deliverables:
 
-1. The `stubbs_cut_in` tests pass: pages 19, 34, 37 and 143 have their
-   notes as margin notes; on pages 120 and 125 no body word moves.
+1. The `stubbs_cut_in` tests pass: pages 19 and 37 have their notes as
+   margin notes; on pages 34, 120, 125 and 143 no body word moves.
 2. Whole-book, in the report and as a tolerance: Stubbs' margin notes
    left in the body fall from 169 to at most 110; the words moved out
    of the body that are body words by the evaluation's reference stay
