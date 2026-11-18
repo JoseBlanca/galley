@@ -21,7 +21,8 @@ from galley.model import (
     Word,
     block_text,
 )
-from galley.structure import make_blocks
+from galley.structure import make_blocks, reference_candidate
+from galley.structure._references import Candidate, NoteToMatch, match_endnotes
 
 _HASH = "a" * 64
 _NO_WORDS: frozenset[str] = frozenset()
@@ -724,3 +725,57 @@ def test_short_last_note_at_a_page_top_is_no_group_heading() -> None:
     blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     assert "10." in tuple(marker for marker, _ in _endnotes(blocks))
     assert not any(note.group for note in blocks.notes)
+
+
+# Spec section 12, "References": a reference that reads another number than
+# a note's is left unlinked when the note has its own reference or the
+# reference stands for a lost note.
+
+
+def _matched_pairs(
+    note_values: tuple[int, ...], references: tuple[str, ...]
+) -> tuple[tuple[str, int], ...]:
+    """Each link as (the reference's word, the linked note's value), of
+    endnotes `note_values` against glued references in reading order."""
+    notes = tuple(
+        NoteToMatch(position, 9, value) for position, value in enumerate(note_values)
+    )
+    candidates = tuple(
+        Candidate(0, position, 1, reference)
+        for position, word in enumerate(references)
+        if (reference := reference_candidate(word)) is not None
+    )
+    return tuple(
+        (references[link.candidate.word], note_values[link.note])
+        for link in match_endnotes(notes, candidates)
+    )
+
+
+def test_endnote_reference_of_a_note_whose_marker_was_lost_stays_unlinked() -> None:
+    # Haynes' page 301: notes 47 and 49 lost their markers into 46 and 48,
+    # and reference 46 was not read; 48 and 49 took notes 46 and 48.
+    assert _matched_pairs(
+        (45, 46, 48, 50),
+        ("word45.", "word47.", "word48.", "word49.", "word50."),
+    ) == (("word45.", 45), ("word48.", 48), ("word50.", 50))
+
+
+def test_endnote_reference_misread_with_a_confused_digit_keeps_its_link() -> None:
+    # Turney: printed 5 read "3", a digit pair the OCR confuses; no other
+    # reference reads 5 and note 3 has its own.
+    assert _matched_pairs(
+        (1, 2, 3, 4, 5, 6),
+        ("word1.", "word2.", "word3.", "word4.", "word3.", "word6."),
+    ) == tuple((f"word{n}.", n) for n in (1, 2, 3, 4)) + (
+        ("word3.", 5),
+        ("word6.", 6),
+    )
+
+
+def test_endnote_reference_standing_for_a_lost_note_stays_unlinked() -> None:
+    # Haynes' page 234: note 18 lost its marker and reference 19 was not
+    # read; reference 18 took note 19.
+    assert _matched_pairs((17, 19, 20), ("word17.", "word18.", "word20.")) == (
+        ("word17.", 17),
+        ("word20.", 20),
+    )
