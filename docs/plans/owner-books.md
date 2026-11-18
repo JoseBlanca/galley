@@ -401,7 +401,7 @@ headings at the top of a column are the case to watch.
 - [x] 3.3 The whole-book tests of deliverables 2 and 3, and the counts
   in the report. Spec: structure §26, "Whole-book tests". Needs 3.2.
   Stream `notes`. Deliverables 2, 3.
-- [ ] Review of work package 3.
+- [x] Review of work package 3.
 
 ## 4. Epigraphs, and a paragraph ended at a page break
 

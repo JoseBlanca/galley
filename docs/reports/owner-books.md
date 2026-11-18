@@ -247,3 +247,35 @@ reading); page 268, a stray "/" under a heading. The public-domain
 books' notes scores did not change (Domesday 1,279, Haskins 65, Mariéjol
 567); §12's count of Gierke's linked endnotes was corrected to 215, the
 number before this work.
+
+## Review 3: work package 3
+
+Of 887685e, by two reviewers (fidelity; spec, tests and conventions).
+No word was lost or added on the eight books. What mattered, all fixed
+(1201131 to ab79cbb):
+
+- **References linked to a note of another number**, on Haynes pages
+  234 and 301-302, where the OCR merged a note into the one before: a
+  reference is now refused when its number differs from the note's and
+  another reference reads the note's number, or when no note of the
+  group reads its own number. Haynes: 582 linked (584 before), 0 to a
+  note of another number (3 before). Turney keeps its 530, whose 8
+  differing numbers are OCR misreadings of the reference ("3" for a
+  printed "5"). Gierke links 208 (215 before): 2 of the 7 lost were
+  wrong; the other 5 were not checked against the page.
+- **A paragraph of a note could become a new note 1**, and a short note
+  a group heading (on built pages; no book does it today): the
+  misread-marker rule now needs a hung line, and only note 1 can be
+  taken as a group heading.
+- **Table rows split into paragraphs** by the hanging-number rule
+  (Domesday 158, 425, 479; Gierke's contents): the word after the
+  number must start with a letter or a quotation mark, and contents
+  pages are left out. Domesday has 2,382 blocks (2,381 before the plan);
+  its paragraph scores stay 0.860 / 0.891 (baseline 0.860 / 0.889).
+- Nine rules had no test that failed when broken; dead code; a group's
+  reach could run into a later group's chapter; constants written
+  twice.
+
+Checks: 2,423 passed and 8 xfailed in 62 s; whole_book 88 passed;
+galley-eval's notes scores unchanged (Domesday 1,279, Haskins 65,
+Mariéjol 567).
