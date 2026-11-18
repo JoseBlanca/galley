@@ -97,7 +97,7 @@ _BAND_GAP_PITCHES: Final[float] = 1.1
 # starts the band on 23 pages of the eight books (Haskins 5, Domesday 14,
 # Kadesh 3, Haynes 1), none in Stubbs, Mariéjol, Gierke or Turney.
 _NOTE_MARKER = re.compile(r"[0-9]{1,3}\.?|[*^•†‡§]{1,2}")
-_MARKER_ROW_WORDS = 2
+_MARKER_ROW_WORDS: Final[int] = 2
 # Measured on the six books (layout spec section 3, "Where the thresholds
 # come from"): a gutter is a strip 6 pt wide in the middle third of the
 # column; a word across it whose middle is more than 6 pt from the strip's
