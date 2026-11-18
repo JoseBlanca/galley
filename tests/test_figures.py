@@ -7,6 +7,7 @@ kadesh_29-38 (section 10).
 import functools
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -188,6 +189,91 @@ def test_figure_boxes_two_blocks_one_square_apart_are_two_figures_by_their_tops(
     assert figure_boxes(_page(lower_left, upper_right), (), (), _KNOWN) == (
         _in_points(upper_right),
         _in_points(lower_left),
+    )
+
+
+def test_figure_boxes_a_block_into_the_outer_band_at_the_top_reaches_its_top() -> None:
+    # From pixel row 3, inside the band's first square; the group's squares
+    # start at row 2.
+    block = (60, 3, 132, 72)
+    assert figure_boxes(_page(block), (), (), _KNOWN) == (_in_points(block),)
+
+
+def test_figure_boxes_a_block_into_the_outer_band_at_the_right_reaches_its_side() -> (
+    None
+):
+    # To pixel 297 of 300; the band is square columns 48 and 49.
+    block = (160, 60, 297, 132)
+    assert figure_boxes(_page(block), (), (), _KNOWN) == (_in_points(block),)
+
+
+def test_figure_boxes_known_words_in_the_band_strip_are_not_counted() -> None:
+    # 14 known words in square column 1, inside the band: in the box grown
+    # into the band, not in the group's own box, which starts at column 2.
+    block = (3, 60, 84, 132)
+    words = tuple(
+        ("the", Box(x, row * 12.0 + 5.5, x + 1.0, row * 12.0 + 6.5))
+        for row in range(10, 17)
+        for x in (15.0, 18.0)
+    )
+    assert figure_boxes(_page(block), words, (), _KNOWN) == (_in_points(block),)
+
+
+def _striped(block: tuple[int, int, int, int]) -> tuple[tuple[int, int, int, int], ...]:
+    """`block`, in pixels, as black columns one pixel wide on its even
+    pixels: inked squares with no run of ink across, as rows of
+    hieroglyphs have none."""
+    left, top, right, bottom = block
+    return tuple((x, top, x + 1, bottom) for x in range(left, right, 2))
+
+
+# A striped block of 12 by 12 squares from square column 10 and row 12,
+# and its ink's box: its last stripe ends at pixel 131.
+_STRIPED = _striped(_squares(10, 12, 12, 12))
+_STRIPED_BOX = _in_points((60, 72, 131, 144))
+
+
+def test_figure_boxes_a_rule_6_pt_above_a_block_is_cut_off() -> None:
+    # A rule of 80 pt, one pixel high in the square row above the block,
+    # 3 pixels (6 pt) above its top: its squares join the block's.
+    rule = (60, 68, 100, 69)
+    assert figure_boxes(_page(*_STRIPED, rule), (), (), _KNOWN) == (_STRIPED_BOX,)
+
+
+def test_figure_boxes_a_line_of_68_pt_above_a_block_is_not_cut_off() -> None:
+    line = (60, 68, 94, 69)
+    assert figure_boxes(_page(*_STRIPED, line), (), (), _KNOWN) == (
+        replace(_STRIPED_BOX, top=136.0),
+    )
+
+
+def test_figure_boxes_a_rule_4_pt_above_a_block_is_not_cut_off() -> None:
+    rule = (60, 69, 100, 70)
+    assert figure_boxes(_page(*_STRIPED, rule), (), (), _KNOWN) == (
+        replace(_STRIPED_BOX, top=138.0),
+    )
+
+
+# A figure shaped as an L lying on its back: 12 by 12 squares from square
+# column 10 and row 10, and an arm of 6 by 2 squares on its right at the
+# top; its box ends at pixel 168.
+_FIGURE_L = (_squares(10, 10, 12, 12), _squares(22, 10, 6, 2))
+
+
+def test_figure_boxes_a_small_group_with_its_middle_in_a_figures_box_grows_it() -> None:
+    # 5 by 3 squares under the arm, apart from the figure: its middle, at
+    # pixel 165, is inside the figure's box, its right side outside.
+    part = _squares(25, 15, 5, 3)
+    assert figure_boxes(_page(*_FIGURE_L, part), (), (), _KNOWN) == (
+        _in_points((60, 60, 180, 132)),
+    )
+
+
+def test_figure_boxes_a_small_group_with_its_middle_outside_does_not_grow_it() -> None:
+    # Its middle at pixel 177, right of the figure's box.
+    part = _squares(27, 15, 5, 3)
+    assert figure_boxes(_page(*_FIGURE_L, part), (), (), _KNOWN) == (
+        _in_points((60, 60, 168, 132)),
     )
 
 
@@ -548,6 +634,41 @@ def test_whole_book_analyze_finds_the_in_page_figures_of_section_2_and_no_other(
         page.index: len(page.figure_boxes) for page in pages if page.figure_boxes
     } == _WHOLE_BOOK_FIGURES[book]
     assert all(page.kind is PageKind.TEXT for page in pages if page.figure_boxes)
+
+
+# Whole Kadesh's boxes that steps 3 and 5 of figures spec section 3 make,
+# checked by eye on the 144 dpi render on 18 November 2026: 40, 44 and 53
+# without the rule under the running head; 41 the map alone, from its
+# frame's top rule, without "19." and the hieroglyphs above it; 50 and 51
+# with the right ends of their rows of hieroglyphs, which the words read
+# on them cut off. 44's bottom is 4 pt above the ink of its last row, whose
+# squares the words of the line below touch.
+_WHOLE_KADESH_BOXES = frozendict(
+    {
+        40: (Box(104.0, 108.0, 430.0, 240.0),),
+        41: (Box(54.0, 286.0, 180.0, 576.0),),
+        44: (Box(72.0, 112.0, 420.0, 204.0), Box(122.0, 450.0, 392.0, 660.0)),
+        50: (Box(106.0, 306.0, 400.0, 548.0),),
+        51: (Box(102.0, 396.0, 430.0, 536.0),),
+        53: (Box(78.0, 90.0, 458.0, 260.0),),
+    }
+)
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+def test_whole_kadesh_boxes_leave_out_rules_and_take_in_cut_off_parts(
+    whole_book_analyzed: Callable[[str], tuple[PageInfo, ...]],
+) -> None:
+    pages = whole_book_analyzed(_KADESH_BOOK)
+    for index, boxes in _WHOLE_KADESH_BOXES.items():
+        found = pages[index].figure_boxes
+        assert len(found) == len(boxes), index
+        assert all(_near(box, expected) for box, expected in zip(found, boxes)), (
+            index,
+            found,
+        )
 
 
 # layout's figure regions (figures spec section 5, "layout: the figure's
