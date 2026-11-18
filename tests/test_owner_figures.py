@@ -16,7 +16,15 @@ import pytest
 from galley import analyze
 from galley.book_folder import BookFolder
 from galley.config import read_config
-from galley.model import PageInfo, PageKind, read_pages
+from galley.model import (
+    Block,
+    BlockKind,
+    BlocksFile,
+    PageInfo,
+    PageKind,
+    block_text,
+    read_pages,
+)
 
 pytestmark = [pytest.mark.whole_book, pytest.mark.timeout(900)]
 
@@ -82,3 +90,73 @@ def test_owner_book_analyze_finds_the_in_page_figures_of_section_2_and_no_other(
         page.index: len(page.figure_boxes) for page in pages if page.figure_boxes
     } == _FIGURES[book]
     assert all(page.kind is PageKind.TEXT for page in pages if page.figure_boxes)
+
+
+# structure's part (figures spec section 10): a figure block for each
+# in-page figure, and the first words of their captions. Only numerals and
+# a label word of the books are written here.
+
+
+def _figure_blocks(blocks: BlocksFile) -> tuple[Block, ...]:
+    return tuple(
+        block
+        for block in blocks.blocks
+        if block.kind is BlockKind.FIGURE and "/figure-" in (block.figure or "")
+    )
+
+
+@pytest.mark.parametrize("book", ["haynes", "turney"])
+def test_owner_book_figure_blocks_are_one_for_each_in_page_figure(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    pages: dict[int, int] = {}
+    for block in _figure_blocks(owner_book_run(book)):
+        index = block.origin[0].page_index
+        pages[index] = pages.get(index, 0) + 1
+    assert pages == _FIGURES[book]
+
+
+# Haynes' 25 figures: each caption's second word, the figure's number as
+# the OCR read it ("li." for 11, "l6." for 16), after "figure" in any case.
+_HAYNES_NUMBERS = (
+    *("1.", "2.", "3.", "4.", "5.", "6.", "7.", "8.", "9.", "10.", "li."),
+    *("12.", "13.", "14.", "15.", "l6.", "17.", "18.", "19.", "20.", "21."),
+    *("22.", "23.", "24.", "25."),
+)
+
+
+def test_haynes_caption_of_each_figure_opens_with_figure_and_its_number(
+    owner_book_run: Callable[[str], BlocksFile],
+) -> None:
+    figures = _figure_blocks(owner_book_run("haynes"))
+    assert tuple(
+        (words[0].lower(), words[1])
+        for words in (block_text(block).split(" ") for block in figures)
+    ) == tuple(("figure", number) for number in _HAYNES_NUMBERS)
+
+
+# Turney's 14 figures, in order: the number that opens each caption as the
+# OCR read it ("i." for 1, "2i." for 21), None for the 3 without one: the
+# second cover of page 174, the film still of 167 and the back cover.
+_TURNEY_NUMBERS = (
+    *("i.", "4.", None, "8.", "12.", "13.", "14", None, "15.", "16.", "17."),
+    *("18.", "2i.", None),
+)
+
+
+def test_turney_caption_of_11_figures_and_no_heading_on_page_174(
+    owner_book_run: Callable[[str], BlocksFile],
+) -> None:
+    blocks = owner_book_run("turney")
+    assert (
+        tuple(
+            block_text(block).split(" ")[0] if block.spans else None
+            for block in _figure_blocks(blocks)
+        )
+        == _TURNEY_NUMBERS
+    )
+    assert not any(
+        block.kind is BlockKind.HEADING
+        and any(origin.page_index == 174 for origin in block.origin)
+        for block in blocks.blocks
+    )
