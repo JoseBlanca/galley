@@ -1276,6 +1276,40 @@ def test_caption_rows_beside_a_figure_end_at_a_row_more_than_20_pt_below() -> No
     assert "the and beside it picture," in block_text(blocks.blocks[0])
 
 
+def test_caption_rows_beside_a_figure_take_their_words_on_its_side() -> None:
+    # Turney 175: the caption's last row is one line with lettering printed
+    # under the picture, and a row of the lettering alone lies 2.6 pt above
+    # it.
+    box = Box(12.0, 200.0, 268.0, 372.0)
+    caption = (
+        _text_line("15. The perfect", 288.0, 316.0),
+        _text_line("baby, and the", 288.0, 330.0),
+        _text_line("product of", 288.0, 344.0),
+    )
+    lettering = _text_line("BROWN, bright-eyed", 40.0, 355.8)
+    shared = _line(
+        *_text_words("rictcn ay", 60.0, 358.4),
+        *_text_words("this new person.", 292.0, 358.4),
+    )
+    page = PageLayout(
+        0,
+        (_region(*_ABOVE_THE_MAP, *caption, lettering, shared),),
+        (_in_page(0, box),),
+    )
+    blocks = _structure(_lines_file(page))
+    assert _texts(blocks) == (
+        (
+            BlockKind.PARAGRAPH,
+            (
+                "The text of the paragraph begins here and goes on along the "
+                "line to the very end of the line before the figure printed in "
+                "it, the BROWN, bright-eyed rictcn ay"
+            ),
+        ),
+        (BlockKind.FIGURE, "15. The perfect baby, and the product of this new person."),
+    )
+
+
 def test_figure_text_a_head_line_inside_a_figure_is_removed() -> None:
     # Turney 174: the lettering at the top of a cover is the page's first
     # row, which layout keeps out of the figure's region.
