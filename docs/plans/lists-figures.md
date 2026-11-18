@@ -328,7 +328,7 @@ not making that row a running head.
   of deliverable 4; the report gives each book's figure blocks and
   captions beside figures §5's "Measured" counts. Spec: figures §10.
   Needs 3.3. Stream `figure-blocks`. Deliverables 3, 4.
-- [ ] Review of work package 3.
+- [x] Review of work package 3.
 
 ## 4. List items
 
