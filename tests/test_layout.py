@@ -2161,11 +2161,17 @@ _EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 
 
 def _assert_laid_out_in_regions(words: WordsFile, lines: LinesFile) -> None:
+    """`_assert_every_word_laid_out`, and some page has more than one
+    region: the book was measured and its pages cut."""
+    _assert_every_word_laid_out(words, lines)
+    assert any(len(page.regions) > 1 for page in lines.pages)
+
+
+def _assert_every_word_laid_out(words: WordsFile, lines: LinesFile) -> None:
     """The fidelity check passes; each page's words, with their boxes, are
     those of the same page in words.json after the page's kept re-readings
     (reocr spec, section 4), since layout never moves a word to another
-    page; and some page has more than one region: the book was measured
-    and its pages cut."""
+    page."""
     check_stage(FidelityBoundary.LAYOUT, words, lines)
     assert tuple(page.index for page in lines.pages) == tuple(
         page.index for page in words.pages
@@ -2183,7 +2189,12 @@ def _assert_laid_out_in_regions(words: WordsFile, lines: LinesFile) -> None:
             (word.text, word.box)
             for word in words_after_rereads(page_words.words, page_rereads)
         )
-    assert any(len(page.regions) > 1 for page in lines.pages)
+
+
+# The excerpts with no page of 3 rows, which the book's measures need
+# (section 3): `haskins_endpapers` keeps words only on its colophon, page
+# index 275, its endpapers being inkless (plates spec section 2b).
+_UNMEASURED_EXCERPTS = frozenset({"haskins_endpapers"})
 
 
 @pytest.mark.parametrize(
@@ -2195,7 +2206,10 @@ def test_layout_of_an_excerpt_with_rereading_keeps_every_word(
     # The session's one run of each excerpt (tests/conftest.py).
     folder = excerpt_books[excerpt]
     words, lines = read_words(folder.words_json), read_lines(folder.lines_json)
-    _assert_laid_out_in_regions(words, lines)
+    if excerpt in _UNMEASURED_EXCERPTS:
+        _assert_every_word_laid_out(words, lines)
+    else:
+        _assert_laid_out_in_regions(words, lines)
 
 
 def test_cut_in_insets_of_the_excerpts_are_stubbs_and_domesday_tables_only(
@@ -2214,8 +2228,12 @@ def test_cut_in_insets_of_the_excerpts_are_stubbs_and_domesday_tables_only(
     insets = {}
     for name, folder in excerpt_books.items():
         measures = measure_book(read_words(folder.words_json))
-        assert measures is not None
-        insets[name] = (measures.cut_in_inset_left, measures.cut_in_inset_right)
+        assert (measures is None) == (name in _UNMEASURED_EXCERPTS), name
+        insets[name] = (
+            (None, None)
+            if measures is None
+            else (measures.cut_in_inset_left, measures.cut_in_inset_right)
+        )
     found = {
         "stubbs_51_56-64": (60.3, 58.2),
         "stubbs_heads": (None, 58.0),
