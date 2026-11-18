@@ -247,7 +247,9 @@ def page_words(
     those whose centre is inside one of its `exclude_regions`, edges
     included, which are removals with the reason `excluded_region`. Every
     word of an excluded page is a removal with the reason `excluded_page`,
-    and of a front-matter page one with the reason `front_matter`. A blank
+    and of a front-matter page one with the reason `front_matter`; every
+    word of an inkless page is a removal with the reason `inkless_page`, but
+    one inside an excluded region, which is `excluded_region`. A blank
     page has neither. A plate page has one figure, the whole page, at 300
     dpi, whose image is `plate_image(page.index)`, of kind `plate`; a text
     page has one for each of its `figure_boxes`, in their order, with that
@@ -300,6 +302,21 @@ def page_words(
             kept = ()
             removals = tuple(
                 _removal(page, layer_word, RemovalReason.FRONT_MATTER)
+                for layer_word in layer_words
+            )
+        case PageKind.INKLESS:
+            # Plates spec, section 2b: every word a removal, as on an
+            # excluded page, but a word in an excluded region, which keeps
+            # the reason of any page.
+            kept = ()
+            removals = tuple(
+                _removal(
+                    page,
+                    layer_word,
+                    RemovalReason.EXCLUDED_REGION
+                    if _in_a_region(layer_word.box, page.exclude_regions)
+                    else RemovalReason.INKLESS_PAGE,
+                )
                 for layer_word in layer_words
             )
         case PageKind.BLANK:
