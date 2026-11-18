@@ -194,8 +194,12 @@ def test_bare_number_run_on_a_contents_page_makes_no_endnote_section() -> None:
         _lines_of(page), _NO_WORDS, contents_pages=frozenset({0}), workers=1
     )
     assert not blocks.notes
-    # No hanging number starts a paragraph there either (spec section 6).
-    assert len(blocks.blocks) == 1
+    # Spec section 30: no paragraph either; the first line is the run's
+    # title, and each hung note a contents entry.
+    assert {block.kind for block in blocks.blocks} == {
+        BlockKind.HEADING,
+        BlockKind.CONTENTS_ENTRY,
+    }
 
 
 def test_bare_number_that_does_not_rise_is_a_later_block_of_its_note() -> None:
@@ -927,11 +931,18 @@ def test_hanging_number_before_a_number_starts_no_paragraph() -> None:
 
 
 def test_hanging_number_on_a_contents_page_starts_no_paragraph() -> None:
+    # Spec section 30: on a contents page an indented line runs on the
+    # entry above it, so each hung note after the title is one entry.
     page = PageLayout(0, (_region(*_hung_notes(("8", "9", "10", "11"))),), ())
     blocks = make_blocks(
         _lines_of(page), _NO_WORDS, contents_pages=frozenset({0}), workers=1
     )
-    assert len(blocks.blocks) == 1
+    assert not any(block.kind is BlockKind.PARAGRAPH for block in blocks.blocks)
+    assert tuple(
+        block_text(block).split(" ")[0]
+        for block in blocks.blocks
+        if block.kind is BlockKind.CONTENTS_ENTRY
+    ) == ("on", "note", "9", "10", "11")
 
 
 def test_group_reach_ends_at_the_next_group_that_has_a_chapter() -> None:

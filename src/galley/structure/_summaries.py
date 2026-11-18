@@ -22,16 +22,18 @@ def _indent(line: PlacedLine) -> float:
     return line.line.box.x0 - line.edges.left
 
 
-def _dashes(lines: Sequence[PlacedLine]) -> int:
-    """The dashes of `lines`: each "—" or "–", and each " - ", a word that
-    is a hyphen alone."""
+def dash_count(texts: Sequence[str]) -> int:
+    """The dashes of the words `texts` (spec section 15, rule 4): each "—"
+    or "–", and each " - ", a word that is a hyphen alone."""
     return sum(
-        1
-        if word.text == _SPACED_HYPHEN
-        else sum(c in _DASH_CHARACTERS for c in word.text)
-        for line in lines
-        for word in line.line.words
+        1 if text == _SPACED_HYPHEN else sum(c in _DASH_CHARACTERS for c in text)
+        for text in texts
     )
+
+
+def _dashes(lines: Sequence[PlacedLine]) -> int:
+    """The dashes of `lines` (`dash_count`)."""
+    return dash_count(tuple(word.text for line in lines for word in line.line.words))
 
 
 def summary_run(lines: Sequence[PlacedLine], start: int, end: int) -> BodyRun | None:

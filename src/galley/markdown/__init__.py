@@ -126,14 +126,13 @@ import re
 import string
 import textwrap
 from collections import Counter
-from dataclasses import dataclass
-from enum import StrEnum
 from typing import assert_never
 
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
 from galley.errors import EditError, FidelityBoundary, InputFileError
 from galley.fidelity import check_stage, read_markdown
+from galley.list_markers import ListMarker, follows, is_bulleted, marker_readings
 from galley.model import (
     Block,
     BlockKind,
@@ -250,135 +249,17 @@ def _image_problems(block: Block) -> tuple[str, ...]:
     return path + reference
 
 
-class _MarkerKind(StrEnum):
-    """The kind of a list marker (structure spec section 29), a letter's
-    and a roman numeral's with their case, which Pandoc's list styles
-    keep apart."""
-
-    DASH = "dash"
-    BULLET = "bullet"
-    NUMBER = "number"
-    LOWER_LETTER = "lower_letter"
-    UPPER_LETTER = "upper_letter"
-    LOWER_ROMAN = "lower_roman"
-    UPPER_ROMAN = "upper_roman"
-
-
-@dataclass(frozen=True, slots=True)
-class _Marker:
-    """One reading of a list item's label: its kind; its form, the dash or
-    bullet itself, or the sign or brackets around the value, "." ")" or
-    "()"; and its value, 0 for a dash or bullet."""
-
-    kind: _MarkerKind
-    form: str
-    value: int
-
-
-# Structure spec section 29, "Terms": the dashes and bullets a list marker
-# is, and the roman numerals it reads, i to xv.
-_DASHES = frozenset({"\u2014", "\u2013"})
-_BULLETS = frozenset("\u2022\u00b7\u25aa\u25a0\u25cf\u25e6\u25cb\u2023")
-_ROMAN_NUMERALS: tuple[str, ...] = (
-    "i",
-    "ii",
-    "iii",
-    "iv",
-    "v",
-    "vi",
-    "vii",
-    "viii",
-    "ix",
-    "x",
-    "xi",
-    "xii",
-    "xiii",
-    "xiv",
-    "xv",
-)
-_ROMAN_VALUES: frozendict[str, int] = frozendict(
-    {numeral: value for value, numeral in enumerate(_ROMAN_NUMERALS, start=1)}
-)
-# A number of 1 or 2 digits, a letter, or a roman numeral in one case,
-# followed by "." or ")", or between round brackets.
-_ORDERED_MARKER = re.compile(
-    r"\((?P<bracketed>[0-9]{1,2}|[A-Za-z]|[ivx]+|[IVX]+)\)"
-    r"|(?P<signed>[0-9]{1,2}|[A-Za-z]|[ivx]+|[IVX]+)(?P<sign>[.)])"
-)
-_BRACKETS = "()"
-_BULLET_KINDS = frozenset({_MarkerKind.DASH, _MarkerKind.BULLET})
-
-
-def _marker_readings(label: str) -> tuple[_Marker, ...]:
-    """The readings of a list item's label as a list marker (structure spec
-    section 29, "Terms"): none when it is not one, two for a letter that is
-    also a roman numeral ("i.", "(v)", "X."), its letter's first."""
-    if label in _DASHES:
-        return (_Marker(_MarkerKind.DASH, label, 0),)
-    if label in _BULLETS:
-        return (_Marker(_MarkerKind.BULLET, label, 0),)
-    match = _ORDERED_MARKER.fullmatch(label)
-    if match is None:
-        return ()
-    if match["bracketed"] is not None:
-        value_text, form = match["bracketed"], _BRACKETS
-    else:
-        value_text, form = match["signed"], match["sign"]
-    if value_text.isdigit():
-        return (_Marker(_MarkerKind.NUMBER, form, int(value_text)),)
-    upper = value_text.isupper()
-    letter = (
-        (
-            _Marker(
-                _MarkerKind.UPPER_LETTER if upper else _MarkerKind.LOWER_LETTER,
-                form,
-                ord(value_text.lower()) - ord("a") + 1,
-            ),
-        )
-        if len(value_text) == 1
-        else ()
-    )
-    roman_value = _ROMAN_VALUES.get(value_text.lower())
-    roman = (
-        (
-            _Marker(
-                _MarkerKind.UPPER_ROMAN if upper else _MarkerKind.LOWER_ROMAN,
-                form,
-                roman_value,
-            ),
-        )
-        if roman_value is not None
-        else ()
-    )
-    return letter + roman
-
-
-def _first_marker(label: str) -> _Marker:
+def _first_marker(label: str) -> ListMarker:
     """The marker of a list's first item: a roman numeral when the label
     reads as one (structure spec section 29, "Terms")."""
-    readings = _marker_readings(label)
-    return next(
-        (
-            reading
-            for reading in readings
-            if reading.kind in {_MarkerKind.LOWER_ROMAN, _MarkerKind.UPPER_ROMAN}
-        ),
-        readings[0],
-    )
+    return marker_readings(label)[0]
 
 
-def _next_marker(before: _Marker, label: str) -> _Marker | None:
+def _next_marker(before: ListMarker, label: str) -> ListMarker | None:
     """The reading of `label` that follows the marker `before` (structure
-    spec section 29, rule 3): the same kind and form, and for a number, a
-    letter or a roman numeral the next value; None when none does."""
+    spec section 29, rule 3); None when none does."""
     return next(
-        (
-            reading
-            for reading in _marker_readings(label)
-            if reading.kind is before.kind
-            and reading.form == before.form
-            and (before.kind in _BULLET_KINDS or reading.value == before.value + 1)
-        ),
+        (reading for reading in marker_readings(label) if follows(reading, before)),
         None,
     )
 
@@ -391,7 +272,7 @@ def _list_problems(block: Block) -> tuple[str, ...]:
     if (
         block.kind is BlockKind.LIST_ITEM
         and block.label is not None
-        and not _marker_readings(block.label)
+        and not marker_readings(block.label)
     ):
         return (
             (
@@ -838,7 +719,7 @@ def _list(items: tuple[Block, ...], notes: frozendict[str, Note]) -> str:
     or a bullet, otherwise an ordered list with each label as its marker;
     a blank line between the items."""
     assert items[0].label is not None, "_check_well_formed refuses an item without one"
-    bulleted = _first_marker(items[0].label).kind in _BULLET_KINDS
+    bulleted = is_bulleted(_first_marker(items[0].label))
     return "\n".join(
         _list_item(
             _BULLET_MARKER if bulleted or item.label is None else item.label,
@@ -881,7 +762,7 @@ def _runs(
     every other block alone. A run ends after the block of each index of
     `ended_after`, after which a note is written."""
     runs: list[list[Block]] = []
-    marker: _Marker | None = None
+    marker: ListMarker | None = None
     for index, block in enumerate(blocks):
         before = blocks[index - 1] if runs and index - 1 not in ended_after else None
         following = (

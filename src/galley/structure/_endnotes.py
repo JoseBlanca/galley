@@ -53,6 +53,11 @@ class EndnoteSection:
     markers: frozendict[int, NoteMarker]
 
 
+# Spec sections 29 and 30: the blocks whose first number is never an
+# endnote's marker.
+_NOT_NOTES = frozenset({BlockKind.LIST_ITEM, BlockKind.CONTENTS_ENTRY})
+
+
 def _first_page(entry: Entry) -> int:
     return entry.piece.lines[0].page_index
 
@@ -62,9 +67,12 @@ def _marker_of(
 ) -> tuple[NoteMarker, bool] | None:
     """The endnote marker the first word of a paragraph has, and whether it
     is a bare number (spec section 12): a bare number counts only outside
-    `contents_pages`. None for a paragraph without one and for a margin
-    note."""
+    `contents_pages`. None for a paragraph without one, for a margin note,
+    and for a list item or a contents entry, whose numbers are their own
+    (spec sections 29 and 30)."""
     match entry:
+        case BodyBlock(kind=kind) if kind in _NOT_NOTES:
+            return None
         case BodyBlock(piece=piece):
             word = first_word(piece.lines[0])
             marker = endnote_marker(word)

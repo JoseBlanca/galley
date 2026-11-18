@@ -4002,7 +4002,9 @@ line, or such a page, ends a list.
    at the line after, and "1." then starts the vill's list of 3 items.
 2. **Not after a hyphen.** A marker line after a line that ends with a
    hyphen (section 6) does not start a list or an item: the hyphen rule
-   holds.
+   holds. Inside a list, the line after a line that ends with a hyphen
+   goes on with the item, wherever its left side lies (decided while
+   writing the code, 18 November 2026).
 3. **The next item** starts at a marker line whose marker follows the
    item before's: the same kind and form, and for a number, a letter or
    a roman numeral the next value; and whose left side lies within 3 pt
@@ -4026,7 +4028,11 @@ line, or such a page, ends a list.
    (its 3 pt aside), when the lines before that one on the page all lie
    within 3 pt of one left side, 5 to 20 pt right of it, or there are
    none; otherwise the text edge (section 6, rule 3) of the page's first
-   body region. The page's lines are then tested by rules 3 to 5.
+   body region. A page whose first body region has no text edge, fewer
+   than 3 lines that do not start with a bare number, ends the list at
+   the page break (decided while writing the code, 18 November 2026; no
+   list of the eight books runs onto such a page). The page's lines are
+   then tested by rules 3 to 5.
    Haynes' page 17 opens with 5 lines of item 5 at 71.8 to 72.0 pt, and
    item 6's marker line lies at 59.5 pt: the marker column of page 17,
    12.5 pt left of them, the hang measured on page 16, where the marker
@@ -4135,7 +4141,14 @@ Terms:
 - an entry's **page number** is its last word when that is a
   page-number form (section 1) or a range of two joined by a dash
   ("26—36.", or the three words "107 — 128."), together with "pp." or
-  "p." before it;
+  "p." before it, and when it is **set apart**: it is a range or has
+  "pp." or "p." before it, or leader dots come just before it, or a
+  space of 11 to 20 pt, or its right side lies within 4 pt of the right
+  side of the longest contents line of its page. A number at an
+  ordinary space, short of the column's edge, ends a title and is no
+  page number ("Psalm 23", "Maldon, 991", the roman form "mix"), since
+  markdown does not write a page number and the reader would lose it
+  (review of 18 November 2026);
 - **leader dots** are words made only of ".", "•", "·" and "…", printed
   between a title and its page number;
 - an **inline page reference** is a word that is neither the first nor
@@ -4171,12 +4184,12 @@ kinds, as on any page.
    each lone label. Rule 3 of section 6 is not applied on these pages,
    as before.
 3. **An analytical summary** is a piece of at least 2 lines that holds
-   at least 2 inline page references, and at least one for every two of
-   its lines: Domesday's and Gierke's topics, which hold one or more per
-   line. The second condition (guessed, and changing nothing on the
-   eight books) keeps a one-line-per-entry page such as Haynes', where
-   the pencil mark before "7." already makes one inline reference, from
-   becoming one summary when a second mark is read so. It
+   at least 2 inline page references, and at least one for every five
+   of its lines: Domesday's and Gierke's topics, which hold one or more
+   per line. The second condition keeps a one-line-per-entry page such
+   as Haynes', where the pencil mark before "7." already makes one
+   inline reference, from becoming one summary when a second mark is
+   read so (its 22 lines would need 5). It
    is one entry, whole, without label or page number; its page numbers
    stay in its text, where the reader sees them.
 4. **Entries.** Every other piece is cut into entries after each line
@@ -4250,7 +4263,15 @@ with the index entries, once every heading is known.
 rule 1 and of the index (section 17). The 2 inline page references of
 rule 3 keep out a section line such as "§ 5. Sake and Soke, pp. 80 —
 107.", which holds "5." and "80" inside its one line: a summary has at
-least 2 lines. The ratio 0.7 was measured on the candidates of the
+least 2 lines. One reference for every five lines was measured with the
+code on 18 November 2026: Gierke's topics end many lines with their
+reference, which is then no inline one, and the OCR reads "(11)" as
+"(n)", so that a summary of pages 52 to 60 can hold one for every three
+lines; one for every two, as first written, cut 2 of those pages' 34
+summaries into an entry per line (72 entries instead of 52), four cut
+some too, and five keeps them all and changes no other book. It also
+makes 11 summaries of rows of the table of pages 61 to 67 against 2,
+each a few of its rows run together. The ratio 0.7 was measured on the candidates of the
 seven books with contents pages, linking every run as rule 9 says.
 The prototype differed from the rules in three ways, corrected in the
 table by the review of 18 November 2026: it did not count rule 1's
@@ -4266,10 +4287,29 @@ to the entry before (no count changes):
 | Turney | 16 | 0 | 16 | 16 | 16 | 16 | 16 |
 | Haskins | 9 | 0 | 9 | 9 | 9 | 9 | 9 |
 | Stubbs | 25 | 12 | 9 | 13 | 13 | 13 | 13 |
-| Domesday | 59 | 32 | 23 | 27 | 23 | 23 | 23 |
+| Domesday | 59 | 32 | 22 | 27 | 23 | 23 | 23 |
 | Gierke, page 10 | 8 | 0 | 3 | 7 | 6 | 5 | 4 |
-| Gierke, pages 52 to 67 | 320 | 47 | 58 | 240 | 10 | 10 | 10 |
-| Mariéjol | 16 | 0 | 1 | 15 | 13 | 12 | 9 |
+| Gierke, pages 52 to 67 | 348 | 45 | 33 | 275 | 10 | 10 | 10 |
+| Mariéjol | 16 | 0 | 1 | 16 | 13 | 12 | 9 |
+
+The rows of Gierke's pages 52 to 67 and Mariéjol's candidates were
+measured again with the code on 18 November 2026 (plan lists-figures,
+task 5.4), with rule 3's one reference for every five lines, and the
+page numbers of every row with the test of "set apart" ("Terms"). The
+spaces before a page number were measured then: Haynes 11.5 to 12.5 pt
+and Turney 13.4 to 14.9, where the other spaces of an entry reach 10.2
+pt; Haskins', Stubbs' and Gierke's numbers end within 1.2 pt of the
+column's right side and Domesday's within 3.7. The test leaves out
+Domesday's "290." after "Note : The Angild Clause," (page 17), at an
+ordinary space in the middle of the column, which stays in its title,
+and on Gierke's pages 52 to 67 the "d" of a signature line "M. d"
+(page 54) and 42 numbers of the table of pages 61 to 67 that the layout
+moved away from their column. The
+prototype had given 320 entries, 47 topics entries, 58 page numbers and
+240 candidates for Gierke's pages 52 to 67, near what rule 3 gives
+without its second condition (317, 47 and 61), and 15 candidates for
+Mariéjol, whose 16 titles all hold at least 4 letters; the links are
+the same.
 
 Every link at 0.7 was read against its heading and is right, but one:
 the column heading "NOTE" of Gierke's page 62 is linked to its endnotes'
@@ -4385,11 +4425,23 @@ blocks as blocks, in the forms above only: an item holding one div of a
 a bullet list of the same form; any other content of a list is an
 element galley's Markdown does not make, and an error. An empty div of
 class `list-break` holds no words and is passed over. A `list_item`'s
-label is not written and not compared, as the marker of a referenced
-footnote is not, and the number of items of all lists of `list_item`
-divs must equal the number of `list_item` blocks. A `contents_entry`'s
-label is written and compared as words of its block; its `page_number`
-is not written and not compared. A link inside a `contents_entry` div,
+label is not written as text, as the marker of a referenced footnote is
+not, and the number of items of all lists of `list_item` divs must equal
+the number of `list_item` blocks. The marker Pandoc shows for each item
+is compared with its block's label instead: a `BulletList`'s item must
+have a dash or a bullet as its label, and an `OrderedList`'s item, the
+list's start plus its place in the list, in the list's style and
+delimiter, a label that reads so (section 29, "Terms": `Decimal` for a
+number, `LowerAlpha` or `UpperAlpha` for a letter, `LowerRoman` or
+`UpperRoman` for a roman numeral; `Period` for "1.", `OneParen` for
+"1)", `TwoParens` for "(1)"), so that a list that starts at "7." where
+the book printed "1." is an error (review of 18 November 2026). A
+`contents_entry`'s label is written and compared as words of its block;
+its `page_number` is not written and not compared as words, but it must
+have a page number's form (section 30, "Terms"), so that no title word
+leaves the book unseen. A page number's rise through a run is not
+checked: Gierke's table of pages 61 to 67, read across its two columns,
+gives numbers out of order. A link inside a `contents_entry` div,
 with no attributes, whose target is `#` and the id of a heading block,
 is read as its text, compared as words of the block; the number of
 such links must equal the number of entries with a `heading_ref`. Any
@@ -4452,7 +4504,7 @@ page images:
 
 | excerpt | page indices | what it checks |
 |---|---|---|
-| `haskins_front` | 14, 16 | the title "CONTENTS" a heading; 9 entries of depth 1, labels from "IV." to "VIII." ("^ VI." with its mark), none on the first three, whose numbers are glued to marks or read "II,", page numbers "i" to "251"; the first entry linked to chapter I's heading on page 16 and the others unlinked, their chapters being outside the excerpt |
+| `haskins_front` | 14, 16 | the title "CONTENTS" a heading; 9 entries of depth 1, labels from "IV." to "VIII." ("^ VI." with its mark), none on the first three, whose numbers are glued to marks or read "II,", page numbers "i" to "251"; none linked: the others' chapters are outside the excerpt, and the excerpt's heading on page 16 holds the half-title before chapter I's title ("THE NORMANS IN EUROPEAN HISTORY I NORMANDY AND ITS PLACE IN HISTORY", section 14), which matches the first entry at 0.66 only; the whole book links it at 1.00 |
 | `stubbs_summaries_index` | 16, 312 | chapters IX to XII as entries of depth 1 with their labels, unlinked; their topics of depth 2 with pages "189", "212", "238" and "263"; "Index" with page "291" linked to the index's heading on page 312 |
 | `domesday_headings_quotes` | 14, 22, 30 | the front matter's entries and leader dots; "ESSAY I." with "DOMESDAY BOOK." linked to page 22's heading; the essay's topics an analytical summary of depth 2; "§ 1." with "Plan of the Survey," and page "pp. 9 — 26.", depth 2, linked to page 30's heading; its topics of depth 3 |
 | `gierke_front_flow` | 10 | 8 entries; page numbers "vii", "xlvii" and "i" taken and the leader dots before them removed; "Ivi", "Ixiii" and "lor" left in their titles with their dots; none linked |
