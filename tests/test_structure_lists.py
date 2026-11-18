@@ -8,6 +8,7 @@ is used beyond a dash and a capital.
 
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -31,9 +32,12 @@ from galley.model import (
     read_blocks,
 )
 from galley.structure import make_blocks
+from galley.structure._assemble import _line_roles
 from galley.structure._lines import PlacedLine
 from galley.structure._lists import ItemLine, StreamPage, list_items
 from galley.structure._measures import Edges
+from galley.structure._paragraphs import PageParts
+from galley.structure._runs import BodyRun
 
 _CHAR_PT = 5.0
 _WORD_HEIGHT_PT = 10.0
@@ -583,3 +587,42 @@ def test_whole_book_list_items(
         assert items >= _LIST_ITEMS_AT_LEAST[book]
     else:
         assert items == 0
+
+
+# Spec section 29, "The rules": the pages and runs whose lines the list
+# rules take none of, in step 3.1.
+
+
+def _parts_of(page_index: int, **fields: object) -> PageParts:
+    """Page `page_index` holding two numbered items in its body stream."""
+    lines = tuple(
+        replace(line, page_index=page_index)
+        for line in _numbered((("1. First", "goes on"), ("2. Second", "goes on"))).lines
+    )
+    return replace(
+        PageParts(
+            index=page_index,
+            removals=(),
+            page_numbers=(),
+            body=lines,
+            margin_notes=(),
+            band_regions=(),
+            band_blocks=(),
+        ),
+        **fields,
+    )
+
+
+def _list_pages(page: PageParts, section_pages: range = range(0)) -> frozenset[int]:
+    roles = _line_roles((page,), (), frozenset(), section_pages, _PITCH_PT)
+    return frozenset(page_index for page_index, _ in roles)
+
+
+def test_list_on_an_index_page_the_endnote_section_or_in_a_run_is_none() -> None:
+    plain = _parts_of(0)
+    index = _parts_of(1, index_lines=plain.body[:1])
+    run = _parts_of(2, runs=(BodyRun(start=0, end=4, kind=BlockKind.VERSE),))
+    assert _list_pages(plain) == {0}
+    assert _list_pages(index) == frozenset()
+    assert _list_pages(_parts_of(3), range(3, 4)) == frozenset()
+    assert _list_pages(run) == frozenset()
