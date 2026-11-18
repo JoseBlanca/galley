@@ -454,7 +454,7 @@ the public-domain books; deliverable 4 shows what it takes.
 - [x] 4.3 The whole-book tests of deliverables 3 and 4, and the counts
   in the report. Spec: structure §22, "What the rule gives"; §26,
   "Whole-book tests". Needs 4.2. Plan's branch. Deliverables 3, 4.
-- [ ] Review of work package 4.
+- [x] Review of work package 4.
 
 ## 5. Spaced punctuation and words glued at a case change
 
@@ -497,7 +497,7 @@ books.
   functions of their own modules, with the unit tests. Spec: structure
   §23, "The rule" and "After a note reference"; §24; §8, the two
   functions. Stream `words`. Deliverable 1.
-- [ ] 5.2 The passes wired into structure: `make_blocks` takes the
+- [x] 5.2 The passes wired into structure: `make_blocks` takes the
   config's `language`; the case split after hyphens in each block; the
   spaced signs at step 3.2, before references are looked for; the
   exports; the excerpt and whole-book tests; the changed reference

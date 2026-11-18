@@ -319,3 +319,55 @@ scored again with it, galley at 9715a93, into
 the page-break cuts of task 4.2 (review 4). Haskins' notes as notes
 66 → 72, with the right reference 61 → 65, none left in the body (6
 before).
+
+## Review 4: work package 4
+
+Of 36f1561, by two reviewers. No word lost or added on the eight books;
+all 13 of Turney's epigraphs match the page images. What mattered,
+fixed (18780a1 to d7e1973, merged at c9263f0):
+
+- **The page-break rule cut sentences in two** where a footnote left in
+  the body was the page's last line (Domesday 131: "We think it" /
+  "highly probable that"). No cut now when the next page goes on in
+  lower case, nor when the last line is a footnote's first (it starts
+  with a note marker). Cuts on the pass that writes blocks.json: Turney
+  24, Haynes 28, Haskins 0, Stubbs 2, Domesday 6, Mariéjol 3, Kadesh 3,
+  Gierke 12. Still wrong, read on the images: Gierke 156 (a two-line
+  footnote) and Kadesh 33 (layout's order beside a map).
+- The counts first reported were taken on structure's first pass;
+  nine epigraph and page-break conditions had no test that failed when
+  broken; a dashed source line needs a letter or digit.
+
+Paragraph scores against the cut baseline: Mariéjol's precision is back
+to 0.727 (0.732 at the start; within the 0.005 tolerance), the others
+as before.
+
+## Task 5.2: spaced signs and case splits in structure
+
+8a63a8f, 72c7959, 13f7433. In English books a "?", ";", ":" or "!" set
+apart by a space is attached to the word before; in French the space
+becomes a no-break space. Three rules the wiring needed (72c7959): a
+case split needs 3 lower-case letters after the capital (Domesday's
+"forðon" and "forðan", one Old English word each on the page, are no
+longer split); a sign holding a note reference (";13") is attached only
+if the word stays a reference; the fidelity check accepts a margin-note
+word joined at a lost hyphen and then given a sign.
+
+| book | signs attached | no-break spaces | case splits |
+|---|---|---|---|
+| Haskins | 89 | 0 | 2 |
+| Stubbs | 1,010 | 0 | 9 |
+| Domesday | 2,112 | 0 | 1 |
+| Gierke | 888 | 0 | 0 |
+| Kadesh | 97 | 0 | 0 |
+| Mariéjol | 0 | 1,149 | 8 |
+
+Body error rates at blocks fell (the reference text attaches its
+signs): Haskins 0.023 → 0.020, Stubbs 0.053 → 0.033, Domesday 0.075 →
+0.058; Mariéjol 0.310. Domesday's notes whose reference is right went
+from 1,279 to 1,277 although galley's links are the same before and
+after: the scorer's alignment of a note's reference word changes when
+a sign is attached to it. The reference literals changed only by
+attached signs (73) and no-break spaces (16). Haskins 22's "theAvre" is
+split on the whole book; its excerpt never prints "Avre" whole, so the
+excerpt's test stays a strict xfail.
