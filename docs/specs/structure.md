@@ -1928,7 +1928,14 @@ stream, or is the first line of its region: a heading set apart, at
 the top of a column too. The first line of a region is told by
 position: a line on a later page than the line before it, or whose top
 lies above that line's, as the top of a right column lies above the
-foot of the left one. It may be a paragraph, a heading block
+foot of the left one. A block or a line with no letter or digit (a
+speck the OCR read as "/") is passed over here, as in the tall line's
+gap of section 14: the block right before a group's first note is the
+nearest before it that holds a letter or a digit, and the line before
+a group heading the nearest that holds one. On Turney's page 268 a
+"/" 5 pt high lies under chapter Six's heading, between it and the
+group's note 1, and the heading was missed; the "/" stays a block of
+the note before the heading. It may be a paragraph, a heading block
 (section 14 makes some, such as Turney's first group heading, an
 unindented "Introduction" 8 pitches below the title "Notes") or what
 section 11 would make a note, since Turney's starts with a number. It
