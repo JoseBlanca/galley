@@ -1,5 +1,6 @@
 """analyze: what each page of the PDF is, written to pages.json (walking
-skeleton spec section 6, plates spec section 2, figures spec section 3).
+skeleton spec section 6, plates spec sections 2 and 2b, figures spec
+section 3).
 
 analyze measures every page with pdfplumber, its size in points and the
 words of its text layer, and renders every page that is neither excluded
@@ -9,12 +10,13 @@ is `excluded` when the config excludes it, a `plate` when the config's
 has a word, and `blank` otherwise. It has no OCR, so a blank page stops
 the run: the owner checks it and adds it to `exclude_pages`. Each page the
 plate rule makes a plate is logged at WARNING, so that the owner sees the
-covers and endpapers it takes too. On each text page, the same render is searched
-for the figures printed among its lines (`figure_boxes`), whose boxes go
-into pages.json; each page with figures is logged at INFO. The same render
-also tells an inkless page (`is_inkless`), whose layer holds only words
-the scanner's OCR invented where nothing is printed: it is `inkless`, and
-each one is logged at WARNING.
+covers and endpapers it takes too. On each text page, the same render is
+searched for the figures printed among its lines (`figure_boxes`), whose
+boxes go into pages.json; each page with figures is logged at INFO. The
+same render also tells an inkless page (`is_inkless`): at least half of
+the words of its layer have no ink under them, words the scanner's OCR
+invented where nothing is printed. It is `inkless`, also when the plate
+rule takes it, and each one is logged at WARNING.
 """
 
 import logging
@@ -172,8 +174,9 @@ def run(
     run leaves none and no later file outlives the pages.json it came from.
     Takes the word list of the book's language from its cache folder,
     extracting it with Tesseract's tools the first time. The text pages
-    before the front-matter end (`front_matter_end`) are `front_matter`.
-    Raises ConfigError when the config asks for OCR, names a page past the
+    before the front-matter end (`front_matter_end`) are `front_matter`. A
+    page the inkless rule takes (`is_inkless`) is `inkless`, or
+    `front_matter` before the front-matter end. Raises ConfigError when the config asks for OCR, names a page past the
     end of the PDF or a contents page before its `front_matter_end`, and
     PdfError when a page that the config does not exclude
     has no text layer and is not a plate. `workers` is the number of

@@ -25,10 +25,10 @@ _INK_BOX_GROWTH_PT: Final[float] = 3.0
 # Plates spec section 2b: guessed, and kept because it absorbs the gradient
 # of Haynes' page 9, which darkens from one side to the other.
 _BACKGROUND_BOX_GROWTH_PT: Final[float] = 6.0
-# Plates spec section 2b: measured, 41 of the 43 junk words of the eight
+# Plates spec section 2b: measured, 40 of the 43 junk words of the eight
 # books have less ink, and 339 of 1.1 million real ones.
 _LEAST_INK_LEVELS: Final[int] = 20
-# Plates spec section 2b: measured, the inkless pages have 0.92 to 1.00 of
+# Plates spec section 2b: measured, the inkless pages have 0.88 to 1.00 of
 # their words without ink, the highest page of print 0.10 (Domesday 481).
 _INKLESS_SHARE: Final[float] = 0.5
 
@@ -78,9 +78,10 @@ def measure_ink(page: RenderedPage, word_boxes: tuple[Box, ...]) -> InkTest | No
 
 def _has_ink(page: RenderedPage, box: Box) -> bool:
     """Whether the word whose box is `box`, in points, has ink on `page`: the
-    local background, the median gray of the box grown by 6 pt, differs by
-    at least 20 levels from the darkest or the brightest pixel of the box
-    grown by 3 pt. A box with no pixel on the page has none."""
+    local background, the median gray of the box grown by
+    `_BACKGROUND_BOX_GROWTH_PT`, differs by at least `_LEAST_INK_LEVELS`
+    gray levels from the darkest or the brightest pixel of the box grown by
+    `_INK_BOX_GROWTH_PT`. A box with no pixel on the page has none."""
     background_pixels = _pixels(page, box, _BACKGROUND_BOX_GROWTH_PT)
     word_pixels = _pixels(page, box, _INK_BOX_GROWTH_PT)
     if not word_pixels:
