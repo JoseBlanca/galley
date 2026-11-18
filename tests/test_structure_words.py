@@ -38,7 +38,11 @@ from galley.structure import (
 )
 from galley.structure._case_split import split_glued_words
 from galley.structure._markers import Reference, ReferenceForm
-from galley.structure._spaced import attach_spaced_signs, no_break_positions
+from galley.structure._spaced import (
+    attach_spaced_signs,
+    no_break_positions,
+    with_spaced_signs,
+)
 from galley.structure._unnumbered import Unnumbered
 
 _ORIGIN = (Origin(4, Box(72.0, 100.0, 400.0, 160.0)),)
@@ -600,3 +604,31 @@ def test_whole_book_haskins_splits_the_avre_and_domesday_keeps_the_old_english(
     assert [
         change.before for change in _changes(domesday, ChangeReason.CASE_SPLIT)
     ] == [("ofChatteris",)]
+
+
+# The passes run before references are looked for: a block that already
+# has a note reference is an error.
+
+_LINKED = Unnumbered(
+    BlockKind.PARAGRAPH,
+    ("hides4", ";", "theAvre"),
+    (4, 4, 4),
+    _ORIGIN,
+    (),
+    links=frozendict({0: (Reference("hides", "4", "", ReferenceForm.GLUED, 4), 0)}),
+)
+
+
+def test_spaced_signs_of_a_block_with_a_reference_are_an_error() -> None:
+    with pytest.raises(ValueError, match="before references are looked for"):
+        attach_spaced_signs(_LINKED)
+
+
+def test_no_break_spaces_of_a_block_with_a_reference_are_an_error() -> None:
+    with pytest.raises(ValueError, match="before references are looked for"):
+        with_spaced_signs(_LINKED, Language.FR)
+
+
+def test_case_split_of_a_block_with_a_reference_is_an_error() -> None:
+    with pytest.raises(ValueError, match="before references are looked for"):
+        split_glued_words(_LINKED, _LOWER_CASE_WORDS, _BOOK_WORDS, _COMMON_INNER_WORDS)
