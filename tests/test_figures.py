@@ -52,6 +52,9 @@ from galley.model import (
     read_words,
 )
 from galley.structure import is_caption_label, make_blocks
+from galley.structure._figure_blocks import figure_position
+from galley.structure._lines import PlacedLine
+from galley.structure._measures import Edges
 
 # Figures spec section 10: a page of white, 300 by 450 pixels at 36 dpi,
 # where a pixel is 2 pt and a square of 12 pt is 6 pixels.
@@ -1091,6 +1094,7 @@ def test_kadesh_29_38_figure_regions_hold_the_words_read_on_the_pictures(
 _CHARACTER_PT = 5.0
 _WORD_TALL_PT = 10.0
 _NO_WORD_LIST: frozenset[str] = frozenset()
+_EDGES = Edges(60.0, 360.0)
 
 
 def _text_words(text: str, x0: float, top: float) -> tuple[Word, ...]:
@@ -1341,6 +1345,113 @@ def test_caption_rows_beside_a_figure_take_their_words_on_its_side() -> None:
     )
 
 
+def _caption_of(page: PageLayout, number: int = 0) -> str:
+    """The text of the page's in-page figure blocks' `number`th."""
+    blocks = _structure(_lines_file(page))
+    figures = tuple(b for b in blocks.blocks if b.kind is BlockKind.FIGURE)
+    return block_text(figures[number])
+
+
+def test_caption_rows_a_label_row_above_a_figure_opens_its_caption() -> None:
+    caption = _text_line("figure 5. The view of the place.", 100.0, 131.0)
+    page = PageLayout(
+        0,
+        (_region(*_ABOVE_THE_MAP[:2], caption, *_BELOW_THE_MAP),),
+        (_in_page(0, _MAP_BOX),),
+    )
+    assert _caption_of(page) == "figure 5. The view of the place."
+
+
+def test_caption_rows_a_caption_left_of_a_figure_takes_its_rows() -> None:
+    # The caption's last word ends 10 pt left of the picture.
+    box = Box(200.0, 145.0, 360.0, 290.0)
+    caption = (
+        _text_line("figure 6. The", 125.0, 150.0),
+        _text_line("view from", 125.0, 163.0),
+        _text_line("the hill.", 125.0, 176.0),
+    )
+    page = PageLayout(
+        0,
+        (_region(*_ABOVE_THE_MAP, *caption, *_BELOW_THE_MAP),),
+        (_in_page(0, box),),
+    )
+    assert _caption_of(page) == "figure 6. The view from the hill."
+
+
+def test_caption_rows_a_row_wider_than_the_figure_from_the_labels_left() -> None:
+    # Haynes: a caption as wide as the column under a narrower picture; its
+    # second row runs 18 pt past the picture's side moved 12 pt.
+    box = Box(100.0, 145.0, 250.0, 290.0)
+    caption = (
+        _text_line("figure 7. The view", 100.0, 296.0),
+        _text_line("of the hills and the rivers far away.", 100.0, 309.0),
+    )
+    page = PageLayout(
+        0,
+        (_region(*_ABOVE_THE_MAP, *caption, *_BELOW_THE_MAP),),
+        (_in_page(0, box),),
+    )
+    assert _caption_of(page) == (
+        "figure 7. The view of the hills and the rivers far away."
+    )
+
+
+def test_caption_rows_end_at_a_row_that_opens_with_a_caption_label() -> None:
+    # "13. The next" lies right of the picture, 40 pt from it: no label row
+    # of its own, and it opens with a label, so the caption ends above it.
+    box = Box(60.0, 145.0, 200.0, 290.0)
+    caption = _text_line("figure 4. The view", 215.0, 150.0)
+    labelled = _text_line("13. The next", 240.0, 163.0)
+    page = PageLayout(
+        0,
+        (_region(*_ABOVE_THE_MAP, caption, labelled, *_BELOW_THE_MAP),),
+        (_in_page(0, box),),
+    )
+    assert _caption_of(page) == "figure 4. The view"
+
+
+def test_caption_rows_a_label_row_next_to_two_figures_goes_to_the_nearer() -> None:
+    # 15 pt under the first figure and 7 pt above the second.
+    first = Box(100.0, 100.0, 320.0, 190.0)
+    second = Box(100.0, 222.0, 320.0, 300.0)
+    caption = _text_line("figure 8. The view", 100.0, 205.0)
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _text_line("A line of text above the figures.", 60.0, 80.0), caption
+            ),
+        ),
+        (_in_page(0, first, 1), _in_page(0, second, 2)),
+    )
+    assert (_caption_of(page, 0), _caption_of(page, 1)) == ("", "figure 8. The view")
+
+
+def test_figure_place_inside_a_contents_run_is_after_its_last_entry() -> None:
+    box = Box(60.0, 145.0, 300.0, 200.0)
+    page = PageLayout(
+        0,
+        (
+            _region(
+                _text_line("CONTENTS", 160.0, 60.0),
+                _text_line("PREFACE . . . . . . . v", 60.0, 100.0, 300.0),
+                _text_line("I. THE NORMAN CONQUEST . . . 1", 60.0, 114.0, 300.0),
+                _text_line("II. THE CHURCH AND THE STATE . . 23", 60.0, 128.0, 300.0),
+                _text_line("INDEX . . . . . . . . . 301", 60.0, 210.0, 300.0),
+            ),
+        ),
+        (_in_page(0, box),),
+    )
+    lines = _lines_file(page)
+    blocks = make_blocks(lines, _NO_WORD_LIST, contents_pages=frozenset({0}), workers=1)
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+    assert tuple(block.kind for block in blocks.blocks) == (
+        BlockKind.HEADING,
+        *(BlockKind.CONTENTS_ENTRY,) * 4,
+        BlockKind.FIGURE,
+    )
+
+
 def test_figure_text_a_head_line_inside_a_figure_is_removed() -> None:
     # Turney 174: the lettering at the top of a cover is the page's first
     # row, which layout keeps out of the figure's region.
@@ -1381,6 +1492,101 @@ def test_figure_text_a_figures_region_is_not_the_pages_widest_region() -> None:
     )
     blocks = _structure(_lines_file(page))
     assert BlockKind.MARGIN_NOTE not in tuple(block.kind for block in blocks.blocks)
+
+
+def _headed_page(index: int, figures: tuple[Figure, ...] = ()) -> PageLayout:
+    """A page with the running head "THE BATTLE OF KADESH" and its number
+    at the top, then 8 lines of body text, and the region of each figure,
+    which holds one word."""
+    head = _line(
+        *_text_words("THE BATTLE OF KADESH", 120.0, 40.0),
+        *_text_words(str(20 + index), 270.0, 40.0),
+    )
+    body = tuple(
+        _text_line(
+            f"the body of page {index} goes on {n} and on", 60.0, 70.0 + 14 * n, 280.0
+        )
+        for n in range(8)
+    )
+    return PageLayout(
+        index,
+        (
+            _region(head),
+            _region(*body),
+            *(
+                Region(figure.box, (_line(_word("Orontes", figure.box.x0 + 5, 100.0)),))
+                for figure in figures
+            ),
+        ),
+        figures,
+    )
+
+
+def test_figure_text_a_figures_region_takes_no_part_in_the_survey() -> None:
+    # The map's box reaches above the running head of page 1: with its
+    # region, the page has no head line, and its running head would not
+    # be found.
+    box = Box(300.0, 30.0, 420.0, 200.0)
+    pages = tuple(
+        _headed_page(index, (_in_page(index, box),) if index == 1 else ())
+        for index in range(4)
+    )
+    blocks = _structure(_lines_file(*pages))
+    assert not any("BATTLE" in block_text(block) for block in blocks.blocks)
+    assert (
+        sum(removal.reason is RemovalReason.RUNNING_HEAD for removal in blocks.removals)
+        == 4
+    )
+
+
+def test_figure_text_a_plates_caption_is_compared_with_plates_topmost_lines_only() -> (
+    None
+):
+    # Structure spec section 18, rule 1: a plate's topmost line alike to the
+    # topmost line of another plate page is a running head. Page 0 is a
+    # text page with an in-page figure, not a plate page, so the plate's
+    # caption, printed as page 0's first line, stays.
+    title = "THE MODERN MOUND OF KADESH"
+    box = Box(60.0, 140.0, 280.0, 300.0)
+    text = PageLayout(
+        0,
+        (
+            _region(
+                _text_line(title, 100.0, 60.0),
+                *(
+                    _text_line(
+                        f"the body goes on {n} and on to the end",
+                        60.0,
+                        80.0 + 14 * n,
+                        280.0,
+                    )
+                    for n in range(4)
+                ),
+            ),
+            Region(box, (_line(_word("Orontes", 100.0, 200.0)),)),
+        ),
+        (_in_page(0, box),),
+    )
+    plate = PageLayout(
+        1,
+        (_region(_text_line(title, 100.0, 400.0)),),
+        (
+            Figure(
+                box=Box(0.0, 0.0, 432.0, 648.0),
+                image="images/plate-0001.png",
+                dpi=300,
+                kind=FigureKind.PLATE,
+            ),
+        ),
+    )
+    blocks = _structure(
+        _lines_file(text, plate), frozenset({"the", "modern", "mound", "of", "kadesh"})
+    )
+    assert tuple(
+        block_text(block)
+        for block in blocks.blocks
+        if block.figure == plate.figures[0].image
+    ) == (title,)
 
 
 def test_figure_text_a_page_with_two_in_page_figures_is_a_text_page() -> None:
@@ -1476,6 +1682,65 @@ def test_figure_place_before_a_paragraph_that_opens_beside_the_figure() -> None:
     )
 
 
+def test_figure_place_in_the_endnote_section_is_after_the_body_before_it() -> None:
+    # The page's lines are endnotes, which no body block holds: the figure
+    # goes after the last body block that starts on its page or before,
+    # the paragraph of page 0, not first.
+    first = PageLayout(
+        0,
+        (
+            _region(
+                _text_line("A paragraph with the text in it goes", 75.0, 70.0, 360.0),
+                *(
+                    _text_line(
+                        f"on over a full line of the body {n}",
+                        60.0,
+                        84.0 + 14 * n,
+                        360.0,
+                    )
+                    for n in range(5)
+                ),
+            ),
+        ),
+        (),
+    )
+    box = Box(60.0, 345.0, 360.0, 395.0)
+    notes = tuple(
+        line
+        for n in range(1, 13)
+        for top in (70.0 + 45 * (n - 1) + (60.0 if n > 6 else 0.0),)
+        for line in (
+            _text_line(f"{n}. The note {n} which", 75.0, top, 360.0),
+            _text_line("goes on over a full line", 60.0, top + 15, 360.0),
+            _text_line("ends.", 60.0, top + 30),
+        )
+    )
+    second = PageLayout(1, (_region(*notes),), (_in_page(1, box),))
+    blocks = _structure(_lines_file(first, second))
+    assert tuple(note.marker for note in blocks.notes)[-1] == "12."
+    assert tuple(block.kind for block in blocks.blocks) == (
+        BlockKind.PARAGRAPH,
+        BlockKind.FIGURE,
+    )
+
+
+def test_figure_place_is_after_the_body_block_not_the_side_text_that_holds_its_line() -> (
+    None
+):
+    # A margin note placed before its paragraph, whose origin would hold the
+    # line too: the figure goes after the paragraph.
+    line = PlacedLine(0, _text_line("the line above", 60.0, 100.0), _EDGES, _EDGES)
+    origin = (Origin(0, Box(40.0, 90.0, 360.0, 200.0)),)
+    assert (
+        figure_position(
+            (BlockKind.MARGIN_NOTE, BlockKind.PARAGRAPH, BlockKind.PARAGRAPH),
+            (origin, origin, (Origin(1, Box(60.0, 60.0, 360.0, 90.0)),)),
+            line,
+        )
+        == 2
+    )
+
+
 def test_figure_place_before_any_body_line_is_first() -> None:
     box = Box(60.0, 40.0, 300.0, 90.0)
     page = PageLayout(0, (_region(*_ABOVE_THE_MAP),), (_in_page(0, box),))
@@ -1546,6 +1811,8 @@ def test_caption_label_is_found(words: tuple[str, ...]) -> None:
         ("L.", "P.", "H.,"),
         ("1066.", "The"),
         ("In", "1066"),
+        # A number before a scale's unit, with no "." after it.
+        ("12", "Miles"),
     ],
 )
 def test_caption_label_is_not_found(words: tuple[str, ...]) -> None:
@@ -1777,3 +2044,11 @@ def test_whole_kadesh_caption_of_each_map_and_none_of_the_hieroglyphs(
         if block.spans
     }
     assert captions == _KADESH_MAP_CAPTIONS
+    # Each map's caption is one row: "MAP 111." and its 11 words of title
+    # and scale, the others 2 words after the label.
+    assert {
+        index: len(block_text(block).split(" "))
+        for index, figures in found.items()
+        for block in figures
+        if block.spans
+    } == {29: 13, 33: 4, 36: 4, 38: 4, 41: 4, 45: 4}

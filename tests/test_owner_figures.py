@@ -125,6 +125,15 @@ _HAYNES_NUMBERS = (
 )
 
 
+# The number of words of each of Haynes' captions, from its label to its
+# last word, as galley gives them on 18 November 2026; each caption's last
+# words were read against its page and none was cut short or ran on.
+_HAYNES_CAPTION_WORDS = (
+    *(12, 12, 21, 40, 14, 50, 21, 44, 75, 40, 19, 24, 10, 95, 15, 14, 26),
+    *(19, 15, 16, 24, 25, 30, 16, 13),
+)
+
+
 def test_haynes_caption_of_each_figure_opens_with_figure_and_its_number(
     owner_book_run: Callable[[str], BlocksFile],
 ) -> None:
@@ -133,6 +142,10 @@ def test_haynes_caption_of_each_figure_opens_with_figure_and_its_number(
         (words[0].lower(), words[1])
         for words in (block_text(block).split(" ") for block in figures)
     ) == tuple(("figure", number) for number in _HAYNES_NUMBERS)
+    assert (
+        tuple(len(block_text(block).split(" ")) for block in figures)
+        == _HAYNES_CAPTION_WORDS
+    )
 
 
 # Turney's 14 figures, in order: the number that opens each caption as the
@@ -142,6 +155,12 @@ _TURNEY_NUMBERS = (
     *("i.", "4.", None, "8.", "12.", "13.", "14", None, "15.", "16.", "17."),
     *("18.", "2i.", None),
 )
+
+
+# The number of words of each of Turney's captions, 0 for the 3 without
+# one, as galley gives them on 18 November 2026: 15 and 17 (pages 175 and
+# 176) whole with their last rows, which layout joined with lettering.
+_TURNEY_CAPTION_WORDS = (34, 32, 0, 41, 18, 41, 62, 0, 41, 31, 33, 30, 42, 0)
 
 
 def test_turney_caption_of_11_figures_and_no_heading_on_page_174(
@@ -154,6 +173,13 @@ def test_turney_caption_of_11_figures_and_no_heading_on_page_174(
             for block in _figure_blocks(blocks)
         )
         == _TURNEY_NUMBERS
+    )
+    assert (
+        tuple(
+            len(block_text(block).split(" ")) if block.spans else 0
+            for block in _figure_blocks(blocks)
+        )
+        == _TURNEY_CAPTION_WORDS
     )
     assert not any(
         block.kind is BlockKind.HEADING
