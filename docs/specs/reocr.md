@@ -719,12 +719,33 @@ the layer reads twice, "Eleanor" and "Eleanor,"; Domesday 4; Gierke
 read both the junk under it and the copy beside it
 (`model.is_junk_beside_its_copy`), below.
 
-Measured on 18 November 2026 on whole Stubbs, Domesday, Gierke and
-Haskins, recomputing the records from the same readings with and without
-the exception: the words read twice (a layer word left within 4 pt of a
-kept record whose letters are equal or alike to those of one of its
-Tesseract words within 16 pt) go from 30 to 4 on Domesday, 12 to 0 on
-Gierke and 6 to 5 on Stubbs, none on Haskins; no record's choice changes
+**A word read twice** is counted, here and in the survey above, as a
+word of the layer that layout left in lines.json whose middle lies
+inside the box of a kept record of its page widened by 4 pt, and whose
+letters and digits equal those of one of the record's Tesseract words
+whose middle lies within 16 pt above or below its own, or, for 3
+letters or more, whose letters are alike to them by (c)'s ratio; each
+word once (`scripts/count_read_twice.py`, on a book folder). Measured
+with that script on 18 November 2026, by layout runs of whole Stubbs,
+Domesday, Gierke and Haskins on the same words.json, the words read
+twice go from 30 to 5 on Domesday, 12 to 0 on Gierke and 6 to 5 on
+Stubbs, none on Haskins, between the code before the exception (commit
+4d9f1e9) and the code of the review of work package 2. Domesday's 5 are
+"Larpe" beside "Large" (page 399), "the" (534), "Devonshire," beside
+"Derbyshire," (547) and "Domini" beside "Dominium" (548), which the
+exception leaves, and "ofdemesne-" (page 90, above), which holds a word
+printed once; Stubbs' 5 are "of" twice in cut-in notes (pages 224 and
+229) and three words of its index (315, 317, 320). A
+count that takes a word whose box, not its middle, comes within 4 pt of
+the record, with the two middles less than 30 pt apart across (the
+review's), finds 40 to 11 on Domesday, 32 to 18 on Gierke and 11 to 10
+on Stubbs: its further words are words of the body at the column's edge
+that hold a note's word ("of", "the" beside a note's "of", "the"), and
+one copy whose middle lies further off, "imgmen." (Domesday page 333,
+above).
+
+Recomputing the records from the same readings with and without the
+exception, on the same four books: no record's choice changes
 (section 3); 34 copies on Domesday, 16 on Gierke and 1 on Stubbs are
 replaced, and one layer word is no longer: "14." under Tesseract's "146"
 on Gierke page 63, a known number, left beside it until the broken
