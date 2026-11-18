@@ -404,7 +404,7 @@ def _head_survey(
         if starts_with_chapter_label_word(_texts(line))
     )
     running = (alike_whole | confirmed | alike_without_number) - labels
-    running_letters = tuple(
+    alike_head_letters = tuple(
         sorted({_line_letters(line) for page, line in near if page in running})
     )
     below_specks = frozenset(
@@ -415,7 +415,7 @@ def _head_survey(
         and len(_line_letters(line)) < _HEAD_MIN_LETTERS
         and in_head_band(below.box.top, median_top, pitch)
         and not starts_with_chapter_label_word(_texts(below))
-        and _alike_to_any(_line_letters(below), running_letters, _HEADS_ALIKE)
+        and _alike_to_any(_line_letters(below), alike_head_letters, _HEADS_ALIKE)
     )
     short_sections = frozenset(
         page_index
