@@ -10,6 +10,7 @@ The whole-book tests at the end hold the counts of work package 3,
 deliverable 3, that layout gives."""
 
 import json
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -17,16 +18,27 @@ from typing import Any
 import pytest
 
 from galley.book_folder import BookFolder
+from galley.cli import main
+from galley.layout import measure_book
+from galley.layout._page import page_parts
 from galley.model import (
     BlocksFile,
     NoteKind,
     PageLayout,
     RemovalReason,
     RereadKind,
+    WordsFile,
     block_text,
     read_blocks,
     read_lines,
+    read_words,
 )
+from galley_eval.align import State, align, reference_side
+from galley_eval.books import EvaluationBook, read_books
+from galley_eval.evaluate import evaluate
+from galley_eval.galley_side import words_tokens
+from galley_eval.reader import ReferenceKind, Stream, read_reference_file
+from galley_eval.stages import StageOutput
 
 _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "stray_text"
 
@@ -336,3 +348,114 @@ def test_whole_no_page_loses_its_footnotes(
 ) -> None:
     pages = _footnote_pages(_whole_blocks(whole_book_run, book))
     assert len(pages) >= _FOOTNOTE_PAGES_AT_START[book]
+
+
+# Stubbs' cut-in notes on the whole book (plan stray-text, work package 4,
+# deliverable 2), by the evaluation tool (tools/galley-eval) against the
+# Gutenberg edition. At a0a1675 (runs/lists-figures/), 169 of the
+# reference's 467 margin notes were in the body, 291 margin notes; on 18
+# November 2026 with the shortened-row test by size, 46 and 413.
+_STUBBS = "earlyplantagenet01stub"
+_STUBBS_NOTES_IN_BODY_MOST = 110
+# Layout's cut-in words that the words' alignment pairs with the
+# reference's body, not a margin note: 24 at a0a1675, of 922 cut-in words;
+# 31 of 1,512 with the test by size, the 7 added on pages 37, 51, 96, 175,
+# 244, 247 and 264 ("Coinage" on 37 and "attached" on 51 are note words
+# the alignment paired with the body). The plan allows 20 more.
+_STUBBS_CUT_IN_BODY_WORDS_AT_START = 24
+_STUBBS_CUT_IN_BODY_WORDS_MORE = 20
+_ALIGNED = frozenset((State.MATCHED, State.CHANGED, State.SPLIT, State.GLUED))
+
+
+def _stubbs_evaluation_book() -> EvaluationBook:
+    books = read_books(Path(__file__).parents[1] / "evaluation" / "books.toml")
+    return next(book for book in books if book.archive_id == _STUBBS)
+
+
+def _gutenberg_html(books_dir: Path, book: EvaluationBook) -> Path:
+    html = books_dir / "gutenberg" / book.html_name
+    if not html.is_file():
+        pytest.skip(f"{html} is missing; run `uv run python scripts/fetch_samples.py`")
+    return html
+
+
+@pytest.mark.whole_book
+@pytest.mark.pandoc
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+def test_whole_stubbs_cut_in_notes_left_in_the_body_are_at_most_110(
+    whole_book_run: Callable[[str], BookFolder], books_dir: Path, tmp_path: Path
+) -> None:
+    book = _stubbs_evaluation_book()
+    html = _gutenberg_html(books_dir, book)
+    # The run's folder is read only: markdown is written in a copy.
+    folder = BookFolder(tmp_path / _STUBBS)
+    shutil.copytree(whole_book_run(_STUBBS).root, folder.root)
+    main(["markdown", str(folder.root)])
+    scores = {
+        output.output: output.margin_notes
+        for output in evaluate(book, folder, html).scorecard.outputs
+    }
+    margin_notes = scores[StageOutput.MARKDOWN]
+    assert margin_notes is not None
+    assert margin_notes.in_body <= _STUBBS_NOTES_IN_BODY_MOST
+
+
+def _cut_in_words(words: WordsFile) -> frozenset[tuple[int, int]]:
+    """The cut-in words layout takes out of the body column of each page of
+    `words` (layout spec, section 3, step 2b), as (page index, place among
+    the page's words)."""
+    measures = measure_book(words)
+    assert measures is not None
+    return frozenset(
+        (page.index, place)
+        for page in words.pages
+        if page.words
+        for parts in (page_parts(page.words, page.index, measures),)
+        for cut_in in ((*parts.left_cut_in, *parts.right_cut_in),)
+        for place, word in enumerate(page.words)
+        if any(word is moved for moved in cut_in)
+    )
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+def test_whole_stubbs_cut_in_words_paired_with_the_body_rise_by_at_most_20(
+    whole_book_run: Callable[[str], BookFolder], books_dir: Path
+) -> None:
+    book = _stubbs_evaluation_book()
+    html = _gutenberg_html(books_dir, book)
+    folder = whole_book_run(_STUBBS)
+    words = read_words(folder.words_json)
+    reference = read_reference_file(
+        html, book.rules, book.html_sha256, ends_at=book.reference_ends_at
+    )
+    prepared = reference_side(reference)
+    tokens = words_tokens(words, read_lines(folder.lines_json))
+    alignment = align(reference, tokens, prepared)
+    cut_in = _cut_in_words(words)
+    # Each word's tokens, in the order words_tokens gives them.
+    token = 0
+    paired_with_body = 0
+    for page in words.pages:
+        for place, word in enumerate(page.words):
+            count = len(word.text.split())
+            pairings = tuple(
+                alignment.pairings[alignment.galley_pairing[index]]
+                for index in range(token, token + count)
+            )
+            token += count
+            if (page.index, place) in cut_in and any(
+                pairing.state in _ALIGNED
+                and pairing.reference_indices
+                and prepared.places[pairing.reference_indices[0]].kind
+                is not ReferenceKind.MARGIN_NOTE
+                and prepared.places[pairing.reference_indices[0]].stream is Stream.BODY
+                for pairing in pairings
+            ):
+                paired_with_body += 1
+    assert token == len(tokens)
+    assert paired_with_body <= (
+        _STUBBS_CUT_IN_BODY_WORDS_AT_START + _STUBBS_CUT_IN_BODY_WORDS_MORE
+    )
