@@ -12,7 +12,7 @@ from collections.abc import Set as AbstractSet
 from enum import StrEnum
 
 from galley.body_measures import median_word_height
-from galley.model import BlockKind, Line
+from galley.model import BlockKind
 from galley.structure._heads import starts_with_chapter_label_word
 from galley.structure._lines import PlacedLine, is_centred
 from galley.structure._measures import Edges
@@ -194,14 +194,14 @@ def _is_heading_line(
     number: int,
     pitch: float,
     side_edges: Edges | None,
-    kept_head: Line | None,
+    kept_head: int | None,
 ) -> bool:
     """Spec section 14, rules 1 to 4, for the line at `number` of a page's
     body stream `lines`. `side_edges` are the sides of the page's body and
     band lines when its body holds fewer than 5 lines, else None;
-    `kept_head` is the page's head line when section 3 left it in the text
-    within 2 pitches of the median head top, which is not flush left
-    unless it starts with a chapter label word."""
+    `kept_head` is the position in `lines` of the page's head line when
+    section 3 left it in the text in its band of the head lines, which is
+    not flush left unless it starts with a chapter label word."""
     line = lines[number]
     texts = _texts(line)
     centred = is_centred(line) or (
@@ -210,7 +210,7 @@ def _is_heading_line(
     flush_left = (
         not centred
         and _is_flush_left(line)
-        and (line.line is not kept_head or _starts_with_label_word(line))
+        and (number != kept_head or _starts_with_label_word(line))
     )
     return (
         (centred or flush_left)
@@ -305,7 +305,7 @@ def _heading_line_numbers(
     lines: Sequence[PlacedLine],
     pitch: float,
     side_edges: Edges | None,
-    kept_head: Line | None,
+    kept_head: int | None,
     never: frozenset[int],
 ) -> frozenset[int]:
     """The positions in `lines`, a page's body stream, of its heading lines
@@ -314,9 +314,9 @@ def _heading_line_numbers(
     each centred chapter label whose next line they take, and each
     continuation of a line they take. `pitch` is the body line pitch;
     `side_edges` the sides of the page's body and band lines when its body
-    holds fewer than 5 lines, else None; `kept_head` the head line section
-    3 left in the text near the head top, or None; `never` the positions of
-    lines that are never heading lines."""
+    holds fewer than 5 lines, else None; `kept_head` the position of the
+    head line section 3 left in the text in its band, or None; `never` the
+    positions of lines that are never heading lines."""
     by_rule = {
         number
         for number in range(len(lines))
@@ -392,7 +392,7 @@ def heading_runs(
     band: Sequence[PlacedLine],
     pitch: float,
     head: PageHead,
-    kept_head: Line | None,
+    kept_head: int | None,
     never: frozenset[int],
 ) -> tuple[BodyRun, ...]:
     """The heading blocks of `lines`, a page's body stream, in order (spec
@@ -400,8 +400,9 @@ def heading_runs(
     (which a line starting with a label word is) or the first line of a page without a
     running head (`head`); level 2 otherwise. `band` are the lines of the
     page's band regions; `pitch` is the body line pitch, in points;
-    `kept_head` the page's head line when section 3 left it in the text
-    within 2 pitches of the book's median head top, else None; `never` the
+    `kept_head` the position in `lines` of the page's head line when
+    section 3 left it in the text in its band of the head lines, else
+    None; `never` the
     positions of the lines that are never heading lines, those of the head
     band alike to a running head."""
     numbers = sorted(

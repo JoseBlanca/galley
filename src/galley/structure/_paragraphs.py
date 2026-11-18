@@ -116,15 +116,16 @@ def _runs(
     body: Sequence[PlacedLine],
     band_regions: Sequence[Sequence[PlacedLine]],
     head: PageHead,
-    kept_head: Line | None,
+    kept_head: int | None,
     survey: BookSurvey,
     contents_pages: frozenset[int],
 ) -> tuple[BodyRun, ...]:
     """The runs of the body stream that are blocks of their own (spec
     section 2, step 2.3), in order: the headings, the chapter summary under
     a heading, and the verse; none on a page of the printed table of
-    contents. `kept_head` is the page's head line that section 3 left in
-    the text near the book's head lines (`kept_head_line`), or None."""
+    contents. `kept_head` is the position in `body` of the page's head line
+    that section 3 left in the text near the book's head lines
+    (`_kept_head_line`), or None."""
     if page_index in contents_pages:
         return ()
     band_lines = tuple(line for region in band_regions for line in region)
@@ -153,7 +154,7 @@ def _runs(
     )
 
 
-def kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
+def _kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
     """The text line of the page's head line when section 3 left it in the
     text and it lies in the band where running heads are looked for, at
     most 2 pitches below the median top of the book's head lines or
@@ -243,6 +244,16 @@ def page_parts(
     body = tuple(
         line for kind, lines in regions if kind is RegionKind.BODY for line in lines
     )
+    # The head line, the first region's last line, is then the last of
+    # that region's lines that open the body stream.
+    head_line_kept = (
+        _kept_head_line(page, survey) is not None
+        and regions
+        and regions[0][0] is RegionKind.BODY
+        and regions[0][1]
+        and regions[0][1][-1].line == page.regions[0].lines[-1]
+    )
+    kept_head = len(regions[0][1]) - 1 if head_line_kept else None
     index_lines = _index_lines(page.index, index)
     page_head = (
         PageHead.RUNNING_HEAD
@@ -274,7 +285,7 @@ def page_parts(
             body,
             (*band_regions, index_lines),
             page_head,
-            kept_head_line(page, survey),
+            kept_head,
             survey,
             contents_pages,
         ),
