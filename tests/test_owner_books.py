@@ -111,12 +111,14 @@ def test_every_chapter_is_a_level_1_heading_with_its_label(
     owner_book_run: Callable[[str], BlocksFile], book: str
 ) -> None:
     labels = _level_1_headings(owner_book_run(book))
-    chapters = sum(
-        1
+    # Distinct labels, so that a chapter found twice does not stand for a
+    # chapter missed.
+    chapters = tuple(
+        label.lower()
         for label in labels
         if label is not None and label.lower().startswith("chapter")
     )
-    assert chapters == _CHAPTERS[book]
+    assert len(set(chapters)) == len(chapters) == _CHAPTERS[book]
 
 
 @pytest.mark.parametrize("book", ["turney", "haynes"])
