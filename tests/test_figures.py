@@ -4,14 +4,18 @@ figure regions (section 5), on values made in the test and on the excerpt
 kadesh_29-38 (section 10).
 """
 
+import functools
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 from PIL import Image
 
+from galley import analyze
 from galley.analyze import figure_boxes
 from galley.book_folder import BookFolder
+from galley.config import read_config
 from galley.extract import figure_crop_px, figure_image, page_words
 from galley.model import (
     Box,
@@ -463,3 +467,77 @@ def test_kadesh_29_38_boxes_each_have_an_in_page_figure_and_its_image(
         5: (FigureKind.PLATE,),
         6: (FigureKind.PLATE,),
     }
+
+
+# Whole books (figures spec section 10, "Whole-book tests", analyze's part):
+# the in-page figures analyze finds, by page index and count.
+_KADESH_BOOK = "battleofkadeshst00breauoft"
+# Figures spec section 2: Kadesh's 6 maps (29, 33, 36, 38, 41, 45) and its
+# 11 groups of hieroglyphs or Arabic, 17 in all.
+_WHOLE_BOOK_FIGURES = frozendict(
+    {
+        _KADESH_BOOK: frozendict(
+            {
+                20: 1,
+                27: 2,
+                29: 1,
+                33: 1,
+                36: 1,
+                37: 1,
+                38: 1,
+                40: 1,
+                41: 1,
+                44: 2,
+                45: 1,
+                50: 1,
+                51: 1,
+                52: 1,
+                53: 1,
+            }
+        ),
+        "normansineuropea00hask": frozendict(),
+        "earlyplantagenet01stub": frozendict(),
+        "domesdaybook00maituoft": frozendict(),
+        "catherinedemedic00mariuoft": frozendict(),
+        "politicaltheorie00gieruoft": frozendict(),
+    }
+)
+
+
+def test_the_whole_book_figures_are_17_all_of_kadesh() -> None:
+    assert sum(sum(pages.values()) for pages in _WHOLE_BOOK_FIGURES.values()) == 17
+
+
+@pytest.fixture(scope="module")
+def whole_book_analyzed(
+    tmp_path_factory: pytest.TempPathFactory, whole_book_toml: frozendict[str, str]
+) -> Callable[[str], tuple[PageInfo, ...]]:
+    """A function that gives the pages of a whole book as analyze finds them
+    with the configs of tests/conftest.py, by Internet Archive identifier,
+    analyze run the first time a test asks for the book."""
+    roots = frozendict(
+        {book: tmp_path_factory.mktemp(book) for book in whole_book_toml}
+    )
+
+    @functools.cache
+    def analyzed(book: str) -> tuple[PageInfo, ...]:
+        folder = BookFolder(roots[book])
+        folder.book_toml.write_text(whole_book_toml[book], encoding="utf-8")
+        analyze.run(folder, read_config(folder.book_toml))
+        return read_pages(folder.pages_json).pages
+
+    return analyzed
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(600)
+@pytest.mark.parametrize("book", sorted(_WHOLE_BOOK_FIGURES))
+def test_whole_book_analyze_finds_the_in_page_figures_of_section_2_and_no_other(
+    book: str, whole_book_analyzed: Callable[[str], tuple[PageInfo, ...]]
+) -> None:
+    pages = whole_book_analyzed(book)
+    assert {
+        page.index: len(page.figure_boxes) for page in pages if page.figure_boxes
+    } == _WHOLE_BOOK_FIGURES[book]
+    assert all(page.kind is PageKind.TEXT for page in pages if page.figure_boxes)
