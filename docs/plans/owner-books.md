@@ -576,7 +576,7 @@ passing epubcheck.
 
 **Stands on:** WPs 1 to 6.
 
-- [ ] 7.1 The measurement: deliverables 1 to 3. Spec: structure §26,
+- [x] 7.1 The measurement: deliverables 1 to 3. Spec: structure §26,
   "Measured by `galley-eval run`"; `docs/specs/evaluation.md` §9.
 - [ ] 7.2 The checks by eye, and the fixes they call for. Spec:
   structure §26, "Excerpt tests", its owner's check, done as "Changed
