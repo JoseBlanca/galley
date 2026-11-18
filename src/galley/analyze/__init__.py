@@ -393,6 +393,8 @@ def classify_page(
             for region in config.exclude_regions
             if region.page_index == index
         ),
+        # The rule of docs/specs/figures.md, section 3, is not written yet.
+        figure_boxes=(),
         blank_checked_by_ocr=False,
     )
 

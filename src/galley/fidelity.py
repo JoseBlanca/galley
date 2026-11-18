@@ -261,8 +261,11 @@ type _BlocksBoundary = Literal[FidelityBoundary.STRUCTURE, FidelityBoundary.MARK
 def _block_words(
     block: Block, boundary: _BlocksBoundary, endnote_ids: frozenset[str]
 ) -> tuple[_PlacedWord, ...]:
-    """The words of a block: a heading's label, then its spans split one by
-    one, then an epigraph's source. A note reference span is replaced by a space in the block's text,
+    """The words of a block: its label, whatever its kind, then its spans
+    split one by one, then an epigraph's source, and at the structure
+    boundary a contents entry's page number, which markdown does not
+    write (structure spec section 31). A note reference span is replaced
+    by a space in the block's text,
     so that it does not glue to the word before, and counted as a word of
     its own: at the structure boundary every one, at the markdown boundary
     those to the endnotes of `endnote_ids`, whose links keep their text."""
@@ -280,6 +283,11 @@ def _block_words(
                 if span.note_ref is not None
                 for word in _placed(span.text, place)
             )
+            page_number = (
+                _placed(block.page_number, place)
+                if block.page_number is not None
+                else ()
+            )
         case FidelityBoundary.MARKDOWN:
             references = tuple(
                 word
@@ -287,9 +295,10 @@ def _block_words(
                 if span.note_ref in endnote_ids
                 for word in _placed(span.text, place)
             )
+            page_number = ()
         case _:
             assert_never(boundary)
-    return label + _placed(text, place) + source + references
+    return label + _placed(text, place) + source + references + page_number
 
 
 def _blocks_file_words(
@@ -574,6 +583,11 @@ _PUNCTUATION_ATTACHED_PARTS = 2
 # reason given for _SOURCE_DASHES.
 _SPACED_SIGNS = frozenset("?;:!")
 _CASE_SPLIT_PARTS = 2
+# A list item's dash split off its first word: the dash and the word
+# (structure spec section 29, "Blocks"). Written here again, not imported
+# from structure, for the reason given for _SOURCE_DASHES.
+_LIST_MARKER_PARTS = 2
+_LIST_DASHES = frozenset({"\u2014", "\u2013"})
 # The changes structure makes after the joins of lost hyphens (structure
 # spec section 2, the paragraph after the steps).
 _CHANGES_AFTER_A_JOIN = frozenset(
@@ -605,7 +619,8 @@ def _change_follows_its_reason(change: WordChange) -> bool:
     hyphen joins two parts as they are, but for one full stop ending the
     first; a source dash is taken off a source's first word; a spaced
     sign is attached to the word before it; a word glued at a case change
-    becomes two whose second starts with a capital."""
+    becomes two whose second starts with a capital; a list item's dash,
+    "—" or "–", is split off the word it starts."""
     if not change.before or not change.after:
         return False
     joined_after = "".join(change.after)
@@ -645,6 +660,14 @@ def _change_follows_its_reason(change: WordChange) -> bool:
                 and len(change.after) == _CASE_SPLIT_PARTS
                 and all(change.after)
                 and change.after[1][0].isupper()
+                and change.before[0] == joined_after
+            )
+        case ChangeReason.LIST_MARKER:
+            return (
+                len(change.before) == 1
+                and len(change.after) == _LIST_MARKER_PARTS
+                and change.after[0] in _LIST_DASHES
+                and bool(change.after[1])
                 and change.before[0] == joined_after
             )
         case _:
@@ -788,8 +811,8 @@ def check_stage(
     re-reading of lines.json and with its Tesseract words added, against
     the words of lines.json's lines. structure:
     the words of lines.json against those of blocks.json's blocks and notes,
-    with each heading's label, each epigraph's source, and each note's
-    marker and group, plus its removals,
+    with each block's label, each epigraph's source, each contents entry's
+    page number, and each note's marker and group, plus its removals,
     with each word change undone. markdown: the words of blocks.json, with
     the edits applied, against book.md as `read_markdown` gives it, without
     the references to footnotes and the markers of referenced footnotes,
@@ -814,7 +837,7 @@ def check_stage(
     change does more than its reason allows (a hyphen join of two parts,
     with the hyphen dropped or kept, a marker split off its word, the
     dashes taken off a source, a spaced sign attached, a word split at a
-    case change).
+    case change, a list item's dash split off its word).
     """
     match stage:
         case FidelityBoundary.LAYOUT:

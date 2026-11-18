@@ -318,6 +318,7 @@ def _book_of(root: Path, blocks: BlocksFile) -> tuple[BookFolder, BookConfig]:
                     text_source=TextSource.TEXT_LAYER,
                     text_layer_score=None,
                     exclude_regions=(),
+                    figure_boxes=(),
                     blank_checked_by_ocr=False,
                 )
                 for index in range(3)

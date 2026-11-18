@@ -70,6 +70,7 @@ def page(index: int, kind: PageKind, text_source: TextSource) -> PageInfo:
         text_source=text_source,
         text_layer_score=None,
         exclude_regions=(),
+        figure_boxes=(),
         blank_checked_by_ocr=False,
     )
 
@@ -88,6 +89,7 @@ def test_page_with_layer_words_is_text_with_its_regions_in_config_order() -> Non
         text_source=TextSource.TEXT_LAYER,
         text_layer_score=None,
         exclude_regions=(REGION_A, REGION_B),
+        figure_boxes=(),
         blank_checked_by_ocr=False,
     )
 
@@ -105,6 +107,7 @@ def test_page_in_exclude_pages_is_excluded_although_it_has_layer_words() -> None
         text_source=TextSource.NONE,
         text_layer_score=None,
         exclude_regions=(REGION_A, REGION_B),
+        figure_boxes=(),
         blank_checked_by_ocr=False,
     )
 
@@ -137,6 +140,7 @@ def test_page_without_layer_words_is_blank_with_no_text_source() -> None:
         text_source=TextSource.NONE,
         text_layer_score=None,
         exclude_regions=(),
+        figure_boxes=(),
         blank_checked_by_ocr=False,
     )
 
@@ -832,6 +836,7 @@ def test_kadesh_pages_are_text_but_8_excluded_and_plate_9_with_the_region_on_0(
                 exclude_regions=(Box(240.0, 620.0, 252.0, 632.0),)
                 if index == 0
                 else (),
+                figure_boxes=(),
                 blank_checked_by_ocr=False,
             )
             for index in range(8)
@@ -846,6 +851,7 @@ def test_kadesh_pages_are_text_but_8_excluded_and_plate_9_with_the_region_on_0(
             text_source=TextSource.NONE,
             text_layer_score=None,
             exclude_regions=(),
+            figure_boxes=(),
             blank_checked_by_ocr=False,
         ),
         # Book page 17, a relief without a text layer.
@@ -857,6 +863,7 @@ def test_kadesh_pages_are_text_but_8_excluded_and_plate_9_with_the_region_on_0(
             text_source=TextSource.NONE,
             text_layer_score=None,
             exclude_regions=(),
+            figure_boxes=(),
             blank_checked_by_ocr=False,
         ),
     )
@@ -926,6 +933,7 @@ def test_gierke_pages_are_ten_text_pages(
             text_source=TextSource.TEXT_LAYER,
             text_layer_score=None,
             exclude_regions=(),
+            figure_boxes=(),
             blank_checked_by_ocr=False,
         )
         for index in range(10)

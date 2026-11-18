@@ -23,6 +23,7 @@ from galley.model import (
     Edit,
     Emphasis,
     Figure,
+    FigureKind,
     Line,
     LinesFile,
     Note,
@@ -79,6 +80,7 @@ PAGES = PagesFile(
             text_source=TextSource.TEXT_LAYER,
             text_layer_score=0.93,
             exclude_regions=(Box(240.0, 620.0, 252.0, 632.0),),
+            figure_boxes=(),
             blank_checked_by_ocr=False,
         ),
         PageInfo(
@@ -89,6 +91,7 @@ PAGES = PagesFile(
             text_source=TextSource.NONE,
             text_layer_score=None,
             exclude_regions=(),
+            figure_boxes=(),
             blank_checked_by_ocr=True,
         ),
     ),
@@ -130,6 +133,7 @@ WORDS = WordsFile(
                     box=Box(30.0, 40.0, 300.0, 500.0),
                     image="images/p0001-1.png",
                     dpi=300,
+                    kind=FigureKind.PLATE,
                 ),
             ),
         ),
@@ -176,6 +180,7 @@ LINES = LinesFile(
                     box=Box(30.0, 40.0, 300.0, 500.0),
                     image="images/p0000-1.png",
                     dpi=300,
+                    kind=FigureKind.PLATE,
                 ),
             ),
         ),
@@ -345,7 +350,7 @@ def test_pages_json_is_written_in_field_order_with_indent_one(tmp_path: Path) ->
     path = tmp_path / "pages.json"
     write_pages(path, PAGES)
     text = path.read_text(encoding="utf-8")
-    assert text.startswith('{\n "format_version": 2,\n "source_pdf_sha256": "aaaa')
+    assert text.startswith('{\n "format_version": 3,\n "source_pdf_sha256": "aaaa')
     assert text.endswith("}\n")
     assert list(json.loads(text)) == [
         "format_version",
@@ -361,6 +366,7 @@ def test_pages_json_is_written_in_field_order_with_indent_one(tmp_path: Path) ->
         "text_source",
         "text_layer_score",
         "exclude_regions",
+        "figure_boxes",
         "blank_checked_by_ocr",
     ]
 
@@ -616,17 +622,16 @@ def test_truncated_file_names_the_line_and_column(tmp_path: Path, name: str) -> 
 
 
 # For each file, a format_version this galley does not read, and the one it
-# reads: pages.json and words.json at 2 since the plan clean-text,
-# blocks.json at 4 since the plan owner-books's epigraphs, note groups and
-# word change reasons, lines.json at 3 since its records of the layer's
-# junk; the version before is the case the owner meets (architecture
-# section 8).
+# reads: since the plan lists-figures, pages.json at 3 with the boxes of
+# in-page figures, words.json at 3 and lines.json at 4 with the kind of a
+# figure, blocks.json at 5 with list items and contents entries; the
+# version before is the case the owner meets (architecture section 8).
 UNSUPPORTED_VERSION: frozendict[str, tuple[int, int]] = frozendict(
     {
-        "pages.json": (1, 2),
-        "words.json": (1, 2),
-        "lines.json": (2, 3),
-        "blocks.json": (3, 4),
+        "pages.json": (2, 3),
+        "words.json": (2, 3),
+        "lines.json": (3, 4),
+        "blocks.json": (4, 5),
     }
 )
 
@@ -651,7 +656,7 @@ def test_unsupported_format_version_names_both_versions(
 def test_format_version_0_or_true_is_an_error(tmp_path: Path, version: object) -> None:
     path = _written(tmp_path, "pages.json")
     _set(path, ("format_version",), version)
-    with pytest.raises(InputFileError, match="format version 2"):
+    with pytest.raises(InputFileError, match="format version 3"):
         read_pages(path)
 
 
@@ -1033,7 +1038,7 @@ def test_top_level_key_given_twice_is_an_error(tmp_path: Path) -> None:
     path = _written(tmp_path, "lines.json")
     text = path.read_text(encoding="utf-8")
     text = text.replace(
-        '"format_version": 3,', '"format_version": 3,\n "format_version": 3,', 1
+        '"format_version": 4,', '"format_version": 4,\n "format_version": 4,', 1
     )
     path.write_text(text, encoding="utf-8")
     with pytest.raises(InputFileError, match="format_version") as caught:
@@ -1157,6 +1162,7 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             Emphasis,
             ChangeReason,
             PageNumberPosition,
+            FigureKind,
             RereadKind,
             Language,
             OcrMode,
@@ -1176,6 +1182,8 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "plate_text",
             "stray_mark",
             "guide_words",
+            "leader_dots",
+            "figure_text",
         ],
         "BlockKind": [
             "heading",
@@ -1187,6 +1195,8 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "figure",
             "margin_note",
             "index_entry",
+            "list_item",
+            "contents_entry",
         ],
         "NoteKind": ["footnote", "endnote"],
         "Emphasis": ["none"],
@@ -1199,8 +1209,10 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "source_dash",
             "punctuation_attached",
             "case_split",
+            "list_marker",
         ],
         "PageNumberPosition": ["head", "foot"],
+        "FigureKind": ["plate", "in_page"],
         "RereadKind": [
             "small_print_page",
             "margin_note",
@@ -1239,8 +1251,12 @@ EVERY_MEMBER_BLOCKS = replace(
             BLOCKS.blocks[1],
             id=f"b-p0003-{number:03}",
             kind=kind,
-            # An index entry has its depth (architecture section 8).
-            level=1 if kind is BlockKind.INDEX_ENTRY else None,
+            # An index entry and a contents entry have their depth, a list
+            # item its marker (architecture section 8).
+            level=1
+            if kind in {BlockKind.INDEX_ENTRY, BlockKind.CONTENTS_ENTRY}
+            else None,
+            label="—" if kind is BlockKind.LIST_ITEM else None,
         )
         for number, kind in enumerate(BlockKind, start=1)
     ),
@@ -1293,9 +1309,9 @@ def _blocks_json(tmp_path: Path, blocks: BlocksFile) -> dict[str, Any]:
     return json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
 
 
-def test_blocks_json_is_format_version_4() -> None:
-    assert model.BLOCKS_FORMAT_VERSION == 4
-    assert BLOCKS.format_version == 4
+def test_blocks_json_is_format_version_5() -> None:
+    assert model.BLOCKS_FORMAT_VERSION == 5
+    assert BLOCKS.format_version == 5
 
 
 def test_heading_label_is_written_after_level_and_read_back(tmp_path: Path) -> None:
@@ -1308,6 +1324,8 @@ def test_heading_label_is_written_after_level_and_read_back(tmp_path: Path) -> N
         "level",
         "label",
         "source",
+        "page_number",
+        "heading_ref",
         "spans",
         "figure",
         "origin",
@@ -1488,7 +1506,8 @@ def test_label_on_a_block_that_is_not_a_heading_names_the_file_and_block(
     block_id = "b-p0003-002" if json_path[0] == "blocks" else "b-p0003-004"
     assert str(caught.value) == (
         f"{tmp_path / 'blocks.json'}: block {block_id} is a paragraph and has "
-        "the label 'CHAPTER IV.'; only a heading has a label"
+        "the label 'CHAPTER IV.'; only a heading, a list item and a contents "
+        "entry have a label"
     )
 
 
@@ -1521,7 +1540,7 @@ def test_epigraph_source_is_written_after_label_and_read_back(
     content = _blocks_json(tmp_path, blocks)
 
     epigraph = content["blocks"][1]
-    assert list(epigraph)[:6] == ["id", "kind", "level", "label", "source", "spans"]
+    assert list(epigraph)[:5] == ["id", "kind", "level", "label", "source"]
     assert epigraph["kind"] == "epigraph"
     assert epigraph["source"] == "Thomas Hobbes, 1651"
     assert epigraph["spans"][0]["text"] == (
@@ -1639,13 +1658,16 @@ def test_blocks_json_of_version_3_without_epigraph_or_note_group_names_structure
     ):
         _delete(tmp_path / "blocks.json", json_path)
     _set(tmp_path / "blocks.json", ("format_version",), 3)
+    for json_path in (("blocks", 0), ("blocks", 1), ("blocks", 2)):
+        _delete(tmp_path / "blocks.json", (*json_path, "page_number"))
+        _delete(tmp_path / "blocks.json", (*json_path, "heading_ref"))
 
     with pytest.raises(InputFileError) as caught:
         read_blocks(tmp_path / "blocks.json")
 
     assert str(caught.value) == (
         f"{tmp_path / 'blocks.json'}: is format version 3; this galley reads "
-        "format version 4; run `galley2epub structure` again"
+        "format version 5; run `galley2epub structure` again"
     )
 
 
@@ -1715,7 +1737,8 @@ def test_index_entry_of_depth_2_is_read_back_and_a_level_on_a_paragraph_is_refus
         read_blocks(tmp_path / "blocks.json")
     assert str(caught.value) == (
         f"{tmp_path / 'blocks.json'}: block b-p0003-{paragraph + 1:03} is a "
-        "paragraph and has the level 1; only a heading and an index entry have one"
+        "paragraph and has the level 1; only a heading, an index entry and a "
+        "contents entry have one"
     )
 
 
@@ -1749,16 +1772,16 @@ def test_note_places_counts_the_blocks_written_before_each_note(
 # the re-reading of small print (reocr spec, section 4, "The record").
 
 
-def test_pages_and_words_json_are_format_version_2_and_lines_json_3() -> None:
+def test_pages_and_words_json_are_format_version_3_and_lines_json_4() -> None:
     assert (
         model.PAGES_FORMAT_VERSION,
         model.WORDS_FORMAT_VERSION,
         model.LINES_FORMAT_VERSION,
-    ) == (2, 2, 3)
+    ) == (3, 3, 4)
     assert (PAGES.format_version, WORDS.format_version, LINES.format_version) == (
-        2,
-        2,
         3,
+        3,
+        4,
     )
 
 
@@ -2493,3 +2516,220 @@ def test_words_after_rereads_swap_each_kept_records_layer_words_once() -> None:
     )
     after = model.words_after_rereads((body, of, moial, of), (kept, not_kept))
     assert tuple(word.text for word in after) == ("The", "of", "Moral")
+
+
+# The plan lists-figures: in-page figures (figures spec section 7), list
+# items and contents entries (structure spec section 7), in pages.json 3,
+# words.json 3, lines.json 4 and blocks.json 5 (architecture section 8).
+
+LIST_ITEM = Block(
+    id="b-p0003-003",
+    kind=BlockKind.LIST_ITEM,
+    level=None,
+    label="—",
+    spans=(Span(text="The founder", emphasis=Emphasis.NONE, note_ref=None),),
+    figure=None,
+    origin=(ORIGIN,),
+)
+CONTENTS_ENTRY = Block(
+    id="b-p0003-004",
+    kind=BlockKind.CONTENTS_ENTRY,
+    level=1,
+    label="2.",
+    page_number="pp. 9 — 26.",
+    heading_ref="b-p0003-001",
+    spans=(Span(text="Carver's New Engineers", emphasis=Emphasis.NONE, note_ref=None),),
+    figure=None,
+    origin=(ORIGIN,),
+)
+IN_PAGE_FIGURE = Figure(
+    box=Box(113.0, 190.8, 393.6, 494.9),
+    image="images/figure-0029-1.png",
+    dpi=300,
+    kind=FigureKind.IN_PAGE,
+)
+
+
+def _with_list_and_contents(blocks: BlocksFile) -> BlocksFile:
+    """`blocks` with LIST_ITEM and CONTENTS_ENTRY after its heading and
+    paragraph, and the list item's dash split off its first word."""
+    return replace(
+        blocks,
+        blocks=(blocks.blocks[0], blocks.blocks[1], LIST_ITEM, CONTENTS_ENTRY),
+        word_changes=(
+            WordChange(
+                page_index=3,
+                before=("—The",),
+                after=("—", "The"),
+                reason=ChangeReason.LIST_MARKER,
+            ),
+        ),
+    )
+
+
+def test_figure_boxes_of_a_text_page_are_written_and_read_back(
+    tmp_path: Path,
+) -> None:
+    boxes = (Box(113.0, 190.8, 393.6, 494.9), Box(50.0, 500.0, 200.0, 600.0))
+    pages = replace(PAGES, pages=(replace(PAGES.pages[0], figure_boxes=boxes),))
+    write_pages(tmp_path / "pages.json", pages)
+
+    content = json.loads((tmp_path / "pages.json").read_text(encoding="utf-8"))
+    assert content["pages"][0]["figure_boxes"] == [
+        [113.0, 190.8, 393.6, 494.9],
+        [50.0, 500.0, 200.0, 600.0],
+    ]
+    assert read_pages(tmp_path / "pages.json") == pages
+
+
+@pytest.mark.parametrize("name", ["words.json", "lines.json"])
+def test_figure_kind_in_page_is_written_and_read_back(
+    tmp_path: Path, name: str
+) -> None:
+    pages: Any
+    if name == "words.json":
+        pages = replace(
+            WORDS, pages=(replace(WORDS.pages[0], figures=(IN_PAGE_FIGURE,)),)
+        )
+        write_words(tmp_path / name, pages)
+        read_back: object = read_words(tmp_path / name)
+    else:
+        pages = replace(
+            LINES, pages=(replace(LINES.pages[0], figures=(IN_PAGE_FIGURE,)),)
+        )
+        write_lines(tmp_path / name, pages)
+        read_back = read_lines(tmp_path / name)
+
+    content = json.loads((tmp_path / name).read_text(encoding="utf-8"))
+    assert content["pages"][0]["figures"][0]["kind"] == "in_page"
+    assert read_back == pages
+
+
+def test_figure_without_its_figure_kind_names_its_path(tmp_path: Path) -> None:
+    write_words(tmp_path / "words.json", WORDS)
+    _delete(tmp_path / "words.json", ("pages", 1, "figures", 0, "kind"))
+
+    with pytest.raises(
+        InputFileError, match=re.escape("pages[1].figures[0].kind: missing")
+    ):
+        read_words(tmp_path / "words.json")
+
+
+def test_list_item_and_contents_entry_with_page_number_and_heading_ref_are_read_back(
+    tmp_path: Path,
+) -> None:
+    blocks = _with_list_and_contents(BLOCKS)
+
+    content = _blocks_json(tmp_path, blocks)
+
+    item, entry = content["blocks"][2], content["blocks"][3]
+    assert (item["kind"], item["label"], item["level"]) == ("list_item", "—", None)
+    assert (item["page_number"], item["heading_ref"]) == (None, None)
+    assert (entry["kind"], entry["label"], entry["level"]) == (
+        "contents_entry",
+        "2.",
+        1,
+    )
+    assert (entry["page_number"], entry["heading_ref"]) == (
+        "pp. 9 — 26.",
+        "b-p0003-001",
+    )
+    assert content["word_changes"][0]["reason"] == "list_marker"
+    assert read_blocks(tmp_path / "blocks.json") == blocks
+
+
+def _refusal(tmp_path: Path, json_path: JsonPath, value: object) -> str:
+    """The message of read_blocks on the blocks of _with_list_and_contents
+    with `value` set at `json_path`."""
+    write_blocks(tmp_path / "blocks.json", _with_list_and_contents(BLOCKS))
+    _set(tmp_path / "blocks.json", json_path, value)
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+    return str(caught.value).removeprefix(f"{tmp_path / 'blocks.json'}: ")
+
+
+def test_list_item_without_a_label_names_the_file_and_block(tmp_path: Path) -> None:
+    assert _refusal(tmp_path, ("blocks", 2, "label"), None) == (
+        "block b-p0003-003 is a list item without a label, its marker"
+    )
+
+
+def test_list_item_with_a_level_names_the_file_and_block(tmp_path: Path) -> None:
+    assert _refusal(tmp_path, ("blocks", 2, "level"), 1) == (
+        "block b-p0003-003 is a list_item and has the level 1; only a heading, "
+        "an index entry and a contents entry have one"
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "name"),
+    [("page_number", "page number"), ("heading_ref", "heading reference")],
+)
+@pytest.mark.parametrize("position", [1, 2], ids=["paragraph", "list_item"])
+def test_page_number_or_heading_ref_on_another_kind_names_the_file_and_block(
+    tmp_path: Path, field: str, name: str, position: int
+) -> None:
+    kind = ("paragraph", "list_item")[position - 1]
+    assert _refusal(tmp_path, ("blocks", position, field), "b-p0003-001") == (
+        f"block b-p0003-00{position + 1} is a {kind} and has the {name} "
+        f"'b-p0003-001'; only a contents entry has a {name}"
+    )
+
+
+def test_heading_ref_naming_a_paragraph_names_the_file_and_block(
+    tmp_path: Path,
+) -> None:
+    assert _refusal(tmp_path, ("blocks", 3, "heading_ref"), "b-p0003-002") == (
+        "block b-p0003-004 refers to 'b-p0003-002', which is not the id of a "
+        "heading block"
+    )
+
+
+@pytest.mark.parametrize("depth", [None, 0])
+def test_contents_entry_without_a_depth_from_1_names_the_file_and_block(
+    tmp_path: Path, depth: int | None
+) -> None:
+    assert _refusal(tmp_path, ("blocks", 3, "level"), depth) == (
+        f"block b-p0003-004 is a contents entry with the depth {depth!r}, not "
+        "one from 1 (architecture section 8)"
+    )
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_file_before_figure_boxes_figure_kind_and_contents_entry_names_the_stage(
+    tmp_path: Path, name: str
+) -> None:
+    # The version before the plan lists-figures, which an earlier run left:
+    # the reader refuses it and names the stage that writes it again.
+    path = _written(tmp_path, name)
+    before, current = UNSUPPORTED_VERSION[name]
+    _set(path, ("format_version",), before)
+
+    with pytest.raises(InputFileError) as caught:
+        READERS[name](path)
+
+    assert str(caught.value) == (
+        f"{path}: is format version {before}; this galley reads format version "
+        f"{current}; run `galley2epub {WRITING_STAGE[name]}` again"
+    )
+    assert (before, current) == {
+        "pages.json": (2, 3),
+        "words.json": (2, 3),
+        "lines.json": (3, 4),
+        "blocks.json": (4, 5),
+    }[name]
+
+
+@pytest.mark.parametrize(
+    "reason", [RemovalReason.LEADER_DOTS, RemovalReason.FIGURE_TEXT]
+)
+def test_leader_dots_and_figure_text_removals_of_a_contents_entry_or_figure_are_read_back(
+    tmp_path: Path, reason: RemovalReason
+) -> None:
+    removal = replace(BLOCKS.removals[0], reason=reason, text=". . . .")
+    blocks = replace(BLOCKS, removals=(removal,))
+
+    content = _blocks_json(tmp_path, blocks)
+
+    assert content["removals"][0]["reason"] == reason.value
+    assert read_blocks(tmp_path / "blocks.json") == blocks

@@ -30,15 +30,15 @@ from pathlib import Path
 
 from galley.errors import EditError, InputFileError
 
-# 2 since the plan clean-text, 17 November 2026: the front matter in
-# pages.json and words.json, the re-read regions in lines.json
-# (architecture section 8).
-PAGES_FORMAT_VERSION = 2
-WORDS_FORMAT_VERSION = 2
-LINES_FORMAT_VERSION = 3
-# 4 since the plan owner-books, 17 November 2026: epigraphs, note groups and
-# three word change reasons (architecture section 8).
-BLOCKS_FORMAT_VERSION = 4
+# Since the plan lists-figures, 18 November 2026 (architecture section 8):
+# pages.json 3 with the boxes of in-page figures, words.json 3 and
+# lines.json 4 with the kind of a figure, blocks.json 5 with list items,
+# contents entries and their fields, and the reasons list_marker,
+# leader_dots and figure_text.
+PAGES_FORMAT_VERSION = 3
+WORDS_FORMAT_VERSION = 3
+LINES_FORMAT_VERSION = 4
+BLOCKS_FORMAT_VERSION = 5
 EDITS_FORMAT_VERSION = 1
 
 
@@ -111,7 +111,9 @@ class PageInfo:
     `text_layer_score` is the share of the layer's words found in the word
     list, from 0 to 1, or None without a layer. `blank_checked_by_ocr` is
     true for a page without a text layer that the OCR audit read and found
-    blank.
+    blank. `figure_boxes` are the boxes of the figures printed inside a
+    text page, in points, from the top down and then from the left; empty
+    on any other page (docs/specs/figures.md, section 3).
     """
 
     index: int
@@ -121,6 +123,7 @@ class PageInfo:
     text_source: TextSource
     text_layer_score: float | None
     exclude_regions: tuple[Box, ...]
+    figure_boxes: tuple[Box, ...]
     blank_checked_by_ocr: bool
 
 
@@ -148,14 +151,25 @@ class Word:
     ocr_confidence: float | None
 
 
-@dataclass(frozen=True, slots=True)
+class FigureKind(StrEnum):
+    """Which rule cut a figure: a plate's, whose box is the whole page
+    (docs/specs/plates.md), or one printed inside a text page among its
+    lines, cut to its box (docs/specs/figures.md)."""
+
+    PLATE = "plate"
+    IN_PAGE = "in_page"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Figure:
     """A picture cut from a page. `image` is its path relative to the book
-    folder, with `/` as separator; `dpi` is the resolution it was rendered at."""
+    folder, with `/` as separator; `dpi` is the resolution it was rendered
+    at; `kind` says whether it is a plate's or an in-page figure."""
 
     box: Box
     image: str
     dpi: int
+    kind: FigureKind
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -181,6 +195,8 @@ class RemovalReason(StrEnum):
     PLATE_TEXT = "plate_text"  # stray text-layer characters on a plate
     STRAY_MARK = "stray_mark"  # a line with no letter or digit above a running head
     GUIDE_WORDS = "guide_words"  # "BUR CON" under the running head of an index page
+    LEADER_DOTS = "leader_dots"  # between a contents entry's title and page number
+    FIGURE_TEXT = "figure_text"  # the words the OCR read inside an in-page figure
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -939,6 +955,8 @@ class BlockKind(StrEnum):
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"
+    LIST_ITEM = "list_item"  # one item of a printed list, its marker in Block.label
+    CONTENTS_ENTRY = "contents_entry"  # one entry of the printed table of contents
 
 
 class Emphasis(StrEnum):
@@ -969,18 +987,25 @@ class Origin:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Block:
     """A block of the book: a heading, paragraph, quote, verse, chapter
-    summary, epigraph, figure, margin note or index entry.
+    summary, epigraph, figure, margin note, index entry, list item or
+    contents entry.
 
     `id` is `b-p<page index, 4 digits>-<n, 3 digits>`; `level` is a
-    heading's, from 1, an index entry's depth, 1 for an entry and 2 for a
-    sub-entry, and None otherwise; `label` is a heading's chapter
-    label as printed ("CHAPTER III.", "V"), whose title is in the spans,
-    and None for a heading without one and for every other kind; `source`
-    is an epigraph's source line as printed, without its leading dash,
-    its words joined by single spaces ("Thomas Hobbes, 1651"), and None
-    for every other kind; `figure`
-    is the image path of a figure block; `origin` has one entry per page
-    the block was printed on.
+    heading's, from 1, an index entry's or a contents entry's depth, 1 for
+    an entry and more for what is printed under it, and None otherwise;
+    `label` is a heading's chapter label as printed ("CHAPTER III.",
+    "V"), whose title is in the spans, a list item's marker as printed
+    ("—", "1.", "(a)"), never None, and a contents entry's number as
+    printed before its title ("2.", "One"); None for a heading or a
+    contents entry without one and for every other kind; `source` is an
+    epigraph's source line as printed, without its leading dash, its words
+    joined by single spaces ("Thomas Hobbes, 1651"), and None for every
+    other kind; `page_number` is a contents entry's page number as printed
+    after its title, its words joined by single spaces ("23", "pp. 9 —
+    26."), and `heading_ref` the id of the heading block of the chapter
+    it names, each None when the entry has none and for every other kind;
+    `figure` is the image path of a figure block; `origin` has one entry
+    per page the block was printed on.
     """
 
     id: str
@@ -989,6 +1014,10 @@ class Block:
     label: str | None
     # A default, so that the stages that make no epigraph need not name it.
     source: str | None = None
+    # Defaults, so that the stages that make no contents entry need not
+    # name them.
+    page_number: str | None = None
+    heading_ref: str | None = None
     spans: tuple[Span, ...]
     figure: str | None
     origin: tuple[Origin, ...]
@@ -1032,7 +1061,8 @@ class ChangeReason(StrEnum):
     the OCR lost or read as a full stop; a note marker split off the
     word it was glued to; the dash before an epigraph's source dropped,
     which markdown writes back; a spaced sign attached to the word before
-    it; or a word the OCR glued at a case change split in two."""
+    it; a word the OCR glued at a case change split in two; or a list
+    item's dash split off its first word."""
 
     HYPHEN_JOIN = "hyphen_join"
     NOTE_MARKER = "note_marker"
@@ -1042,6 +1072,7 @@ class ChangeReason(StrEnum):
     SOURCE_DASH = "source_dash"  # "—Hobbes," to "Hobbes," before an epigraph's source
     PUNCTUATION_ATTACHED = "punctuation_attached"  # "subjection" ";" to "subjection;"
     CASE_SPLIT = "case_split"  # "theAvre" to "the" "Avre"
+    LIST_MARKER = "list_marker"  # "—The" to "—" "The", the dash to Block.label
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1565,47 +1596,34 @@ def write_blocks(path: Path, blocks: BlocksFile) -> None:
 
 
 def has_index_depth(block: Block) -> bool:
-    """Whether `block`, an index entry, has its depth, a level from 1
-    (architecture section 8)."""
+    """Whether `block`, an index entry or a contents entry, has its depth,
+    a level from 1 (architecture section 8)."""
     return block.level is not None and block.level >= 1
 
 
 def read_blocks(path: Path) -> BlocksFile:
     """Reads blocks.json as write_blocks wrote it. Raises InputFileError,
-    naming the file and the block, also when a block that is not a heading
-    has a label, one that is not an epigraph has a source, an index entry
-    has no depth from 1, a block that is neither a heading nor an index
-    entry has a level, or a note that is not an endnote has a group."""
+    naming the file and the block, also when a block has a field its kind
+    does not have (architecture section 8): a label on a block that is not
+    a heading, a list item or a contents entry, a source on one that is
+    not an epigraph, a level on one that is not a heading, an index entry
+    or a contents entry, a page number or a heading reference on one that
+    is not a contents entry; when a list item has no label, an index entry
+    or a contents entry no depth from 1, or a heading reference names a
+    block that is not a heading; or when a note that is not an endnote has
+    a group."""
     blocks = _read_json(path, BlocksFile, BLOCKS_FORMAT_VERSION, "structure")
-    for block in (
+    every_block = (
         *blocks.blocks,
         *(block for note in blocks.notes for block in note.blocks),
-    ):
-        if block.label is not None and block.kind is not BlockKind.HEADING:
-            message = (
-                f"{path}: block {block.id} is a {block.kind.value} and has the "
-                f"label {block.label!r}; only a heading has a label"
-            )
-            raise InputFileError(message)
-        if block.source is not None and block.kind is not BlockKind.EPIGRAPH:
-            message = (
-                f"{path}: block {block.id} is a {block.kind.value} and has the "
-                f"source {block.source!r}; only an epigraph has a source"
-            )
-            raise InputFileError(message)
-        if block.kind is BlockKind.INDEX_ENTRY and not has_index_depth(block):
-            message = (
-                f"{path}: block {block.id} is an index entry with the depth "
-                f"{block.level!r}, not one from 1 (architecture section 8); a "
-                "blocks.json written before index entries had a depth needs "
-                "`galley2epub structure` run again"
-            )
-            raise InputFileError(message)
-        if block.level is not None and block.kind not in _KINDS_WITH_LEVEL:
-            message = (
-                f"{path}: block {block.id} is a {block.kind.value} and has the "
-                f"level {block.level!r}; only a heading and an index entry have one"
-            )
+    )
+    headings = frozenset(
+        block.id for block in every_block if block.kind is BlockKind.HEADING
+    )
+    for block in every_block:
+        problem = _block_problem(block, headings)
+        if problem is not None:
+            message = f"{path}: block {block.id} {problem}"
             raise InputFileError(message)
     for note in blocks.notes:
         if note.group is not None and note.kind is not NoteKind.ENDNOTE:
@@ -1617,8 +1635,63 @@ def read_blocks(path: Path) -> BlocksFile:
     return blocks
 
 
-# Architecture section 8: a heading's level, and an index entry's depth.
-_KINDS_WITH_LEVEL = frozenset({BlockKind.HEADING, BlockKind.INDEX_ENTRY})
+# Architecture section 8: the kinds that have each field.
+_KINDS_WITH_LABEL = frozenset(
+    {BlockKind.HEADING, BlockKind.LIST_ITEM, BlockKind.CONTENTS_ENTRY}
+)
+_KINDS_WITH_LEVEL = frozenset(
+    {BlockKind.HEADING, BlockKind.INDEX_ENTRY, BlockKind.CONTENTS_ENTRY}
+)
+
+
+def _block_problem(block: Block, headings: frozenset[str]) -> str | None:
+    """What is wrong with `block` by the fields its kind has (architecture
+    section 8), as the end of a sentence that starts with the block's id,
+    or None. `headings` are the ids of the file's heading blocks."""
+    kind = block.kind.value
+    if block.label is not None and block.kind not in _KINDS_WITH_LABEL:
+        return (
+            f"is a {kind} and has the label {block.label!r}; only a heading, "
+            "a list item and a contents entry have a label"
+        )
+    if block.label is None and block.kind is BlockKind.LIST_ITEM:
+        return "is a list item without a label, its marker"
+    if block.source is not None and block.kind is not BlockKind.EPIGRAPH:
+        return (
+            f"is a {kind} and has the source {block.source!r}; "
+            "only an epigraph has a source"
+        )
+    if block.kind is BlockKind.INDEX_ENTRY and not has_index_depth(block):
+        return (
+            f"is an index entry with the depth {block.level!r}, not one from 1 "
+            "(architecture section 8); a blocks.json written before index "
+            "entries had a depth needs `galley2epub structure` run again"
+        )
+    if block.kind is BlockKind.CONTENTS_ENTRY and not has_index_depth(block):
+        return (
+            f"is a contents entry with the depth {block.level!r}, not one "
+            "from 1 (architecture section 8)"
+        )
+    if block.level is not None and block.kind not in _KINDS_WITH_LEVEL:
+        return (
+            f"is a {kind} and has the level {block.level!r}; only a heading, "
+            "an index entry and a contents entry have one"
+        )
+    if block.kind is not BlockKind.CONTENTS_ENTRY:
+        for name, value in (
+            ("page number", block.page_number),
+            ("heading reference", block.heading_ref),
+        ):
+            if value is not None:
+                return (
+                    f"is a {kind} and has the {name} {value!r}; "
+                    f"only a contents entry has a {name}"
+                )
+    if block.heading_ref is not None and block.heading_ref not in headings:
+        return (
+            f"refers to {block.heading_ref!r}, which is not the id of a heading block"
+        )
+    return None
 
 
 # The hashes.

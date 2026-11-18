@@ -221,10 +221,27 @@ def _image_problems(block: Block) -> tuple[str, ...]:
     return path + reference
 
 
+# The kinds of blocks.json 5 whose Markdown, lists and a contents, the
+# plan lists-figures writes in its work package 6 (structure spec section
+# 31); until then a file that holds one is refused, not written without
+# its label.
+_KINDS_NOT_WRITTEN_YET = frozenset({BlockKind.LIST_ITEM, BlockKind.CONTENTS_ENTRY})
+
+
 def _block_problems(block: Block) -> tuple[str, ...]:
-    """Why a block cannot be written: a figure's image _image_problems
-    refuses, or a character XML 1.0 does not allow, in its text, label or
-    source; empty when it can."""
+    """Why a block cannot be written: a kind markdown does not write yet,
+    a figure's image _image_problems refuses, or a character XML 1.0 does
+    not allow, in its text, label or source; empty when it can."""
+    kind = (
+        (
+            (
+                f"block {block.id} is a {block.kind.value}, which markdown does "
+                "not write yet (docs/plans/lists-figures.md, work package 6)"
+            ),
+        )
+        if block.kind in _KINDS_NOT_WRITTEN_YET
+        else ()
+    )
     image = _image_problems(block)
     label = (
         _character_problems(f"the label of block {block.id}", block.label)
@@ -237,7 +254,8 @@ def _block_problems(block: Block) -> tuple[str, ...]:
         else ()
     )
     return (
-        image
+        kind
+        + image
         + _character_problems(f"block {block.id}", block_text(block))
         + label
         + source
@@ -446,6 +464,8 @@ def _class_name(kind: BlockKind) -> str | None:
             | BlockKind.FIGURE
             | BlockKind.MARGIN_NOTE
             | BlockKind.INDEX_ENTRY
+            | BlockKind.LIST_ITEM
+            | BlockKind.CONTENTS_ENTRY
         ):
             return kind.value.replace("_", "-")
         case _:
@@ -513,6 +533,8 @@ def _text_markdown(block: Block, notes: frozendict[str, Note], marker: str) -> s
             | BlockKind.FIGURE
             | BlockKind.MARGIN_NOTE
             | BlockKind.INDEX_ENTRY
+            | BlockKind.LIST_ITEM
+            | BlockKind.CONTENTS_ENTRY
         ):
             text = "".join(
                 _span_markdown(span, notes, _PLAIN_WHITE_SPACE) for span in block.spans

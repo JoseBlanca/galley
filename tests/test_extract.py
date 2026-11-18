@@ -23,6 +23,7 @@ from galley.extract import page_words, plate_image
 from galley.model import (
     Box,
     Figure,
+    FigureKind,
     PageInfo,
     PageKind,
     PagesFile,
@@ -60,6 +61,7 @@ KADESH_PLATE_FIGURE = frozendict(
             box=Box(0.0, 0.0, 508.32, 728.16),
             image=f"images/plate-{index:04d}.png",
             dpi=300,
+            kind=FigureKind.PLATE,
         )
         for index in (8, 9)
     }
@@ -79,6 +81,7 @@ def page(
         text_source=text_source,
         text_layer_score=None,
         exclude_regions=exclude_regions,
+        figure_boxes=(),
         blank_checked_by_ocr=False,
     )
 
@@ -207,7 +210,10 @@ def test_blank_page_has_no_words_and_no_removals() -> None:
 # A plate page (plates spec section 3)
 
 PLATE_FIGURE = Figure(
-    box=Box(0.0, 0.0, 400.0, 600.0), image="images/plate-0004.png", dpi=300
+    box=Box(0.0, 0.0, 400.0, 600.0),
+    image="images/plate-0004.png",
+    dpi=300,
+    kind=FigureKind.PLATE,
 )
 
 
@@ -474,6 +480,7 @@ def test_each_excerpt_plate_has_its_whole_page_figure_and_its_image_alone(
                     box=Box(0.0, 0.0, pages[index].width_pt, pages[index].height_pt),
                     image=f"images/plate-{index:04d}.png",
                     dpi=300,
+                    kind=FigureKind.PLATE,
                 ),
             ), name
             with Image.open(folder.root / words.pages[index].figures[0].image) as plate:
@@ -720,6 +727,7 @@ def test_kadesh_plates_8_and_9_get_their_images_and_figures_and_8_keeps_its_word
                 box=Box(0.0, 0.0, 508.32, 728.16),
                 image="images/plate-0008.png",
                 dpi=300,
+                kind=FigureKind.PLATE,
             ),
         ),
     )
@@ -738,6 +746,7 @@ def test_kadesh_plates_8_and_9_get_their_images_and_figures_and_8_keeps_its_word
                 box=Box(0.0, 0.0, 508.32, 728.16),
                 image="images/plate-0009.png",
                 dpi=300,
+                kind=FigureKind.PLATE,
             ),
         ),
     )

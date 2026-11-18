@@ -27,6 +27,7 @@ from galley.errors import InputFileError
 from galley.model import (
     Box,
     Figure,
+    FigureKind,
     PageInfo,
     PageKind,
     PageWords,
@@ -197,6 +198,7 @@ def page_words(
                     box=Box(0.0, 0.0, page.width_pt, page.height_pt),
                     image=plate_image(page.index),
                     dpi=_PLATE_DPI,
+                    kind=FigureKind.PLATE,
                 ),
             )
         case PageKind.EXCLUDED:

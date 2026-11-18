@@ -69,6 +69,8 @@ class ReferenceKind(StrEnum):
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"
+    LIST_ITEM = "list_item"
+    CONTENTS_ENTRY = "contents_entry"
     TABLE = "table"
 
 
