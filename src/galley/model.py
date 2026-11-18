@@ -708,14 +708,33 @@ def _junk_under(
 ) -> frozenset[int]:
     """The positions in `layer_words` of the junk under a freed Tesseract
     word that (b) or (c) paired, `under_freed` mapping each word under one
-    to that word's position in `ocr_words`: a word that is no known word
-    and whose letters are unlike the Tesseract word's, so not another
-    printed word the layer read rightly."""
+    to that word's position in `ocr_words`: a word whose letters are
+    unlike the Tesseract word's and that is no known word, so not another
+    printed word the layer read rightly, or that holds the first digits of
+    the Tesseract word's number only."""
     return frozenset(
         index
         for index, position in under_freed.items()
-        if not is_known(layer_words[index].text)
+        if (
+            not is_known(layer_words[index].text)
+            or _is_digits_begun(layer_words[index], ocr_words[position])
+        )
         and not _letters_read_by(layer_words[index], ocr_words[position])
+    )
+
+
+def _is_digits_begun(word: Word, ocr_word: Word) -> bool:
+    """Whether `word`, a layer word, holds digits only, as letters and
+    digits go, that begin the digits of `ocr_word`, Tesseract's, and are
+    fewer: the layer's broken reading of the number ("14." under
+    Tesseract's "146", Gierke page 63)."""
+    digits = folded_letters_and_digits(word.text)
+    ocr_digits = folded_letters_and_digits(ocr_word.text)
+    return (
+        digits.isdigit()
+        and ocr_digits.isdigit()
+        and len(digits) < len(ocr_digits)
+        and ocr_digits.startswith(digits)
     )
 
 

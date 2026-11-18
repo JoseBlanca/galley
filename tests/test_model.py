@@ -2299,6 +2299,25 @@ def test_unlike_junk_under_an_ocr_word_stays_its_pair_beside_a_glued_alike_word(
     )
 
 
+def test_unlike_broken_number_under_an_ocr_word_paired_by_digits_is_replaced() -> None:
+    # Gierke page 63: the page image shows "146" only; the layer has "14."
+    # under Tesseract's "146" and its own "146" beside it. "14." is known,
+    # but its digits begin Tesseract's number: the layer's broken reading.
+    broken, copy = _layer("14.", 10, 101), _layer("146", 10, 107)
+    ocr = (_tesseract("146", 10, 100),)
+    is_known = _in(frozenset({"14"}))
+    assert model.replaced_layer_words((broken, copy), ocr, is_known=is_known) == (
+        broken,
+        copy,
+    )
+    # Digits that do not begin it, or as many, stay.
+    for other in ("46", "147"):
+        under = _layer(other, 10, 101)
+        assert model.replaced_layer_words(
+            (under, copy), ocr, is_known=_in(frozenset({other}))
+        ) == (copy,)
+
+
 def test_unlike_known_word_under_an_ocr_word_paired_by_letters_stays() -> None:
     # A known word under it may be another printed word the layer read
     # rightly ("14." under Tesseract's "146", Gierke page 63).
