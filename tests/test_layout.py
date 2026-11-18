@@ -2597,8 +2597,7 @@ def test_reread_stubbs_excerpt_keeps_tesseract_for_eleven_of_its_cut_in_crops(
     # 8) is a sure single word over no layer word (reocr spec, section 3).
     # The crops of pages 1, 7 and 9 hold notes whose lines share the body's
     # baselines, found by the shortened-row test by size (layout spec,
-    # section 3, step 2b, rule 2). Page 1's reading also takes in junk
-    # below the note, which the next test holds.
+    # section 3, step 2b, rule 2). The next test holds page 1's reading.
     lines = read_lines(excerpt_books["stubbs_51_56-64"].lines_json)
     (page_1,) = (reading for reading in _kept_readings(lines) if reading[0] == 1)
     assert page_1[2].startswith("Youth and education of Henry.")
@@ -2640,20 +2639,13 @@ def test_reread_stubbs_excerpt_keeps_tesseract_for_eleven_of_its_cut_in_crops(
 
 @pytest.mark.tesseract
 @pytest.mark.usefixtures("tesseract_of_the_literals")
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "the cut-in crop of book page 56 keeps '[dy', Tesseract's reading of the "
-        "tops of the body's 'it was' that the crop's foot cuts, above the boxes "
-        "the layer gives them, so that no body word overlaps it (reocr spec, "
-        "section 3, kind 3)"
-    ),
-)
 def test_reread_stubbs_56_cut_in_note_is_read_without_junk_below_it(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     # Printed "Youth and education of Henry." beside shortened body lines;
-    # the crop runs down to the next rows of full body lines.
+    # the crop's bottom cuts the tops of the body's "and it was", which
+    # Tesseract reads "[dy" above the layer's box of "it" (reocr spec,
+    # section 3, kind 3).
     lines = read_lines(excerpt_books["stubbs_51_56-64"].lines_json)
     assert tuple(reading for reading in _kept_readings(lines) if reading[0] == 1) == (
         (1, RereadKind.CUT_IN_NOTE, "Youth and education of Henry."),
