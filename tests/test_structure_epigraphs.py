@@ -11,6 +11,7 @@ are, or 44 pt, as Turney's.
 from galley.model import Box, ChangeReason, Line, Word, WordChange
 from galley.structure._epigraphs import (
     QuotationForm,
+    epigraph_column,
     epigraphs_after_heading,
     page_epigraph,
 )
@@ -74,7 +75,11 @@ def _haynes_page(*source: str) -> tuple[PlacedLine, ...]:
 def test_dashed_source_in_smaller_type_ends_an_epigraph() -> None:
     lines = _haynes_page("—Dickens,", "A", "Tale")
     (epigraph,) = epigraphs_after_heading(lines, 1, len(lines), _COLUMN)
-    assert (epigraph.start, epigraph.quotation, epigraph.source_line) == (1, (1, 2), 3)
+    assert (epigraph.start, epigraph.quotation, epigraph.source_lines) == (
+        1,
+        (1, 2),
+        (3,),
+    )
     assert epigraph.end == 4
     assert epigraph.stray_marks == ()
     assert epigraph.form is QuotationForm.PROSE
@@ -117,19 +122,107 @@ def test_dashed_line_in_the_body_s_type_is_no_source() -> None:
 
 def test_source_set_flush_right_ends_an_epigraph_without_a_dash() -> None:
     # Turney's kind: the source starts far right of the quotation and ends
-    # within 3 pt of its right side.
+    # within 5 pt of its right side (4.5 pt short on Turney's page 229).
     quotation_right = _TURNEY_LEFT + _CHAR_PT * max(map(len, _PROSE))
     lines = (
         _heading(0),
         _line(_PROSE[0], _TURNEY_LEFT, 2),
         _line(_PROSE[1], _TURNEY_LEFT, 3),
-        _flush_right("Charles Dickens", quotation_right - 2.0, 4),
+        _flush_right("Charles Dickens", quotation_right - 4.5, 4),
         _line(_BODY, _COLUMN.left, 6),
     )
     (epigraph,) = epigraphs_after_heading(lines, 1, len(lines), _COLUMN)
-    assert (epigraph.quotation, epigraph.source_line) == ((1, 2), 3)
+    assert (epigraph.quotation, epigraph.source_lines) == ((1, 2), (3,))
     assert epigraph.source == "Charles Dickens"
     assert epigraph.source_dash is None
+
+
+def test_line_ending_more_than_5_pt_short_is_no_flush_right_source() -> None:
+    quotation_right = _TURNEY_LEFT + _CHAR_PT * max(map(len, _PROSE))
+    lines = (
+        _heading(0),
+        _line(_PROSE[0], _TURNEY_LEFT, 2),
+        _line(_PROSE[1], _TURNEY_LEFT, 3),
+        _flush_right("Charles Dickens", quotation_right - 6.0, 4),
+        _line(_BODY, _COLUMN.left, 6),
+    )
+    assert epigraphs_after_heading(lines, 1, len(lines), _COLUMN) == ()
+
+
+# Turney's page 56: a quotation in justified lines, its last short, and a
+# source over four lines set flush right, the first two starting 12.5 and
+# 49 pt right of the quotation.
+_JUSTIFIED = " ".join(["word"] * 12)
+_JUSTIFIED_RIGHT = _TURNEY_LEFT + _CHAR_PT * len(_JUSTIFIED)
+
+
+def _turney_56(
+    third_source_right: float, last_source_right: float
+) -> tuple[PlacedLine, ...]:
+    return (
+        _heading(0),
+        _line(_JUSTIFIED, _TURNEY_LEFT, 2),
+        _line(_JUSTIFIED, _TURNEY_LEFT, 3),
+        _line("the end of it", _TURNEY_LEFT, 4),
+        _line(
+            "Sir Henry Acland , testimony to the Royal Commission on a",
+            _TURNEY_LEFT + 12.5,
+            5,
+        ),
+        _line(
+            "Practice of the Subjecting of Live Animals to it ,", _TURNEY_LEFT + 49.0, 6
+        ),
+        _flush_right("Purposes , 1876", third_source_right, 7),
+        _flush_right("Quoted in French", last_source_right, 8),
+        _line(_BODY, _COLUMN.left, 10),
+    )
+
+
+def test_source_over_several_lines_set_flush_right_is_one_source() -> None:
+    lines = _turney_56(_JUSTIFIED_RIGHT, _JUSTIFIED_RIGHT - 1.0)
+    (epigraph,) = epigraphs_after_heading(lines, 1, len(lines), _COLUMN)
+    assert epigraph.quotation == (1, 2, 3)
+    assert epigraph.source_lines == (4, 5, 6, 7)
+    assert epigraph.source == (
+        "Sir Henry Acland , testimony to the Royal Commission on a Practice of the Subjecting of Live Animals to it ,"
+        " Purposes , 1876 Quoted in French"
+    )
+
+
+def test_line_ending_short_of_the_source_line_does_not_continue_it() -> None:
+    # Turney's back cover: a line at the right that ends under the
+    # quotation's right side but 20 pt short of the source line above it.
+    lines = _turney_56(_JUSTIFIED_RIGHT + 20.0, _JUSTIFIED_RIGHT)
+    (epigraph,) = epigraphs_after_heading(lines, 1, len(lines), _COLUMN)
+    assert epigraph.source_lines == (4, 5, 6)
+
+
+def test_dashed_source_continues_on_a_smaller_line_after_it() -> None:
+    lines = (
+        _heading(0),
+        _line(_PROSE[0], _HAYNES_LEFT, 2),
+        _line("\u2014Dickens, A Tale of", _HAYNES_LEFT, 3, _SOURCE_HEIGHT_PT),
+        _line("Two Cities", _HAYNES_LEFT + 10.0, 4, _SOURCE_HEIGHT_PT),
+        _line(_BODY, _COLUMN.left, 6),
+    )
+    (epigraph,) = epigraphs_after_heading(lines, 1, len(lines), _COLUMN)
+    assert epigraph.source_lines == (2, 3)
+    assert epigraph.source == "Dickens, A Tale of Two Cities"
+
+
+def test_column_starts_at_the_leftmost_line_that_is_no_heading_line() -> None:
+    # Turney's page 229: the title hangs left, the epigraphs' lines are the
+    # most, and the text starts 43 pt left of them.
+    lines = (
+        _line("Chapter Ten", 110.0, 0),
+        _line("Conclusion", 30.0, 1, 20.0),
+        _line(_PROSE[0], 110.0, 3),
+        _line("/", 20.0, 4),
+        _line(_PROSE[1], 67.0, 6),
+    )
+    column = epigraph_column(lines, frozenset({0, 1}), Edges(110.0, 440.0))
+    assert column == Edges(67.0, 440.0)
+    assert epigraph_column(lines[:2], frozenset({0, 1}), _COLUMN) is None
 
 
 def test_line_set_in_too_little_is_no_flush_right_source() -> None:
@@ -272,10 +365,10 @@ def _page_of_its_own(quotation_lines: int) -> tuple[PlacedLine, ...]:
 def test_page_holding_only_a_quotation_and_its_source_is_an_epigraph() -> None:
     epigraph = page_epigraph(_page_of_its_own(5), _COLUMN)
     assert epigraph is not None
-    assert (epigraph.start, epigraph.quotation, epigraph.source_line) == (
+    assert (epigraph.start, epigraph.quotation, epigraph.source_lines) == (
         0,
         (0, 1, 2, 3, 4),
-        5,
+        (5,),
     )
     assert epigraph.source == "Charles Dickens"
 
@@ -283,6 +376,13 @@ def test_page_holding_only_a_quotation_and_its_source_is_an_epigraph() -> None:
 def test_page_of_more_than_10_lines_signed_at_the_right_is_no_epigraph() -> None:
     # A preface's last page, signed at the right.
     assert page_epigraph(_page_of_its_own(10), _COLUMN) is None
+
+
+def test_page_of_10_lines_and_a_speck_is_an_epigraph() -> None:
+    lines = (_line("/", 200.0, 0), *_page_of_its_own(9))
+    epigraph = page_epigraph(lines, _COLUMN)
+    assert epigraph is not None
+    assert epigraph.stray_marks == (0,)
 
 
 def test_page_with_lines_after_the_source_is_no_epigraph() -> None:
