@@ -578,7 +578,8 @@ is laid out as one region, as the skeleton did.
    region and number and head stayed in a paragraph. So, when the head
    row is one word of 2 or 3 digits, with or without a "." or "," after
    them, the **head-word row** is the next row below it that holds a
-   letter, and its skew rows are the rows right below the head-word row
+   letter, when its top lies at most 2 body line pitches below the head
+   row's top, and its skew rows are the rows right below the head-word row
    whose tops lie less than half a body line pitch below its top. When
    the first row with a letter or a digit after those skew rows has its
    top at least 1.3 body line pitches below the head-word row's top,
@@ -599,6 +600,16 @@ is laid out as one region, as the skeleton did.
    7" or "d": structure's rule for a speck as the head line (structure
    §3) already finds those heads, and the joined line would read the
    speck as a page number.
+   The limit of 2 pitches keeps a page number apart from a heading set
+   lower on the page, such as "CHAPTER IV." 5 pitches below a number at
+   the head of a chapter's page, which would otherwise be joined to the
+   number as a head line and removed as a running head. Measured on 19
+   November 2026 on the eight books' `words.json`, by median tops, the
+   head-word row lies 1.61 pitches below the number on Kadesh's page 38,
+   0.59 and 0.66 on Domesday's 200 and 428, and 1.05 on its 552; no
+   other page has a head row of this form with a head-word row set
+   apart, so the limit changes no page of the eight books (a guess
+   above the largest, 1.61, with room).
 4. **Footnote band.** Of the rows left after step 3, the band begins at
    the first row, other than the first of them, that is small (the
    median height of its words is at most 0.85 of the body word height,
