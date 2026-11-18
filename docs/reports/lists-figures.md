@@ -90,3 +90,40 @@ updated in task 3.4.
 
 The default run, at the merge, under the load of the lists stream: 2,613
 passed in 79 s with a 120 s per-test limit.
+
+## Review of work packages 1 and 2, with task 3.1
+
+Four reviewers (spec, tests, fidelity, conventions) on 55128c4. Every
+finding held and was fixed (6dc6aec to afc757d, spec commits first). What
+mattered:
+
+- **A figure in the footnotes rearranged the notes.** Layout took the
+  figure's words out before laying out the page, so the rest of the page
+  was laid out differently: on Kadesh page 52, 7 footnotes became 4 and
+  note text ran out of order. Layout now lays the page out with all its
+  words and then moves the figure's words into the figure's region. On
+  Kadesh, Turney and Haynes every region outside a figure now equals
+  main's less the figure's words. Kadesh has 149 notes against main's 152:
+  main made 4 notes out of map labels and hieroglyph junk on pages 33 and
+  52; page 51's junk makes one note until task 3.2 removes figure words.
+- **A re-read could read a figure's words a second time** into the
+  footnotes (shown with a stand-in for Tesseract). Every re-read now drops
+  Tesseract's words inside a figure.
+- **Boxes took in nearby ink** on Kadesh 41, 44 and 51 (a quotation
+  number and a third of its hieroglyphs; the rule under a running head).
+  A group is now cut at a 6 pt band without ink beside a run of 72 pt of
+  ink (a rule or a frame's edge: these measure 96 to 154 pt; runs beside
+  bands inside pictures, at most 30 pt). Boxes changed on Kadesh 40, 41,
+  44, 50, 51, 53 and Turney 173 only, checked by eye; the counts stay 56.
+- **An untested fidelity condition** (a list marker change must rejoin
+  to the word it replaced) now has failing cases.
+- Untested branches of the box rule, tests that ran no galley code, a
+  duplicated word-in-box test, names and docstrings: fixed.
+
+Left: Kadesh 44's first box stops 4 pt above its last row of hieroglyphs
+(the next line's words touch those squares; an overhang rule moved 12
+other boxes and was reverted). Kadesh 33's box starts 9 pt below the
+map's frame (the spec's table now says so).
+
+Checks at afc757d: 2,633 passed in 88 s with a 120 s per-test limit, the
+machine loaded by the lists stream; figure whole_book tests 10 passed.
