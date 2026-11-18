@@ -653,24 +653,50 @@ def _margin_note_words(blocks: BlocksFile) -> frozenset[tuple[int, str]]:
     )
 
 
+def _source_first_words(blocks: BlocksFile) -> frozenset[tuple[int, str]]:
+    """The first word of the source of each epigraph, with each page the
+    epigraph has a part on."""
+    return frozenset(
+        (origin.page_index, words[0])
+        for block in _all_blocks(blocks)
+        if block.kind is BlockKind.EPIGRAPH and block.source is not None
+        for words in (block.source.split(),)
+        if words
+        for origin in block.origin
+    )
+
+
 def _change_problems(blocks: BlocksFile) -> tuple[str, ...]:
     """The word changes that delete or invent words or change a letter,
-    which the multiset comparison would take on trust, and the joins of a
-    lost hyphen whose word is in no margin note of their page (structure
-    spec section 5)."""
+    which the multiset comparison would take on trust, the joins of a lost
+    hyphen whose word is in no margin note of their page (structure spec
+    section 5), and the source dashes taken off a word that is not the
+    first of an epigraph's source on their page (section 22)."""
     in_margin_notes = _margin_note_words(blocks)
-    return tuple(
-        f"word change on page {change.page_index}: {change.before!r} to "
-        f"{change.after!r} is not a {change.reason.value}"
-        for change in blocks.word_changes
-        if not _change_follows_its_reason(change)
-    ) + tuple(
-        f"word change on page {change.page_index}: {change.after!r}, a "
-        f"{change.reason.value}, is not in a margin note"
-        for change in blocks.word_changes
-        if change.reason is ChangeReason.HYPHEN_LOST
-        and _change_follows_its_reason(change)
-        and (change.page_index, change.after[0]) not in in_margin_notes
+    source_first_words = _source_first_words(blocks)
+    return (
+        tuple(
+            f"word change on page {change.page_index}: {change.before!r} to "
+            f"{change.after!r} is not a {change.reason.value}"
+            for change in blocks.word_changes
+            if not _change_follows_its_reason(change)
+        )
+        + tuple(
+            f"word change on page {change.page_index}: {change.after!r}, a "
+            f"{change.reason.value}, is not in a margin note"
+            for change in blocks.word_changes
+            if change.reason is ChangeReason.HYPHEN_LOST
+            and _change_follows_its_reason(change)
+            and (change.page_index, change.after[0]) not in in_margin_notes
+        )
+        + tuple(
+            f"word change on page {change.page_index}: {change.after!r}, a "
+            f"{change.reason.value}, is not the first word of an epigraph's source"
+            for change in blocks.word_changes
+            if change.reason is ChangeReason.SOURCE_DASH
+            and _change_follows_its_reason(change)
+            and (change.page_index, change.after[0]) not in source_first_words
+        )
     )
 
 
