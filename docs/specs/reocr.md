@@ -408,6 +408,18 @@ The four kinds, each with what is cropped and how it is read:
      a body word, whatever it reads: it is a reading of the body line,
      "he was an" before the wide space of a justified line on Stubbs'
      page 57, or junk read off one ("NE");
+   - a word of Tesseract's is dropped when its box reaches within 3 pt
+     of the crop's top or bottom: the crop's edge cuts a body line
+     there, and Tesseract reads the cut-off tops or feet of its letters
+     as junk that no body word's box overlaps, since the layer's box of
+     a short word such as "it" starts below the dot and the ascender
+     ("[dy" and "*," for the tops of "it" in "and it was", Stubbs'
+     page 56, added 19 November 2026 when layout's cut-in zones first
+     took that note). On the whole of Stubbs, with layout at 8c18e68,
+     5 of Tesseract's words in the cut-in crops reached within 1.6 pt of
+     the crop's bottom, each the tops of a cut body line on the page
+     image (pages 56, 102, 127, 177 and 283), and the next lay 10.7 pt
+     inside it;
    - a reading with no word left is never kept, so that a note the
      layer read ("Despensers,", page 306) is not replaced by nothing.
 
@@ -1051,7 +1063,8 @@ the extract change, Stubbs' index error rate was 1.543.
   the layer's single letters inside a Tesseract word's box replaced; in
   a cut-in crop, a Tesseract word over a word of a full body line
   dropped, whatever it reads ("an" over "an", "NE" over "change"), a
-  layout's column word in a zone row left of the inset replaced, and
+  Tesseract word 3 pt from the crop's bottom or top dropped and one 4 pt
+  from it kept, a layout's column word in a zone row left of the inset replaced, and
   a reading with no word left not kept; two regions whose
   crops overlap, the second taking no word the first replaced; on a
   small-print page, a margin word read with the page and no margin
