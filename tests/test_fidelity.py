@@ -133,6 +133,9 @@ def _markdown(
         words=tuple(MarkdownWord(text, block_id) for text, block_id in words),
         note_count=note_count,
         note_link_count=note_link_count,
+        list_item_count=0,
+        shown_markers=(),
+        contents_links=(),
     )
 
 
@@ -2742,3 +2745,201 @@ def test_read_markdown_reads_an_epigraph_source_and_a_note_group() -> None:
         MarkdownWord("1", "b-p0001-001"),
         MarkdownWord("See.", "b-p0001-001"),
     )
+
+
+# The structure boundary of the plan lists-figures (structure spec section
+# 31, its last paragraph): a block's label counts whatever its kind, a
+# contents entry's page number too, a list item's dash split off its word
+# is verified, and the removals of leader dots and of the words inside an
+# in-page figure are read as any removal.
+
+
+def _list_item(label: str, text: str) -> Block:
+    return replace(
+        _block("b-p0000-001", (0,), (_span(text),)),
+        kind=BlockKind.LIST_ITEM,
+        label=label,
+    )
+
+
+def _contents_entry(label: str | None, title: str, page_number: str | None) -> Block:
+    return replace(
+        _block("b-p0000-001", (0,), (_span(title),)),
+        kind=BlockKind.CONTENTS_ENTRY,
+        level=1,
+        label=label,
+        page_number=page_number,
+    )
+
+
+def _removal(text: str, reason: RemovalReason) -> Removal:
+    return Removal(page_index=0, box=_BOX, text=text, reason=reason)
+
+
+@pytest.mark.parametrize("dash", ["\u2014", "\u2013"], ids=["em-dash", "en-dash"])
+def test_structure_list_marker_split_off_its_word_with_the_dash_as_label_passes(
+    dash: str,
+) -> None:
+    lines = _lines_file(((f"{dash}The founder, who returns",),))
+    change = WordChange(
+        page_index=0,
+        before=(f"{dash}The",),
+        after=(dash, "The"),
+        reason=ChangeReason.LIST_MARKER,
+    )
+    blocks = _blocks_file(
+        (_list_item(dash, "The founder, who returns"),), word_changes=(change,)
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+@pytest.mark.parametrize(
+    ("line", "label", "text", "after"),
+    [
+        # A marker that is not a dash.
+        ("1.The King", "1.", "The King", ("1.", "The")),
+        # A hyphen, which is no list dash.
+        ("-The King", "-", "The King", ("-", "The")),
+        # The dash split off with a letter of the word.
+        ("—The King", "—T", "he King", ("—T", "he")),
+        # Nothing left after the dash.
+        ("— King", "—", "King", ("—", "")),
+        # The word after the dash is not the word the dash was split off.
+        ("—The King", "—", "Cat King", ("—", "Cat")),
+        ("–The King", "–", "Cat King", ("–", "Cat")),
+    ],
+    ids=[
+        "number",
+        "hyphen",
+        "dash-with-a-letter",
+        "empty-word",
+        "em-dash-another-word",
+        "en-dash-another-word",
+    ],
+)
+def test_structure_list_marker_not_a_dash_split_off_its_own_word_fails(
+    line: str, label: str, text: str, after: tuple[str, ...]
+) -> None:
+    # The change accounts for the words exactly, so only its rule can make
+    # the check fail.
+    before = (line.split()[0],)
+    change = WordChange(
+        page_index=0, before=before, after=after, reason=ChangeReason.LIST_MARKER
+    )
+    lines = _lines_file(((line,),))
+    blocks = _blocks_file((_list_item(label, text),), word_changes=(change,))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert raised.value.detail == (
+        f"word change on page 0: {change.before!r} to {change.after!r} is not a "
+        "list_marker"
+    )
+
+
+@pytest.mark.parametrize(
+    ("block", "lines"),
+    [
+        (_list_item("1.", "The King"), ("1. The King",)),
+        (
+            _contents_entry("2.", "Carver's New Engineers", "23"),
+            ("2. Carver's New Engineers 23",),
+        ),
+    ],
+    ids=["list_item", "contents_entry"],
+)
+def test_structure_any_label_counts_as_words_of_its_block(
+    block: Block, lines: tuple[str, ...]
+) -> None:
+    check_stage(
+        FidelityBoundary.STRUCTURE, _lines_file((lines,)), _blocks_file((block,))
+    )
+
+
+def test_structure_any_label_dropped_from_a_list_item_is_missing() -> None:
+    lines = _lines_file((("1. The King",),))
+    blocks = _blocks_file(
+        (
+            replace(
+                _block("b-p0000-001", (0,), (_span("The King"),)),
+                kind=BlockKind.PARAGRAPH,
+            ),
+        )
+    )
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert raised.value.missing == frozendict({"1.": 1})
+
+
+def test_structure_page_number_of_a_contents_entry_not_in_the_lines_is_invented() -> (
+    None
+):
+    lines = _lines_file((("Introduction",),))
+    blocks = _blocks_file((_contents_entry(None, "Introduction", "pp. 9 — 26."),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert raised.value.missing == frozendict()
+    assert raised.value.invented == frozendict({"pp.": 1, "9": 1, "—": 1, "26.": 1})
+
+
+def test_structure_page_number_dropped_from_a_contents_entry_is_missing() -> None:
+    lines = _lines_file((("Introduction 1",),))
+    blocks = _blocks_file((_contents_entry(None, "Introduction", None),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert raised.value.missing == frozendict({"1": 1})
+
+
+def test_structure_leader_dots_removed_between_title_and_page_number_pass() -> None:
+    lines = _lines_file((("PREFACE . . . . v",),))
+    blocks = _blocks_file(
+        (_contents_entry(None, "PREFACE", "v"),),
+        removals=(_removal(". . . .", RemovalReason.LEADER_DOTS),),
+    )
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_structure_leader_dots_dropped_without_a_removal_are_missing() -> None:
+    lines = _lines_file((("PREFACE . . v",),))
+    blocks = _blocks_file((_contents_entry(None, "PREFACE", "v"),))
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert raised.value.missing == frozendict({".": 2})
+
+
+def test_structure_figure_text_removed_with_a_record_passes_and_without_is_missing() -> (
+    None
+):
+    lines = _lines_file((("Kadesh", "Orontes", "country grows lower"),))
+    figure = replace(
+        _block("b-p0000-002", (0,), ()), kind=BlockKind.FIGURE, figure="images/f.png"
+    )
+    body = _block("b-p0000-001", (0,), (_span("country grows lower"),))
+    removals = (
+        _removal("Kadesh", RemovalReason.FIGURE_TEXT),
+        _removal("Orontes", RemovalReason.FIGURE_TEXT),
+    )
+
+    check_stage(
+        FidelityBoundary.STRUCTURE,
+        lines,
+        _blocks_file((body, figure), removals=removals),
+    )
+    with pytest.raises(FidelityError) as raised:
+        check_stage(
+            FidelityBoundary.STRUCTURE,
+            lines,
+            _blocks_file((body, figure), removals=removals[:1]),
+        )
+    assert raised.value.missing == frozendict({"Orontes": 1})

@@ -24,6 +24,7 @@ from galley_eval.scores import (
     Placement,
     block_kinds,
     galley_parts,
+    kinds_right,
     margin_note_scores,
     note_scores,
     page_parts,
@@ -314,6 +315,26 @@ def test_block_with_no_aligned_token_has_kind_none() -> None:
         align(reference, galley), places, galley, galley_blocks, (Part.BODY,) * 4
     )
     assert KindCount(ReferenceKind.PARAGRAPH, GalleyKind.NONE, 1) in kinds[Part.BODY]
+
+
+def test_a_paragraph_or_quote_held_by_a_contents_entry_is_of_the_right_kind() -> None:
+    # Gutenberg sets a printed contents' entries as paragraphs or a block
+    # quote; galley makes contents entries on the contents pages only.
+    kinds: frozendict[Part, tuple[KindCount, ...]] = frozendict(
+        {
+            Part.BODY: (
+                KindCount(ReferenceKind.PARAGRAPH, GalleyKind.CONTENTS_ENTRY, 39),
+                KindCount(ReferenceKind.QUOTE, GalleyKind.CONTENTS_ENTRY, 2),
+                KindCount(ReferenceKind.PARAGRAPH, GalleyKind.PARAGRAPH, 5),
+                KindCount(ReferenceKind.HEADING, GalleyKind.CONTENTS_ENTRY, 1),
+                KindCount(ReferenceKind.PARAGRAPH, GalleyKind.LIST_ITEM, 3),
+            ),
+            Part.TABLES: (
+                KindCount(ReferenceKind.TABLE, GalleyKind.CONTENTS_ENTRY, 4),
+            ),
+        }
+    )
+    assert kinds_right(kinds) == frozendict({Part.BODY: 46, Part.TABLES: 0})
 
 
 # Notes

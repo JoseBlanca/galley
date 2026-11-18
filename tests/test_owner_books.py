@@ -11,18 +11,12 @@ the owner's is written in the repository.
 """
 
 import bisect
-import functools
 import itertools
-import json
 import re
-import threading
 from collections.abc import Callable
-from pathlib import Path
 
 import pytest
 
-from galley.book_folder import BookFolder
-from galley.cli import main
 from galley.model import (
     BlockKind,
     BlocksFile,
@@ -32,24 +26,10 @@ from galley.model import (
     PageNumberPosition,
     RemovalReason,
     block_text,
-    read_blocks,
 )
 
 pytestmark = [pytest.mark.whole_book, pytest.mark.timeout(900)]
 
-# Structure spec section 21, "Their configs", as the survey of 17 November
-# 2026 ran them; the pattern finds each PDF in the samples folder.
-_PATTERNS = {"turney": "*Turney*.pdf", "haynes": "*Haynes*.pdf"}
-_CONFIGS = {
-    "turney": (
-        "exclude_pages = [2, 3, 5, 9, 165, 168, 171, 306, 307, 308, 309]\n"
-        "contents_pages = [10]\n"
-    ),
-    "haynes": (
-        "exclude_pages = [0, 1, 3, 7, 11, 13, 329, 389, 431, 432, 434]\n"
-        "contents_pages = [8]\n"
-    ),
-}
 # Structure spec section 21: the chapters each book numbers ("Chapter One"
 # to "Chapter Ten"; "CHAPTER ONE" to "CHAPTER SIXTEEN").
 _CHAPTERS = {"turney": 10, "haynes": 16}
@@ -76,44 +56,6 @@ _LINKED = {"turney": 450, "haynes": 550}
 _LABEL_WORDS = frozenset(
     {"chapter", "chapitre", "essay", "part", "partie", "book", "livre"}
 )
-
-
-@pytest.fixture(scope="session")
-def owner_book_run(
-    samples_dir: Path, tmp_path_factory: pytest.TempPathFactory
-) -> Callable[[str], BlocksFile]:
-    """A function that gives blocks.json of one of the owner's books, by
-    the name "turney" or "haynes", run from its PDF to structure the first
-    time a test asks for it and kept for the session. Skips the test when
-    the book's PDF is not in the samples folder. A book's run holds its
-    lock, so that two threads asking for it share one run."""
-    roots = {book: tmp_path_factory.mktemp(book) for book in _PATTERNS}
-    locks = {book: threading.Lock() for book in _PATTERNS}
-
-    def run(book: str) -> BlocksFile:
-        pdfs = sorted(samples_dir.glob(_PATTERNS[book]))
-        if not pdfs:
-            pytest.skip(f"no PDF matching {_PATTERNS[book]} in {samples_dir}")
-        with locks[book]:
-            return run_once(book, pdfs[0])
-
-    @functools.cache
-    def run_once(book: str, pdf: Path) -> BlocksFile:
-        folder = BookFolder(roots[book])
-        folder.book_toml.write_text(
-            f"pdf = {json.dumps(str(pdf))}\n"
-            'title = "An owner\'s book"\n'
-            'authors = ["An Author"]\n'
-            'language = "en"\n'
-            'ocr = "trust"\n'
-            f"{_CONFIGS[book]}",
-            encoding="utf-8",
-        )
-        for stage in ("analyze", "extract", "layout", "structure"):
-            main([stage, str(folder.root)])
-        return read_blocks(folder.blocks_json)
-
-    return run
 
 
 def _level_1_headings(blocks: BlocksFile) -> tuple[str | None, ...]:

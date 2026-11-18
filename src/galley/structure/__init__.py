@@ -24,6 +24,7 @@ from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage
 from galley.model import (
     BlocksFile,
+    FigureKind,
     LinesFile,
     read_checked_input,
     read_lines,
@@ -32,6 +33,7 @@ from galley.model import (
 from galley.parallel import DEFAULT_WORKERS, map_pages
 from galley.structure._assemble import assemble
 from galley.structure._case_split import split_at_case
+from galley.structure._figures import is_caption_label
 from galley.structure._hyphens import HyphenJoin, join_hyphen, join_lost_hyphen
 from galley.structure._markers import (
     NoteMarker,
@@ -52,6 +54,7 @@ __all__ = [
     "Reference",
     "ReferenceForm",
     "attach_spaced_sign",
+    "is_caption_label",
     "join_hyphen",
     "join_lost_hyphen",
     "make_blocks",
@@ -80,15 +83,18 @@ def make_blocks(
     `language` the config's, by which a spaced sign is attached to its word
     or, in French, takes a no-break space (spec section 23);
     `contents_pages` the page indices of the printed table of contents
-    (the config's), whose lines stay paragraphs (spec section 14) and
-    after the last of which the references to endnotes are taken (spec
-    section 12)."""
+    (the config's), whose lines are its title and its entries (spec
+    section 30) and after the last of which the references to endnotes
+    are taken (spec section 12)."""
     survey = survey_book(lines, workers=workers)
     plates = plate_survey(lines, survey)
     pages = map_pages(
         lambda page: (
             plate_parts(page, survey, plates, lower_case_words)
-            if page.figures
+            # Figures spec section 5: the plate rules on a plate's page only;
+            # a page with in-page figures is laid out as a text page, its
+            # figures not yet placed as blocks.
+            if any(figure.kind is FigureKind.PLATE for figure in page.figures)
             else page_parts(page, survey, contents_pages)
         ),
         lines.pages,
@@ -108,7 +114,17 @@ def make_blocks(
         source_pdf_sha256=lines.source_pdf_sha256,
         blocks=assembled.blocks,
         notes=assembled.notes,
-        removals=tuple(removal for page in pages for removal in page.removals),
+        # The leader dots removed across pages go after their page's
+        # removals; the sort is stable.
+        removals=tuple(
+            sorted(
+                (
+                    *(removal for page in pages for removal in page.removals),
+                    *assembled.removals,
+                ),
+                key=lambda removal: removal.page_index,
+            )
+        ),
         word_changes=assembled.word_changes,
         page_numbers=tuple(number for page in pages for number in page.page_numbers),
     )

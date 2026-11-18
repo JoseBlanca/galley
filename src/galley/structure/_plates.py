@@ -1,6 +1,6 @@
 """Plates (spec section 18): a plate page's running head, its caption
-lines and its stray words, and the figure block placed as side text of
-its page.
+lines and its stray words (its figure block is placed by
+`_figure_blocks`).
 
 A plate page is a page with a figure (`docs/specs/plates.md`). Its lines
 never reach the body stream: section 3 removes its running head as on any
@@ -11,18 +11,18 @@ removed as `plate_text`.
 """
 
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from galley.body_measures import rows_of
 from galley.errors import InputFileError
 from galley.model import (
-    BlockKind,
+    FigureKind,
     LinesFile,
-    Origin,
     PageLayout,
     Removal,
     RemovalReason,
 )
+from galley.structure._figures import PageFigure, text_page
 from galley.structure._foot import LinePlace, line_at
 from galley.structure._lines import Piece, PlacedLine
 from galley.structure._measures import (
@@ -32,10 +32,9 @@ from galley.structure._measures import (
     words_removal,
     words_text,
 )
-from galley.structure._paragraphs import PageFigure, PageParts
+from galley.structure._paragraphs import PageParts
 from galley.structure._removals import head_removals, running_head_line
 from galley.structure._survey import BookSurvey, alike_to_a_head
-from galley.structure._unnumbered import Unnumbered, first_page, joined
 from galley.wordlist import is_known_word
 
 # Spec section 18, rule 2: a caption line has at least 2 known words, or
@@ -79,12 +78,13 @@ def plate_survey(lines: LinesFile, survey: BookSurvey) -> PlateSurvey:
     topmost = {
         page.index: tuple(word.text for word in line_at(page, place).words)
         for page in lines.pages
-        if page.figures and (place := _topmost(page)) is not None
+        if any(figure.kind is FigureKind.PLATE for figure in page.figures)
+        and (place := _topmost(page)) is not None
     }
     heads = {
         head
         for page in lines.pages
-        if (head := _running_head_letters(page, survey)) is not None
+        if (head := _running_head_letters(text_page(page), survey)) is not None
     }
     return PlateSurvey(frozendict(topmost), tuple(sorted(heads)))
 
@@ -205,52 +205,3 @@ def plate_parts(
             Piece(tuple(caption)),
         ),
     )
-
-
-def _figure_block(
-    page_index: int,
-    figure: PageFigure,
-    book_words: frozenset[str],
-    lower_case_words: frozenset[str],
-) -> Unnumbered:
-    """The figure block of a plate page: its caption with its hyphens
-    joined, its image, and its figure's box as its origin."""
-    return replace(
-        joined(figure.caption, BlockKind.FIGURE, book_words, lower_case_words),
-        origin=(Origin(page_index, figure.box),),
-        figure=figure.image,
-    )
-
-
-def with_figures(
-    body: Sequence[Unnumbered],
-    parts: Sequence[PageParts],
-    book_words: frozenset[str],
-    lower_case_words: frozenset[str],
-) -> tuple[Unnumbered, ...]:
-    """The book's body blocks with the figure block of each plate page of
-    `parts` placed as side text of its page (spec sections 6 and 18): after
-    the last block that starts on an earlier page and is neither a margin
-    note nor a figure, the paragraph in which the body before the plate
-    ends, and after the margin notes and figures that follow it and start
-    on the plate's page or earlier; first when no block starts earlier."""
-    result = list(body)
-    for page in parts:
-        if page.figure is None:
-            continue
-        figure = _figure_block(page.index, page.figure, book_words, lower_case_words)
-        position = 0
-        for number, block in enumerate(result):
-            if (
-                block.kind not in {BlockKind.MARGIN_NOTE, BlockKind.FIGURE}
-                and first_page(block.origin) < page.index
-            ):
-                position = number + 1
-        while (
-            position < len(result)
-            and result[position].kind in {BlockKind.MARGIN_NOTE, BlockKind.FIGURE}
-            and first_page(result[position].origin) <= page.index
-        ):
-            position += 1
-        result.insert(position, figure)
-    return tuple(result)

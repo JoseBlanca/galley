@@ -1,0 +1,51 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"); the frames and ink extents in points were measured on that render (the outermost rule of a map's frame, 300 pixels to 72 pt). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/specs/figures.md, sections 3 and 5 and the table of section 10. Compared with galley's output on 18 November 2026 by the excerpt tests of tests/test_figures.py (task 3.4 of the lists-figures plan); where the rules of docs/specs/figures.md as written differ from the first reading, \"known\" says why.",
+  "excerpt": "kadesh_29-38",
+  "page": 8,
+  "book_page_index": 37,
+  "checks": "a block of hieroglyphs, a figure without a caption",
+  "printed": {
+    "running_head": {
+      "words": "The Battle of Kadesh",
+      "page_number": "26",
+      "number_side": "left"
+    },
+    "figures": [
+      {
+        "what": "quotation \"9.\" printed in hieroglyphs, ten rows, three of them variants headed \"Var.\"",
+        "ink_extent_pt": [
+          90.0,
+          149.8,
+          404.4,
+          397.2
+        ],
+        "caption": null
+      }
+    ],
+    "text_above_figure_ends": "southern divisions, thus:",
+    "text_below_figure_starts": "Lo, his majesty was alone by himself",
+    "page_number_at_foot": "104"
+  },
+  "expected": {
+    "figures": [
+      {
+        "kind": "in_page",
+        "box_within_ink_extent": [
+          90.0,
+          149.8,
+          404.4,
+          397.2
+        ],
+        "caption": null,
+        "figure_text": [
+          "Var."
+        ]
+      }
+    ],
+    "figure_after_the_paragraph_holding": "southern divisions, thus:",
+    "stay_text": [
+      "Var."
+    ]
+  },
+  "known": "The text layer holds two words in the block, \"Var.\", their middles at 98.7 and 100.5 pt from the left (tops 276.9 and 351.4); the printed \"9.\" starts at 99.4 pt and has no word. The two words stop the squares they touch, so the figure's box starts at 100 pt, 10 pt right of the ink (figures spec section 3): the second \"Var.\" lies inside it and is figure text, the first stays text, a paragraph of its own."
+}

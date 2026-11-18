@@ -93,6 +93,20 @@ BOOKS = (
                     "docs/specs/plates.md)"
                 ),
             ),
+            Excerpt(
+                name="kadesh_29-38",
+                page_indices=tuple(range(29, 39)),
+                covers=(
+                    "the reference pages of docs/specs/figures.md, section 10: "
+                    "maps printed on text pages with a caption below (page "
+                    "indices 29, 33), maps set beside the text (36, 38), a "
+                    "caption on the row of a footnote (36) and on the row of "
+                    "the text beside it (38), and quotations printed in "
+                    "hieroglyphs, a block of ten rows (37) and smaller ones "
+                    "(31, 32, 36, 38); 34 is a plate with a text layer and 35 "
+                    "the back of it, without one"
+                ),
+            ),
         ),
     ),
     Book(
@@ -356,6 +370,28 @@ EVALUATION_EXCERPTS = frozendict(
                     "them (97, 138); and two text lines of page 136 that "
                     "the tall branch of the heading rule takes for "
                     "headings, a known failure"
+                ),
+            ),
+            Excerpt(
+                name="domesday_lists",
+                # Pages 133, 143, 147, 155, 161, 162 and 163 are body pages
+                # that bring the excerpt's body measures near the book's
+                # (structure spec, section 32), measured by structure's
+                # survey on 18 November 2026: a body word height of 10.0 pt
+                # and a body line pitch of 11.65 pt, against the book's
+                # 10.0 and 11.98. The five pages of the cases alone measure
+                # 9.0 and 10.39: their tables set the rows close. Page 146,
+                # tried first, kept its running head, which the book
+                # removes by its other pages' heads.
+                page_indices=(133, 141, 143, 147, 155, 156, 157, 158, 161, 162, 163),
+                covers=(
+                    "the cases of docs/specs/structure.md, section 32: the "
+                    "tables of the Wetherley hundred, each vill's rows "
+                    "numbered and their second lines hung (page indices 156 "
+                    "to 158), which the list rules make numbered lists; "
+                    'enumerations "(i)" to "(vi)" set as paragraphs (141), '
+                    'and "(iv)" to "(viii)", which start with no first value '
+                    "(143)"
                 ),
             ),
         ),

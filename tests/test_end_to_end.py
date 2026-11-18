@@ -295,6 +295,16 @@ def _words_of_book_md_and_their_expected_count(
         if span.note_ref in footnotes
     )
     words.subtract(word for span in references for word in span.text.split())
+    # A contents entry's page number and a list item's marker are not
+    # written (structure spec section 31).
+    words.subtract(
+        word
+        for block in blocks.blocks
+        for word in (
+            *(block.page_number or "").split(),
+            *((block.label or "").split() if block.kind is BlockKind.LIST_ITEM else ()),
+        )
+    )
     return (
         Counter(word.text for word in markdown.words),
         +words,
@@ -395,7 +405,13 @@ def test_each_block_div_of_the_epub_holds_the_words_of_its_block(
         note_blocks = tuple(block for note in blocks.notes for block in note.blocks)
         assert divs == {
             block.id: markers.get(block.id, [])
-            + (block.label.split() if block.label is not None else [])
+            # A list item's marker is the reader's, not written (structure
+            # spec section 31).
+            + (
+                block.label.split()
+                if block.label is not None and block.kind is not BlockKind.LIST_ITEM
+                else []
+            )
             + "".join(
                 span.text for span in block.spans if span.note_ref not in footnotes
             ).split()
@@ -407,7 +423,9 @@ def test_each_figure_block_div_of_the_epub_holds_one_image(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     # The owner's decision: plates go into the EPUB as pictures with their
-    # caption. Pandoc renames the images it packs, so they are counted.
+    # caption, and so do the figures printed inside text pages
+    # (docs/specs/figures.md): kadesh_29-38 has 2 plates and 5 in-page
+    # figures. Pandoc renames the images it packs, so they are counted.
     figure_counts = {}
     for name, folder in excerpt_books.items():
         figures = tuple(
@@ -428,6 +446,7 @@ def test_each_figure_block_div_of_the_epub_holds_one_image(
         "kadesh_8-17": 1,
         "kadesh_59-68": 3,
         "domesday_headings_quotes": 2,
+        "kadesh_29-38": 7,
     }
 
 
@@ -476,12 +495,20 @@ def test_only_the_kadesh_epub_has_the_cover_extract_rendered(
 
 
 # Java starts in about a second; the 8-thread run would start it 8 times.
+# One call checks every excerpt EPUB a test validates: kadesh_29-38's, with
+# its in-page figures (docs/specs/figures.md, section 10), checked here
+# rather than in a call of its own saved 1.1 s of the default run (18
+# November 2026).
 @pytest.mark.thread_unsafe
 @pytest.mark.epubcheck
-def test_the_excerpt_epubs_of_kadesh_and_gierke_pass_epubcheck(
+def test_the_excerpt_epubs_of_kadesh_its_figures_and_gierke_pass_epubcheck(
     excerpt_books: frozendict[str, BookFolder], check_epubs: Callable[..., None]
 ) -> None:
-    check_epubs(excerpt_books[KADESH].book_epub, excerpt_books[GIERKE].book_epub)
+    check_epubs(
+        excerpt_books[KADESH].book_epub,
+        excerpt_books["kadesh_29-38"].book_epub,
+        excerpt_books[GIERKE].book_epub,
+    )
 
 
 # The configs of the six whole books (tests/conftest.py, WHOLE_BOOK_CONFIGS)

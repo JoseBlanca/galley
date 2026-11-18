@@ -35,6 +35,7 @@ from galley.layout import (
     Rereading,
     Side,
     layout_page,
+    layout_page_with_figures,
     layout_page_with_rereads,
     measure_book,
 )
@@ -43,6 +44,7 @@ from galley.model import (
     BlockKind,
     Box,
     Figure,
+    FigureKind,
     Line,
     LinesFile,
     PageInfo,
@@ -111,7 +113,14 @@ def test_page_with_no_words_has_no_region() -> None:
 
 
 def test_layout_page_copies_the_figures() -> None:
-    figures = (Figure(Box(10, 20, 300, 400), "images/p0002-01.png", 300),)
+    figures = (
+        Figure(
+            box=Box(10, 20, 300, 400),
+            image="images/p0002-01.png",
+            dpi=300,
+            kind=FigureKind.PLATE,
+        ),
+    )
     page = replace(_page(2, _PAGE_WORDS[:1]), figures=figures)
     assert layout_page(page, None).figures == figures
     assert layout_page(page, _MEASURES).figures == figures
@@ -1912,6 +1921,49 @@ def test_reread_footnote_band_kept_takes_the_band_place() -> None:
     _assert_fidelity(page, result)
 
 
+def test_reread_footnote_band_across_a_figure_neither_reads_nor_replaces_its_words() -> (
+    None
+):
+    # An in-page figure over the band's third row: the band's crop runs
+    # across it, and Tesseract reads a word there (figures spec section 5).
+    figure = Figure(
+        box=Box(40.0, 362.0, 260.0, 380.0),
+        image="images/figure-0000-1.png",
+        dpi=300,
+        kind=FigureKind.IN_PAGE,
+    )
+    page = replace(_page_with_band(), figures=(figure,))
+    read = tuple(
+        replace(word, text=text, ocr_confidence=90.0)
+        for word, text in zip(
+            _small_rows(3, _LAST_BODY_TOP + 1.5 * _PITCH),
+            ("First", "second", "third."),
+            strict=True,
+        )
+    )
+    result = layout_page_with_figures(
+        page,
+        _MEASURES,
+        _rereading(
+            _reader(read),
+            render=_render_with_ink(),
+            words=frozenset({"first", "second", "third"}),
+            footnote_bands=True,
+        ),
+    )
+    layout_of_page, (record,) = result
+    assert (record.kind, record.kept) == (RereadKind.FOOTNOTE_BAND, True)
+    assert tuple(word.text for word in record.ocr_words) == ("First", "second")
+    assert tuple(word.text for word in record.layer_words) == ("n0", "n1")
+    body, band, figure_region = _region_texts(layout_of_page)
+    assert len(body) == 20
+    assert band == (("First",), ("second",))
+    # The layer's word in the figure is the figure's region, not re-read.
+    assert figure_region == (("n2",),)
+    assert layout_of_page.regions[2].box == figure.box
+    _assert_fidelity(page, result)
+
+
 def test_reread_tesseract_failure_names_the_page_and_the_pdf() -> None:
     def failing(
         image: Image.Image, *, origin: tuple[float, float], psm: int
@@ -1997,6 +2049,7 @@ def _book(root: Path) -> tuple[BookFolder, BookConfig]:
                 text_source=TextSource.TEXT_LAYER,
                 text_layer_score=None,
                 exclude_regions=(),
+                figure_boxes=(),
                 blank_checked_by_ocr=False,
             )
             for index in range(_PAGE_COUNT)
@@ -2145,22 +2198,29 @@ def test_layout_of_an_excerpt_with_rereading_keeps_every_word(
     _assert_laid_out_in_regions(words, lines)
 
 
-def test_cut_in_insets_of_the_excerpts_are_stubbs_only(
+def test_cut_in_insets_of_the_excerpts_are_stubbs_and_domesday_tables_only(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     # Layout spec section 3, "The book's measures": the Stubbs excerpt's
     # insets are 60.3 pt (17 rows) and 58.2 pt (13 rows); no other excerpt
     # has 10 rows at its peak and 4 times those beside it but `stubbs_heads`,
     # whose pages are all even, with their notes on the right, and whose
-    # right inset is 58.0 pt (scripts/fetch_samples.py; 17 November 2026).
+    # right inset is 58.0 pt (scripts/fetch_samples.py; 17 November 2026),
+    # and `domesday_lists`, whose tables of page indices 156 to 158 end
+    # their rows 58.8 pt inside the column, a peak the whole book's other
+    # rows drown (18 November 2026).
     insets = {}
     for name, folder in excerpt_books.items():
         measures = measure_book(read_words(folder.words_json))
         assert measures is not None
         insets[name] = (measures.cut_in_inset_left, measures.cut_in_inset_right)
-    stubbs = {"stubbs_51_56-64": (60.3, 58.2), "stubbs_heads": (None, 58.0)}
-    assert insets == {name: stubbs.get(name, (None, None)) for name in excerpt_books}
-    assert len(insets) == 18
+    found = {
+        "stubbs_51_56-64": (60.3, 58.2),
+        "stubbs_heads": (None, 58.0),
+        "domesday_lists": (None, 58.8),
+    }
+    assert insets == {name: found.get(name, (None, None)) for name in excerpt_books}
+    assert len(insets) == 20
 
 
 def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(

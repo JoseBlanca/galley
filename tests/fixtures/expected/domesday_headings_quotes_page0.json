@@ -1,10 +1,10 @@
 {
-  "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "known": "The contents page's own structure is not kept. The owner: \"ESSAY I.\" is a heading and \"DOMESDAY BOOK.\" another, lesser one; the lines starting with \"§\" group sections of the contents, and what follows each is a paragraph. galley makes no heading on a contents page, by the owner's earlier decision, so each is a paragraph; how a contents page's own structure is kept is open.",
+  "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages; its contents entries checked against the page image at 300 dpi by the assistant on 18 November 2026 (galley at 1f9b89a).",
+  "known": "Since the lists-figures revision of 18 November 2026 (structure spec section 30) the contents page's structure is kept: its first line, \"CONTENTS,\", is a level-1 heading (rule 1), each entry a contents_entry block with its label (\"ESSAY I.\", \"§ 1.\"), page number (\"v\", \"pp. 9 — 26.\") and depth apart from its title, the essay's and each section's topics an analytical summary kept whole (rule 3), and the leader dots before \"vii\" removed (rule 6). The column heading \"PAGE\" is an entry of its own (section 30, \"Where they fail\"). Earlier the owner read \"ESSAY I.\" as a heading and \"DOMESDAY BOOK.\" as a lesser one, the lines starting with \"§\" as groups of sections, and what follows each as a paragraph.",
   "excerpt": "domesday_headings_quotes",
   "page": 0,
   "book_page_index": 14,
-  "shows": "a printed table of contents, named in the config's contents_pages: no line a heading",
+  "shows": "a printed table of contents, named in the config's contents_pages: its title a heading and its entries contents entries",
   "layout": [
     [
       "CONTENTS,"
@@ -43,70 +43,93 @@
   ],
   "blocks": [
     {
-      "kind": "paragraph",
-      "text": "CONTENTS, PAGE PREFACE *. v TABLE OF CONTEXTS ....... vii LIST OF ABBREVIATIONS xiv",
+      "kind": "heading",
+      "text": "CONTENTS,",
+      "level": 1,
+      "label": null,
       "pages": [
         0
       ]
     },
     {
-      "kind": "paragraph",
-      "text": "ESSAY I.",
+      "kind": "contents_entry",
+      "text": "PAGE",
       "pages": [
         0
       ]
     },
     {
-      "kind": "paragraph",
+      "kind": "contents_entry",
+      "text": "PREFACE *.",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "contents_entry",
+      "text": "TABLE OF CONTEXTS",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "contents_entry",
+      "text": "LIST OF ABBREVIATIONS",
+      "pages": [
+        0
+      ]
+    },
+    {
+      "kind": "contents_entry",
       "text": "DOMESDAY BOOK.",
       "pages": [
         0
       ]
     },
     {
-      "kind": "paragraph",
+      "kind": "contents_entry",
       "text": "Domesday Book and its satellites, 1. Domesday and legal history, 2. Domesday a geld book,. 3. The danegeld, 3. The inquest and the geld system, 5. Importance of the geld, 7. Unstable terminology of the record, 8. The legal ideas of century xi. 9.",
       "pages": [
         0
       ]
     },
     {
-      "kind": "paragraph",
-      "text": "§ 1. Plan of the Survey, pp. 9 — 26.",
+      "kind": "contents_entry",
+      "text": "Plan of the Survey,",
       "pages": [
         0
       ]
     },
     {
-      "kind": "paragraph",
+      "kind": "contents_entry",
       "text": "The geographical basis, 9. The vill as the unit, 10. Modern and ancient vills, 12. Omission of vills, 13. Fission of vills, 14. The nucleated village and the vill of scattered steads, 15. Illustration by maps, 16. Size of the vill, 17. Population of the vill, 19. Contrasts between east and west, 20. Small vills, 20. Importance of the east, 21. Manorial and non-manorial vills, 22. Distribution of free men and serfs, 23. The classification of men, 23. The classes of men and the geld system, 24. Our course, 25.",
       "pages": [
         0
       ]
     },
     {
-      "kind": "paragraph",
-      "text": "§ 2. The Serfs, pp. 26—36.",
+      "kind": "contents_entry",
+      "text": "The Serfs,",
       "pages": [
         0
       ]
     },
     {
-      "kind": "paragraph",
+      "kind": "contents_entry",
       "text": "The servus of Domesday, 26. Legal position of the serf, 27. Degrees of serfdom, 27. Predial element in serfdom, 28. The serf and criminal law, 29. Serf and villein, 30. The serf of the Leges, 30. Return to the servus of Domesday, 33. Disappearance of servi, 35.",
       "pages": [
         0
       ]
     },
     {
-      "kind": "paragraph",
-      "text": "§ 3. The Villeins, pp. 36—66.",
+      "kind": "contents_entry",
+      "text": "The Villeins,",
       "pages": [
         0
       ]
     },
     {
-      "kind": "paragraph",
+      "kind": "contents_entry",
       "text": "The boors or coliberts, 36. The continental colibert, 37. The English boor, 37. Villani, bordarii, cotarii, 38. The villein's tenement, 40. Villeins and cottiers, 41. Freedom and unfreedom of the villani, 41. Meaning of freedom, 42. The villein as free, 43. The villein as",
       "pages": [
         0
@@ -114,7 +137,12 @@
     }
   ],
   "notes": [],
-  "removals": [],
+  "removals": [
+    {
+      "reason": "leader_dots",
+      "text": "......."
+    }
+  ],
   "word_changes": [],
   "page_numbers": []
 }

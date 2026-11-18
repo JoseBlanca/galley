@@ -25,7 +25,8 @@ class Unnumbered:
     a verse epigraph too (section 22); a figure block's image path
     (section 18); an epigraph's source (section 22); and, in a French
     book, the positions of the words that take a no-break space, U+00A0,
-    before them instead of a space (section 23)."""
+    before them instead of a space (section 23); a contents entry's page
+    number as printed (section 30)."""
 
     kind: BlockKind
     words: tuple[str, ...]
@@ -39,6 +40,7 @@ class Unnumbered:
     figure: str | None = None
     source: str | None = None
     no_break: frozenset[int] = frozenset()
+    page_number: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +129,35 @@ def _joined(
     )
 
 
+def _without_first(block: Unnumbered, prefix: str, reason: ChangeReason) -> Unnumbered:
+    """`block` without `prefix`, with which its first word starts: the
+    whole word left out when it is `prefix`, or else split off it by a
+    word change of `reason` on the block's first page."""
+    first = block.words[0]
+    rest = first[len(prefix) :]
+    if not rest:
+        return replace(
+            block,
+            words=block.words[1:],
+            word_pages=block.word_pages[1:],
+            line_starts=frozenset(
+                start - 1 for start in block.line_starts if start > 1
+            ),
+            changes=tuple((position - 1, change) for position, change in block.changes),
+        )
+    change = WordChange(
+        page_index=block.word_pages[0],
+        before=(first,),
+        after=(prefix, rest),
+        reason=reason,
+    )
+    return replace(
+        block,
+        words=(rest, *block.words[1:]),
+        changes=((-1, change), *block.changes),
+    )
+
+
 def without_marker(
     block: Unnumbered, marker: NoteMarker | None
 ) -> tuple[Unnumbered, str]:
@@ -138,33 +169,24 @@ def without_marker(
         marker is None
         or not block.words
         or not block.words[0].startswith(marker.marker)
+        or block.words == (marker.marker,)
     ):
         return block, ""
-    first = block.words[0]
-    rest = first[len(marker.marker) :]
-    if not rest:
-        if len(block.words) == 1:
-            return block, ""
-        return replace(
-            block,
-            words=block.words[1:],
-            word_pages=block.word_pages[1:],
-            line_starts=frozenset(
-                start - 1 for start in block.line_starts if start > 1
-            ),
-            changes=tuple((position - 1, change) for position, change in block.changes),
-        ), marker.marker
-    change = WordChange(
-        page_index=block.word_pages[0],
-        before=(first,),
-        after=(marker.marker, rest),
-        reason=ChangeReason.NOTE_MARKER,
+    return (
+        _without_first(block, marker.marker, ChangeReason.NOTE_MARKER),
+        marker.marker,
     )
+
+
+def with_list_marker(block: Unnumbered, marker: str) -> Unnumbered:
+    """The list item `block` with its first word, or the dash glued to it,
+    as its label (spec section 29, "Blocks"): a marker that is the whole
+    first word leaves the text; a dash glued to the item's first word is
+    split off it by a list_marker word change on the item's page, "—The"
+    to "—" "The"."""
     return replace(
-        block,
-        words=(rest, *block.words[1:]),
-        changes=((-1, change), *block.changes),
-    ), marker.marker
+        _without_first(block, marker, ChangeReason.LIST_MARKER), label=marker
+    )
 
 
 def changes_in_order(blocks: Sequence[Unnumbered]) -> tuple[WordChange, ...]:

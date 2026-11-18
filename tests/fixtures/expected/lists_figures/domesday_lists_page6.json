@@ -1,0 +1,122 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer and its lines as layout gives them at 1b2959f (the words as the OCR read them, their left sides), and docs/specs/structure.md, section 29 (the rules) and section 32 (the table of excerpt tests): each list item's label is its marker as read and its text the words of its lines after the marker. Not yet compared with galley's output, which at 1b2959f makes no list item.",
+  "excerpt": "domesday_lists",
+  "page": 6,
+  "book_page_index": 157,
+  "checks": "two numbered lists of a table; two vills whose rows are no list, a continuation line hung 24.9 pt",
+  "printed": {
+    "running_head": {
+      "words": "Domesday Book.",
+      "page_number": "132",
+      "number_side": "left"
+    },
+    "vills": [
+      {
+        "heading": "III. Grantchester. A vill of 7 hides.",
+        "rows": [
+          "1. Five sokemen, men of the King",
+          "2. Two sokemen, men of the King / A sokeman, man of Æsgar the Staller",
+          "3. A sokeman, man of Earl Ælfgar / Three sokemen, men of Earl Waltheof",
+          "4. Godman a man of Edith the Fair",
+          "5. Juhael the King's hunter",
+          "6. Wulfric, the King's man"
+        ]
+      },
+      {
+        "heading": "IV. Haslingfield. A vill of 20 hides.",
+        "rows": [
+          "1. The King",
+          "2. Five sokemen, men of the King / A sokeman, man of Æsgar the Staller",
+          "3. Ealdred a man of Edith the Fair",
+          "4. Edith the Fair, belonging to Swavesey",
+          "5. Sigar a man of Æsgar the Staller",
+          "6. Two sokemen of the King",
+          "7. Merewin, a man of Edith the Fair"
+        ]
+      },
+      {
+        "heading": "V. Harlton. A vill of 5 hides.",
+        "rows": [
+          "1. Achil, a King's thegn and under him / five sokemen of whom four were / his men while the fifth was the / man of Ernulf",
+          "2. Godman a man of Æsgar the Staller"
+        ]
+      },
+      {
+        "heading": "VI. Barrington. A vill of 10 hides.",
+        "rows": [
+          "1. Eadric Púr a King's thegn / Fifteen sokemen, men of the King / Four sokemen, men of Earl Ælfgar / Three sokemen, men of Æsgar the / Staller / Eadric Púr, holding of the Church / of Chatteris",
+          "2. The Church of Chatteris",
+          "3. Ethsi, holding of Robert Wimarc's son",
+          "4. Achil the Dane, a man of Earl Harold",
+          "5. A sokeman, man of the King"
+        ]
+      }
+    ],
+    "row_layout": "as page index 156; in vill V the second to fourth lines of row 1 are hung further than the holders of other rows, as are \"Staller\" and \"of Chatteris\" in vill VI",
+    "footnotes": [
+      "1 The Inq. Com. Cant. says 6 hides.",
+      "2 An error of one hide in the particulars. The two records do not fully agree."
+    ]
+  },
+  "expected": {
+    "lists": [
+      [
+        {
+          "label": "1.",
+          "text": "Five sokemen, men of the King"
+        },
+        {
+          "label": "2.",
+          "text": "Two sokemen, men of the King A sokeman, man of ^sgar the Staller"
+        },
+        {
+          "label": "3.",
+          "text": "A sokeman, man of Earl ^Elfgar Three sokemen, men of Earl Waltheof"
+        },
+        {
+          "label": "4.",
+          "text": "Godman a man of Edith the Fair"
+        },
+        {
+          "label": "5.",
+          "text": "Juhael the King's hunter"
+        },
+        {
+          "label": "6.",
+          "text": "Wulfric, the King's man"
+        }
+      ],
+      [
+        {
+          "label": "1.",
+          "text": "The King"
+        },
+        {
+          "label": "2.",
+          "text": "Five sokemen, men of the King A sokeman, man of JSsgar the Staller"
+        },
+        {
+          "label": "3.",
+          "text": "Ealdred a man of Edith the Fair"
+        },
+        {
+          "label": "4.",
+          "text": "Edith the Fair, belonging to Swavesey"
+        },
+        {
+          "label": "5.",
+          "text": "Sigar a man of ^Esgar the Staller"
+        },
+        {
+          "label": "6.",
+          "text": "Two sokemen of the King"
+        },
+        {
+          "label": "7.",
+          "text": "Merewin, a man of Edith the Fair"
+        }
+      ]
+    ]
+  },
+  "known": "Vill V is no list: the line after \"1. Achil…\" lies 24.9 pt right of the marker column, outside the 5 to 20 pt of a hang (structure spec section 29, \"Where they fail\"). Vill VI is none either: row 1's \"Staller\" is hung further than its other holders, so the list ends after its first item. In the excerpt, layout finds a right cut-in inset of 58.8 pt that the whole book does not have, and makes margin notes of a few numbers of the table's right columns (\"6 0\" here); the lists are the same as the whole book's."
+}

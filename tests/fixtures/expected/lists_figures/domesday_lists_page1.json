@@ -1,0 +1,47 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer and its lines as layout gives them at 1b2959f (the words as the OCR read them, their left sides), and docs/specs/structure.md, section 29 (the rules) and section 32 (the table of excerpt tests): each list item's label is its marker as read and its text the words of its lines after the marker. Not yet compared with galley's output, which at 1b2959f makes no list item.",
+  "excerpt": "domesday_lists",
+  "page": 1,
+  "book_page_index": 141,
+  "checks": "enumerations \"(i)\" to \"(vi)\" set as paragraphs, each first line indented and the others at the column's left side: no list",
+  "printed": {
+    "running_head": {
+      "words": "Domesday Book.",
+      "page_number": "116",
+      "number_side": "left"
+    },
+    "margin_notes": [
+      "Minute manors."
+    ],
+    "enumeration": [
+      "(i) A Somersetshire manor",
+      "(ii) A Somersetshire manor",
+      "(iii) A Somersetshire manor",
+      "(iv) A Somersetshire manor",
+      "(v) A Devonshire manor",
+      "(vi) A Devonshire manor"
+    ],
+    "enumeration_layout": "six paragraphs in smaller type, each marker at the paragraph indent and its other lines at the column's left side, 13 pt left of the marker",
+    "footnotes": [
+      "1 D. B. iv. 397; i. 93 b, Ichetoca.",
+      "2 D. B. iv. 411; i. 94 b, Tocheswilla.",
+      "3 D. B. iv. 398; i. 93 b, Pilloc.",
+      "4 D. B. iv. 341; i. 96, Sordemanneford.",
+      "5 D. B. iv. 355; i. 116 b, Labera.",
+      "6 D. B. iv. 367; i. 112 b, Oplomia."
+    ]
+  },
+  "expected": {
+    "list_items": [],
+    "blocks_starting": [
+      "(i) A Somersetshire",
+      "(ii) A Somersetshire",
+      "(iii) A Somersetshire",
+      "(iv) A Somersetshire",
+      "(v) A Devonshire",
+      "(vi) A Devonshire"
+    ],
+    "blocks_kind": "quote"
+  },
+  "known": "Structure spec section 32 says six paragraphs; set in smaller type, they are quotes today (section 16), and the list rules do not change their kind. \"(i)\" starts no list: the line after it lies 12.9 pt left of the marker, neither a continuation line nor the next item's marker line."
+}

@@ -58,6 +58,15 @@ how all of it is verified (section 26). `blocks.json` goes to
 pairing of words (`docs/specs/reocr.md` §4). No code of this revision
 exists.
 
+Revised on 18 November 2026 for lists and the printed table of
+contents, which the owner found joined into one paragraph each in
+Haynes' EPUB: a list's items are blocks of kind `list_item` (section
+29), the entries of a printed contents blocks of kind `contents_entry`,
+each linked to the heading of its chapter (section 30), and markdown
+writes both as lists (section 31). `blocks.json` goes to
+`format_version` 5 (section 7). How it is verified is section 32, and
+its two open points section 33. No code of this revision exists.
+
 It builds on `docs/architecture.md` (cited as "architecture §8") and
 `docs/glossary.md`, and on the layout spec, whose terms (body column,
 footnote band, margin note, row, body word height, body line pitch) it
@@ -156,9 +165,11 @@ inside it.
    line pitch, the offset between page index and printed page number,
    the pages whose lowest line is a signature line (section 4), the
    index pages (section 17), the plate pages (the pages that have a
-   figure; section 18), the book's marker form (section 1) and the
-   endnote section (section 12), which is found from the lines that
-   start a paragraph by section 6's rules. The body word height and body line pitch are
+   figure of kind `plate`; section 18), the book's marker form (section
+   1) and the endnote section (section 12), which is found from the
+   lines that start a paragraph by section 6's rules. The region of an
+   in-page figure takes no part in the survey (`docs/specs/figures.md`
+   §5). The body word height and body line pitch are
    measured as layout measures them, by `body_measures.body_measures`
    (architecture §12) on the rows that `body_measures.group_rows` makes
    of each page's words from every region. A book for which it gives
@@ -170,13 +181,23 @@ inside it.
    both. The two stages kept a copy each until the second plan, which
    moves the rule to the shared module.)
 2. **Per page**:
-   1. decide what each region is (below; on an index page, section 17);
+   1. decide what each region is (below; on an index page, section 17),
+      a region whose box is an in-page figure's being that figure's
+      region (`docs/specs/figures.md` §5);
    2. remove the running head, page numbers, signature marks and stray
       marks (sections 3 and 4), the guide words of an index page
       (section 17), and on a plate page its running head and stray
-      words, keeping its caption (section 18);
+      words, keeping its caption (section 18); then, on a text page with
+      in-page figures, find each figure's caption, take it out of the
+      body stream, and remove the figure's region as `figure_text`
+      (`docs/specs/figures.md` §5). The captions are taken here,
+      before step 2.3 and step 3.1, so that a caption line is never a
+      heading, a list item or a contents entry: Turney's
+      captions open with "13." and Haynes' contents entries with "2.",
+      and both look like a list's marker line;
    3. in the body stream, find the heading lines (section 14), except on
-      the config's `contents_pages`, then the chapter summary under a
+      the config's `contents_pages`, where only a contents run's title is
+      one (section 30, rule 1), then the chapter summary under a
       heading (section 15), the epigraphs under a level-1 heading
       (section 22) and the runs of verse (section 16, rule 4);
    4. group the body stream into paragraphs (section 6), each heading,
@@ -189,7 +210,10 @@ inside it.
       and the index.
 3. **Across pages**, in page order:
    1. make the band blocks of Haskins' bibliographical notes body
-      paragraphs (section 16); join the last paragraph of each page with
+      paragraphs (section 16); find the list items (section 29) and the
+      entries of each contents run (section 30), whose rules replace
+      section 6's inside a list and on a contents page; join the last
+      paragraph of each page with
       the first of the next when it runs on, and the hyphen at that page
       break (section 6), and a verse block likewise (section 16); a note
       taken in step 2.5
@@ -207,12 +231,15 @@ inside it.
       runs over a page break, make the endnotes (section 12), and match
       the references in the text to the notes, splitting each off its
       word;
-   4. the index entries (section 17);
+   4. the index entries (section 17), and the links of the contents
+      entries to their headings (section 30, rule 9);
    5. the quotes (section 16, rules 1 to 3), among the body blocks that
       are still paragraphs;
    6. place the margin notes (section 13);
    7. put the side text, figures and notes in reading order, and number
-      the blocks (section 6).
+      the blocks (section 6); an in-page figure goes after the block
+      that holds the last body line printed above it
+      (`docs/specs/figures.md` §5, "Where the figure block goes").
 
 The case split of step 2.4 and the spaced signs of step 3.2 change only
 the words of a block, which no step between them and the matching of
@@ -1002,7 +1029,7 @@ and a joined word in place of its two parts.
 
 ## 7. The format it writes
 
-`blocks.json` as architecture §8 gives it, at `format_version` 4 (3 before the plan owner-books):
+`blocks.json` as architecture §8 gives it, at `format_version` 5 (4 before the revision of sections 29 to 33, 3 before the plan owner-books):
 
 | field | in the first plan | added by the second plan |
 |---|---|---|
@@ -1064,6 +1091,36 @@ as it counts a heading's `label`, and a note's `group` as words of the
 note, as it counts its `marker`; it verifies each new change reason as
 those sections say.
 
+The revision of sections 29 to 33 adds, and so takes `blocks.json` to
+version 5 (a file of version 4 is the error that says to run structure
+again):
+
+- `BlockKind.list_item`, one item of a list, its marker as printed in
+  `label` ("—", "1.", "(a)"), `level` `None` (section 29);
+- `BlockKind.contents_entry`, one entry of a printed table of contents,
+  its number as printed in `label` or `None`, its title in the spans,
+  its depth in `level`, from 1 (section 30);
+- `Block.page_number: str | None`, a contents entry's printed page
+  number, words joined by single spaces ("pp. 9 — 26."), `None` when it
+  has none and for every other kind;
+- `Block.heading_ref: str | None`, the id of the heading block a
+  contents entry names, `None` when none matches and for every other
+  kind; reading a file where it names a block that is not a heading is
+  an error that names the file and the block;
+- `ChangeReason.list_marker`: a dash split off the word it was glued to
+  ("—The" into "—" and "The"), the dash going to `label`;
+- `RemovalReason.leader_dots`: the dots printed between a contents
+  entry's title and its page number;
+- `RemovalReason.figure_text`: the words the OCR read inside a figure
+  printed on a text page (`docs/specs/figures.md` §5). It comes from
+  the figures spec, written the same day, and goes into the same
+  version 5, so that the owner reruns structure once.
+
+`label` may now be set on a heading, a list item (always) and a
+contents entry; `level` on a heading, an index entry and a contents
+entry (always). Reading a file that breaks one of these is an error
+that names the file and the block, as for `label` today.
+
 ## 8. The public interface
 
 The pipeline calls `run`. The other functions are public so that tests
@@ -1084,7 +1141,7 @@ class BookSurvey:
     common_inner_words: frozenset[str]     # keys printed after a line's first word more than 8 times (section 5)
     signature_lines: frozenset[int]        # pages whose lowest line is a signature line
     index_pages: frozenset[int]            # section 17, rule 1
-    plate_pages: frozenset[int]            # pages with a figure (section 18)
+    plate_pages: frozenset[int]            # pages with a figure of kind plate (section 18)
     head_numbers: frozendict[int, int]     # page index -> its arabic head page number (section 4, local offset)
 
 class HyphenJoin(NamedTuple):
@@ -2456,8 +2513,9 @@ index and Domesday's essays level 1, and Haskins' "BIBLIOGRAPHICAL NOTE"
 sections and Domesday's "§" sections and "NOTE." level 2.
 
 **Contents pages.** On the pages of the config's `contents_pages`, no
-line is a heading line; their lines stay paragraphs (owner, 15 November
-2026): no chapter summary, verse (section 15 and 16, rule 4) or quote
+line is a heading line, but for the title of each contents run (section
+30, rule 1); their lines were paragraphs (owner, 15 November 2026) and
+are contents entries since 18 November 2026 (section 30): no chapter summary, verse (section 15 and 16, rule 4) or quote
 (section 16, rules 1 to 3) is made of them either, a block counting as
 on such a page when its first line is. Without that, Domesday's
 contents page 14, set in small type, gives 5 quotes. A printed table of contents repeats the chapter headings, and
@@ -3014,7 +3072,8 @@ picture's lines and shading ("^U;L", "/•-„"). In the first plan they
 ran into the paragraph around the plate (Kadesh's page 16 into the
 paragraph of pages 15 to 18).
 
-**The rules**, on a page that has a figure:
+**The rules**, on a page that has a figure of kind `plate`; a text
+page's in-page figures follow `docs/specs/figures.md` §5:
 
 1. **Its running head.** Layout makes no head line on a page whose first
    row is its only row or is not set apart (layout §3, step 3), and the
@@ -3840,11 +3899,12 @@ over a word under a Tesseract word whose letters are unlike
   against its notes, one heading block against the two headings Stubbs'
   and Mariéjol's reference texts make of a label and its title): a change
   to `docs/specs/evaluation.md`, before the plan's scores are taken.
-- Removing specks read as margin notes, figures inside text pages,
-  tables as tables: later. Domesday's tables (its pages 28, 42 to 44,
+- Removing specks read as margin notes, and tables as tables: later.
+  Figures inside text pages are `docs/specs/figures.md`. Domesday's tables (its pages 28, 42 to 44,
   156 to 158, 425 to 428 and others) stay as the paragraph, verse and
   note rules make them, and section 6's rule 3 cuts some of their rows
-  into paragraphs.
+  into paragraphs; since 18 November 2026 the rows of pages 156 to 159
+  are numbered lists (section 29).
 - Left out of the plan owner-books, by the owner's scope of 17 November
   2026: the correct stage; Mariéjol's references read "(i)" (section
   11), which stay in their words; Kadesh's notes, too damaged to cut
@@ -3854,3 +3914,673 @@ over a word under a Tesseract word whose letters are unlike
 - The entries of a bibliography (Turney's pages 278 to 299, Haynes' 390
   to 421), which the quote rules make quotes: a kind of their own, like
   index entries, later.
+
+## 29. Lists
+
+A **list** is a run of short items that the printer sets apart from the
+running text, each item starting with a **list marker**: a dash, a
+bullet, a number or a letter. A **list item** is a block of kind
+`list_item` (decided for the owner on 18 November 2026, by the
+principle that a kind says what a text is): one item, its marker in
+`label` as printed, its text in the spans. markdown writes the items
+as a list (section 31). Before this revision a list was never seen:
+the introduction of Haynes prints, on its pages 16 and 17, a sentence
+that ends with a colon, six items each
+starting with a dash, and a paragraph after them, and galley made one
+paragraph of 544 words of all of it.
+
+**What the books print.** Measured on 18 November 2026 on the
+`lines.json` of the plan owner-books' runs (`runs/owner-books/`, galley
+at 83f2754), with a prototype of the rules below run on the body streams
+that galley's `page_parts` gives (scripts kept outside git):
+
+| book | pages | marker | layout |
+|---|---|---|---|
+| Haynes | 16 to 17 | "—" glued to the first word ("—The") | 6 items of 5 to 10 lines; each marker line at the column's left side, its continuation lines 12.5 pt to the right of it (a hanging indent), the last line of each item short; 2 pitches of space before the first item and after the last; item 5 runs over the page break; the paragraph after starts flush left |
+| Haynes | 226 | "1." to "5." | the same, 14 pt of hang, items of 1 to 3 lines |
+| Domesday | 156 to 159 | "1." to "8." | the rows of the tables of the Wetherley hundred, a holder per row, the continuation of a row 14 pt to the right of its number |
+
+No other book of the eight prints a list so: the scan found no bullet
+in any book and no other dash item. Three things look like lists and
+are not taken for them:
+
+- **Numbered paragraphs**: Kadesh's pages 11 to 13 sets out its sources
+  as paragraphs "1. Of the three…", "2. The RECORD…", "3. The
+  RELIEFS…" of 368, 156 and 160 words, each first line indented as any
+  paragraph's. Domesday prints its enumerations so too, "(i)" to "(vi)"
+  on page 141, "(ii)" to "(xv)" on 316 and 317; nothing in print tells
+  them from Kadesh's paragraphs, so they all stay paragraphs, each
+  starting with its marker as printed.
+- **A dash in running text**: Stubbs' page 21 starts two lines with
+  "—" inside a sentence ("— the only period during which…"); the next
+  line lies at the same left side.
+- **Notes**: Mariéjol's notes left in the body start "(3)", "(4)";
+  Haynes' notes at the back start "1.", "2." and hang like list items;
+  Turney's bare numbers hang left of their text (section 6, rule 3).
+
+Terms:
+
+- a word is a **list marker** when it is a dash, "—" or "–", alone or
+  glued before a letter ("—The"); a bullet, one of "•", "·", "▪", "■",
+  "●", "◦", "○" and "‣"; or a number of 1 or 2 digits, a letter a to z
+  or A to Z, or a roman numeral i to xv in lower case or I to XV in
+  upper case, each followed by "." or ")" or between round brackets
+  ("1.", "2)", "(3)", "a.", "(b)", "iv.", "(ii)"). Its **kind** is
+  dash, bullet, number, letter or roman; its **form** is the bullet
+  itself, or the brackets or sign around the value ("1." and "2." have
+  one form, "1." and "(1)" two); its **value** is the number, the
+  letter's place in the alphabet, or the numeral's value. A marker of
+  the letters i, v and x only is read as a roman numeral when it starts
+  a list or follows a roman marker, and as a letter when it follows a
+  letter ("h.", "i.");
+- a **marker line** is a line of the body stream whose first word is a
+  list marker and that holds at least one more word;
+- a list's **marker column** is the left side of its first marker line
+  on the page, and its **hang** the distance from the marker column to
+  the left side of its first continuation line (rule 4).
+
+### The rules
+
+The rules run on the body stream of the book in page order, as the
+paragraphs are joined over page breaks (section 2, step 3.1), because
+an item can run over a page break. They take no line of a page of the
+config's `contents_pages` (section 30), of an index page (section 17),
+or of the endnote section (section 12), and no line of a run of section
+2, step 2.3 (a heading, a chapter summary, an epigraph, verse): such a
+line, or such a page, ends a list.
+
+1. **A list starts** at a marker line whose marker is a dash, a bullet,
+   or the first value of its kind ("1", "a", "A", "i", "I"), when the
+   line after it is a continuation line (rule 4) or the next item's
+   marker line (rule 3), and the list it starts has at least two items
+   when it ends. A list of one item is no list: its marker line is given
+   to the paragraph rules of section 6 as if the rules had not looked at
+   it, and the search for a list starts again at the line after it, so
+   that a line taken for its continuation can still start a list. On
+   Domesday's page 156, "I. COMBERTON…" reads as a roman first value and
+   "1. Seven sokemen…" lies 8.6 pt right of it; the "list" of "I." ends
+   at the line after, and "1." then starts the vill's list of 3 items.
+2. **Not after a hyphen.** A marker line after a line that ends with a
+   hyphen (section 6) does not start a list or an item: the hyphen rule
+   holds. Inside a list, the line after a line that ends with a hyphen
+   goes on with the item, wherever its left side lies (decided while
+   writing the code, 18 November 2026).
+3. **The next item** starts at a marker line whose marker follows the
+   item before's: the same kind and form, and for a number, a letter or
+   a roman numeral the next value; and whose left side lies within 3 pt
+   of the marker column.
+4. **A continuation line** of the item lies, when the list has a hang,
+   within 3 pt of the marker column plus the hang; before the list has
+   one, 5 to 20 pt right of the marker column, and that distance is
+   then the list's hang.
+5. **The list ends** at the first line that is neither, or whose top
+   lies more than 1.5 body line pitches below the top of the line before
+   it on the same page. The line that ends a list starts a block, as
+   the first marker line ends the block before it. Across an in-page
+   figure, whose lines and caption are out of the body stream
+   (`docs/specs/figures.md` §5), the gap is not tested, as it is not
+   across a page break: a figure printed between two items does not
+   end the list. The eight books print none so.
+6. **Over a page break** the list goes on with the first line of the
+   next page that has a body stream, and the marker column is found
+   again, since it moves with the page. It is the left side of the
+   page's first marker line that follows the list's last item by rule 3
+   (its 3 pt aside), when the lines before that one on the page all lie
+   within 3 pt of one left side, 5 to 20 pt right of it, or there are
+   none; otherwise the text edge (section 6, rule 3) of the page's first
+   body region. A page whose first body region has no text edge, fewer
+   than 3 lines that do not start with a bare number, ends the list at
+   the page break (decided while writing the code, 18 November 2026; no
+   list of the eight books runs onto such a page). The page's lines are
+   then tested by rules 3 to 5.
+   Haynes' page 17 opens with 5 lines of item 5 at 71.8 to 72.0 pt, and
+   item 6's marker line lies at 59.5 pt: the marker column of page 17,
+   12.5 pt left of them, the hang measured on page 16, where the marker
+   column was 37.9 pt.
+
+Inside a list the paragraph rules of section 6 do not apply, nor the
+short last line at a page break; around it they apply as before.
+
+**Blocks.** Each item is one `list_item` block: its lines joined as a
+paragraph's, hyphens joined (section 5), its `label` the marker as
+printed, `level` `None`. A dash glued to the item's first word is split
+off it, with the word change `list_marker`: ("—The",) becomes ("—",
+"The"), the "—" going to `label`. An item over a page break has an
+origin per page and the id of its first page, as a paragraph. For the
+references to notes (section 11), the notes left in the body (section
+11), the margin notes (section 13) and the case split and spaced signs
+(sections 23 and 24) a list item is a paragraph, but a list item is
+never a quote (section 16 changes only paragraphs), and section 13's
+rule 3 does not cut an item where a margin note stands beside one of
+its continuation lines, which are indented by the hang.
+
+**The thresholds.**
+
+| threshold | value | where it comes from |
+|---|---|---|
+| hang | 5 to 20 pt | Haynes 12.5 and 14 pt, Domesday 14 to 14.4. 30 pt would add one list of Domesday (page 157, "1. Achil…", whose next line lies 24.9 pt in) but would reach Haynes' paragraph indent, 29 pt |
+| marker column | 3 pt | the five marker lines of Haynes' page 16 lie from 37.7 to 39.4 pt |
+| gap | 1.5 pitches | guessed: with no limit the eight books give the same lists; it keeps a paragraph set off by space below a list out of the list's last item |
+| first value | "1", "a", "i" | without it, Mariéjol's notes left in the body make 17 lists ("(3)", "(4)") and Domesday's list of abbreviations one ("D. B. = Domesday Book.", "E. = Earle…", page 21) |
+
+### What the rules give
+
+On the eight books, with the endnote sections, index pages and
+`contents_pages` left out: Haynes 2 lists of 6 and 5 items (pages 16
+to 17 and 226), each item whole; Domesday 8 lists of 40 items, the
+tables of pages 156 to 159; Turney, Haskins, Stubbs, Gierke, Mariéjol
+and Kadesh none. Kadesh's numbered paragraphs, Domesday's enumerations
+of page 141 and Stubbs' dashes of page 21 stay paragraphs.
+
+### Where they fail
+
+- **Tables** (Domesday 156 to 159) come out as numbered lists, one per
+  vill, with the hides and values of the row read into the item's text
+  ("Seven sokemen of the King 1"); a list stops at a row whose number
+  the OCR read without its "." ("4 The King 2", page 156), and at a row
+  hung 24.9 pt (157). Better than the paragraphs they were, and still
+  not a table (section 28).
+- **A misread marker** ("l." for "1.") ends the list before it; the
+  items after it are paragraphs, or a new list when the misread marker
+  reads as a first value.
+- **A list of one-line items followed, without space, by a paragraph
+  indented 5 to 20 pt**: the paragraph's first line becomes part of the
+  last item. No book of the eight prints one.
+- **A list inside a list**: none in the eight books; a sub-item's marker
+  line lies at neither the marker column nor the hang and ends the list.
+- **No public-domain dash or bullet list**: the six public-domain books
+  print none, so a dash list is checked by unit tests and by Haynes'
+  `whole_book` test (section 32).
+
+## 30. The printed table of contents
+
+The config names the pages of the printed table of contents,
+`contents_pages`, and until this revision their lines stayed paragraphs
+(section 14): Haynes' contents came out as one paragraph of 123 words,
+"CONTENTS Acknowledgments ix Introduction i" and then each chapter's
+mark, number, title and page run together, and Turney's as one of 84. Each entry
+of a printed contents is now a block of kind `contents_entry` (decided
+for the owner on 18 November 2026), which keeps apart what an entry
+holds:
+
+- `label`: the chapter's number as printed before the title, "2.",
+  "One", "CHAPTER II.", "§ 1.", as a heading keeps its label; `None`
+  when the entry has none;
+- the spans: the title;
+- `page_number`: the page number printed after the title, as printed,
+  "23", "xiv", "pp. 9 — 26."; `None` when the entry has none. It is
+  kept and not shown in the EPUB, where printed page numbers mean
+  nothing;
+- `level`: the entry's depth, 1 for a chapter, as an index entry has
+  one (section 17);
+- `heading_ref`: the id of the heading block of the chapter the entry
+  names, found by its title (rule 9), so that markdown links the entry
+  to it; `None` when no heading matches.
+
+**What the books print**, measured as in section 29:
+
+| book | contents pages | an entry | its page number | depth |
+|---|---|---|---|---|
+| Haynes | 8 | one line: a number "2." to "16." in a column of its own, right-aligned, then the title; the front and back matter have no number | after the title, a space apart | 1 |
+| Turney | 10 | one line or two: a spelled number "One" to "Ten", then the title at a column 42 pt to the right, where its second line continues | after the title | 1 |
+| Haskins | 14 | one line: a roman numeral, the title in capitals | right-aligned at the column's edge | 1 |
+| Stubbs | 14 to 16 | "CHAPTER II." and the title centred on two lines, then the chapter's topics, separated by dashes, with a hanging indent | after the topics, with leader dots | 2 |
+| Domesday | 14 to 20 | the front matter on a line each; "ESSAY I." and its title centred; each section centred, "§ 1. Plan of the Survey, pp. 9 — 26."; then its topics as a paragraph with a page number after each topic ("Domesday Book and its satellites, 1.") | right-aligned with leader dots; a range for a section | 3 |
+| Gierke | 10; 52 to 67 | page 10 a line each, with leader dots; pages 52 to 60 a section "I. The Evolution of Political Theory." centred and its topics as paragraphs with a page number in brackets after each, "(3)."; pages 61 to 67 a table of the notes' numbers, titles and pages in two columns | roman, read "Ivi", "Ixiii" | 2 |
+| Mariéjol | 450 | "CHAPITRE II" and the title on the next line | in a column that layout makes a region of its own | 1 |
+
+Pencil marks on Haynes' and Haskins' pages are read as words, glued to
+a title or a number or apart: "(Tj" and "(^" glued to a title's
+first word (made-up examples: "(TjDark", "(^Unkind"), "(' 7.",
+"-^1.", "_ II,".
+
+Terms:
+
+- a **contents run** is a set of consecutive pages of `contents_pages`:
+  Gierke has two, page 10 and pages 52 to 67, and every other book one;
+- an entry's **page number** is its last word when that is a
+  page-number form (section 1) or a range of two joined by a dash
+  ("26—36.", or the three words "107 — 128."), together with "pp." or
+  "p." before it, and when it is **set apart**: it is a range or has
+  "pp." or "p." before it, or leader dots come just before it, or a
+  space of 11 to 20 pt, or its right side lies within 4 pt of the right
+  side of the longest contents line of its page. A number at an
+  ordinary space, short of the column's edge, ends a title and is no
+  page number ("Psalm 23", "Maldon, 991", the roman form "mix"), since
+  markdown does not write a page number and the reader would lose it
+  (review of 18 November 2026);
+- **leader dots** are words made only of ".", "•", "·" and "…", printed
+  between a title and its page number;
+- an **inline page reference** is a word that is neither the first nor
+  the last of its line and is 1 to 3 digits with any of "(", ")", "."
+  and "," around them ("1.", "(3).");
+- a **lone label** is a line whose first word is a chapter label word
+  (section 14) and that has at most one more word ("CHAPTER II.",
+  "CHAPITRE PREMIER", "ESSAY I."), or that is a roman numeral alone of
+  section 14's form.
+
+### The rules
+
+The rules run on each contents run's body stream, its pages' in page
+order: the lines that are left once the running heads and page numbers
+are removed (sections 3 and 4). Margin and band regions keep their
+kinds, as on any page.
+
+1. **The title.** The lines before the run's first line with a letter
+   or a digit are removed as `stray_mark` (the speck read "—" above
+   Stubbs' "CONTENTS"). That first line is the run's title, unless it
+   ends with a page number or is a lone label, in which case it is a
+   line like the others: a `heading` of level 1, without a label
+   (section 33, open point 2, settled).
+   This changes section 14, which made no heading on a contents page,
+   for this one line, so that the printed contents has an entry in the
+   EPUB's table of contents, and Gierke's "ANALYTICAL SUMMARY." a heading
+   that page 10's entry can link to (decided while writing, 18 November
+   2026). Every other line of a contents page is still never a heading
+   line.
+2. **Pieces.** The lines after the title are cut into pieces where
+   section 6's rule 1 or rule 2 starts a paragraph (an indented line
+   after a short one; a centred line, or the line after one) and before
+   each lone label. Rule 3 of section 6 is not applied on these pages,
+   as before.
+3. **An analytical summary** is a piece of at least 2 lines that holds
+   at least 2 inline page references, and at least one for every five
+   of its lines: Domesday's and Gierke's topics, which hold one or more
+   per line. The second condition keeps a one-line-per-entry page such
+   as Haynes', where the pencil mark before "7." already makes one
+   inline reference, from becoming one summary when a second mark is
+   read so (its 22 lines would need 5). It
+   is one entry, whole, without label or page number; its page numbers
+   stay in its text, where the reader sees them.
+4. **Entries.** Every other piece is cut into entries after each line
+   that ends with a page number, and after each line whose next line in
+   the piece does not lie at least 5 pt right of the left side of the
+   entry's first line: an entry runs on to a second line only when the
+   printer indented it, as Turney's titles of two lines, whose second
+   line starts under the first's title (42 pt) and Stubbs' topics (13 pt). Without the second
+   condition Haynes' closing chapter's entry, whose page number the OCR
+   read "3x3", ran into "Notes 317". A line with no letter or digit joins the
+   entry before it.
+5. **A lone label joins the entry after it** as its label: Stubbs',
+   Domesday's and Mariéjol's labels over their titles. A lone label
+   never has a page number ("CHAPITRE 11", the OCR's "II"). At the end
+   of a run it is an entry with the label and an empty title.
+6. **The page number** is taken off the entry's end when at least one
+   word is left before it; the leader dots just before it are removed,
+   with the reason `leader_dots`, one removal for the dots of each line.
+7. **The label** of an entry that has none from rule 5 is its first
+   word, past any words with no letter or digit, when that word is a
+   number of 1 or 2 digits with "." ("2."), a roman numeral of section
+   14's form with "." ("IV."), an English number word "One" to "Twenty"
+   in any case, a chapter label word together with the word after it
+   ("CHAPTER II."), or "§" together with the word after it ("§ 1."), and
+   at least one word follows it. The words before it with no letter or
+   digit are part of the label ("(' 7."). The rest of the entry, up to
+   its page number, is its title.
+8. **Depth.** A **topics entry**, an analytical summary or an entry of
+   at least 2 lines whose title holds at least 2 dashes, "—" or "–" (the
+   test of a chapter summary, section 15, rule 4), is one deeper than
+   the nearest entry before it in the run that is not a topics entry,
+   or 1 when there is none. An entry whose label starts with a chapter
+   label word is 1. A centred entry, one whose first line is centred
+   (section 6, rule 2), that comes after any entry of the run whose
+   label starts with a chapter label word is 2: Domesday's "§" sections
+   under its essays. Any other entry is 1.
+9. **The link to the chapter.** A **candidate** is an entry that is not
+   a topics entry and whose title holds at least 4 letters. Each
+   candidate's title is compared with the text of every heading block
+   of the book, its spans without its `label`, both made **plain**:
+   case-folded, every character that is not a letter (`str.isalpha`)
+   made a space, the spaces collapsed to one and stripped. Labels are
+   left out because a contents and the headings print the same number
+   differently: "2." against "CHAPTER TWO", "One" against "Chapter
+   One". Two plain texts **match** when `difflib.SequenceMatcher(None,
+   a, b, autojunk=False).ratio()` is at least 0.7. The links of a run
+   are the largest set of matching pairs (candidate, heading), each
+   candidate and each heading in one pair at most, in which the
+   candidates and the headings come in the same order, the run's order
+   and the book's; among sets of the same size, the one whose ratios
+   add up to the most, and among those, the one in which the first
+   candidate whose pairing differs has the earlier heading. The run's
+   own title (rule 1) is a heading like any other. Each run is linked on its own,
+   so that a heading can be named by an entry of each run. A paired
+   entry's `heading_ref` is its heading's id. The order is what keeps
+   "EDWARD I." from "EDWARD II.", whose plain texts match at 0.94.
+10. **Blocks.** Each entry is one `contents_entry` block, its lines
+    joined as a paragraph's, hyphens joined; its origin has one box per
+    page, and its id is given as any block's. It is not searched for
+    note references, as an index entry is not (section 17, rule 4). A
+    paragraph does not run on into a contents page or out of the last
+    page of a run: the first line of each run and the first body line
+    after it start a block. No chapter summary, verse or quote is made
+    of a contents page's lines, as before (section 14).
+
+The entries and their page numbers are made in step 3.1, where the
+body stream is walked over page breaks, and the links in step 3.4,
+with the index entries, once every heading is known.
+
+**The thresholds.** The 5 pt of rule 4 is the indent of section 6's
+rule 1 and of the index (section 17). The 2 inline page references of
+rule 3 keep out a section line such as "§ 5. Sake and Soke, pp. 80 —
+107.", which holds "5." and "80" inside its one line: a summary has at
+least 2 lines. One reference for every five lines was measured with the
+code on 18 November 2026: Gierke's topics end many lines with their
+reference, which is then no inline one, and the OCR reads "(11)" as
+"(n)", so that a summary of pages 52 to 60 can hold one for every three
+lines; one for every two, as first written, cut 2 of those pages' 34
+summaries into an entry per line (72 entries instead of 52), four cut
+some too, and five keeps them all and changes no other book. It also
+makes 11 summaries of rows of the table of pages 61 to 67 against 2,
+each a few of its rows run together. The ratio 0.7 was measured on the candidates of the
+seven books with contents pages, linking every run as rule 9 says.
+The prototype differed from the rules in three ways, corrected in the
+table by the review of 18 November 2026: it did not count rule 1's
+titles among the headings (with them, Gierke's "ANALYTICAL SUMMARY"
+of page 10 links to the heading of page 52, one link more), it took
+the "11" of Mariéjol's "CHAPITRE 11" for a page number (one entry
+more), and it dropped lines with no letter or digit, which rule 4 joins
+to the entry before (no count changes):
+
+| book | entries | topics entries | with a page number | candidates | linked at 0.6 | at 0.7 | at 0.8 |
+|---|---|---|---|---|---|---|---|
+| Haynes | 22 | 0 | 21 | 22 | 22 | 22 | 22 |
+| Turney | 16 | 0 | 16 | 16 | 16 | 16 | 16 |
+| Haskins | 9 | 0 | 9 | 9 | 9 | 9 | 9 |
+| Stubbs | 25 | 12 | 9 | 13 | 13 | 13 | 13 |
+| Domesday | 59 | 32 | 22 | 27 | 23 | 23 | 23 |
+| Gierke, page 10 | 8 | 0 | 3 | 7 | 6 | 5 | 4 |
+| Gierke, pages 52 to 67 | 348 | 45 | 33 | 275 | 10 | 10 | 10 |
+| Mariéjol | 16 | 0 | 1 | 16 | 13 | 12 | 9 |
+
+The rows of Gierke's pages 52 to 67 and Mariéjol's candidates were
+measured again with the code on 18 November 2026 (plan lists-figures,
+task 5.4), with rule 3's one reference for every five lines, and the
+page numbers of every row with the test of "set apart" ("Terms"). The
+spaces before a page number were measured then: Haynes 11.5 to 12.5 pt
+and Turney 13.4 to 14.9, where the other spaces of an entry reach 10.2
+pt; Haskins', Stubbs' and Gierke's numbers end within 1.2 pt of the
+column's right side and Domesday's within 3.7. The test leaves out
+Domesday's "290." after "Note : The Angild Clause," (page 17), at an
+ordinary space in the middle of the column, which stays in its title,
+and on Gierke's pages 52 to 67 the "d" of a signature line "M. d"
+(page 54) and 42 numbers of the table of pages 61 to 67 that the layout
+moved away from their column. The
+prototype had given 320 entries, 47 topics entries, 58 page numbers and
+240 candidates for Gierke's pages 52 to 67, near what rule 3 gives
+without its second condition (317, 47 and 61), and 15 candidates for
+Mariéjol, whose 16 titles all hold at least 4 letters; the links are
+the same.
+
+Every link at 0.7 was read against its heading and is right, but one:
+the column heading "NOTE" of Gierke's page 62 is linked to its endnotes'
+title "NOTES.". At 0.6 the two links more are right too (Mariéjol's
+"BlBUOGHArHlB SUCCINCTE" to "BIBLIOGRAPHIE SUCCINCTE" at 0.67,
+Gierke's "TRANSLATOR'S INTRODUCTION" to "INTRODUCTION." at 0.65), but
+the books gave no other title between 0.6 and 0.7 to judge by, and the
+lowest right link in the books that matter, Haynes' chapter 1 entry,
+with a pen mark glued to its first word, to its heading, is 0.94.
+The candidates Domesday leaves unlinked are its front matter ("TABLE OF
+CONTEXTS", "LIST OF ABBREVIATIONS"), which has no heading in the body,
+and "Statistical Tables" (page 19). Haynes' 22 entries are its 16
+chapters and 6 front and back matter titles, each linked to its
+heading; Turney's 16 likewise.
+
+### What the rules give, and where they fail
+
+Haynes' page 8 gives the title "CONTENTS" as a heading and 22 entries
+of depth 1: "Acknowledgments", label `None`, page "ix", linked; "Bacon's
+New Engineers", label "2.", page "23", linked to "BACON'S NEW
+ENGINEERS" under "CHAPTER TWO". Stubbs gives 13 entries of depth 1
+(the 12 chapters with their labels, and "Index") and 12 of depth 2, the
+topics, 8 of them with their page number; Domesday 8 of depth 1, 22 of
+depth 2 and 29 of depth 3. These stay wrong:
+
+- **A misread page number** stays in the title, and the EPUB shows it:
+  Haynes' "3x3", Gierke's "Ivi", "Ixiii", "lor", Stubbs' "P&ge I" (page
+  14, the word "Page" and the "1" read "I"), "n", "Page58" and
+  ". . .110", whose number is glued to its dots; the leader dots before
+  such a number stay too.
+- **Depths in Domesday**: "Note : The Angild Clause" (page 17) is not
+  centred and so of depth 1, and the sections § 4 to § 6 of Essay II
+  after it are written nested under it; "Statistical Tables" (page 19),
+  centred, is of depth 2, and the topics of § 2 are nested under it.
+- **Pencil marks** stay in the title or the label: "(TjDark Chemists
+  and Master Wagner" has no label; "-^1. NORMANDY…" neither.
+- **Column headings**, Domesday's "PAGE" (page 14) and Gierke's
+  "PA'.R" (page 10), are entries of their own.
+- **Gierke's pages 52 to 67**: on pages 52 to 60, a topics line indented
+  15 pt that ends 20 pt short of the column is centred by section 6's
+  rule 2, and cuts a summary into entries of a line or two; pages 61 to
+  67, a table of two columns read across, give an entry per line or two,
+  unlinked.
+- **Mariéjol's page numbers**, a region of their own, stay margin notes,
+  and its entries have none.
+
+## 31. The change to markdown and to the fidelity check
+
+How a list and a contents look is decided here and in the style sheet,
+`src/galley/epub/style.css`, never by structure (architecture §3).
+
+**A list** is a run of consecutive `list_item` blocks in `blocks`, each
+of whose labels follows the one before by section 29's rule 3. A list
+whose kind is dash or bullet is a Pandoc bullet list; a list of
+numbers, letters or roman numerals is an ordered list, each item's
+marker written as its label, not escaped, which Pandoc reads as an
+ordered list of that style and start (Pandoc 3.14 reads "(i)" as lower roman in
+two brackets). Each item holds the block's fenced div, with its id and
+the class `list-item`, and its text in it:
+
+```
+-   ::: {#b-p0016-002 .list-item}
+    The founder, who returns in hard times…
+    :::
+```
+
+The marker is not written as text: the EPUB shows the reader's bullet
+for a dash list, and Pandoc's numbers for an ordered one, which equal
+the printed ones because section 29 takes only markers in sequence;
+Pandoc writes `<ol type="i">` for "(i)", so the brackets are lost
+(checked with Pandoc 3.14 on 18 November 2026; section 33, open point
+1, settled). A
+block between two items of a list, a margin note or a note that
+markdown places there (section 6, "Order"), ends the list; the next item
+starts a new one, whose start is its own value. Two lists with nothing
+between them (a list ended by rule 5's gap and a new "1.") are written
+with an empty fenced div of class `list-break` between them, since
+Pandoc 3.14 reads two lists separated by a blank line only as one list
+of all their items. An ordered item's div is indented by the width of
+its marker and the space after it, at least 4 characters ("(iv) " takes
+5, and with 4 Pandoc read the next item as code), and a marker of a
+capital letter and a period, "A.", is followed by two spaces, without
+which Pandoc reads a paragraph (both checked with Pandoc 3.14 in the
+review of 18 November 2026).
+
+**A contents** is a run of consecutive `contents_entry` blocks: a
+fenced div of class `contents` holding a bullet list, each item a
+fenced div with the block's id and the class `contents-entry`, holding
+its label as a span of class `label`, as a heading's (section 19), then
+its title, as a link to `#<heading_ref>` when it has one:
+
+```
+::: contents
+-   ::: {#b-p0008-005 .contents-entry}
+    [2\.]{.label} [Carver's New Engineers](#b-p0036-001)
+    :::
+:::
+```
+
+An entry of depth 2 or 3 goes in a bullet list inside the item before
+it, its depth in the Markdown being its `level`, or one more than the
+entry before's when its `level` is deeper still. `page_number` is not
+written. Pandoc 3.14 points each link into the chapter file of its
+heading in the EPUB (checked on 18 November 2026). The style sheet sets
+a contents' lists without bullets (`list-style: none`) and each depth
+in from the one above; the Kindle's handling of `list-style` was not
+tried.
+
+**The fidelity check at the markdown boundary** (architecture §13)
+reads Pandoc's `BulletList` and `OrderedList` elements, each item's
+blocks as blocks, in the forms above only: an item holding one div of a
+`list_item` block, or one div of a `contents_entry` block and, after it,
+a bullet list of the same form; any other content of a list is an
+element galley's Markdown does not make, and an error. An empty div of
+class `list-break` holds no words and is passed over. A `list_item`'s
+label is not written as text, as the marker of a referenced footnote is
+not, and the number of items of all lists of `list_item` divs must equal
+the number of `list_item` blocks. The marker Pandoc shows for each item
+is compared with its block's label instead: a `BulletList`'s item must
+have a dash or a bullet as its label, and an `OrderedList`'s item, the
+list's start plus its place in the list, in the list's style and
+delimiter, a label that reads so (section 29, "Terms": `Decimal` for a
+number, `LowerAlpha` or `UpperAlpha` for a letter, `LowerRoman` or
+`UpperRoman` for a roman numeral; `Period` for "1.", `OneParen` for
+"1)", `TwoParens` for "(1)"), so that a list that starts at "7." where
+the book printed "1." is an error (review of 18 November 2026). A
+`contents_entry`'s label is written and compared as words of its block;
+its `page_number` is not written and not compared as words, but it must
+have a page number's form (section 30, "Terms"), so that no title word
+leaves the book unseen. A page number's rise through a run is not
+checked: Gierke's table of pages 61 to 67, read across its two columns,
+gives numbers out of order. A link inside a `contents_entry` div,
+with no attributes, whose target is `#` and the id of a heading block,
+is read as its text, compared as words of the block; the number of
+such links must equal the number of entries with a `heading_ref`. Any
+other link stays an error.
+
+**At the structure boundary**, the check counts a block's `label` as
+words of the block whatever its kind, and a `contents_entry`'s
+`page_number` too; it verifies a `list_marker` change: one word before,
+two after, the first after a dash, "—" or "–", and the two joined equal
+to the word before; and it reads `leader_dots` removals as any removal.
+
+## 32. How lists and contents are verified
+
+**Unit tests**, on `LinesFile` values and words written in the test:
+
+- a dash list in Haynes' geometry: a lead-in line ending
+  "…types:" 2 pitches above six marker lines "—The…" at 37.9 pt,
+  each item's continuation lines at 50.4 pt, the fifth item's last
+  five lines at the top of the next page at 72.0 pt and the sixth's
+  marker line under them at 59.5 pt, then a line flush at 59.3 pt 2
+  pitches lower: a paragraph, six `list_item` blocks with label "—" and
+  six `list_marker` changes, the fifth with two origins, and a
+  paragraph;
+- a numbered list "1." to "5." whose third and fourth items have one
+  line: five items;
+- not lists: a line "— the only period…" at the left side with the next
+  line at the same left side (Stubbs' page 21); one marker line with a
+  hang and no second item; "2." and "3." without "1."; "1." then "3.",
+  whose list is "1." alone and so no list; three paragraphs "1. Of
+  the three…" whose first lines are indented 15 pt and whose other
+  lines lie at the column's edge (Kadesh's page 11); a marker line
+  inside a verse run; a marker line after a line ending with a hyphen;
+  a numbered list whose next line after the last item is 2 pitches
+  lower and indented 12 pt keeps it out;
+- contents in each book's layout, with Haynes', Turney's, Stubbs' and
+  Domesday's geometry as section 30's table gives it: labels, titles,
+  page numbers, the leader dots removed, depths 1 to 3, an analytical
+  summary kept whole, "CHAPITRE 11" over a title giving one entry with
+  label "CHAPITRE 11" and no page number, and the run's title a level-1
+  heading;
+- links: entries "(TjDark Chemists and Master Wagner" (made up) and
+  "EDWARD I." and "EDWARD II.", and headings "DARK CHEMISTS AMD MASTER
+  WAGNER", "EDWARD I." and "EDWARD II." in that order, give the three
+  links in order; an entry with no heading alike has none; two entries
+  in the order opposite to their headings' give one link;
+- the fidelity check passes on all of these and fails on a
+  `list_marker` change whose first word is not a dash, a
+  `contents_entry` whose `heading_ref` names a block that is not a
+  heading, a link in `book.md` to anything else than a heading, a list
+  item holding two divs, and a written `page_number`;
+- markdown: the dash list, the numbered list and a contents with depths
+  1 and 2, read back by Pandoc as a `BulletList` of 6 items, an
+  `OrderedList` starting at 1 in decimal with a period, and a `Div` of
+  class `contents` holding a `BulletList` whose second item holds a
+  nested one; the EPUB of the end-to-end test passes epubcheck with a
+  contents link into another chapter file.
+
+**Excerpt tests**, whose expected output the owner checks against the
+page images:
+
+| excerpt | page indices | what it checks |
+|---|---|---|
+| `haskins_front` | 14, 16 | the title "CONTENTS" a heading; 9 entries of depth 1, labels from "IV." to "VIII." ("^ VI." with its mark), none on the first three, whose numbers are glued to marks or read "II,", page numbers "i" to "251"; none linked: the others' chapters are outside the excerpt, and the excerpt's heading on page 16 holds the half-title before chapter I's title ("THE NORMANS IN EUROPEAN HISTORY I NORMANDY AND ITS PLACE IN HISTORY", section 14), which matches the first entry at 0.66 only; the whole book links it at 1.00 |
+| `stubbs_summaries_index` | 16, 312 | chapters IX to XII as entries of depth 1 with their labels, unlinked; their topics of depth 2 with pages "189", "212", "238" and "263"; "Index" with page "291" linked to the index's heading on page 312 |
+| `domesday_headings_quotes` | 14, 22, 30 | the front matter's entries and leader dots; "ESSAY I." with "DOMESDAY BOOK." linked to page 22's heading; the essay's topics an analytical summary of depth 2; "§ 1." with "Plan of the Survey," and page "pp. 9 — 26.", depth 2, linked to page 30's heading; its topics of depth 3 |
+| `gierke_front_flow` | 10 | 8 entries; page numbers "vii", "xlvii" and "i" taken and the leader dots before them removed; "Ivi", "Ixiii" and "lor" left in their titles with their dots; none linked |
+| `kadesh_8-17` | 11 to 13 | the numbered paragraphs stay paragraphs |
+| `domesday_lists` (new, Domesday, `domesdaybook00maituoft`) | 141, 156, 157, 158 and body pages the plan adds | the tables' rows as numbered lists, as section 29 gives them; page 141's "(i)" to "(vi)" six paragraphs |
+
+The new excerpt is added to `scripts/fetch_samples.py` by the plan,
+which checks its body measures against the whole book's, as section 26
+asks of every new excerpt, and adds body pages of Domesday until they
+agree. Its expected lists are those the prototype gives, which the
+owner checks against the page images.
+
+**Whole-book tests**, marked `whole_book`, count and never quote text;
+on the owner's books, found and skipped as section 26 says:
+
+| count | Turney | Haynes |
+|---|---|---|
+| `list_item` blocks; with label "—"; `list_marker` changes | 0; 0; 0 | 11; 6; 6 |
+| `contents_entry` blocks on the contents page, all of depth 1 | 16 | 22 |
+| of them with a `page_number`; with a `heading_ref` | 16; 16 | 21; 22 |
+| headings of level 1 on the contents page (the title) | 1 | 1 |
+
+On the public-domain books: `contents_entry` blocks with a
+`heading_ref`, at least 9 in Haskins, 13 in Stubbs, 23 in Domesday,
+13 in Gierke and 9 in Mariéjol; every `heading_ref` names a heading;
+`list_item` blocks at least 36 in Domesday and none in Haskins, Stubbs,
+Gierke, Mariéjol and Kadesh; the fidelity check on every book.
+
+**Measured by `galley-eval run`** on the four evaluation books, before
+and after, in the plan's work report: the paragraph boundaries of
+Domesday, whose tables become lists (galley-eval counts a list item as
+a paragraph), and the reference headings in heading blocks, which may
+not fall (section 9's targets).
+
+## 33. Open points of the lists and contents revision
+
+Both are settled; the options are kept for whoever reopens them.
+
+1. **How a list's markers look in the EPUB.** Settled: (a), the
+   reader's own markers (orchestrator for the owner, 18 November 2026). (a) As written: a dash
+   or bullet list is a bullet list, which shows the reader's bullet,
+   not a dash; an ordered list shows Pandoc's numbers, which equal the
+   printed ones, with "." for every form ("i." for "(i)"); the Kindle
+   lays out both as lists natively. (b) Every list without the
+   reader's markers (`list-style: none`), the printed marker written as
+   text before the item's text in a span of class `label`, with a
+   hanging indent from the style sheet; the EPUB then shows "—" and
+   "(i)" as printed, but depends on the Kindle honouring `list-style`
+   and the indent, which was not tried, and the fidelity check then
+   compares the label. Recommended: (a), the decision taken for the
+   owner on 18 November 2026, since it uses the reader's own list
+   layout. Changing to (b) later is a change to markdown and the style
+   sheet only.
+2. **The title of a printed contents as a heading.** Settled: (a), a
+   level-1 heading (orchestrator for the owner, 18 November 2026). (a) As written
+   (section 30, rule 1): "CONTENTS" becomes a level-1 heading, so the
+   EPUB's own table of contents gains an entry "CONTENTS" that opens the
+   printed one, and Gierke's "ANALYTICAL SUMMARY", which page 10 lists,
+   is a heading an entry can link to; Pandoc starts a new chapter file
+   at it, as at every level-1 heading. This undoes, for that one line,
+   the decision of 15 November 2026 that a contents page makes no
+   heading, whose reason, each chapter listed twice in the EPUB's table
+   of contents, it does not touch. (b) The title stays a paragraph, as
+   now; the printed contents is then reached only by paging, and
+   Gierke's page 10 has one link fewer. Recommended: (a); (b) is a
+   one-line change of rule 1.
+
+Decided while writing, with the reasons in their sections: lists
+printed as paragraphs stay paragraphs (section 29); an analytical summary
+keeps its page numbers in its text (section 30, rule 3); the links are
+made by structure, as note references are, and kept in `heading_ref`
+(section 30, rule 9).
+
+Not in this revision: a list inside a list; tables, which some rows of
+Domesday's become lists of; a public-domain excerpt with a dash or
+bullet list, which none of the six books prints, to be added when such
+a book is found; linking an entry whose section has no heading in the
+body (Domesday's "LIST OF ABBREVIATIONS", page 21, which structure
+makes a quote).

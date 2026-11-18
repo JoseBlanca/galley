@@ -318,6 +318,7 @@ def _book_of(root: Path, blocks: BlocksFile) -> tuple[BookFolder, BookConfig]:
                     text_source=TextSource.TEXT_LAYER,
                     text_layer_score=None,
                     exclude_regions=(),
+                    figure_boxes=(),
                     blank_checked_by_ocr=False,
                 )
                 for index in range(3)
@@ -388,11 +389,14 @@ def test_the_epub_of_every_kind_and_of_a_footnote_and_endnotes_has_each_in_its_h
 
 
 # Java starts in about a second; the 8-thread run would start it 8 times.
+# One call checks these and the lists book's EPUB (structure spec sections
+# 31 and 32), which test_markdown_lists.py reads: a call of its own took
+# about 1.5 s of the default run (18 November 2026).
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
 @pytest.mark.epubcheck
-def test_the_epubs_of_a_hand_written_book_md_and_of_every_kind_pass_epubcheck(
-    tmp_path: Path, check_epubs: Callable[..., None]
+def test_the_epubs_of_a_hand_written_book_md_of_every_kind_and_of_lists_pass_epubcheck(
+    tmp_path: Path, check_epubs: Callable[..., None], lists_book_epub: BookFolder
 ) -> None:
     (tmp_path / "hand_written").mkdir()
     (tmp_path / "every_kind").mkdir()
@@ -402,4 +406,4 @@ def test_the_epubs_of_a_hand_written_book_md_and_of_every_kind_pass_epubcheck(
     markdown.run(every_kind, config)
     epub.run(every_kind, config)
 
-    check_epubs(hand_written.book_epub, every_kind.book_epub)
+    check_epubs(hand_written.book_epub, every_kind.book_epub, lists_book_epub.book_epub)
