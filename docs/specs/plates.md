@@ -39,6 +39,17 @@ architecture §8, unchanged. extract reads the PDF, the config and
 `pages.json`, and writes `words.json`, whose `PageWords.figures` now
 holds a plate's figure, and the plate's image in `images/`.
 
+Revised on 18 November 2026 for the plan stray-text
+(`docs/plans/stray-text.md`): analyze also uses the same 36 dpi render
+to find an **inkless page**, a page that prints nothing, or only the
+next page showing through or a patterned endpaper, while its text layer
+holds words the scanner's OCR invented there (section 2b). Such a page
+gets the page kind `inkless`, which takes `pages.json` to version 4, and
+extract records each of its words as a removal with the reason
+`inkless_page` (architecture §8). Without it, those words reach the
+EPUB: Haynes' page 9, blank after the contents, gave a paragraph "." and
+a heading of five junk words.
+
 ## 1. The plates of the six books
 
 | book | page | what it is | its text layer |
@@ -190,6 +201,127 @@ pages on the one PDFium thread, against about 2.5 s for the whole of
 `galley2epub layout` on the same book (layout §5). The OCR audit
 renders some pages anyway; the two renders are not shared.
 
+## 2b. analyze: an inkless page
+
+Some pages of a scan print nothing, yet their text layer holds words:
+the OCR read the next page showing through the paper, the pattern of an
+endpaper or the speckle of a blank leaf as letters. Haynes' page 9,
+blank after the contents, holds 6 such words, among them "SP I fiyj.",
+which structure made a heading; Haskins' back endpapers, pages 277 and
+278, hold 10 and 24, which became quotes, a footnote and margin notes.
+A rule on the words alone cannot tell them from a damaged line of text,
+but the render can: under a real word there is ink, under these there
+is none. So analyze measures the ink under each word, on the 36 dpi
+render it already makes for the plate rule, and nothing more is
+rendered.
+
+**What is measured**, on each page the plate rule tests (section 2: not
+excluded, not the `cover_page`, not in `plate_pages`) that has a text
+layer, for each word of the layer whose middle lies outside the page's
+`exclude_regions` (the test extract uses):
+
+1. The word's box, in points, is grown by 3 pt on every side and turned
+   into pixels of the render (0.5 pixel per point), its left and top
+   sides rounded down and its right and bottom sides rounded up, then
+   cut to the page; the same with the box grown by 6 pt. A box that
+   lies wholly off the page, as the text layer gives 34 of the 390
+   words of Domesday's page 481 ("Cotton" starts at 422 pt on a page
+   393 pt wide), has no pixel and counts as a word with no ink.
+2. The **local background** is the median gray of the pixels of the box
+   grown by 6 pt: the paper around the word, which absorbs a page that
+   darkens from one side to the other, as Haynes' page 9 does.
+3. The word's **ink** is the larger of two differences, in gray levels
+   of 255, over the pixels of the box grown by 3 pt: the local
+   background minus the darkest pixel, and the brightest pixel minus
+   the local background. The second is for white print on a dark
+   ground: Haynes' back cover, page 435, prints its 236 words so, and
+   with the first difference alone each would have 0.
+4. A word has **no ink** when its ink is below 20 levels.
+
+A page is **inkless** when at least half of those words have no ink. A
+page with none of those words is not tested.
+
+**What follows.** A page the test finds inkless gets the kind `inkless`
+and the text source `none`, also when the plate rule takes it as a
+plate, unless it lies before the front-matter end
+(`docs/specs/front-matter.md`): such a page stays `front_matter`, whose
+words are removed with a record all the same. Haskins' front endpapers,
+pages 1 and 2, are inkless by the test (0.95 and 0.90 of their words
+without ink) and stay `front_matter`, as front-matter §6 has them. A page
+the config excludes or names in `plate_pages` is not tested and keeps
+the kind the config gives it.
+It is not `blank`: a blank page is one without a text layer, which
+stops the run until the OCR audit exists, while an inkless page has a
+layer and its words are kept as a record. extract reads its words as
+on any page with a layer and records each as a removal with the reason
+`inkless_page`, as it does for an excluded page with `excluded_page`,
+but for a word inside one of the page's `exclude_regions`, which keeps
+the reason `excluded_region` as on any page;
+it has no kept word and no figure, so layout gives it no region and
+structure no block. analyze logs each inkless page at WARNING, with its
+share of words without ink, so that the owner sees a page taken
+wrongly. No config key keeps such a page: the rule takes no page of
+print in the eight books (below), and a key is added when a book needs
+one.
+
+**Measured** on 18 November 2026 on the eight books named in
+`docs/specs/figures.md` (the six public-domain books and the owner's
+two), with the words of `words.json` of their runs at main a0a1675,
+each word's ink measured as above on a 36 dpi render by pypdfium2.
+The front-matter pages were not in this count, their words being
+removals in `words.json` (spec review, 18 November 2026: Haskins' pages
+1 and 2, above). Of the 1,099,520 words of the pages that are not
+inkless, 339 have ink
+below 20 levels; of the 43 words of the four inkless pages, 41:
+
+| words | how many | ink below 20 | ink at the 1st percentile | median ink |
+|---|---|---|---|---|
+| words of 3 characters or more | 827,453 | 73 | 41 | 80 |
+| words of 1 or 2 characters | 232,695 | 48 | 38 | 70 |
+| punctuation only | 23,634 | 182 | 23 | 57 |
+| 1 to 3 digits | 15,738 | 36 | 35 | 68 |
+| the words of the four inkless pages | 43 | 41 | | 10 |
+
+The share of a page's words without ink:
+
+| page | share | what it is |
+|---|---|---|
+| Haynes 9 and 421 | 1.00 | blank pages, another page faintly showing through |
+| Haskins 277 | 1.00 | the back endpaper, patterned |
+| Haskins 278 | 0.92 | the back endpaper, patterned |
+| Domesday 481 | 0.10 | a table whose column heads are printed sideways, each boxed across instead of along its print |
+| Turney 176 | 0.07 | a newspaper page reproduced as a figure |
+| Gierke 63 and 66 | 0.03 | contents pages whose layer boxes sit 5 to 20 pt off the print |
+| every other page | 0.02 or less | |
+
+So half leaves a margin of 0.42 below the lowest inkless page and 0.40
+above the highest page of print. The rule takes Haynes 9 and 421 and
+Haskins 277 and 278, and no other page of the eight books that the
+configs do not exclude.
+
+| threshold | value | from |
+|---|---|---|
+| render | 36 dpi, the plate rule's | decided: no second render. At 72 dpi Haskins 278's share falls to 0.58, because the endpaper's pattern is then resolved into ink, and Domesday 481 stays at 0.10 |
+| box grown | 3 pt | measured: the layer's boxes sit a few points off the print; of the real words, 2,573 have no ink with the box not grown, 972 grown by 1 pt and 339 by 3 pt, while the four inkless pages keep their shares (Haskins 278 0.92 with each) |
+| local background | median of the box grown by 6 pt | guessed, and kept because it absorbs Haynes 9's gradient; the page's median gray, as the plate rule's ink uses, was not tried |
+| no ink | below 20 levels | measured, above: 41 of the 43 junk words, 339 of 1.1 million real ones |
+| inkless page | at least 0.5 of its words | measured, above |
+
+**A rule per word was measured and dropped.** Removing each word
+without ink, wherever it is, would also remove real words. Of 12 words
+without ink on pages of print, checked by eye on the page images, 5
+were specks of the scan read as letters (Stubbs' "6" on page 33,
+Domesday's "e" on page 259) and 7 were real words whose layer box sits
+5 to 20 pt off the print (Gierke's "14" on page 63, Domesday's
+"Acreage" on 427, Kadesh's "27" on 38), and Domesday's page 481 alone
+has 40 real words without ink, its sideways column heads. The page
+rule keeps them all.
+
+**Not caught.** Mariéjol's page 459, the back board, is dark and
+mottled: its 8 junk words have up to 67 levels of ink, and its share of
+words without ink is 0.12, and 0.38 even with a limit of 30 levels. The owner
+asked for no effort on Mariéjol's scans, and the page is left as it is.
+
 ## 3. extract: cutting the picture
 
 A plate's picture is the **whole page**. Two boxes measured from the
@@ -241,6 +373,12 @@ def is_plate(page: RenderedPage, word_boxes: tuple[Box, ...] | None,
     # Whether the page is a plate by section 2; `word_boxes` is None for
     # a page without a text layer, and `known_words` is then ignored.
 
+def is_inkless(page: RenderedPage, word_boxes: tuple[Box, ...]) -> bool: ...
+    # Whether the page is inkless by section 2b: at least half of
+    # `word_boxes`, the boxes of the page's text-layer words outside its
+    # excluded regions, in points, have no ink on `page`, its 36 dpi
+    # render. False when `word_boxes` is empty.
+
 # galley.wordlist
 
 def is_known_word(word: str, lower_case_words: frozenset[str]) -> bool: ...
@@ -279,6 +417,11 @@ covers `contents_pages` too.
   plate.
 - **The `cover_page`**: never tested, so never a figure. When it is
   excluded too, `images/cover.png` is still made, as now.
+- **An inkless page** (section 2b): kind `inkless`, every word a
+  removal with the reason `inkless_page`, no figure. A page whose layer
+  boxes sit off the print (Gierke 63) or whose words are boxed across a
+  sideways print (Domesday 481) has a few words without ink and stays a
+  text page with all its words.
 
 ## 6. How it is verified
 
@@ -307,10 +450,35 @@ becomes a test:
 A `whole_book` test asserts, with the configs of section 2, that the
 plates of the six books are the 21 of section 1.
 
+**The inkless page** (section 2b). Unit tests of `is_inkless` on
+`RenderedPage` values made in the test: a white page with 4 word boxes
+over white gives true; with 2 of them each over a black bar 1 pixel
+high across the box's middle, true (half); with 3, false; a black page with a white bar, 1 pixel high, under
+each of 4 boxes gives false (white print on a dark ground); a page whose gray darkens from 200 on
+the left to 120 on the right, with 4 boxes over plain gray, gives true;
+no box gives false. A word box 2 pt left of a black bar 1 pixel wide
+has ink (the box is grown by 3 pt). Excerpt tests, on pages the
+assistant transcribed from their images
+(`tests/fixtures/expected/stray_text/`):
+
+| excerpt | page (excerpt page, book page index) | expected |
+|---|---|---|
+| `haskins_endpapers` (new) | 0 (275) | `text`, the printer's colophon, its words kept |
+| `haskins_endpapers` | 1 (276) | `excluded`, as the book's config has it |
+| `haskins_endpapers` | 2 (277), 3 (278) | `inkless`, every word a removal with the reason `inkless_page` |
+| `domesday_notes` (new) | the excerpt page of 481 | `text`: the sideways table keeps its words |
+| `gierke_notes_heads` (new) | the excerpt page of 63 | `text`: the boxes off the print keep their words |
+
+A `whole_book` test asserts that the inkless pages of the eight books,
+with the configs of section 2, are exactly Haynes 9 and 421 and Haskins
+277 and 278, Haynes' only when its PDF is present.
+
 ## 7. Not in this spec
 
 - The OCR audit, and what analyze does with a page without a text layer
   that is not a plate: analyze's own spec (architecture §7b).
+- A per-word removal of words without ink, and Mariéjol's page 459:
+  section 2b says why not.
 - Figures inside text pages, and captions beside them: later.
 - What structure makes of a plate's words: structure §18.
 - How a figure is written in `book.md` and shown in the EPUB, and a

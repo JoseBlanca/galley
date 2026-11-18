@@ -33,7 +33,11 @@ the figures printed inside text pages (`docs/specs/figures.md`):
 `PageInfo.figure_boxes` takes `pages.json` to version 3, `Figure.kind`
 takes `words.json` to 3 and `lines.json` to 4, and the removal reason
 `figure_text` goes into `blocks.json` version 5 with the lists' changes,
-one version for both.
+one version for both. Revised again the same day for the plan
+stray-text (`docs/plans/stray-text.md`): the page kind `inkless`, a page
+that prints nothing although its text layer holds words
+(`docs/specs/plates.md` §2b), takes `pages.json` to version 4, and the
+removal reason `inkless_page` records those words in `words.json`.
 
 Decisions marked "owner", with a date from 14 to 17 November 2026,
 were taken by the owner in chat; those of 18 November 2026 were taken
@@ -264,8 +268,8 @@ but was fitted on 16 books only.
 The formats are frozen dataclasses in `src/galley/model.py`, with tuples
 for sequences, `frozendict` (a built-in type of Python 3.15) for
 mappings, `StrEnum` for finite sets, and floats for positions. Each file
-has a `format_version` int: 5 for `blocks.json`, 4 for `lines.json`, 3
-for `pages.json` and `words.json`, 1 for the others.
+has a `format_version` int: 5 for `blocks.json`, 4 for `lines.json` and
+`pages.json`, 3 for `words.json`, 1 for the others.
 `blocks.json` went to 2 with the second plan of structure (16 November
 2026), which added `Note.kind`, `Block.label`, the block kinds `verse`
 and `chapter_summary` and the removal reason `guide_words`; reading a
@@ -290,7 +294,13 @@ change reason `list_marker` and the removal reason `leader_dots`
 (`docs/specs/figures.md` §7); the owner reruns structure. `pages.json`
 went to 3 the same day, with `PageInfo.figure_boxes`, and `words.json`
 to 3 and `lines.json` to 4, with `Figure.kind` (`docs/specs/figures.md`
-§7); the owner reruns analyze, which deletes every later file. Each has
+§7); the owner reruns analyze, which deletes every later file.
+`pages.json` went to 4 the same day, with the page kind `inkless`
+(`docs/specs/plates.md` §2b); the owner reruns analyze. `words.json`
+stays at 3 although its removals gain the reason `inkless_page`: a
+words.json of version 3 is made from a pages.json of version 3, which
+layout refuses, so a book run before the change is run again from
+analyze either way. Each has
 one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
@@ -313,11 +323,16 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
   (`docs/specs/figures.md` §3).
 - `PageKind`: `blank`, `text`, `plate` (mostly a picture), `excluded`,
   `front_matter` (a page before the book's text that would otherwise be
-  a text page: `docs/specs/front-matter.md`). analyze recognises a plate
+  a text page: `docs/specs/front-matter.md`), `inkless` (a page that
+  prints nothing, or only another page showing through or a patterned
+  endpaper, while its text layer holds words the OCR invented there:
+  at least half of those words have no ink under them on analyze's 36
+  dpi render; `docs/specs/plates.md` §2b). analyze recognises a plate
   from a small render of the page, with a text layer or without one
-  (`docs/specs/plates.md`).
-- `TextSource`: `text_layer`, `ocr`, `none` (blank, excluded and
-  front-matter pages, and plates without a text layer).
+  (`docs/specs/plates.md`). An inkless page is not `blank`: a blank page
+  has no text layer.
+- `TextSource`: `text_layer`, `ocr`, `none` (blank, excluded,
+  front-matter and inkless pages, and plates without a text layer).
 - `text_layer_score`: the share of the layer's words found in the word
   list (section 12), from 0 to 1; `None` without a layer.
 - `blank_checked_by_ocr: bool`: true for a page without a text layer that
@@ -352,8 +367,10 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
   structure sorts into its caption and stray words.
 - A word inside an excluded region is a removal, one per word, with reason
   `excluded_region`; the words of an excluded page likewise, with
-  `excluded_page`, and those of a front-matter page with
-  `front_matter`.
+  `excluded_page`, those of a front-matter page with
+  `front_matter`, and those of an inkless page with `inkless_page`. Such
+  a page has no word in `PageWords.words`, so layout gives it no region
+  and structure no block.
 
 **lines.json**, `LinesFile(pages: tuple[PageLayout, ...], rereads:
 tuple[Reread, ...])`:
@@ -528,14 +545,17 @@ page_numbers)`:
   `page_numbers: tuple[PageNumber, ...]`, taken from the removals; the
   index stage uses it (section 11).
 
-**Removal**, in words.json (excluded pages and regions, and the front
-matter) and blocks.json (the rest): `page_index`, `box`, `text`,
+**Removal**, in words.json (excluded pages and regions, the front
+matter and inkless pages) and blocks.json (the rest): `page_index`, `box`, `text`,
 `reason: RemovalReason`: `excluded_page`, `excluded_region`,
 `front_matter` (a word of a page before the book's text, where analyze's
 rule or the config's `front_matter_end` puts the end of the front
 matter; a reason apart from `excluded_page`, whose pages the owner names
 one by one),
-`running_head`, `page_number`, `signature_mark`, `plate_text`,
+`inkless_page` (a word of an inkless page, which the OCR read in what
+shows through the paper or in an endpaper's pattern; a reason apart
+from `excluded_page` because analyze's rule, not the owner, chose the
+page), `running_head`, `page_number`, `signature_mark`, `plate_text`,
 `stray_mark` (a line with no letter or digit above a running head or
 above the title of a printed contents, a speck of the scan),
 `guide_words` (the first letters of the first and last entries that
@@ -576,7 +596,9 @@ it read (the `coding` skill, "Functional style").
 whether it is blank, text or a plate; applies the config's
 `exclude_pages` and `exclude_regions`; finds where the front matter
 ends and makes the text pages before it `front_matter`
-(`docs/specs/front-matter.md`); and runs the OCR audit of section
+(`docs/specs/front-matter.md`); marks a page whose text layer holds
+words with no ink under them `inkless` (`docs/specs/plates.md` §2b);
+and runs the OCR audit of section
 7b, which decides each page's `text_source`. A plate is recognised from
 a render of each page at 36 dpi, as a large area of ink that no word
 covers on a page of few known words, or, on a page without a text
@@ -1035,6 +1057,11 @@ lists-figures):
 - **The four format changes of figures are accepted**, with an explicit
   `Figure.kind` rather than a figure's kind read from its box
   (`docs/specs/figures.md` §11, open point 2).
+- **An inkless page is a page kind of its own**, `inkless`, and its
+  words removals with the reason `inkless_page`, which takes
+  `pages.json` to version 4; books run before the change are run again
+  from analyze (`docs/specs/plates.md` §2b; decided by the plan
+  stray-text, `docs/plans/stray-text.md`).
 
 ## 18. Not in this document
 

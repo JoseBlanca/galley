@@ -65,6 +65,21 @@ over rows of marks (step 3); the footnote band also starts, without a
 gap, at a small row that opens with a note marker and a capital (step
 4).
 
+Revised on 18 November 2026 for the plan stray-text
+(`docs/plans/stray-text.md`), which changes three steps of section 3
+and no format, each for text a reader of the EPUB finds in the middle
+of the book: a page number the text layer boxes apart from its running
+head no longer leaves the head in the text (step 3, "A page number
+boxed apart"); notes set small against a page's own text, rather than
+against the book's, make a band, and so does a note of one line whose
+words the layer boxes as tall as the body's (step 4); and a cut-in
+note whose lines share the body's baselines is found by the size of
+its words (step 2b, rule 2, and section 9). The numbers were measured
+on 18 November 2026 on the `words.json` of the eight books' runs at
+main a0a1675 (the six public-domain books and the owner's two, named
+as `docs/specs/figures.md` names them), with layout's own code and the
+rule changed in a copy.
+
 ## 1. Terms
 
 Besides those of the glossary, this spec uses these; the first four, and
@@ -383,6 +398,33 @@ is laid out as one region, as the skeleton did.
       trimmed at both ends to its first and last shortened rows, and is
       then a **cut-in zone**, from the top of its first row to the
       bottom of its last, even when one row remains.
+      A cut row is **shortened by size** too, and counts as shortened,
+      when its **strip words**, its words whose right side lies at most
+      L + I − 4 pt (the test above) and that hold at least 2 letters,
+      are set smaller than the page's body: their median height (of
+      their boxes) is at most **0.9** of the page's body word height,
+      and their width per character, the sum of their box widths over
+      the sum of the characters of their texts, at most **0.9** of the
+      page's. A row with no strip word, its strip holding only specks
+      and single letters, counts as shortened. The page's **body word
+      height** and **width per character** are taken the same way from
+      the words left in the column after step 2 that hold at least 3
+      letters. A page with fewer than 50 words left in the column, of
+      any length, has no such measures (a guess, as the simulation
+      below made it), and there a row is shortened only by the first
+      test.
+      This is for notes whose lines share the body's baselines: the OCR
+      then puts each note line into the body row beside it, so that no
+      row has its strip empty and no zone is made (Stubbs' page 37,
+      "Coinage debased." and "Mercenaries imported.", each beside two
+      body lines). Measured on Stubbs' 500 cut rows with words in the
+      strip (rows, not notes), of which 151 hold only words of a margin note by the
+      evaluation's alignment: those notes' strip words are 0.79 of the
+      page's body word height at the median (0.66 to 0.87 for the 5th
+      to 90th percentiles) and 3.85 pt per character (3.21 to 4.29),
+      while the body lines with a sentence's gap at the inset are about
+      1.0 of the height and 4.6 to 5.6 pt per character (section 9
+      gives what the rule moves).
       A full body line with a wide space at the inset by chance is a cut
       row too ("of John. The same year Johanna", page 120; "averted open
       war. Henry was", 125); at a chain's end it is trimmed off, and a
@@ -505,9 +547,44 @@ is laid out as one region, as the skeleton did.
    is less than 1.3 pitches above the title (0.98 on page 41), so they
    have no such region; Kadesh's article title on page 8 is set apart
    and makes one, which structure keeps in the text (structure §3).
+
+   **A page number boxed apart.** The text layer sometimes boxes the
+   page number of the head several points above the head's words, as a
+   row of its own. On Kadesh's page 38 "27" lies 20 pt above "JAMES
+   HENBY BREASTED", more than 1.3 pitches, so the region held the number
+   alone and the head stayed as the first line of the body, inside a
+   quotation; on Domesday's pages 200 and 428 "175" and "403" lie 7.2
+   and 8.0 pt above "TJie Boroughs." and "Domesday Statistics.", more
+   than half a pitch and less than 1.3 pitches, so the page had no
+   region and number and head stayed in a paragraph. So, when the head
+   row is one word of 2 or 3 digits, with or without a "." or "," after
+   them, the **head-word row** is the next row below it that holds a
+   letter, and its skew rows are the rows right below the head-word row
+   whose tops lie less than half a body line pitch below its top. When
+   the first row with a letter or a digit after those skew rows has its
+   top at least 1.3 body line pitches below the head-word row's top,
+   the running-head region holds every row from the top of the column
+   down to the last skew row (or the head-word row, without skew
+   rows). Its line is then every row from the head row down, their
+   words left to right, so that structure sees the number and the head
+   as one head line; the rows above the head row are lines of their
+   own, as above. When that gap is less than 1.3 pitches, the rule
+   above applies, as before. Measured: the row with a letter
+   lies 2.8 pitches above the body on Kadesh's page 38, 2.0 and 4.1 on
+   Domesday's pages 200 and 428, and the rule changes one more page of
+   the eight books, Domesday's 552, "527" over "Index.", 2.4 pitches,
+   whose "Index." stayed in the text as a paragraph. With any
+   page-number form for the head row (structure §1), a roman one or a
+   single digit, it also changes six of Stubbs' pages (28, 33, 35, 97,
+   232 and 267), where a speck above the head reads "1", "6", "8", "6
+   7" or "d": structure's rule for a speck as the head line (structure
+   §3) already finds those heads, and the joined line would read the
+   speck as a page number.
 4. **Footnote band.** Of the rows left after step 3, the band begins at
    the first row, other than the first of them, that is small (the
-   median height of its words is at most 0.85 of the body word height),
+   median height of its words is at most 0.85 of the body word height,
+   or at most 0.82 of the page's **median row height**, the median,
+   over the rows left after step 3, of each row's median word height),
    whose top is at least 1.1 body line pitches below the top of the row
    before, and from which on at least two thirds of the rows down to the
    last, that row and the last included, are small. A page number or
@@ -554,6 +631,63 @@ is laid out as one region, as the skeleton did.
    have no band, as before the gapless start.
    On a page whose every row is small, such as a page of the index, there
    is no band: the rows are the body.
+
+   **Small against the page.** Gierke's introduction (pages 13 to 49)
+   is set larger than the translation that fills most of the book: its
+   body rows are 10 to 11 pt high and its notes 8 pt, while the book's
+   body word height is 9.0 pt, set by the translation, so 8 pt is 0.89
+   of it and its notes made no band; they ran into the paragraphs, a
+   note's text glued into a sentence of the text on every page of the
+   introduction that has one. Against the page's median row height
+   their rows are 0.67 to 0.80. The test against the page gains a band
+   on 30 of Gierke's pages, each holding the page's footnotes (15 to
+   18, 23 to 31, 34 to 39, 41 to 45, 48 and 49 of the introduction,
+   and 109, 146, 147 and 156, the translator's notes marked "*"), and on
+   Mariéjol's 25, 159, 245 and 323 (notes, 9 pt rows against 11), and
+   starts the band of Gierke's page 40 six rows higher and Mariéjol's
+   34 one row higher, at the page's first note; no page of the eight
+   books loses its band, and no band of the other five books moves.
+   The limit is 0.82, not the 0.85 of the book's measure: at 0.85 it
+   also made a band of the last rows of two printed contents, Haskins'
+   page 14 ("INDEX 251", 0.83 of the page's median) and Turney's page 10
+   ("Notes 223" and the entries after it, 0.85), and of a signature
+   mark alone, Gierke's 168 (0.83). The text layer gives these pages'
+   heights in whole points, so the ratios are 8/10, 9/11, 8.2/9.9, 10/12
+   and 11/13: the margin lies between 0.818 and 0.832. Re-reading
+   tests a page printed wholly in small type (`docs/specs/reocr.md`)
+   with the book's measure alone, 0.85 of the body word height, as
+   before: against the page's own rows such a page is not small.
+
+   **A note of one line boxed as tall as the body.** On some of
+   Domesday's pages the only footnote is one line, which the text layer
+   boxes 10 pt high as it boxes the body ("1 D. B. i. 141 b." on page
+   163), so it is not small and stands less than 1.1 pitches below the
+   text on several; it stayed in the body as a paragraph, and structure's
+   rule for notes left in the body (structure §11), which asks for a
+   smaller height too, missed it. Its characters are narrower than the
+   body's: on a page where the rules above find no band, the last row
+   that holds a letter or a digit begins the band when its first word
+   is "1", its second word starts with a capital letter, and its
+   **width per character**, the sum of its words' box widths over the
+   number of characters of their texts (spaces not counted), is at
+   most 0.9 of the page's, the median width per character of the rows
+   above it that hold at least 20 characters (a guess, to leave out
+   short rows). The band then holds it and the rows of marks below it.
+   The rule is not applied when no row above it holds 20 characters, or
+   when the row is the first of the rows left after step 3. Measured: the rule takes Domesday's pages 163, 174,
+   185, 278, 303, 308, 315, 347, 472 and 485, at 0.70 to 0.85 of the
+   page's width per character (185 at 0.854, two notes on one line),
+   and Gierke's 61 (0.83), each row the page's footnotes on the page
+   image, and no other row of the eight books; Gierke's 48, at 0.68,
+   gets its band first from the test against the page above. No
+   candidate row of the eight books lies between 0.854 and 1.05, so the
+   limit is **0.9**, with room on both sides; at 0.85 it missed 185
+   (spec review, 18 November 2026). The first word
+   must be "1", the first note of a page: with any marker form of
+   the band (above), the rule also takes Domesday's page 13, the date
+   "20 January, 1897." under the preface, and the last of several
+   notes on Kadesh's page 40 and on nine of Gierke's pages, whose
+   other notes it leaves above it in the body.
 5. **Columns.** The body, and the band apart from it, are each cut into
    two columns at a **gutter**: a vertical strip at least 6 pt wide,
    whose middle lies in the middle third of the body column. A row is
@@ -978,7 +1112,9 @@ machine with 6 workers, `galley2epub layout` on the whole book, against
   and the rest stays.
 - **Mariéjol's notes in 9-pt OCR lines**: a fifth of its note words
   (5,735 of 25,784) stay in the body, at the foot of
-  their page, because their lines are not small by step 4. A reader of
+  their page, because their lines are not small by step 4 (the test
+  against the page's median row height takes those of 4 pages more,
+  step 4). A reader of
   the EPUB sees them as body text there. A height measured per book for
   the notes, rather than the 0.85 ratio, may catch them; that is left
   until the first plan's evaluation shows how much it matters.
@@ -1115,6 +1251,21 @@ checks them against the page images before they become the test.
 | `mariejol_210-219` (new) | 0 (210) | footnotes of 9-pt OCR lines; a foot line holding the signature and the page number "(l93)" |
 | `mariejol_210-219` | 4 (214) | a foot line the OCR garbled |
 
+The plan stray-text adds three excerpts whose pages check the rules
+of 18 November 2026 (`tests/fixtures/expected/stray_text/`, each page
+transcribed by the assistant from its image):
+
+| excerpt | book pages | what it shows |
+|---|---|---|
+| `kadesh_29-38` (committed) | 38 | the head "JAMES HENBY BREASTED" with its number "27" boxed 20 pt above it: a running-head region holding both |
+| `domesday_front_flow` (committed) | 200 | "175" boxed 7.2 pt above "TJie Boroughs.": the same |
+| `domesday_notes` (new) | 428 | "403" above "Domesday Statistics.": the same |
+| `domesday_notes` | 163, 174, 278 | a band holding the one-line note |
+| `gierke_notes_heads` (new) | 15 to 18, 40, 146 | a band holding the page's notes, from the first |
+| `stubbs_cut_in` (new) | 19, 37 | cut-in notes on the body's baselines taken into margin regions: on 19 the words "The epoch to be now" of the note "The epoch to be now treated.", whose "treated." stays in the body, on 37 "Coinage debased." and "Mercenaries imported." |
+| `stubbs_cut_in` | 120, 125 | a body line with a wide space at the inset keeps every word ("The same", "open war."), while the note beside it ("Henry resumes his schemes.", "The house of Anjou at Jerusalem.") is taken whole or in part |
+| `stubbs_cut_in` | 34, 143 | notes the rule leaves in the body (section 9: on 34 the layer mixes the rows, on 143 the gap before the body word is under 8 pt): the test asserts that no body word moves |
+
 The plan owner-books adds the excerpts `haskins_heads_notes`,
 `stubbs_heads` and `domesday_rereads` (`docs/specs/structure.md` §26),
 whose reference pages check steps 3 and 4 here: Haskins' pages 23, 30,
@@ -1207,6 +1358,39 @@ some note words are glued to body words ("toHenry's").
 
 Whatever is tried, the bar is on precision: a body word moved into a
 margin note breaks the text a reader reads.
+
+**Revised on 18 November 2026: a row shortened by size** (step 2b,
+rule 2). By the evaluation of that day, 169 of Stubbs' 467 margin notes
+of the reference text stayed in the body, on 134 pages, and 24 more in
+part; for about 93 of them the note's words lie in the strip of cut
+rows that are not shortened, because the note's lines share the body's
+baselines and the OCR put them into the body rows. The test by size
+was simulated with layout's own code, its zones changed in a copy, on
+the whole book's `words.json`, each moved word labelled by the
+evaluation's alignment as before:
+
+| strip words' height and width per character, of the page's | words moved in addition | note words | words of at most 2 letters | other | pages |
+|---|---|---|---|---|---|
+| at most 0.85 and 0.85 | 561 | 343 | 139 | 79 | 117 |
+| at most 0.9 and 0.9 (as written) | 590 | 365 | 143 | 82 | 120 |
+| at most 0.95 and 0.95 | 598 | 370 | 144 | 84 | 121 |
+| no test of size | 640 | 373 | 153 | 114 | 126 |
+
+No word moved before stops moving. The "other" words at 0.9 are mostly
+note words the OCR garbled, which the alignment could not place
+("Constitu-", "Recall Gaveston.", "advUers."), and perhaps 10 body
+words ("the" on pages 247, 301 and 305). Without the test of size the
+30 more words are clear body lines with a wide space at the inset
+("The same" on page 120, "open war." on 125, "abundant." on 247): the
+test is what keeps them. Of the 169 notes in the body, 71 come out
+whole at 0.9, 41 mostly, 9 in part and 48 not. The 48 are left: on
+about 18 the body line's edge lies more than 3 pt from the inset (pages
+46, 68, 82, 100), on about 15 the text layer mixes the rows or puts a
+note word inside the text's width (18, 34, 65, 97), on 6 the rows hold
+note words only (24, 40, 58, 108), on 6 the gap before the body word
+is under 8 pt (143, 145, 176, 210, 289, 298) and on 5 the chain of cut
+rows is too short (26, 198, 275, 294). This keeps the decision above:
+precision first, and every note left in the body breaks a paragraph.
 
 ## 10. Not in this spec
 
