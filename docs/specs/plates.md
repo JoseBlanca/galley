@@ -291,7 +291,7 @@ The share of a page's words without ink:
 | Haskins 278 | 0.88 | the back endpaper, patterned |
 | Domesday 481 | 0.10 | a table whose column heads are printed sideways, each boxed across instead of along its print |
 | Turney 176 | 0.07 | a newspaper page reproduced as a figure |
-| Gierke 63 and 66 | 0.03 | contents pages whose layer boxes sit 5 to 20 pt off the print |
+| Gierke 63 and 66 | 0.02 | contents pages whose layer boxes sit 5 to 20 pt off the print |
 | every other page | 0.02 or less | |
 
 Haskins 278's share, and the count of its words without ink, are those
