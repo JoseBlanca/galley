@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed since that check by task 3.1 (layout spec section 3, step 2b, Stubbs' cut-in notes): the cut-in notes at the right \"B an i s h m e n t\" and \"Cti°n °£ J^tE.\" (\"Banishment of mercenaries.\" and \"Destruction of castles.\" in print) leave the body lines and become margin regions and margin_note blocks after the body. With them gone, \"was\" and \"boon\" join their body line again, which reads \"fifteen, was a still greater boon ; for these,\", and the paragraph \"The demolition of the castles\" is no longer broken there. Checked against the page image by the task 3.1 session on 16 November 2026, for the orchestrator to check again. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image.",
+  "changed": "Changed since that check by task 3.1 (layout spec section 3, step 2b, Stubbs' cut-in notes): the cut-in notes at the right \"B an i s h m e n t\" and \"Cti°n °£ J^tE.\" (\"Banishment of mercenaries.\" and \"Destruction of castles.\" in print) leave the body lines and become margin regions and margin_note blocks after the body. With them gone, \"was\" and \"boon\" join their body line again, which reads \"fifteen, was a still greater boon ; for these,\", and the paragraph \"The demolition of the castles\" is no longer broken there. Checked against the page image by the task 3.1 session on 16 November 2026, for the orchestrator to check again. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image. Changed by task 4.1 of the stray-text plan (layout spec section 3, step 2b, a cut row shortened by size): \"Df mercena-\" and \"nes\", the layer's last two lines of the cut-in note \"Banishment of mercenaries.\", leave the body lines beside them, and the note is re-read whole by Tesseract, \"Banishment of mercena- ries.\", one margin_note block \"Banishment of mercenaries.\"; the body lines read \"business of the revenue. From this . court at\" and \"Bermondsey went forth the decree that the\"; checked against the page image rendered at 200 dpi on 18 November 2026.",
   "excerpt": "stubbs_51_56-64",
   "page": 9,
   "book_page_index": 64,
@@ -19,9 +19,8 @@
       "Bishop Nigel of Ely, whom Stephen had displaced in",
       "1140, and setting ° at work at once with the",
       "^ ' ,",
-      "business of the revenue. From this . court at Df mercena-",
-      "nes",
-      "Bermondsey went forth the decree that the -",
+      "business of the revenue. From this . court at",
+      "Bermondsey went forth the decree that the",
       "Flemish and other foreign mercenaries should leave the",
       "kingdom at once, and that the castles built under Stephen",
       "should be thrown down. The mercenaries fled forthwith.",
@@ -48,7 +47,9 @@
       "war, but have continued to afford to their owners a"
     ],
     [
-      "Banishment"
+      "Banishment",
+      "of mercena-",
+      "ries."
     ],
     [
       "Destruction of",
@@ -66,14 +67,14 @@
     },
     {
       "kind": "margin_note",
-      "text": "Banishment",
+      "text": "Banishment of mercenaries.",
       "pages": [
         9
       ]
     },
     {
       "kind": "paragraph",
-      "text": "^ ' , business of the revenue. From this . court at Df mercenanes Bermondsey went forth the decree that the - Flemish and other foreign mercenaries should leave the kingdom at once, and that the castles built under Stephen should be thrown down. The mercenaries fled forthwith. Their presence was perhaps the most offensive of all insults to the national pride, and the late reign had taught Normans and Englishmen that they had now a common nationality in suffering, if not in conquest. By this article of the agreement Henry faithfully stood. Although he fought all his foreign wars with mercenaries, he never but once — and that in the greatest emergency, and to repel foreign mercenaries brought against him by the rebellious earls in 1174 — introduced any such force into England. Even Richard employed in the kingdom no more foreigners than formed his ordinary surroundings, and it is not until John's reign that we find the country again oppressed and insulted by hired foreign soldiery.",
+      "text": "^ ' , business of the revenue. From this . court at Bermondsey went forth the decree that the Flemish and other foreign mercenaries should leave the kingdom at once, and that the castles built under Stephen should be thrown down. The mercenaries fled forthwith. Their presence was perhaps the most offensive of all insults to the national pride, and the late reign had taught Normans and Englishmen that they had now a common nationality in suffering, if not in conquest. By this article of the agreement Henry faithfully stood. Although he fought all his foreign wars with mercenaries, he never but once — and that in the greatest emergency, and to repel foreign mercenaries brought against him by the rebellious earls in 1174 — introduced any such force into England. Even Richard employed in the kingdom no more foreigners than formed his ordinary surroundings, and it is not until John's reign that we find the country again oppressed and insulted by hired foreign soldiery.",
       "pages": [
         9
       ]
@@ -138,12 +139,12 @@
     {
       "before": [
         "mercena-",
-        "nes"
+        "ries."
       ],
       "after": [
-        "mercenanes"
+        "mercenaries."
       ],
-      "reason": "hyphen_join_guessed"
+      "reason": "hyphen_join"
     },
     {
       "before": [

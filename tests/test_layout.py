@@ -781,6 +781,77 @@ def test_marks_row_between_head_and_body_is_passed_over_and_stays_in_the_body() 
     assert len(body.lines) == 21
 
 
+# A page number boxed apart above its head (step 3): the head's words at
+# top 76, 2 pitches above the body.
+_HEAD_WORDS_TOP = 100 - 2 * _PITCH
+
+
+def _head_words(top: float = _HEAD_WORDS_TOP) -> tuple[Word, ...]:
+    return (
+        _word("The", 100, top, 125, top + 8),
+        _word("Boroughs.", 130, top, 180, top + 8),
+    )
+
+
+@pytest.mark.parametrize("number_above_pt", [7.2, 20.0])
+def test_page_number_boxed_above_the_head_is_one_head_line_with_it(
+    number_above_pt: float,
+) -> None:
+    # Domesday's page 200, "175" 7.2 pt above "TJie Boroughs.", and
+    # Kadesh's 38, "27" 20 pt above its head.
+    number_top = _HEAD_WORDS_TOP - number_above_pt
+    number = _word("175", 230, number_top, 250, number_top + 8)
+    result = layout_page(_page(0, (number, *_head_words(), *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("The", "Boroughs.", "175"),)
+    assert len(body.lines) == 20
+
+
+def test_page_number_boxed_apart_keeps_a_speck_above_it_a_line_of_its_own() -> None:
+    speck = _word(";", 140, 40, 144, 46)
+    number = _word("175", 230, 60, 250, 68)
+    result = layout_page(
+        _page(0, (speck, number, *_head_words(), *_rows(20))), _MEASURES
+    )
+    assert _region_texts(result)[0] == ((";",), ("The", "Boroughs.", "175"))
+
+
+def test_page_number_boxed_apart_takes_the_skew_of_the_head_below_it() -> None:
+    number = _word("175", 230, 60, 250, 68)
+    skew = _word("1170", 190, _HEAD_WORDS_TOP + 4, 220, _HEAD_WORDS_TOP + 11)
+    result = layout_page(
+        _page(0, (number, *_head_words(), skew, *_rows(20))), _MEASURES
+    )
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("The", "Boroughs.", "1170", "175"),)
+    assert len(body.lines) == 20
+
+
+@pytest.mark.parametrize("number", ["1", "6", "xii", "1234"])
+def test_head_row_of_another_number_form_takes_no_head_below_it(number: str) -> None:
+    # Stubbs' specks above the head read "1" or "6": one digit is no page
+    # number of this rule, nor a roman one or 4 digits.
+    speck = _word(number, 230, _HEAD_WORDS_TOP - 20, 250, _HEAD_WORDS_TOP - 12)
+    result = layout_page(_page(0, (speck, *_head_words(), *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == ((number,),)
+    assert _texts(body.lines)[0] == ("The", "Boroughs.")
+
+
+def test_page_number_boxed_apart_above_a_head_close_to_the_body_is_a_head_alone() -> (
+    None
+):
+    # The head's words 1.2 pitches above the body: the rule as before.
+    head_top = 100 - 1.2 * _PITCH
+    number = _word("27", 230, head_top - 20, 250, head_top - 12)
+    result = layout_page(
+        _page(0, (number, *_head_words(head_top), *_rows(20))), _MEASURES
+    )
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("27",),)
+    assert _texts(body.lines)[0] == ("The", "Boroughs.")
+
+
 def _hanging(text: str, row: int, gap: float = 9.0) -> Word:
     """A number 10 pt wide ending `gap` pt left of the column's edge, 50,
     beside row `row` of `_rows`."""
@@ -1253,6 +1324,95 @@ def test_band_needs_a_gap_of_1_1_pitches_above_it(gap: float, regions: int) -> N
     assert len(result.regions) == regions
 
 
+def _tall_rows(count: int, height: float) -> tuple[Word, ...]:
+    """`count` full rows of the column of `_MEASURES`, 12 pt apart from 100,
+    their words `height` high."""
+    return tuple(
+        replace(word, box=replace(word.box, bottom=word.box.top + height))
+        for word in _rows(count)
+    )
+
+
+@pytest.mark.parametrize(("note_height", "regions"), [(8.0, 2), (8.5, 1)])
+def test_band_rows_are_small_at_0_82_of_the_pages_median_row_height(
+    note_height: float, regions: int
+) -> None:
+    # Gierke's introduction: body rows 10 pt high, notes 8 pt, where the
+    # book's body word height is 8 (so 8 is not small against the book).
+    band = _rows_of_height(5, _LAST_BODY_TOP + 1.5 * _PITCH, note_height)
+    result = layout_page(_page(0, (*_tall_rows(20, 10.0), *band)), _MEASURES)
+    assert len(result.regions) == regions
+
+
+def _prose_rows(count: int) -> tuple[Word, ...]:
+    """`count` full rows of the column of `_MEASURES`, 12 pt apart from 100,
+    of three words of 8 characters: 24 characters at 8 pt each."""
+    return tuple(
+        _word(
+            f"{word.text:x<8}", word.box.x0, word.box.top, word.box.x1, word.box.bottom
+        )
+        for word in _rows(count)
+    )
+
+
+def _one_line_note(
+    texts: tuple[str, ...], point_per_character: float, top: float
+) -> tuple[Word, ...]:
+    """A row of words `texts` as high as the body, each `point_per_character`
+    wide for each character, 4 pt apart from 50."""
+    words = []
+    left = 50.0
+    for text in texts:
+        right = left + point_per_character * len(text)
+        words.append(_word(text, left, top, right, top + _ROW_HEIGHT))
+        left = right + 4
+    return tuple(words)
+
+
+_ONE_LINE_NOTE = ("1", "D.", "B.", "i.", "141", "b.")
+
+
+@pytest.mark.parametrize(
+    ("texts", "point_per_character", "band"),
+    [
+        (_ONE_LINE_NOTE, 6.0, True),
+        (_ONE_LINE_NOTE, 7.1, True),
+        (_ONE_LINE_NOTE, 7.3, False),
+        (("2", *_ONE_LINE_NOTE[1:]), 6.0, False),
+        (("1.", *_ONE_LINE_NOTE[1:]), 6.0, False),
+        (("1", "ibid.", "141"), 6.0, False),
+    ],
+)
+def test_one_line_note_with_narrow_characters_is_a_band(
+    texts: tuple[str, ...], point_per_character: float, *, band: bool
+) -> None:
+    # Domesday's page 163: "1 D. B. i. 141 b.", boxed as tall as the body
+    # and 1 pitch below it, at 0.70 of the body's width per character; the
+    # limit is 0.9, 7.2 pt here.
+    note = _one_line_note(texts, point_per_character, _LAST_BODY_TOP + _PITCH)
+    result = layout_page(_page(0, (*_prose_rows(20), *note)), _MEASURES)
+    expected = ((texts,),) if band else ()
+    assert _region_texts(result)[1:] == expected
+    assert len(result.regions[0].lines) == (20 if band else 21)
+
+
+def test_one_line_note_takes_the_marks_below_it_into_the_band() -> None:
+    note = _one_line_note(_ONE_LINE_NOTE, 6.0, _LAST_BODY_TOP + _PITCH)
+    speck = _word(
+        "•", 140, _LAST_BODY_TOP + 2 * _PITCH, 142, _LAST_BODY_TOP + 2 * _PITCH + 3
+    )
+    result = layout_page(_page(0, (*_prose_rows(20), *note, speck)), _MEASURES)
+    assert _region_texts(result)[1:] == ((_ONE_LINE_NOTE, ("•",)),)
+
+
+def test_one_line_note_needs_a_row_of_20_characters_above_it() -> None:
+    # The rows of _rows hold 6 characters each.
+    note = _one_line_note(_ONE_LINE_NOTE, 2.0, _LAST_BODY_TOP + _PITCH)
+    result = layout_page(_page(0, (*_rows(20), *note)), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 21
+
+
 def test_2_band_rows_with_a_gutter_at_the_middle_stay_rows() -> None:
     band = _two_column_rows(
         2, top=_LAST_BODY_TOP + 1.5 * _PITCH, height=_SMALL_HEIGHT, pitch=9.0
@@ -1484,16 +1644,18 @@ def test_cut_in_rows_2_pitches_apart_are_no_chain() -> None:
 
 def test_cut_in_full_line_at_the_end_of_a_chain_keeps_its_words() -> None:
     # Row 13 is a full line with a 9-pt space before the word at the inset:
-    # a cut row, but not shortened, so the zone ends at row 12.
+    # a cut row, but not shortened, so the zone ends at row 12. Its first
+    # word has letters, as a body line's has: a strip of a single letter
+    # counts as shortened.
     top = _row_top(13)
     rows = {
         10: _cut_row(10),
         11: (*_note_words(11, _CHARACTER_OF_HENRY), *_cut_row(11)),
         12: _cut_row(12),
-        13: (_word("a13", 50, top, 101, top + 8), *_cut_row(13)),
+        13: (_word("England.", 50, top, 101, top + 8), *_cut_row(13)),
     }
     body, margin = _region_texts(_cut_in_page(rows))
-    assert body[13] == ("a13", "d13", "e13")
+    assert body[13] == ("England.", "d13", "e13")
     assert margin == (("Character", "of", "Henry"),)
 
 
@@ -1591,6 +1753,75 @@ def test_cut_in_zone_keeps_a_word_ending_3_pt_short_of_the_inset() -> None:
     body, margin = _region_texts(_cut_in_page(rows))
     assert ("Henry",) in body
     assert margin == (("Character", "of"),)
+
+
+# A cut row shortened by size (step 2b, rule 2): the note's lines share the
+# body's baselines, so every cut row has words in the strip (Stubbs' page
+# 37, "Coinage debased.").
+
+
+def _size_page(
+    strip: tuple[tuple[str, float, float], ...],
+    body_rows: int = 20,
+) -> tuple[tuple[tuple[str, ...], ...], ...]:
+    """The regions' texts of a page of `body_rows` rows of words of 8
+    characters, 8 pt high and 8 pt a character, but for rows 10 and 11,
+    cut at the inset, each with a strip word (text, height, points per
+    character) from 55."""
+    full = tuple(
+        word
+        for word in _prose_rows(body_rows)
+        if word.box.top not in {_row_top(10), _row_top(11)}
+    )
+    cut = tuple(
+        word
+        for row, (text, height, per_character) in zip((10, 11), strip, strict=True)
+        for word in (
+            *_cut_row(row),
+            _word(
+                text,
+                55,
+                _row_top(row) + 1,
+                55 + per_character * len(text),
+                _row_top(row) + 1 + height,
+            ),
+        )
+    )
+    return _region_texts(layout_page(_page(0, (*full, *cut)), _CUT_IN_MEASURES))
+
+
+def test_cut_in_note_set_smaller_on_the_body_baselines_is_a_margin_region() -> None:
+    regions = _size_page((("Coinage", 7.0, 5.0), ("debased.", 7.0, 5.0)))
+    body, margin = regions
+    assert body[10:12] == (("d10", "e10"), ("d11", "e11"))
+    assert margin == (("Coinage",), ("debased.",))
+
+
+@pytest.mark.parametrize(
+    ("height", "per_character"), [(7.3, 5.0), (7.0, 7.3), (8.0, 8.0)]
+)
+def test_cut_in_strip_words_not_smaller_by_both_measures_stay_in_the_body(
+    height: float, per_character: float
+) -> None:
+    # The limits are 0.9 of the page's 8 pt height and 8 pt a character:
+    # 7.2 each. A full body line with a wide space at the inset stays.
+    (body,) = _size_page(
+        (("Coinage", height, per_character), ("debased.", height, per_character))
+    )
+    assert body[10:12] == (("Coinage", "d10", "e10"), ("debased.", "d11", "e11"))
+
+
+def test_cut_in_strip_of_single_letters_counts_as_shortened() -> None:
+    # A note the OCR spaced out ("B an i s h"): no strip word of 2 letters.
+    body, margin = _size_page((("B", 8.0, 8.0), ("n", 8.0, 8.0)))
+    assert body[10:12] == (("d10", "e10"), ("d11", "e11"))
+    assert margin == (("B",), ("n",))
+
+
+def test_cut_in_page_of_fewer_than_50_words_has_no_test_of_size() -> None:
+    # 14 rows: 12 full ones of 3 words and the two cut rows, 42 words.
+    (body,) = _size_page((("Coinage", 7.0, 5.0), ("debased.", 7.0, 5.0)), 14)
+    assert body[10:12] == (("Coinage", "d10", "e10"), ("debased.", "d11", "e11"))
 
 
 def test_cut_in_note_at_the_right_is_a_margin_region() -> None:
@@ -2357,16 +2588,23 @@ def test_reread_gierke_88_reads_its_four_margin_notes_the_last_one_the_layer_mis
 
 @pytest.mark.tesseract
 @pytest.mark.usefixtures("tesseract_of_the_literals")
-def test_reread_stubbs_excerpt_keeps_tesseract_for_nine_of_its_cut_in_crops(
+def test_reread_stubbs_excerpt_keeps_tesseract_for_eleven_of_its_cut_in_crops(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     # The excerpt's pages 1 to 9 are book page indices 56 to 64. The other
     # crops keep the layer: it read the note as well ("His family policy.",
-    # page 2), or Tesseract's reading scores no higher. "Henry’s" (page 7)
-    # and "Coronation." (page 8) are sure single words over no layer word
-    # (reocr spec, section 3).
+    # page 2), or Tesseract's reading scores no higher. "Coronation." (page
+    # 8) is a sure single word over no layer word (reocr spec, section 3).
+    # The crops of pages 1, 7 and 9 hold notes whose lines share the body's
+    # baselines, found by the shortened-row test by size (layout spec,
+    # section 3, step 2b, rule 2). Page 1's reading also takes in junk
+    # below the note, which the next test holds.
     lines = read_lines(excerpt_books["stubbs_51_56-64"].lines_json)
-    assert _kept_readings(lines) == tuple(
+    (page_1,) = (reading for reading in _kept_readings(lines) if reading[0] == 1)
+    assert page_1[2].startswith("Youth and education of Henry.")
+    assert tuple(
+        reading for reading in _kept_readings(lines) if reading[0] != 1
+    ) == tuple(
         (page, RereadKind.CUT_IN_NOTE, text)
         for page, text in (
             (4, "Henry’s mismanage- ment of his children."),
@@ -2374,20 +2612,21 @@ def test_reread_stubbs_excerpt_keeps_tesseract_for_nine_of_its_cut_in_crops(
             (5, "Terms of pacification,"),  # printed "pacification."
             (6, "Meaning of these terms,"),  # printed "terms."
             (7, "Arrival of Henry as successor to Stephen, 1154."),
-            (7, "Henry’s"),  # printed "Henry's advisers."
+            (7, "Henry’s advisers."),
             (8, "Bishop of Winchester. The Empress."),
             (8, "Coronation."),
+            (9, "Banishment of mercena- ries."),
             (9, "Destruction of castles."),
         )
     )
-    # The notes as regions, with those whose layer reading stays on the same
-    # pages ("Theobald and Becket.", page 8; "Banishment", page 9).
+    # The notes as regions, with the one whose layer reading stays on the
+    # same pages ("Theobald and Becket.", page 8).
     assert tuple(_line_texts(lines.pages[page])[2:] for page in (5, 6, 7, 8, 9)) == (
         (("Plan of", "reform."), ("Terms of", "pacification,")),
         (("Meaning of", "these terms,"),),
         (
             ("Arrival of", "Henry as", "successor", "to Stephen,", "1154."),
-            ("Henry’s",),
+            ("Henry’s", "advisers."),
         ),
         (
             ("Bishop", "of Winchester."),
@@ -2395,7 +2634,29 @@ def test_reread_stubbs_excerpt_keeps_tesseract_for_nine_of_its_cut_in_crops(
             ("Theobald", "and Becket."),
             ("Coronation.",),
         ),
-        (("Banishment",), ("Destruction of", "castles.")),
+        (("Banishment", "of mercena-", "ries."), ("Destruction of", "castles.")),
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "the cut-in crop of book page 56 keeps '[dy', Tesseract's reading of the "
+        "tops of the body's 'it was' that the crop's foot cuts, above the boxes "
+        "the layer gives them, so that no body word overlaps it (reocr spec, "
+        "section 3, kind 3)"
+    ),
+)
+def test_reread_stubbs_56_cut_in_note_is_read_without_junk_below_it(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Printed "Youth and education of Henry." beside shortened body lines;
+    # the crop runs down to the next rows of full body lines.
+    lines = read_lines(excerpt_books["stubbs_51_56-64"].lines_json)
+    assert tuple(reading for reading in _kept_readings(lines) if reading[0] == 1) == (
+        (1, RereadKind.CUT_IN_NOTE, "Youth and education of Henry."),
     )
 
 
@@ -2428,8 +2689,9 @@ def test_reread_stubbs_excerpt_leaves_every_line_without_a_replaced_word_as_trus
     # beside the notes, in rows outside the cut-in zones and right of the
     # inset alike, are as without re-reading, and a note line keeps the
     # layer words no record replaced. "advUers.", the layer's reading of
-    # the note "advisers." that layout leaves at the end of a body line
-    # (book page index 62, layout spec section 3, step 2b), stays there.
+    # the note "advisers." on a body line's baseline (book page index 62),
+    # is a cut-in note's word by its size (layout spec section 3, step 2b,
+    # rule 2), so the body line ends without it.
     folder = excerpt_books["stubbs_51_56-64"]
     reread = read_lines(folder.lines_json)
     trusted = read_lines(_layout_again(folder, tmp_path, _trusting, 1).lines_json)
@@ -2455,15 +2717,13 @@ def test_reread_stubbs_excerpt_leaves_every_line_without_a_replaced_word_as_trus
             if (kept_line := tuple(word for word in line if word not in replaced))
         )
         assert layer_lines_reread == layer_lines_trusted, page_reread.index
-    assert (
-        "one, to be maintained only by caution ; advUers."
-        in _line_texts(reread.pages[7])[1]
-    )
-    # Two more regions: the notes "Henry’s" and "Coronation.", which the
-    # layer did not read (pages 7 and 8).
-    assert sum(len(page.regions) for page in reread.pages) == 2 + sum(
-        len(page.regions) for page in trusted.pages
-    )
+    assert "one, to be maintained only by caution ;" in _line_texts(reread.pages[7])[1]
+    # One more region: the note "Coronation.", which the layer did not read
+    # (page 8). Page 1, whose reading keeps junk (the test above), is left
+    # out.
+    assert sum(
+        len(page.regions) for page in reread.pages if page.index != 1
+    ) == 1 + sum(len(page.regions) for page in trusted.pages if page.index != 1)
 
 
 @pytest.mark.tesseract
@@ -2631,20 +2891,15 @@ _DOMESDAY = "domesday_74-83"  # excerpt pages 1 and 3 are book page indices 75 a
         _owner_note(_STUBBS, 5, "Terms of pacification.", _FINAL_STOP_READ_AS_COMMA),
         _owner_note(_STUBBS, 6, "Meaning of these terms.", _FINAL_STOP_READ_AS_COMMA),
         _owner_note(_STUBBS, 7, "Arrival of Henry as successor to Stephen, 1154."),
-        _owner_note(
-            _STUBBS,
-            7,
-            "Henry’s advisers.",
-            "the crop drops Tesseract's 'advisers.' over the layer's 'advUers.', "
-            "which layout leaves at the end of a body line by its 5 pt guard",
-        ),
+        # "advisers." and "Banishment"'s last lines share the body's
+        # baselines: found by the shortened-row test by size (layout spec,
+        # section 3, step 2b, rule 2).
+        _owner_note(_STUBBS, 7, "Henry’s advisers."),
         _owner_note(_STUBBS, 8, "Bishop of Winchester."),
         _owner_note(_STUBBS, 8, "The Empress."),
         _owner_note(_STUBBS, 8, "Theobald and Becket."),
         _owner_note(_STUBBS, 8, "Coronation."),
-        _owner_note(
-            _STUBBS, 9, "Banishment of mercenaries.", _CUT_IN_LINES_LEFT_IN_THE_COLUMN
-        ),
+        _owner_note(_STUBBS, 9, "Banishment of mercenaries."),
         _owner_note(_STUBBS, 9, "Destruction of castles."),
         _owner_note(_GIERKE, 2, "Diverse methods."),
         _owner_note(
