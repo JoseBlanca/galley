@@ -2038,9 +2038,9 @@ after the config's `contents_pages` and before the endnote section,
 found from the group heading: the heading whose spans' letters, in
 lower case, are the most alike (`difflib.SequenceMatcher` ratio, at
 least 0.85) to the group heading's letters in
-lower case, once a first word that is a chapter label word or a
-number, and a number after a label word, are dropped ("Chapter 1." and
-Turney's leading "2"). The groups follow the chapters' order, so a
+lower case, once a first word that is a chapter label word is dropped
+("Chapter" of "Chapter 1."); a number, "1." or Turney's leading "2",
+falls out with every other character that is not a letter. The groups follow the chapters' order, so a
 group without a heading, or whose heading is alike to none, takes its
 chapter by counting from the nearest group before it that found its
 chapter by its heading: the n-th level-1 heading after that chapter,
@@ -2080,7 +2080,7 @@ reach of the group before it over the chapters after (with groups
 "alpha", two without a chapter and "betagamma", the first reached to
 the section's start, over "betagamma"'s chapter, before the review of
 the plan's work package 3). Only the group heading loses
-its first word; a body heading is compared by its spans, which never
+a label word; a body heading is compared by its spans, which never
 hold its label. Before this revision the
 whole book was one range and Haynes' 633 endnotes were matched in order
 of their values, all the notes 1 first: 127 were linked, 120 of them
