@@ -28,12 +28,12 @@ PLATE_RENDER_DPI: Final[int] = 36
 # Guessed: 12 pixels at 36 dpi.
 _SQUARE_PT: Final[int] = 24
 # Measured on the six books: at 50, Kadesh 16 and Domesday 39 and 40 are lost.
-_INK_LEVELS_WITH_LAYER: Final[int] = 25
+INK_LEVELS_WITH_LAYER: Final[int] = 25
 # Measured on the 79 pages without a layer of the six books: at 15, Kadesh
 # 23's group falls to 0.12 of the page.
 _INK_LEVELS_WITHOUT_LAYER: Final[int] = 10
 # Guessed: the share of a square's pixels that must be ink.
-_INKED_SHARE: Final[float] = 0.06
+INKED_SHARE: Final[float] = 0.06
 # Guessed: how far a word box is grown on every side before it is said to
 # touch a square.
 _WORD_BOX_GROWTH_PT: Final[float] = 2.0
@@ -46,7 +46,7 @@ _MAX_KNOWN_WORDS: Final[int] = 20
 # highest of the other pages 0.32 (Kadesh 72, a blank page).
 _MIN_GROUP_SHARE_WITHOUT_LAYER: Final[float] = 0.34
 
-type _Square = tuple[int, int]  # (row, column), from the top left
+type Square = tuple[int, int]  # (row, column), from the top left
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,29 +100,29 @@ def picture_area(page: RenderedPage, word_boxes: tuple[Box, ...] | None) -> Pict
         for column in range(side, columns - side)
     )
     levels = (
-        _INK_LEVELS_WITH_LAYER if word_boxes is not None else _INK_LEVELS_WITHOUT_LAYER
+        INK_LEVELS_WITH_LAYER if word_boxes is not None else _INK_LEVELS_WITHOUT_LAYER
     )
-    ink = _ink(page, levels)
-    min_ink_pixels = _INKED_SHARE * square_px * square_px
+    ink = ink_mask(page, levels)
+    min_ink_pixels = INKED_SHARE * square_px * square_px
     touched = (
         frozenset()
         if word_boxes is None
         else frozenset(
             square
             for box in word_boxes
-            for square in _squares_touched(box, page.dpi, square_px)
+            for square in squares_touched(box, page.dpi, square_px)
         )
     )
     pictures = frozenset(
         square
         for square in looked_at
         if square not in touched
-        and _ink_pixels(ink, page.width_px, square, square_px) >= min_ink_pixels
+        and ink_pixels(ink, page.width_px, square, square_px) >= min_ink_pixels
     )
     return PictureArea(largest_group=_largest_group(pictures), squares=len(looked_at))
 
 
-def _ink(page: RenderedPage, levels: int) -> bytes:
+def ink_mask(page: RenderedPage, levels: int) -> bytes:
     """One byte per pixel of `page`: 1 for a pixel darker than the page's
     median gray by more than `levels`, else 0."""
     cutoff = statistics.median_low(page.pixels) - levels
@@ -130,7 +130,7 @@ def _ink(page: RenderedPage, levels: int) -> bytes:
     return page.pixels.translate(table)
 
 
-def _ink_pixels(ink: bytes, width_px: int, square: _Square, square_px: int) -> int:
+def ink_pixels(ink: bytes, width_px: int, square: Square, square_px: int) -> int:
     row, column = square
     top = row * square_px
     left = column * square_px
@@ -140,7 +140,7 @@ def _ink_pixels(ink: bytes, width_px: int, square: _Square, square_px: int) -> i
     )
 
 
-def _squares_touched(box: Box, dpi: int, square_px: int) -> Iterator[_Square]:
+def squares_touched(box: Box, dpi: int, square_px: int) -> Iterator[Square]:
     """The squares that `box`, grown by 2 pt on every side, overlaps or
     touches by an edge."""
     scale = dpi / POINTS_PER_INCH
@@ -158,7 +158,7 @@ def _squares_touched(box: Box, dpi: int, square_px: int) -> Iterator[_Square]:
             yield row, column
 
 
-def _largest_group(squares: frozenset[_Square]) -> int:
+def _largest_group(squares: frozenset[Square]) -> int:
     """The number of squares in the largest set of `squares` that touch side
     by side, not only by a corner."""
     unvisited = set(squares)
