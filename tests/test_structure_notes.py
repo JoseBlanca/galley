@@ -783,6 +783,132 @@ def test_endnote_reference_standing_for_a_lost_note_stays_unlinked() -> None:
     )
 
 
+# Review of work package 3: hand-written cases for the rules the mutation
+# of the suite left alive.
+
+
+def test_chapter_of_group_alike_by_0_76_to_another_chapter_is_counted() -> None:
+    # A made-up chapter 9 heading, 0.76 alike to chapter 11's as Haynes'
+    # is: below 0.85, so the group is counted on from the introduction's,
+    # not matched.
+    chapters = (
+        (10, "introduction"),
+        (20, "anotherchapter"),
+        (30, "thebuilderashero"),
+    )
+    assert group_reaches(
+        chapters, ("Introduction", "Chapter 9. The Builder as Traveller"), 40
+    ) == ((10, 20), (20, 40))
+
+
+def test_chapter_of_group_counted_onto_the_next_groups_chapter_is_none() -> None:
+    # The group between two found by their headings, whose chapters are
+    # next to each other, has no chapter left: counting on would reach the
+    # next group's, counting back the group before's.
+    chapters = ((10, "alpha"), (20, "beta"))
+    assert group_reaches(chapters, ("alpha", None, "beta"), 30) == (
+        (10, 20),
+        (0, 0),
+        (20, 30),
+    )
+
+
+def test_chapter_of_groups_without_any_heading_counts_from_the_first() -> None:
+    chapters = ((10, "alpha"), (20, "beta"))
+    assert group_reaches(chapters, (None, None), 30) == ((10, 20), (20, 30))
+
+
+def test_group_heading_of_4_lines_left_at_the_end_of_a_note_is_not_cut() -> None:
+    # Four lines set apart after note 9: more than a group heading holds,
+    # they stay in note 9's paragraph and the second group has no heading.
+    first = (*_group_heading(1, _CHAPTERS[0], 50.0), *_dotted_notes(80.0))
+    top = first[-1].box.top + 27.0
+    heading = tuple(
+        _spread(text, _LEFT_PT, 160.0, top + _PITCH_PT * number)
+        for number, text in enumerate(
+            ("Chapter 2. Silent", "Harbour", "Rebuilt Once", "More Again")
+        )
+    )
+    second = (*heading, *_dotted_notes(top + 4 * _PITCH_PT + 15.0))
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(note.group for note in blocks.notes if note.group is not None) == (
+        f"Chapter 1. {_CHAPTERS[0]}",
+    )
+    note_9 = next(note for note in blocks.notes if note.marker == "9.")
+    assert len(note_9.blocks) == 1
+
+
+def _speck(x0: float, top: float) -> Line:
+    return Line(
+        Box(x0, top, x0 + 3, top + 5), (Word("/", Box(x0, top, x0 + 3, top + 5), None),)
+    )
+
+
+def test_group_heading_measures_its_gap_past_a_speck_just_above_it() -> None:
+    # A speck 5 pt above the second heading, which lies 27 pt below note 9:
+    # the gap is measured from note 9's last line, so the heading is set
+    # apart.
+    first = _turney_group(1, _CHAPTERS[0], 50.0)
+    second = _turney_group(2, _CHAPTERS[1], first[-1].box.top + 30.0)
+    speck = _speck(310.0, second[0].box.top - 8.0)
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, speck, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(note.group for note in blocks.notes if note.group is not None) == (
+        f"1 {_CHAPTERS[0]}",
+        f"2 {_CHAPTERS[1]}",
+    )
+
+
+def test_heading_with_a_1_followed_by_a_speck_stays_a_note() -> None:
+    # The first group's "1 ..." heading is followed by a speck before its
+    # note 1: the heading is the first block of an endnote that keeps a
+    # later block, so it is not taken, and stays note "1" with the speck.
+    first = _turney_group(1, _CHAPTERS[0], 50.0)
+    speck = _speck(310.0, first[0].box.top + 14.0)
+    second = _turney_group(2, _CHAPTERS[1], first[-1].box.top + 30.0)
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(first[0], speck, *first[1:], *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    endnotes = _endnotes(blocks)
+    assert endnotes[0] == ("1", f"{_CHAPTERS[0]} / /")
+    assert tuple(note.group for note in blocks.notes if note.group is not None) == (
+        f"2 {_CHAPTERS[1]}",
+    )
+
+
+def test_misread_marker_before_2_3_and_5_is_no_marker() -> None:
+    # "x" before 2, 3 and 5 (not 4): no misread marker, and the second
+    # group is lost as before the rule.
+    first = _turney_group(1, _CHAPTERS[0], 50.0)
+    heading_top = first[-1].box.top + 30.0
+    numbers = ("x", "2", "3", "5", "6", "7", "8", "9", "10")
+    misread = tuple(
+        line
+        for position, number in enumerate(numbers)
+        for line in _hung_note(number, heading_top + 27.0 + 36.0 * position)
+    )
+    second = (_line(f"2 {_CHAPTERS[1]}", _HUNG_PT, heading_top), *misread)
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        _chapter_page(1, _CHAPTERS[1]),
+        PageLayout(2, (_region(*first, *second),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert "x" not in tuple(marker for marker, _ in _endnotes(blocks))
+
+
 def test_hanging_number_before_a_number_starts_no_paragraph() -> None:
     # A table's column of numbers, "1 10", "3 0)": no note text after it.
     lines = tuple(

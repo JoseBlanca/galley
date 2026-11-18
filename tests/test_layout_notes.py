@@ -63,3 +63,20 @@ def test_number_before_a_number_of_the_right_column_stays_left() -> None:
     # Gierke's contents: the right column's line starts with a number.
     regions = _first_words(_page("121"))
     assert regions[1][2] == "121"
+
+
+def test_number_nearer_the_word_before_it_stays_in_the_left_column() -> None:
+    # The number ends its left line 2 pt after the word before it and lies
+    # 10 pt from the right column's text: it is the left line's, not hung.
+    words = []
+    for row in range(10):
+        words.append(_word(f"left{row}", 50, 120, row))
+        if row in (2, 5, 8):
+            words.append(_word(str(row), 122, 130, row))
+        words.append(_word(f"right{row}", 140, 250, row))
+    page = PageWords(
+        index=0, text_source=TextSource.TEXT_LAYER, words=tuple(words), figures=()
+    )
+    result = layout_page(page, _MEASURES)
+    left = result.regions[0]
+    assert tuple(word.text for word in left.lines[2].words) == ("left2", "2")
