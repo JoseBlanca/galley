@@ -3219,9 +3219,10 @@ is removed with a record: a `WordChange` of the new reason
 `source_dash`, on the source's page, whose `before` is the source's
 first word ("—Hobbes,") or the dash word and the word after it ("—",
 "Hobbes,"), and whose `after` is the one word without its leading
-dashes ("Hobbes,"). The fidelity check verifies it: `before` is one or
-two words, the first starts with a dash, and `after` is one word, the
-words of `before` joined with every dash at their start dropped; and,
+dashes ("Hobbes,"). The fidelity check verifies it: `before` is one
+word that starts with a dash, or two words whose first is dashes only,
+and `after` is one word, not empty, the last word of `before` with every
+dash at its start dropped; and,
 as for `hyphen_lost`, the word of `after` is the first word of the
 `source` of an epigraph with a part on the change's page, so that the
 reason cannot take a dash off a word of the body (review of work
