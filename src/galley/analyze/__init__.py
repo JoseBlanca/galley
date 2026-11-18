@@ -26,7 +26,7 @@ from typing import Final, assert_never
 import pdfplumber
 
 from galley import pdfium, wordlist
-from galley.analyze._figures import PictureGroup, figure_boxes, picture_groups
+from galley.analyze._figures import PictureGroup, figure_boxes, figure_groups
 from galley.analyze._plates import (
     PLATE_RENDER_DPI,
     PictureArea,
@@ -267,19 +267,15 @@ def _measurer(
             or plate_test is None
             or plate_test.rule is PlateRule.PLATE
             or not page_layer_words
-            else tuple(
-                group
-                for group in picture_groups(
-                    rendered,
-                    page_layer_words,
-                    tuple(
-                        region.box
-                        for region in config.exclude_regions
-                        if region.page_index == page_index
-                    ),
-                    lower_case_words,
-                )
-                if group.is_figure
+            else figure_groups(
+                rendered,
+                page_layer_words,
+                tuple(
+                    region.box
+                    for region in config.exclude_regions
+                    if region.page_index == page_index
+                ),
+                lower_case_words,
             )
         )
         return _Measurement(

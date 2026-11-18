@@ -18,7 +18,7 @@ from galley import analyze
 from galley.analyze import figure_boxes
 from galley.book_folder import BookFolder
 from galley.config import read_config
-from galley.extract import figure_crop_px, figure_image, page_words
+from galley.extract import _save_figures, figure_crop_px, figure_image, page_words
 from galley.layout import figure_regions, layout_page_with_figures
 from galley.model import (
     Box,
@@ -381,6 +381,40 @@ def test_cut_the_box_is_rounded_outwards_to_whole_pixels() -> None:
         2100,
     )
     assert figure_crop_px(Box(0.1, 0.1, 0.2, 0.2), 72) == (0, 0, 1, 1)
+
+
+def test_cut_a_box_past_the_render_is_clipped_with_a_warning_naming_the_page(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # A render of 72 by 72 pixels at 72 dpi, and a box whose right side is
+    # 8 pt past it.
+    rendered = RenderedPage(
+        page_index=25, dpi=72, width_px=72, height_px=72, pixels=bytes(72 * 72)
+    )
+    (tmp_path / "images").mkdir()
+    with caplog.at_level(logging.WARNING, logger="galley.extract"):
+        _save_figures(rendered, _text_page((Box(10.0, 10.0, 80.0, 30.0),)), tmp_path)
+    with Image.open(tmp_path / figure_image(25, 1)) as image:
+        assert image.size == (62, 20)
+    assert [record.getMessage() for record in caplog.records] == [
+        (
+            "extract: page index 25, figure 1: its box (10.0, 10.0, 80.0, 30.0) "
+            "pt runs past the page's render, 72 by 72 pixels at 72 dpi; the "
+            "image is cut to the render"
+        )
+    ]
+
+
+def test_cut_a_box_inside_the_render_logs_no_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    rendered = RenderedPage(
+        page_index=25, dpi=72, width_px=72, height_px=72, pixels=bytes(72 * 72)
+    )
+    (tmp_path / "images").mkdir()
+    with caplog.at_level(logging.WARNING, logger="galley.extract"):
+        _save_figures(rendered, _text_page((Box(10.0, 10.0, 72.0, 30.0),)), tmp_path)
+    assert caplog.records == []
 
 
 # The excerpt kadesh_29-38 (figures spec section 10): Kadesh's page indices

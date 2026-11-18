@@ -41,6 +41,7 @@ from galley.model import (
     TextSource,
     Word,
     WordsFile,
+    box_holds_middle,
     read_checked_pages,
     write_words,
 )
@@ -156,7 +157,7 @@ def plate_image(page_index: int) -> str:
 def figure_image(page_index: int, number: int) -> str:
     """The path of the image of the in-page figure `number`, from 1 in the
     order of pages.json, on page `page_index`, relative to the book folder:
-    `images/figure-0025-1.png` for the first on page 25 (figures spec
+    `images/figure-0025-1.png` for the first on page index 25 (figures spec
     section 4)."""
     return f"images/figure-{page_index:04d}-{number}.png"
 
@@ -176,12 +177,35 @@ def figure_crop_px(box: Box, dpi: int) -> tuple[int, int, int, int]:
 
 def _save_figures(rendered: RenderedPage, page: PageInfo, book_root: Path) -> None:
     """Saves the image of each in-page figure of `page`, cut from
-    `rendered`, the page at 300 dpi, as an 8-bit grayscale PNG."""
+    `rendered`, the page at 300 dpi, as an 8-bit grayscale PNG. A box that
+    runs past the render is cut to it, with a warning that names the page:
+    analyze's boxes lie on the page, so it is a box made from another
+    render or a page of another size."""
     image = Image.frombytes(
         "L", (rendered.width_px, rendered.height_px), rendered.pixels
     )
     for number, box in enumerate(page.figure_boxes, start=1):
         left, top, right, bottom = figure_crop_px(box, rendered.dpi)
+        if (
+            left < 0
+            or top < 0
+            or right > rendered.width_px
+            or bottom > rendered.height_px
+        ):
+            _logger.warning(
+                "extract: page index %d, figure %d: its box (%.1f, %.1f, %.1f, "
+                "%.1f) pt runs past the page's render, %d by %d pixels at %d "
+                "dpi; the image is cut to the render",
+                page.index,
+                number,
+                box.x0,
+                box.top,
+                box.x1,
+                box.bottom,
+                rendered.width_px,
+                rendered.height_px,
+                rendered.dpi,
+            )
         image.crop(
             (
                 max(0, left),
@@ -223,14 +247,14 @@ def page_words(
     those whose centre is inside one of its `exclude_regions`, edges
     included, which are removals with the reason `excluded_region`. Every
     word of an excluded page is a removal with the reason `excluded_page`,
-    and of a front-matter page one with the reason `front_matter`.
-    A blank page has neither. A plate page has one figure, the whole page,
-    at 300 dpi, whose image is `plate_image(page.index)`, of kind `plate`;
-    a text page has one for each of its `figure_boxes`, in their order,
-    with that box, at 300 dpi, whose image is `figure_image(page.index,
-    n)`, n from 1, of kind `in_page`; no other page has one. Raises ValueError for a page read by OCR, which extract
-    cannot read yet, and for a blank page or a plate without a text layer
-    given words, which would be lost.
+    and of a front-matter page one with the reason `front_matter`. A blank
+    page has neither. A plate page has one figure, the whole page, at 300
+    dpi, whose image is `plate_image(page.index)`, of kind `plate`; a text
+    page has one for each of its `figure_boxes`, in their order, with that
+    box, at 300 dpi, whose image is `figure_image(page.index, n)`, n from 1,
+    of kind `in_page`; no other page has one. Raises ValueError for a page
+    read by OCR, which extract cannot read yet, and for a blank page or a
+    plate without a text layer given words, which would be lost.
     """
     if page.text_source is TextSource.OCR:
         message = f"page {page.index} is read by OCR, which extract cannot read yet"
@@ -321,10 +345,5 @@ def _removal(page: PageInfo, layer_word: Word, reason: RemovalReason) -> Removal
 
 
 def _in_a_region(box: Box, regions: tuple[Box, ...]) -> bool:
-    """Whether the centre of `box` is inside one of `regions`, edges included."""
-    centre_x = (box.x0 + box.x1) / 2
-    centre_y = (box.top + box.bottom) / 2
-    return any(
-        region.x0 <= centre_x <= region.x1 and region.top <= centre_y <= region.bottom
-        for region in regions
-    )
+    """Whether the middle of `box` is inside one of `regions`, edges included."""
+    return any(box_holds_middle(region, box) for region in regions)

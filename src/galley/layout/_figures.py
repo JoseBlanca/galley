@@ -26,6 +26,7 @@ from galley.model import (
     Region,
     Reread,
     Word,
+    box_holds_middle,
 )
 
 
@@ -47,7 +48,7 @@ def _figure_words(page: PageWords) -> frozendict[Word, int]:
             (
                 position
                 for position, box in enumerate(boxes)
-                if _holds_middle(box, word.box)
+                if box_holds_middle(box, word.box)
             ),
             None,
         )
@@ -145,9 +146,3 @@ def layout_page_with_figures(
     the regions re-read, of which a figure's region is never one."""
     layout, records = layout_page_with_rereads(page, measures, rereading)
     return figure_regions(page, layout), records
-
-
-def _holds_middle(box: Box, word_box: Box) -> bool:
-    middle_x = (word_box.x0 + word_box.x1) / 2
-    middle_y = (word_box.top + word_box.bottom) / 2
-    return box.x0 <= middle_x <= box.x1 and box.top <= middle_y <= box.bottom

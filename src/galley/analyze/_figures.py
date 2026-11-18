@@ -28,7 +28,7 @@ from galley.analyze._plates import (
     ink_pixels,
     squares_touched,
 )
-from galley.model import Box, RenderedPage
+from galley.model import Box, RenderedPage, box_holds_middle
 from galley.pdfium import POINTS_PER_INCH
 
 # Figures spec section 3, "square": measured; with the plate rule's 24 pt
@@ -84,7 +84,21 @@ def figure_boxes(
     `lower_case_words`.
     """
     return tuple(
-        group.box
+        group.box for group in figure_groups(page, words, excluded, lower_case_words)
+    )
+
+
+def figure_groups(
+    page: RenderedPage,
+    words: tuple[tuple[str, Box], ...],
+    excluded: tuple[Box, ...],
+    lower_case_words: frozenset[str],
+) -> tuple[PictureGroup, ...]:
+    """The groups of `picture_groups` that are figures, in its order: those
+    whose boxes `figure_boxes` gives, with their squares and known words
+    for the log; the arguments are `figure_boxes`'."""
+    return tuple(
+        group
         for group in picture_groups(page, words, excluded, lower_case_words)
         if group.is_figure
     )
@@ -106,7 +120,9 @@ def picture_groups(
     ink = ink_mask(page, INK_LEVELS_WITH_LAYER)
     least_ink_pixels = INKED_SHARE * square_px * square_px
     kept_words = tuple(
-        (text, box) for text, box in words if not _middle_inside(box, excluded)
+        (text, box)
+        for text, box in words
+        if not any(box_holds_middle(region, box) for region in excluded)
     )
     touched = frozenset(
         square
@@ -158,7 +174,7 @@ def picture_groups(
         known = sum(
             1
             for text, box in kept_words
-            if _middle_inside(box, (own_pt,))
+            if box_holds_middle(own_pt, box)
             and wordlist.is_known_word(text, lower_case_words)
         )
         return PictureGroup(
@@ -194,7 +210,7 @@ def _with_parts_inside(groups: tuple[PictureGroup, ...]) -> tuple[PictureGroup, 
 
     def grown(figure: PictureGroup) -> PictureGroup:
         inside = tuple(
-            other.box for other in others if _middle_inside(other.box, (figure.box,))
+            other.box for other in others if box_holds_middle(figure.box, other.box)
         )
         if not inside:
             return figure
@@ -313,17 +329,6 @@ def _cut_at_rules(
         for part in _groups(
             frozenset(square for square, owner in owners.items() if owner == position)
         )
-    )
-
-
-def _middle_inside(box: Box, regions: tuple[Box, ...]) -> bool:
-    """Whether the middle of `box` is inside one of `regions`, edges
-    included: extract's test for an excluded region (extract spec)."""
-    middle_x = (box.x0 + box.x1) / 2
-    middle_y = (box.top + box.bottom) / 2
-    return any(
-        region.x0 <= middle_x <= region.x1 and region.top <= middle_y <= region.bottom
-        for region in regions
     )
 
 
