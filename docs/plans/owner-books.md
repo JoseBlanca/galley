@@ -578,7 +578,7 @@ passing epubcheck.
 
 - [x] 7.1 The measurement: deliverables 1 to 3. Spec: structure §26,
   "Measured by `galley-eval run`"; `docs/specs/evaluation.md` §9.
-- [ ] 7.2 The checks by eye, and the fixes they call for. Spec:
+- [x] 7.2 The checks by eye, and the fixes they call for. Spec:
   structure §26, "Excerpt tests", its owner's check, done as "Changed
   reference pages" above says. Needs 7.1. Deliverable 4.
 
