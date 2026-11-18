@@ -5347,8 +5347,9 @@ def test_whole_book_haskins_quotes_and_bibliographical_notes(
 
 
 # The head of a short section on the six whole books (structure spec,
-# section 3, its last paragraph): the rule takes exactly two head lines,
-# Haskins' page index 13 "vlil PREFACE" and Domesday's "vi Preface.". The
+# section 3, its last paragraph): the rule takes three head lines,
+# Haskins' page index 13 "vlil PREFACE", Domesday's "vi Preface." and
+# Gierke's 58 "Analytical Snnittniry. liii". The
 # pages it takes are those whose head line is a running head with the rule
 # and not without it.
 
@@ -5396,7 +5397,9 @@ def test_whole_book_short_section_rule_removes_only_the_haskins_and_domesday_hea
         "domesdaybook00maituoft": (13,),
         "earlyplantagenet01stub": (),
         "normansineuropea00hask": (13,),
-        "politicaltheorie00gieruoft": (),
+        # With the likeness at 0.70, the running head of Gierke's
+        # analytical summary (spec section 3).
+        "politicaltheorie00gieruoft": (58,),
     }
     assert all(without_rule[book] <= with_rule[book] for book in _WHOLE_BOOKS)
     haskins_blocks = outputs["normansineuropea00hask"][1]
