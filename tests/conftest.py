@@ -423,8 +423,35 @@ _OWNER_BOOK_CONFIGS = {
 
 
 @pytest.fixture(scope="session")
+def owner_book_toml(samples_dir: Path) -> Callable[[str], str]:
+    """A function that gives the `book.toml` of one of the owner's books,
+    by the name "turney" or "haynes": its PDF in the samples folder, its
+    config of _OWNER_BOOK_CONFIGS, a made-up title and author, and `ocr =
+    "trust"`. Skips the test when the book's PDF is not in the samples
+    folder. Every whole_book test of the owner's books takes its config
+    from here."""
+
+    def toml(book: str) -> str:
+        pdfs = sorted(samples_dir.glob(_OWNER_BOOK_PATTERNS[book]))
+        if not pdfs:
+            pytest.skip(
+                f"no PDF matching {_OWNER_BOOK_PATTERNS[book]} in {samples_dir}"
+            )
+        return (
+            f"pdf = {json.dumps(str(pdfs[0]))}\n"
+            'title = "An owner\'s book"\n'
+            'authors = ["An Author"]\n'
+            'language = "en"\n'
+            'ocr = "trust"\n'
+            f"{_OWNER_BOOK_CONFIGS[book]}"
+        )
+
+    return toml
+
+
+@pytest.fixture(scope="session")
 def owner_book_run(
-    samples_dir: Path, tmp_path_factory: pytest.TempPathFactory
+    owner_book_toml: Callable[[str], str], tmp_path_factory: pytest.TempPathFactory
 ) -> Callable[[str], BlocksFile]:
     """A function that gives blocks.json of one of the owner's books, by
     the name "turney" or "haynes", run from its PDF to structure the first
@@ -435,26 +462,14 @@ def owner_book_run(
     locks = {book: threading.Lock() for book in _OWNER_BOOK_PATTERNS}
 
     def run(book: str) -> BlocksFile:
-        pdfs = sorted(samples_dir.glob(_OWNER_BOOK_PATTERNS[book]))
-        if not pdfs:
-            pytest.skip(
-                f"no PDF matching {_OWNER_BOOK_PATTERNS[book]} in {samples_dir}"
-            )
+        toml = owner_book_toml(book)
         with locks[book]:
-            return run_once(book, pdfs[0])
+            return run_once(book, toml)
 
     @functools.cache
-    def run_once(book: str, pdf: Path) -> BlocksFile:
+    def run_once(book: str, toml: str) -> BlocksFile:
         folder = BookFolder(roots[book])
-        folder.book_toml.write_text(
-            f"pdf = {json.dumps(str(pdf))}\n"
-            'title = "An owner\'s book"\n'
-            'authors = ["An Author"]\n'
-            'language = "en"\n'
-            'ocr = "trust"\n'
-            f"{_OWNER_BOOK_CONFIGS[book]}",
-            encoding="utf-8",
-        )
+        folder.book_toml.write_text(toml, encoding="utf-8")
         for stage in ("analyze", "extract", "layout", "structure"):
             main([stage, str(folder.root)])
         return read_blocks(folder.blocks_json)
