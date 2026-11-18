@@ -1213,6 +1213,37 @@ def test_figure_text_the_words_of_a_figures_region_are_removed_one_per_line() ->
     ) == ((RemovalReason.FIGURE_TEXT, "Orontes"),)
 
 
+def test_caption_rows_a_caption_wider_than_its_figure_is_taken_whole() -> None:
+    # The label row's words past the map's right side (320 pt) follow the
+    # caption's 5 pt apart: they are the caption's, not the paragraph's.
+    page = _map_page()
+    wide = _text_line(
+        "figure 2. A picture of the place whose hills and rivers.", 100.0, 296.0
+    )
+    _, region = page.regions
+    page = PageLayout(
+        0,
+        (
+            _region(*_ABOVE_THE_MAP, wide, *_BELOW_THE_MAP),
+            region,
+        ),
+        page.figures,
+    )
+    blocks = _structure(_lines_file(page))
+    assert _texts(blocks) == (
+        (
+            BlockKind.PARAGRAPH,
+            (
+                "The text of the paragraph begins here and goes on along the "
+                "line to the very end of the line before the figure printed in "
+                "it, the picture, and then it goes on after it as it did, to "
+                "its end."
+            ),
+        ),
+        (BlockKind.FIGURE, "figure 2. A picture of the place whose hills and rivers."),
+    )
+
+
 def test_caption_rows_a_hyphen_before_the_figure_joins_the_word_after_it() -> None:
     above = (
         *_ABOVE_THE_MAP[:2],

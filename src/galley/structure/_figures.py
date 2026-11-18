@@ -56,6 +56,12 @@ _NUMBERED_LABEL_WORDS = 2
 _NEAR_INSIDE_PT = 6.0
 _NEAR_OUTSIDE_PT = 24.0
 _SIDES_SLACK_PT = 6.0
+# Rule 2: below or above, the label row's words that follow the caption's
+# at less than 13 pt are the caption's too (measured: a caption's words are
+# at most 10.0 pt apart in Kadesh, Haynes and Turney, Kadesh 45's spaced
+# capitals; the text set beside Kadesh's maps starts 16.9 to 80 pt after
+# the caption's last word).
+_FOLLOWING_WORD_MAX_PT = 13.0
 # Rule 1, beside: the label's first word 0 to 30 pt right of the figure,
 # or the row's last word 0 to 30 pt left of it (measured: Haynes 10.4 to
 # 17.3 pt, Turney 6.5 to 20.0).
@@ -297,14 +303,40 @@ def _label_rows(rows: Sequence[_Row], boxes: Sequence[Box]) -> tuple[_LabelRow, 
     return tuple(found)
 
 
+def _with_following_words(
+    words: tuple[_RowWord, ...], inside: tuple[bool, ...]
+) -> tuple[_RowWord, ...]:
+    """The `words` of a row, left to right, that are `inside` the figure's
+    sides, with the words that follow them on either side, each less than
+    `_FOLLOWING_WORD_MAX_PT` from the word before it (rule 2)."""
+    taken = list(inside)
+    for number in range(1, len(words)):
+        if taken[number - 1] and _follows(words[number - 1], words[number]):
+            taken[number] = True
+    for number in range(len(words) - 2, -1, -1):
+        if taken[number + 1] and _follows(words[number], words[number + 1]):
+            taken[number] = True
+    return tuple(word for word, kept in zip(words, taken, strict=True) if kept)
+
+
+def _follows(left: _RowWord, right: _RowWord) -> bool:
+    """Whether `right` follows `left` on a caption's line: less than
+    `_FOLLOWING_WORD_MAX_PT` from it."""
+    return right.box.x0 - left.box.x1 < _FOLLOWING_WORD_MAX_PT
+
+
 def _label_words(row: _Row, box: Box, side: _Side) -> tuple[_RowWord, ...]:
-    """The words of a label row that are the caption's (rule 2)."""
+    """The words of a label row that are the caption's (rule 2): below or
+    above, those between the figure's sides moved 6 pt outwards and the
+    words that follow them; on the right or left, those on that side."""
     match side:
         case _Side.BELOW | _Side.ABOVE:
-            return tuple(
-                word
-                for word in row.words
-                if _within_sides(middle(word.box), box, _SIDES_SLACK_PT)
+            return _with_following_words(
+                row.words,
+                tuple(
+                    _within_sides(middle(word.box), box, _SIDES_SLACK_PT)
+                    for word in row.words
+                ),
             )
         case _Side.RIGHT:
             return tuple(word for word in row.words if middle(word.box) > box.x1)
