@@ -177,3 +177,21 @@ hundreds of tests on setup.
 
 Checks after the merge: 2,723 passed in 71.6 s, and with 8 threads in
 114 s (120 s limit).
+
+## Tasks 3.2 to 3.4 (stream `figure-blocks`)
+
+Done at a7f931b. Each in-page figure becomes a figure block at its place
+in the text, its caption taken out of the paragraph; the words the OCR
+read inside the picture are removed with the reason `figure_text`.
+Haynes 25 figures, all 25 captioned; Turney 14, 11 captioned, and page
+174 no longer gives a false heading; Kadesh 17, its 6 maps captioned.
+Kadesh has 148 notes: main's 152 less 4 made of picture junk. The EPUBs
+of Kadesh, Haynes and Turney pass epubcheck with no error or warning,
+each figure with its image and caption.
+
+One spec change (c9f2665): a caption is looked for outside the figures'
+regions. A mark read inside the picture on the same row as a caption
+line cut three captions short (Haynes 310, Turney 174 and 176).
+
+The default run: 72.3 s on 2,761 tests (orchestrator's run, idle
+machine), past the plan's 70 s. It is dealt with in work package 7.
