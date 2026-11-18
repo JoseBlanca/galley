@@ -347,9 +347,22 @@ _GLUED_WIDEN_PT = 1.0
 _GLUED_LEAST_MORE_LETTERS = 2
 
 
+def box_middle(box: Box) -> tuple[float, float]:
+    """The middle of `box`, (across, down) in points."""
+    return (box.x0 + box.x1) / 2, (box.top + box.bottom) / 2
+
+
 def word_middle(word: Word) -> tuple[float, float]:
     """The middle of `word`'s box, (across, down) in points."""
-    return (word.box.x0 + word.box.x1) / 2, (word.box.top + word.box.bottom) / 2
+    return box_middle(word.box)
+
+
+def box_holds_middle(box: Box, inner: Box) -> bool:
+    """Whether the middle of `inner` lies inside `box`, edges included: the
+    test of a word in an excluded region (extract), in an in-page figure
+    (analyze, layout) and of a picture group in a figure (analyze)."""
+    across, down = box_middle(inner)
+    return box.x0 <= across <= box.x1 and box.top <= down <= box.bottom
 
 
 def _is_under(word: Word, ocr_word: Word) -> bool:
@@ -806,40 +819,38 @@ def replaced_layer_words(
     replaces, in their order: each the same printed word as one of
     `ocr_words` (reocr spec, section 4).
 
-    A layer word is matched (a) when its middle lies inside the box of
-    one of `ocr_words` widened by 2 pt up and down and 1 pt across, and
-    it is of that word's printed line: the layer words under it taken
-    nearest first, by their middles up or down, each whose box overlaps,
-    up and down, those of all taken before it; or when its letters and
-    digits are those of two or three consecutive `ocr_words` joined, each
-    with its middle inside its box widened by 1 pt, a word the layer
-    glued; or else (b) when its letters and digits, case-folded and not empty, equal
-    those of one of `ocr_words` whose middle lies within 16 pt above or
-    below its own and that no other layer word has matched;
-    or else (c) when it has 3 letters or more and its case-folded letters
-    are alike, by difflib's ratio of 0.6 or more, to those of one of
-    `ocr_words` within 16 pt above or below that (a) and (b) left
-    unmatched; or else (d) when `is_known` says its text is no known word
-    (layout says so of a word of the book's word list with no mark
-    inside it) and, whatever the texts, the `ocr_words` that (a) to (c)
-    left unmatched whose middles lie inside its box, widened by 1 pt
-    across only, are two or three consecutive words of one line, a word
-    the layer glued and misread. A Tesseract word is matched in (a) by any layer word under
-    it, whatever its text, and by a layer word glued over it, but for one
-    exception: when the letters and digits of every layer word of its line
-    under it are unlike its own (neither equal nor alike as in (b) and
+    A layer word is matched (a) when its middle lies inside the box of one
+    of `ocr_words` widened by 2 pt up and down and 1 pt across, and it is of
+    that word's printed line: the layer words under it taken nearest first,
+    by their middles up or down, each whose box overlaps, up and down, those
+    of all taken before it; or when its letters and digits are those of two
+    or three consecutive `ocr_words` joined, each with its middle inside its
+    box widened by 1 pt, a word the layer glued; or else (b) when its
+    letters and digits, case-folded and not empty, equal those of one of
+    `ocr_words` whose middle lies within 16 pt above or below its own and
+    that no other layer word has matched; or else (c) when it has 3 letters
+    or more and its case-folded letters are alike, by difflib's ratio of 0.6
+    or more, to those of one of `ocr_words` within 16 pt above or below that
+    (a) and (b) left unmatched; or else (d) when `is_known` says its text is
+    no known word (layout says so of a word of the book's word list with no
+    mark inside it) and, whatever the texts, the `ocr_words` that (a) to (c)
+    left unmatched whose middles lie inside its box, widened by 1 pt across
+    only, are two or three consecutive words of one line, a word the layer
+    glued and misread. A Tesseract word is matched in (a) by any layer word
+    under it, whatever its text, and by a layer word glued over it, but for
+    one exception: when the letters and digits of every layer word of its
+    line under it are unlike its own (neither equal nor alike as in (b) and
     (c)), and a layer word that the rules leave unmatched lies within 16 pt
-    above or below with letters equal or alike to its own, it is left to
-    (b) and (c), and the words under it to the other `ocr_words`; if
-    neither pairs it, it reads the words under it after all, and if one
-    does, it also replaces the junk under it that no rule matched, of
-    letters unlike its own: a word `is_junk(word, ocr_word)` takes for
-    junk under it, or, when `is_junk` is None, a word `is_known` says is
-    no known word, or a number whose digits begin its own. In (b)
-    and (c) the pairs of a layer word and a
-    Tesseract word are taken nearest first, by the distance of their
-    middles across plus up or down, each word in one pair at most. A layer
-    word matched by none stays in the layer. Boxes in points.
+    above or below with letters equal or alike to its own, it is left to (b)
+    and (c), and the words under it to the other `ocr_words`; if neither
+    pairs it, it reads the words under it after all, and if one does, it
+    also replaces the junk under it that no rule matched, of letters unlike
+    its own: a word `is_junk(word, ocr_word)` takes for junk under it, or,
+    when `is_junk` is None, a word `is_known` says is no known word, or a
+    number whose digits begin its own. In (b) and (c) the pairs of a layer
+    word and a Tesseract word are taken nearest first, by the distance of
+    their middles across plus up or down, each word in one pair at most. A
+    layer word matched by none stays in the layer. Boxes in points.
     """
     matched = _pairing(
         layer_words, ocr_words, is_known, _junk_test(is_known, is_junk)
@@ -1595,7 +1606,7 @@ def write_blocks(path: Path, blocks: BlocksFile) -> None:
     _write_json(path, blocks)
 
 
-def has_index_depth(block: Block) -> bool:
+def has_entry_depth(block: Block) -> bool:
     """Whether `block`, an index entry or a contents entry, has its depth,
     a level from 1 (architecture section 8)."""
     return block.level is not None and block.level >= 1
@@ -1661,13 +1672,13 @@ def _block_problem(block: Block, headings: frozenset[str]) -> str | None:
             f"is a {kind} and has the source {block.source!r}; "
             "only an epigraph has a source"
         )
-    if block.kind is BlockKind.INDEX_ENTRY and not has_index_depth(block):
+    if block.kind is BlockKind.INDEX_ENTRY and not has_entry_depth(block):
         return (
             f"is an index entry with the depth {block.level!r}, not one from 1 "
             "(architecture section 8); a blocks.json written before index "
             "entries had a depth needs `galley2epub structure` run again"
         )
-    if block.kind is BlockKind.CONTENTS_ENTRY and not has_index_depth(block):
+    if block.kind is BlockKind.CONTENTS_ENTRY and not has_entry_depth(block):
         return (
             f"is a contents entry with the depth {block.level!r}, not one "
             "from 1 (architecture section 8)"

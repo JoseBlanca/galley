@@ -63,8 +63,8 @@ from galley.model import (
     TextSource,
     Word,
     WordsFile,
+    box_holds_middle,
     take_out_once,
-    word_middle,
     words_after_rereads,
 )
 from galley.ocr import OCR_DPI, point_box, read_image_lines
@@ -300,7 +300,9 @@ def _outside_figures(reading: RegionReading, boxes: tuple[Box, ...]) -> RegionRe
 
     def outside(words: tuple[Word, ...]) -> tuple[Word, ...]:
         return tuple(
-            word for word in words if not any(_holds_middle(box, word) for box in boxes)
+            word
+            for word in words
+            if not any(box_holds_middle(box, word.box) for box in boxes)
         )
 
     return replace(
@@ -308,11 +310,6 @@ def _outside_figures(reading: RegionReading, boxes: tuple[Box, ...]) -> RegionRe
         ocr_words=outside(reading.ocr_words),
         layer_words=outside(reading.layer_words),
     )
-
-
-def _holds_middle(box: Box, word: Word) -> bool:
-    across, down = word_middle(word)
-    return box.x0 <= across <= box.x1 and box.top <= down <= box.bottom
 
 
 def _read_regions(

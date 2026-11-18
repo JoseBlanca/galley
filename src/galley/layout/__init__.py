@@ -277,12 +277,12 @@ def run(
 
     Only text pages whose words are the text layer's are re-read (reocr
     spec, section 3), and never the words inside an in-page figure, which
-    are the figure's region (`figure_regions`); a render is made in the
-    one PDFium thread, and Tesseract runs in the worker threads. lines.json and every later
-    stage's file (blocks.json, book.md, book.epub) are deleted first.
-    pages.json must have been made from `config.pdf` and words.json from
-    the same PDF, or InputFileError names the stage to run again. When the
-    words of lines.json are not those of words.json after the kept
+    are the figure's region (`figure_regions`); a render is made in the one
+    PDFium thread, and Tesseract runs in the worker threads. lines.json and
+    every later stage's file (blocks.json, book.md, book.epub) are deleted
+    first. pages.json must have been made from `config.pdf` and words.json
+    from the same PDF, or InputFileError names the stage to run again. When
+    the words of lines.json are not those of words.json after the kept
     records, FidelityError is raised and nothing is written.
     """
     delete_stage_outputs(folder, Stage.LAYOUT)
