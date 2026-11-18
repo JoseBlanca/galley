@@ -738,6 +738,26 @@ def test_cut_in_crop_replaces_a_column_word_of_a_zone_row_left_of_the_inset() ->
     _check_fidelity(_CUT_IN_PAGE, (record,))
 
 
+def test_cut_in_crop_drops_tesseract_words_within_3_pt_of_its_top_or_bottom() -> None:
+    # The crop runs from 165 to 255 pt. "[dy" is Tesseract's reading of the
+    # tops of a body line the crop's bottom cuts (Stubbs page 56), "'" of
+    # the feet of one its top cuts; neither overlaps a body word's box.
+    at_bottom = _ocr("[dy", 60, 252, 66, 255.2)
+    at_top = _ocr("'", 52, 164.8, 56, 168)
+    above_bottom = _ocr("of", 52, 245, 60, 251)
+    below_top = _ocr("The", 50, 169, 58, 175)
+    reading = cut_in_reading(
+        Side.LEFT,
+        _CROP,
+        ((at_top,), (below_top,), (above_bottom,), (at_bottom,)),
+        edge=50,
+        inset=60,
+        cut_in_words=(),
+        column_words=(),
+    )
+    assert reading.ocr_words == (below_top, above_bottom)
+
+
 def test_cut_in_reading_with_no_word_left_replaces_nothing() -> None:
     # The layer's note word is unknown, so an empty reading would score
     # higher; every word of Tesseract's lies over a body word, so no
@@ -951,10 +971,12 @@ def test_records_of_a_page_are_in_the_order_of_their_kinds_and_tops() -> None:
             case "margin":
                 return margin_note_reading(side, box, (word,), page_words=(), edge=50)
             case "cut-in":
+                # Taller, so that the word lies 3 pt or more inside its top
+                # and bottom (reocr spec, section 3, kind 3).
                 return cut_in_reading(
                     side,
-                    CutInCrop(box, ((top, top + 10),)),
-                    ((word,),),
+                    CutInCrop(Box(x0, top, x0 + 38, top + 20), ((top, top + 10),)),
+                    ((replace(word, box=Box(x0 + 8, top + 6, x0 + 30, top + 14)),),),
                     edge=50 if side is Side.LEFT else 350,
                     inset=60,
                     cut_in_words=(),
