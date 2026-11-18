@@ -401,3 +401,38 @@ of this plan cost about 2 s.
 Turney's epigraph sources are printed without a dash; the EPUB writes
 one before every source (structure §25), so all epigraphs look the
 same.
+
+## Task 7.1: the final measurement
+
+At f5cdf4e. `uv run galley-eval run` (574 s), in `runs/owner-books-final/`
+of the main checkout, against the cut baseline (galley at 9715a93,
+Stubbs' reference ended at its publisher's lists on both sides):
+
+| book | body error rate, blocks | paragraph precision / recall | headings in heading blocks | notes whose reference is right | margin notes as margin notes |
+|---|---|---|---|---|---|
+| Haskins | 0.023 → 0.020 | 0.885 / 0.902 → 0.908 / 0.902 | 18 → 18 | 61 → 66 | – |
+| Stubbs | 0.053 → 0.033 | 0.811 / 0.801 → 0.809 / 0.801 | 25 → 26 | – | 291 → 291 |
+| Domesday | 0.075 → 0.058 | 0.860 / 0.889 → 0.861 / 0.897 | 23 → 23 | 1,278 → 1,277 | 579 → 577 |
+| Mariéjol | 0.310 → 0.310 | 0.733 / 0.753 → 0.727 / 0.753 | 26 → 26 | 567 → 567 | – |
+
+reocr §9's targets all hold (Stubbs' index 0.985 / 0.964; margin notes
+291 and 577; body error rates 0.033 and 0.058; Haskins' index 0.094).
+Three scores fall beyond the plan's tolerances, none by a lost word:
+
+- Mariéjol's paragraph precision, by 0.0051: the heading rule makes 4
+  more headings there, three of them lines the OCR garbled (pages 57,
+  194, 402), one splitting the bibliography's title (page 14). Accepted:
+  Mariéjol is the unreadable scan.
+- Domesday's notes whose reference is right, by 1: galley's links are
+  the same set as before plus two on page 443; the scorer's alignment
+  of a reference word with a sign now attached moved.
+- Domesday's margin notes found as margin notes, by 2: galley's margin
+  notes are the same on every page but 156, which gained one; see task
+  7.2.
+
+`uv run pytest -m whole_book` with the owner's PDFs present: 106
+passed in 515 s. The eight EPUBs in `runs/owner-books/` of the main
+checkout, each with 0 errors and 0 warnings from epubcheck: Haskins
+175 s, Stubbs 317 s, Domesday 359 s, Mariéjol 28 s, Kadesh 5 s, Gierke
+65 s, Turney 11 s, Haynes 15 s (the first three far slower than in the
+last plan; see task 7.2).
