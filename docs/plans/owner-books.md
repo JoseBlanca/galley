@@ -444,14 +444,14 @@ the public-domain books; deliverable 4 shows what it takes.
   epigraph runs, their sources and the dash to remove; with the unit
   tests. Spec: structure §22, "The rule", "Verse". Stream `epigraphs`.
   Deliverable 1.
-- [ ] 4.2 The rule wired into structure: the step after the heading
+- [x] 4.2 The rule wired into structure: the step after the heading
   lines, the speck between title and epigraph as a `stray_mark`, the
   block with its `source` and its `source_dash` change; and a short
   last line at a page break, with its unit tests. Spec: structure §2,
   steps 2.3 and 2.4; §6, "A short last line at a page break"; §22,
   "The block" and "The dash is look, not text". Needs 4.1 and WP 3.
   Plan's branch. Deliverable 2.
-- [ ] 4.3 The whole-book tests of deliverables 3 and 4, and the counts
+- [x] 4.3 The whole-book tests of deliverables 3 and 4, and the counts
   in the report. Spec: structure §22, "What the rule gives"; §26,
   "Whole-book tests". Needs 4.2. Plan's branch. Deliverables 3, 4.
 - [ ] Review of work package 4.
