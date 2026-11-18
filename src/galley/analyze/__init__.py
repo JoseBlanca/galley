@@ -1,5 +1,5 @@
 """analyze: what each page of the PDF is, written to pages.json (walking
-skeleton spec section 6, plates spec section 2).
+skeleton spec section 6, plates spec section 2, figures spec section 3).
 
 analyze measures every page with pdfplumber, its size in points and the
 words of its text layer, and renders every page that is neither excluded
@@ -9,7 +9,9 @@ is `excluded` when the config excludes it, a `plate` when the config's
 has a word, and `blank` otherwise. It has no OCR, so a blank page stops
 the run: the owner checks it and adds it to `exclude_pages`. Each page the
 plate rule takes is logged at WARNING, so that the owner sees the covers
-and endpapers it takes too.
+and endpapers it takes too. On each text page, the same render is searched
+for the figures printed among its lines (`figure_boxes`), whose boxes go
+into pages.json; each page with figures is logged at INFO.
 """
 
 import logging
@@ -17,13 +19,14 @@ import statistics
 import unicodedata
 from collections.abc import Callable
 from contextlib import closing
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Final, assert_never
 
 import pdfplumber
 
 from galley import pdfium, wordlist
+from galley.analyze._figures import PictureGroup, figure_boxes, picture_groups
 from galley.analyze._plates import (
     PLATE_RENDER_DPI,
     PictureArea,
@@ -54,6 +57,7 @@ __all__ = [
     "PlateRule",
     "check_config_pages",
     "classify_page",
+    "figure_boxes",
     "front_matter_end",
     "is_plate",
     "picture_area",
@@ -137,14 +141,16 @@ class _PlateTest:
 class _Measurement:
     """What analyze measures of one page: its size in points from
     pdfplumber, the number of words of its text layer, the words of the
-    layer's topmost row (empty without words), and the plate rule's test,
-    None for a page it does not test."""
+    layer's topmost row (empty without words), the plate rule's test,
+    None for a page it does not test, and the in-page figures found on a
+    page it tests that has a text layer and is not a plate."""
 
     width_pt: float
     height_pt: float
     layer_word_count: int
     first_row: tuple[str, ...]
     plate_test: _PlateTest | None
+    figures: tuple[PictureGroup, ...]
 
 
 def run(
@@ -178,16 +184,19 @@ def run(
 
     def classify(end: int) -> tuple[PageInfo, ...]:
         return tuple(
-            classify_page(
-                index,
-                measurement.width_pt,
-                measurement.height_pt,
-                measurement.layer_word_count,
-                config,
-                plate_rule=PlateRule.NOT_PLATE
-                if measurement.plate_test is None
-                else measurement.plate_test.rule,
-                front_matter_end=end,
+            _with_figures(
+                classify_page(
+                    index,
+                    measurement.width_pt,
+                    measurement.height_pt,
+                    measurement.layer_word_count,
+                    config,
+                    plate_rule=PlateRule.NOT_PLATE
+                    if measurement.plate_test is None
+                    else measurement.plate_test.rule,
+                    front_matter_end=end,
+                ),
+                measurement.figures,
             )
             for index, measurement in enumerate(measurements)
         )
@@ -206,6 +215,9 @@ def run(
     for index, measurement in enumerate(measurements):
         _log_plate_taken(index, measurement.plate_test)
     _log_front_matter(end, step, pages, config)
+    for page, measurement in zip(pages, measurements, strict=True):
+        if page.figure_boxes:
+            _log_figures(page.index, measurement.figures)
     require_text_layer(pages)
     write_pages(
         folder.pages_json,
@@ -237,14 +249,38 @@ def _measurer(
             words = layer_words(page)
         page_layer_words = tuple((word.text, word.box) for word in words)
         rows = group_rows(words)
-        plate_test = (
-            _test_plate(
-                pdfium.render(config.pdf, page_index, PLATE_RENDER_DPI),
-                page_layer_words,
-                lower_case_words,
-            )
+        rendered = (
+            pdfium.render(config.pdf, page_index, PLATE_RENDER_DPI)
             if _plate_rule_tests(page_index, config)
             else None
+        )
+        plate_test = (
+            None
+            if rendered is None
+            else _test_plate(rendered, page_layer_words, lower_case_words)
+        )
+        # Figures spec section 3: a page that may end as a text page is
+        # searched for figures on the same render; classify_page decides.
+        figures = (
+            ()
+            if rendered is None
+            or plate_test is None
+            or plate_test.rule is PlateRule.PLATE
+            or not page_layer_words
+            else tuple(
+                group
+                for group in picture_groups(
+                    rendered,
+                    page_layer_words,
+                    tuple(
+                        region.box
+                        for region in config.exclude_regions
+                        if region.page_index == page_index
+                    ),
+                    lower_case_words,
+                )
+                if group.is_figure
+            )
         )
         return _Measurement(
             width_pt=width_pt,
@@ -252,6 +288,7 @@ def _measurer(
             layer_word_count=len(page_layer_words),
             first_row=tuple(word.text for word in rows[0].words) if rows else (),
             plate_test=plate_test,
+            figures=figures,
         )
 
     return measure
@@ -288,6 +325,30 @@ def _test_plate(
     )
     return _PlateTest(
         area=area, known_words=known_words, has_layer=bool(layer_words), rule=rule
+    )
+
+
+def _with_figures(page: PageInfo, figures: tuple[PictureGroup, ...]) -> PageInfo:
+    """`page` with the boxes of `figures` when it is a text page; a page of
+    any other kind has none (figures spec section 3)."""
+    if page.kind is not PageKind.TEXT:
+        return page
+    return replace(page, figure_boxes=tuple(figure.box for figure in figures))
+
+
+def _log_figures(page_index: int, figures: tuple[PictureGroup, ...]) -> None:
+    """Logs at INFO the in-page figures of a page, each box with its squares
+    and known words (figures spec section 3)."""
+    _logger.info(
+        "analyze: page index %d has %d in-page figures: %s",
+        page_index,
+        len(figures),
+        "; ".join(
+            f"box ({figure.box.x0:.1f}, {figure.box.top:.1f}, {figure.box.x1:.1f}, "
+            f"{figure.box.bottom:.1f}) pt, {figure.squares} squares, "
+            f"{figure.known_words} known words"
+            for figure in figures
+        ),
     )
 
 
@@ -393,7 +454,7 @@ def classify_page(
             for region in config.exclude_regions
             if region.page_index == index
         ),
-        # The rule of docs/specs/figures.md, section 3, is not written yet.
+        # analyze adds the boxes of a text page (figures spec section 3).
         figure_boxes=(),
         blank_checked_by_ocr=False,
     )
