@@ -4140,7 +4140,14 @@ Terms:
 - an entry's **page number** is its last word when that is a
   page-number form (section 1) or a range of two joined by a dash
   ("26—36.", or the three words "107 — 128."), together with "pp." or
-  "p." before it;
+  "p." before it, and when it is **set apart**: it is a range or has
+  "pp." or "p." before it, or leader dots come just before it, or a
+  space of 11 to 20 pt, or its right side lies within 4 pt of the right
+  side of the longest contents line of its page. A number at an
+  ordinary space, short of the column's edge, ends a title and is no
+  page number ("Psalm 23", "Maldon, 991", the roman form "mix"), since
+  markdown does not write a page number and the reader would lose it
+  (review of 18 November 2026);
 - **leader dots** are words made only of ".", "•", "·" and "…", printed
   between a title and its page number;
 - an **inline page reference** is a word that is neither the first nor
@@ -4279,14 +4286,24 @@ to the entry before (no count changes):
 | Turney | 16 | 0 | 16 | 16 | 16 | 16 | 16 |
 | Haskins | 9 | 0 | 9 | 9 | 9 | 9 | 9 |
 | Stubbs | 25 | 12 | 9 | 13 | 13 | 13 | 13 |
-| Domesday | 59 | 32 | 23 | 27 | 23 | 23 | 23 |
+| Domesday | 59 | 32 | 22 | 27 | 23 | 23 | 23 |
 | Gierke, page 10 | 8 | 0 | 3 | 7 | 6 | 5 | 4 |
-| Gierke, pages 52 to 67 | 395 | 45 | 76 | 308 | 10 | 10 | 10 |
+| Gierke, pages 52 to 67 | 348 | 45 | 33 | 275 | 10 | 10 | 10 |
 | Mariéjol | 16 | 0 | 1 | 16 | 13 | 12 | 9 |
 
 The rows of Gierke's pages 52 to 67 and Mariéjol's candidates were
 measured again with the code on 18 November 2026 (plan lists-figures,
-task 5.4), with rule 3's one reference for every five lines. The
+task 5.4), with rule 3's one reference for every five lines, and the
+page numbers of every row with the test of "set apart" ("Terms"). The
+spaces before a page number were measured then: Haynes 11.5 to 12.5 pt
+and Turney 13.4 to 14.9, where the other spaces of an entry reach 10.2
+pt; Haskins', Stubbs' and Gierke's numbers end within 1.2 pt of the
+column's right side and Domesday's within 3.7. The test leaves out
+Domesday's "290." after "Note : The Angild Clause," (page 17), at an
+ordinary space in the middle of the column, which stays in its title,
+and on Gierke's pages 52 to 67 the "d" of a signature line "M. d"
+(page 54) and 42 numbers of the table of pages 61 to 67 that the layout
+moved away from their column. The
 prototype had given 320 entries, 47 topics entries, 58 page numbers and
 240 candidates for Gierke's pages 52 to 67, near what rule 3 gives
 without its second condition (317, 47 and 61), and 15 candidates for
