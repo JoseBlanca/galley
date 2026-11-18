@@ -116,6 +116,16 @@ _BAND_OPEN_ROWS: Final[int] = 3
 # 8 pt of the column's middle (Kadesh, 30 runs of 3 open rows or more); that
 # of Domesday's short notes printed side by side 13 to 46 pt from it.
 _BAND_GUTTER_OFF_CENTRE_PT: Final[float] = 10.0
+# Step 5: a number hung before a line of the right column, left of the
+# gutter, goes right. Turney prints its notes in two columns, each note's
+# number 6 to 14 pt left of its text (structure section 21); on its page
+# 262 the gutter falls between those numbers and their text. The 15 pt and
+# the 2 numbers are those of step 2's hanging numbers. The word after the
+# number holds a letter: on Gierke's contents pages 63, 65 and 66 a left
+# entry's page number lies as near the right entry's number, "121".
+_HUNG_NUMBER = re.compile(r"[0-9]{1,3}")
+_HUNG_NUMBER_GAP_PT: Final[float] = 15.0
+_HUNG_NUMBERS_LEAST: Final[int] = 2
 # Measured: Haskins' drop capitals are 2.67 ("IN", page 163) to 4 times the
 # body word height.
 _DROP_CAPITAL_HEIGHTS: Final[float] = 2.2
@@ -277,25 +287,50 @@ def _run_is_cut(column_run: tuple[tuple[Line, _AtGutter], ...], part: _Part) -> 
     return open_rows >= _open_rows_to_cut(part)
 
 
+def _hung_right(row: Line, middle: float) -> Word | None:
+    """The word of `row` left of `middle` that is a number hung before the
+    right column's line (step 5): the last word left of it, 1 to 3
+    digits, whose next word, the first right of `middle`, holds a letter,
+    starts at most `_HUNG_NUMBER_GAP_PT` right of it and nearer than the
+    word before it on the row ends, if there is one. None when there is
+    no such word."""
+    words = sorted(row.words, key=lambda word: word.box.x0)
+    left = tuple(word for word in words if (word.box.x0 + word.box.x1) / 2 < middle)
+    right = tuple(word for word in words if (word.box.x0 + word.box.x1) / 2 >= middle)
+    if not left or not right or _HUNG_NUMBER.fullmatch(left[-1].text) is None:
+        return None
+    number = left[-1]
+    after = right[0].box.x0 - number.box.x1
+    before = number.box.x0 - left[-2].box.x1 if len(left) > 1 else math.inf
+    has_letter = any(character.isalpha() for character in right[0].text)
+    return (
+        number
+        if has_letter and after <= _HUNG_NUMBER_GAP_PT and after < before
+        else None
+    )
+
+
 def _cut_run(rows: tuple[Line, ...], middle: float) -> tuple[Region, Region]:
     """The left and right columns of a cut run: each word goes by its own
-    middle, left of `middle` or not."""
+    middle, left of `middle` or not, but a number hung before a line of
+    the right column (`_hung_right`) goes right when the run holds at
+    least `_HUNG_NUMBERS_LEAST` of them."""
+    hung = tuple(
+        number for row in rows if (number := _hung_right(row, middle)) is not None
+    )
+    moved = (
+        frozenset(id(number) for number in hung)
+        if len(hung) >= _HUNG_NUMBERS_LEAST
+        else frozenset()
+    )
+
+    def goes_left(word: Word) -> bool:
+        return (word.box.x0 + word.box.x1) / 2 < middle and id(word) not in moved
+
     words = words_of(rows)
     return (
-        _region(
-            group_rows(
-                tuple(
-                    word for word in words if (word.box.x0 + word.box.x1) / 2 < middle
-                )
-            )
-        ),
-        _region(
-            group_rows(
-                tuple(
-                    word for word in words if (word.box.x0 + word.box.x1) / 2 >= middle
-                )
-            )
-        ),
+        _region(group_rows(tuple(word for word in words if goes_left(word)))),
+        _region(group_rows(tuple(word for word in words if not goes_left(word)))),
     )
 
 

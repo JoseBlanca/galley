@@ -782,6 +782,13 @@ than a note's short line does; so the rule is for margin notes only.
    its `contents_pages`), 3 of Mariéjol's notes and 1 line of Stubbs'
    index; none of Haynes'. A start inside a table cuts the table into
    more paragraphs than before; galley has no table kind (section 28).
+   A line whose first word is one character that is not a digit, with
+   a second word, hung so (5 to 20 pt left of the text edge), starts a
+   paragraph too when the next three lines of its page that start with
+   a hanging number read 2, 3 and 4: a note's "1" the OCR misread
+   (section 12, the misread marker; Turney's "x", page 258). Measured on
+   18 November 2026 on the eight books' `lines.json`, it starts that
+   line and no other.
 
 A line after a line that ends with a hyphen (its last word ends as
 section 5 asks of a first part, "-" after a letter or digit), unless
@@ -1860,7 +1867,26 @@ of bare numbers whose first value is 1 and outside the config's
 `contents_pages`: the first because each of Turney's groups (below)
 starts at 1, the second because Gierke's printed contents, pages 63 to
 66, start 13 lines with rising bare numbers from 139 (section 6, rule
-3), which would otherwise begin its section 120 pages early. The
+3), which would otherwise begin its section 120 pages early. A bare
+number that does not rise above the marker before it is no marker
+unless it reads 1, so it neither starts a run nor ends one. A run of
+bare numbers may start with one **misread marker**: a paragraph whose
+first word is one character that is not a digit, with a word after it,
+when the next three paragraphs that start with a bare number read 2, 3
+and 4. Its marker is that character as the OCR read it, taken out as
+any marker (section 11), and its value is 1, given by its place before
+2, 3 and 4, as a note numbered per page takes its value from its place
+(section 11, "Its value"); no word is changed. Turney's chapter Three
+opens its notes with a "1" the OCR read as "x" (page 258): without this
+its notes 2 to 48, which do not rise above chapter Two's last, 48, were
+later blocks of that note, and its group was lost. Section 6, rule 3,
+starts such a paragraph. The two forms make runs of their own: a bare
+number neither goes on with nor ends a run of "N." markers, and the
+section's markers are those of the forms of its runs of at least 8.
+Gierke prints a bare "1" before some of the margin notes that layout
+leaves in its notes' body (pages 195, 196, 225, 226, 237, 240 and 241);
+read as markers in the same runs, they made 9 more endnotes and cut
+the section into groups (measured on 18 November 2026). The
 section runs from the first marker of the first run of at least 8 to
 the last marker of the last such run, so that a damaged marker that
 reads lower does not cut it in two. On its first page it reaches back
@@ -1911,7 +1937,17 @@ A **group heading** is the block of the section right before a group's
 first note, when it holds at most 3 lines and its first line lies at
 least 1.5 body line pitches below the line before it in the body
 stream, or is the first line of its region: a heading set apart, at
-the top of a column too. It may be a paragraph, a heading block
+the top of a column too. The first line of a region is told by
+position: a line on a later page than the line before it, or whose top
+lies above that line's, as the top of a right column lies above the
+foot of the left one. A block or a line with no letter or digit (a
+speck the OCR read as "/") is passed over here, as in the tall line's
+gap of section 14: the block right before a group's first note is the
+nearest before it that holds a letter or a digit, and the line before
+a group heading the nearest that holds one. On Turney's page 268 a
+"/" 5 pt high lies under chapter Six's heading, between it and the
+group's note 1, and the heading was missed; the "/" stays a block of
+the note before the heading. It may be a paragraph, a heading block
 (section 14 makes some, such as Turney's first group heading, an
 unindented "Introduction" 8 pitches below the title "Notes") or what
 section 11 would make a note, since Turney's starts with a number. It
@@ -1919,6 +1955,18 @@ is no note, starts no group (Turney's chapter One heading starts with a
 bare "1", page 253) and is no block of the note before it: its text, its lines
 joined by single spaces, becomes the `group` of the group's first note
 (section 7), and the fidelity check counts it as words of that note.
+A group heading that no paragraph rule starts ends the block before
+the group's first note, after that note's last line: Haynes sets four
+of its eighteen (chapters 5, 6, 10 and 12, pages 343, 344, 362 and
+370) flush left under the note before, which section 6's rules 1 and 2
+do not cut, and section 14 does not take them for headings. So, in a section of several
+groups, when the block right before a group's first note is no group
+heading, its last lines from the last of them that is set apart (1.5
+pitches below the line before, or the first of its region), when that
+line is not the block's first and at most 3 lines remain, are cut off
+into a paragraph of their own, which is then the group heading. With
+it Haynes has its 18 group headings, without it 14 (measured on 18
+November 2026 with the configs of section 21).
 Measured by the survey: Haynes' group headings stand about 30 pt (2.1
 pitches of 14.4 pt) below the last line of the note before; Turney's
 30 to 32 pt (1.8 to 1.9 pitches of 16.8 pt) or at the top of a column;
@@ -1942,7 +1990,10 @@ table of contents, refers to its own notes, and its glued numbers took
 endnotes 1 to 7 from Gierke's "Law1" (page 88), "communities2." (93)
 and the rest (decided in the review of 16 November 2026). Gierke's markers end with "." ("1.") and its
 references do not ("Law1"), so none reads as its marker; linked as
-section 11 says, 205 of them are, 186 by an exact value. Maitland's
+section 11 says, 215 of them are, 193 by an exact value (measured on
+18 November 2026 on the layout of the plan owner-books at 4d9f1e9, the
+same as the clean-text build's; the 205 and 186 written before were of
+an earlier build). Maitland's
 introduction (pages 0 to 85) has notes of its own, printed on pages 62
 to 64; they were not studied, and stay where they are now.
 
@@ -1950,15 +2001,40 @@ to 64; they were not studied, and stay where they are now.
 after the config's `contents_pages` and before the endnote section,
 found from the group heading: the heading whose spans' letters, in
 lower case, are the most alike (`difflib.SequenceMatcher` ratio, at
-least 0.75 as for running heads) to the group heading's letters in
+least 0.85) to the group heading's letters in
 lower case, once a first word that is a chapter label word or a
 number, and a number after a label word, are dropped ("Chapter 1." and
-Turney's leading "2"); a group without a heading, or whose heading is
-alike to none, takes the first level-1 heading after the chapter of
-the group before (the first after `contents_pages` for the first
-group). A label is not compared: Haynes' body heading has "CHAPTER ONE"
+Turney's leading "2"). The groups follow the chapters' order, so a
+group without a heading, or whose heading is alike to none, takes its
+chapter by counting from the nearest group before it that found its
+chapter by its heading: the n-th level-1 heading after that chapter,
+for the n-th group after that group; when there is no such group
+before it, or that heading would not lie before the chapter of the
+nearest group after it found by its heading, it counts back from that
+one instead, the n-th heading before it for the n-th group before;
+with neither, it counts from the first level-1 heading after
+`contents_pages`, the first group's. A count that falls outside the
+chapters, or back onto or before the chapter of the group before,
+gives the group no chapter, and it reaches no block. Before this revision a group
+without a heading took the heading after the chapter of the group
+before, so a first group whose heading was lost took the first
+level-1 heading after the contents (a preface, say) even when the
+group after it named its chapter. Counting cannot tell which chapter a
+group takes when another group between the counted ones was lost as
+well: on Turney, before the fixes of layout §3, step 5, and of the
+misread marker above, chapter Three's group was lost and chapter
+Four's heading too, and chapter Four's notes took chapter Three's
+references, 40 links in the wrong chapter, and the counting gives the
+same. A label is not compared: Haynes' body heading has "CHAPTER ONE"
 in its label and its group heading "Chapter 1.", and the titles match
-("AMD" for "AND" in the body's OCR still gives a ratio above 0.9). A
+("AMD" for "AND" in the body's OCR still gives a ratio above 0.9). The
+0.85 is not the running heads' 0.70 (section 3), since it is set
+between what was measured on 18 November 2026 on the 26 group headings
+the two books' notes give (Turney 8, Haynes 18): each is 0.94 to 1.00
+alike to its own chapter's heading, and at most 0.76 to another's
+(Haynes' chapter 9 to chapter 11, two titles that share three of
+their four words); at 0.70 or 0.75 a group whose chapter
+heading the body lacked would take that other chapter. A
 group's candidates are the glued numbers of the body, from the pages
 after `contents_pages` and not taken by a footnote, as above, from its
 chapter's heading up to the heading of the next group's chapter, or up
