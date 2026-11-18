@@ -133,6 +133,8 @@ def _markdown(
         words=tuple(MarkdownWord(text, block_id) for text, block_id in words),
         note_count=note_count,
         note_link_count=note_link_count,
+        list_item_count=0,
+        contents_links=(),
     )
 
 
