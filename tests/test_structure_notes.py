@@ -642,3 +642,24 @@ def test_bare_number_run_starts_at_a_misread_marker_before_2_3_and_4() -> None:
         *(0,) * 9,
         *(1,) * 9,
     )
+
+
+def test_chapter_of_first_group_without_heading_counts_back_from_the_next() -> None:
+    # The body has an opening chapter before the two the groups belong to;
+    # the first group has no heading, the second names its chapter: the
+    # first takes the chapter before the second's, not the first of all.
+    second_top = 80.0 + 27 * _PITCH_PT + 27.0
+    notes = (
+        *_dotted_notes(80.0),
+        *_group_heading(2, _CHAPTERS[1], second_top),
+        *_dotted_notes(second_top + 30.0),
+    )
+    pages = (
+        _chapter_page(0, "An Unrelated Opening Chapter"),
+        _chapter_page(1, _CHAPTERS[0]),
+        _chapter_page(2, _CHAPTERS[1]),
+        PageLayout(3, (_region(*notes),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    pages_linked = tuple(page for page, _ in _links_by_chapter(blocks))
+    assert pages_linked == (*(1,) * 9, *(2,) * 9)

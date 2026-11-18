@@ -371,32 +371,60 @@ def _title_letters(group_heading: str) -> str:
     return letters(" ".join(words))
 
 
-def _group_chapter(
-    group_heading: str | None,
-    chapters: Sequence[tuple[int, str]],
-    chapter_before: int | None,
+def _chapter_by_heading(
+    group_heading: str | None, chapters: Sequence[tuple[int, str]]
 ) -> int | None:
-    """The position of a group's chapter heading among `chapters`, the
-    positions and letters of the body's level-1 headings in order: the
-    one most alike to `group_heading`, at least 0.85 alike; else the first
-    after `chapter_before`, the chapter of the group before (the first of
-    all for the first group); None when there is none."""
-    if group_heading is not None:
-        title = _title_letters(group_heading)
-        ratios = tuple(
-            SequenceMatcher(None, title, chapter_letters).ratio()
-            for _, chapter_letters in chapters
-        )
-        if ratios and max(ratios) >= _CHAPTER_ALIKE_RATIO:
-            return chapters[ratios.index(max(ratios))][0]
-    return next(
+    """The index in `chapters`, the positions and letters of the body's
+    level-1 headings in order, of the one most alike to `group_heading`,
+    at least 0.85 alike; None for a group without a heading or alike to
+    none (spec section 12, "The chapter of a group")."""
+    if group_heading is None:
+        return None
+    title = _title_letters(group_heading)
+    ratios = tuple(
+        SequenceMatcher(None, title, chapter_letters).ratio()
+        for _, chapter_letters in chapters
+    )
+    if not ratios or max(ratios) < _CHAPTER_ALIKE_RATIO:
+        return None
+    return ratios.index(max(ratios))
+
+
+def _counted_chapter(
+    group: int, by_heading: Sequence[int | None], chapter_count: int
+) -> int | None:
+    """The index among the chapters of a group not found by its heading
+    (spec section 12): counted on from the nearest group before it found
+    by its heading, or, when there is none or the count would not lie
+    before the chapter of the nearest such group after it, back from that
+    one; from the first chapter, the first group's, when no group was
+    found by its heading. None when the count falls outside."""
+    before = next(
+        (other for other in range(group - 1, -1, -1) if by_heading[other] is not None),
+        None,
+    )
+    after = next(
         (
-            position
-            for position, _ in chapters
-            if chapter_before is None or position > chapter_before
+            other
+            for other in range(group + 1, len(by_heading))
+            if by_heading[other] is not None
         ),
         None,
     )
+    after_index = by_heading[after] if after is not None else None
+    before_index = by_heading[before] if before is not None else None
+    if before_index is not None:
+        counted = before_index + group - (before or 0)
+        if counted < chapter_count and (after_index is None or counted < after_index):
+            return counted
+    if after_index is not None:
+        counted = after_index - ((after or 0) - group)
+        if counted >= 0 and (before_index is None or counted > before_index):
+            return counted
+        return None
+    if before_index is None and group < chapter_count:
+        return group
+    return None
 
 
 def group_reaches(
@@ -417,12 +445,18 @@ def group_reaches(
     block."""
     if len(group_headings) <= 1:
         return tuple((0, before_section) for _ in group_headings)
-    found: list[int | None] = []
-    for heading in group_headings:
-        before = next(
-            (chapter for chapter in reversed(found) if chapter is not None), None
-        )
-        found.append(_group_chapter(heading, chapters, before))
+    by_heading = tuple(
+        _chapter_by_heading(heading, chapters) for heading in group_headings
+    )
+    indices = tuple(
+        found
+        if (found := by_heading[group]) is not None
+        else _counted_chapter(group, by_heading, len(chapters))
+        for group in range(len(group_headings))
+    )
+    found = tuple(
+        chapters[index][0] if index is not None else None for index in indices
+    )
     return tuple(
         (start, end)
         if start is not None
