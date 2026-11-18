@@ -7,10 +7,8 @@ from dataclasses import replace
 
 from galley.model import ChangeReason, WordChange
 from galley.structure._unnumbered import Unnumbered
-from galley.wordlist import is_known_word
+from galley.wordlist import is_known_word, word_key
 
-# Spec section 24: the left part has at least 2 letters ("aWilliam" stays).
-_MIN_LEFT_LETTERS = 2
 # Spec section 24: the capital is followed by at least 3 lower-case
 # letters. With 2, the rule split Domesday's Old English "forSon" and
 # "forSan" (printed "forðon", "forðan", page 339) and 4 of Mariéjol's
@@ -37,17 +35,15 @@ def _letters_span(word: str) -> tuple[int, int]:
 def _capital_position(core: str) -> int | None:
     """The position of the capital in `core` when it is a run of lower-case
     letters, one capital and at least 3 lower-case letters, and nothing
-    else; None otherwise."""
+    else; None otherwise. The left part's minimum is is_known_word's."""
     capitals = [position for position, letter in enumerate(core) if letter.isupper()]
     if len(capitals) != 1:
         return None
     capital = capitals[0]
     left = core[:capital]
     right = core[capital + 1 :]
-    if (
-        len(left) >= _MIN_LEFT_LETTERS
-        and len(right) >= _MIN_RIGHT_LOWER_LETTERS
-        and all(letter.isalpha() and letter.islower() for letter in left + right)
+    if len(right) >= _MIN_RIGHT_LOWER_LETTERS and all(
+        letter.isalpha() and letter.islower() for letter in left + right
     ):
         return capital
     return None
@@ -77,10 +73,12 @@ def split_at_case(
         return None
     left = core[:capital]
     right = core[capital:]
+    # is_known_word asks for at least 2 letters, the spec's minimum for the
+    # left part ("aWilliam" stays).
     if (
         is_known_word(left, lower_case_words)
-        and left in common_inner_words
-        and right.lower() in book_words
+        and word_key(left) in common_inner_words
+        and word_key(right) in book_words
         and not is_known_word(core, lower_case_words)
     ):
         cut = start + capital
