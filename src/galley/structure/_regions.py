@@ -27,11 +27,11 @@ _BELOW_SLACK_PT = 2.0
 # within 4 pt of the head's (Turney's numbers 0 to 0.8 pt, Gierke's 0 to
 # 3.9 pt, measured on 17 November 2026).
 _BESIDE_MAX_CHARACTERS = 5
+_BESIDE_TOP_PT = 4.0
 # Spec section 2: the head line lies above every other region, which may
 # reach 2 pt into it; Stubbs' "MAPS." (page 17), boxed 18 pt tall, reaches
 # 1 pt into the region below it.
 _HEAD_OVERLAP_PT = 2.0
-_BESIDE_TOP_PT = 4.0
 
 
 class Small(StrEnum):
