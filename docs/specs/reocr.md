@@ -806,6 +806,8 @@ class Reread:
     ocr_score: int
     kept: bool                        # by the rule of section 3
     dropped_junk_count: int = 0       # Tesseract's junk tokens dropped
+    junk_words: tuple[Word, ...] = () # of layer_words, the layer's junk
+                                      # under a word paired with its copy
 ```
 
 A region where both readings are empty, before Tesseract's junk is
@@ -813,7 +815,14 @@ dropped, is not recorded. `LinesFile`
 gains `rereads: tuple[Reread, ...]`, in page order and, within a page,
 small-print page first, then margin bands top to bottom with the left
 side first at the same top, then cut-in crops likewise, then the
-footnote band. `lines.json` goes to `format_version` 2.
+footnote band. `lines.json` goes to `format_version` 2, and to 3 with
+`junk_words` (review of work package 2 of the plan owner-books, 18
+November 2026). `junk_words` names the layer words that the exception
+in (a) replaced as junk, so that the fidelity check, which has no word
+list, can tell them from a known word: without it the check took every
+word for unknown and accepted a record that replaced "the", "Ælfric" or
+Gierke's "vacant" (page 127, read by its own Tesseract word) as junk
+under a word beside its copy.
 
 **The fidelity check** at layout's boundary becomes: the words of
 `words.json`, minus the `layer_words` of every kept `Reread`, plus their
@@ -822,12 +831,15 @@ the `layer_words` of each kept `Reread` are words of its page in
 `words.json`; no word of the page is among the `layer_words` of two
 kept records (compared as page, text and box); and each of a kept
 record's `layer_words` is matched to one of its `ocr_words` by rules (a)
-to (d) above (`model.replaced_layer_words`, taking no word as known); and, by a test that does not
+to (d) above (`model.replaced_layer_words`, taking no word as known for
+(d) and as junk only the record's `junk_words`, which must be among its
+`layer_words`); and, by a test that does not
 use that pairing, no Tesseract word of a kept record is the only one of
 the record that may read two of its `layer_words` of different printed
-lines (architecture §13), unless one lies under it with letters unlike
-its own and the other, not under it, holds its letters or letters alike
-to them, the junk and the copy of the exception in (a); so that a
+lines (architecture §13), unless one is of the record's `junk_words`
+and lies under it with letters unlike its own and the other, not under
+it, is the layer's copy of its word, as the exception in (a) takes it;
+so that a
 record cannot name a word the
 layer never had, one another record already replaced, or one that no
 word of Tesseract's reads. Every word of the layer is then either in `lines.json` or in

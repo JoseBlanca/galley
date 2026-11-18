@@ -251,8 +251,8 @@ but was fitted on 16 books only.
 The formats are frozen dataclasses in `src/galley/model.py`, with tuples
 for sequences, `frozendict` (a built-in type of Python 3.15) for
 mappings, `StrEnum` for finite sets, and floats for positions. Each file
-has a `format_version` int: 4 for `blocks.json`, 2 for `pages.json`,
-`words.json` and `lines.json`, 1 for the others.
+has a `format_version` int: 4 for `blocks.json`, 3 for `lines.json`, 2
+for `pages.json` and `words.json`, 1 for the others.
 `blocks.json` went to 2 with the second plan of structure (16 November
 2026), which added `Note.kind`, `Block.label`, the block kinds `verse`
 and `chapter_summary` and the removal reason `guide_words`; reading a
@@ -267,7 +267,10 @@ reruns structure. `blocks.json` went to 4 the same day, for the plan
 owner-books, with the block kind `epigraph`, `Block.source`,
 `Note.group` and the change reasons `source_dash`,
 `punctuation_attached` and `case_split` (`docs/specs/structure.md` §7);
-the owner reruns structure. Each has one pair of functions
+the owner reruns structure. `lines.json` went to 3 on 18 November 2026,
+with `Reread.junk_words` (`docs/specs/reocr.md` §4, the review of work
+package 2 of the plan owner-books); the owner reruns layout. Each has
+one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
 Reading a file whose `format_version` is not the current one is an error
@@ -348,7 +351,10 @@ tuple[Reread, ...])`:
   one sure single word, `docs/specs/reocr.md` §3), and
   `dropped_junk_count` (Tesseract's words of no letter or digit, not
   punctuation or a printed sign, dropped from `ocr_words`, and its words
-  stripped of an underscore at either end, `docs/specs/reocr.md` §4). Every region read is recorded, kept or not, in page order.
+  stripped of an underscore at either end, `docs/specs/reocr.md` §4),
+  and `junk_words` (those of `layer_words` that layout replaced as the
+  layer's junk under a Tesseract word paired with the layer's copy of
+  its word, by its word list; reocr §4, the exception in (a)). Every region read is recorded, kept or not, in page order.
 - `RereadKind`: `small_print_page` (a page printed wholly in small
   type, read below its running head), `margin_note` (one note of an
   outer margin), `cut_in_note` (one crop of Stubbs' notes cut into the
@@ -728,10 +734,14 @@ lists the words, with the pages they came from where the origins say.
   letters and digits it holds, or whose letters are alike to its own,
   within 16 pt, as the three rules say). One Tesseract word then
   stands for two printed words, and one of them is lost (Domesday page
-  548, review of 17 November 2026). The one pair allowed is the layer's
-  junk under the word, with letters unlike its own, and the layer's copy
-  of the word beside it, not under it, with its letters or letters alike
-  (`model.is_junk_beside_its_copy`; reocr §4, the exception in (a)); structure,
+  548, review of 17 November 2026). The one pair allowed is a word of the
+  record's `junk_words` under the word, with letters unlike its own, and
+  the layer's copy of the word beside it, not under it, with its letters
+  or letters alike (`model.is_junk_beside_its_copy`; reocr §4, the
+  exception in (a)). The check has no word list, so it takes as junk
+  only the words the record names, which must be among its
+  `layer_words`: a word under such a Tesseract word that the record does
+  not name is matched by no rule, and the check fails; structure,
   lines.json against blocks.json (the text of every body and note block,
   with a note's `marker` and `group`, a heading's `label` and an
   epigraph's `source` counted as words of it); markdown, blocks.json
