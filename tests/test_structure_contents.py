@@ -47,14 +47,23 @@ _EDGES = Edges(_LEFT_PT, _RIGHT_PT)
 
 
 def _line(
-    text: str, x0: float, top: float, x1: float | None = None, page_index: int = 0
+    text: str,
+    x0: float,
+    top: float,
+    x1: float | None = None,
+    page_index: int = 0,
+    apart: float = _CHAR_PT,
 ) -> PlacedLine:
     """A line of `text` whose left side is `x0` and top `top`, its words 5
-    pt a character with one character between them; its last word moved to
-    end at `x1` when given, as a page number set at the column's edge."""
+    pt a character with one character between them, but `apart` pt before
+    the last; its last word moved to end at `x1` when given, as a page
+    number set at the column's edge."""
     words = []
     left = x0
-    for part in text.split(" "):
+    parts = text.split(" ")
+    for number, part in enumerate(parts):
+        if number == len(parts) - 1 and number > 0:
+            left += apart - _CHAR_PT
         right = left + _CHAR_PT * len(part)
         words.append(Word(part, Box(left, top, right, top + _WORD_HEIGHT_PT), None))
         left = right + _CHAR_PT
@@ -71,11 +80,14 @@ def _centred(text: str, top: float) -> PlacedLine:
     return _line(text, (_LEFT_PT + _RIGHT_PT - width) / 2, top)
 
 
-def _lines(*made: tuple[str, float, float | None]) -> tuple[PlacedLine, ...]:
+def _lines(
+    *made: tuple[str, float, float | None], apart: float = _CHAR_PT
+) -> tuple[PlacedLine, ...]:
     """Lines a pitch apart from top 100, each given by its text, left side
-    and right side (None for its words' own)."""
+    and right side (None for its words' own), `apart` pt before the last
+    word of each."""
     return tuple(
-        _line(text, x0, 100 + number * _PITCH_PT, x1)
+        _line(text, x0, 100 + number * _PITCH_PT, x1, apart=apart)
         for number, (text, x0, x1) in enumerate(made)
     )
 
@@ -123,6 +135,7 @@ def test_haynes_layout_gives_one_line_entries_with_labels_and_page_numbers() -> 
         ("10. A Later Chapter 150", 80, None),
         ("Consequences 3x3", 100, None),
         ("Notes 317", 100, None),
+        apart=12.0,
     )
     assert _summary(contents_entries(lines)) == (
         (None, "Acknowledgments", "ix", 1),
@@ -135,6 +148,44 @@ def test_haynes_layout_gives_one_line_entries_with_labels_and_page_numbers() -> 
     )
 
 
+def test_number_ending_a_title_at_a_word_space_is_no_page_number() -> None:
+    # Spec section 30, "Terms": a number at an ordinary space, short of the
+    # column's edge, ends the title ("Psalm 23", "Maldon, 991", "mix").
+    lines = _lines(
+        ("The Battle of Maldon, 991 12", 60, _RIGHT_PT),
+        ("Psalm 23", 60, None),
+        ("A short title to mix", 60, None),
+        ("The longest line of the page, set to its edge 40", 60, _RIGHT_PT),
+    )
+    assert tuple(
+        (entry.page_number, " ".join(w.text for l in entry.title for w in l.line.words))
+        for entry in contents_entries(lines)
+    ) == (
+        ("12", "The Battle of Maldon, 991"),
+        (None, "Psalm 23"),
+        (None, "A short title to mix"),
+        ("40", "The longest line of the page, set to its edge"),
+    )
+
+
+def test_number_far_from_its_word_and_short_of_the_edge_is_no_page_number() -> None:
+    # Gierke's page 54: a signature line "M. d", the "d" 254 pt right of
+    # "M." and 18 pt short of the column's edge.
+    lines = (
+        _line("A topic of the summary that fills its line", 60, 100, _RIGHT_PT),
+        _line("M. d", 60, 114, _RIGHT_PT - 18),
+    )
+    assert all(entry.page_number is None for entry in contents_entries(lines))
+
+
+def test_number_after_leader_dots_is_a_page_number_wherever_it_ends() -> None:
+    lines = (
+        _line("PREFACE . . . . v", 60, 100),
+        _line("The longest line of the page, set to its edge 1", 60, 114, _RIGHT_PT),
+    )
+    assert contents_entries(lines)[0].page_number == "v"
+
+
 def test_turney_layout_runs_a_title_on_to_its_indented_second_line() -> None:
     # Turney's page 10: a spelled number, the title 42 pt to its right,
     # where its second line goes on.
@@ -142,6 +193,7 @@ def test_turney_layout_runs_a_title_on_to_its_indented_second_line() -> None:
         ("One The Growth of Practical", 60, None),
         ("Geology 43", 102, None),
         ("Two A Second Title 61", 60, None),
+        apart=14.0,
     )
     assert _summary(contents_entries(lines)) == (
         ("One", "The Growth of Practical Geology", "43", 1),
@@ -247,7 +299,7 @@ def test_chapitre_11_over_a_title_is_one_entry_with_that_label_and_no_page() -> 
 
 
 def test_lone_label_at_the_end_of_a_run_is_an_entry_with_an_empty_title() -> None:
-    lines = (_line("PREFACE 1", 60, 100), _centred("CHAPTER XII.", 128))
+    lines = (_line("PREFACE 1", 60, 100, apart=12.0), _centred("CHAPTER XII.", 128))
     entries = contents_entries(lines)
     assert _summary(entries) == (
         (None, "PREFACE", "1", 1),
