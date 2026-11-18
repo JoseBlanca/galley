@@ -11,6 +11,8 @@ so that white print on a dark ground counts.
 
 import math
 import statistics
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import Final
 
 from galley.model import Box, RenderedPage
@@ -28,7 +30,27 @@ _BACKGROUND_BOX_GROWTH_PT: Final[float] = 6.0
 _LEAST_INK_LEVELS: Final[int] = 20
 # Plates spec section 2b: measured, the inkless pages have 0.92 to 1.00 of
 # their words without ink, the highest page of print 0.10 (Domesday 481).
-INKLESS_SHARE: Final[float] = 0.5
+_INKLESS_SHARE: Final[float] = 0.5
+
+
+class InkRule(StrEnum):
+    """What the inkless rule of plates spec section 2b found on a page: an
+    inkless page, or not one (also for a page it does not test, one the
+    plate rule does not test or one without words outside its excluded
+    regions)."""
+
+    INKLESS = "inkless"
+    NOT_INKLESS = "not_inkless"
+
+
+@dataclass(frozen=True, slots=True)
+class InkTest:
+    """What the inkless rule measured on a page it tested: the share of the
+    words outside its excluded regions that have no ink, and the rule's
+    finding."""
+
+    share_without_ink: float
+    rule: InkRule
 
 
 def is_inkless(page: RenderedPage, word_boxes: tuple[Box, ...]) -> bool:
@@ -36,17 +58,22 @@ def is_inkless(page: RenderedPage, word_boxes: tuple[Box, ...]) -> bool:
     of `word_boxes`, the boxes of the page's text-layer words outside its
     excluded regions, in points, have no ink on `page`, its 36 dpi render.
     False when `word_boxes` is empty."""
-    share = share_without_ink(page, word_boxes)
-    return share is not None and share >= INKLESS_SHARE
+    ink_test = measure_ink(page, word_boxes)
+    return ink_test is not None and ink_test.rule is InkRule.INKLESS
 
 
-def share_without_ink(page: RenderedPage, word_boxes: tuple[Box, ...]) -> float | None:
-    """The share of `word_boxes` that have no ink on `page`, as `is_inkless`
-    takes them; None when `word_boxes` is empty."""
+def measure_ink(page: RenderedPage, word_boxes: tuple[Box, ...]) -> InkTest | None:
+    """The inkless rule on `page` and `word_boxes`, as `is_inkless` takes
+    them: the share of `word_boxes` without ink and the rule's finding;
+    None when `word_boxes` is empty, a page the rule does not test."""
     if not word_boxes:
         return None
     without_ink = sum(1 for box in word_boxes if not _has_ink(page, box))
-    return without_ink / len(word_boxes)
+    share = without_ink / len(word_boxes)
+    return InkTest(
+        share_without_ink=share,
+        rule=InkRule.INKLESS if share >= _INKLESS_SHARE else InkRule.NOT_INKLESS,
+    )
 
 
 def _has_ink(page: RenderedPage, box: Box) -> bool:

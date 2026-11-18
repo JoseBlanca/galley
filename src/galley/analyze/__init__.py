@@ -30,7 +30,7 @@ import pdfplumber
 
 from galley import pdfium, wordlist
 from galley.analyze._figures import PictureGroup, figure_boxes, figure_groups
-from galley.analyze._inkless import INKLESS_SHARE, is_inkless, share_without_ink
+from galley.analyze._inkless import InkRule, InkTest, is_inkless, measure_ink
 from galley.analyze._plates import (
     PLATE_RENDER_DPI,
     PictureArea,
@@ -132,26 +132,6 @@ class PlateRule(StrEnum):
     NOT_PLATE = "not_plate"
 
 
-class InkRule(StrEnum):
-    """What the inkless rule of plates spec section 2b found on a page: an
-    inkless page, or not one (also for a page it does not test, one the
-    plate rule does not test or one without words outside its excluded
-    regions)."""
-
-    INKLESS = "inkless"
-    NOT_INKLESS = "not_inkless"
-
-
-@dataclass(frozen=True, slots=True)
-class _InkTest:
-    """What the inkless rule measured on a page it tested: the share of the
-    words outside its excluded regions that have no ink, and the rule's
-    finding."""
-
-    share_without_ink: float
-    rule: InkRule
-
-
 @dataclass(frozen=True, slots=True)
 class _PlateTest:
     """What the plate rule measured on a page it tested: its picture area,
@@ -178,7 +158,7 @@ class _Measurement:
     layer_word_count: int
     first_row: tuple[str, ...]
     plate_test: _PlateTest | None
-    ink_test: _InkTest | None
+    ink_test: InkTest | None
     figures: tuple[PictureGroup, ...]
 
 
@@ -314,7 +294,7 @@ def _measurer(
         ink_test = (
             None
             if rendered is None
-            else _test_ink(
+            else measure_ink(
                 rendered,
                 tuple(
                     box
@@ -370,21 +350,7 @@ def _test_plate(
     )
 
 
-def _test_ink(rendered: RenderedPage, word_boxes: tuple[Box, ...]) -> _InkTest | None:
-    """The inkless rule on a page rendered as `rendered` whose words outside
-    its excluded regions have the boxes `word_boxes`, in points; None for a
-    page without such words, which the rule does not test (plates spec,
-    section 2b)."""
-    share = share_without_ink(rendered, word_boxes)
-    if share is None:
-        return None
-    return _InkTest(
-        share_without_ink=share,
-        rule=InkRule.INKLESS if share >= INKLESS_SHARE else InkRule.NOT_INKLESS,
-    )
-
-
-def _log_inkless(page_index: int, ink_test: _InkTest) -> None:
+def _log_inkless(page_index: int, ink_test: InkTest) -> None:
     """Logs at WARNING a page made `inkless`, with its share of words without
     ink, so that the owner sees a page taken wrongly (plates spec, section
     2b)."""
