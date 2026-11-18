@@ -1,0 +1,58 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "gierke_intro_heads",
+  "page": 0,
+  "book_page_index": 68,
+  "checks": "the list's first page: no running head; its title and section headings, taken by the tall branch of the heading rule (structure spec section 14)",
+  "expected": {
+    "removals": [],
+    "page_numbers": [],
+    "heading_lines": [
+      "LIST OF AUTHORITIES.",
+      "I. THE MEDIEVAL PUBLICISTS.",
+      "Century XL"
+    ]
+  },
+  "printed": {
+    "book_page_index": 68,
+    "running_head": null,
+    "above_head": null,
+    "title_heading": "LIST OF AUTHORITIES.",
+    "section_headings": [
+      {
+        "text": "I. THE MEDIEVAL PUBLICISTS.",
+        "as_printed": "I. The Medieval Publicists. (capitals and small capitals)",
+        "position": "top",
+        "line_from_top": 2,
+        "look": "centred, roman capitals and small capitals, body-size or a little larger, wide space above and below"
+      },
+      {
+        "text": "Century XI.",
+        "position": "top",
+        "line_from_top": 3,
+        "look": "italic, upper- and lower-case with italic roman numeral, centred, slightly larger than body or body size, space above and below; a sub-heading under the section"
+      }
+    ],
+    "entries": {
+      "setting": "Each entry has a hanging number in bold sans-serif figures with a full stop (e.g. '8.'), set flush with the left edge of the column; the entry text is roman (author name in the same plain roman as the rest, not small caps or italic), first line beside the number, turnover lines indented further (hanging indent).",
+      "count_numbered_on_page": 7,
+      "first_entry_first_words": "Petrus Damiani (born",
+      "last_entry_first_words": "Wido Episcopus Ferrariensis.",
+      "starts_mid_entry": false
+    },
+    "margin_numbers": {
+      "side": "left, hanging (inside the column's left edge, the entry numbers)",
+      "numbers": [
+        "1.",
+        "2.",
+        "3.",
+        "4.",
+        "5.",
+        "6.",
+        "7."
+      ]
+    },
+    "foot": null,
+    "notes": "No running head and no printed page number (first page of the list; would be lxiii). Title 'LIST OF AUTHORITIES.' in large spaced roman capitals, centred, about a quarter down the page. Lower half of the page below entry 7 is empty space (~250 px). A dot below the text near the foot (speck). Tiny specks at top right corner."
+  }
+}

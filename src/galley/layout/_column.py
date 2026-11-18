@@ -13,6 +13,8 @@ small type that the footnote band (step 4) and the small-print page
 share. Positions are PDF points from the page's top left.
 """
 
+import re
+import statistics
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -27,6 +29,7 @@ __all__ = [
     "ColumnWords",
     "Side",
     "ends_short_of_inset",
+    "has_letter_or_digit",
     "in_cut_in_zone",
     "is_small_row",
     "running_head_row_count",
@@ -134,6 +137,28 @@ _MARGIN_NOTE_LETTERS: Final[int] = 2
 # Measured: the 5th percentile of the gap below the running head is 1.42
 # pitches or more in the four evaluation books.
 _RUNNING_HEAD_GAP_PITCHES: Final[float] = 1.3
+# Measured on the whole books' words.json on 17 November 2026 (layout spec
+# section 3, step 3): Stubbs' skew sets the date at the end of its head a
+# row of its own 0.2 to 0.5 pitch below the rest of the head (pages 20,
+# 100, 152, 158, 186, 202 and 210).
+_HEAD_SKEW_PITCHES: Final[float] = 0.5
+# Layout spec section 3, step 3: the head row's top leaves out its words of
+# a page-number form (structure spec section 1: 1 to 3 digits or a roman
+# numeral in lower case, with at most one "." or "," after it), which the
+# OCR may box lower than the head's words (Domesday's "134", page 159).
+_PAGE_NUMBER_FORM = re.compile(
+    r"(?:[0-9]{1,3}|(?=[ivxlcdm])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))[.,]?"
+)
+# Measured on 17 November 2026 (layout spec section 3, step 2): Turney's
+# notes at the back hang their numbers 6 to 14 pt left of their text, left
+# of the page's left edge; a number up to 15 pt from the word right of it
+# stays in that word's line, on a page where 2 numbers do (18 November
+# 2026, after review: one alone was an OCR speck read as a digit, on
+# Gierke's 115 and 160 and Domesday's 443). So kept: Turney 99, Gierke 28
+# (its contents, pages 62 and 65), none in the other books.
+HANGING_NUMBER = re.compile(r"[0-9]{1,3}")
+HANGING_NUMBER_GAP_PT: Final[float] = 15.0
+HANGING_NUMBERS_LEAST: Final[int] = 2
 
 
 def _column_edges(
@@ -176,23 +201,54 @@ def _word_reaching_from_left_margin(
     return first if reaches else None
 
 
-def _has_letter_or_digit(row: Line) -> bool:
+def has_letter_or_digit(row: Line) -> bool:
+    """Whether a word of `row` holds a letter or a digit."""
     return any(char.isalnum() for word in row.words for char in word.text)
+
+
+def _median_top(row: Line) -> float:
+    """The median of the tops of `row`'s words, in points: the row's top
+    for step 3, which an em dash or a word boxed tall does not move."""
+    return statistics.median(word.box.top for word in row.words)
+
+
+def _head_row_top(row: Line) -> float:
+    """The head row's top for step 3, in points: the median top of its
+    words that are no page-number form, so that a page number boxed low
+    ("134") does not move it; of all its words when every one is."""
+    kept = tuple(
+        word for word in row.words if _PAGE_NUMBER_FORM.fullmatch(word.text) is None
+    )
+    return statistics.median(word.box.top for word in kept or row.words)
 
 
 def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
     """How many of the column's `rows`, from the top, form the running-head
-    region (step 3): the first row with a letter or a digit and the rows
-    above it, when the next row's top is at least
-    `_RUNNING_HEAD_GAP_PITCHES` times `pitch` below that row's top. 0 when
-    there is no such region."""
+    region (step 3): the head row, the first with a letter or a digit, the
+    rows above it, and the rows right below it whose tops lie less than
+    `_HEAD_SKEW_PITCHES` times `pitch` below its top, when the next row
+    with a letter or a digit has its top at least
+    `_RUNNING_HEAD_GAP_PITCHES` times `pitch` below the head row's. A
+    row's top is the median of its words' tops, the head row's of its
+    words that are no page-number form (`_head_row_top`). 0 when there is
+    no such region."""
     first = next(
-        (index for index, row in enumerate(rows) if _has_letter_or_digit(row)), None
+        (index for index, row in enumerate(rows) if has_letter_or_digit(row)), None
     )
-    if first is None or first + 1 >= len(rows):
+    if first is None:
         return 0
-    gap = rows[first + 1].box.top - rows[first].box.top
-    return first + 1 if gap >= _RUNNING_HEAD_GAP_PITCHES * pitch else 0
+    head_top = _head_row_top(rows[first])
+    end = first + 1
+    while (
+        end < len(rows)
+        and _median_top(rows[end]) - head_top < _HEAD_SKEW_PITCHES * pitch
+    ):
+        end += 1
+    below = next((row for row in rows[end:] if has_letter_or_digit(row)), None)
+    if below is None:
+        return 0
+    gap = _median_top(below) - head_top
+    return end if gap >= _RUNNING_HEAD_GAP_PITCHES * pitch else 0
 
 
 # Measured: the median height of a line's words over the book's is at
@@ -248,16 +304,79 @@ def split_at_column(
         )
         is not None
     }
+    left_margin = (
+        *outside_left,
+        *(word for word in in_column if id(word) in reaching),
+    )
+    column = tuple(word for word in in_column if id(word) not in reaching)
+    hanging = _hanging_numbers(left_margin, column)
+    # The column keeps the order of the page's words, its hanging numbers
+    # among them.
+    kept = hanging | {id(word) for word in column}
     return ColumnSplit(
         left=left,
         right=right,
-        left_margin=(
-            *outside_left,
-            *(word for word in in_column if id(word) in reaching),
-        ),
+        left_margin=tuple(word for word in left_margin if id(word) not in hanging),
         right_margin=right_margin,
-        column=tuple(word for word in in_column if id(word) not in reaching),
+        column=tuple(word for word in words if id(word) in kept),
     )
+
+
+def _hanging_number(
+    number: Word, left_margin: tuple[Word, ...], column: tuple[Word, ...]
+) -> bool:
+    """Whether `number`, a word of `left_margin`, hangs before a line of
+    `column`'s words (step 2): 1 to 3 digits, on a row that is not the
+    first with a letter or a digit (the head row of step 3), whose next
+    word right of it starts at most `HANGING_NUMBER_GAP_PT` right of the
+    number's right side, with no other margin word between them but
+    digits."""
+    if HANGING_NUMBER.fullmatch(number.text) is None:
+        return False
+    rows = group_rows((*column, number))
+    place = next(
+        place
+        for place, row in enumerate(rows)
+        if any(word is number for word in row.words)
+    )
+    head = next(
+        (place for place, row in enumerate(rows) if has_letter_or_digit(row)), None
+    )
+    right = tuple(
+        word
+        for word in rows[place].words
+        if word is not number and word.box.x0 > number.box.x0
+    )
+    if place == head or not right:
+        return False
+    start = min(word.box.x0 for word in right)
+    row = rows[place].box
+    # A number the OCR split ("5" "1") hangs whole: digits between count
+    # as none.
+    between = any(
+        other is not number
+        and HANGING_NUMBER.fullmatch(other.text) is None
+        and other.box.x0 >= number.box.x1
+        and other.box.x1 <= start
+        and other.box.top < row.bottom
+        and other.box.bottom > row.top
+        for other in left_margin
+    )
+    return start - number.box.x1 <= HANGING_NUMBER_GAP_PT and not between
+
+
+def _hanging_numbers(
+    left_margin: tuple[Word, ...], column: tuple[Word, ...]
+) -> frozenset[int]:
+    """The identities of the words of `left_margin` that stay in the column
+    as hanging numbers (step 2): those `_hanging_number` takes, when it
+    takes at least `HANGING_NUMBERS_LEAST` on the page."""
+    hanging = frozenset(
+        id(number)
+        for number in left_margin
+        if _hanging_number(number, left_margin, column)
+    )
+    return hanging if len(hanging) >= HANGING_NUMBERS_LEAST else frozenset()
 
 
 # Measured on Stubbs' whole book on 16 November 2026 (layout spec section

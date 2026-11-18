@@ -1,14 +1,15 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 1.2 of the plan owner-books (layout spec section 3, step 3, 17 November 2026): the map's first row of specks is a head row, and the row 3.4 pt below it is the rest of a skewed head, so the two are one line of a head-line region, their words left to right, and one plate_text removal; not yet checked against the page image.",
   "excerpt": "domesday_headings_quotes",
   "page": 4,
   "book_page_index": 40,
   "shows": "a second map as a plate: stray words removed, the caption kept",
   "layout": [
     [
-      "^^^»»=f^ a",
-      ".<«WL , U",
+      ".<«WL ^^^»»=f^ , a U"
+    ],
+    [
       "^^^B^^^r^m^",
       "• \\| /.\": ;,///;'///.».\"''*,. ^;\\ \\\\ . ((1^^*^==%-^^^^^^*"
     ],
@@ -38,11 +39,7 @@
   "removals": [
     {
       "reason": "plate_text",
-      "text": "^^^»»=f^ a"
-    },
-    {
-      "reason": "plate_text",
-      "text": ".<«WL , U"
+      "text": ".<«WL ^^^»»=f^ , a U"
     },
     {
       "reason": "plate_text",

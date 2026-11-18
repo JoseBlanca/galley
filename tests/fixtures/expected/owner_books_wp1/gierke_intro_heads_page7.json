@@ -1,0 +1,64 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "gierke_intro_heads",
+  "page": 7,
+  "book_page_index": 75,
+  "checks": "a running head with its roman page number printed beside it, a region of its own (structure spec section 3, \"A short region beside the head\"), removed with it; the list's section heading, taken by the tall branch",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "ixx Political Theories of the Middle Age."
+      }
+    ],
+    "page_numbers": [],
+    "heading_lines": [
+      "Century XV."
+    ]
+  },
+  "known": "The roman page number is read \"ixx\", which is no well-formed roman numeral, so it goes with the running head (structure spec section 3).",
+  "printed": {
+    "book_page_index": 75,
+    "running_head": {
+      "words": "Political Theories of the Middle Age.",
+      "page_number": "lxx",
+      "number_side": "left",
+      "number_position": "inside the text column: flush with the column's left edge (the left end of the head rule and of the body lines), separated from the italic title by space",
+      "rule_below": true
+    },
+    "above_head": "a small speck above the head at left-centre",
+    "title_heading": null,
+    "section_headings": [
+      {
+        "text": "Century XV.",
+        "position": "middle (about line 26)",
+        "line_from_top": 26,
+        "look": "italic, upper- and lower-case with italic roman numeral, centred, slightly larger than body or body size, space above and below; a sub-heading under the section"
+      }
+    ],
+    "entries": {
+      "setting": "Each entry has a hanging number in bold sans-serif figures with a full stop (e.g. '8.'), set flush with the left edge of the column; the entry text is roman (author name in the same plain roman as the rest, not small caps or italic), first line beside the number, turnover lines indented further (hanging indent).",
+      "count_numbered_on_page": 10,
+      "first_entry_first_words": "Ubertus de Lampugnano.",
+      "last_entry_first_words": "Johannes Gerson (1363—1429).",
+      "starts_mid_entry": false
+    },
+    "margin_numbers": {
+      "side": "left, hanging (inside the column's left edge, the entry numbers)",
+      "numbers": [
+        "76.",
+        "77.",
+        "78.",
+        "79.",
+        "80.",
+        "81.",
+        "82.",
+        "83.",
+        "84.",
+        "85"
+      ]
+    },
+    "foot": null,
+    "notes": "Entry number 85 is printed without its full stop ('85'). Entry 85 runs off the foot ('...in particular, Protestatio') and continues next page. Many specks around the text."
+  }
+}

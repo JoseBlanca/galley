@@ -1,0 +1,72 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "gierke_intro_heads",
+  "page": 4,
+  "book_page_index": 72,
+  "checks": "a running head the text layer misreads; the list's section heading, taken by the tall branch",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "List of ~-l ntlioritics."
+      },
+      {
+        "reason": "signature_mark",
+        "text": "e 2"
+      }
+    ],
+    "page_numbers": [],
+    "heading_lines": [
+      "Century XIV."
+    ]
+  },
+  "known": "The head is read \"List of ~-l ntlioritics.\", 0.74 alike to the other heads; since structure spec section 3 takes heads 0.70 alike (17 November 2026), it is removed as a running head.",
+  "printed": {
+    "book_page_index": 72,
+    "running_head": {
+      "words": "List of Authorities.",
+      "page_number": "lxvii",
+      "number_side": "right",
+      "number_position": "inside the text column: flush with the column's right edge (the right end of the head rule and of the body lines), separated from the italic title by space",
+      "rule_below": true
+    },
+    "above_head": null,
+    "title_heading": null,
+    "section_headings": [
+      {
+        "text": "Century XIV.",
+        "position": "lower middle (about 37th line)",
+        "line_from_top": 37,
+        "look": "italic, upper- and lower-case with italic roman numeral, centred, slightly larger than body or body size, space above and below; a sub-heading under the section"
+      }
+    ],
+    "entries": {
+      "setting": "Each entry has a hanging number in bold sans-serif figures with a full stop (e.g. '8.'), set flush with the left edge of the column; the entry text is roman (author name in the same plain roman as the rest, not small caps or italic), first line beside the number, turnover lines indented further (hanging indent).",
+      "count_numbered_on_page": 11,
+      "first_entry_first_words": "Vincentius Bellovacensis (d.",
+      "last_entry_first_words": "Disputatio inter militem",
+      "starts_mid_entry": true
+    },
+    "margin_numbers": {
+      "side": "left, hanging (inside the column's left edge, the entry numbers)",
+      "numbers": [
+        "40.",
+        "41.",
+        "42.",
+        "43.",
+        "44.",
+        "45.",
+        "46.",
+        "47.",
+        "48.",
+        "49.",
+        "50."
+      ]
+    },
+    "foot": {
+      "text": "e 2",
+      "description": "signature mark 'e 2' (italic e and figure 2) at the foot, right side under the column"
+    },
+    "notes": "Page starts mid-entry: first 5 lines ('Staatslehre des h. Thomas v. Aquino, Leipz. 1873. Nic. Thoemes, ...') continue entry 39 from the page before, at turnover indent. 11 numbered entries (40-50)."
+  }
+}

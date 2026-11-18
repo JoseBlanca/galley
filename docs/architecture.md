@@ -17,7 +17,13 @@ reason `front_matter`, the config key `front_matter_end` and
 `text_layer.layer_words`; and the same day for re-reading small print
 with Tesseract (`docs/specs/reocr.md`), which gives layout the PDF and
 the config as inputs, adds the record `Reread` to `lines.json` (version
-2), the module `ocr.py` and the config key `reread_footnotes`.
+2), the module `ocr.py` and the config key `reread_footnotes`. Revised
+again the same day for the plan owner-books, which makes galley read
+the owner's two modern books (`docs/specs/structure.md` §21 to §27):
+it adds the block kind `epigraph` with `Block.source`, `Note.group`,
+and the word change reasons `source_dash`, `punctuation_attached` and
+`case_split`, which take `blocks.json` to version 4; no other file
+changes format.
 
 Decisions marked "owner", with a date from 14 to 17 November 2026,
 were taken by the owner in chat. The others were taken while writing,
@@ -152,7 +158,7 @@ An unknown key or a wrong type is an error.
 | `pdf` | path, required | relative to `book.toml` |
 | `title` | string, required | |
 | `authors` | list of strings, required | |
-| `language` | string, required | ISO 639-1 code: `en`, `es`, `fr`, `de`, `it`. `config.py` maps it to Tesseract's code (`eng`, `spa`…) and to the word list |
+| `language` | string, required | ISO 639-1 code: `en`, `es`, `fr`, `de`, `it`. `config.py` maps it to Tesseract's code (`eng`, `spa`…) and to the word list; structure treats spaced punctuation by it (`docs/specs/structure.md` §23) |
 | `ocr` | `verify` / `trust` / `redo`, `verify` | how far the book's own OCR is trusted (section 7b), and whether layout re-reads small print: not with `trust` or `redo` (`docs/specs/reocr.md`) |
 | `correct` | bool, `false` | whether `galley2epub run` runs the correct stage |
 | `exclude_pages` | list of page indices, `[]` | pages left out, as removals |
@@ -186,7 +192,11 @@ A stage spec adds the keys it needs, here and in `config.py` together.
   block are joined by one space, except in a `verse` block, where they
   are separated by a line feed, `"\n"`, so that a poem keeps its printed
   line breaks (owner, 15 November 2026); a line feed is in no other
-  block. Prose lines are always joined.
+  block but an `epigraph` whose quotation is verse (`docs/specs/structure.md`
+  §22; owner, 17 November 2026). Prose lines are always joined. In a
+  book whose `language` is `fr`, structure puts a no-break space,
+  U+00A0, before a spaced "?", ";", ":" or "!" (§23 of the same spec);
+  it is white space to the fidelity check.
 
 ## 7b. Trusting the book's own OCR
 
@@ -241,8 +251,8 @@ but was fitted on 16 books only.
 The formats are frozen dataclasses in `src/galley/model.py`, with tuples
 for sequences, `frozendict` (a built-in type of Python 3.15) for
 mappings, `StrEnum` for finite sets, and floats for positions. Each file
-has a `format_version` int: 3 for `blocks.json`, 2 for `pages.json`,
-`words.json` and `lines.json`, 1 for the others.
+has a `format_version` int: 4 for `blocks.json`, 3 for `lines.json`, 2
+for `pages.json` and `words.json`, 1 for the others.
 `blocks.json` went to 2 with the second plan of structure (16 November
 2026), which added `Note.kind`, `Block.label`, the block kinds `verse`
 and `chapter_summary` and the removal reason `guide_words`; reading a
@@ -253,7 +263,14 @@ page kind and the removal reason `front_matter`
 went to 2 the same day, with `rereads` (`docs/specs/reocr.md`); the
 owner reruns layout. `blocks.json` went to 3 the same day, with the word
 change reason `hyphen_lost` (`docs/specs/structure.md` §5); the owner
-reruns structure. Each has one pair of functions
+reruns structure. `blocks.json` went to 4 the same day, for the plan
+owner-books, with the block kind `epigraph`, `Block.source`,
+`Note.group` and the change reasons `source_dash`,
+`punctuation_attached` and `case_split` (`docs/specs/structure.md` §7);
+the owner reruns structure. `lines.json` went to 3 on 18 November 2026,
+with `Reread.junk_words` (`docs/specs/reocr.md` §4, the review of work
+package 2 of the plan owner-books); the owner reruns layout. Each has
+one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
 Reading a file whose `format_version` is not the current one is an error
@@ -327,13 +344,17 @@ tuple[Reread, ...])`:
   replaces, each the same printed word as one of its `ocr_words` by
   the rules of `docs/specs/reocr.md` §4),
   `ocr_words` (Tesseract's, without its junk), `layer_score` and `ocr_score`
-  (ints, known words minus unknown words of each reading), `kept`
+  (ints, known words minus unknown words of each reading, the layer's
+  as `docs/specs/reocr.md` §3 scores it), `kept`
   (whether `ocr_words` took the place of `layer_words`: `ocr_score`
   higher, or equal with more known words, and, where `layer_words` is empty, at least 2 known words or
   one sure single word, `docs/specs/reocr.md` §3), and
   `dropped_junk_count` (Tesseract's words of no letter or digit, not
   punctuation or a printed sign, dropped from `ocr_words`, and its words
-  stripped of an underscore at either end, `docs/specs/reocr.md` §4). Every region read is recorded, kept or not, in page order.
+  stripped of an underscore at either end, `docs/specs/reocr.md` §4),
+  and `junk_words` (those of `layer_words` that layout replaced as the
+  layer's junk under a Tesseract word paired with the layer's copy of
+  its word, by its word list; reocr §4, the exception in (a)). Every region read is recorded, kept or not, in page order.
 - `RereadKind`: `small_print_page` (a page printed wholly in small
   type, read below its running head), `margin_note` (one note of an
   outer margin), `cut_in_note` (one crop of Stubbs' notes cut into the
@@ -363,6 +384,10 @@ page_numbers)`:
   "CHAPTER III.", "V"; `None` for a heading without one and for every
   other kind: reading a blocks.json where a block that is not a heading
   has a label is an error that names the file and the block),
+  `source: str | None` (epigraphs: the source line as printed, without
+  its leading dash, words joined by single spaces; `None` for every
+  other kind: reading a blocks.json where a block that is not an
+  epigraph has a source is an error that names the file and the block),
   `spans: tuple[Span, ...]`, `figure: str | None` (figure blocks),
   `origin: tuple[Origin, ...]`.
 - `BlockKind`, each value what the text is:
@@ -379,6 +404,10 @@ page_numbers)`:
     line breaks (section 7);
   - `chapter_summary`: the list of a chapter's topics printed under its
     heading, as Stubbs prints one under each chapter (owner, 15 November
+    2026);
+  - `epigraph`: a quotation set at the head of a chapter, before its
+    text; its spans hold the quotation, with a line feed between its
+    lines when it is verse, and `source` its source (owner, 17 November
     2026);
   - `figure`: a picture, with its caption as the block's text (empty when
     it has none) and its image in `figure`;
@@ -397,7 +426,11 @@ page_numbers)`:
 - `Note`: `id`, `kind: NoteKind`, `marker` (as printed at the start of
   the note: "8", "*", "291.", or as OCR misread it; empty when it has
   none), `blocks: tuple[Block, ...]` (a note may have several
-  paragraphs, and margin notes: below), `origin`, `referenced: bool`. A
+  paragraphs, and margin notes: below), `origin`, `referenced: bool`,
+  `group: str | None` (on the first note of a note group of an endnote
+  section, the group's heading as printed, "Chapter 1." and the
+  chapter's title; `None` on every other note:
+  `docs/specs/structure.md` §12). A
   note whose reference structure could not find (in Gierke's excerpt,
   endnotes 291 to 294, whose references are on pages outside it) has
   `referenced` false. A reference in the text
@@ -429,7 +462,13 @@ page_numbers)`:
   "ment,") becomes ("movement,",), two parts of a word in a margin note
   whose line-end hyphen the OCR dropped or read as "." (structure §5).
   `note_marker`: ("Greece,1",)
-  becomes ("Greece,", "1"), the "1" going to the note reference. A spec
+  becomes ("Greece,", "1"), the "1" going to the note reference.
+  `source_dash`: ("—Hobbes",) becomes ("Hobbes",), the dash before an
+  epigraph's source, which markdown writes back. `punctuation_attached`:
+  ("subjection", ";") becomes ("subjection;",), a spaced sign attached
+  in a book not in French. `case_split`: ("theAvre",) becomes ("the",
+  "Avre"), a word the OCR glued at a case change
+  (`docs/specs/structure.md` §22 to §24). A spec
   adds a reason when it needs one.
 - `PageNumber`: `page_index`, `text`, `position: head | foot`.
   `page_numbers: tuple[PageNumber, ...]`, taken from the removals; the
@@ -512,7 +551,11 @@ summaries and verse, groups lines into paragraphs, keeps a plate's
 caption and removes its stray words, and joins hyphenated words
 (dropping the hyphen where the word list or the book's own words allow
 it, keeping it in a compound the book prints, and dropping it as a
-recorded guess where neither decides; `docs/specs/structure.md` §5).
+recorded guess where neither decides; `docs/specs/structure.md` §5);
+finds the epigraphs under a chapter's heading and splits words glued at
+a case change. It attaches a spaced "?", ";", ":" or "!" to the word
+before it, or, in French, puts a no-break space before it, each change
+recorded (§22 to §24 of the same spec).
 Last, over the whole book, it joins paragraphs that run over a page
 break; cuts the notes, joins those that run over a page break, finds
 the endnotes, and matches each note reference to its note, splitting it
@@ -540,7 +583,11 @@ and each reference to one a link to it marked as a note reference
 3.14 keeps an `epub:type` attribute on a link and a div, and points the
 link into the right chapter file, checked on 16 November 2026; the
 pop-up itself was not tried on a Kindle); a `verse` block with a hard
-line break at each line feed; a margin note inside a note within that
+line break at each line feed; an `epigraph` as a div holding its
+quotation, with hard line breaks when it is verse, and a div of class
+`epigraph-source` holding a dash and its source, the dash written as text;
+a note group's heading as a div of class `note-group` before its first
+note, not a heading (`docs/specs/structure.md` §25); a margin note inside a note within that
 note; figures as images with their caption. How each kind is written and
 styled is the markdown and epub specs' to decide. Pandoc runs with
 `--fail-if-warnings`, so that a note it would drop is an error (checked
@@ -608,7 +655,7 @@ A stage imports these and nothing else of galley.
 
 | module | gives |
 |---|---|
-| `model.py` | the formats of section 8, with their read and write functions; and the rules of re-reading (`docs/specs/reocr.md` §4) that layout and the fidelity check share: `replaced_layer_words(layer_words, ocr_words, is_known=...)`, the layer words a kept `Reread` replaces, and `matched_ocr_positions`, the Tesseract words that read them; `is_under_ocr_word` and `may_read`, the tests of rule (a) and of any one rule alone; `words_after_rereads(words, rereads)`, a page's words as lines.json holds them; `take_out_once(groups, taken)`, `word_middle(word)` and `folded_letters_and_digits(text)` |
+| `model.py` | the formats of section 8, with their read and write functions; and the rules of re-reading (`docs/specs/reocr.md` §4) that layout and the fidelity check share: `replaced_layer_words(layer_words, ocr_words, is_known=..., is_junk=...)`, the layer words a kept `Reread` replaces, and `matched_ocr_positions`, the Tesseract words that read them; `junk_layer_words`, those of them replaced as the layer's junk, a `Reread`'s `junk_words`; `scored_layer_words`, the layer words whose reading score is set against Tesseract's (reocr §3); `is_junk_beside_its_copy(junk, copy, ocr_word)`, the one pair of layer words of two lines a Tesseract word may read (section 13); `is_under_ocr_word` and `may_read`, the tests of rule (a) and of any one rule alone; `words_after_rereads(words, rereads)`, a page's words as lines.json holds them; `take_out_once(groups, taken)`, `word_middle(word)` and `folded_letters_and_digits(text)` |
 | `config.py` | `BookConfig`, `read_config(path)`, the language codes |
 | `book_folder.py` | `BookFolder` |
 | `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract or Pandoc), `EditError`, `FidelityError` |
@@ -687,10 +734,17 @@ lists the words, with the pages they came from where the origins say.
   letters and digits it holds, or whose letters are alike to its own,
   within 16 pt, as the three rules say). One Tesseract word then
   stands for two printed words, and one of them is lost (Domesday page
-  548, review of 17 November 2026); structure,
+  548, review of 17 November 2026). The one pair allowed is a word of the
+  record's `junk_words` under the word, with letters unlike its own, and
+  the layer's copy of the word beside it, not under it, with its letters
+  or letters alike (`model.is_junk_beside_its_copy`; reocr §4, the
+  exception in (a)). The check has no word list, so it takes as junk
+  only the words the record names, which must be among its
+  `layer_words`: a word under such a Tesseract word that the record does
+  not name is matched by no rule, and the check fails; structure,
   lines.json against blocks.json (the text of every body and note block,
-  with a note's `marker` and a heading's `label` counted as words of
-  it); markdown, blocks.json
+  with a note's `marker` and `group`, a heading's `label` and an
+  epigraph's `source` counted as words of it); markdown, blocks.json
   with the edits applied against `book.md` as Pandoc reads it (`pandoc -f
   markdown-smart -t json`): a reference to a footnote is matched to
   Pandoc's note element and its marker is not compared as a word, because
@@ -706,7 +760,10 @@ lists the words, with the pages they came from where the origins say.
   galley's Markdown does not make, and an error. An endnote stays where it was printed, so its
   `marker` is written there and counted, referenced or not (section 9).
   A heading's `label` is written in `book.md`, in the form the markdown
-  spec gives, and counted as words of its block.
+  spec gives, and counted as words of its block; so are an epigraph's
+  `source`, in its `epigraph-source` div after the dash markdown writes
+  there, which is not compared, and a note's `group`, in the
+  `note-group` div before the note (`docs/specs/structure.md` §25).
 - A figure's image is the one place `book.md` holds an image. Pandoc
   reads a figure block with a caption as a `Figure` element whose
   caption holds the caption's words and whose body is one `Image`, and
@@ -839,6 +896,20 @@ On 17 November 2026:
   the text layer, region by region, every replaced word recorded
   (`docs/specs/reocr.md`). That layout does it, the rule that chooses,
   and footnotes only when the config asks were decided while writing.
+- **The plan owner-books**: its scope (running heads and page numbers,
+  flush-left and tall headings, notes grouped per chapter, epigraphs, a
+  paragraph ended at a page break, spaced punctuation, three fixes from
+  the public-domain books); an **epigraph** is a block kind of its own
+  with its source as a separate part; the dash before a source is look,
+  removed with a record and written back by markdown; a verse epigraph keeps
+  its line breaks; a spaced "?", ";", ":" or "!" is attached to its
+  word in an English book, with a record, and preceded by a no-break
+  space in a French one, and left alone after a dash or a quotation
+  mark (`docs/specs/structure.md` §22 and §23). The source and a note
+  group's heading are strings on the block and the note, the group
+  heading is not in the table of contents, and markdown writes the
+  dash as text, not the style sheet (§27 of the same spec, settled by
+  the plan's orchestrator the same day).
 
 ## 18. Not in this document
 

@@ -1,9 +1,13 @@
 """A line placed on its page, and the rules of spec section 6 that say
 whether a line starts a paragraph: the indent after a short line, the
-centred line, and the hyphen that joins a line to the one before."""
+centred line, the hanging number, and the hyphen that joins a line to the
+one before."""
 
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 
+from galley.body_measures import commonest
 from galley.model import Line, Word
 from galley.structure._measures import (
     Edges,
@@ -22,18 +26,44 @@ _SHORT_LINE_PT = 3.0
 # edges, the two insets differing by at most 10 pt.
 _CENTRED_INSET_MIN_PT = 15.0
 _CENTRED_INSET_DIFFERENCE_PT = 10.0
+# Spec section 6, rule 3: a hanging number is 1 to 3 digits, hung 5 to 20
+# pt left of its region's text edge (Turney's notes hang theirs 8.8 to
+# 18.8 pt), which is the commonest left side of at least 3 lines that do
+# not start with such a number.
+_HANGING_NUMBER = re.compile(r"[0-9]{1,3}")
+_HANG_MIN_PT = 5.0
+_HANG_MAX_PT = 20.0
+_TEXT_EDGE_MIN_LINES = 3
+# Spec section 6, rule 3: a note's text after its hanging number starts
+# with a letter or one of these ("‘Only an", Turney's page 253).
+_QUOTATION_MARKS = frozenset("‘“'\"«")
+# Spec section 6, "A short last line at a page break": the last line of a
+# page ends more than 20 pt short of its region's right edge (the survey's
+# value, not varied; the owner's books' justified lines end within about
+# 1.3 pt) with a sentence's end, after which closing quotation marks or
+# brackets, then 1 to 3 digits of a note reference ("tendency.43"), may
+# follow.
+_PAGE_END_SHORT_PT = 20.0
+_SENTENCE_END = re.compile(r"[.?!:][\"'’”»)\]]*[0-9]{0,3}$")
+# Spec section 6, rule 3, and section 12: a misread marker is followed by
+# lines hung with 2, 3 and 4.
+MISREAD_FOLLOWERS = (2, 3, 4)
 
 
 @dataclass(frozen=True, slots=True)
 class PlacedLine:
-    """A line of a page with its page index, its region's edges, and the
+    """A line of a page with its page index, its region's edges, the
     edges its centring is measured against: the region's, or the page's
-    body column for a line of a short body region (spec section 6)."""
+    body column for a line of a short body region, and, for a line of a
+    body region, the region's text edge in points from the left of the
+    page, None when it has none or the line is side text (spec section 6,
+    rule 3)."""
 
     page_index: int
     line: Line
     edges: Edges
     centring_edges: Edges
+    text_edge: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +87,81 @@ def with_words(line: PlacedLine, words: tuple[Word, ...]) -> PlacedLine:
     """The part of `line` that holds `words`, some of its words in order,
     which are not none."""
     return PlacedLine(
-        line.page_index, Line(words_box(words), words), line.edges, line.centring_edges
+        line.page_index,
+        Line(words_box(words), words),
+        line.edges,
+        line.centring_edges,
+        line.text_edge,
+    )
+
+
+def is_bare_number(word: str) -> bool:
+    """Whether `word` is 1 to 3 digits with nothing after them, "8" or
+    "145" (spec section 6, rule 3; section 12)."""
+    return _HANGING_NUMBER.fullmatch(word) is not None
+
+
+def text_edge(lines: Sequence[Line]) -> float | None:
+    """The text edge of a region of `lines` (spec section 6, rule 3): the
+    commonest left side of its lines whose first word is not a bare
+    number, in points; None when fewer than 3 lines are such."""
+    lefts = tuple(
+        line.box.x0
+        for line in lines
+        if line.words and not is_bare_number(line.words[0].text)
+    )
+    return commonest(lefts) if len(lefts) >= _TEXT_EDGE_MIN_LINES else None
+
+
+def has_hanging_number(line: PlacedLine) -> bool:
+    """Spec section 6, rule 3: the line's first word is a bare number, its
+    second word starts with a letter or a quotation mark, and its left
+    side lies 5 to 20 pt left of its region's text edge. A second word
+    that does not is a cell of a table's row of numbers (Domesday's pages
+    158, 425 and 479)."""
+    second = line.line.words[1].text if len(line.line.words) > 1 else ""
+    return (
+        is_hung(line)
+        and is_bare_number(line.line.words[0].text)
+        and (second[:1].isalpha() or second[:1] in _QUOTATION_MARKS)
+    )
+
+
+def is_misread_marker(word: str) -> bool:
+    """Whether `word` may be a note's "1" the OCR misread: one character
+    that is not a digit, Turney's "x" (spec section 12, the misread
+    marker)."""
+    return len(word) == 1 and not word.isdigit()
+
+
+def is_hung(line: PlacedLine) -> bool:
+    """Whether `line` has a second word and its left side lies 5 to 20 pt
+    left of its region's text edge, as a hanging number does (spec section
+    6, rule 3)."""
+    return (
+        line.text_edge is not None
+        and len(line.line.words) > 1
+        and _HANG_MIN_PT <= line.text_edge - line.line.box.x0 <= _HANG_MAX_PT
+    )
+
+
+def misread_marker_lines(lines: Sequence[PlacedLine]) -> frozenset[int]:
+    """The positions in `lines`, a page's body stream, of the lines that
+    start a paragraph with a misread marker (spec section 6, rule 3): the
+    first word one character that is not a digit, a second word, hung 5 to
+    20 pt left of the text edge, and the next three lines that start with
+    a hanging number reading 2, 3 and 4."""
+    return frozenset(
+        number
+        for number, line in enumerate(lines)
+        if is_hung(line)
+        and is_misread_marker(line.line.words[0].text)
+        and tuple(
+            int(later.line.words[0].text)
+            for later in lines[number + 1 :]
+            if has_hanging_number(later)
+        )[: len(MISREAD_FOLLOWERS)]
+        == MISREAD_FOLLOWERS
     )
 
 
@@ -95,12 +199,41 @@ def hyphen_between(before: PlacedLine, line: PlacedLine) -> bool:
     )
 
 
+def _starts_in_lower_case(line: PlacedLine) -> bool:
+    """Whether the first word of `line`, past its opening quotation marks,
+    starts with a lower-case letter."""
+    return (
+        bool(line.line.words)
+        and line.line.words[0].text.lstrip("".join(_QUOTATION_MARKS))[:1].islower()
+    )
+
+
+def ends_paragraph_at_page_break(before: PlacedLine, line: PlacedLine) -> bool:
+    """Whether `before`, the last line of a page's body stream, ends its
+    paragraph before `line`, the first of the next page's (spec section
+    6, "A short last line at a page break"): `before` ends more than 20
+    pt short of its region's right edge and its last word ends a
+    sentence, and `line` does not start in lower case."""
+    return (
+        bool(before.line.words)
+        and before.edges.right - before.line.box.x1 > _PAGE_END_SHORT_PT
+        and _SENTENCE_END.search(before.line.words[-1].text) is not None
+        and not _starts_in_lower_case(line)
+    )
+
+
 def starts_paragraph(line: PlacedLine, before: PlacedLine | None) -> bool:
     """Whether `line` starts a paragraph after `before`, the line before it
     (spec section 6): never after a hyphen; else when it is indented after
-    a short line, or it or the line before is centred."""
+    a short line, it or the line before is centred, or it starts with a
+    hanging number."""
     if before is None:
         return True
     if hyphen_between(before, line):
         return False
-    return is_indented(line, before) or is_centred(line) or is_centred(before)
+    return (
+        is_indented(line, before)
+        or is_centred(line)
+        or is_centred(before)
+        or has_hanging_number(line)
+    )

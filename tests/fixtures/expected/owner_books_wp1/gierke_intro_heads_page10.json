@@ -1,0 +1,69 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "gierke_intro_heads",
+  "page": 10,
+  "book_page_index": 78,
+  "checks": "a running head the text layer misreads; the list's section heading, taken by the tall branch",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "List of slnthoriti* ixxiii"
+      }
+    ],
+    "page_numbers": [],
+    "heading_lines": []
+  },
+  "known": "The head is read \"List of slnthoriti* ixxiii\", 0.70 alike to the other heads; since structure spec section 3 takes heads 0.70 alike (17 November 2026), it is removed as a running head, with \"ixxiii\", which is no well-formed roman numeral. The list's section heading \"II. Li.oisTS1.\" (LEGISTS) is no heading: its line is as tall as the list's lines (9 pt on the whole book), and it is neither centred (89 and 123 pt from the column's edges) nor flush left.",
+  "printed": {
+    "book_page_index": 78,
+    "running_head": {
+      "words": "List of Authorities.",
+      "page_number": "lxxiii",
+      "number_side": "right",
+      "number_position": "inside the text column: flush with the column's right edge (the right end of the head rule and of the body lines), separated from the italic title by space",
+      "rule_below": true
+    },
+    "above_head": "a small vertical mark at the top right; specks between title and number",
+    "title_heading": null,
+    "section_headings": [
+      {
+        "text": "II. LEGISTS¹.",
+        "as_printed": "II. Legists¹. (capitals and small capitals, superscript footnote reference 1 before the full stop)",
+        "position": "top",
+        "line_from_top": 1,
+        "look": "centred, roman capitals and small capitals, same style as 'I. The Medieval Publicists.', large space above and below; the E is damaged in the scan (reads like 'LEGISTS' with a broken E)"
+      }
+    ],
+    "entries": {
+      "setting": "Each entry has a hanging number in bold sans-serif figures with a full stop (e.g. '8.'), set flush with the left edge of the column; the entry text is roman (author name in the same plain roman as the rest, not small caps or italic), first line beside the number, turnover lines indented further (hanging indent).",
+      "count_numbered_on_page": 13,
+      "first_entry_first_words": "Glossa Ordinaria, compiled",
+      "last_entry_first_words": "Raphael Fulgosius (1367—1427).",
+      "starts_mid_entry": false
+    },
+    "margin_numbers": {
+      "side": "left, hanging (inside the column's left edge, the entry numbers)",
+      "numbers": [
+        "105.",
+        "106.",
+        "107.",
+        "108.",
+        "109.",
+        "110.",
+        "111.",
+        "112.",
+        "113.",
+        "114.",
+        "115.",
+        "116.",
+        "117."
+      ]
+    },
+    "foot": {
+      "footnote": "¹ On pp. 186, 238, 351 and 416 Dr Gierke gives long lists of legists and canonists. We here select only such writers as are referred to in the chapter that is here translated.",
+      "description": "A footnote in smaller type at the foot of the text, attached to the heading 'Legists¹', no rule above it; no signature mark."
+    },
+    "notes": "Section heading sits below a blank band under the head rule. The footnote reference is on the section heading."
+  }
+}

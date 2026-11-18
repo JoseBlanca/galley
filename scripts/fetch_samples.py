@@ -121,6 +121,22 @@ BOOKS = (
                     '"T" on page index 13, "h" and "im" on 100'
                 ),
             ),
+            Excerpt(
+                name="gierke_intro_heads",
+                # Page index 87, a body page, keeps the excerpt's body line
+                # pitch near the book's: 11.79 pt by structure's survey
+                # against 11.84, where pages 68 to 79 alone measure 11.67
+                # and join page 75's margin notes otherwise than the book
+                # does (17 November 2026).
+                page_indices=(*range(68, 80), 87),
+                covers=(
+                    "the list of authorities (docs/specs/structure.md, "
+                    "section 26): running heads with a roman page number "
+                    "beside them, removed with it, and the list's section "
+                    "headings, which the tall branch of the heading rule "
+                    "takes"
+                ),
+            ),
         ),
     ),
 )
@@ -175,6 +191,49 @@ EVALUATION_EXCERPTS = frozendict(
                     "one column to the top of the next (267, 269)"
                 ),
             ),
+            Excerpt(
+                name="haskins_heads_notes",
+                # The pages added to those of the cases (17 November 2026):
+                # 64, whose running head "THE COMING OF THE NORTHMEN" is
+                # the one other page's that 66's is alike to (structure
+                # spec, section 3), and 24, 27 and 31, body pages that keep
+                # the excerpt's measures at the book's, 8.23 pt and 15.17
+                # pt against 8.31 and 15.19, and its marker form a sign, as
+                # the book's. The nine pages of the cases alone measure a
+                # pitch of 15.09 pt and the marker form digits, and page
+                # 55's note row, 16.6 pt below the row above, then falls
+                # within 1.1 pitches and makes a band the book does not
+                # have. And 163, the first page of chapter VI: without a
+                # chapter heading between page 66's "BIBLIOGRAPHICAL NOTE"
+                # and page 195, structure took 195's footnotes for that
+                # note's paragraphs (structure spec section 16).
+                page_indices=(
+                    22,
+                    23,
+                    24,
+                    27,
+                    28,
+                    29,
+                    30,
+                    31,
+                    55,
+                    64,
+                    66,
+                    163,
+                    195,
+                    235,
+                ),
+                covers=(
+                    "the cases of docs/specs/structure.md, section 26: a "
+                    'word glued at a case change, "theAvre" (page index '
+                    "22); running heads whose next row has a word boxed "
+                    "tall (23, 30, 66, 235), with a speck above page 23's; "
+                    "footnotes set close under the text, with no gap above "
+                    'them (28, 55, 195), and page 28\'s "subjection ;" with '
+                    "its note's sign; 29 holds the paragraph that runs on "
+                    "from 28"
+                ),
+            ),
         ),
         "earlyplantagenet01stub": (
             Excerpt(
@@ -199,6 +258,47 @@ EVALUATION_EXCERPTS = frozendict(
                     "(157), and the index: guide words, columns read as a band, "
                     "rows across the columns, letter initials and spaced "
                     "letters (312 to 321)"
+                ),
+            ),
+            Excerpt(
+                name="stubbs_heads",
+                # The pages added to those of the cases (17 November 2026):
+                # 22, 98, 102, 150, 154, 160, 164, 184, 204, 208 and 212,
+                # whose running heads are alike to those of the cases, so
+                # that each case's head has another page's to be alike to
+                # (structure spec, section 3), as on the whole book; they
+                # are even pages with their margin notes on the right, as
+                # the cases have. The skew splits the rows of pages 100,
+                # 152, 186, 202 and 210: the seven pages of the cases alone
+                # measure a body line pitch of 7.68 pt against the book's
+                # 12.87, and no cut-in inset; with the pages added, 12.27 pt
+                # and a right inset of 58.0 pt against 59.0. Page 152's
+                # cut-in notes still differ from the book's.
+                page_indices=(
+                    20,
+                    22,
+                    98,
+                    100,
+                    102,
+                    150,
+                    152,
+                    154,
+                    158,
+                    160,
+                    164,
+                    184,
+                    186,
+                    202,
+                    204,
+                    208,
+                    210,
+                    212,
+                ),
+                covers=(
+                    "the cases of docs/specs/structure.md, section 26: "
+                    "running heads whose date at the outer end the scan's "
+                    'skew sets a row lower (every page), and a ";" set '
+                    "apart from its word by a space"
                 ),
             ),
         ),
@@ -239,6 +339,23 @@ EVALUATION_EXCERPTS = frozendict(
                     "footnotes; 47 and 272 repeat the running heads of 93 and "
                     "274 and keep the excerpt's body measures at the book's "
                     "(structure spec, section 9)"
+                ),
+            ),
+            Excerpt(
+                name="domesday_rereads",
+                # Page indices 34, 140 and 158 repeat the running heads of
+                # 36, 136 and 160, which the excerpt otherwise keeps in the
+                # text where the book removes them (17 November 2026).
+                page_indices=(26, 34, 36, 97, 136, 138, 139, 140, 150, 158, 160),
+                covers=(
+                    "the cases of docs/specs/structure.md, section 26: "
+                    "margin notes whose words the text layer and "
+                    "re-reading both give (docs/specs/reocr.md, section 4: "
+                    '"tem," on page index 26, and 36, 139, 150, 160); '
+                    "footnotes set close under the text, with no gap above "
+                    "them (97, 138); and two text lines of page 136 that "
+                    "the tall branch of the heading rule takes for "
+                    "headings, a known failure"
                 ),
             ),
         ),

@@ -64,6 +64,7 @@ def _book(
         contents_pages=(),
         plate_pages=(),
         not_in_reference=not_in_reference,
+        reference_ends_at=None,
         margin_notes_moved=margin_notes_moved,
         body_pages=body_pages,
         html_sha256="0" * 64,

@@ -38,6 +38,25 @@ h6 .label {
   text-align: left;
 }
 
+/* An epigraph at a chapter's head: set in from both sides, its lines
+   not justified (a verse one keeps its line breaks), and its source on a
+   line of its own aligned right. markdown writes the source's dash as
+   text (structure spec section 25). */
+.epigraph {
+  margin: 1em 2em 1.5em 2em;
+  font-size: 0.95em;
+}
+
+.epigraph p {
+  text-indent: 0;
+  text-align: left;
+}
+
+.epigraph .epigraph-source p {
+  text-align: right;
+  margin-top: 0.3em;
+}
+
 /* A chapter summary, smaller and set in, under its heading. */
 .chapter-summary {
   margin: 0.8em 1.5em;
@@ -86,4 +105,13 @@ h6 .label {
 
 .endnote {
   margin-bottom: 0.6em;
+}
+
+/* A note group's heading, "Chapter 1." and the chapter's title, before
+   the group's first endnote: a bold line, not a heading, so that it stays
+   out of the table of contents (structure spec section 25). */
+.note-group p {
+  font-weight: bold;
+  text-indent: 0;
+  margin: 1.2em 0 0.4em 0;
 }

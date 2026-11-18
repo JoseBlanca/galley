@@ -2,6 +2,7 @@
 and the reference pages of the layout and structure specs are checked on
 them exactly."""
 
+import functools
 import json
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
@@ -17,6 +18,7 @@ from galley.model import (
     Block,
     BlockKind,
     BlocksFile,
+    ChangeReason,
     LinesFile,
     NoteKind,
     Origin,
@@ -24,12 +26,15 @@ from galley.model import (
     PageNumber,
     PageNumberPosition,
     RemovalReason,
+    WordChange,
     block_text,
     read_blocks,
     read_lines,
     read_pages,
     read_words,
 )
+from galley.structure import survey_book
+from galley.structure._regions import RegionKind, region_kinds
 from galley.text_layer import layer_words, open_pdf
 
 # The excerpts that scripts/fetch_samples.py cuts, with their page counts.
@@ -48,6 +53,10 @@ EXPECTED_EXCERPT_PAGES = {
     "haskins_front": 11,
     "domesday_front_flow": 10,
     "gierke_front_flow": 10,
+    "haskins_heads_notes": 14,
+    "stubbs_heads": 18,
+    "gierke_intro_heads": 13,
+    "domesday_rereads": 11,
 }
 
 # The pages of each excerpt, by index in the excerpt, that have no word in
@@ -69,6 +78,10 @@ PAGES_WITHOUT_WORDS = {
     "haskins_front": (),
     "domesday_front_flow": (),
     "gierke_front_flow": (),
+    "haskins_heads_notes": (),
+    "stubbs_heads": (),
+    "gierke_intro_heads": (),
+    "domesday_rereads": (),
 }
 
 
@@ -138,6 +151,15 @@ def test_excerpt_has_its_pages_and_words_on_each_but_its_blank_pages(
 # checks both pages on the whole books. Two more, Domesday 30 and 42, record
 # a footnote of page 30 that the excerpt runs on to page 42, its next text
 # page.
+#
+# tests/fixtures/expected/owner_books_wp1/ holds, for each page of the four
+# excerpts of structure spec section 26 that a case is printed on, what the
+# rules of work package 1 of docs/plans/owner-books.md must give there: the
+# page's removals and page numbers, and where a case needs them its notes,
+# headings, heading lines and first line of the footnote band, with what
+# the page image shows ("printed"), read from the 300-dpi render by the
+# assistant on 17 November 2026. No test reads them yet: the rules do not
+# exist, and task 1.5 of the plan writes the tests.
 
 EXPECTED_DIR = Path(__file__).parent / "fixtures" / "expected"
 REFERENCE_PAGES = tuple(
@@ -277,6 +299,84 @@ def test_reference_page_break_pair_gives_the_blocks_and_joins_across_the_break(
         "word_changes": _structure_of_page(blocks, first)["word_changes"]
     }
     assert actual == {key: expected[key] for key in actual}
+
+
+# The pages of the four excerpts of the plan owner-books (structure spec
+# section 26, "Excerpt tests"): each file of
+# tests/fixtures/expected/owner_books_wp1/ gives, in "expected", what the
+# rules of the plan's work package 1 give on a page that holds one of its
+# cases, its removals and page numbers, and where the case needs them its
+# heading blocks ("heading_lines", their texts; "headings", with level and
+# label), its notes, and the first line of its footnote band.
+
+OWNER_BOOKS_WP1_DIR = EXPECTED_DIR / "owner_books_wp1"
+OWNER_BOOKS_WP1_PAGES = tuple(
+    sorted(path.stem for path in OWNER_BOOKS_WP1_DIR.glob("*.json"))
+)
+
+
+@functools.cache
+def _band_kinds(lines: LinesFile) -> frozendict[int, tuple[RegionKind, ...]]:
+    """The kind of each region of each page of `lines`, by page index, as
+    structure decides them from its survey of the excerpt."""
+    survey = survey_book(lines, workers=1)
+    return frozendict(
+        {
+            page.index: region_kinds(
+                page, survey.body_word_height, survey.running_heads
+            )
+            for page in lines.pages
+        }
+    )
+
+
+def _owner_books_wp1_page(
+    lines: LinesFile, blocks: BlocksFile, page: int
+) -> dict[str, Any]:
+    """What the excerpt gives on `page`, in the keys of the files of
+    tests/fixtures/expected/owner_books_wp1/."""
+    structure = _structure_of_page(blocks, page)
+    layout = next(layout for layout in lines.pages if layout.index == page)
+    headings = tuple(
+        block
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING and block.origin[0].page_index == page
+    )
+    band_lines = tuple(
+        " ".join(word.text for word in region.lines[0].words)
+        for region, kind in zip(layout.regions, _band_kinds(lines)[page], strict=True)
+        if kind is RegionKind.BAND
+    )
+    return {
+        "removals": structure["removals"],
+        "page_numbers": structure["page_numbers"],
+        "heading_lines": [block_text(block) for block in headings],
+        "headings": [
+            {"level": block.level, "label": block.label, "text": block_text(block)}
+            for block in headings
+        ],
+        "notes": [
+            {
+                "marker": note.marker,
+                "text": " ".join(block_text(block) for block in note.blocks),
+            }
+            for note in blocks.notes
+            if note.origin[0].page_index == page
+        ],
+        "band_first_line": band_lines[0] if band_lines else None,
+    }
+
+
+@pytest.mark.parametrize("name", OWNER_BOOKS_WP1_PAGES)
+def test_owner_books_wp1_page_gives_its_removals_numbers_headings_and_notes(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]], name: str
+) -> None:
+    case = json.loads(
+        (OWNER_BOOKS_WP1_DIR / f"{name}.json").read_text(encoding="utf-8")
+    )
+    lines, blocks = excerpt_outputs[case["excerpt"]]
+    actual = _owner_books_wp1_page(lines, blocks, case["page"])
+    assert {key: actual[key] for key in case["expected"]} == case["expected"]
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_EXCERPT_PAGES))
@@ -451,6 +551,119 @@ def test_referenced_kadesh_10_links_notes_12_to_14_and_leaves_10_and_11(
     )[:2] == (("\"'", False), ("11", False))
 
 
+def _word_changes_on(
+    blocks: BlocksFile, page: int, reason: ChangeReason
+) -> tuple[WordChange, ...]:
+    return tuple(
+        change
+        for change in blocks.word_changes
+        if change.page_index == page and change.reason is reason
+    )
+
+
+def _texts_on(blocks: BlocksFile, page: int) -> tuple[str, ...]:
+    """The texts of the blocks, the notes' too, that start on `page`."""
+    return tuple(
+        block_text(block)
+        for block in (
+            *blocks.blocks,
+            *(block for note in blocks.notes for block in note.blocks),
+        )
+        if block.origin[0].page_index == page
+    )
+
+
+def test_spaced_sign_haskins_28_glued_to_its_reference_is_linked_to_its_note(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # haskins_heads_notes page 4 is book page index 28: "subjection ;^",
+    # the "^" a superscript 1 (structure spec section 23, "After a note
+    # reference"); the OCR reads the note's marker "*".
+    _, blocks = excerpt_outputs["haskins_heads_notes"]
+    assert ("subjection;^", "*") in _references_on(blocks, 4)
+    assert _word_changes_on(blocks, 4, ChangeReason.PUNCTUATION_ATTACHED) == (
+        WordChange(
+            page_index=4,
+            before=("subjection", ";^"),
+            after=("subjection;^",),
+            reason=ChangeReason.PUNCTUATION_ATTACHED,
+        ),
+    )
+
+
+def test_spaced_sign_stubbs_heads_20_semicolon_is_attached(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # stubbs_heads page 0 is book page index 20, which prints
+    # "constituted ;".
+    _, blocks = excerpt_outputs["stubbs_heads"]
+    assert any("France was constituted; the" in text for text in _texts_on(blocks, 0))
+    assert not any(" ;" in text for text in _texts_on(blocks, 0))
+    assert _word_changes_on(blocks, 0, ChangeReason.PUNCTUATION_ATTACHED) == (
+        WordChange(
+            page_index=0,
+            before=("constituted", ";"),
+            after=("constituted;",),
+            reason=ChangeReason.PUNCTUATION_ATTACHED,
+        ),
+    )
+
+
+def test_spaced_sign_mariejol_212_takes_a_no_break_space_and_no_change(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # mariejol_210-219 page 2 is book page index 212; the book is French
+    # (structure spec section 23).
+    _, blocks = excerpt_outputs[MARIEJOL]
+    texts = _texts_on(blocks, 2)
+    assert any("d'une nouvelle révolte\u00a0; et elle" in text for text in texts)
+    assert any("l'intérêt et à la peur\u00a0; elles" in text for text in texts)
+    assert not any(" ;" in text for text in texts)
+    assert not any(
+        change.reason is ChangeReason.PUNCTUATION_ATTACHED
+        for change in blocks.word_changes
+    )
+
+
+def test_case_split_stubbs_312_index_entry_of_scotland(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # stubbs_summaries_index page 4 is book page index 312, the index:
+    # "made king ofScotland," in the text layer (structure spec section 24).
+    _, blocks = excerpt_outputs["stubbs_summaries_index"]
+    assert any("made king of Scotland, 241;" in text for text in _texts_on(blocks, 4))
+    assert _word_changes_on(blocks, 4, ChangeReason.CASE_SPLIT) == (
+        WordChange(
+            page_index=4,
+            before=("ofScotland,",),
+            after=("of", "Scotland,"),
+            reason=ChangeReason.CASE_SPLIT,
+        ),
+    )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "the excerpt's pages never print 'Avre' whole, the evidence for the "
+        "split; the whole book does (test_structure_words.py, whole_book)"
+    ),
+)
+def test_case_split_haskins_22_the_avre(
+    excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
+) -> None:
+    # haskins_heads_notes page 0 is book page index 22, printed "the Avre".
+    _, blocks = excerpt_outputs["haskins_heads_notes"]
+    assert _word_changes_on(blocks, 0, ChangeReason.CASE_SPLIT) == (
+        WordChange(
+            page_index=0,
+            before=("theAvre",),
+            after=("the", "Avre"),
+            reason=ChangeReason.CASE_SPLIT,
+        ),
+    )
+
+
 def test_referenced_mariejol_214_leaves_note_1_unreferenced(
     excerpt_outputs: frozendict[str, tuple[LinesFile, BlocksFile]],
 ) -> None:
@@ -541,7 +754,7 @@ def test_margin_note_before_domesday_75_paragraphs_whose_first_lines_it_is_besid
     assert _margin_notes_before(blocks, 1) == (
         ("Free land.", "The idea of", [1]),
         ("The unfree dom of the villein.", "If now we", [1]),
-        ("Can the villein be pursued ?", "^ ^e free", [1, 2]),
+        ("Can the villein be pursued?", "^ ^e free", [1, 2]),
     )
 
 
@@ -754,7 +967,7 @@ _VERSE_ON_REFERENCE_PAGES = (
                 "Laquelle (Catherine) dé« qtiaiorw ans\nPortoit au b(^ la sagette\n"
                 "La robe et les arcs duisans (convenant)\nAux pocelles de Taygette\n"
                 "ToDjours dés l'aube du jour\nAlloit aux forftts en qneste\n"
-                "Ou de reths tcmt à l'entour\nCemoit le trac d'une beste ;\n"
+                "Ou de reths tcmt à l'entour\nCemoit le trac d'une beste\u00a0;\n"
                 "Ou pressoit les cerfs au cours;\nOu i«r le pendant des roches.\n"
                 "Sans chiens assaUloit les ours\nEt les sanghers aux dents croches '1)4"
             ),
@@ -784,7 +997,7 @@ _VERSE_ON_REFERENCE_PAGES = (
             ),
             (
                 "Le hon jeune le vieux surmontera\n"
-                "En champ bolliquc par singuUer duelle :\n"
+                "En champ bolliquc par singuUer duelle\u00a0:\n"
                 "Dans cage d'or les yeux luy crèvera, '\n"
                 "Deux classes une, puis mourir, mort cruelle.\n(Cent L, qaatraio 35.)"
             ),
@@ -826,17 +1039,17 @@ _VERSE_ON_REFERENCE_PAGES = (
         6,
         (
             (
-                "South -Western Group : 49,155\nMid- Western Group: 33,191\n"
+                "South -Western Group: 49,155\nMid- Western Group: 33,191\n"
                 "Eastern Group: 72,883"
             ),
             (
-                "South- Western Group : 4,038\nMid-Western Group: 3,514\n"
-                "Eastern Group : 7,329"
+                "South- Western Group: 4,038\nMid-Western Group: 3,514\n"
+                "Eastern Group: 7,329"
             ),
             (
-                "South- Western Group : 183,842 106,086\n"
-                "Mid- Western Group : 158,245 115,679\n"
-                "Eastern Group : 255,498 182,830"
+                "South- Western Group: 183,842 106,086\n"
+                "Mid- Western Group: 158,245 115,679\n"
+                "Eastern Group: 255,498 182,830"
             ),
         ),
     ),
@@ -1031,9 +1244,11 @@ def test_caption_kadesh_64_and_68_kept_and_the_back_of_plate_65_removed(
     assert figures[1][2] == ""
     assert _plate_removals(blocks, 6) == (("plate_text", "a"), ("plate_text", "t I"))
     assert figures[2][2].endswith("THE MODERN MODND OF KADESH")
-    # "V", the end of the garbled series head, is on the head's row, which
-    # is caption (spec section 18, rule 2, by row).
-    assert "PLATE VIII V THE MODERN" in figures[2][2]
+    # "V", the end of the garbled series head, lies a row lower than the
+    # rest of the head, which layout makes one line with it, left to right
+    # (layout spec section 3, step 3); the line is caption (spec section
+    # 18, rule 2, by row).
+    assert "PUBLICATIONS, V PLATE VIII THE MODERN" in figures[2][2]
     assert _plate_removals(blocks, 9) == ()
     # The paragraph of page 63 runs on over the plates 64 and 65.
     assert any(_pages(block.origin) == [4, 7] for block in blocks.blocks)
@@ -1055,7 +1270,9 @@ def test_caption_domesday_39_and_40_kept_and_their_stray_words_removed(
     )
     assert ("plate_text", '--,. ^X.^ MoulslVl^rf /\\"?') in _plate_removals(blocks, 3)
     assert {reason for reason, _ in _plate_removals(blocks, 4)} == {"plate_text"}
-    assert len(_plate_removals(blocks, 4)) == 8
+    # The map's first two rows of specks are one line of the head region
+    # (layout spec section 3, step 3).
+    assert len(_plate_removals(blocks, 4)) == 7
 
 
 # Index entries and guide words (structure spec, section 17).

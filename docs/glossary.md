@@ -6,8 +6,8 @@ on 14 November 2026 with `docs/architecture.md`; a term a spec needs and
 this list lacks is added here.
 
 **block**: a unit of the book's text after structure: a heading, a
-paragraph, a quote, verse, a chapter summary, a figure, a margin note or
-an index entry. Its kind says what the text is, never how it looks. It
+paragraph, a quote, verse, a chapter summary, an epigraph, a figure, a
+margin note or an index entry. Its kind says what the text is, never how it looks. It
 has an id,
 `b-p0012-003`, which is its anchor in the EPUB and what an edit names.
 Not a "chunk" or an "element".
@@ -28,8 +28,10 @@ stages write, and the edits.
 MOUND OF KADESH"). On a plate it is the text of the plate's figure block.
 
 **chapter label**: the line that gives a chapter's number, "CHAPTER
-III.", "CHAPITRE II", "ESSAY I.", or a roman numeral alone, "IV". With
-the title under it, it is one heading.
+III.", "CHAPITRE II", "ESSAY I.", a spelled number, "Chapter One", or a
+roman numeral alone, "IV". With the title under it, it is one heading,
+whose `label` it is; it is never a running head, even when it repeats
+from chapter to chapter near the top of the page.
 
 **chapter summary**: the list of a chapter's topics printed under its
 heading, separated by dashes, as Stubbs prints them ("Terms of Henry's
@@ -48,6 +50,14 @@ lines tall. Placed by layout as the first word of the first line.
 **edit**: a change to the text of one block, kept in a file under
 `edits/` and applied by the markdown stage. Made by the correct stage, the
 owner or an agent. Not a "correction" unless the correct stage made it.
+
+**epigraph**: a quotation set at the head of a chapter, before its
+text, with its **source**, the line that names its author and often the
+work or year, printed after a dash or set flush right. A block kind of
+its own, `epigraph`, its source a separate part; a verse epigraph keeps
+its line breaks. The dash is how the source looks, not its text: it is
+removed with a record and written back by the output. Not a quote, which is
+quoted inside the text.
 
 **evaluation book**: a book of the evaluation set of
 `evaluation/books.toml`: an Internet Archive PDF, the Project Gutenberg
@@ -126,6 +136,13 @@ still linked when it has a **marker's shape** (at most 4 characters, at
 most 3 of them letters or digits and at most 1 a letter) and falls in
 the right order.
 
+**note group**: the endnotes printed together under one heading, in a
+book that collects its notes at the back per chapter and numbers them
+from 1 in each chapter; its **group heading** is that heading, the
+chapter's number and title ("Chapter 1." and the title, or
+"Introduction"), kept with the group's first note. A group's notes are
+linked to the references of their own chapter.
+
 **note band**: the rows of ink of one printed margin note, found in a
 render of the margin; what re-reading reads for an outer margin note.
 
@@ -177,6 +194,11 @@ running head, are set in small type (their median word height at most
 or a bibliographical note. Re-reading reads it whole below its running
 head.
 
+**spaced punctuation**: a "?", ";", ":" or "!" that the printer set
+apart from its word by a space, "subjection ;". structure attaches it
+to the word, with a record, in a book not in French, and puts a
+no-break space before it in a French one.
+
 **span**: a run of a block's text with one emphasis and, optionally, a
 note reference.
 
@@ -203,5 +225,8 @@ printed line breaks; every other block joins its lines.
 used by the `whole_book` tests.
 
 **word change**: a change structure makes to words without losing a
-letter, recorded for the fidelity check: a hyphen join, or a note marker
-split off the word it was glued to ("Greece,1" into "Greece," and "1").
+letter, recorded for the fidelity check: a hyphen join, a note marker
+split off the word it was glued to ("Greece,1" into "Greece," and "1"),
+a spaced sign attached, a word glued at a case change split ("theAvre"
+into "the" and "Avre"), or the dash before an epigraph's source
+dropped.

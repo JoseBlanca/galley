@@ -255,7 +255,9 @@ def evaluate(
     together, and AlignmentError when galley's words align less than half
     of the reference."""
     side = read_galley_side(folder)
-    reference = read_reference_file(reference_html, book.rules, book.html_sha256)
+    reference = read_reference_file(
+        reference_html, book.rules, book.html_sha256, ends_at=book.reference_ends_at
+    )
     words = (
         word_list
         if word_list is not None

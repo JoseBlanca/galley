@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): each note's marker, \"\\\"'\", \"11\", \"12\", \"13\", \"u\", is taken out of its text into `marker`; the glued \"13The\" is split by a note_marker word change; note 12's second piece, \"(Histoire. 1875…\" in the right column, is part of note 12. Changed by task 2.3 (structure spec section 11, \"References\"): \"Kadesh,12\", \";13\" and \"above).'*\" are linked to notes 12, 13 and 14 (marked \"u\"), each split off its word by a note_marker word change; notes 10 and 11 stay unreferenced. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed by task 2.1 (structure spec section 11, \"The marker of a note\"): each note's marker, \"\\\"'\", \"11\", \"12\", \"13\", \"u\", is taken out of its text into `marker`; the glued \"13The\" is split by a note_marker word change; note 12's second piece, \"(Histoire. 1875…\" in the right column, is part of note 12. Changed by task 2.3 (structure spec section 11, \"References\"): \"Kadesh,12\", \";13\" and \"above).'*\" are linked to notes 12, 13 and 14 (marked \"u\"), each split off its word by a note_marker word change; notes 10 and 11 stay unreferenced. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image.",
   "excerpt": "kadesh_8-17",
   "page": 2,
   "book_page_index": 10,
@@ -81,7 +81,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "There is a good deal of misunderstanding regarding these sources, and it will be necessary, therefore, to offer a brief statement of them here. They are threefold : (1) The familiar so-called POEM, so long known as the \"Poem of Pentaur,\" until Erman showed that Pentaur (Pn-f- Wr-t) was only the copyist and not the author of the composition (Xeuaeg. Gr,n,,.. p. Ti: we shall ref.-r I., the document us the Poem. CJl A brief RECORD\" of the campaign, engraved over the t.'in|.i.--r. li, fs, which d.pict itchief events; we shall refer to it as the Record. (3) The TEMPLE-RELIEFS depicting the campaign, together with the accompanying short explanatory inscriptions.",
+      "text": "There is a good deal of misunderstanding regarding these sources, and it will be necessary, therefore, to offer a brief statement of them here. They are threefold: (1) The familiar so-called POEM, so long known as the \"Poem of Pentaur,\" until Erman showed that Pentaur (Pn-f- Wr-t) was only the copyist and not the author of the composition (Xeuaeg. Gr,n,,.. p. Ti: we shall ref.-r I., the document us the Poem. CJl A brief RECORD\" of the campaign, engraved over the t.'in|.i.--r. li, fs, which d.pict itchief events; we shall refer to it as the Record. (3) The TEMPLE-RELIEFS depicting the campaign, together with the accompanying short explanatory inscriptions.",
       "pages": [
         2,
         3
@@ -220,6 +220,16 @@
         "*"
       ],
       "reason": "note_marker"
+    },
+    {
+      "before": [
+        "threefold",
+        ":"
+      ],
+      "after": [
+        "threefold:"
+      ],
+      "reason": "punctuation_attached"
     },
     {
       "before": [

@@ -7,8 +7,9 @@ and language that galley's `book.toml` needs, the pages without a text
 layer (`exclude_pages`), and the book config's `contents_pages` and
 `plate_pages` (architecture section 6), which galley-eval passes into the
 `book.toml` it writes; the pages whose text Gutenberg left out
-(`not_in_reference`), whether Gutenberg moved the margin notes
-(`margin_notes_moved`), the first and last page index of the body range,
+(`not_in_reference`), the `id` of the element of the HTML where the
+reference ends (`reference_ends_at`), whether Gutenberg moved the margin
+notes (`margin_notes_moved`), the first and last page index of the body range,
 on which the headings are scored (`body_pages`), the SHA-256 of the HTML
 file the rules and counts were written for (`html_sha256`), the counts
 the reader must find in the HTML and the first five tokens of its body
@@ -67,6 +68,9 @@ class EvaluationBook:
     contents_pages: tuple[int, ...]
     plate_pages: tuple[int, ...]
     not_in_reference: tuple[int, ...]
+    # The `id` of the element of the HTML where the reference ends, that
+    # element left out; None when the reference runs to the end.
+    reference_ends_at: str | None
     margin_notes_moved: bool
     body_pages: tuple[int, int]
     html_sha256: str
@@ -100,6 +104,7 @@ _OPTIONAL_KEYS = (
     "contents_pages",
     "plate_pages",
     "not_in_reference",
+    "reference_ends_at",
     "margin_notes_moved",
     "rules",
 )
@@ -183,6 +188,9 @@ def _book(table: object, key: str, path: Path) -> EvaluationBook:
         ),
         not_in_reference=_page_indices(
             book.get("not_in_reference", []), f"{key}.not_in_reference", path
+        ),
+        reference_ends_at=_optional_id(
+            book.get("reference_ends_at"), f"{key}.reference_ends_at", path
         ),
         margin_notes_moved=_bool(
             book.get("margin_notes_moved", False), f"{key}.margin_notes_moved", path
@@ -305,6 +313,12 @@ def _not_empty[T: (str, tuple[str, ...])](value: T, key: str, path: Path) -> T:
     if len(value) == 0:
         raise _error(path, key, "must not be empty")
     return value
+
+
+def _optional_id(value: object, key: str, path: Path) -> str | None:
+    if value is None:
+        return None
+    return _not_empty(_string(value, key, path), key, path)
 
 
 def _bool(value: object, key: str, path: Path) -> bool:

@@ -616,15 +616,17 @@ def test_truncated_file_names_the_line_and_column(tmp_path: Path, name: str) -> 
 
 
 # For each file, a format_version this galley does not read, and the one it
-# reads: pages.json, words.json and lines.json at 2 since the plan
-# clean-text, blocks.json at 3 since its word change reason hyphen_lost;
-# the version before is the case the owner meets (architecture section 8).
+# reads: pages.json and words.json at 2 since the plan clean-text,
+# blocks.json at 4 since the plan owner-books's epigraphs, note groups and
+# word change reasons, lines.json at 3 since its records of the layer's
+# junk; the version before is the case the owner meets (architecture
+# section 8).
 UNSUPPORTED_VERSION: frozendict[str, tuple[int, int]] = frozendict(
     {
         "pages.json": (1, 2),
         "words.json": (1, 2),
-        "lines.json": (1, 2),
-        "blocks.json": (2, 3),
+        "lines.json": (2, 3),
+        "blocks.json": (3, 4),
     }
 )
 
@@ -1031,7 +1033,7 @@ def test_top_level_key_given_twice_is_an_error(tmp_path: Path) -> None:
     path = _written(tmp_path, "lines.json")
     text = path.read_text(encoding="utf-8")
     text = text.replace(
-        '"format_version": 2,', '"format_version": 2,\n "format_version": 2,', 1
+        '"format_version": 3,', '"format_version": 3,\n "format_version": 3,', 1
     )
     path.write_text(text, encoding="utf-8")
     with pytest.raises(InputFileError, match="format_version") as caught:
@@ -1181,6 +1183,7 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "quote",
             "verse",
             "chapter_summary",
+            "epigraph",
             "figure",
             "margin_note",
             "index_entry",
@@ -1193,6 +1196,9 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "hyphen_join_guessed",
             "hyphen_kept",
             "hyphen_lost",
+            "source_dash",
+            "punctuation_attached",
+            "case_split",
         ],
         "PageNumberPosition": ["head", "foot"],
         "RereadKind": [
@@ -1287,9 +1293,9 @@ def _blocks_json(tmp_path: Path, blocks: BlocksFile) -> dict[str, Any]:
     return json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
 
 
-def test_blocks_json_is_format_version_3() -> None:
-    assert model.BLOCKS_FORMAT_VERSION == 3
-    assert BLOCKS.format_version == 3
+def test_blocks_json_is_format_version_4() -> None:
+    assert model.BLOCKS_FORMAT_VERSION == 4
+    assert BLOCKS.format_version == 4
 
 
 def test_heading_label_is_written_after_level_and_read_back(tmp_path: Path) -> None:
@@ -1301,6 +1307,7 @@ def test_heading_label_is_written_after_level_and_read_back(tmp_path: Path) -> N
         "kind",
         "level",
         "label",
+        "source",
         "spans",
         "figure",
         "origin",
@@ -1345,6 +1352,7 @@ def test_note_kind_is_written_after_id_and_read_back(tmp_path: Path) -> None:
         "blocks",
         "origin",
         "referenced",
+        "group",
     ]
     assert content["notes"][0]["kind"] == "endnote"
     assert read_blocks(tmp_path / "blocks.json").notes == (endnote,)
@@ -1484,6 +1492,187 @@ def test_label_on_a_block_that_is_not_a_heading_names_the_file_and_block(
     )
 
 
+# The plan owner-books: epigraphs and their source, note groups, and three
+# word change reasons, in blocks.json version 4 (architecture section 8).
+
+EPIGRAPH = Block(
+    id="b-p0003-002",
+    kind=BlockKind.EPIGRAPH,
+    level=None,
+    label=None,
+    source="Thomas Hobbes, 1651",
+    spans=(
+        Span(
+            text="The life of man,\nsolitary, poor, nasty, brutish, and short.",
+            emphasis=Emphasis.NONE,
+            note_ref=None,
+        ),
+    ),
+    figure=None,
+    origin=(ORIGIN,),
+)
+
+
+def test_epigraph_source_is_written_after_label_and_read_back(
+    tmp_path: Path,
+) -> None:
+    blocks = replace(BLOCKS, blocks=(BLOCKS.blocks[0], EPIGRAPH))
+
+    content = _blocks_json(tmp_path, blocks)
+
+    epigraph = content["blocks"][1]
+    assert list(epigraph)[:6] == ["id", "kind", "level", "label", "source", "spans"]
+    assert epigraph["kind"] == "epigraph"
+    assert epigraph["source"] == "Thomas Hobbes, 1651"
+    assert epigraph["spans"][0]["text"] == (
+        "The life of man,\nsolitary, poor, nasty, brutish, and short."
+    )
+    assert read_blocks(tmp_path / "blocks.json") == blocks
+
+
+def test_epigraph_without_a_source_and_other_blocks_have_source_null(
+    tmp_path: Path,
+) -> None:
+    unsourced = replace(EPIGRAPH, source=None)
+    blocks = replace(BLOCKS, blocks=(BLOCKS.blocks[0], unsourced))
+
+    content = _blocks_json(tmp_path, blocks)
+
+    assert content["blocks"][0]["source"] is None
+    assert content["blocks"][1]["source"] is None
+    assert content["notes"][0]["blocks"][0]["source"] is None
+    assert read_blocks(tmp_path / "blocks.json") == blocks
+
+
+def test_block_without_its_source_field_names_its_path_as_for_an_epigraph(
+    tmp_path: Path,
+) -> None:
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _delete(tmp_path / "blocks.json", ("blocks", 1, "source"))
+
+    with pytest.raises(InputFileError, match=re.escape("blocks[1].source: missing")):
+        read_blocks(tmp_path / "blocks.json")
+
+
+@pytest.mark.parametrize(
+    "json_path",
+    [("blocks", 1, "source"), ("notes", 0, "blocks", 1, "source")],
+    ids=["body", "note"],
+)
+def test_source_on_a_block_that_is_not_an_epigraph_names_the_file_and_block(
+    tmp_path: Path, json_path: JsonPath
+) -> None:
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _set(tmp_path / "blocks.json", json_path, "Hobbes")
+
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+
+    block_id = "b-p0003-002" if json_path[0] == "blocks" else "b-p0003-004"
+    assert str(caught.value) == (
+        f"{tmp_path / 'blocks.json'}: block {block_id} is a paragraph and has "
+        "the source 'Hobbes'; only an epigraph has a source"
+    )
+
+
+def test_group_on_a_footnote_names_the_file_and_note(tmp_path: Path) -> None:
+    # Architecture section 8: a note group heads notes of an endnote
+    # section; markdown writes it before an endnote only.
+    assert BLOCKS.notes[0].kind is NoteKind.FOOTNOTE
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _set(tmp_path / "blocks.json", ("notes", 0, "group"), "Chapter 1.")
+
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+
+    assert str(caught.value) == (
+        f"{tmp_path / 'blocks.json'}: note {BLOCKS.notes[0].id} is a footnote and "
+        "has the group 'Chapter 1.'; only an endnote has a group"
+    )
+
+
+def test_note_group_is_written_after_referenced_and_read_back(
+    tmp_path: Path,
+) -> None:
+    first = replace(
+        BLOCKS.notes[0],
+        kind=NoteKind.ENDNOTE,
+        marker="1",
+        group="Chapter 1. The Seed",
+    )
+    second = replace(
+        BLOCKS.notes[0],
+        id="n-p0003-002",
+        kind=NoteKind.ENDNOTE,
+        marker="2",
+        blocks=(replace(BLOCKS.notes[0].blocks[0], id="b-p0003-005"),),
+    )
+    blocks = replace(BLOCKS, notes=(first, second))
+
+    content = _blocks_json(tmp_path, blocks)
+
+    assert list(content["notes"][0])[-2:] == ["referenced", "group"]
+    assert content["notes"][0]["group"] == "Chapter 1. The Seed"
+    assert content["notes"][1]["group"] is None
+    assert read_blocks(tmp_path / "blocks.json") == blocks
+
+
+def test_note_without_its_note_group_field_names_its_path(tmp_path: Path) -> None:
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    _delete(tmp_path / "blocks.json", ("notes", 0, "group"))
+
+    with pytest.raises(InputFileError, match=re.escape("notes[0].group: missing")):
+        read_blocks(tmp_path / "blocks.json")
+
+
+def test_blocks_json_of_version_3_without_epigraph_or_note_group_names_structure(
+    tmp_path: Path,
+) -> None:
+    write_blocks(tmp_path / "blocks.json", BLOCKS)
+    for json_path in (
+        ("blocks", 0, "source"),
+        ("blocks", 1, "source"),
+        ("blocks", 2, "source"),
+        ("notes", 0, "blocks", 0, "source"),
+        ("notes", 0, "blocks", 1, "source"),
+        ("notes", 0, "group"),
+    ):
+        _delete(tmp_path / "blocks.json", json_path)
+    _set(tmp_path / "blocks.json", ("format_version",), 3)
+
+    with pytest.raises(InputFileError) as caught:
+        read_blocks(tmp_path / "blocks.json")
+
+    assert str(caught.value) == (
+        f"{tmp_path / 'blocks.json'}: is format version 3; this galley reads "
+        "format version 4; run `galley2epub structure` again"
+    )
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "reason"),
+    [
+        (("—Hobbes",), ("Hobbes",), ChangeReason.SOURCE_DASH),
+        (("subjection", ";"), ("subjection;",), ChangeReason.PUNCTUATION_ATTACHED),
+        (("theAvre",), ("the", "Avre"), ChangeReason.CASE_SPLIT),
+    ],
+    ids=["source_dash", "punctuation_attached", "case_split"],
+)
+def test_word_change_of_an_epigraph_source_or_a_word_is_read_back(
+    tmp_path: Path,
+    before: tuple[str, ...],
+    after: tuple[str, ...],
+    reason: ChangeReason,
+) -> None:
+    change = WordChange(page_index=3, before=before, after=after, reason=reason)
+    blocks = replace(BLOCKS, word_changes=(change,))
+
+    content = _blocks_json(tmp_path, blocks)
+
+    assert content["word_changes"][0]["reason"] == reason.value
+    assert read_blocks(tmp_path / "blocks.json").word_changes == (change,)
+
+
 # An index entry's depth (architecture section 8)
 
 
@@ -1560,16 +1749,16 @@ def test_note_places_counts_the_blocks_written_before_each_note(
 # the re-reading of small print (reocr spec, section 4, "The record").
 
 
-def test_pages_words_and_lines_json_are_format_version_2() -> None:
+def test_pages_and_words_json_are_format_version_2_and_lines_json_3() -> None:
     assert (
         model.PAGES_FORMAT_VERSION,
         model.WORDS_FORMAT_VERSION,
         model.LINES_FORMAT_VERSION,
-    ) == (2, 2, 2)
+    ) == (2, 2, 3)
     assert (PAGES.format_version, WORDS.format_version, LINES.format_version) == (
         2,
         2,
-        2,
+        3,
     )
 
 
@@ -1619,8 +1808,9 @@ def test_front_matter_or_reread_file_of_version_1_names_the_stage_to_run_again(
     with pytest.raises(InputFileError) as caught:
         READERS[name](path)
 
+    current = UNSUPPORTED_VERSION[name][1]
     assert str(caught.value) == (
-        f"{path}: is format version 1; this galley reads format version 2; "
+        f"{path}: is format version 1; this galley reads format version {current}; "
         f"run `galley2epub {WRITING_STAGE[name]}` again"
     )
 
@@ -1651,9 +1841,23 @@ def test_reread_is_written_with_its_fields_in_order_and_read_back(
             "ocr_score": 1,
             "kept": True,
             "dropped_junk_count": 0,
+            "junk_words": [],
         }
     ]
     assert read_lines(tmp_path / "lines.json") == LINES
+
+
+def test_reread_junk_words_are_written_and_read_back(tmp_path: Path) -> None:
+    (reread,) = LINES.rereads
+    with_junk = replace(reread, junk_words=reread.layer_words)
+    lines = replace(LINES, rereads=(with_junk,))
+    write_lines(tmp_path / "lines.json", lines)
+
+    content = json.loads((tmp_path / "lines.json").read_text(encoding="utf-8"))
+    assert content["rereads"][0]["junk_words"] == [
+        {"text": "Ra-", "box": [12.0, 82.0, 30.0, 90.0], "ocr_confidence": None}
+    ]
+    assert read_lines(tmp_path / "lines.json") == lines
 
 
 def test_reread_of_every_kind_kept_or_not_is_read_back_equal(tmp_path: Path) -> None:
@@ -2090,6 +2294,174 @@ def test_ocr_word_matched_by_its_text_is_not_alike_to_another_layer_word() -> No
     assert model.replaced_layer_words((garbled, same), ocr, is_known=_unknown) == (
         same,
     )
+
+
+# The exception in (a): a pairing by letters wins over a word under a
+# Tesseract word whose letters are unlike (reocr spec, section 4).
+
+
+def test_unlike_junk_under_an_ocr_word_is_replaced_with_its_letters_word() -> None:
+    # Domesday page 26: the layer's junk '^"i' lies under Tesseract's
+    # "tem," and its own "tem<" 7 pt below, out of the widened box. Both
+    # are readings of the printed "tem.", which Tesseract's word replaces.
+    junk, beside = _layer('^"i', 10, 101), _layer("tem<", 10, 107)
+    ocr = (_tesseract("tem,", 10, 100),)
+    assert model.replaced_layer_words((junk, beside), ocr, is_known=_unknown) == (
+        junk,
+        beside,
+    )
+
+
+def test_unlike_junk_under_an_ocr_word_stays_its_pair_beside_a_glued_alike_word() -> (
+    None
+):
+    # Domesday page 90: the layer glued the body's "of" to the note's
+    # "demesne" as "ofdemesne-", alike to Tesseract's "demesne." with 2
+    # letters more; replacing it would lose "of". The Tesseract word reads
+    # the junk under it, as rule (a) has it.
+    junk, glued = _layer("rSoyal", 10, 101), _layer("ofdemesne-", 10, 107)
+    ocr = (_tesseract("demesne.", 10, 100),)
+    assert model.replaced_layer_words((junk, glued), ocr, is_known=_unknown) == (junk,)
+    # One letter more is a copy: "the" beside Tesseract's "th" (page 107).
+    copy = _layer("the", 10, 107)
+    ocr = (_tesseract("th", 10, 100),)
+    assert model.replaced_layer_words((junk, copy), ocr, is_known=_unknown) == (
+        junk,
+        copy,
+    )
+
+
+def test_unlike_broken_number_under_an_ocr_word_paired_by_digits_is_replaced() -> None:
+    # Gierke page 63: the page image shows "146" only; the layer has "14."
+    # under Tesseract's "146" and its own "146" beside it. "14." is known,
+    # but its digits begin Tesseract's number: the layer's broken reading.
+    broken, copy = _layer("14.", 10, 101), _layer("146", 10, 107)
+    ocr = (_tesseract("146", 10, 100),)
+    is_known = _in(frozenset({"14"}))
+    assert model.replaced_layer_words((broken, copy), ocr, is_known=is_known) == (
+        broken,
+        copy,
+    )
+    # Digits that do not begin it, or as many, stay.
+    for other in ("46", "147"):
+        under = _layer(other, 10, 101)
+        assert model.replaced_layer_words(
+            (under, copy), ocr, is_known=_in(frozenset({other}))
+        ) == (copy,)
+
+
+def test_unlike_word_under_an_ocr_word_the_layer_glued_over_stays_its_pair() -> None:
+    # reocr spec, section 4: a Tesseract word over a word the layer glued
+    # is not excepted. "of,96" lies over Tesseract's "of," and "96", with
+    # the known "the" under "of," too, and a copy "of" below: "of," keeps
+    # the words under it, the copy stays.
+    glued = Word("of,96", Box(10, 100, 42, 108), None)
+    under = Word("the", Box(12, 101, 20, 107), None)
+    copy = _layer("of", 10, 110)
+    ocr = (
+        Word("of,", Box(10, 100, 30, 108), 90.0),
+        Word("96", Box(32, 100, 42, 108), 90.0),
+    )
+    assert model.replaced_layer_words(
+        (glued, under, copy), ocr, is_known=_in(frozenset({"the"}))
+    ) == (glued, under)
+
+
+def test_unlike_exception_takes_no_copy_another_ocr_word_already_reads() -> None:
+    # The layer's "tem" lies nearer Tesseract's first "tem," than its
+    # second, but the first has junk under it, so (b) pairs "tem" with the
+    # second; the first keeps its junk, and "tem" counts in the score.
+    junk, copy = _layer("~", 10, 101), _layer("tem", 10, 110)
+    ocr = (_tesseract("tem,", 10, 100), _tesseract("tem,", 10, 124))
+    assert model.matched_ocr_positions((junk, copy), ocr, is_known=_unknown) == {
+        0,
+        1,
+    }
+    assert model.scored_layer_words((junk, copy), ocr, is_known=_unknown) == (
+        junk,
+        copy,
+    )
+
+
+def test_unlike_known_word_under_an_ocr_word_paired_by_letters_stays() -> None:
+    # A known word under it may be another printed word the layer read
+    # rightly ("14." under Tesseract's "146", Gierke page 63).
+    under, beside = _layer("of", 10, 101), _layer("tem<", 10, 107)
+    ocr = (_tesseract("tem,", 10, 100),)
+    assert model.replaced_layer_words(
+        (under, beside), ocr, is_known=_in(frozenset({"of"}))
+    ) == (beside,)
+
+
+def test_unlike_junk_is_scored_in_place_of_the_letters_word_beside_it() -> None:
+    # reocr spec, section 3: the copy and the junk are two readings of one
+    # printed word, and the junk is the one rule (a) alone would score.
+    junk, beside = _layer('^"i', 10, 101), _layer("tem<", 10, 107)
+    ocr = (_tesseract("tem,", 10, 100),)
+    assert model.scored_layer_words((junk, beside), ocr, is_known=_unknown) == (junk,)
+    # A known word under it, left in the layer, is scored too, as before.
+    under = _layer("of", 10, 101)
+    assert model.scored_layer_words(
+        (under, beside), ocr, is_known=_in(frozenset({"of"}))
+    ) == (under,)
+
+
+def test_unlike_word_under_an_ocr_word_gives_way_to_an_alike_word_by_c() -> None:
+    # Domesday page 36: "scat'" beside Tesseract's "seat-", alike by (c)'s
+    # ratio (0.75), and the junk "&g" under it.
+    junk, beside = _layer("&g", 10, 101), _layer("scat'", 10, 107)
+    ocr = (_tesseract("seat-", 10, 100),)
+    assert model.replaced_layer_words((junk, beside), ocr, is_known=_unknown) == (
+        junk,
+        beside,
+    )
+
+
+def test_word_under_an_ocr_word_not_unlike_it_keeps_it() -> None:
+    # Stubbs' index page 315: the layer read "Eleanor" twice, under
+    # Tesseract's word and beside it; the one under it stays its pair.
+    under, beside = _layer("Eleanor", 10, 101), _layer("Eleanor,", 10, 107)
+    ocr = (_tesseract("Eleanor,", 10, 100),)
+    assert model.replaced_layer_words((under, beside), ocr, is_known=_unknown) == (
+        under,
+    )
+    # Alike, not equal, keeps it too.
+    alike = _layer("Elcanor", 10, 101)
+    assert model.replaced_layer_words((alike, beside), ocr, is_known=_unknown) == (
+        alike,
+    )
+
+
+def test_unlike_word_of_the_next_line_is_left_to_its_own_ocr_word() -> None:
+    # Gierke page 127: the layer's "vacant", of the next line, lies under
+    # Tesseract's "Empire." and under Tesseract's "vacant"; the layer's
+    # "Empire." lies 8 pt above, out of the widened box.
+    empire, vacant = _layer("Empire.", 10, 92), _layer("vacant", 10, 105)
+    ocr = (_tesseract("Empire.", 10, 100), _tesseract("vacant", 10, 109))
+    assert model.replaced_layer_words((empire, vacant), ocr, is_known=_unknown) == (
+        empire,
+        vacant,
+    )
+
+
+def test_unlike_word_under_an_ocr_word_with_no_word_of_its_letters_stays_paired() -> (
+    None
+):
+    junk, other = _layer('^"i', 10, 101), _layer("land", 10, 107)
+    ocr = (_tesseract("tem,", 10, 100),)
+    assert model.replaced_layer_words((junk, other), ocr, is_known=_unknown) == (junk,)
+
+
+def test_unlike_ocr_word_left_unpaired_keeps_the_words_under_it() -> None:
+    # Two of Tesseract's "tem," with a word under each, and one "tem" of
+    # the layer between them, nearer the second: the first keeps the word
+    # under it, though known; the second's known word stays in the layer.
+    first_under, second_under = _layer("of", 10, 101), _layer("of", 10, 121)
+    beside = _layer("tem", 10, 113)
+    ocr = (_tesseract("tem,", 10, 100), _tesseract("tem,", 10, 120))
+    assert model.replaced_layer_words(
+        (first_under, beside, second_under), ocr, is_known=_in(frozenset({"of"}))
+    ) == (first_under, beside)
 
 
 def _rereads_record(

@@ -662,3 +662,30 @@ def test_note_inside_a_note_is_text_of_the_outer_note() -> None:
     assert reference.notes == (
         ReferenceNote("Footnote_1", (_paragraph("Outer."), _paragraph("Inner."))),
     )
+
+
+def test_reading_ends_before_the_element_with_the_end_id_nested_in_a_paragraph() -> (
+    None
+):
+    # Stubbs: the anchor of printed page 301, in a p inside a div.chapter,
+    # opens its publisher's lists (books.toml, reference_ends_at).
+    reference = read_reference(
+        f"<html><body>{HEADER}"
+        '<p>the end <span class="pagenum" id="Page_300">[Pg 300]</span>of it</p>'
+        '<div class="chapter"><p>last words <span class="pagenum" id="Page_301">'
+        "[Pg 301]</span>first list</p><h2>EPOCHS OF HISTORY</h2></div>"
+        f"<p>Eleven volumes</p>{FOOTER}</body></html>",
+        DEFAULT_RULES,
+        ends_at="Page_301",
+    )
+    assert reference.blocks == (_paragraph("the end of it"), _paragraph("last words"))
+    assert reference.page_anchors == (PageAnchor("300", _body(2)),)
+
+
+def test_end_id_that_no_element_has_is_an_error() -> None:
+    with pytest.raises(ReferenceReadError, match="Page_301"):
+        read_reference(
+            f"<html><body>{HEADER}<p>one</p>{FOOTER}</body></html>",
+            DEFAULT_RULES,
+            ends_at="Page_301",
+        )

@@ -30,7 +30,9 @@ def _reference(book: EvaluationBook, books_dir: Path) -> ReferenceText:
     html = books_dir / "gutenberg" / book.html_name
     if not html.is_file():
         pytest.skip(f"{html} is missing; run `uv run python scripts/fetch_samples.py`")
-    return read_reference_file(html, book.rules, book.html_sha256)
+    return read_reference_file(
+        html, book.rules, book.html_sha256, ends_at=book.reference_ends_at
+    )
 
 
 def _tokens(reference: ReferenceText) -> tuple[str, ...]:

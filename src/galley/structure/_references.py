@@ -71,7 +71,9 @@ def pair_score(reference: Reference, note_value: int | None) -> int:
 
 
 def align(
-    values: Sequence[int | None], references: Sequence[Reference]
+    values: Sequence[int | None],
+    references: Sequence[Reference],
+    score: Callable[[Reference, int | None], int] = pair_score,
 ) -> tuple[tuple[int, int], ...]:
     """The pairs (note position, candidate position) of the alignment of
     notes of `values` with `references`, both in reading order, whose total
@@ -79,11 +81,11 @@ def align(
     candidate with at most one note, a later note never with an earlier
     candidate. Of two alignments with the same total, the one that pairs
     the first note with the earlier candidate wins, then the second note,
-    and so on; a note left alone counts as paired after every candidate."""
+    and so on; a note left alone counts as paired after every candidate.
+    `score` gives each pair's score, `pair_score` unless given."""
     note_count, candidate_count = len(values), len(references)
     scores = tuple(
-        tuple(pair_score(reference, value) for reference in references)
-        for value in values
+        tuple(score(reference, value) for reference in references) for value in values
     )
     # best[i][j]: the highest total of the notes from i and the candidates
     # from j.
@@ -112,14 +114,17 @@ def align(
 
 
 def _matched(
-    notes: Sequence[NoteToMatch], candidates: Sequence[Candidate]
+    notes: Sequence[NoteToMatch],
+    candidates: Sequence[Candidate],
+    score: Callable[[Reference, int | None], int] = pair_score,
 ) -> tuple[Link, ...]:
-    """The links of an alignment of `notes` with `candidates`."""
+    """The links of an alignment of `notes` with `candidates`, by `score`."""
     return tuple(
         Link(candidates[candidate], notes[note].note)
         for note, candidate in align(
             tuple(note.value for note in notes),
             tuple(candidate.reference for candidate in candidates),
+            score,
         )
     )
 
@@ -186,19 +191,38 @@ def match_footnotes(
 def match_endnotes(
     notes: Sequence[NoteToMatch], candidates: Sequence[Candidate]
 ) -> tuple[Link, ...]:
-    """The endnotes linked to the glued numbers of the body before the
-    endnote section (spec section 12, "References"): matched once over the
-    whole book, the endnotes with a value in the order of their values,
-    against `candidates` in reading order, by the scores of footnotes."""
+    """The endnotes of one note group linked to the glued numbers of its
+    chapter (spec section 12, "References"): the endnotes with a value in
+    the order of their values, against `candidates` in reading order, by
+    the scores of footnotes, but a candidate that reads another number
+    than a note's never takes it when another glued candidate reads the
+    note's number, or when its own number lies among the notes' numbers
+    and no note reads it: the note it stands for lost its marker to the
+    OCR (Haynes' pages 234 and 301)."""
     valued = sorted(
         (note for note in notes if note.value is not None),
         key=lambda note: note.value if note.value is not None else 0,
     )
-    return _matched(
-        valued,
-        tuple(
-            candidate
-            for candidate in candidates
-            if candidate.reference.form is ReferenceForm.GLUED
-        ),
+    glued = tuple(
+        candidate
+        for candidate in candidates
+        if candidate.reference.form is ReferenceForm.GLUED
     )
+    read = Counter(candidate.reference.value for candidate in glued)
+    values = frozenset(note.value for note in valued if note.value is not None)
+    lowest, highest = min(values, default=0), max(values, default=0)
+
+    def score(reference: Reference, note_value: int | None) -> int:
+        # A candidate reading another number never takes a note whose own
+        # number another candidate reads, nor stands for a missing note.
+        value = reference.value
+        if value != note_value and (
+            read[note_value] > 0
+            or (
+                value is not None and lowest <= value <= highest and value not in values
+            )
+        ):
+            return 0
+        return pair_score(reference, note_value)
+
+    return _matched(valued, glued, score)

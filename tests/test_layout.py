@@ -38,6 +38,7 @@ from galley.layout import (
     layout_page_with_rereads,
     measure_book,
 )
+from galley.layout._reread import RegionReading, page_rereads
 from galley.model import (
     BlockKind,
     Box,
@@ -54,6 +55,7 @@ from galley.model import (
     TextSource,
     Word,
     WordsFile,
+    folded_letters_and_digits,
     read_blocks,
     read_lines,
     read_words,
@@ -716,6 +718,124 @@ def test_page_whose_only_row_holds_a_letter_has_no_running_head_region() -> None
     assert _region_texts(result) == ((("Alone",),),)
 
 
+def test_head_set_apart_by_median_top_above_a_tall_em_dash_is_a_running_head_region() -> (
+    None
+):
+    # The head 1.6 pitches above the body by its words' median tops; the
+    # body's first row holds an em dash boxed 10 pt taller than its words,
+    # so the row's box top lies 0.77 pitch below the head's.
+    head = _word("HEAD", 120, 100 - 1.6 * _PITCH, 180, 100 - 1.6 * _PITCH + 8)
+    dash = _word("—", 116, 90, 118, 108)
+    result = layout_page(_page(0, (head, dash, *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("HEAD",),)
+    assert _texts(body.lines)[0] == ("a0", "—", "b0", "c0")
+    assert len(body.lines) == 20
+
+
+def test_head_row_top_leaves_out_a_page_number_boxed_low() -> None:
+    # Domesday's page 159: "134" boxed 3 pt lower than the head's words,
+    # which lie 1.31 pitches above the body; with "134" in the median the
+    # gap is 1.18 pitches.
+    head = (_word("134", 50, 83, 65, 91), _word("HEAD", 120, 80, 180, 88))
+    result = layout_page(
+        _page(0, (*head, *_rows(20, top=80 + 1.31 * _PITCH))), _MEASURES
+    )
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("134", "HEAD"),)
+    assert len(body.lines) == 20
+
+
+def test_skewed_head_whose_last_word_is_a_row_4_pt_lower_is_one_region_of_one_line() -> (
+    None
+):
+    # Words 7 pt high: the date's centre lies below the head's bottom, so
+    # it is a row of its own, 4 pt (a third of a pitch) lower. A speck
+    # above the head stays a line of its own.
+    speck = _word(";", 140, 60, 144, 66)
+    date = _word("1170", 40, 84, 70, 91)
+    head = _word("HEAD", 120, 80, 180, 87)
+    result = layout_page(_page(0, (speck, date, head, *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == ((";",), ("1170", "HEAD"))
+    assert head_region.lines[1].box == Box(40, 80, 180, 91)
+    assert len(body.lines) == 20
+
+
+def test_marks_row_between_head_and_body_is_passed_over_and_stays_in_the_body() -> None:
+    head = _word("HEAD", 120, 80, 180, 88)
+    marks = (_word("^", 130, 90, 134, 96), _word("_", 160, 90, 166, 96))
+    result = layout_page(_page(0, (head, *marks, *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    assert _texts(head_region.lines) == (("HEAD",),)
+    assert _texts(body.lines)[0] == ("^", "_")
+    assert len(body.lines) == 21
+
+
+def _hanging(text: str, row: int, gap: float = 9.0) -> Word:
+    """A number 10 pt wide ending `gap` pt left of the column's edge, 50,
+    beside row `row` of `_rows`."""
+    top = 100 + row * _PITCH
+    return _word(text, 50 - gap - 10, top, 50 - gap, top + 8)
+
+
+def test_hanging_number_9_pt_left_of_a_line_stays_at_the_start_of_that_line() -> None:
+    numbers = (_hanging("12", 3), _hanging("13", 4))
+    result = layout_page(_page(0, (*_rows(20), *numbers)), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[3:5] == (
+        ("12", "a3", "b3", "c3"),
+        ("13", "a4", "b4", "c4"),
+    )
+
+
+def test_hanging_number_16_pt_left_of_a_line_is_a_margin_word() -> None:
+    numbers = (_hanging("12", 3), _hanging("13", 4), _hanging("14", 5, 16.0))
+    result = layout_page(_page(0, (*_rows(20), *numbers)), _MEASURES)
+    assert _region_texts(result)[1:] == ((("14",),),)
+
+
+def test_hanging_number_alone_on_its_page_is_a_margin_word() -> None:
+    # A speck read as a digit beside a margin note (Gierke's page 160).
+    result = layout_page(_page(0, (*_rows(20), _hanging("9", 3))), _MEASURES)
+    assert _region_texts(result)[1:] == ((("9",),),)
+
+
+def test_hanging_number_with_a_margin_word_before_its_line_is_a_margin_word() -> None:
+    # A margin "—" between the number and the line (Domesday's page 39).
+    dash = _word("—", 44, 124 + 3 * _PITCH - 24, 48, 124 + 3 * _PITCH - 16)
+    numbers = (
+        _word("16", 30, 136, 40, 144),
+        _hanging("17", 4),
+        _hanging("18", 5),
+    )
+    result = layout_page(_page(0, (*_rows(20), dash, *numbers)), _MEASURES)
+    (body, *margins) = _region_texts(result)
+    assert body[3] == ("a3", "b3", "c3")
+    assert body[4][0] == "17"
+    assert ("16", "—") in tuple(line for region in margins for line in region)
+
+
+def test_hanging_number_split_by_the_ocr_hangs_whole() -> None:
+    numbers = (
+        _word("5", 33, 136, 36, 144),
+        _word("1", 37, 136, 41, 144),
+        _hanging("52", 4),
+    )
+    result = layout_page(_page(0, (*_rows(20), *numbers)), _MEASURES)
+    (body,) = result.regions
+    assert _texts(body.lines)[3] == ("5", "1", "a3", "b3", "c3")
+
+
+def test_hanging_number_on_the_head_row_is_a_margin_word() -> None:
+    head = _word("HEAD", 50, 80, 110, 88)
+    number = _word("12", 31, 80, 41, 88)
+    numbers = (_hanging("13", 3), _hanging("14", 4))
+    result = layout_page(_page(0, (head, number, *numbers, *_rows(20))), _MEASURES)
+    assert _region_texts(result)[0] == (("HEAD",),)
+    assert _region_texts(result)[2:] == ((("12",),),)
+
+
 def test_margin_note_level_with_the_head_never_joins_the_head() -> None:
     head = _word("HEAD", 120, 80, 180, 88)
     note = _word("Note", 256, 80, 290, 88)
@@ -762,6 +882,53 @@ def test_page_of_small_rows_only_has_no_band() -> None:
     result = layout_page(_page(0, rows), _MEASURES)
     (body,) = result.regions
     assert len(body.lines) == 20
+
+
+def _note_row(texts: tuple[str, ...], top: float) -> tuple[Word, ...]:
+    """A row of small words `texts`, 30 pt wide and 4 pt apart from 50."""
+    return tuple(
+        _word(text, 50 + 34 * place, top, 80 + 34 * place, top + _SMALL_HEIGHT)
+        for place, text in enumerate(texts)
+    )
+
+
+def test_gapless_band_starts_at_a_small_row_opening_with_a_note_marker() -> None:
+    note = _note_row(("1", "Ibid.", "29."), _LAST_BODY_TOP + _PITCH)
+    after = _small_rows(3, _LAST_BODY_TOP + _PITCH + 9)
+    result = layout_page(_page(0, (*_rows(20), *note, *after)), _MEASURES)
+    body, band = result.regions
+    assert len(body.lines) == 20
+    assert _texts(band.lines) == (("1", "Ibid.", "29."), ("n0",), ("n1",), ("n2",))
+
+
+def test_gapless_band_does_not_start_at_a_marker_below_a_small_row() -> None:
+    # A small row with no gap above it, then a note "2 Ibid." among small
+    # rows, as a marker inside notes in two columns (Kadesh's page 14).
+    above = _small_rows(1, _LAST_BODY_TOP + _PITCH)
+    note = _note_row(("2", "Ibid.", "29."), _LAST_BODY_TOP + _PITCH + 9)
+    after = _small_rows(3, _LAST_BODY_TOP + _PITCH + 18)
+    result = layout_page(_page(0, (*_rows(20), *above, *note, *after)), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 25
+
+
+def test_gapless_band_starts_at_a_marker_below_a_speck() -> None:
+    # Domesday's page 406: a speck between the text and its note.
+    speck = _word("•", 140, _LAST_BODY_TOP + _PITCH, 142, _LAST_BODY_TOP + _PITCH + 3)
+    note = _note_row(("1", "Ibid.", "29."), _LAST_BODY_TOP + _PITCH + 6)
+    after = _small_rows(3, _LAST_BODY_TOP + _PITCH + 15)
+    result = layout_page(_page(0, (*_rows(20), speck, *note, *after)), _MEASURES)
+    body, band = result.regions
+    assert len(body.lines) == 21
+    assert _texts(band.lines)[0] == ("1", "Ibid.", "29.")
+
+
+def test_gapless_band_does_not_start_at_a_row_of_numbers() -> None:
+    numbers = _note_row(("35", "52", "26"), _LAST_BODY_TOP + _PITCH)
+    after = _small_rows(3, _LAST_BODY_TOP + _PITCH + 9)
+    result = layout_page(_page(0, (*_rows(20), *numbers, *after)), _MEASURES)
+    (body,) = result.regions
+    assert len(body.lines) == 24
 
 
 def test_small_row_set_apart_but_followed_by_body_rows_is_no_band() -> None:
@@ -1983,17 +2150,17 @@ def test_cut_in_insets_of_the_excerpts_are_stubbs_only(
 ) -> None:
     # Layout spec section 3, "The book's measures": the Stubbs excerpt's
     # insets are 60.3 pt (17 rows) and 58.2 pt (13 rows); no other excerpt
-    # has 10 rows at its peak and 4 times those beside it.
+    # has 10 rows at its peak and 4 times those beside it but `stubbs_heads`,
+    # whose pages are all even, with their notes on the right, and whose
+    # right inset is 58.0 pt (scripts/fetch_samples.py; 17 November 2026).
     insets = {}
     for name, folder in excerpt_books.items():
         measures = measure_book(read_words(folder.words_json))
         assert measures is not None
         insets[name] = (measures.cut_in_inset_left, measures.cut_in_inset_right)
-    assert insets == {
-        name: (60.3, 58.2) if name == "stubbs_51_56-64" else (None, None)
-        for name in excerpt_books
-    }
-    assert len(insets) == 14
+    stubbs = {"stubbs_51_56-64": (60.3, 58.2), "stubbs_heads": (None, 58.0)}
+    assert insets == {name: stubbs.get(name, (None, None)) for name in excerpt_books}
+    assert len(insets) == 18
 
 
 def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(
@@ -2415,12 +2582,9 @@ _DOMESDAY = "domesday_74-83"  # excerpt pages 1 and 3 are book page indices 75 a
             "the excerpt's ten pages never print 'unfreedom' whole, the evidence "
             "for joining 'unfree' 'dom'; the whole book does (whole-book test below)",
         ),
-        _owner_note(
-            _DOMESDAY,
-            1,
-            "Can the villein be pursued?",
-            "the page prints a space before '?', which galley keeps as a word",
-        ),
+        # The page prints a space before "?", which structure attaches
+        # (structure spec, section 23).
+        _owner_note(_DOMESDAY, 1, "Can the villein be pursued?"),
         _owner_note(_DOMESDAY, 3, "The villein and seignorial justice."),
         _owner_note(_DOMESDAY, 3, "The villein and national justice."),
     ],
@@ -2442,6 +2606,118 @@ def _margin_notes_of_page(blocks_json: Path, page: int) -> tuple[str, ...]:
     )
 
 
+def test_reread_scores_the_junk_under_a_word_not_its_copy_beside_it() -> None:
+    # reocr spec, section 3: Domesday page 469, "Produce and value.", where
+    # the layer holds junk under Tesseract's "value." and its copy "value."
+    # 7 pt below. Counted with the copy, the layer's reading tied and was
+    # kept; with the junk, Tesseract's is kept, and both are replaced.
+    produce = Word("Produce", Box(10, 100, 34, 108), None)
+    conjunction = Word("and", Box(40, 100, 52, 108), None)
+    junk = Word("^x", Box(10, 111, 30, 119), None)
+    copy = Word("value.", Box(10, 117, 30, 125), None)
+    ocr = (
+        Word("Produce", Box(10, 100, 34, 108), 90.0),
+        Word("and", Box(40, 100, 52, 108), 90.0),
+        Word("value.", Box(10, 110, 30, 118), 90.0),
+    )
+    reading = RegionReading(
+        kind=RereadKind.MARGIN_NOTE,
+        side=Side.LEFT,
+        box=Box(8, 98, 56, 128),
+        ocr_words=ocr,
+        layer_words=(produce, conjunction, junk, copy),
+    )
+    (record,) = page_rereads(
+        0, (reading,), frozenset({"produce", "and", "value"}), page_words=()
+    )
+    assert record.kept
+    assert record.layer_words == (produce, conjunction, junk, copy)
+    assert record.junk_words == (junk,)
+    assert (record.layer_score, record.ocr_score) == (1, 3)
+
+
+# domesday_rereads: excerpt pages 0, 2, 6, 8 and 10 are book page indices
+# 26, 36, 139, 150 and 160. The text layer holds, beside a margin note's
+# last word, its own reading a few points off and junk under Tesseract's
+# word (reocr spec, section 4, "A pairing by letters wins over a word under
+# it whose letters are unlike"). The printed notes are those the assistant
+# read on the 300-dpi renders (tests/fixtures/expected/owner_books_wp1/).
+_DOMESDAY_REREADS = "domesday_rereads"
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+@pytest.mark.parametrize(
+    ("page", "layer_word"),
+    [(0, "tem<"), (2, "scat'"), (6, "midlands."), (8, "taxes>"), (10, "Justice-")],
+)
+def test_reread_domesday_margin_note_word_of_the_layer_beside_is_read_once(
+    page: int, layer_word: str, excerpt_books: frozendict[str, BookFolder]
+) -> None:
+    # The layer's second reading of the note's last word is replaced by
+    # Tesseract's reading, not left beside it.
+    lines = read_lines(excerpt_books[_DOMESDAY_REREADS].lines_json)
+    assert any(
+        word.text == layer_word
+        for reread in lines.rereads
+        if reread.kept and reread.page_index == page
+        for word in reread.layer_words
+    )
+    # Tesseract's words have a confidence; the text layer's have none.
+    assert layer_word not in (
+        word.text
+        for page_layout in lines.pages
+        if page_layout.index == page
+        for region in page_layout.regions
+        for line in region.lines
+        for word in line.words
+        if word.ocr_confidence is None
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_reread_domesday_junk_under_a_note_word_read_once_is_replaced_too(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    # Excerpt page 2, book page index 36: the layer's "&g" lies under
+    # Tesseract's "seat-", whose copy "scat'" the record replaces; left in
+    # the text, it fell between "seat-" and "tered".
+    lines = read_lines(excerpt_books[_DOMESDAY_REREADS].lines_json)
+    assert any(
+        word.text == "&g"
+        for reread in lines.rereads
+        if reread.kept and reread.page_index == 2
+        for word in reread.layer_words
+    )
+
+
+@pytest.mark.tesseract
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+@pytest.mark.parametrize(
+    ("page", "printed"),
+    [
+        # Tesseract reads the final full stop as a comma.
+        (0, "The survey and the geld system."),
+        (6, "Large manors in the midlands."),
+        (8, "The lord and his man's taxes."),
+        (10, "The sokeman and seignorial justice."),
+    ],
+)
+def test_reread_domesday_margin_note_read_once_has_the_printed_words(
+    page: int, printed: str, excerpt_books: frozendict[str, BookFolder]
+) -> None:
+    def letters(text: str) -> tuple[str, ...]:
+        return tuple(
+            folded
+            for word in text.split()
+            if (folded := folded_letters_and_digits(word))
+        )
+
+    notes = _margin_notes_of_page(excerpt_books[_DOMESDAY_REREADS].blocks_json, page)
+    assert letters(printed) in tuple(letters(note) for note in notes), notes
+
+
 @pytest.mark.whole_book
 @pytest.mark.tesseract
 @pytest.mark.thread_unsafe
@@ -2456,7 +2732,7 @@ def test_reread_owner_checked_whole_domesday_75_joins_unfree_dom(
     assert _margin_notes_of_page(folder.blocks_json, 75) == (
         "Free land.",
         "The unfreedom of the villein.",
-        "Can the villein be pursued ?",
+        "Can the villein be pursued?",
     )
 
 
