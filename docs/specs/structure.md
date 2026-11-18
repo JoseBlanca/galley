@@ -1868,9 +1868,13 @@ chapter Three opens its notes with a "1" the OCR read as "x" (page
 they are later blocks of that note, not the starts of 47 runs too short
 for a section (a loss of 47 of Turney's notes, measured on 18 November
 2026 on the survey's configs; reading "x" as 1 is not done, since no
-other book shows it). Within a run
-the two forms are not told apart: any marker that rises goes on with
-it. The
+other book shows it). The two forms make runs of their own: a bare
+number neither goes on with nor ends a run of "N." markers, and the
+section's markers are those of the forms of its runs of at least 8.
+Gierke prints a bare "1" before some of the margin notes that layout
+leaves in its notes' body (pages 195, 196, 225, 226, 237, 240 and 241);
+read as markers in the same runs, they made 9 more endnotes and cut
+the section into groups (measured on 18 November 2026). The
 section runs from the first marker of the first run of at least 8 to
 the last marker of the last such run, so that a damaged marker that
 reads lower does not cut it in two. On its first page it reaches back
