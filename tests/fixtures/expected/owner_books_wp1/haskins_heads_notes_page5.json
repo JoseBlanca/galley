@@ -1,0 +1,102 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "haskins_heads_notes",
+  "page": 5,
+  "book_page_index": 29,
+  "checks": "the paragraph that runs on from page 28; its footnotes in the band, as now",
+  "expected": {
+    "removals": [
+      {
+        "reason": "stray_mark",
+        "text": ":"
+      },
+      {
+        "reason": "page_number",
+        "text": "14"
+      },
+      {
+        "reason": "running_head",
+        "text": "NORMANS IN EUROPEAN HISTORY"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "14",
+        "position": "head"
+      }
+    ],
+    "band_first_line": "1 Historia Sicula, i, 3. * Gesta Regutn (Rolls Series), p. 306.",
+    "notes": [
+      {
+        "marker": "1",
+        "text": "Historia Sicula, i, 3."
+      },
+      {
+        "marker": "*",
+        "text": "Gesta Regutn (Rolls Series), p. 306. ' Ed. LePrevost, iii, p. 474; cf. p. 230,"
+      }
+    ]
+  },
+  "known": "The third note's marker, printed 3, is read \"'\" by the text layer, and the note runs on in the second, as now.",
+  "printed": {
+    "book_page_index": 29,
+    "running_head": {
+      "words": [
+        "NORMANS",
+        "IN",
+        "EUROPEAN",
+        "HISTORY"
+      ],
+      "page_number": "14",
+      "number_side": "left",
+      "skew": "none visible"
+    },
+    "above_head": null,
+    "below_head_tall": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [],
+    "paragraph_starts_note": "No indented new paragraph. After the block quotation the text resumes flush left ('A little later it is the Norman poet Wace...') as a continuation of the same paragraph.",
+    "ends_mid_paragraph": true,
+    "last_words": "William the Con-",
+    "margin_notes": [],
+    "footnotes": [
+      {
+        "marker": "superscript 1",
+        "text": "Historia Sicula, I, 3.",
+        "italic": "Historia Sicula",
+        "reference": "justice.¹"
+      },
+      {
+        "marker": "superscript 2",
+        "text": "Gesta Regum (Rolls Series), p. 306.",
+        "italic": "Gesta Regum",
+        "reference": "superiors;²"
+      },
+      {
+        "marker": "superscript 3",
+        "text": "Ed. LePrévost, III, p. 474; cf. p. 230.",
+        "note": "III in small capitals",
+        "reference": "undoing.³ (end of the block quotation)"
+      }
+    ],
+    "footnotes_layout": "1 and 2 side by side on first line, 3 on second line",
+    "quotes_or_verse": [
+      {
+        "kind": "block quotation in smaller type, introduced by 'who says: —'",
+        "first_words": "The race of the Normans",
+        "last_words": "learned to their undoing.³"
+      }
+    ],
+    "spaced_punctuation": [
+      {
+        "text": "says: —",
+        "note": "colon followed by space and em dash; colon itself attached to 'says'"
+      }
+    ],
+    "case_glued": null,
+    "foot": null,
+    "notes": null,
+    "footnote_gap": "close: no blank line; slightly more than one line pitch (about 1.3 body lines) between last body line and first footnote"
+  }
+}

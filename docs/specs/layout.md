@@ -56,6 +56,15 @@ and every region read is recorded in `lines.json`, whose format goes to
 version 2. That spec gives the rules, the record and the fidelity rule;
 this one points to it where they meet.
 
+Revised again on 17 November 2026 for the plan owner-books
+(`docs/specs/structure.md`, from its section 21), which changes three
+steps of section 3 and no format: a number hung in the margin before a
+line stays in that line (step 2); the running-head row is measured by
+its words' median top, takes in the rows of a skewed head and passes
+over rows of marks (step 3); the footnote band also starts, without a
+gap, at a small row that opens with a note marker and a capital (step
+4).
+
 ## 1. Terms
 
 Besides those of the glossary, this spec uses these; the first four, and
@@ -314,6 +323,37 @@ is laid out as one region, as the skeleton did.
    Domesday's page 90), and one a body word ("the", Domesday's page
    270), so it is not applied there.
 
+   **A hanging number stays in its line.** A margin word of the left
+   side that is 1 to 3 digits with nothing after them stays in the
+   column, in the line of the word right of it on its row, when the gap
+   from its right side to that word's left side is at most 15 pt, no
+   other margin word but digits lies between them, and the row is not
+   the page's first row with a letter or digit (the running head's,
+   step 3); and only on a page where at least 2 numbers hang so: a
+   column of numbers, not a speck. Turney (structure §21) prints its notes at
+   the back in two columns with each note's number hung 6 to 14 pt left
+   of its text; in the left column the numbers lie left of the page's
+   usual left edge, and without this rule they were margin regions, a
+   column of "1 2 3 4" read apart from the notes. The head row is left
+   out because Turney prints its page number 13.4 to 15.1 pt beside the
+   running head (261 pages, measured on 17 November 2026 on the
+   survey's `lines.json`), which structure takes into the head line
+   instead (structure §2). The numbers the rule keeps in their lines,
+   counted with the rule as built on the `words.json` of the eight
+   books (18 November 2026): Turney 99, on 13 of its notes pages, each
+   with its note (read on page 268); Gierke 28, the numbers of the
+   entries of its printed contents (23 on page 62, among them "5" of a
+   "51" the OCR split, 5 on 65), which then stay with their entries;
+   none in the other six books. The last two conditions were added
+   after the review of work package 1 (18 November 2026): without
+   them the rule also took three specks the OCR read as digits beside a
+   margin note, into a sentence (Gierke's "9" on page 160 and "6" on
+   115, Domesday's "6" on 443), and split a plate's caption "[Between
+   pp. 16—17]" on Domesday's page 39, where a margin "—" lay between
+   the "16" and the column's word. Each condition alone keeps Turney's
+   and Gierke's contents numbers: the margin word between drops the
+   caption's number, the page's 2 numbers the three specks.
+
    Each side's margin words are grouped into lines, and the lines into
    regions: a region ends where the next line's top is more than 1.5
    body line pitches below the top of the line before (a guess, so that each printed note is a
@@ -415,11 +455,51 @@ is laid out as one region, as the skeleton did.
    research, by the words of 3 letters or more found only in the body
    text of the page).
 3. **Running-head line.** Of the remaining words, grouped into rows,
-   take the first row that holds a letter or a digit. It and every row
-   above it (specks) form the running-head region when the next row's
-   top is at least 1.3 body line pitches below its top. A page whose
-   first such row is not that far apart, or is its only row, has no such
-   region, and the specks above stay with the body. This region is a
+   take the first row that holds a letter or a digit, the **head row**.
+   It, every row above it (specks), and every row below it whose top
+   lies less than half a body line pitch below its top (the rest of a
+   head that the scan's skew set lower) form the running-head region
+   when the next row that holds a letter or a digit has its top at
+   least 1.3 body line pitches below the head row's top; rows of marks
+   between them (no letter or digit) go with the body. A row's **top**
+   here is the median of its words' tops, not the top of its box. The
+   head row's top leaves out its words of a page-number form
+   (structure §1), which the OCR may box lower than the head's words:
+   Domesday's page 159 boxes its "134" 3 pt low, which put the gap at
+   15.67 pt against the 15.78 of 1.3 pitches, and the head stayed in
+   the text (found by the review of 18 November 2026). Measured that
+   day on the eight books' `words.json`, this changes no other page. A
+   page whose head row is not that far apart, or has no row with a
+   letter or digit below it, has no such region, and the specks above
+   stay with the body. In the region, the head row and the rows of its
+   skew are one line, their words left to right, and each row above
+   them a line of its own (step 7 does not regroup them): the head is
+   one printed line, and structure takes a head line that holds one
+   line with a letter or a digit (structure §2). Grouped by step 7,
+   Stubbs' date was a line of its own and the region no head line
+   (decided on 17 November 2026 while building the plan owner-books;
+   the spec had left it open).
+
+   The three changes of 17 November 2026, each for a case measured by
+   the public-domain survey on the clean-text build: a row's box top is
+   its tallest word's, and an em dash or a word the OCR boxed 18 pt
+   tall in the row below the head (Haskins' pages 23, 30, 66 and 235)
+   made the gap read 1.08 pitches where the words' median tops are
+   1.53 to 1.64 apart, as on Haskins' other pages; Stubbs prints a date
+   at the outer end of its head that the skew sets 4 to 5 pt lower, a
+   row of its own 0.2 to 0.5 pitch below (pages 20, 100, 152, 158, 186,
+   202 and 210); Domesday's page 398 has a row of specks between head
+   and body. In each case the page had no head region and its running
+   head and page number stayed in the text, about 25 pages in the six
+   books. Simulated on the whole books' `words.json` (17 November
+   2026): the rule gains a head region on Haskins' pages 12, 23, 30,
+   66, 235 and 278, Stubbs' 17, 20, 100, 152, 158, 186, 202 and 210,
+   Domesday's 40 and 398, Kadesh's 68 and Gierke's 11, and loses it on
+   Domesday's page 159, a table whose head stands 1.43 pitches above the
+   next row by box tops and 1.30 by median tops, and Turney's 175, a
+   newspaper front page reproduced as an illustration; none on Mariéjol
+   or Haynes. A head region is a candidate: structure keeps the lines
+   that are no running head (structure §3). This region is a
    candidate; structure decides whether it is a running head. On
    Haskins' chapter pages (41, 67, 100, 131, 163, 233) the chapter number
    is less than 1.3 pitches above the title (0.98 on page 41), so they
@@ -431,8 +511,47 @@ is laid out as one region, as the skeleton did.
    whose top is at least 1.1 body line pitches below the top of the row
    before, and from which on at least two thirds of the rows down to the
    last, that row and the last included, are small. A page number or
-   signature mark at the foot counts as a row. The
-   band runs to the foot of the page; the rows above it are the body.
+   signature mark at the foot counts as a row. The band also begins,
+   whatever its gap, at a row that meets every other condition and
+   opens with a **note marker**: its first word is 1 to 3 digits, with
+   an optional "." after them, or 1 or 2 of the signs `* ^ • † ‡ §`,
+   and its second word starts with a capital letter, when the nearest
+   row above it that holds a letter or a digit is not small (a speck
+   above it is passed over); the first such row wins when it comes
+   before the row the gap rule finds. The band runs to the foot of the
+   page; the rows above it are the body.
+
+   The gapless start is for notes set close under the text: Haskins'
+   page 28, whose note row is small (median word height 5.6 pt against
+   a limit of 7.1) but only 1.06 pitches below the row above (1.18 by
+   median word tops, which would recover 2 of Haskins' 5 such pages
+   only), so the note stayed in the body and cut the paragraph that
+   runs on to page 29. Measured on 17 November 2026 with a prototype on
+   the whole books' `words.json`, pages whose band it starts: Haskins
+   5 (28, 55, 173, 195, 258), Domesday 15 (each a note "1 …" or "3 …":
+   90, 97, 138, 142, 156, 232, 247, 313, 342, 360, 406, 409, 443, 534
+   and 535), Kadesh 3 (14, 28, 40, notes numbered through the
+   article), Haynes 2 (its index pages 422 and 423, where a page number
+   overhangs a row: structure reads the index's columns whether they
+   are body or band, structure §17), and none in Stubbs, Mariéjol,
+   Gierke or Turney. This form is narrower than structure's note
+   marker (structure §11): layout needs only the forms that start the
+   notes found, and keeps none of structure's code.
+
+   The row above must not be small because a note that opens with a
+   marker in the middle of the notes would otherwise start the band
+   there: on Kadesh's pages 14, 28 and 40 the notes, in two columns,
+   opened no band by the gap, and a marker inside them started one, so
+   that the column cut read a note's continuation into another note
+   (found by the review of 18 November 2026). With the condition,
+   measured that day on the eight books' `words.json`, the marker
+   starts the band on Haskins' 5 pages and 13 of Domesday's, as above
+   but 534, and on no page of Kadesh or Haynes; on Domesday's page 406
+   the row above its note is a speck "•", passed over, and the note
+   starts the band as the page image shows it. Kadesh's 14, 28 and 40,
+   Domesday's 534 (whose band opens with a note run on from the page
+   before, small, above the note "1") and Haynes' index page 422 then
+   have no band, as before the gapless start.
    On a page whose every row is small, such as a page of the index, there
    is no band: the rows are the body.
 5. **Columns.** The body, and the band apart from it, are each cut into
@@ -465,7 +584,25 @@ is laid out as one region, as the skeleton did.
    on either side of the middle; Domesday's short notes printed side by
    side in a row are not, and must be read row by row, 1, 2, 3, 4, not 1,
    3, 2, 4). A cut run becomes two regions: each word goes
-   left or right of the strip's middle by its own middle. The rows
+   left or right of the strip's middle by its own middle, but for a
+   **number hung before the right column**: the last word left of the
+   middle on its row, 1 to 3 digits, whose next word, the first right
+   of the middle, holds a letter, starts at most 15 pt right of the
+   number and nearer than the word before it on the row ends, goes
+   right, when the run holds at least 2 such numbers (step 2's 15 pt
+   and 2). Turney prints its notes at the back in two columns, each
+   note's number hung 6 to 14 pt left of its text (structure §21); on
+   its page 262 the left column ends at 202.8 pt, the right column's
+   numbers lie at 217 to 225 and its text starts at 233, and rows that
+   hold only a right-column number and its text, beside the left
+   column's chapter heading, put the gutter between the numbers and
+   their text: notes 12 to 31 were read as words at the ends of the
+   left column's lines, and the heading of chapter 4 ran into
+   three of them. The letter is for Gierke's
+   printed contents (pages 63, 65 and 66), where a left entry's page
+   number lies as near the right entry's number. Laid out with and
+   without the rule on 18 November 2026, the eight books' `lines.json`
+   differ on Turney's page 262 alone. The rows
    before and after it stay regions of their own: an index page whose
    title spans the column gives the title, then the left column, then
    the right.
@@ -806,6 +943,14 @@ machine with 6 workers, `galley2epub layout` on the whole book, against
   to right, which is their order; the gutter test of step 5 keeps
   three or more such rows from being cut into columns (page 83, a
   reference page).
+- **Indented epigraphs and headings taken for cut-in notes**: the
+  owner's two modern books give a left cut-in inset (Turney 44.3 pt,
+  from the indent of its epigraphs, chapter labels and section
+  headings; Haynes 30.0 pt, from its epigraphs and paragraph indents),
+  so step 2b runs on them; it moves no word in either, since no row
+  beside those lines is shortened with words left of the inset
+  (measured on 17 November 2026: every page laid out with and without
+  the insets gives the same regions; structure §21).
 - **Index pages**: two columns, each read top to bottom (step 5). An
   index set in small type under a full-size title has the title in the
   body and the columns as the band, which keeps their order.
@@ -890,7 +1035,18 @@ with their boxes, with a `BookMeasures` given in the test:
   ";" whose middle lies 3 pt left of the edge;
 - a head row 1.4 pitches above the body gives a running-head region
   first; at 1.2 pitches, no such region; a row of ";" above it goes into
-  the head region;
+  the head region; a head row 1.6 pitches above the body by its words'
+  median tops, whose next row holds an em dash boxed 10 pt taller than
+  its words, still gives one; a head whose last word lies 4 pt lower, a
+  row of its own, gives one region whose one line holds both rows'
+  words; a row of "^ _" between
+  head and body is passed over and stays with the body;
+- a left margin word "12" 9 pt left of a line's first word on a row
+  below the head stays at the start of that line; at 16 pt, or on the
+  head row, it is a margin word;
+- a small row "1 Ibid. 29." 1.0 pitch below the body's last row, with
+  small rows after it, starts the band; a small row "35 52 26" there
+  does not;
 - 5 rows of words of height 0.7 under 20 rows of height 1.0, 1.5 pitches
   apart, give a band region; the same rows without the gap give no band;
   a page of small rows only gives no band;
@@ -958,6 +1114,13 @@ checks them against the page images before they become the test.
 | `domesday_74-83` | 9 (83) | short notes side by side in three rows, read row by row |
 | `mariejol_210-219` (new) | 0 (210) | footnotes of 9-pt OCR lines; a foot line holding the signature and the page number "(l93)" |
 | `mariejol_210-219` | 4 (214) | a foot line the OCR garbled |
+
+The plan owner-books adds the excerpts `haskins_heads_notes`,
+`stubbs_heads` and `domesday_rereads` (`docs/specs/structure.md` §26),
+whose reference pages check steps 3 and 4 here: Haskins' pages 23, 30,
+66 and 235 and Stubbs' 20, 100, 152, 158, 186, 202 and 210 give a
+running-head region first, Haskins' 28, 55 and 195 and Domesday's 97
+and 138 a band holding their notes.
 
 The three new excerpts are added to `scripts/fetch_samples.py` with
 what they cover, ten pages each, all with a text layer:

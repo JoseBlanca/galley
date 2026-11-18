@@ -1,0 +1,62 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "gierke_intro_heads",
+  "page": 3,
+  "book_page_index": 71,
+  "checks": "a running head with its roman page number printed beside it, a region of its own (structure spec section 3, \"A short region beside the head\"), removed with it; the list's section heading, taken by the tall branch",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "ixvi Political Theories of the Middle Age."
+      }
+    ],
+    "page_numbers": [],
+    "heading_lines": [
+      "Century XIII."
+    ]
+  },
+  "known": "The roman page number is read \"ixvi\", which is no well-formed roman numeral, so it goes with the running head (structure spec section 3).",
+  "printed": {
+    "book_page_index": 71,
+    "running_head": {
+      "words": "Political Theories of the Middle Age.",
+      "page_number": "lxvi",
+      "number_side": "left",
+      "number_position": "inside the text column: flush with the column's left edge (the left end of the head rule and of the body lines), separated from the italic title by space",
+      "rule_below": true
+    },
+    "above_head": null,
+    "title_heading": null,
+    "section_headings": [
+      {
+        "text": "Century XIII.",
+        "position": "top",
+        "line_from_top": 1,
+        "look": "italic, upper- and lower-case with italic roman numeral, centred, slightly larger than body or body size, space above and below; a sub-heading under the section"
+      }
+    ],
+    "entries": {
+      "setting": "Each entry has a hanging number in bold sans-serif figures with a full stop (e.g. '8.'), set flush with the left edge of the column; the entry text is roman (author name in the same plain roman as the rest, not small caps or italic), first line beside the number, turnover lines indented further (hanging indent).",
+      "count_numbered_on_page": 8,
+      "first_entry_first_words": "Frederick II. (1211—1250),",
+      "last_entry_first_words": "S. Thomas Aquinas",
+      "starts_mid_entry": false
+    },
+    "margin_numbers": {
+      "side": "left, hanging (inside the column's left edge, the entry numbers)",
+      "numbers": [
+        "32.",
+        "33.",
+        "34.",
+        "35.",
+        "36.",
+        "37.",
+        "38.",
+        "39."
+      ]
+    },
+    "foot": null,
+    "notes": "'Century XIII.' is directly under the head rule, the first line of the page. Entry 39 (Thomas Aquinas) runs to the foot and continues on the next page; last line ends '...See Baumann, die'."
+  }
+}

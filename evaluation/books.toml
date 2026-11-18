@@ -46,11 +46,18 @@ archive_id = "earlyplantagenet01stub"
 title = "The Early Plantagenets"
 authors = ["William Stubbs"]
 language = "en"
-exclude_pages = [0, 2, 3, 4, 5, 8, 10, 53, 55, 338, 339, 340, 341, 342, 343]
+# Pages 322 to 337, the publisher's lists after the text, are excluded too:
+# the heading rule takes their lines for headings (structure spec section
+# 27, point 4, settled on 17 November 2026). The reference ends where they
+# begin, at the anchor of printed page 301, so that both sides leave them
+# out (docs/specs/evaluation.md, section 3); the expected counts are those
+# before it, 306 of the HTML's 322 page anchors and 35 of its 37 headings.
+exclude_pages = [0, 2, 3, 4, 5, 8, 10, 53, 55, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343]
 contents_pages = [14, 15, 16]
 body_pages = [18, 321]
+reference_ends_at = "Page_301"
 html_sha256 = "0c026dfc971d6fe8e8e55e00aaaa6bd3e4c109095011836c6cb411e24304b0dc"
-expected_counts = { notes = 0, margin_notes = 467, note_references = 0, page_anchors = 322, headings = 37, first_tokens = ["Epochs", "of", "Modern", "History", "EDITED"] }
+expected_counts = { notes = 0, margin_notes = 467, note_references = 0, page_anchors = 306, headings = 35, first_tokens = ["Epochs", "of", "Modern", "History", "EDITED"] }
 
 [book.rules.add]
 # The chapter titles are p.ph3, not h1-h6.

@@ -48,9 +48,11 @@ from galley.model import (
     Word,
     folded_letters_and_digits,
     is_under_ocr_word,
+    junk_layer_words,
     matched_ocr_positions,
     may_read,
     replaced_layer_words,
+    scored_layer_words,
     take_out_once,
     word_middle,
 )
@@ -886,7 +888,13 @@ def page_rereads(
         layer_words = replaced_layer_words(replaceable, ocr_words, is_known=is_known)
         if not layer_words and not read:
             continue
-        layer_scores = _word_scores(layer_words, lower_case_words)
+        # The layer's side is scored as rule (a) alone pairs it (reocr spec,
+        # section 3): the exception in (a) changes the words replaced, not
+        # the choice.
+        layer_scores = _word_scores(
+            scored_layer_words(replaceable, ocr_words, is_known=is_known),
+            lower_case_words,
+        )
         layer_score = sum(layer_scores)
         ocr_scores = _word_scores(ocr_words, lower_case_words)
         ocr_score = sum(ocr_scores)
@@ -910,6 +918,7 @@ def page_rereads(
                 ocr_score=ocr_score,
                 kept=kept,
                 dropped_junk_count=len(read) - len(not_junk) + stripped_count,
+                junk_words=junk_layer_words(replaceable, ocr_words, is_known=is_known),
             )
         )
     return tuple(records)

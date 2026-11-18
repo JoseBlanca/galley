@@ -65,6 +65,7 @@ class ReferenceKind(StrEnum):
     QUOTE = "quote"
     VERSE = "verse"
     CHAPTER_SUMMARY = "chapter_summary"
+    EPIGRAPH = "epigraph"
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"
@@ -146,11 +147,12 @@ class ReferenceText:
 
 
 def read_reference_file(
-    path: Path, rules: ReadingRules, html_sha256: str
+    path: Path, rules: ReadingRules, html_sha256: str, *, ends_at: str | None = None
 ) -> ReferenceText:
     """The reference text of the Gutenberg HTML file at `path`, read by
     `rules`, which were written for the file whose SHA-256 is
-    `html_sha256` (64 hexadecimal digits). Raises ReferenceReadError, with
+    `html_sha256` (64 hexadecimal digits), up to the element whose `id` is
+    `ends_at`, as read_reference says. Raises ReferenceReadError, with
     the file's path in the message, when the file is missing, is not
     UTF-8, has another SHA-256 (Gutenberg published a new version), or
     cannot be read as read_reference says."""
@@ -176,22 +178,29 @@ def read_reference_file(
         message = f"{path} is not UTF-8 text: {err}"
         raise ReferenceReadError(message) from err
     try:
-        return read_reference(html, rules)
+        return read_reference(html, rules, ends_at=ends_at)
     except ReferenceReadError as err:
         message = f"{path}: {err}"
         raise ReferenceReadError(message) from err
 
 
-def read_reference(html: str, rules: ReadingRules) -> ReferenceText:
+def read_reference(
+    html: str, rules: ReadingRules, *, ends_at: str | None = None
+) -> ReferenceText:
     """The reference text of the Gutenberg HTML `html`, read by `rules`.
+    When `ends_at` is given, the element whose `id` it is and everything
+    after it in the HTML are left out: of the elements that hold it, the
+    text before it is kept (spec section 3, `reference_ends_at`).
 
     Raises ReferenceReadError when no element matches `start` (or there is
-    no `header.pg-boilerplate` when `start` is empty), when text lies
+    no `header.pg-boilerplate` when `start` is empty), when no element has
+    the `id` `ends_at`, when text lies
     outside every block, when a notes section has content before its first
     note, when a note holds no `id` that a note reference points to, or
     when a page anchor has neither an `id="Page_N"` nor a `title`.
     """
-    root = _from_start(_tree(_events(html)), rules)
+    whole = _tree(_events(html))
+    root = _from_start(whole if ends_at is None else _until(whole, ends_at), rules)
     context = _Context(
         rules=rules,
         targets=_note_targets(root, rules),
@@ -372,6 +381,34 @@ def _from_start(root: _Element, rules: ReadingRules) -> _Element:
         message = f"no element matches the start rule ({wanted})"
         raise ReferenceReadError(message)
     return pruned
+
+
+def _until(root: _Element, element_id: str) -> _Element:
+    """`root` without the element whose `id` is `element_id` and what
+    follows it. Raises ReferenceReadError when no element has that `id`."""
+    cut = _cut_at(root, element_id)
+    if cut is None:
+        message = (
+            f"no element has the id {element_id!r} where the reference ends "
+            "(reference_ends_at)"
+        )
+        raise ReferenceReadError(message)
+    return cut
+
+
+def _cut_at(element: _Element, element_id: str) -> _Element | None:
+    """`element` keeping only what comes before the first descendant
+    whose `id` is `element_id`; None when no descendant has it."""
+    for position, child in enumerate(element.children):
+        if isinstance(child, _Data):
+            continue
+        before = element.children[:position]
+        if child.attributes.get("id") == element_id:
+            return replace(element, children=before)
+        inner = _cut_at(child, element_id)
+        if inner is not None:
+            return replace(element, children=(*before, inner))
+    return None
 
 
 def _prune(

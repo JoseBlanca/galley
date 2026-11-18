@@ -1,0 +1,72 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "gierke_intro_heads",
+  "page": 11,
+  "book_page_index": 79,
+  "checks": "a running head with its roman page number printed beside it, a region of its own (structure spec section 3, \"A short region beside the head\"), removed with it; the list's section heading, taken by the tall branch",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "ixxiv Political Theories of the Middle Age."
+      }
+    ],
+    "page_numbers": [],
+    "heading_lines": [
+      "III. CANONISTS."
+    ]
+  },
+  "known": "The roman page number is read \"ixxiv\", which is no well-formed roman numeral, so it goes with the running head (structure spec section 3).",
+  "printed": {
+    "book_page_index": 79,
+    "running_head": {
+      "words": "Political Theories of the Middle Age.",
+      "page_number": "lxxiv",
+      "number_side": "left",
+      "number_position": "inside the text column: flush with the column's left edge (the left end of the head rule and of the body lines), separated from the italic title by space",
+      "rule_below": true
+    },
+    "above_head": null,
+    "title_heading": null,
+    "section_headings": [
+      {
+        "text": "III. CANONISTS.",
+        "as_printed": "III. Canonists. (capitals and small capitals)",
+        "position": "lower (about three-quarters down), line ~38",
+        "line_from_top": 38,
+        "look": "centred, roman capitals and small capitals, same style as sections I and II, space above and below"
+      }
+    ],
+    "entries": {
+      "setting": "Each entry has a hanging number in bold sans-serif figures with a full stop (e.g. '8.'), set flush with the left edge of the column; the entry text is roman (author name in the same plain roman as the rest, not small caps or italic), first line beside the number, turnover lines indented further (hanging indent).",
+      "count_numbered_on_page": 17,
+      "first_entry_first_words": "Johannes de Imola",
+      "last_entry_first_words": "Innocentius IV., Sinibaldus Fliscus",
+      "starts_mid_entry": false
+    },
+    "margin_numbers": {
+      "side": "left, hanging (inside the column's left edge, the entry numbers)",
+      "numbers": [
+        "118.",
+        "119.",
+        "120.",
+        "121.",
+        "122.",
+        "123.",
+        "124.",
+        "125.",
+        "126.",
+        "127.",
+        "128.",
+        "129.",
+        "130.",
+        "131.",
+        "132.",
+        "133.",
+        "134."
+      ]
+    },
+    "foot": null,
+    "notes": "'134.' full stop looks broken ('134L'-like). Entry 134 runs off the foot ('Apparatus (Com-') and continues on the next page. Many specks/dots in the scan around entries 120-122 and 131."
+  }
+}

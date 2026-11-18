@@ -1307,7 +1307,8 @@ def test_head_below_the_median_by_pitches(pitches: float, running: bool) -> None
     ("heads", "running"),
     [
         (("ABCDEFGH", "ABCDEFXY"), True),
-        (("ABCDEFGHIJ", "ABCDEFGXYZ"), False),
+        (("ABCDEFGHIJ", "ABCDEFGXYZ"), True),
+        (("ABCDEFGHIJKLMNOPQRST", "ABCDEFGHIJKLMVWXYZVW"), False),
         (("ABCD", "ABCD"), True),
         (("ABC", "ABC"), False),
         (
@@ -1328,6 +1329,7 @@ def test_head_below_the_median_by_pitches(pitches: float, running: bool) -> None
     ids=[
         "0.75 alike",
         "0.70 alike",
+        "0.65 alike",
         "4 letters",
         "3 letters",
         "31 and 39 letters",
@@ -1836,6 +1838,43 @@ def test_caption_hyphen_is_joined_and_a_number_at_the_plate_foot_stays_caption()
     )
     assert block_text(blocks.blocks[-1]) == "A LAND OF VILLAGES OF OLD 17"
     assert blocks.page_numbers == ()
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_caption_gets_its_spaced_sign_attached_and_its_glued_word_split() -> None:
+    # Spec section 2, the paragraph after the steps: a figure's caption,
+    # made after the references, gets the case split (section 24) and the
+    # spaced signs (section 23). "of" is printed after a line's first word
+    # 10 times, and the book prints "Kadesh" whole.
+    plate = _plate(1, _spread("THE BATTLE ; ofKadesh AT Kadesh", 60, 300, 500))
+    pages = (
+        _body_page(0, *_five_full_lines(70, "first")),
+        plate,
+        _body_page(2, *_five_full_lines(70, "second")),
+    )
+    lines = _lines_of(*pages)
+    known = frozenset({"the", "battle", "of", "at", "kadesh"})
+    blocks = make_blocks(lines, known, workers=1)
+    (figure,) = (block for block in blocks.blocks if block.kind is BlockKind.FIGURE)
+    assert block_text(figure) == "THE BATTLE; of Kadesh AT Kadesh"
+    assert tuple(
+        change
+        for change in blocks.word_changes
+        if change.reason in {ChangeReason.PUNCTUATION_ATTACHED, ChangeReason.CASE_SPLIT}
+    ) == (
+        WordChange(
+            page_index=1,
+            before=("BATTLE", ";"),
+            after=("BATTLE;",),
+            reason=ChangeReason.PUNCTUATION_ATTACHED,
+        ),
+        WordChange(
+            page_index=1,
+            before=("ofKadesh",),
+            after=("of", "Kadesh"),
+            reason=ChangeReason.CASE_SPLIT,
+        ),
+    )
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
@@ -4080,17 +4119,26 @@ def test_heading_starting_with_a_label_word_is_level_1_with_its_words() -> None:
 
 
 @pytest.mark.parametrize(
-    ("distance", "gap_after", "continued"),
-    [(39.0, 33.0, True), (39.5, 33.0, False), (33.0, 22.5, True), (33.0, 22.0, False)],
+    ("above", "distance", "gap_after", "continued"),
+    [
+        ("THE OPENING TITLE", 39.0, 33.0, True),
+        ("THE OPENING TITLE", 39.5, 33.0, False),
+        ("THE OPENING TITLE", 33.0, 22.5, True),
+        ("THE OPENING TITLE", 33.0, 22.0, False),
+        # Below a chapter label alone, 4.0 pitches (the plan owner-books,
+        # structure spec section 14).
+        ("CHAPITRE V", 60.0, 33.0, True),
+        ("CHAPITRE V", 60.5, 33.0, False),
+    ],
 )
 def test_heading_continuation_in_capitals_within_2_6_pitches_and_1_5_above_the_text(
-    distance: float, gap_after: float, continued: bool
+    above: str, distance: float, gap_after: float, continued: bool
 ) -> None:
     title = "L'EXPERIENCE ET L'ECHEC DE LA POLITIQUE MODEREE"
     blocks = make_blocks(
         _lines_of(
             _around(
-                _centred_line("CHAPITRE V", 130),
+                _centred_line(above, 130),
                 _full(title, 130 + distance),
                 gap_after=gap_after,
             )
@@ -4098,7 +4146,8 @@ def test_heading_continuation_in_capitals_within_2_6_pitches_and_1_5_above_the_t
         _NO_WORDS,
         workers=1,
     )
-    assert (_kinds_and_texts(blocks)[1][3] == title) is continued
+    # The title is the heading's text, after the label or the line above.
+    assert _kinds_and_texts(blocks)[1][3].endswith(title) is continued
 
 
 @pytest.mark.parametrize(
@@ -5173,11 +5222,16 @@ def test_run_that_loses_a_word_raises_and_writes_no_blocks_json(
         lines: LinesFile,
         word_list: frozenset[str],
         *,
+        language: Language,
         contents_pages: frozenset[int],
         workers: int,
     ) -> BlocksFile:
         blocks = make_blocks(
-            lines, word_list, contents_pages=contents_pages, workers=workers
+            lines,
+            word_list,
+            language=language,
+            contents_pages=contents_pages,
+            workers=workers,
         )
         first = blocks.blocks[0]
         shorter = replace(
@@ -5264,11 +5318,13 @@ def test_whole_book_gierke_endnote_section_runs_from_186_to_282(
 ) -> None:
     # Structure spec, section 12: 299 endnotes on pages 186 to 282, the
     # library card of page 288 (excluded) not among them, and "NOTES."
-    # a heading of the body (section 14).
+    # a heading of the body (section 14). Numbered through the book, they
+    # are one note group, without a group heading.
     endnotes = tuple(
         note for note in gierke_blocks.notes if note.kind is NoteKind.ENDNOTE
     )
     assert len(endnotes) == 299
+    assert not any(note.group is not None for note in endnotes)
     pages = {origin.page_index for note in endnotes for origin in note.origin}
     assert (min(pages), max(pages)) == (186, 282)
     assert endnotes[0].marker == "1."
@@ -5335,8 +5391,9 @@ def test_whole_book_haskins_quotes_and_bibliographical_notes(
 
 
 # The head of a short section on the six whole books (structure spec,
-# section 3, its last paragraph): the rule takes exactly two head lines,
-# Haskins' page index 13 "vlil PREFACE" and Domesday's "vi Preface.". The
+# section 3, its last paragraph): the rule takes three head lines,
+# Haskins' page index 13 "vlil PREFACE", Domesday's "vi Preface." and
+# Gierke's 58 "Analytical Snnittniry. liii". The
 # pages it takes are those whose head line is a running head with the rule
 # and not without it.
 
@@ -5384,7 +5441,9 @@ def test_whole_book_short_section_rule_removes_only_the_haskins_and_domesday_hea
         "domesdaybook00maituoft": (13,),
         "earlyplantagenet01stub": (),
         "normansineuropea00hask": (13,),
-        "politicaltheorie00gieruoft": (),
+        # With the likeness at 0.70, the running head of Gierke's
+        # analytical summary (spec section 3).
+        "politicaltheorie00gieruoft": (58,),
     }
     assert all(without_rule[book] <= with_rule[book] for book in _WHOLE_BOOKS)
     haskins_blocks = outputs["normansineuropea00hask"][1]
@@ -5895,8 +5954,8 @@ def test_reread_whole_stubbs_index_pages_312_to_321_are_read_whole_and_kept(
     # ten index pages are small-print pages of the whole book, read whole
     # below their running heads and kept. The running head keeps the
     # layer's words. Page 312's entry "Acre, siege of, 116; the English at,
-    # 118;" has both ";" (Tesseract read "116 ;"), and structure cuts it in
-    # two after the first. Its guide words, and the book's 935 index
+    # 118;" has both ";" (Tesseract read "116 ;", which structure attaches,
+    # spec section 23), and structure cuts it in two after the first. Its guide words, and the book's 935 index
     # entries, are tested above (test_whole_book_stubbs_guide_words_on_
     # each_of_its_ten_index_pages).
     words = read_words(whole_book_run("earlyplantagenet01stub").words_json)
@@ -5936,7 +5995,7 @@ def test_reread_whole_stubbs_index_pages_312_to_321_are_read_whole_and_kept(
     acre = next(
         position
         for position, entry in enumerate(entries)
-        if entry.endswith("Acre, siege of, 116 ;")
+        if entry.endswith("Acre, siege of, 116;")
     )
     assert entries[acre + 1] == "the English at, 118;"
 

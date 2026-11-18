@@ -21,8 +21,11 @@ class Unnumbered:
     its note references: for the position of a word, the reference it
     holds and the position of its note among the notes; a heading's level
     and chapter label; the positions of the words that start a printed
-    line after the first, which a verse block keeps (spec section 16); and
-    a figure block's image path (section 18)."""
+    line after the first, which a verse block keeps (spec section 16), and
+    a verse epigraph too (section 22); a figure block's image path
+    (section 18); an epigraph's source (section 22); and, in a French
+    book, the positions of the words that take a no-break space, U+00A0,
+    before them instead of a space (section 23)."""
 
     kind: BlockKind
     words: tuple[str, ...]
@@ -34,17 +37,21 @@ class Unnumbered:
     label: str | None = None
     line_starts: frozenset[int] = frozenset()
     figure: str | None = None
+    source: str | None = None
+    no_break: frozenset[int] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
 class UnnumberedNote:
-    """A note before it has its id."""
+    """A note before it has its id; `group` is the group heading on a note
+    group's first endnote, else None (spec section 12)."""
 
     kind: NoteKind
     marker: str
     blocks: tuple[Unnumbered, ...]
     origin: tuple[Origin, ...]
     referenced: bool
+    group: str | None = None
 
 
 def piece_origin(piece: Piece) -> tuple[Origin, ...]:

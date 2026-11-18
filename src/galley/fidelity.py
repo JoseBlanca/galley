@@ -33,6 +33,7 @@ from galley.model import (
     Word,
     WordChange,
     WordsFile,
+    is_junk_beside_its_copy,
     may_read,
     replaced_layer_words,
     take_out_once,
@@ -150,7 +151,12 @@ def _unmatched(reread: Reread) -> tuple[Word, ...]:
         # accepts every glued misreading layout matched (reocr spec,
         # section 4).
         replaced_layer_words(
-            reread.layer_words, reread.ocr_words, is_known=_NO_KNOWN_WORDS.__contains__
+            reread.layer_words,
+            reread.ocr_words,
+            is_known=_NO_KNOWN_WORDS.__contains__,
+            # The junk under a word paired with its copy is the junk layout
+            # named, by its word list, which this check has not.
+            is_junk=lambda word, _ocr_word: word in reread.junk_words,
         ),
     )
     return unmatched
@@ -166,7 +172,9 @@ def _one_reading_of_two_lines(reread: Reread) -> tuple[str, ...]:
     """A problem for each Tesseract word of `reread` that is the only one
     of its `ocr_words` that may read two of its `layer_words` of different
     printed lines (`model.may_read`): it would stand for two printed words.
-    Independent of `model.replaced_layer_words`, the pairing layout made."""
+    Independent of `model.replaced_layer_words`, the pairing layout made.
+    The layer's junk under it beside the layer's copy of its word is no
+    such pair (`model.is_junk_beside_its_copy`)."""
     sole_readings: dict[int, list[Word]] = {}
     for word in reread.layer_words:
         readings = tuple(
@@ -185,6 +193,16 @@ def _one_reading_of_two_lines(reread: Reread) -> tuple[str, ...]:
         for index, first in enumerate(layer_words)
         for second in layer_words[index + 1 :]
         if not _share_a_line(first, second)
+        # The layer's junk under the word and its copy of the word beside
+        # it: one printed word read twice (reocr spec, section 4).
+        and not (
+            first in reread.junk_words
+            and is_junk_beside_its_copy(first, second, ocr_word)
+        )
+        and not (
+            second in reread.junk_words
+            and is_junk_beside_its_copy(second, first, ocr_word)
+        )
     )
 
 
@@ -196,7 +214,8 @@ def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
     record's `ocr_words`, by `model.replaced_layer_words` (reocr spec,
     section 4); or a Tesseract word that is the only one of its record
     that may read two of its layer words of different printed lines
-    (architecture section 13)."""
+    (architecture section 13); or a word of its `junk_words` that is not
+    among its `layer_words`."""
     on_pages = Counter(
         (page.index, word.text, word.box) for page in words.pages for word in page.words
     )
@@ -215,6 +234,12 @@ def _reread_problems(words: WordsFile, lines: LinesFile) -> tuple[str, ...]:
         problem
         for reread in _kept_rereads(lines)
         for problem in _one_reading_of_two_lines(reread)
+    )
+    problems.extend(
+        f"a kept reread on page {reread.page_index} names {word.text!r} at "
+        f"{_box_text(word.box)} as junk, which is not among its layer words"
+        for reread in _kept_rereads(lines)
+        for word in take_out_once((reread.junk_words,), reread.layer_words)[0]
     )
     for (page_index, text, box), count in named.items():
         where = f"{text!r} at {_box_text(box)}"
@@ -237,12 +262,13 @@ def _block_words(
     block: Block, boundary: _BlocksBoundary, endnote_ids: frozenset[str]
 ) -> tuple[_PlacedWord, ...]:
     """The words of a block: a heading's label, then its spans split one by
-    one. A note reference span is replaced by a space in the block's text,
+    one, then an epigraph's source. A note reference span is replaced by a space in the block's text,
     so that it does not glue to the word before, and counted as a word of
     its own: at the structure boundary every one, at the markdown boundary
     those to the endnotes of `endnote_ids`, whose links keep their text."""
     place = f"block {block.id} {_pages(block.origin)}"
     label = _placed(block.label, place) if block.label is not None else ()
+    source = _placed(block.source, place) if block.source is not None else ()
     text = "".join(
         " " if span.note_ref is not None else span.text for span in block.spans
     )
@@ -263,7 +289,7 @@ def _block_words(
             )
         case _:
             assert_never(boundary)
-    return label + _placed(text, place) + references
+    return label + _placed(text, place) + source + references
 
 
 def _blocks_file_words(
@@ -271,8 +297,9 @@ def _blocks_file_words(
 ) -> tuple[_PlacedWord, ...]:
     """The words of the body and of every note, with each note's marker,
     except at the markdown boundary the marker of a referenced footnote,
-    which Pandoc replaces with its own number. An endnote is written where
-    it was printed, its marker with it, referenced or not."""
+    which Pandoc replaces with its own number, and each note's group. An
+    endnote is written where it was printed, its marker with it, referenced
+    or not, and its group in the div before it."""
     endnote_ids = _endnote_ids(blocks)
     body = tuple(
         word
@@ -301,7 +328,13 @@ def _blocks_file_words(
         for note in counted_notes
         for word in _placed(note.marker, f"note {note.id} {_pages(note.origin)}")
     )
-    return body + notes + markers
+    groups = tuple(
+        word
+        for note in blocks.notes
+        if note.group is not None
+        for word in _placed(note.group, f"note {note.id} {_pages(note.origin)}")
+    )
+    return body + notes + markers + groups
 
 
 def _removal_words(blocks: BlocksFile) -> tuple[_PlacedWord, ...]:
@@ -528,6 +561,39 @@ def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
 
 # A hyphen join is two parts of a word split at a line end (glossary).
 _HYPHEN_JOIN_PARTS = 2
+# The dashes that may start an epigraph's source line, alone or several
+# (structure spec section 22, rule 3). Written here again, not imported
+# from structure's _epigraphs.py: the check states its rules on its own,
+# so that a change to the stage does not change what it is checked
+# against.
+_SOURCE_DASHES = "\u2014\u2013-"
+# A spaced sign is attached to the one word before it, and a word glued
+# at a case change is split in two (structure spec sections 23 and 24).
+_PUNCTUATION_ATTACHED_PARTS = 2
+# Written here again, not imported from structure's _spaced.py, for the
+# reason given for _SOURCE_DASHES.
+_SPACED_SIGNS = frozenset("?;:!")
+_CASE_SPLIT_PARTS = 2
+# The changes structure makes after the joins of lost hyphens (structure
+# spec section 2, the paragraph after the steps).
+_CHANGES_AFTER_A_JOIN = frozenset(
+    {ChangeReason.PUNCTUATION_ATTACHED, ChangeReason.CASE_SPLIT}
+)
+
+
+def _is_source_dash(change: WordChange) -> bool:
+    """Whether a source_dash change takes the dashes off the start of an
+    epigraph's source and nothing else: one word that starts with a dash,
+    or a word of dashes alone and the word after, become the one word
+    without them (structure spec section 22)."""
+    match change.before:
+        case (word,) if word[:1] in _SOURCE_DASHES:
+            undashed = word.lstrip(_SOURCE_DASHES)
+        case (dashes, word) if dashes and not dashes.strip(_SOURCE_DASHES):
+            undashed = word.lstrip(_SOURCE_DASHES)
+        case _:
+            return False
+    return bool(undashed) and change.after == (undashed,)
 
 
 def _change_follows_its_reason(change: WordChange) -> bool:
@@ -537,7 +603,9 @@ def _change_follows_its_reason(change: WordChange) -> bool:
     hyphen joins two parts, the first ending with a hyphen, as they are,
     the hyphen written "-" whether the first ends with "-" or "¬"; a lost
     hyphen joins two parts as they are, but for one full stop ending the
-    first."""
+    first; a source dash is taken off a source's first word; a spaced
+    sign is attached to the word before it; a word glued at a case change
+    becomes two whose second starts with a capital."""
     if not change.before or not change.after:
         return False
     joined_after = "".join(change.after)
@@ -562,6 +630,23 @@ def _change_follows_its_reason(change: WordChange) -> bool:
                 and change.before[0][-1:] in LINE_END_HYPHENS
                 and change.before[0][:-1] + "-" + change.before[1] == joined_after
             )
+        case ChangeReason.SOURCE_DASH:
+            return _is_source_dash(change)
+        case ChangeReason.PUNCTUATION_ATTACHED:
+            return (
+                len(change.before) == _PUNCTUATION_ATTACHED_PARTS
+                and len(change.after) == 1
+                and change.before[1][:1] in _SPACED_SIGNS
+                and "".join(change.before) == joined_after
+            )
+        case ChangeReason.CASE_SPLIT:
+            return (
+                len(change.before) == 1
+                and len(change.after) == _CASE_SPLIT_PARTS
+                and all(change.after)
+                and change.after[1][0].isupper()
+                and change.before[0] == joined_after
+            )
         case _:
             assert_never(change.reason)
 
@@ -578,24 +663,90 @@ def _margin_note_words(blocks: BlocksFile) -> frozenset[tuple[int, str]]:
     )
 
 
+def _margin_note_words_before_changes(
+    blocks: BlocksFile,
+) -> frozenset[tuple[int, str]]:
+    """The words of the margin-note blocks, as `_margin_note_words` gives
+    them, and every word that a chain of signs attached and case splits
+    turned into such words on their page (structure spec section 5): a
+    join of a lost hyphen comes before both, so its word may be one of
+    these ("theWilliam" split into "the" "William", then "William;").
+    A word is added only when every word of the change's `after` already
+    is one, so a join is admitted only when the words its chain ends in
+    are words of a margin note of its page, as without the chain."""
+    words = _margin_note_words(blocks)
+    later = tuple(
+        change
+        for change in blocks.word_changes
+        if change.reason in _CHANGES_AFTER_A_JOIN
+    )
+    while True:
+        undone = frozenset(
+            (change.page_index, change.before[0])
+            for change in later
+            if all((change.page_index, word) in words for word in change.after)
+        )
+        if undone <= words:
+            return words
+        words |= undone
+
+
+def _source_first_words(blocks: BlocksFile) -> frozenset[tuple[int, str]]:
+    """The first word of the source of each epigraph, with each page the
+    epigraph has a part on."""
+    return frozenset(
+        (origin.page_index, words[0])
+        for block in _all_blocks(blocks)
+        if block.kind is BlockKind.EPIGRAPH and block.source is not None
+        for words in (block.source.split(),)
+        if words
+        for origin in block.origin
+    )
+
+
 def _change_problems(blocks: BlocksFile) -> tuple[str, ...]:
     """The word changes that delete or invent words or change a letter,
-    which the multiset comparison would take on trust, and the joins of a
-    lost hyphen whose word is in no margin note of their page (structure
-    spec section 5)."""
-    in_margin_notes = _margin_note_words(blocks)
+    which the multiset comparison would take on trust, the joins of a lost
+    hyphen whose word is in no margin note of their page (structure spec
+    section 5), and the source dashes taken off a word that is not the
+    first of an epigraph's source on their page (section 22)."""
+    in_margin_notes = _margin_note_words_before_changes(blocks)
+    source_first_words = _source_first_words(blocks)
+    return (
+        tuple(
+            f"word change on page {change.page_index}: {change.before!r} to "
+            f"{change.after!r} is not a {change.reason.value}"
+            for change in blocks.word_changes
+            if not _change_follows_its_reason(change)
+        )
+        + tuple(
+            f"word change on page {change.page_index}: {change.after!r}, a "
+            f"{change.reason.value}, is not in a margin note"
+            for change in blocks.word_changes
+            if change.reason is ChangeReason.HYPHEN_LOST
+            and _change_follows_its_reason(change)
+            and (change.page_index, change.after[0]) not in in_margin_notes
+        )
+        + tuple(
+            f"word change on page {change.page_index}: {change.after!r}, a "
+            f"{change.reason.value}, is not the first word of an epigraph's source"
+            for change in blocks.word_changes
+            if change.reason is ChangeReason.SOURCE_DASH
+            and _change_follows_its_reason(change)
+            and (change.page_index, change.after[0]) not in source_first_words
+        )
+    )
+
+
+def _source_problems(blocks: BlocksFile) -> tuple[str, ...]:
+    """The blocks that are not epigraphs and have a source, whose words
+    would be counted at the structure boundary but which markdown does not
+    write (structure spec section 7)."""
     return tuple(
-        f"word change on page {change.page_index}: {change.before!r} to "
-        f"{change.after!r} is not a {change.reason.value}"
-        for change in blocks.word_changes
-        if not _change_follows_its_reason(change)
-    ) + tuple(
-        f"word change on page {change.page_index}: {change.after!r}, a "
-        f"{change.reason.value}, is not in a margin note"
-        for change in blocks.word_changes
-        if change.reason is ChangeReason.HYPHEN_LOST
-        and _change_follows_its_reason(change)
-        and (change.page_index, change.after[0]) not in in_margin_notes
+        f"block {block.id} is a {block.kind.value} and has the source "
+        f"{block.source!r}; only an epigraph has a source"
+        for block in _all_blocks(blocks)
+        if block.source is not None and block.kind is not BlockKind.EPIGRAPH
     )
 
 
@@ -637,10 +788,12 @@ def check_stage(
     re-reading of lines.json and with its Tesseract words added, against
     the words of lines.json's lines. structure:
     the words of lines.json against those of blocks.json's blocks and notes,
-    with each heading's label and each note's marker, plus its removals,
+    with each heading's label, each epigraph's source, and each note's
+    marker and group, plus its removals,
     with each word change undone. markdown: the words of blocks.json, with
     the edits applied, against book.md as `read_markdown` gives it, without
-    the references to footnotes and the markers of referenced footnotes;
+    the references to footnotes and the markers of referenced footnotes,
+    and without the dash markdown writes before an epigraph's source;
     the number of references to footnotes against Pandoc's notes, and to
     endnotes against the links marked as note references, whose text is
     the reference's. The words are compared as multisets over the whole
@@ -656,9 +809,12 @@ def check_stage(
     names no note, does not have a marker's shape (1 to 4 characters, at
     most 3 letters or digits, no white space, "&" or dash, a letter only
     beside a round bracket), or holds a letter without a note_marker word
-    change that split it off a word; and at the structure boundary when a
-    word change does more than its reason allows (a hyphen join of two
-    parts, with the hyphen dropped or kept, a marker split off its word).
+    change that split it off a word, or when a block that is not an
+    epigraph has a source; and at the structure boundary when a word
+    change does more than its reason allows (a hyphen join of two parts,
+    with the hyphen dropped or kept, a marker split off its word, the
+    dashes taken off a source, a spaced sign attached, a word split at a
+    case change).
     """
     match stage:
         case FidelityBoundary.LAYOUT:
@@ -675,7 +831,12 @@ def check_stage(
         case FidelityBoundary.STRUCTURE:
             if not (isinstance(before, LinesFile) and isinstance(after, BlocksFile)):
                 raise _wrong_types(stage, before, after)
-            _check_records(stage, _reference_problems(after) + _change_problems(after))
+            _check_records(
+                stage,
+                _source_problems(after)
+                + _reference_problems(after)
+                + _change_problems(after),
+            )
             _check_words(
                 stage,
                 _lines_file_words(before),
@@ -690,7 +851,9 @@ def check_stage(
                 isinstance(before, BlocksFile) and isinstance(after, MarkdownWords)
             ):
                 raise _wrong_types(stage, before, after)
-            _check_records(stage, _reference_problems(before))
+            _check_records(
+                stage, _source_problems(before) + _reference_problems(before)
+            )
             _check_words(
                 stage,
                 _blocks_file_words(before, stage),
@@ -847,7 +1010,9 @@ def _block_tokens(block: object, block_id: str | None) -> tuple[_Token, ...]:
     """The tokens of a block element, between two breaks. A div or heading
     with an id gives it to the words inside; one without keeps `block_id`.
     A figure gives its caption's words once, and an image without a caption
-    alone in a paragraph none (architecture section 13)."""
+    alone in a paragraph none (architecture section 13). An epigraph's div
+    gives its source's words without the dash before them (structure spec
+    section 25)."""
     match block:
         case {"t": "Para" | "Plain", "c": [image]} if _is_figure_image(image, []):
             content = ()
@@ -860,8 +1025,11 @@ def _block_tokens(block: object, block_id: str | None) -> tuple[_Token, ...]:
             content = _inlines_tokens(inlines, block_id)
         case {"t": "BlockQuote", "c": list() as blocks}:
             content = _blocks_tokens(blocks, block_id)
-        case {"t": "Div", "c": [[str() as div_id, *_], list() as blocks]}:
-            content = _blocks_tokens(blocks, div_id or block_id)
+        case {
+            "t": "Div",
+            "c": [[str() as div_id, list() as classes, *_], list() as blocks],
+        }:
+            content = _div_tokens(classes, blocks, div_id or block_id)
         case {
             "t": "Header",
             "c": [int(), [str() as heading_id, *_], list() as inlines],
@@ -875,7 +1043,125 @@ def _block_tokens(block: object, block_id: str | None) -> tuple[_Token, ...]:
 
 
 def _blocks_tokens(blocks: list[object], block_id: str | None) -> tuple[_Token, ...]:
-    return tuple(token for block in blocks for token in _block_tokens(block, block_id))
+    """The tokens of a list of block elements. A note group's div gives its
+    words to the endnote whose div follows it (structure spec section 25)."""
+    tokens: list[_Token] = []
+    for position, block in enumerate(blocks):
+        if _NOTE_GROUP_CLASS in _div_classes(block):
+            following = blocks[position + 1] if position + 1 < len(blocks) else None
+            tokens.extend(_note_group_tokens(block, following, block_id))
+        else:
+            tokens.extend(_block_tokens(block, block_id))
+    return tuple(tokens)
+
+
+# Structure spec section 25: the classes of the divs markdown writes for an
+# epigraph, its source and a note group, and markdown's for an endnote.
+_EPIGRAPH_CLASS = "epigraph"
+_EPIGRAPH_SOURCE_CLASS = "epigraph-source"
+_NOTE_GROUP_CLASS = "note-group"
+_ENDNOTE_CLASS = "endnote"
+_DIV = "Div"
+# The dash markdown writes before an epigraph's source, followed by a
+# no-break space, which splits it off as a word of its own. Written here
+# again, not imported from the markdown stage, for the reason given for
+# _SOURCE_DASHES.
+_SOURCE_DASH = "\u2014"
+
+
+def _div_classes(block: object) -> tuple[str, ...]:
+    """The classes of a Div element; none for any other element."""
+    match block:
+        case {"t": "Div", "c": [[_, list() as classes, *_], _]}:
+            return tuple(name for name in classes if isinstance(name, str))
+        case _:
+            return ()
+
+
+def _div_tokens(
+    classes: list[object], blocks: list[object], block_id: str | None
+) -> tuple[_Token, ...]:
+    """The tokens of the blocks of a div of `classes`. An epigraph's source
+    div is read only inside an epigraph's div; a note group's never comes
+    here, since _blocks_tokens reads it."""
+    if _EPIGRAPH_SOURCE_CLASS in classes:
+        raise _not_read(_DIV, block_id)
+    if _EPIGRAPH_CLASS in classes:
+        return _epigraph_tokens(blocks, block_id)
+    return _blocks_tokens(blocks, block_id)
+
+
+def _epigraph_tokens(blocks: list[object], block_id: str | None) -> tuple[_Token, ...]:
+    """The tokens of the blocks of an epigraph's div: its quotation, and
+    its source div's words without the dash markdown wrote. Any other div
+    inside it is an element galley's Markdown does not make."""
+    tokens: list[_Token] = []
+    for block in blocks:
+        match block:
+            case {"t": "Div", "c": [_, list() as source_blocks]} if (
+                _EPIGRAPH_SOURCE_CLASS in _div_classes(block)
+            ):
+                tokens.extend(_source_tokens(source_blocks, block_id))
+            case {"t": "Div"}:
+                raise _not_read(_DIV, block_id)
+            case _:
+                tokens.extend(_block_tokens(block, block_id))
+    return tuple(tokens)
+
+
+def _source_tokens(blocks: list[object], block_id: str | None) -> tuple[_Token, ...]:
+    """The words of an epigraph's source div, counted to the epigraph's
+    block, without the dash markdown writes as their first word, which
+    blocks.json does not hold (structure spec section 25). Raises
+    ExternalProgramError when the div holds a note or does not start with
+    that dash."""
+    content = _blocks_tokens(blocks, block_id)
+    where = f"in block {block_id}" if block_id is not None else "outside any block"
+    if _Boundary.NOTE in content or _Boundary.NOTE_LINK in content:
+        message = (
+            f"the epigraph-source div {where} holds a note or a note reference, "
+            "which galley's Markdown does not make"
+        )
+        raise ExternalProgramError(message)
+    words = _token_words(content)
+    if not words or words[0].text != _SOURCE_DASH:
+        message = (
+            f"the epigraph-source div {where} does not start with the dash "
+            f"markdown writes before a source, {_SOURCE_DASH!r} and a no-break "
+            "space, so its words cannot be checked"
+        )
+        raise ExternalProgramError(message)
+    return (
+        _Boundary.BREAK,
+        *(
+            token
+            for word in words[1:]
+            for token in (_Text(word.text, word.block_id), _Boundary.BREAK)
+        ),
+    )
+
+
+def _note_group_tokens(
+    group: object, following: object, block_id: str | None
+) -> tuple[_Token, ...]:
+    """The words of a note group's div, counted to the endnote whose div
+    `following` is (structure spec section 25). Raises ExternalProgramError
+    when `following` is not an endnote's div with its id."""
+    match group, following:
+        case (
+            {"t": "Div", "c": [_, list() as blocks]},
+            {"t": "Div", "c": [[str() as note_id, *_], _]},
+        ) if note_id and _ENDNOTE_CLASS in _div_classes(following):
+            return (_Boundary.BREAK, *_blocks_tokens(blocks, note_id), _Boundary.BREAK)
+        case _:
+            where = (
+                f"in block {block_id}" if block_id is not None else "outside any block"
+            )
+            message = (
+                f"a note-group div {where} is not followed by an endnote's div, "
+                "which galley's Markdown does not make"
+            )
+            raise ExternalProgramError(message)
 
 
 def _joined_words(texts: tuple[_Text, ...]) -> tuple[MarkdownWord, ...]:
@@ -887,16 +1173,9 @@ def _joined_words(texts: tuple[_Text, ...]) -> tuple[MarkdownWord, ...]:
     return tuple(MarkdownWord(word, texts[0].block_id) for word in joined.split())
 
 
-def _words_of_pandoc_json(pandoc_json: str) -> MarkdownWords:
-    """The words of the `blocks` of Pandoc's JSON, as `pandoc --to json`
-    writes it, not of its `meta`, and the number of its Note elements."""
-    document = json.loads(pandoc_json)
-    match document:
-        case {"blocks": list() as blocks}:
-            tokens = _blocks_tokens(blocks, None)
-        case _:
-            message = f"Pandoc's JSON has no list of blocks: {repr(document)[:80]}"
-            raise ExternalProgramError(message)
+def _token_words(tokens: tuple[_Token, ...]) -> tuple[MarkdownWord, ...]:
+    """The words of `tokens`: each run of text between two boundaries
+    joined, then split on white space."""
     words: list[MarkdownWord] = []
     run: list[_Text] = []
     for token in tokens:
@@ -909,8 +1188,21 @@ def _words_of_pandoc_json(pandoc_json: str) -> MarkdownWords:
             case _:
                 assert_never(token)
     words.extend(_joined_words(tuple(run)))
+    return tuple(words)
+
+
+def _words_of_pandoc_json(pandoc_json: str) -> MarkdownWords:
+    """The words of the `blocks` of Pandoc's JSON, as `pandoc --to json`
+    writes it, not of its `meta`, and the number of its Note elements."""
+    document = json.loads(pandoc_json)
+    match document:
+        case {"blocks": list() as blocks}:
+            tokens = _blocks_tokens(blocks, None)
+        case _:
+            message = f"Pandoc's JSON has no list of blocks: {repr(document)[:80]}"
+            raise ExternalProgramError(message)
     return MarkdownWords(
-        words=tuple(words),
+        words=_token_words(tokens),
         note_count=sum(1 for token in tokens if token is _Boundary.NOTE),
         note_link_count=sum(1 for token in tokens if token is _Boundary.NOTE_LINK),
     )
@@ -969,7 +1261,10 @@ def read_markdown(markdown: str) -> MarkdownWords:
 
     Words are split at spaces and line breaks, and at the start and end of
     every block, note and link marked as a note reference, whose text is
-    read as its own words; emphasis does not split a word. A figure's
+    read as its own words; emphasis does not split a word. The words of an
+    epigraph's source div count to the epigraph, without the dash markdown
+    writes first, and those of a note group's div to the endnote whose div
+    follows it. A figure's
     caption is read once, and its image's alt text, which Pandoc copies
     from the caption, not at all. The metadata header, the title and
     authors, gives no words. Raises
@@ -978,6 +1273,8 @@ def read_markdown(markdown: str) -> MarkdownWords:
     longer than 60 s, or reads an element galley's Markdown does not make,
     such as a list, a link that is no note reference, or an image that is
     not alone in its paragraph, whose alt text is not its figure's caption,
-    or that has a title or attributes.
+    or that has a title or attributes; or a div inside an epigraph's div
+    that is not its source's, a source's div that does not start with the
+    dash, or a note group's div not followed by an endnote's.
     """
     return _words_of_pandoc_json(_pandoc_json(markdown))

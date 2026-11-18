@@ -1,0 +1,62 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "stubbs_heads",
+  "page": 0,
+  "book_page_index": 20,
+  "checks": "a running head whose page number the skew sets 4 pt lower, a row of its own (layout step 3), removed with it",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "ch. I. Introduction."
+      },
+      {
+        "reason": "page_number",
+        "text": "3"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "3",
+        "position": "head"
+      }
+    ]
+  },
+  "printed": {
+    "book_page_index": 20,
+    "running_head": {
+      "words": [
+        "CH. I.",
+        "Introduction."
+      ],
+      "page_number": "3",
+      "number_side": "right",
+      "skew": "page number 3 sits a little lower than 'CH. I.' and 'Introduction.'"
+    },
+    "above_head": "faint specks only; a small dot sits IN the head line between 'CH. I.' and 'Introduction.'",
+    "below_head_tall": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "In the relations of the",
+      "Whilst these greater actors are"
+    ],
+    "ends_mid_paragraph": true,
+    "last_words": "preparing for the",
+    "margin_notes": [
+      "Germany.",
+      "The Empire."
+    ],
+    "footnotes": [],
+    "quotes_or_verse": [],
+    "spaced_punctuation": [
+      {
+        "word": "constituted",
+        "text": "constituted ;"
+      }
+    ],
+    "case_glued": null,
+    "foot": null,
+    "notes": "Margin notes on the right (outer) side, set into a cut-out of the column. Small stray strokes in left and right margins."
+  }
+}

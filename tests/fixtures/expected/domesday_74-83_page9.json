@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the orchestrator against the page image on 15 November 2026 (galley at ec2edc4); the owner did not check this page.",
-  "changed": "Changed since that check by task 2.5: \"Eng-\" leaves the body line for the margin note \"The Eng-\", and \"As a last question\" starts a paragraph. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"Two notes on one line\" and \"The marker of a note\"): the three lines of two notes each give two notes each, cut at the second marker (\"2\", \"*\", \"e\"); each marker is taken out of its note's text. Changed by task 2.3 (structure spec section 11, \"References\"): references split off their words by note_marker word changes and linked to the page's notes: \"12s.2\", \"30d8\", \"10s.4\", \"year6\", \"consuetude6.\", \"year7.\", \"provender8.\"; \"£2\" and \"£8.\" are no candidates (\"£\" is no punctuation). Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed again by the fix of task 5.2 (reocr spec, section 4, rules (a) and (b)): a layer word the layer placed off Tesseract's reading of it, of the same text, is replaced and no longer read twice; listed in the task's list of changed reference pages.",
+  "changed": "Changed since that check by task 2.5: \"Eng-\" leaves the body line for the margin note \"The Eng-\", and \"As a last question\" starts a paragraph. Checked against the page image by the orchestrator on 15 November 2026. Changed by task 2.1 (structure spec section 11, \"Two notes on one line\" and \"The marker of a note\"): the three lines of two notes each give two notes each, cut at the second marker (\"2\", \"*\", \"e\"); each marker is taken out of its note's text. Changed by task 2.3 (structure spec section 11, \"References\"): references split off their words by note_marker word changes and linked to the page's notes: \"12s.2\", \"30d8\", \"10s.4\", \"year6\", \"consuetude6.\", \"year7.\", \"provender8.\"; \"£2\" and \"£8.\" are no candidates (\"£\" is no punctuation). Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the clean-text plan (reocr spec, sections 3 and 4): layout re-reads the outer margin notes, the cut-in notes and the small-print pages with Tesseract and keeps its words for a region whose reading scores higher than the layer's; each change is listed, with the region's layer words and Tesseract's words, in the task's list of changed reference pages; not yet checked against the page image. Changed again by the fix of task 5.2 (reocr spec, section 4, rules (a) and (b)): a layer word the layer placed off Tesseract's reading of it, of the same text, is replaced and no longer read twice; listed in the task's list of changed reference pages. Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image.",
   "excerpt": "domesday_74-83",
   "page": 9,
   "book_page_index": 83,
@@ -63,7 +63,7 @@
   "blocks": [
     {
       "kind": "paragraph",
-      "text": "With our thirteenth century cartularies before us, we might T easily underrate the amount or money that was already being paid as the rent of land at the date of the Conquest. In several counties we come across small groups of censarii, censores, gablatores who pay for their land in money, of cervisarii and mellitarii who bring beer and honey. Renders in kind, in herrings, eels, salmon are not uncommon, and sometimes they are ' appreciated,' valued in terms of money. The pannage pig or the grass swine, which the villeins give in return for mast and herbage, is often mentioned. Throughout Sussex it seems to be the custom that the lord should have ' for herbage ' one pig from every villein who has seven pigs8. But money will be taken instead of swine, oxen or fish9. The gersuma, the tailla, the theoretically free gifts of the tenants, are sums of money. But often enough the villanus is paying a substantial money rent. We have seen how at Leominster villeins plough and sow 140 acres for their lord and pay a rent of more than £11 1. At Lewisham in Kent the Abbot of Gand has a manor valued at £30 ; of this £2 is due to the profits of the port while two mills with 'the gafol of the rustics' bring in £8. 12s.2 Such entries as the following are not uncommon — there is one villein rendering 30d8 — there is one villein rendering 10s.4 — 46 cotarii with one hide render 30 shillings a year6 — the villeins give 13s. 4>d. by way of consuetude6. No doubt it would be somewhat rare to find a villein discharging all his dues in money — this is suggested when we are told how on the land of Sl. Augustin one Wadard holds a large piece 'de terra villanorum' and yet renders no service to the abbot save 30s. a year7. At least in one instance the villeins seem to be holding the manor in farm, that is to say, they are farming the demesne land and paying a rent in money or in provender8. We dare not represent the stream of economic history as flowing uninterruptedly from a system of labour services to a system of rents. We must remember that in the Conqueror's reign the lord very often had numerous serfs whose whole time was given to the cultivation of his demesne. In the south-western counties he will often have two, three or more serfs for every team that he has on his demesne, and, while this is so, we can not safely say that his husbandry requires that the villeins should be labouring on his land for three or four days in every week.",
+      "text": "With our thirteenth century cartularies before us, we might T easily underrate the amount or money that was already being paid as the rent of land at the date of the Conquest. In several counties we come across small groups of censarii, censores, gablatores who pay for their land in money, of cervisarii and mellitarii who bring beer and honey. Renders in kind, in herrings, eels, salmon are not uncommon, and sometimes they are ' appreciated,' valued in terms of money. The pannage pig or the grass swine, which the villeins give in return for mast and herbage, is often mentioned. Throughout Sussex it seems to be the custom that the lord should have ' for herbage ' one pig from every villein who has seven pigs8. But money will be taken instead of swine, oxen or fish9. The gersuma, the tailla, the theoretically free gifts of the tenants, are sums of money. But often enough the villanus is paying a substantial money rent. We have seen how at Leominster villeins plough and sow 140 acres for their lord and pay a rent of more than £11 1. At Lewisham in Kent the Abbot of Gand has a manor valued at £30; of this £2 is due to the profits of the port while two mills with 'the gafol of the rustics' bring in £8. 12s.2 Such entries as the following are not uncommon — there is one villein rendering 30d8 — there is one villein rendering 10s.4 — 46 cotarii with one hide render 30 shillings a year6 — the villeins give 13s. 4>d. by way of consuetude6. No doubt it would be somewhat rare to find a villein discharging all his dues in money — this is suggested when we are told how on the land of Sl. Augustin one Wadard holds a large piece 'de terra villanorum' and yet renders no service to the abbot save 30s. a year7. At least in one instance the villeins seem to be holding the manor in farm, that is to say, they are farming the demesne land and paying a rent in money or in provender8. We dare not represent the stream of economic history as flowing uninterruptedly from a system of labour services to a system of rents. We must remember that in the Conqueror's reign the lord very often had numerous serfs whose whole time was given to the cultivation of his demesne. In the south-western counties he will often have two, three or more serfs for every team that he has on his demesne, and, while this is so, we can not safely say that his husbandry requires that the villeins should be labouring on his land for three or four days in every week.",
       "pages": [
         8,
         9
@@ -78,7 +78,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "As a last question we may ask : What was the English for villanus ? It is a foreign word, one of those words which came in with the Conqueror. Surely, we may argue, there must have been some English equivalent for it. Yet we have the greatest difficulty in finding the proper term. True that in the Quadripartitus and the Leges villanus generally represents ceorl ; ceorl when it is not rendered by villanus is left untranslated in some such form as cyrliscus homo. But then ceorl must be a wider",
+      "text": "As a last question we may ask: What was the English for villanus? It is a foreign word, one of those words which came in with the Conqueror. Surely, we may argue, there must have been some English equivalent for it. Yet we have the greatest difficulty in finding the proper term. True that in the Quadripartitus and the Leges villanus generally represents ceorl; ceorl when it is not rendered by villanus is left untranslated in some such form as cyrliscus homo. But then ceorl must be a wider",
       "pages": [
         9
       ]
@@ -195,6 +195,16 @@
   "word_changes": [
     {
       "before": [
+        "£30",
+        ";"
+      ],
+      "after": [
+        "£30;"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
         "12s.2"
       ],
       "after": [
@@ -278,6 +288,26 @@
     },
     {
       "before": [
+        "ask",
+        ":"
+      ],
+      "after": [
+        "ask:"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
+        "villanus",
+        "?"
+      ],
+      "after": [
+        "villanus?"
+      ],
+      "reason": "punctuation_attached"
+    },
+    {
+      "before": [
         "Quadri-",
         "partitus"
       ],
@@ -285,6 +315,16 @@
         "Quadripartitus"
       ],
       "reason": "hyphen_join_guessed"
+    },
+    {
+      "before": [
+        "ceorl",
+        ";"
+      ],
+      "after": [
+        "ceorl;"
+      ],
+      "reason": "punctuation_attached"
     }
   ],
   "page_numbers": [

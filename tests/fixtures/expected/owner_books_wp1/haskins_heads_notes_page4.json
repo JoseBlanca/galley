@@ -1,0 +1,74 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "haskins_heads_notes",
+  "page": 4,
+  "book_page_index": 28,
+  "checks": "a footnote set close under the text, 1.06 pitches below the row above (layout step 4): a band, and a note, not body; the running head removed as now, the speck above it a stray_mark",
+  "expected": {
+    "removals": [
+      {
+        "reason": "stray_mark",
+        "text": "!"
+      },
+      {
+        "reason": "running_head",
+        "text": "NORMANDY IN HISTORY"
+      },
+      {
+        "reason": "page_number",
+        "text": "13"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "13",
+        "position": "head"
+      }
+    ],
+    "band_first_line": "* Ystoire de U Normant (ed. Delarc), p. lo.",
+    "notes": [
+      {
+        "marker": "*",
+        "text": "Ystoire de U Normant (ed. Delarc), p. lo."
+      }
+    ]
+  },
+  "known": "The reference \"subjection ;^\" is linked to the note by work package 5 (structure spec section 23), not by this one.",
+  "printed": {
+    "book_page_index": 28,
+    "running_head": {
+      "words": [
+        "NORMANDY",
+        "IN",
+        "HISTORY"
+      ],
+      "page_number": "13",
+      "number_side": "right",
+      "skew": "none visible"
+    },
+    "above_head": null,
+    "below_head_tall": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "The land is not the"
+    ],
+    "ends_mid_paragraph": true,
+    "last_words": "contemporary, Geoffrey Malaterra,",
+    "margin_notes": [],
+    "footnotes": [
+      {
+        "marker": "superscript 1",
+        "text": "Ystoire de li Normant (ed. Delarc), p. 10.",
+        "italic": "Ystoire de li Normant",
+        "reference": "subjection;¹"
+      }
+    ],
+    "quotes_or_verse": [],
+    "spaced_punctuation": [],
+    "case_glued": "'the whole of nature's' set tight ('the wholeof'); 'earliest characterizations' tight ('earliestcharacterizations')",
+    "foot": null,
+    "notes": "Grey smudges in right margin below the footnote.",
+    "footnote_gap": "close: footnote set directly under the last body line, no blank gap (about one body line pitch)"
+  }
+}

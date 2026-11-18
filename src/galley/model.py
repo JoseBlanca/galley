@@ -23,7 +23,7 @@ import re
 import threading
 import types
 import typing
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -35,9 +35,10 @@ from galley.errors import EditError, InputFileError
 # (architecture section 8).
 PAGES_FORMAT_VERSION = 2
 WORDS_FORMAT_VERSION = 2
-LINES_FORMAT_VERSION = 2
-# 2 since the second plan of structure, 16 November 2026 (architecture section 8).
-BLOCKS_FORMAT_VERSION = 3
+LINES_FORMAT_VERSION = 3
+# 4 since the plan owner-books, 17 November 2026: epigraphs, note groups and
+# three word change reasons (architecture section 8).
+BLOCKS_FORMAT_VERSION = 4
 EDITS_FORMAT_VERSION = 1
 
 
@@ -250,12 +251,17 @@ class Reread:
     `box` is the crop, in points. `layer_words` are the words of words.json
     the reading would replace, `ocr_words` Tesseract's, with boxes in points
     and their confidence. `layer_score` and `ocr_score` are each reading's
-    known words minus its unknown words. When `kept`, `ocr_words` stand in
-    lines.json in place of `layer_words`; otherwise the record changes
-    nothing. `dropped_junk_count` is the number of Tesseract's words of no
+    known words minus its unknown words, the layer's scored on
+    `scored_layer_words` (reocr spec, section 3). When `kept`, `ocr_words`
+    stand in lines.json in place of `layer_words`; otherwise the record
+    changes nothing. `dropped_junk_count` is the number of Tesseract's words of no
     letter or digit, not punctuation or a sign the books print, dropped
     before `ocr_words`, and of its words stripped of an underscore at
     either end ("_and" is "and" in `ocr_words`; reocr spec, section 4).
+    `junk_words` are those of `layer_words` that layout replaced as the
+    layer's junk under a Tesseract word paired with the layer's copy of
+    its word (`junk_layer_words`), which the fidelity check, having no
+    word list, takes from the record.
     """
 
     page_index: int
@@ -267,6 +273,8 @@ class Reread:
     ocr_score: int
     kept: bool
     dropped_junk_count: int = 0
+    # A default, so that the records of regions with no junk need not name it.
+    junk_words: tuple[Word, ...] = ()
 
 
 # A kept Reread replaces a layer word that is the same printed word as one
@@ -299,13 +307,28 @@ _SAME_TEXT_REACH_PT = 16.0
 # Tesseract missed but numbers, which rule (c) leaves to (a) and (b); from
 # 0.5 to 0.6, 10 copies and 4 body words at the column's edge ("for" beside
 # "lord", Domesday page 310).
+_ALIKE_LEAST_LETTERS = 3
+_ALIKE_LEAST_RATIO = 0.6
 # A layer word glued over two or three Tesseract words is the same printed
 # words as they ("of,96" where Tesseract read "of," "96", Stubbs' index page
 # 312): each Tesseract word's middle lies inside its box widened by 1 pt.
 _GLUED_WORD_COUNTS = (2, 3)
 _GLUED_WIDEN_PT = 1.0
-_ALIKE_LEAST_LETTERS = 3
-_ALIKE_LEAST_RATIO = 0.6
+# The exception in (a): a Tesseract word whose layer words under it are all
+# unlike it, with a layer word of its letters left unmatched within 16 pt,
+# pairs with that word by (b) or (c), and replaces the junk under it too
+# ("tem<" beside Tesseract's "tem," over the junk '^"i', Domesday page 26);
+# a known word under it stays, as another printed word may. Counted on the
+# clean-text build of 17 November 2026, 55 layer words of Stubbs, Domesday
+# and Gierke stayed beside a kept record's word of their letters, 47 of them
+# over junk or a word of the next line. It takes no alike layer word of 2
+# letters or more than the Tesseract word: the layer may have glued another
+# printed word to it.
+# Of the 16 alike words it took on whole Stubbs, Domesday, Gierke and
+# Haskins (18 November 2026), 2 had 2 letters more or over, both glued
+# ("ofdemesne-", Domesday page 90; "imgmen.", page 333); the others at most
+# one ("the" for Tesseract's "th", page 107).
+_GLUED_LEAST_MORE_LETTERS = 2
 
 
 def word_middle(word: Word) -> tuple[float, float]:
@@ -449,17 +472,11 @@ def _middle_inside(ocr_word: Word, word: Word) -> bool:
     )
 
 
-def may_read(word: Word, ocr_word: Word) -> bool:
-    """Whether `ocr_word`, Tesseract's, may be a reading of the printed
-    word that `word`, a word of the text layer, reads, by one of the rules
-    of `replaced_layer_words` taken alone, whatever other words match:
-    `word` lies under it, or, within 16 pt above or below, its letters and
-    digits are those of `word`, or its letters are alike to those of a
-    `word` of 3 letters or more. Boxes in points."""
-    if _is_under(word, ocr_word):
-        return True
-    if abs(word_middle(ocr_word)[1] - word_middle(word)[1]) > _SAME_TEXT_REACH_PT:
-        return False
+def _letters_read_by(word: Word, ocr_word: Word) -> bool:
+    """Whether the letters and digits of `word`, a layer word, equal those
+    of `ocr_word`, Tesseract's, or, for a `word` of 3 letters or more, its
+    letters are alike to those of `ocr_word`: what (b) and (c) pair, without
+    the distance."""
     return (
         bool(folded_letters_and_digits(word.text))
         and folded_letters_and_digits(word.text)
@@ -470,17 +487,142 @@ def may_read(word: Word, ocr_word: Word) -> bool:
     )
 
 
+def _is_copy(word: Word, ocr_word: Word) -> bool:
+    """Whether `word`, a layer word, may be the layer's copy of the word
+    `ocr_word` reads, for the exception in (a): its letters and digits
+    equal, or alike with fewer than 2 letters more ("ofdemesne-" beside
+    "demesne." glues the printed "of" to it, Domesday page 90)."""
+    return _letters_read_by(word, ocr_word) and (
+        folded_letters_and_digits(word.text) == folded_letters_and_digits(ocr_word.text)
+        or _letter_count(word.text) - _letter_count(ocr_word.text)
+        < _GLUED_LEAST_MORE_LETTERS
+    )
+
+
+def _within_reach(word: Word, ocr_word: Word) -> bool:
+    """Whether the middles of `word` and `ocr_word` lie within 16 pt of
+    each other up or down."""
+    return abs(word_middle(ocr_word)[1] - word_middle(word)[1]) <= _SAME_TEXT_REACH_PT
+
+
+def may_read(word: Word, ocr_word: Word) -> bool:
+    """Whether `ocr_word`, Tesseract's, may be a reading of the printed
+    word that `word`, a word of the text layer, reads, by one of the rules
+    of `replaced_layer_words` taken alone, whatever other words match:
+    `word` lies under it, or, within 16 pt above or below, its letters and
+    digits are those of `word`, or its letters are alike to those of a
+    `word` of 3 letters or more. Boxes in points."""
+    return _is_under(word, ocr_word) or (
+        _within_reach(word, ocr_word) and _letters_read_by(word, ocr_word)
+    )
+
+
+def is_junk_beside_its_copy(junk: Word, copy: Word, ocr_word: Word) -> bool:
+    """Whether `ocr_word`, Tesseract's, may read both `junk` and `copy`,
+    layer words, as the exception in (a) of `replaced_layer_words` lets it:
+    `junk` lies under it with letters and digits unlike its own (neither
+    equal nor alike), and `copy` does not lie under it but lies within 16
+    pt above or below as the layer's copy of its word (`_is_copy`).
+    The layer read the one printed word twice, as junk over the ink and a
+    few points off."""
+    return (
+        _is_under(junk, ocr_word)
+        and not _letters_read_by(junk, ocr_word)
+        and not _is_under(copy, ocr_word)
+        and _within_reach(copy, ocr_word)
+        and _is_copy(copy, ocr_word)
+    )
+
+
+def _distance(word: Word, ocr_word: Word) -> float:
+    """The distance of the middles of `word` and `ocr_word`, across plus up
+    or down."""
+    return abs(word_middle(ocr_word)[0] - word_middle(word)[0]) + abs(
+        word_middle(ocr_word)[1] - word_middle(word)[1]
+    )
+
+
+@dataclasses.dataclass(frozen=True, slots=True, kw_only=True)
+class _Paired:
+    """The pairing of a region's layer words with its Tesseract words.
+
+    `matched` holds, for each layer word, whether a rule matched it;
+    `taken`, the positions of the Tesseract words that read one. `copies`
+    are the positions of the layer words that the exception in (a) paired
+    by (b) or (c) with a Tesseract word freed from the words under it, and
+    `under_freed` those of the layer words of that word's line under it,
+    and `junk` those of them replaced as junk.
+    """
+
+    matched: tuple[bool, ...]
+    taken: frozenset[int]
+    copies: frozenset[int]
+    under_freed: frozenset[int]
+    junk: frozenset[int]
+
+
 def _pairing(
     layer_words: Sequence[Word],
     ocr_words: Sequence[Word],
     is_known: Callable[[str], bool],
-) -> tuple[tuple[bool, ...], frozenset[int]]:
-    """Which of `layer_words` the rules of `replaced_layer_words` match,
-    and the positions in `ocr_words` of the Tesseract words they match."""
+    is_junk: Callable[[Word, Word], bool],
+) -> _Paired:
+    """The pairing of `layer_words` and `ocr_words` by the rules of
+    `replaced_layer_words`: the rules applied once, then again with the
+    Tesseract words of the exception in (a) freed, when there are any."""
+    first = _pairing_freeing(layer_words, ocr_words, is_known, is_junk, frozenset())
+    freed = _excepted_ocr_positions(layer_words, ocr_words, first.matched)
+    if not freed:
+        return first
+    return _pairing_freeing(layer_words, ocr_words, is_known, is_junk, freed)
+
+
+def _excepted_ocr_positions(
+    layer_words: Sequence[Word], ocr_words: Sequence[Word], matched: Sequence[bool]
+) -> frozenset[int]:
+    """The positions in `ocr_words` of the exception in (a): a Tesseract
+    word with layer words of its line under it, not glued, whose letters
+    and digits are all unlike its own, and a layer word that `matched`
+    leaves unmatched within 16 pt above or below that is the layer's copy
+    of its word (`_is_copy`)."""
+    glued = {
+        position for word in layer_words for position in _glued_over(word, ocr_words)
+    }
+    return frozenset(
+        position
+        for position, ocr_word in enumerate(ocr_words)
+        if position not in glued
+        and (line := _under_line(layer_words, ocr_word))
+        and not any(_letters_read_by(layer_words[index], ocr_word) for index in line)
+        and any(
+            not matched[index]
+            and _within_reach(word, ocr_word)
+            and _is_copy(word, ocr_word)
+            for index, word in enumerate(layer_words)
+        )
+    )
+
+
+def _pairing_freeing(
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    is_known: Callable[[str], bool],
+    is_junk: Callable[[Word, Word], bool],
+    freed: frozenset[int],
+) -> _Paired:
+    """The pairing of `layer_words` and `ocr_words` by the rules of
+    `replaced_layer_words`, with the Tesseract words at `freed` left out
+    of (a) and paired by (b) or (c); one that neither pairs takes the words
+    under it by (a) after all, and one that pairs takes, besides, the
+    words under it that are no known word, whose letters are unlike its
+    own and that no other rule matched: the layer's junk under it."""
     # (a): a Tesseract word with layer words under it reads the printed
     # words of one line, whatever the texts, and pairs with no other.
     under_line = {
-        index for ocr_word in ocr_words for index in _under_line(layer_words, ocr_word)
+        index
+        for position, ocr_word in enumerate(ocr_words)
+        if position not in freed
+        for index in _under_line(layer_words, ocr_word)
     }
     # (a) also: a layer word glued over two or three Tesseract words, which
     # read it and pair with no other.
@@ -495,51 +637,55 @@ def _pairing(
     taken = {
         position
         for position, ocr_word in enumerate(ocr_words)
-        if any(_is_under(word, ocr_word) for word in layer_words)
+        if position not in freed
+        and any(_is_under(word, ocr_word) for word in layer_words)
     } | {position for positions in glued.values() for position in positions}
     # (b): the pairs of a layer word and a Tesseract word of its text, the
     # nearest first, each word in one pair at most.
     pairs = sorted(
-        (
-            abs(word_middle(ocr_word)[0] - word_middle(word)[0])
-            + abs(word_middle(ocr_word)[1] - word_middle(word)[1]),
-            index,
-            position,
-        )
+        (_distance(word, ocr_word), index, position)
         for index, word in enumerate(layer_words)
         if not under[index] and folded_letters_and_digits(word.text)
         for position, ocr_word in enumerate(ocr_words)
         if position not in taken
         and folded_letters_and_digits(ocr_word.text)
         == folded_letters_and_digits(word.text)
-        and abs(word_middle(ocr_word)[1] - word_middle(word)[1]) <= _SAME_TEXT_REACH_PT
+        and _within_reach(word, ocr_word)
     )
     matched = list(under)
+    copies: set[int] = set()
     for _, index, position in pairs:
         if not matched[index] and position not in taken:
             matched[index] = True
             taken.add(position)
+            if position in freed:
+                copies.add(index)
     # (c): the pairs of a layer word of 3 letters or more and a Tesseract
     # word whose letters are alike, the nearest first, each word in one
     # pair at most.
     alike_pairs = sorted(
-        (
-            abs(word_middle(ocr_word)[0] - word_middle(word)[0])
-            + abs(word_middle(ocr_word)[1] - word_middle(word)[1]),
-            index,
-            position,
-        )
+        (_distance(word, ocr_word), index, position)
         for index, word in enumerate(layer_words)
         if not matched[index] and _letter_count(word.text) >= _ALIKE_LEAST_LETTERS
         for position, ocr_word in enumerate(ocr_words)
         if position not in taken
-        and abs(word_middle(ocr_word)[1] - word_middle(word)[1]) <= _SAME_TEXT_REACH_PT
+        and _within_reach(word, ocr_word)
         and _are_alike(word.text, ocr_word.text)
+        and (position not in freed or _is_copy(word, ocr_word))
     )
     for _, index, position in alike_pairs:
         if not matched[index] and position not in taken:
             matched[index] = True
             taken.add(position)
+            if position in freed:
+                copies.add(index)
+    paired_freed = freed & taken
+    # A freed Tesseract word that (b) and (c) did not pair reads the words
+    # under it, as (a) would have had it.
+    for position in sorted(freed - taken):
+        for index in _under_line(layer_words, ocr_words[position]):
+            matched[index] = True
+        taken.add(position)
     # (d): a layer word not known, over two or three Tesseract words of its
     # line left free, whatever the texts: the layer glued and misread them
     # ("lo/.," over "10" "f.,").
@@ -550,7 +696,86 @@ def _pairing(
         if positions:
             matched[index] = True
             taken.update(positions)
-    return tuple(matched), frozenset(taken)
+    under_freed = {
+        index: position
+        for position in sorted(paired_freed)
+        for index in _under_line(layer_words, ocr_words[position])
+    }
+    junk = _junk_under(layer_words, ocr_words, is_junk, under_freed)
+    return _Paired(
+        matched=tuple(
+            is_matched or index in junk for index, is_matched in enumerate(matched)
+        ),
+        taken=frozenset(taken),
+        copies=frozenset(copies),
+        under_freed=frozenset(under_freed),
+        junk=frozenset(index for index in junk if not matched[index]),
+    )
+
+
+def _junk_under(
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    is_junk: Callable[[Word, Word], bool],
+    under_freed: Mapping[int, int],
+) -> frozenset[int]:
+    """The positions in `layer_words` of the junk under a freed Tesseract
+    word that (b) or (c) paired, `under_freed` mapping each word under one
+    to that word's position in `ocr_words`: those `is_junk` takes for junk
+    under that word. Their letters are unlike its own, or it would not
+    have been freed."""
+    return frozenset(
+        index
+        for index, position in under_freed.items()
+        if is_junk(layer_words[index], ocr_words[position])
+    )
+
+
+def _junk_by_word_list(is_known: Callable[[str], bool]) -> Callable[[Word, Word], bool]:
+    """Layout's test of the junk under a Tesseract word, by `is_known`:
+    a layer word that is no known word, so not another printed word the
+    layer read rightly, or that holds the first digits of the Tesseract
+    word's number only."""
+
+    def is_junk(word: Word, ocr_word: Word) -> bool:
+        return not is_known(word.text) or _is_digits_begun(word, ocr_word)
+
+    return is_junk
+
+
+def _is_digits_begun(word: Word, ocr_word: Word) -> bool:
+    """Whether `word`, a layer word, holds digits only, as letters and
+    digits go, that begin the digits of `ocr_word`, Tesseract's, and are
+    fewer: the layer's broken reading of the number ("14." under
+    Tesseract's "146", Gierke page 63)."""
+    digits = folded_letters_and_digits(word.text)
+    ocr_digits = folded_letters_and_digits(ocr_word.text)
+    return (
+        digits.isdigit()
+        and ocr_digits.isdigit()
+        and len(digits) < len(ocr_digits)
+        and ocr_digits.startswith(digits)
+    )
+
+
+def _junk_test(
+    is_known: Callable[[str], bool], is_junk: Callable[[Word, Word], bool] | None
+) -> Callable[[Word, Word], bool]:
+    """`is_junk`, or, when None, layout's test by `is_known`."""
+    return _junk_by_word_list(is_known) if is_junk is None else is_junk
+
+
+def junk_layer_words(
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    *,
+    is_known: Callable[[str], bool],
+) -> tuple[Word, ...]:
+    """The words of `layer_words` that `replaced_layer_words` replaces as
+    the layer's junk under a Tesseract word of the exception in (a), by
+    `is_known`, in their order: a Reread's `junk_words`."""
+    junk = _pairing(layer_words, ocr_words, is_known, _junk_by_word_list(is_known)).junk
+    return tuple(word for index, word in enumerate(layer_words) if index in junk)
 
 
 def replaced_layer_words(
@@ -558,6 +783,7 @@ def replaced_layer_words(
     ocr_words: Sequence[Word],
     *,
     is_known: Callable[[str], bool],
+    is_junk: Callable[[Word, Word], bool] | None = None,
 ) -> tuple[Word, ...]:
     """The words of `layer_words`, the text layer's words a region read
     again may replace, that a kept Reread with Tesseract's `ocr_words`
@@ -583,12 +809,25 @@ def replaced_layer_words(
     left unmatched whose middles lie inside its box, widened by 1 pt
     across only, are two or three consecutive words of one line, a word
     the layer glued and misread. A Tesseract word is matched in (a) by any layer word under
-    it, whatever its text, and by a layer word glued over it; in (b) and (c) the pairs of a layer word and a
+    it, whatever its text, and by a layer word glued over it, but for one
+    exception: when the letters and digits of every layer word of its line
+    under it are unlike its own (neither equal nor alike as in (b) and
+    (c)), and a layer word that the rules leave unmatched lies within 16 pt
+    above or below with letters equal or alike to its own, it is left to
+    (b) and (c), and the words under it to the other `ocr_words`; if
+    neither pairs it, it reads the words under it after all, and if one
+    does, it also replaces the junk under it that no rule matched, of
+    letters unlike its own: a word `is_junk(word, ocr_word)` takes for
+    junk under it, or, when `is_junk` is None, a word `is_known` says is
+    no known word, or a number whose digits begin its own. In (b)
+    and (c) the pairs of a layer word and a
     Tesseract word are taken nearest first, by the distance of their
     middles across plus up or down, each word in one pair at most. A layer
     word matched by none stays in the layer. Boxes in points.
     """
-    matched, _ = _pairing(layer_words, ocr_words, is_known)
+    matched = _pairing(
+        layer_words, ocr_words, is_known, _junk_test(is_known, is_junk)
+    ).matched
     return tuple(
         word
         for word, is_matched in zip(layer_words, matched, strict=True)
@@ -601,13 +840,39 @@ def matched_ocr_positions(
     ocr_words: Sequence[Word],
     *,
     is_known: Callable[[str], bool],
+    is_junk: Callable[[Word, Word], bool] | None = None,
 ) -> frozenset[int]:
     """The positions in `ocr_words`, Tesseract's, of the words that read a
     word of `layer_words` by the rules of `replaced_layer_words`: those
     with a layer word under them or glued over them, and those paired by
     (b) or (c)."""
-    _, positions = _pairing(layer_words, ocr_words, is_known)
-    return positions
+    return _pairing(
+        layer_words, ocr_words, is_known, _junk_test(is_known, is_junk)
+    ).taken
+
+
+def scored_layer_words(
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    *,
+    is_known: Callable[[str], bool],
+    is_junk: Callable[[Word, Word], bool] | None = None,
+) -> tuple[Word, ...]:
+    """The words of `layer_words` whose reading score is set against that
+    of `ocr_words` (reocr spec, section 3), in their order: those that
+    `replaced_layer_words` gives, but with the words under each Tesseract
+    word of the exception in (a) in place of the layer word of its letters
+    that it pairs with. That word and the junk under it are two readings of
+    one printed word, and the junk is the one rule (a) alone would have
+    scored, so the exception changes the words replaced, not the choice."""
+    paired = _pairing(layer_words, ocr_words, is_known, _junk_test(is_known, is_junk))
+    return tuple(
+        word
+        for index, (word, is_matched) in enumerate(
+            zip(layer_words, paired.matched, strict=True)
+        )
+        if (is_matched and index not in paired.copies) or index in paired.under_freed
+    )
 
 
 def take_out_once(
@@ -670,6 +935,7 @@ class BlockKind(StrEnum):
     QUOTE = "quote"  # a passage quoted from another text, in prose
     VERSE = "verse"  # lines of a poem, separated by line feeds in the text
     CHAPTER_SUMMARY = "chapter_summary"  # a chapter's topics under its heading
+    EPIGRAPH = "epigraph"  # a quotation at a chapter's head, its source in Block.source
     FIGURE = "figure"
     MARGIN_NOTE = "margin_note"
     INDEX_ENTRY = "index_entry"
@@ -703,13 +969,16 @@ class Origin:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Block:
     """A block of the book: a heading, paragraph, quote, verse, chapter
-    summary, figure, margin note or index entry.
+    summary, epigraph, figure, margin note or index entry.
 
     `id` is `b-p<page index, 4 digits>-<n, 3 digits>`; `level` is a
     heading's, from 1, an index entry's depth, 1 for an entry and 2 for a
     sub-entry, and None otherwise; `label` is a heading's chapter
     label as printed ("CHAPTER III.", "V"), whose title is in the spans,
-    and None for a heading without one and for every other kind; `figure`
+    and None for a heading without one and for every other kind; `source`
+    is an epigraph's source line as printed, without its leading dash,
+    its words joined by single spaces ("Thomas Hobbes, 1651"), and None
+    for every other kind; `figure`
     is the image path of a figure block; `origin` has one entry per page
     the block was printed on.
     """
@@ -718,6 +987,8 @@ class Block:
     kind: BlockKind
     level: int | None
     label: str | None
+    # A default, so that the stages that make no epigraph need not name it.
+    source: str | None = None
     spans: tuple[Span, ...]
     figure: str | None
     origin: tuple[Origin, ...]
@@ -739,7 +1010,10 @@ class Note:
     printed at the start of the note, or as the OCR read it, and empty when
     it has none; `blocks` are its paragraphs, quotes or verse, with each
     margin note printed beside one of them as a block just before it;
-    `referenced` is false when no reference to it was found."""
+    `referenced` is false when no reference to it was found; `group` is,
+    on the first note of a note group of an endnote section, the group's
+    heading as printed, its lines joined by single spaces, and None on
+    every other note."""
 
     id: str
     kind: NoteKind
@@ -747,20 +1021,27 @@ class Note:
     blocks: tuple[Block, ...]
     origin: tuple[Origin, ...]
     referenced: bool
+    # A default, so that the stages that make no note group need not name it.
+    group: str | None = None
 
 
 class ChangeReason(StrEnum):
     """Why structure changed words without losing a letter: a hyphen join,
     with the hyphen dropped on evidence, dropped without it (guessed), or
     kept in a compound; a join in a margin note of two parts whose hyphen
-    the OCR lost or read as a full stop; or a note marker split off the
-    word it was glued to."""
+    the OCR lost or read as a full stop; a note marker split off the
+    word it was glued to; the dash before an epigraph's source dropped,
+    which markdown writes back; a spaced sign attached to the word before
+    it; or a word the OCR glued at a case change split in two."""
 
     HYPHEN_JOIN = "hyphen_join"
     NOTE_MARKER = "note_marker"
     HYPHEN_JOIN_GUESSED = "hyphen_join_guessed"  # dropped without evidence
     HYPHEN_KEPT = "hyphen_kept"  # "Anglo-" "Saxon" to "Anglo-Saxon"
     HYPHEN_LOST = "hyphen_lost"  # "move." "ment," to "movement," in a margin note
+    SOURCE_DASH = "source_dash"  # "—Hobbes," to "Hobbes," before an epigraph's source
+    PUNCTUATION_ATTACHED = "punctuation_attached"  # "subjection" ";" to "subjection;"
+    CASE_SPLIT = "case_split"  # "theAvre" to "the" "Avre"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1292,8 +1573,9 @@ def has_index_depth(block: Block) -> bool:
 def read_blocks(path: Path) -> BlocksFile:
     """Reads blocks.json as write_blocks wrote it. Raises InputFileError,
     naming the file and the block, also when a block that is not a heading
-    has a label, an index entry has no depth from 1, or a block that is
-    neither a heading nor an index entry has a level."""
+    has a label, one that is not an epigraph has a source, an index entry
+    has no depth from 1, a block that is neither a heading nor an index
+    entry has a level, or a note that is not an endnote has a group."""
     blocks = _read_json(path, BlocksFile, BLOCKS_FORMAT_VERSION, "structure")
     for block in (
         *blocks.blocks,
@@ -1303,6 +1585,12 @@ def read_blocks(path: Path) -> BlocksFile:
             message = (
                 f"{path}: block {block.id} is a {block.kind.value} and has the "
                 f"label {block.label!r}; only a heading has a label"
+            )
+            raise InputFileError(message)
+        if block.source is not None and block.kind is not BlockKind.EPIGRAPH:
+            message = (
+                f"{path}: block {block.id} is a {block.kind.value} and has the "
+                f"source {block.source!r}; only an epigraph has a source"
             )
             raise InputFileError(message)
         if block.kind is BlockKind.INDEX_ENTRY and not has_index_depth(block):
@@ -1317,6 +1605,13 @@ def read_blocks(path: Path) -> BlocksFile:
             message = (
                 f"{path}: block {block.id} is a {block.kind.value} and has the "
                 f"level {block.level!r}; only a heading and an index entry have one"
+            )
+            raise InputFileError(message)
+    for note in blocks.notes:
+        if note.group is not None and note.kind is not NoteKind.ENDNOTE:
+            message = (
+                f"{path}: note {note.id} is a {note.kind.value} and has the "
+                f"group {note.group!r}; only an endnote has a group"
             )
             raise InputFileError(message)
     return blocks

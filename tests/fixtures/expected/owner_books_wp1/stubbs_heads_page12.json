@@ -1,0 +1,77 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "stubbs_heads",
+  "page": 12,
+  "book_page_index": 186,
+  "checks": "a running head whose date the skew sets 4 pt lower (layout step 3), removed with its page number, and the speck above it a stray_mark",
+  "expected": {
+    "removals": [
+      {
+        "reason": "stray_mark",
+        "text": ";"
+      },
+      {
+        "reason": "running_head",
+        "text": "a.d. I2i6. Henry III. l6"
+      },
+      {
+        "reason": "page_number",
+        "text": "5"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "5",
+        "position": "head"
+      }
+    ]
+  },
+  "known": "The page number 165 is read \"l6 5\"; its last word, \"5\", is a page-number form at the end of the head, so it is removed as the page number and \"l6\" with the running head (structure spec section 3).",
+  "printed": {
+    "book_page_index": 186,
+    "running_head": {
+      "words": [
+        "A.D. 1216.",
+        "Henry III."
+      ],
+      "page_number": "165",
+      "number_side": "right",
+      "skew": "'A.D. 1216.' sits visibly lower than '165'"
+    },
+    "above_head": "a short slanted stroke above the head, above 'Henry'",
+    "below_head_tall": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [],
+    "ends_mid_paragraph": true,
+    "last_words": "justiciar after the",
+    "margin_notes": [],
+    "footnotes": [],
+    "quotes_or_verse": [],
+    "spaced_punctuation": [
+      {
+        "word": "side",
+        "text": "side ;"
+      },
+      {
+        "word": "king",
+        "text": "king ;"
+      },
+      {
+        "word": "Henry",
+        "text": "Henry ;"
+      },
+      {
+        "word": "side",
+        "text": "side ; (second occurrence, 'from his side ;')"
+      },
+      {
+        "word": "half-service",
+        "text": "half-service ;"
+      }
+    ],
+    "case_glued": null,
+    "foot": null,
+    "notes": "No margin notes on this page. Stray dashes in margins and lower area."
+  }
+}

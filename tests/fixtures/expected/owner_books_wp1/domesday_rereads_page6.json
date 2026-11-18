@@ -1,0 +1,98 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "domesday_rereads",
+  "page": 6,
+  "book_page_index": 139,
+  "checks": "margin notes read by re-reading (work package 2); the running head and its page number removed as now",
+  "expected": {
+    "removals": [
+      {
+        "reason": "page_number",
+        "text": "114"
+      },
+      {
+        "reason": "running_head",
+        "text": "Domesday Book."
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "114",
+        "position": "head"
+      }
+    ]
+  },
+  "printed": {
+    "book_page_index": 139,
+    "running_head": {
+      "words": "Domesday Book.",
+      "page_number": "114",
+      "number_side": "left"
+    },
+    "above_head": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "If we wish to see",
+      "It is common enough to"
+    ],
+    "ends_mid_paragraph": true,
+    "last_body_words": "be some way",
+    "margin_notes": [
+      {
+        "text": "Large / manors / in the / midlands.",
+        "beside": "If we wish to see a midland manor"
+      },
+      {
+        "text": "Town- / houses and / berewicks / attached / to manors.",
+        "beside": "It is common enough to see a town-house"
+      }
+    ],
+    "footnotes": [
+      {
+        "marker": "1",
+        "text": "D. B. i. 101 b; iv. 107.",
+        "ref_word": "bordiers"
+      },
+      {
+        "marker": "2",
+        "text": "D. B. i. 41.",
+        "ref_word": "churches"
+      },
+      {
+        "marker": "3",
+        "text": "D. B. i. 230.",
+        "ref_word": "Leicestershire"
+      },
+      {
+        "marker": "4",
+        "text": "D. B. i. 338–9.",
+        "ref_word": "15 (\"Horncastle 15⁴\")"
+      },
+      {
+        "marker": "5",
+        "text": "D. B. i. 220, Tingdene.",
+        "ref_word": "hundreds"
+      },
+      {
+        "marker": "6",
+        "text": "D. B. ii. 15 b, 17 b.",
+        "ref_word": "Barking"
+      },
+      {
+        "marker": "7",
+        "text": "D. B. ii. 385 b.",
+        "ref_word": "manors"
+      },
+      {
+        "marker": "8",
+        "text": "The form bereuita is exceedingly common, but must, we think, be due to a mistake; c has been read as t.",
+        "ref_word": "(bereuita) (mark after the closing parenthesis)"
+      }
+    ],
+    "footnote_gap": "visible gap, about one line",
+    "tables_or_lists": [],
+    "foot": null,
+    "notes": "Short footnotes set in columns: 1,2,3 on one line; 4,5 on next; 6,7 on next; 8 full width. Margin notes in left outer margin. Dark band at right edge (gutter)."
+  }
+}

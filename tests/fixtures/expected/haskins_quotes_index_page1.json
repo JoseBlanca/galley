@@ -1,13 +1,15 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 1.2 of the plan owner-books (layout spec section 3, step 3, 17 November 2026): the row \"II\" is now measured by its words' median top, 1.32 of the excerpt's body line pitches above the title's (11.86 pt; the whole book's pitch, 15.2 pt, makes it 1.03), so the excerpt makes it a head-line region of its own; structure keeps it in the text as before, and the blocks are unchanged; not yet checked against the page image.",
   "excerpt": "haskins_quotes_index",
   "page": 1,
   "book_page_index": 41,
   "shows": "the opening of chapter II, whose heading ends the bibliographical note of page 39",
   "layout": [
     [
-      "II",
+      "II"
+    ],
+    [
       "THE COMING OF THE NORTHMEN",
       "THE central fact of Norman history and the",
       "starting-point for its study is the event so bril-",

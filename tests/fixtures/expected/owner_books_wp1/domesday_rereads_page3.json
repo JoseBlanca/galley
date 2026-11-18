@@ -1,0 +1,84 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "domesday_rereads",
+  "page": 3,
+  "book_page_index": 97,
+  "checks": "footnotes set close under the text, 1.09 pitches below the row above (layout step 4): a band, and notes, not body",
+  "expected": {
+    "removals": [
+      {
+        "reason": "page_number",
+        "text": "72"
+      },
+      {
+        "reason": "running_head",
+        "text": "Domesday Book."
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "72",
+        "position": "head"
+      }
+    ],
+    "band_first_line": "1 D. B. i. 72 : ' Toti emit earn T. B. E. de aecclesia Malmesburiensi ad",
+    "notes": [
+      {
+        "marker": "1",
+        "text": "D. B. i. 72: ' Toti emit earn T. B. E. de aecclesia Malmesburiensi ad etatem trium hominum et infra hunc terminum poterat ire cum ea ad quern vellet dominum.'"
+      },
+      {
+        "marker": "3",
+        "text": "D. B. ii. 57 b: ' Et haec terra quam modo tenet G. fuit in abbatia de Berchingis sicuti hundret testatur; set ille qui tenuit hane terrain fuit tantuni modo homo [Leuild] antecessoris Goisfiidi et non potuit istam terrain mittere in aliquo loco nisi in abbatia.'"
+      },
+      {
+        "marker": "8",
+        "text": "Leg. Hen. 82, § 3."
+      }
+    ]
+  },
+  "known": "The text layer reads the markers 2 and 3 as \"3\" and \"8\".",
+  "printed": {
+    "book_page_index": 97,
+    "running_head": {
+      "words": "Domesday Book.",
+      "page_number": "72",
+      "number_side": "left"
+    },
+    "above_head": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "Not that he need pay"
+    ],
+    "ends_mid_paragraph": true,
+    "last_body_words": "a rough age",
+    "margin_notes": [
+      {
+        "text": "The lord's / interest in / commenda- / tion.",
+        "beside": "Not that he need pay rent"
+      }
+    ],
+    "footnotes": [
+      {
+        "marker": "1",
+        "text": "D. B. i. 72: 'Toti emit eam T. R. E. de aecclesia Malmesburiensi ad etatem trium hominum et infra hunc terminum poterat ire cum ea ad quem vellet dominum.'",
+        "ref_word": "pleased (\"pleased¹.'\")"
+      },
+      {
+        "marker": "2",
+        "text": "D. B. ii. 57 b: 'Et haec terra quam modo tenet G. fuit in abbatia de Berchingis sicuti hundret testatur; set ille qui tenuit hanc terram fuit tantum modo homo [Leuild] antecessoris Goisfridi et non potuit istam terram mittere in aliquo loco nisi in abbatia.'",
+        "ref_word": "Mandeville"
+      },
+      {
+        "marker": "3",
+        "text": "Leg. Hen. 82, § 3.",
+        "ref_word": "defence"
+      }
+    ],
+    "footnote_gap": "visible gap, slightly less than a line",
+    "tables_or_lists": [],
+    "foot": null,
+    "notes": "Margin note in left (outer) margin on this verso. A small speck in the running head between '72' and 'Domesday'. Short dashes/specks at left end of the rule under the head. Small speck right of body near 'separated from the'. Dark band along right edge (gutter). Footnote 3 marker in body is faint."
+  }
+}

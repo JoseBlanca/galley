@@ -2,6 +2,7 @@
 or last word, or a run of digit words there that the OCR split ("5 1")."""
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from galley.structure._measures import arabic_value, is_roman_form
@@ -13,6 +14,10 @@ _DIGIT_WORD = re.compile(r"[0-9]+[.,]?")
 # the page index within 2 (Stubbs' offset is 17 on pages 19 to 51 and 21
 # after; its heads there are alike by their letters).
 _HEAD_NUMBER_SLACK = 2
+# Spec sections 3 and 14: the words that start a chapter label.
+CHAPTER_LABEL_WORDS = frozenset(
+    {"chapter", "chapitre", "essay", "part", "partie", "book", "livre"}
+)
 # Spec section 3, the head of a short section: a word that may be a page
 # number, misread or not.
 _NUMBER_LIKE = re.compile(r"[0-9ivxlcdmIVXLCDM]{1,4}[.,]?")
@@ -83,3 +88,11 @@ def is_number_like(text: str) -> bool:
     one of the letters i, v, x, l, c, d, m in either case, with at most one
     "." or "," after them ("vi", "vlil", "xiv.", "47")."""
     return _NUMBER_LIKE.fullmatch(text) is not None
+
+
+def starts_with_chapter_label_word(texts: Sequence[str]) -> bool:
+    """Whether the first of a line's words `texts` is a chapter label word
+    (spec section 3): one of `CHAPTER_LABEL_WORDS` in any case, with ".",
+    ",", ":" or ";" after it or not: "CHAPTER", "Book." but not
+    "Book-land"."""
+    return bool(texts) and texts[0].rstrip(".,:;").lower() in CHAPTER_LABEL_WORDS

@@ -6,6 +6,7 @@ Positions are PDF points from the page's top left.
 """
 
 import math
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 from itertools import groupby
@@ -15,8 +16,12 @@ from galley.body_measures import (
     group_rows,
 )
 from galley.layout._column import (
+    HANGING_NUMBER,
+    HANGING_NUMBER_GAP_PT,
+    HANGING_NUMBERS_LEAST,
     BookMeasures,
     Side,
+    has_letter_or_digit,
     is_small_row,
     running_head_row_count,
     split_at_column,
@@ -88,6 +93,14 @@ _BAND_SMALL_ROWS_SHARE: Final[float] = 2 / 3
 # first note line is 1.16 pitches in Haskins, 1.24 in Domesday, 1.39 in
 # Mariéjol.
 _BAND_GAP_PITCHES: Final[float] = 1.1
+# Measured on 17 November 2026 on the whole books' words.json (layout spec
+# section 3, step 4): a small row that opens with a note marker, 1 to 3
+# digits or 1 or 2 signs and a word with a capital, starts the band without
+# the gap, as Haskins' note on page 28, 1.06 pitches below the text; it
+# starts the band on 23 pages of the eight books (Haskins 5, Domesday 14,
+# Kadesh 3, Haynes 1), none in Stubbs, Mariéjol, Gierke or Turney.
+_NOTE_MARKER = re.compile(r"[0-9]{1,3}\.?|[*^•†‡§]{1,2}")
+_MARKER_ROW_WORDS: Final[int] = 2
 # Measured on the six books (layout spec section 3, "Where the thresholds
 # come from"): a gutter is a strip 6 pt wide in the middle third of the
 # column; a word across it whose middle is more than 6 pt from the strip's
@@ -106,6 +119,14 @@ _BAND_OPEN_ROWS: Final[int] = 3
 # 8 pt of the column's middle (Kadesh, 30 runs of 3 open rows or more); that
 # of Domesday's short notes printed side by side 13 to 46 pt from it.
 _BAND_GUTTER_OFF_CENTRE_PT: Final[float] = 10.0
+# Step 5: a number hung before a line of the right column, left of the
+# gutter, goes right. Turney prints its notes in two columns, each note's
+# number 6 to 14 pt left of its text (structure section 21); on its page
+# 262 the gutter falls between those numbers and their text. The number's
+# form, the 15 pt and the 2 numbers are step 2's hanging numbers', from
+# _column. The word after the number holds a letter: on Gierke's contents
+# pages 63, 65 and 66 a left entry's page number lies as near the right
+# entry's number, "121".
 # Measured: Haskins' drop capitals are 2.67 ("IN", page 163) to 4 times the
 # body word height.
 _DROP_CAPITAL_HEIGHTS: Final[float] = 2.2
@@ -144,9 +165,40 @@ class _AtGutter(StrEnum):
     BLOCKED = "blocked"
 
 
+def _opens_with_note_marker(row: Line) -> bool:
+    """Whether `row` opens with a note marker (step 4): its first word is 1
+    to 3 digits with an optional "." or 1 or 2 of the signs `* ^ • † ‡ §`,
+    and its second word starts with a capital letter."""
+    words = sorted(row.words, key=lambda word: word.box.x0)
+    return (
+        len(words) >= _MARKER_ROW_WORDS
+        and _NOTE_MARKER.fullmatch(words[0].text) is not None
+        and words[1].text[:1].isupper()
+    )
+
+
+def _after_small_row(
+    rows: tuple[Line, ...], small: tuple[bool, ...], index: int
+) -> bool:
+    """Whether the nearest row above `rows[index]` that holds a letter or a
+    digit is small, `small` saying which rows are (step 4); a row of marks
+    above it, a speck, is passed over."""
+    return next(
+        (
+            small[before]
+            for before in range(index - 1, -1, -1)
+            if has_letter_or_digit(rows[before])
+        ),
+        False,
+    )
+
+
 def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
     """The index in `rows` of the first row of the footnote band (step 4),
-    or len(rows) when there is no band."""
+    or len(rows) when there is no band: the first small row, not the
+    first of `rows`, from which on two thirds of the rows are small, and
+    which lies `_BAND_GAP_PITCHES` below the row before or opens with a
+    note marker below a row that is not small (`_after_small_row`)."""
     small = tuple(is_small_row(row, measures) for row in rows)
     if all(small):
         return len(rows)
@@ -155,9 +207,15 @@ def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
             index
             for index in range(1, len(rows))
             if small[index]
-            and rows[index].box.top - rows[index - 1].box.top
-            >= _BAND_GAP_PITCHES * measures.body_line_pitch
             and sum(small[index:]) >= _BAND_SMALL_ROWS_SHARE * (len(rows) - index)
+            and (
+                rows[index].box.top - rows[index - 1].box.top
+                >= _BAND_GAP_PITCHES * measures.body_line_pitch
+                or (
+                    not _after_small_row(rows, small, index)
+                    and _opens_with_note_marker(rows[index])
+                )
+            )
         ),
         len(rows),
     )
@@ -230,25 +288,50 @@ def _run_is_cut(column_run: tuple[tuple[Line, _AtGutter], ...], part: _Part) -> 
     return open_rows >= _open_rows_to_cut(part)
 
 
+def _hung_right(row: Line, middle: float) -> Word | None:
+    """The word of `row` left of `middle` that is a number hung before the
+    right column's line (step 5): the last word left of it, 1 to 3
+    digits, whose next word, the first right of `middle`, holds a letter,
+    starts at most `HANGING_NUMBER_GAP_PT` right of it and nearer than the
+    word before it on the row ends, if there is one. None when there is
+    no such word."""
+    words = sorted(row.words, key=lambda word: word.box.x0)
+    left = tuple(word for word in words if (word.box.x0 + word.box.x1) / 2 < middle)
+    right = tuple(word for word in words if (word.box.x0 + word.box.x1) / 2 >= middle)
+    if not left or not right or HANGING_NUMBER.fullmatch(left[-1].text) is None:
+        return None
+    number = left[-1]
+    after = right[0].box.x0 - number.box.x1
+    before = number.box.x0 - left[-2].box.x1 if len(left) > 1 else math.inf
+    has_letter = any(character.isalpha() for character in right[0].text)
+    return (
+        number
+        if has_letter and after <= HANGING_NUMBER_GAP_PT and after < before
+        else None
+    )
+
+
 def _cut_run(rows: tuple[Line, ...], middle: float) -> tuple[Region, Region]:
     """The left and right columns of a cut run: each word goes by its own
-    middle, left of `middle` or not."""
+    middle, left of `middle` or not, but a number hung before a line of
+    the right column (`_hung_right`) goes right when the run holds at
+    least `HANGING_NUMBERS_LEAST` of them."""
+    hung = tuple(
+        number for row in rows if (number := _hung_right(row, middle)) is not None
+    )
+    moved = (
+        frozenset(id(number) for number in hung)
+        if len(hung) >= HANGING_NUMBERS_LEAST
+        else frozenset()
+    )
+
+    def goes_left(word: Word) -> bool:
+        return (word.box.x0 + word.box.x1) / 2 < middle and id(word) not in moved
+
     words = words_of(rows)
     return (
-        _region(
-            group_rows(
-                tuple(
-                    word for word in words if (word.box.x0 + word.box.x1) / 2 < middle
-                )
-            )
-        ),
-        _region(
-            group_rows(
-                tuple(
-                    word for word in words if (word.box.x0 + word.box.x1) / 2 >= middle
-                )
-            )
-        ),
+        _region(group_rows(tuple(word for word in words if goes_left(word)))),
+        _region(group_rows(tuple(word for word in words if not goes_left(word)))),
     )
 
 
@@ -299,6 +382,16 @@ def _column_cut_regions(
     return tuple(regions)
 
 
+def _head_region(rows: tuple[Line, ...]) -> Region:
+    """The running-head region of its `rows` (step 3): each row above the
+    head row a line of its own, and the head row with the rows of its
+    skew below it one line, its words left to right."""
+    head_row = next(index for index, row in enumerate(rows) if has_letter_or_digit(row))
+    words = sorted(words_of(rows[head_row:]), key=lambda word: word.box.x0)
+    head_line = Line(_enclosing_box(tuple(word.box for word in words)), tuple(words))
+    return _region((*rows[:head_row], head_line))
+
+
 def _column_regions(
     words: tuple[Word, ...],
     left: float,
@@ -321,7 +414,7 @@ def _column_regions(
     width = measures.column_width
     return (
         (
-            *((_region_of_rows(head),) if head else ()),
+            *((_head_region(head),) if head else ()),
             *_column_cut_regions(body_rows, left, width, _Part.BODY),
         ),
         _column_cut_regions(band_rows, left, width, _Part.BAND),

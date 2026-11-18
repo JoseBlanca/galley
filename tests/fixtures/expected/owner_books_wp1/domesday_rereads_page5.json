@@ -1,0 +1,124 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "domesday_rereads",
+  "page": 5,
+  "book_page_index": 138,
+  "checks": "footnotes set close under the text (layout step 4): a band, and notes, not body; the signature mark removed as now",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "The Manor."
+      },
+      {
+        "reason": "page_number",
+        "text": "113"
+      },
+      {
+        "reason": "signature_mark",
+        "text": "M. 8"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "113",
+        "position": "head"
+      }
+    ],
+    "band_first_line": "1 D. B. i. 163.",
+    "notes": [
+      {
+        "marker": "1",
+        "text": "D. B. i. 163."
+      },
+      {
+        "marker": "2",
+        "text": "If we mistake not, the Osleuuorde of the record is Ashleworth, which, though some miles to the north of Gloucester, either still is, or but lately was, a detached piece of the Berkeley hundred."
+      },
+      {
+        "marker": "3",
+        "text": "D. B. i. 163."
+      },
+      {
+        "marker": "4",
+        "text": "D. B. i. 163 b: 'Hanc terram dedit regina Rogerio de Buslei et geldabat pro 4 hidis in Tedechesberie.'"
+      },
+      {
+        "marker": "6",
+        "text": "D. B. i. 87 b; iv. 161."
+      },
+      {
+        "marker": "6",
+        "text": "Eyton, Somerset, ii. 34."
+      }
+    ]
+  },
+  "known": "The text layer reads the marker 5 as \"6\".",
+  "printed": {
+    "book_page_index": 138,
+    "running_head": {
+      "words": "The Manor.",
+      "page_number": "113",
+      "number_side": "right"
+    },
+    "above_head": "a tiny dot between 'Manor.' and '113' at head level (not above)",
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "No less handsome and yet",
+      "No list of great manors"
+    ],
+    "ends_mid_paragraph": true,
+    "last_body_words": "Crediton in Devon",
+    "margin_notes": [
+      {
+        "text": "Berkeley.",
+        "beside": "No less handsome and yet more valuable"
+      },
+      {
+        "text": "Tewkes- / bury.",
+        "beside": "54½ teams; and the tenants had 192. Tewkesbury also is"
+      },
+      {
+        "text": "Taunton.",
+        "beside": "No list of great manors would be complete"
+      }
+    ],
+    "footnotes": [
+      {
+        "marker": "1",
+        "text": "D. B. i. 163.",
+        "ref_word": "Gloucestershire"
+      },
+      {
+        "marker": "2",
+        "text": "If we mistake not, the Osleuuorde of the record is Ashleworth, which, though some miles to the north of Gloucester, either still is, or but lately was, a detached piece of the Berkeley hundred.",
+        "ref_word": "points"
+      },
+      {
+        "marker": "3",
+        "text": "D. B. i. 163.",
+        "ref_word": "£12 (\"£12³\")"
+      },
+      {
+        "marker": "4",
+        "text": "D. B. i. 163 b: 'Hanc terram dedit regina Rogerio de Buslei et geldabat pro 4 hidis in Tedechesberie.'",
+        "ref_word": "Tewkesbury"
+      },
+      {
+        "marker": "5",
+        "text": "D. B. i. 87 b; iv. 161.",
+        "ref_word": "Taunton"
+      },
+      {
+        "marker": "6",
+        "text": "Eyton, Somerset, ii. 34.",
+        "ref_word": "made"
+      }
+    ],
+    "footnote_gap": "visible gap, about half a line to a line",
+    "tables_or_lists": [],
+    "foot": "M.   8  (signature: 'M.' at left, '8' centred-right, below footnotes)",
+    "notes": "Footnotes 5 and 6 share one line. Speck in right margin beside footnote 4."
+  }
+}

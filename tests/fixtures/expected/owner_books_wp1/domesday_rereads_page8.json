@@ -1,0 +1,83 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "domesday_rereads",
+  "page": 8,
+  "book_page_index": 150,
+  "checks": "margin notes read by re-reading (work package 2); the running head and its page number removed as now",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "The Manor."
+      },
+      {
+        "reason": "page_number",
+        "text": "125"
+      }
+    ],
+    "page_numbers": [
+      {
+        "text": "125",
+        "position": "head"
+      }
+    ]
+  },
+  "printed": {
+    "book_page_index": 150,
+    "running_head": {
+      "words": "The Manor.",
+      "page_number": "125",
+      "number_side": "right"
+    },
+    "above_head": "one small dot above the head, roughly over the left of 'The Manor.' (near top of page)",
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "The petty maneria of Suffolk,",
+      "In supposing that forces have",
+      "Our theory that while the"
+    ],
+    "ends_mid_paragraph": true,
+    "last_body_words": "or 'free men'",
+    "margin_notes": [
+      {
+        "text": "The petty / manors.",
+        "beside": "The petty maneria of Suffolk"
+      },
+      {
+        "text": "The lord / and his / man's / taxes.",
+        "beside": "In supposing that forces have been at work"
+      },
+      {
+        "text": "Distinction / between / villeins and / sokemen.",
+        "beside": "Our theory that while the lord"
+      }
+    ],
+    "footnotes": [
+      {
+        "marker": "1",
+        "text": "Above, p. 110.",
+        "ref_word": "lost"
+      },
+      {
+        "marker": "2",
+        "text": "D. B. i. 35 b.",
+        "ref_word": "manor (\"one manor²?\")"
+      },
+      {
+        "marker": "3",
+        "text": "Northumbrian Priests' Law, 58, 59, (Schmid, p. 369.)",
+        "ref_word": "ores"
+      },
+      {
+        "marker": "4",
+        "text": "An Act of 1869 (32-3 Vic. c. 41) allowed the owners of certain small houses to agree to pay the rates which under the ordinary law would become due from the occupiers, and authorized the vestries to allow such owners a commission of 25 per cent. See also the instructive recital in 59 Geo. III. c. 12, sec. 19:—The small occupiers are evading the poors' rate, and the owners exact higher rents than they would otherwise get, on the ground that the occupiers can not be effectually assessed.",
+        "ref_word": "intermediation"
+      }
+    ],
+    "footnote_gap": "visible gap, about one line",
+    "tables_or_lists": [],
+    "foot": null,
+    "notes": "Rule under the head is broken/dashed. Footnotes 1 and 2 share one line. Speck in right margin beside footnote 4."
+  }
+}

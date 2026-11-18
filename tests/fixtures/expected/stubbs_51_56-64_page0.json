@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 15 November 2026 (galley at ec2edc4).",
-  "changed": "Changed since that check by task 3.1 (layout spec section 3, step 2b, Stubbs' cut-in notes): \"accession.\", the last line of the cut-in note at the left, leaves the body line \"accession. .\", which keeps \".\", and becomes a margin region after the body, and a margin_note block after the paragraph. The rest of that note stays in the body, beside lines that are not shortened (layout spec section 8). Checked against the page image by the task 3.1 session on 16 November 2026, for the orchestrator to check again. Changed by task 4.1 (structure spec section 14, \"Heading blocks\"): \"CHAPTER III.\" and \"THE EARLY YEARS OF HENRY II.\" are one heading of level 1, its label \"CHAPTER III.\" and its text the title. The chapter summary is still cut as before (task 4.2). Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 4.2 (structure spec section 15): the three lines under the heading, \"Terms ofHenryJs accession — …\" to \"… years' work.\", are one chapter_summary block (first line at the left edge, the next two indented about 9 pt, 5 dashes), and \"Very few epochs…\" starts a paragraph, so \"accession.\" now stands before that paragraph (section 13). Checked against the excerpt's text by the task 4.2 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed since that check by task 3.1 (layout spec section 3, step 2b, Stubbs' cut-in notes): \"accession.\", the last line of the cut-in note at the left, leaves the body line \"accession. .\", which keeps \".\", and becomes a margin region after the body, and a margin_note block after the paragraph. The rest of that note stays in the body, beside lines that are not shortened (layout spec section 8). Checked against the page image by the task 3.1 session on 16 November 2026, for the orchestrator to check again. Changed by task 4.1 (structure spec section 14, \"Heading blocks\"): \"CHAPTER III.\" and \"THE EARLY YEARS OF HENRY II.\" are one heading of level 1, its label \"CHAPTER III.\" and its text the title. The chapter summary is still cut as before (task 4.2). Checked against the excerpt's text by the task 4.1 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 4.2 (structure spec section 15): the three lines under the heading, \"Terms ofHenryJs accession — …\" to \"… years' work.\", are one chapter_summary block (first line at the left edge, the next two indented about 9 pt, 5 dashes), and \"Very few epochs…\" starts a paragraph, so \"accession.\" now stands before that paragraph (section 13). Checked against the excerpt's text by the task 4.2 session on 16 November 2026, for the orchestrator to check against the page image. Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image.",
   "excerpt": "stubbs_51_56-64",
   "page": 0,
   "book_page_index": 51,
@@ -82,7 +82,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "Very few epochs of history are more clearly marked than the accession of Henry II. Most great eras are Importance determined, and their real importance asattached by certained, long after the event the famous ; contemporaries to Henry's Parliament of Simon . de Montfort, in 1265, . , ,, for instance, is . scarcely named , , by the contemporary historians, and only rises into importance as later history unfolds its real bearings. But the succession of Henry is hailed by the writers of his time as a dawn of hope, a certain omen of restoration and refreshing. Often and often, it is true, such omens are discerned on the accession of a new king; men hasten to salute the rising sun ; good wishes to the new sovereign take the form of prophecy, and, where they are fulfilled, partly help on their own fulfilment. Here, however, we have omens that were amply fulfilled, and an epoch which those who lived in it were the first to recognise. The fact proves how weary England was of Stephen's incompetency, how thoroughly she had learned the miserable consequences of a feudal system of society unchecked by strong government, how readily she welcomed the young and inexperienced but strong and, in the main, honest rule of Henry.",
+      "text": "Very few epochs of history are more clearly marked than the accession of Henry II. Most great eras are Importance determined, and their real importance asattached by certained, long after the event the famous; contemporaries to Henry's Parliament of Simon . de Montfort, in 1265, . , ,, for instance, is . scarcely named , , by the contemporary historians, and only rises into importance as later history unfolds its real bearings. But the succession of Henry is hailed by the writers of his time as a dawn of hope, a certain omen of restoration and refreshing. Often and often, it is true, such omens are discerned on the accession of a new king; men hasten to salute the rising sun; good wishes to the new sovereign take the form of prophecy, and, where they are fulfilled, partly help on their own fulfilment. Here, however, we have omens that were amply fulfilled, and an epoch which those who lived in it were the first to recognise. The fact proves how weary England was of Stephen's incompetency, how thoroughly she had learned the miserable consequences of a feudal system of society unchecked by strong government, how readily she welcomed the young and inexperienced but strong and, in the main, honest rule of Henry.",
       "pages": [
         0
       ]
@@ -113,6 +113,16 @@
         "asattached"
       ],
       "reason": "hyphen_join_guessed"
+    },
+    {
+      "before": [
+        "famous",
+        ";"
+      ],
+      "after": [
+        "famous;"
+      ],
+      "reason": "punctuation_attached"
     },
     {
       "before": [
@@ -153,6 +163,16 @@
         "refreshing."
       ],
       "reason": "hyphen_join"
+    },
+    {
+      "before": [
+        "sun",
+        ";"
+      ],
+      "after": [
+        "sun;"
+      ],
+      "reason": "punctuation_attached"
     },
     {
       "before": [

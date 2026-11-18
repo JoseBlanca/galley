@@ -1,6 +1,6 @@
 {
   "checked": "Checked by the owner against the page image on 16 November 2026 (galley at c2d6e27), on the second sheet of reference pages.",
-  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image.",
+  "changed": "Changed by task 2.2 of the clean-text plan (extract spec sections 3 and 4): the words of the text layer read in the PDF's order and glued words split, each change a join, a split or a regrouping of the words before, as listed in the plan's work report; not yet checked against the page image. Changed by task 5.2 of the owner-books plan (structure spec section 23): a spaced \"?\", \";\", \":\" or \"!\" is attached to the word before it, recorded as a punctuation_attached word change, or, in Mariéjol, takes a no-break space before it; listed in the task's commit; not yet checked against the page image.",
   "known": "The last blocks of the page (\"{!• iryuiiiu…\", \"I '> ua« chaste…\", \"i4i Uat…\") are footnotes in OCR that cannot be read; galley leaves them paragraphs. The owner: \"cannot be read at all, the scan is too bad.\"",
   "excerpt": "mariejol_headings_verse",
   "page": 1,
@@ -61,7 +61,7 @@
   "blocks": [
     {
       "kind": "paragraph",
-      "text": "De la descendance légitime de Côme l'Ancien, il ne restait que trois mâles, Catherine, déjà grande ûlie. a dû suivre de chasses. Autrement on ne s'ex« pliquerait pa5 qu'aussitôt arrivée en France, elk ait montré l'ardeur dont parle Ronsard, peut-être avec quelque exagération poétique :",
+      "text": "De la descendance légitime de Côme l'Ancien, il ne restait que trois mâles, Catherine, déjà grande ûlie. a dû suivre de chasses. Autrement on ne s'ex« pliquerait pa5 qu'aussitôt arrivée en France, elk ait montré l'ardeur dont parle Ronsard, peut-être avec quelque exagération poétique :",
       "pages": [
         0,
         1
@@ -69,7 +69,7 @@
     },
     {
       "kind": "verse",
-      "text": "Laquelle (Catherine) dé« qtiaiorw ans\nPortoit au b(^ la sagette\nLa robe et les arcs duisans (convenant)\nAux pocelles de Taygette\nToDjours dés l'aube du jour\nAlloit aux forftts en qneste\nOu de reths tcmt à l'entour\nCemoit le trac d'une beste ;\nOu pressoit les cerfs au cours;\nOu i«r le pendant des roches.\nSans chiens assaUloit les ours\nEt les sanghers aux dents croches '1)4",
+      "text": "Laquelle (Catherine) dé« qtiaiorw ans\nPortoit au b(^ la sagette\nLa robe et les arcs duisans (convenant)\nAux pocelles de Taygette\nToDjours dés l'aube du jour\nAlloit aux forftts en qneste\nOu de reths tcmt à l'entour\nCemoit le trac d'une beste ;\nOu pressoit les cerfs au cours;\nOu i«r le pendant des roches.\nSans chiens assaUloit les ours\nEt les sanghers aux dents croches '1)4",
       "pages": [
         1
       ]
@@ -97,7 +97,7 @@
     },
     {
       "kind": "paragraph",
-      "text": "{!• iryuiiiu: Hr.ir.t 'lut rapporte que Cathorioe «vait açipht ê oiaal«r «a antMoof do !« Ju ; 4 ,<.- : I Ain*. UrnuUoc de Daoemack, c'«lt>èKttr« «pré* M v«niM co huac^ i.:. 1.4I1..",
+      "text": "{!• iryuiiiu: Hr.ir.t 'lut rapporte que Cathorioe «vait açipht ê oiaal«r «a antMoof do !« Ju ; 4 ,<.- : I Ain*. UrnuUoc de Daoemack, c'«lt>èKttr« «pré* M v«niM co huac^ i.:. 1.4I1..",
       "pages": [
         1
       ]

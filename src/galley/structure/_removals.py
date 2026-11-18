@@ -2,6 +2,7 @@
 head, its page number and the stray marks above it; the page number at the
 foot, the signature line and the printer's signature mark."""
 
+import bisect
 import re
 from dataclasses import dataclass
 
@@ -23,16 +24,16 @@ from galley.structure._foot import (
     running_head_lines,
     signature_page_number,
 )
-from galley.structure._heads import EndNumber, arabic_number, is_confirmed
 from galley.structure._measures import (
     Edges,
+    arabic_value,
     line_has_letter_or_digit,
     middle,
     words_removal,
     words_text,
 )
 from galley.structure._regions import RegionKind, head_line
-from galley.structure._survey import BookSurvey, number_candidates
+from galley.structure._survey import BookSurvey, head_page_number
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,35 +59,15 @@ _SIGNATURE_MARK_FROM_LEFT_SHARE = 0.3
 _DIGITS_AROUND_A_DASH_OR_SPACE = re.compile(r"[0-9]+ ?[-–—] ?[0-9]+|[0-9]+ [0-9]+")
 
 
-def _head_page_number(
-    line: Line, page_index: int, survey: BookSurvey
-) -> EndNumber | None:
-    """The running head's page number, or None (spec section 3): a
-    page-number form at its start or end, a run of digit words joined, a
-    roman one only before the first arabic head number; of two, the one
-    the offset puts within 2 of the page index, else the first."""
-    candidates = number_candidates(page_index, line, survey.first_arabic_page)
-    if not candidates:
-        return None
-    return next(
-        (
-            candidate
-            for candidate in candidates
-            if is_confirmed(
-                page_index, arabic_number(candidate), survey.head_page_offset
-            )
-        ),
-        candidates[0],
-    )
-
-
 def _running_head_removals(
     page_index: int, line: Line, survey: BookSurvey
 ) -> tuple[tuple[Removal, ...], tuple[PageNumber, ...]]:
     """A running head's line removed: its page number as `page_number`, the
     rest as `running_head`, in the order of the line."""
     words = line.words
-    number = _head_page_number(line, page_index, survey)
+    number = head_page_number(
+        page_index, line, survey.first_arabic_page, survey.head_page_offset
+    )
     if number is None:
         return (words_removal(page_index, words, RemovalReason.RUNNING_HEAD),), ()
     number_words = words[number.first : number.last + 1]
@@ -105,17 +86,43 @@ def _running_head_removals(
     )
 
 
-def running_head_place(page: PageLayout, survey: BookSurvey) -> LinePlace | None:
-    """The place of the line that section 3 makes the page's running head:
-    the text line of its head line, or the line below a speck; None when
-    the page has none."""
-    if page.index in survey.running_heads and (head := head_line(page)) is not None:
-        return (0, len(head.lines) - 1)
+@dataclass(frozen=True, slots=True)
+class _RunningHead:
+    """The line section 3 makes a page's running head, and the places of
+    the lines it is made of: the text line of the head line and the lines
+    of the regions beside it, or the line below a speck."""
+
+    line: Line
+    places: frozenset[LinePlace]
+
+
+def _running_head(page: PageLayout, survey: BookSurvey) -> _RunningHead | None:
+    """The page's running head, None when it has none."""
+    head = head_line(page)
+    if page.index in survey.running_heads and head is not None:
+        return _RunningHead(
+            head.line,
+            frozenset(
+                {
+                    (0, len(head.region.lines) - 1),
+                    *((number, 0) for number in head.beside),
+                }
+            ),
+        )
     if page.index in survey.heads_below_specks:
-        below = line_below_head(page)
+        assert head is not None, "the survey found a speck as the head line"
+        below = line_below_head(page, head.region_numbers)
         assert below is not None, "the survey found a line below the speck"
-        return below
+        return _RunningHead(line_at(page, below), frozenset({below}))
     return None
+
+
+def running_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
+    """The line that section 3 makes the page's running head: the words of
+    its head line, or the line below a speck; None when the page has
+    none."""
+    head = _running_head(page, survey)
+    return None if head is None else head.line
 
 
 def head_removals(page: PageLayout, survey: BookSurvey) -> LineRemovals:
@@ -125,8 +132,8 @@ def head_removals(page: PageLayout, survey: BookSurvey) -> LineRemovals:
     the head line is a speck and the line below it the running head, that
     line is removed so, and the speck stays. A page with no running head
     loses nothing."""
-    head_place = running_head_place(page, survey)
-    if head_place is None:
+    head = _running_head(page, survey)
+    if head is None:
         return _NOTHING_REMOVED
     mark_places = tuple(
         (0, number)
@@ -137,11 +144,9 @@ def head_removals(page: PageLayout, survey: BookSurvey) -> LineRemovals:
         words_removal(page.index, line_at(page, place).words, RemovalReason.STRAY_MARK)
         for place in mark_places
     )
-    removals, page_numbers = _running_head_removals(
-        page.index, line_at(page, head_place), survey
-    )
+    removals, page_numbers = _running_head_removals(page.index, head.line, survey)
     return LineRemovals(
-        strays + removals, page_numbers, frozenset((*mark_places, head_place))
+        strays + removals, page_numbers, frozenset(mark_places) | head.places
     )
 
 
@@ -198,6 +203,33 @@ def _signature_line_removals(
     )
 
 
+def _local_offset(page_index: int, head_numbers: frozendict[int, int]) -> int | None:
+    """The local offset of a page (spec section 4): page index minus printed
+    number of the nearest page, before or after it, before on a tie, whose
+    running head has an arabic page number in `head_numbers`; None when
+    no page has one."""
+    pages = sorted(head_numbers)
+    after = bisect.bisect_left(pages, page_index)
+    near = tuple(pages[max(0, after - 1) : after + 1])
+    if not near:
+        return None
+    nearest = min(near, key=lambda page: (abs(page - page_index), page))
+    return nearest - head_numbers[nearest]
+
+
+def _is_foot_number_by_value(
+    line: Line, page_index: int, head_numbers: frozendict[int, int]
+) -> bool:
+    """Whether a lowest line is a page number at the foot by its value
+    (spec section 4): one word of the arabic page-number form whose value
+    plus the page's local offset is the page index, wherever it lies."""
+    if len(line.words) != 1:
+        return False
+    value = arabic_value(line.words[0].text)
+    offset = _local_offset(page_index, head_numbers)
+    return value is not None and offset is not None and value + offset == page_index
+
+
 def foot_removals(
     page: PageLayout,
     kinds: tuple[RegionKind, ...],
@@ -214,7 +246,9 @@ def foot_removals(
     if column is None or place is None:
         return _NOTHING_REMOVED
     line = line_at(page, place)
-    if is_foot_page_number(line, column):
+    if is_foot_page_number(line, column) or _is_foot_number_by_value(
+        line, page.index, survey.head_numbers
+    ):
         text = "".join(word.text for word in line.words)
         above = _signature_mark_removals(
             page, lowest_line(page, head | {place}), column

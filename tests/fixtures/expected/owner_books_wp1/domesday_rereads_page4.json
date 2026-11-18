@@ -1,0 +1,77 @@
+{
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "excerpt": "domesday_rereads",
+  "page": 4,
+  "book_page_index": 136,
+  "checks": "a list in small type; no line of the page is a heading, although the text layer boxes the lines under the list tall (structure spec section 14, a page with more than 6 tall lines has none)",
+  "expected": {
+    "removals": [
+      {
+        "reason": "running_head",
+        "text": "TJie Manor. Ill"
+      }
+    ],
+    "page_numbers": [],
+    "band_first_line": "1 D. B. i. 128. 2 D. B. i. 128 b.",
+    "heading_lines": []
+  },
+  "known": "\"Ill\" (111) is no page-number form and goes with the running head, as now. Before task 1.6 of the plan owner-books, the tall branch of structure spec section 14 took the page's lower paragraph for a heading; since, a page with more than 6 tall lines has no tall line (this page has 14 on the whole book).",
+  "printed": {
+    "book_page_index": 136,
+    "running_head": {
+      "words": "The Manor.",
+      "page_number": "111",
+      "number_side": "right"
+    },
+    "above_head": null,
+    "headings": [],
+    "starts_mid_paragraph": true,
+    "paragraph_starts": [
+      "We may begin by looking",
+      "There are 6 mills of"
+    ],
+    "ends_mid_paragraph": true,
+    "last_body_words": "To the demesne",
+    "margin_notes": [
+      {
+        "text": "A large / manor.",
+        "beside": "We may begin by looking at a somewhat large manor"
+      }
+    ],
+    "footnotes": [
+      {
+        "marker": "1",
+        "text": "D. B. i. 128.",
+        "ref_word": "Westminster (line 3 of the paragraph)"
+      },
+      {
+        "marker": "2",
+        "text": "D. B. i. 128 b.",
+        "ref_word": "Westminster (\"St Peter of Westminster²\")"
+      }
+    ],
+    "footnote_gap": "large visible gap (about 1.5 lines); both footnotes set side by side on one line",
+    "tables_or_lists": [
+      {
+        "lines": [
+          "3 villeins with a half-hide apiece.",
+          "4 villeins with a hide between them.",
+          "8 villeins with a half-virgate apiece.",
+          "36 bordiers with 3 hides between them.",
+          "1 villein with 1 virgate.",
+          "4 bordiers with 40 acres between them.",
+          "10 bordiers with 5 acres apiece.",
+          "5 cottiers with 4 acres.",
+          "8 bordiers with 1 virgate.",
+          "3 cottiers with 9 acres.",
+          "13 serfs.",
+          "46 burgesses paying 40 shillings a year."
+        ],
+        "setting": "smaller (footnote-size) type, indented about a fifth of the measure from the left, numbers right-aligned, introduced by 'There are :—' ending the paragraph above; small gap above and below the list"
+      }
+    ],
+    "foot": null,
+    "book_page_136_special": "No line is centred or in larger type. Candidates that a layout stage might mistake for headings are the two shortest list lines, '1 villein with 1 virgate.' and '13 serfs.', which are isolated short lines in smaller type indented well in from the left margin; also the paragraph opening after the list, 'There are 6 mills of 64 shillings and one fish-weir of 6s. 8d.', starts after a small vertical gap with a paragraph indent, and the line before the list 'are 13 teams there. The villeins have 11 teams. There are :—' ends short. None is a real heading.",
+    "notes": "Speck in right margin near the last body line."
+  }
+}

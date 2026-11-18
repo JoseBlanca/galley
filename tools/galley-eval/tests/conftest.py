@@ -81,6 +81,7 @@ def _small_book(name: str = "small") -> EvaluationBook:
         contents_pages=(1,),
         plate_pages=(2,),
         not_in_reference=(),
+        reference_ends_at=None,
         margin_notes_moved=False,
         body_pages=(0, 0),
         html_sha256="0" * 64,
