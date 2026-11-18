@@ -203,7 +203,7 @@ def _signature_line_removals(
     )
 
 
-def local_offset(page_index: int, head_numbers: frozendict[int, int]) -> int | None:
+def _local_offset(page_index: int, head_numbers: frozendict[int, int]) -> int | None:
     """The local offset of a page (spec section 4): page index minus printed
     number of the nearest page, before or after it, before on a tie, whose
     running head has an arabic page number in `head_numbers`; None when
@@ -226,7 +226,7 @@ def _is_foot_number_by_value(
     if len(line.words) != 1:
         return False
     value = arabic_value(line.words[0].text)
-    offset = local_offset(page_index, head_numbers)
+    offset = _local_offset(page_index, head_numbers)
     return value is not None and offset is not None and value + offset == page_index
 
 

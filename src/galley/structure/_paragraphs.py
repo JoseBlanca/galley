@@ -41,7 +41,11 @@ from galley.structure._regions import RegionKind, head_line, region_kinds
 from galley.structure._removals import foot_removals, head_removals
 from galley.structure._runs import BodyRun, LabelLine
 from galley.structure._summaries import summary_run
-from galley.structure._survey import BookSurvey, like_a_running_head
+from galley.structure._survey import (
+    BookSurvey,
+    in_head_band,
+    like_a_running_head,
+)
 from galley.structure._verse import verse_runs
 
 
@@ -112,15 +116,16 @@ def _runs(
     body: Sequence[PlacedLine],
     band_regions: Sequence[Sequence[PlacedLine]],
     head: PageHead,
-    kept_head: Line | None,
+    kept_head: int | None,
     survey: BookSurvey,
     contents_pages: frozenset[int],
 ) -> tuple[BodyRun, ...]:
     """The runs of the body stream that are blocks of their own (spec
     section 2, step 2.3), in order: the headings, the chapter summary under
     a heading, and the verse; none on a page of the printed table of
-    contents. `kept_head` is the page's head line that section 3 left in
-    the text near the book's head lines (`kept_head_line`), or None."""
+    contents. `kept_head` is the position in `body` of the page's head line
+    that section 3 left in the text near the book's head lines
+    (`_kept_head_line`), or None."""
     if page_index in contents_pages:
         return ()
     band_lines = tuple(line for region in band_regions for line in region)
@@ -149,17 +154,13 @@ def _runs(
     )
 
 
-# Spec section 3: running heads lie at most 2 pitches below the median top
-# of the book's head lines.
-_HEAD_TOP_PITCHES = 2.0
-
-
-def kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
+def _kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
     """The text line of the page's head line when section 3 left it in the
-    text and its top lies at most 2 pitches below the median top of the
-    book's head lines, where running heads are looked for: never a
-    flush-left heading line unless it starts with a chapter label word
-    (spec section 14, rule 1). None otherwise."""
+    text and it lies in the band where running heads are looked for, at
+    most 2 pitches below the median top of the book's head lines or
+    anywhere above it (`in_head_band`): never a flush-left heading line
+    unless it starts with a chapter label word (spec section 14, rule 1).
+    None otherwise."""
     head = head_line(page)
     if (
         head is None
@@ -168,10 +169,7 @@ def kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
     ):
         return None
     line = head.region.lines[-1]
-    within = (
-        line.box.top - survey.median_head_top
-        <= _HEAD_TOP_PITCHES * survey.body_line_pitch
-    )
+    within = in_head_band(line.box.top, survey.median_head_top, survey.body_line_pitch)
     return line if within else None
 
 
@@ -184,11 +182,11 @@ def _like_running_heads(
     and whose letters are at least 0.6 alike to a running head's."""
     if survey.median_head_top is None:
         return frozenset()
-    limit = survey.median_head_top + _HEAD_TOP_PITCHES * survey.body_line_pitch
+    median_head_top = survey.median_head_top
     return frozenset(
         number
         for number, line in enumerate(body)
-        if line.line.box.top <= limit
+        if in_head_band(line.line.box.top, median_head_top, survey.body_line_pitch)
         and like_a_running_head(
             letters(words_text(line.line.words)), survey.running_head_letters
         )
@@ -246,6 +244,16 @@ def page_parts(
     body = tuple(
         line for kind, lines in regions if kind is RegionKind.BODY for line in lines
     )
+    # The head line, the first region's last line, is then the last of
+    # that region's lines that open the body stream.
+    head_line_kept = (
+        _kept_head_line(page, survey) is not None
+        and regions
+        and regions[0][0] is RegionKind.BODY
+        and regions[0][1]
+        and regions[0][1][-1].line == page.regions[0].lines[-1]
+    )
+    kept_head = len(regions[0][1]) - 1 if head_line_kept else None
     index_lines = _index_lines(page.index, index)
     page_head = (
         PageHead.RUNNING_HEAD
@@ -277,7 +285,7 @@ def page_parts(
             body,
             (*band_regions, index_lines),
             page_head,
-            kept_head_line(page, survey),
+            kept_head,
             survey,
             contents_pages,
         ),

@@ -29,6 +29,7 @@ from galley.model import (
     read_blocks,
 )
 from galley.structure import make_blocks, survey_book
+from galley.structure._regions import RegionKind, region_kinds
 
 _HASH = "a" * 64
 _NO_WORDS: frozenset[str] = frozenset()
@@ -221,6 +222,16 @@ def test_chapter_label_stays_in_the_text_as_its_headings_label() -> None:
         (1, "CHAPTER THREE", "THE ENDING"),
     )
     assert all(_removed(blocks, page) == () for page in (14, 15, 16))
+
+
+def test_chapter_label_word_with_a_colon_after_it_is_no_running_head() -> None:
+    pages = (
+        *(_page_with_head(index, "THE BOOK") for index in range(10, 14)),
+        _page_with_head(14, "Chapter: One"),
+        _page_with_head(15, "Chapter: Two"),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert survey.running_heads == frozenset(range(10, 14))
 
 
 def test_head_whose_first_word_only_starts_with_a_chapter_label_word_stays_a_head() -> (
@@ -479,6 +490,27 @@ def test_title_line_in_capitals_continues_up_to_4_pitches_below_a_chapter_label(
         )
 
 
+@pytest.mark.parametrize(("top", "headings"), [(3.0, 0), (36 + 2.2 * 15, 1)])
+def test_flush_left_head_line_above_the_head_top_is_no_heading(
+    top: float, headings: int
+) -> None:
+    # Page 14's head line, alike to no running head, lies 2.2 pitches above
+    # the median head top, in section 3's band, or 2.2 pitches below it.
+    page = PageLayout(
+        14,
+        (
+            _region(_line("A STRANGE LINE", _BODY_LEFT_PT, top)),
+            _region(*_running_text(110, 12)),
+        ),
+        (),
+    )
+    lines = _lines_of(
+        *(_page_with_head(index, "THE BOOK") for index in range(10, 14)), page
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert len(_headings(blocks)) == headings
+
+
 @pytest.mark.parametrize(
     ("line", "headings"),
     [("A BOOK OF WINTERS", ()), ("A NEW BEGINNING", ((1, None, "A NEW BEGINNING"),))],
@@ -515,6 +547,102 @@ def test_head_line_boxed_tall_into_the_region_below_by_1_pt_is_a_heading() -> No
         )
         blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
         assert (_headings(blocks) == ((1, None, "MAPS."),)) is heading
+
+
+@pytest.mark.parametrize(("reach", "kind"), [(0.8, "band"), (2.5, "margin")])
+def test_note_line_reaching_into_the_text_above_by_0_8_pt_is_a_band_region(
+    reach: float, kind: str
+) -> None:
+    # Domesday's page 535: a note of one line in small type, narrow,
+    # under the text, whose top lies 0.8 pt above the text's bottom.
+    body = _body(70, *_BODY_TEXTS)
+    note = _region(_line("1 Id.", 90, body.box.bottom - reach, 7))
+    page = PageLayout(30, (body, note), ())
+    assert region_kinds(page, _WORD_HEIGHT_PT, frozenset()) == (
+        RegionKind.BODY,
+        RegionKind(kind),
+    )
+
+
+@pytest.mark.parametrize(("indent", "headings"), [(3.0, 1), (10.0, 0)])
+def test_flush_left_line_lies_within_4_pt_of_the_left_edge(
+    indent: float, headings: int
+) -> None:
+    line = _line("A NEW SECTION", _BODY_LEFT_PT + indent, 175 + 2.4 * _PITCH_PT)
+    page = _page_with_a_line_among_the_text(20, line, 2.0)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert len(_headings(blocks)) == headings
+
+
+def test_chapter_label_below_a_speck_is_no_running_head() -> None:
+    # Pages 10 to 13 have the running head "THE CHAPTER BOOK"; page 14's
+    # head line is a speck "d", and the line below it, "CHAPTER BOOK",
+    # 0.88 alike to the head, starts with a chapter label word.
+    page = PageLayout(
+        14,
+        (
+            _region(_line("d", 120, 20)),
+            _body(36, "CHAPTER BOOK", *_BODY_TEXTS),
+        ),
+        (),
+    )
+    lines = _lines_of(
+        *(_page_with_head(index, "THE CHAPTER BOOK") for index in range(10, 14)),
+        page,
+    )
+    survey = survey_book(lines, workers=1)
+    assert survey.running_heads == frozenset(range(10, 14))
+    assert 14 not in survey.heads_below_specks
+
+
+def test_short_region_overlapping_the_head_across_is_not_beside_it() -> None:
+    # "22" lies under the end of "THE BOOK", 1 pt lower: not wholly left or
+    # right of it, so the page has no head line.
+    page = PageLayout(
+        10,
+        (
+            _region(_line("THE BOOK", _BODY_LEFT_PT, 36)),
+            _body(70, *_BODY_TEXTS),
+            _region(_line("22", 80, 37)),
+        ),
+        (),
+    )
+    lines = _lines_of(
+        page, *(_page_with_head(index, "THE BOOK") for index in range(11, 14))
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _removed(blocks, 10) == ()
+
+
+def test_local_offset_of_a_page_between_two_takes_the_one_before_on_a_tie() -> None:
+    # Page 180 prints 167 in its head (offset 13), page 184 155 (offset
+    # 29); page 182, 2 pages from each, prints "169" at the foot.
+    lines = _lines_of(
+        _page_with_head(180, "THE BOOK 167"),
+        _page_with_number_at_the_foot(182, "169"),
+        _page_with_head(184, "THE BOOK 155"),
+        *(
+            _page_with_head(index, f"THE BOOK {index - 29}")
+            for index in range(185, 188)
+        ),
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _removed(blocks, 182) == (("page_number", "169"),)
+
+
+def test_tall_line_right_after_a_tall_heading_line_is_its_second_line() -> None:
+    # Turney's page 80: a section heading on two lines 1.3 times the text's
+    # height, the second 1.1 pitches below the first, 2 pitches below the
+    # text above, and indented as Turney's are.
+    first = _line("A Section Heading", _BODY_LEFT_PT + 45, 175 + 2 * _PITCH_PT, 13)
+    second = _line(
+        "On Two Lines", _BODY_LEFT_PT + 45, first.box.top + 1.1 * _PITCH_PT, 13
+    )
+    above = _running_text(100, 6)
+    below = _running_text(second.box.top + 2 * _PITCH_PT, 6)
+    page = PageLayout(20, (_region(*above, first, second, *below),), ())
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _headings(blocks) == ((2, None, "A Section Heading On Two Lines"),)
 
 
 # On the six public-domain books (spec section 26, "Whole-book tests"), from
@@ -558,6 +686,7 @@ def whole_book_blocks(
 
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
 @pytest.mark.parametrize("book", _PUBLIC_DOMAIN_BOOKS)
 def test_whole_book_no_running_head_removed_starts_with_a_chapter_label_word(
     whole_book_blocks: Callable[[str], BlocksFile], book: str
@@ -569,12 +698,13 @@ def test_whole_book_no_running_head_removed_starts_with_a_chapter_label_word(
     )
     assert heads
     assert not any(
-        head.split()[0].rstrip(".,").lower() in _LABEL_WORDS for head in heads
+        head.split()[0].rstrip(".,:;").lower() in _LABEL_WORDS for head in heads
     )
 
 
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
 @pytest.mark.parametrize("book", sorted(_HEADS_REMOVED))
 def test_whole_book_running_heads_of_the_reference_pages_are_removed(
     whole_book_blocks: Callable[[str], BlocksFile], book: str
@@ -589,6 +719,7 @@ def test_whole_book_running_heads_of_the_reference_pages_are_removed(
 
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
 def test_whole_book_haskins_195_notes_set_close_under_the_text_are_notes(
     whole_book_blocks: Callable[[str], BlocksFile],
 ) -> None:

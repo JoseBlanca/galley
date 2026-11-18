@@ -2,6 +2,7 @@
 or last word, or a run of digit words there that the OCR split ("5 1")."""
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from galley.structure._measures import arabic_value, is_roman_form
@@ -89,9 +90,9 @@ def is_number_like(text: str) -> bool:
     return _NUMBER_LIKE.fullmatch(text) is not None
 
 
-def starts_with_chapter_label_word(texts: tuple[str, ...]) -> bool:
-    """Whether the first of a line's words `texts`, without a "." or ","
-    after it, is a chapter label word in any case (spec section 3, "A
-    chapter label is never a running head"): "CHAPTER", "Book." but not
+def starts_with_chapter_label_word(texts: Sequence[str]) -> bool:
+    """Whether the first of a line's words `texts` is a chapter label word
+    (spec section 3): one of `CHAPTER_LABEL_WORDS` in any case, with ".",
+    ",", ":" or ";" after it or not: "CHAPTER", "Book." but not
     "Book-land"."""
-    return bool(texts) and texts[0].rstrip(".,").lower() in CHAPTER_LABEL_WORDS
+    return bool(texts) and texts[0].rstrip(".,:;").lower() in CHAPTER_LABEL_WORDS

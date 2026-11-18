@@ -30,7 +30,7 @@ from galley.model import (
     read_blocks,
 )
 
-pytestmark = pytest.mark.whole_book
+pytestmark = [pytest.mark.whole_book, pytest.mark.timeout(900)]
 
 # Structure spec section 21, "Their configs", as the survey of 17 November
 # 2026 ran them; the pattern finds each PDF in the samples folder.
@@ -111,12 +111,14 @@ def test_every_chapter_is_a_level_1_heading_with_its_label(
     owner_book_run: Callable[[str], BlocksFile], book: str
 ) -> None:
     labels = _level_1_headings(owner_book_run(book))
-    chapters = sum(
-        1
+    # Distinct labels, so that a chapter found twice does not stand for a
+    # chapter missed.
+    chapters = tuple(
+        label.lower()
         for label in labels
         if label is not None and label.lower().startswith("chapter")
     )
-    assert chapters == _CHAPTERS[book]
+    assert len(set(chapters)) == len(chapters) == _CHAPTERS[book]
 
 
 @pytest.mark.parametrize("book", ["turney", "haynes"])
@@ -140,7 +142,7 @@ def test_no_running_head_removed_starts_with_a_chapter_label_word(
     )
     assert heads
     assert not any(
-        head.split()[0].rstrip(".,").lower() in _LABEL_WORDS for head in heads
+        head.split()[0].rstrip(".,:;").lower() in _LABEL_WORDS for head in heads
     )
 
 
