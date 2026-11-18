@@ -134,6 +134,7 @@ def _markdown(
         note_count=note_count,
         note_link_count=note_link_count,
         list_item_count=0,
+        shown_markers=(),
         contents_links=(),
     )
 
