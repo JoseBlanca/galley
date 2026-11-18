@@ -273,3 +273,20 @@ def test_an_ordered_list_of_contents_entries_is_refused() -> None:
 
     with pytest.raises(ExternalProgramError, match="OrderedList element"):
         read_markdown(written)
+
+
+@pytest.mark.pandoc
+def test_two_contents_links_swapped_fail_though_each_targets_a_heading() -> None:
+    written = (
+        render_markdown(CONTENTS, CONFIG)
+        .replace("(#b-p0036-001)", "(#swap)")
+        .replace("(#b-p0050-001)", "(#b-p0036-001)")
+        .replace("(#swap)", "(#b-p0050-001)")
+    )
+
+    with pytest.raises(
+        FidelityError,
+        match="the contents entry b-p0008-002 links to '#b-p0050-001', and its "
+        "heading reference is '#b-p0036-001'",
+    ):
+        _check(CONTENTS, written)
