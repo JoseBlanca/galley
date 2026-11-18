@@ -1,0 +1,62 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer and its lines as layout gives them at 1b2959f (the words as the OCR read them, their left sides), and docs/specs/structure.md, section 29 (the rules) and section 32 (the table of excerpt tests): each list item's label is its marker as read and its text the words of its lines after the marker. Not yet compared with galley's output, which at 1b2959f makes no list item.",
+  "excerpt": "domesday_lists",
+  "page": 5,
+  "book_page_index": 156,
+  "checks": "a table's rows as a numbered list; a list that stops at a row whose number the OCR read without its \".\"; a vill with no list",
+  "printed": {
+    "running_head": {
+      "words": "Manor and Vill.",
+      "page_number": "131",
+      "number_side": "right"
+    },
+    "table_title": "Cambridgeshire. Wetherley Hundred.",
+    "vills": [
+      {
+        "heading": "I. Comberton. A vill of 6 hides.",
+        "rows": [
+          "1. Seven sokemen of the King / A sokeman, man of Earl Waltheof / A sokeman, man of Abp Stigand",
+          "2. A man of Earl Waltheof",
+          "3. A sokeman, man of the King / A sokeman, man of Abp Stigand / A sokeman, man of Earl Waltheof",
+          "4. The King"
+        ]
+      },
+      {
+        "heading": "II. Barton. A vill of 7 hides.",
+        "rows": [
+          "1. Two sokemen, men of Earl Waltheof / A sokeman, man of Earl Waltheof / A sokeman, man of Earl Waltheof",
+          "2. Juhael the King's hunter",
+          "3. A sokeman, man of Edith the Fair",
+          "4. Twenty-three sokemen of the King"
+        ]
+      }
+    ],
+    "row_layout": "each row's number at one left side, its text after it, a row's further holders hung under its text; columns H. V. A. C. B. of numbers on the right, and a line of totals under each vill",
+    "footnotes": [
+      "1 Wratworth has completely disappeared from the modern map",
+      "2 The figures in our first column represent the division of the vill among the Norman lords.",
+      "3 There is some small error in this case.",
+      "4 A small conjectural emendation."
+    ],
+    "signature_mark": "9—2"
+  },
+  "expected": {
+    "lists": [
+      [
+        {
+          "label": "1.",
+          "text": "Seven sokemen of the King 1 A sokeman, man of Earl Waltheof ) A sokeman, man of Abp Stigand /"
+        },
+        {
+          "label": "2.",
+          "text": "A man of Earl Waltheof"
+        },
+        {
+          "label": "3.",
+          "text": "A sokeman, man of the King A sokeman, man of Abp Stigand A sokeman, man of Earl Waltheof"
+        }
+      ]
+    ]
+  },
+  "known": "Structure spec section 29, \"Where they fail\": vill I's list stops at row 4, read \"4 The King 2\"; \"I. COMBERTON…\" reads as a first roman value whose list of one item is no list, and \"1.\" then starts the list. Vill II has none: a number of the H. column read as a line of its own (\"1\", 193.7 pt from the left) follows row 1 and ends its list at one item, and \"2.\" is no first value."
+}

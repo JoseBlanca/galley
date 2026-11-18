@@ -864,13 +864,15 @@ def test_kadesh_pages_are_text_but_8_excluded_and_plate_9_with_the_region_on_0(
 
 # The plates of each excerpt, by page index in the excerpt (plates spec
 # section 6): Kadesh 17 (16, the scan of a cover, is excluded); Kadesh 64,
-# 65 (the back of plate 64, a known wrong case) and 68; Domesday's maps 39 and 40. The other
+# 65 (the back of plate 64, a known wrong case) and 68; Domesday's maps 39 and 40;
+# Kadesh 34 and 35, the back of plate 34, without a text layer. The other
 # excerpts have none.
 EXCERPT_PLATES = frozendict(
     {
         "kadesh_8-17": (9,),
         "kadesh_59-68": (5, 6, 9),
         "domesday_headings_quotes": (3, 4),
+        "kadesh_29-38": (5, 6),
     }
 )
 # The front-matter pages of each excerpt (front-matter spec section 6,

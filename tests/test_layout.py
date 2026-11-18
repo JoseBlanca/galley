@@ -2145,22 +2145,29 @@ def test_layout_of_an_excerpt_with_rereading_keeps_every_word(
     _assert_laid_out_in_regions(words, lines)
 
 
-def test_cut_in_insets_of_the_excerpts_are_stubbs_only(
+def test_cut_in_insets_of_the_excerpts_are_stubbs_and_domesday_tables_only(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     # Layout spec section 3, "The book's measures": the Stubbs excerpt's
     # insets are 60.3 pt (17 rows) and 58.2 pt (13 rows); no other excerpt
     # has 10 rows at its peak and 4 times those beside it but `stubbs_heads`,
     # whose pages are all even, with their notes on the right, and whose
-    # right inset is 58.0 pt (scripts/fetch_samples.py; 17 November 2026).
+    # right inset is 58.0 pt (scripts/fetch_samples.py; 17 November 2026),
+    # and `domesday_lists`, whose tables of page indices 156 to 158 end
+    # their rows 58.8 pt inside the column, a peak the whole book's other
+    # rows drown (18 November 2026).
     insets = {}
     for name, folder in excerpt_books.items():
         measures = measure_book(read_words(folder.words_json))
         assert measures is not None
         insets[name] = (measures.cut_in_inset_left, measures.cut_in_inset_right)
-    stubbs = {"stubbs_51_56-64": (60.3, 58.2), "stubbs_heads": (None, 58.0)}
-    assert insets == {name: stubbs.get(name, (None, None)) for name in excerpt_books}
-    assert len(insets) == 18
+    found = {
+        "stubbs_51_56-64": (60.3, 58.2),
+        "stubbs_heads": (None, 58.0),
+        "domesday_lists": (None, 58.8),
+    }
+    assert insets == {name: found.get(name, (None, None)) for name in excerpt_books}
+    assert len(insets) == 20
 
 
 def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(
