@@ -31,6 +31,7 @@ from galley.model import (
     FigureKind,
     Line,
     LinesFile,
+    Origin,
     PageInfo,
     PageKind,
     PageLayout,
@@ -40,12 +41,13 @@ from galley.model import (
     RenderedPage,
     TextSource,
     Word,
+    block_text,
     read_blocks,
     read_lines,
     read_pages,
     read_words,
 )
-from galley.structure import make_blocks
+from galley.structure import is_caption_label, make_blocks
 
 # Figures spec section 10: a page of white, 300 by 450 pixels at 36 dpi,
 # where a pixel is 2 pt and a square of 12 pt is 6 pixels.
@@ -1140,6 +1142,10 @@ def _structure(
     return blocks
 
 
+def _texts(blocks: BlocksFile) -> tuple[tuple[BlockKind, str], ...]:
+    return tuple((block.kind, block_text(block)) for block in blocks.blocks)
+
+
 _MAP_BOX = Box(100.0, 145.0, 320.0, 290.0)
 _ABOVE_THE_MAP = (
     _text_line("The text of the paragraph begins here and", 75.0, 100.0, 360.0),
@@ -1174,6 +1180,26 @@ def _map_page(
     )
 
 
+def test_caption_rows_below_a_figure_join_the_paragraph_it_cuts() -> None:
+    blocks = _structure(_lines_file(_map_page()))
+    assert _texts(blocks) == (
+        (
+            BlockKind.PARAGRAPH,
+            (
+                "The text of the paragraph begins here and goes on along the "
+                "line to the very end of the line before the figure printed in "
+                "it, the picture, and then it goes on after it as it did, to "
+                "its end."
+            ),
+        ),
+        (BlockKind.FIGURE, "figure 2. A picture of the place."),
+    )
+    figure = blocks.blocks[1]
+    assert figure.figure == "images/figure-0000-1.png"
+    # Its origin holds the map and its caption.
+    assert figure.origin == (Origin(0, Box(100.0, 145.0, 320.0, 319.0)),)
+
+
 def test_figure_text_the_words_of_a_figures_region_are_removed_one_per_line() -> None:
     blocks = _structure(_lines_file(_map_page()))
     assert tuple(
@@ -1181,6 +1207,69 @@ def test_figure_text_the_words_of_a_figures_region_are_removed_one_per_line() ->
         for removal in blocks.removals
         if removal.reason is RemovalReason.FIGURE_TEXT
     ) == ((RemovalReason.FIGURE_TEXT, "Orontes"),)
+
+
+def test_caption_rows_a_hyphen_before_the_figure_joins_the_word_after_it() -> None:
+    above = (
+        *_ABOVE_THE_MAP[:2],
+        _text_line("the line before the figure printed in it, the pic-", 60.0, 128.0),
+    )
+    below = (
+        _text_line("ture, and then it goes on after it as it", 60.0, 330.0, 360.0),
+        _BELOW_THE_MAP[1],
+    )
+    blocks = _structure(_lines_file(_map_page(above, below)), frozenset({"picture"}))
+    assert tuple(block.kind for block in blocks.blocks) == (
+        BlockKind.PARAGRAPH,
+        BlockKind.FIGURE,
+    )
+    assert "the picture, and then" in block_text(blocks.blocks[0])
+
+
+def test_caption_rows_below_a_figure_leave_the_body_words_of_their_row() -> None:
+    # Kadesh 38: the map's caption and the line of text set beside the map
+    # are one line of layout's.
+    box = Box(60.0, 145.0, 200.0, 290.0)
+    beside = tuple(
+        _text_line(f"words set beside the map {n} go", 215.0, 146.0 + 14 * n, 360.0)
+        for n in range(11)
+    )
+    shared = _line(
+        *_text_words("MAP vi. Third Positions", 60.0, 300.0),
+        *_text_words("Shabtuna and the camp", 215.0, 300.0),
+    )
+    page = PageLayout(
+        0,
+        (_region(*_ABOVE_THE_MAP, *beside, shared, *_BELOW_THE_MAP),),
+        (_in_page(0, box),),
+    )
+    blocks = _structure(_lines_file(page))
+    assert tuple(block.kind for block in blocks.blocks) == (
+        BlockKind.PARAGRAPH,
+        BlockKind.FIGURE,
+    )
+    assert block_text(blocks.blocks[1]) == "MAP vi. Third Positions"
+    assert "go Shabtuna and the camp picture," in block_text(blocks.blocks[0])
+
+
+def test_caption_rows_beside_a_figure_end_at_a_row_more_than_20_pt_below() -> None:
+    # Haynes: a caption in a narrow column right of the picture, the next
+    # row of text 26 pt below its last.
+    box = Box(60.0, 145.0, 200.0, 290.0)
+    caption = (
+        _text_line("figure 4. The", 215.0, 150.0),
+        _text_line("view from the", 215.0, 163.0),
+        _text_line("hill.", 215.0, 176.0),
+    )
+    beside = _text_line("and beside it", 215.0, 202.0)
+    page = PageLayout(
+        0,
+        (_region(*_ABOVE_THE_MAP, *caption, beside, *_BELOW_THE_MAP),),
+        (_in_page(0, box),),
+    )
+    blocks = _structure(_lines_file(page))
+    assert block_text(blocks.blocks[1]) == "figure 4. The view from the hill."
+    assert "the and beside it picture," in block_text(blocks.blocks[0])
 
 
 def test_figure_text_a_head_line_inside_a_figure_is_removed() -> None:
@@ -1198,7 +1287,7 @@ def test_figure_text_a_head_line_inside_a_figure_is_removed() -> None:
         (_in_page(0, box),),
     )
     blocks = _structure(_lines_file(page))
-    assert BlockKind.HEADING not in tuple(block.kind for block in blocks.blocks)
+    assert _texts(blocks) == ((BlockKind.FIGURE, "14 (a) A cover and (b) another."),)
     assert tuple(
         removal.text
         for removal in blocks.removals
@@ -1223,3 +1312,124 @@ def test_figure_text_a_figures_region_is_not_the_pages_widest_region() -> None:
     )
     blocks = _structure(_lines_file(page))
     assert BlockKind.MARGIN_NOTE not in tuple(block.kind for block in blocks.blocks)
+
+
+def test_figure_text_a_page_with_two_in_page_figures_is_a_text_page() -> None:
+    # The plate rules refuse a page with two figures; in-page figures are
+    # not a plate's.
+    first, second = Box(60.0, 145.0, 200.0, 290.0), Box(220.0, 145.0, 360.0, 290.0)
+    page = PageLayout(
+        0,
+        (_region(*_ABOVE_THE_MAP, *_BELOW_THE_MAP),),
+        (_in_page(0, first, 1), _in_page(0, second, 2)),
+    )
+    blocks = _structure(_lines_file(page))
+    assert tuple((block.kind, block.figure) for block in blocks.blocks) == (
+        (BlockKind.PARAGRAPH, None),
+        (BlockKind.FIGURE, "images/figure-0000-1.png"),
+        (BlockKind.FIGURE, "images/figure-0000-2.png"),
+    )
+
+
+def test_figure_place_inside_a_list_is_after_its_last_item() -> None:
+    # Structure spec section 29's Haynes geometry: dash items at 37.9 pt,
+    # hung 12.5 pt; the figure printed between the two items does not end
+    # the list (rule 5), and its block comes after the list.
+    box = Box(60.0, 150.0, 300.0, 260.0)
+    lines = (
+        _text_line(
+            "The figures of the scientist in the stories are", 37.9, 60.0, 300.0
+        ),
+        _text_line("sorted into two common types:", 37.9, 74.0, 260.0),
+        _text_line("—The first item starts here and", 37.9, 102.0, 300.0),
+        _text_line("it goes on here to the end", 50.4, 116.0, 250.0),
+        _text_line("—The second item starts here and", 37.9, 270.0, 300.0),
+        _text_line("it goes on here to the end", 50.4, 284.0, 250.0),
+        _text_line("The paragraph after it 0 goes on", 37.9, 312.0, 322.0),
+    )
+    page = PageLayout(0, (_region(*lines),), (_in_page(0, box),))
+    blocks = _structure(_lines_file(page))
+    assert tuple(block.kind for block in blocks.blocks) == (
+        BlockKind.PARAGRAPH,
+        BlockKind.LIST_ITEM,
+        BlockKind.LIST_ITEM,
+        BlockKind.FIGURE,
+        BlockKind.PARAGRAPH,
+    )
+    assert blocks.blocks[3].spans == ()
+
+
+def test_figure_place_before_any_body_line_is_first() -> None:
+    box = Box(60.0, 40.0, 300.0, 90.0)
+    page = PageLayout(0, (_region(*_ABOVE_THE_MAP),), (_in_page(0, box),))
+    blocks = _structure(_lines_file(page))
+    assert tuple(block.kind for block in blocks.blocks) == (
+        BlockKind.FIGURE,
+        BlockKind.PARAGRAPH,
+    )
+
+
+def test_figure_place_at_a_pages_top_is_after_the_paragraph_from_the_page_before() -> (
+    None
+):
+    # Haynes' figure 2, printed at the top of page 25 inside the paragraph
+    # that runs from page 24.
+    box = Box(60.0, 40.0, 300.0, 90.0)
+    first = PageLayout(0, (_region(*_ABOVE_THE_MAP),), ())
+    second = PageLayout(
+        1,
+        (
+            _region(
+                *_BELOW_THE_MAP,
+                _text_line("A new paragraph starts here and", 75.0, 358.0, 360.0),
+                _text_line("ends.", 60.0, 372.0),
+            ),
+        ),
+        (_in_page(1, box),),
+    )
+    blocks = _structure(_lines_file(first, second))
+    assert tuple(
+        (block.kind, tuple(origin.page_index for origin in block.origin))
+        for block in blocks.blocks
+    ) == (
+        (BlockKind.PARAGRAPH, (0, 1)),
+        (BlockKind.FIGURE, (1,)),
+        (BlockKind.PARAGRAPH, (1,)),
+    )
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        ("figure", "2."),
+        ("FIGURE", "l6."),
+        ("figure", "li."),
+        ("MAP", "111."),
+        ("MAP", "vi."),
+        ("13.", "The"),
+        ("14", "(a)"),
+        ("2.", "(top)"),
+        ("2i.", "The"),
+        ("M", "FIGURE", "25."),
+    ],
+)
+def test_caption_label_is_found(words: tuple[str, ...]) -> None:
+    assert is_caption_label(words)
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        # A line inside Turney 179's caption.
+        ("figure", "drawn"),
+        ("Figure",),
+        ("8.",),
+        # Kadesh's numbers of inscriptions beside its maps.
+        ("12.", "n", "lie"),
+        ("L.", "P.", "H.,"),
+        ("1066.", "The"),
+        ("In", "1066"),
+    ],
+)
+def test_caption_label_is_not_found(words: tuple[str, ...]) -> None:
+    assert not is_caption_label(words)

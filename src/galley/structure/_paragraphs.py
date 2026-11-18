@@ -24,7 +24,10 @@ from galley.model import (
 from galley.structure._contents import ContentsEntry, contents_title
 from galley.structure._epigraphs import epigraph_run, page_epigraphs
 from galley.structure._figures import (
+    InPageFigure,
     SplitPage,
+    WordPlace,
+    figure_captions,
     in_any_figure,
     split_figure_regions,
 )
@@ -47,6 +50,7 @@ from galley.structure._measures import (
     is_short,
     letters,
     region_edges,
+    words_box,
     words_removal,
     words_text,
 )
@@ -86,8 +90,8 @@ class PageParts:
     in the body"), none until they are taken. On an index page,
     `index_lines` are the lines of its columns, left then right, and
     `index_starts` the positions of those that start an entry (spec
-    section 17). `in_page_figures` are the boxes of the page's in-page
-    figures (`docs/specs/figures.md` §5)."""
+    section 17). `in_page_figures` are the page's in-page figures, each
+    with its caption (`docs/specs/figures.md` §5)."""
 
     index: int
     removals: tuple[Removal, ...]
@@ -102,7 +106,7 @@ class PageParts:
     body_notes: tuple[PlacedLine, ...] = ()
     index_lines: tuple[PlacedLine, ...] = ()
     index_starts: frozenset[int] = frozenset()
-    in_page_figures: tuple[Box, ...] = ()
+    in_page_figures: tuple[InPageFigure, ...] = ()
 
 
 def _pieces(lines: tuple[PlacedLine, ...]) -> tuple[Piece, ...]:
@@ -258,8 +262,8 @@ def page_parts(
     are the page indices of the printed table of contents, on which the
     only heading is a contents run's title (spec section 30, rule 1). On a
     page with in-page figures, their regions take no part in it: their
-    words are removed as `figure_text`, and so is a head line printed
-    inside a figure (`docs/specs/figures.md` §5)."""
+    words are removed as `figure_text`, but for their captions', and so is
+    a head line printed inside a figure (`docs/specs/figures.md` §5)."""
     split = split_figure_regions(page)
     page = split.text
     kinds = region_kinds(page, survey.body_word_height, survey.running_heads)
@@ -276,6 +280,16 @@ def page_parts(
     figure_boxes = tuple(figure.box for figure in split.figures)
     head_inside = _head_inside_figures(head_line(page), removed, figure_boxes)
     removed |= frozenset(head_inside)
+    captions = figure_captions(
+        tuple(
+            ((region_number, line_number), line)
+            for region_number, region in enumerate(page.regions)
+            if region_number not in taken
+            for line_number, line in enumerate(region.lines)
+            if (region_number, line_number) not in removed
+        ),
+        figure_boxes,
+    )
 
     def centring_edges(region: Region, kind: RegionKind, edges: Edges) -> Edges:
         if kind is RegionKind.BODY and is_short(region) and column is not None:
@@ -296,7 +310,7 @@ def page_parts(
             tuple(
                 PlacedLine(
                     page.index,
-                    line,
+                    kept,
                     edges,
                     centring_edges(region, kind, edges),
                     text_edges[region_number],
@@ -304,6 +318,12 @@ def page_parts(
                 for line_number, line in enumerate(region.lines)
                 if (region_number, line_number) not in removed
                 and region_number not in taken
+                and (
+                    kept := _without_taken(
+                        line, (region_number, line_number), captions.taken
+                    )
+                )
+                is not None
             ),
         )
         for region_number, (region, kind, edges) in enumerate(
@@ -390,7 +410,24 @@ def page_parts(
         runs=page_runs.runs,
         index_lines=index_lines,
         index_starts=index.starts if index is not None else frozenset(),
-        in_page_figures=tuple(figure.box for figure in split.figures),
+        in_page_figures=tuple(
+            InPageFigure(
+                figure.image,
+                figure.box,
+                Piece(
+                    tuple(
+                        PlacedLine(
+                            page.index,
+                            line,
+                            Edges(figure.box.x0, figure.box.x1),
+                            Edges(figure.box.x0, figure.box.x1),
+                        )
+                        for line in caption
+                    )
+                ),
+            )
+            for figure, caption in zip(split.figures, captions.lines, strict=True)
+        ),
     )
 
 
@@ -411,6 +448,21 @@ def _head_inside_figures(
     if any(place in removed for place in places) or not in_any_figure(head.line, boxes):
         return ()
     return places
+
+
+def _without_taken(
+    line: Line, place: LinePlace, taken: frozenset[WordPlace]
+) -> Line | None:
+    """`line`, at `place`, without the words a caption took; None when it
+    took them all."""
+    kept = tuple(
+        word for number, word in enumerate(line.words) if (*place, number) not in taken
+    )
+    if len(kept) == len(line.words):
+        return line
+    if not kept:
+        return None
+    return Line(words_box(kept), kept)
 
 
 def _figure_text(split: SplitPage) -> tuple[Removal, ...]:

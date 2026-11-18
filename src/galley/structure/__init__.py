@@ -33,6 +33,7 @@ from galley.model import (
 from galley.parallel import DEFAULT_WORKERS, map_pages
 from galley.structure._assemble import assemble
 from galley.structure._case_split import split_at_case
+from galley.structure._figures import is_caption_label
 from galley.structure._hyphens import HyphenJoin, join_hyphen, join_lost_hyphen
 from galley.structure._markers import (
     NoteMarker,
@@ -53,6 +54,7 @@ __all__ = [
     "Reference",
     "ReferenceForm",
     "attach_spaced_sign",
+    "is_caption_label",
     "join_hyphen",
     "join_lost_hyphen",
     "make_blocks",

@@ -74,7 +74,7 @@ from galley.structure._paragraphs import (
     PageParts,
     body_entries,
 )
-from galley.structure._plates import with_figures
+from galley.structure._plates import with_figures, with_in_page_figures
 from galley.structure._quotes import book_density, with_quotes
 from galley.structure._references import (
     Link,
@@ -654,7 +654,7 @@ def _line_roles(
                 or page.index_lines
                 or page.index in section_pages
                 else _run_lines(page),
-                page.in_page_figures,
+                tuple(figure.box for figure in page.in_page_figures),
             )
             for page in pages
         ),
@@ -859,7 +859,10 @@ def assemble(
     linked_body, linked_notes = _with_margin_notes_placed(
         linked_body, linked_notes, kept_positions, entries, places
     )
-    # Spec section 18: the figure blocks, side text of their pages.
+    # Figures spec section 5: the in-page figures' blocks, each after the
+    # block that holds the body line printed above it; then spec section
+    # 18: the plates' figure blocks, side text of their pages.
+    linked_body = with_in_page_figures(linked_body, pages, book_words, word_list)
     linked_body = tuple(
         mended(block) if block.kind is BlockKind.FIGURE else block
         for block in with_figures(linked_body, parts, book_words, word_list)
