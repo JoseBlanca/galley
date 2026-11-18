@@ -490,6 +490,27 @@ def test_title_line_in_capitals_continues_up_to_4_pitches_below_a_chapter_label(
         )
 
 
+@pytest.mark.parametrize(("top", "headings"), [(3.0, 0), (36 + 2.2 * 15, 1)])
+def test_flush_left_head_line_above_the_head_top_is_no_heading(
+    top: float, headings: int
+) -> None:
+    # Page 14's head line, alike to no running head, lies 2.2 pitches above
+    # the median head top, in section 3's band, or 2.2 pitches below it.
+    page = PageLayout(
+        14,
+        (
+            _region(_line("A STRANGE LINE", _BODY_LEFT_PT, top)),
+            _region(*_running_text(110, 12)),
+        ),
+        (),
+    )
+    lines = _lines_of(
+        *(_page_with_head(index, "THE BOOK") for index in range(10, 14)), page
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert len(_headings(blocks)) == headings
+
+
 @pytest.mark.parametrize(
     ("line", "headings"),
     [("A BOOK OF WINTERS", ()), ("A NEW BEGINNING", ((1, None, "A NEW BEGINNING"),))],
