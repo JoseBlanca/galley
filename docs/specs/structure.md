@@ -3303,9 +3303,11 @@ November 2026.)
      of its own or at the start of its first word (Haynes' OCR reads
      one as "—-"), has a letter or digit after its dashes, and has a
      line height at most 0.92 of the median line height of the run's
-     lines before it (Haynes: 0.73 to 0.90; a line of dashes alone would
-     leave a source of no word, and its dash's removal, `before` "—"
-     and `after` "", is one the fidelity check refuses); or
+     lines before it (Haynes: 0.73 to 0.90). A line of dashes alone has
+     no letter or digit, so rule 2 passes over it as a stray mark and it
+     is never a source line: it would leave a source of no word, and its
+     dash's removal, `before` "—" and `after` "", is one the fidelity
+     check refuses; or
    - lies at least 60 pt right of the leftmost left side of the run's
      lines before it, and its right side lies no more than 5 pt left
      of their rightmost right side (Turney: 100.3 to 244.6 pt right,
