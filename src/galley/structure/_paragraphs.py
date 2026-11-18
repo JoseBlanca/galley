@@ -155,10 +155,11 @@ def _runs(
 
 def kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
     """The text line of the page's head line when section 3 left it in the
-    text and its top lies at most 2 pitches below the median top of the
-    book's head lines, where running heads are looked for: never a
-    flush-left heading line unless it starts with a chapter label word
-    (spec section 14, rule 1). None otherwise."""
+    text and it lies in the band where running heads are looked for, at
+    most 2 pitches below the median top of the book's head lines or
+    anywhere above it (`in_head_band`): never a flush-left heading line
+    unless it starts with a chapter label word (spec section 14, rule 1).
+    None otherwise."""
     head = head_line(page)
     if (
         head is None
