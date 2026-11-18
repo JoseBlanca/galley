@@ -547,3 +547,46 @@ def test_heading_block_inside_a_note_group_is_made_a_paragraph_of_its_note() -> 
         block.kind is BlockKind.HEADING and "SEE" in block_text(block)
         for block in blocks.blocks
     )
+
+
+def test_bare_number_in_a_section_of_dotted_markers_is_no_marker() -> None:
+    # Gierke's form: notes "1." to "9." and, inside note 4, a paragraph
+    # starting with a bare "1" hung left of the text (a margin note left in
+    # the body): it stays a later block of note 4, and no group starts.
+    notes = _dotted_notes(80.0)
+    bare = _hung_note("1", 0.0, hung=33.0, x0=_LEFT_PT)
+    shifted = tuple(
+        Line(
+            Box(line.box.x0, top, line.box.x1, top + _WORD_HEIGHT_PT),
+            tuple(
+                Word(word.text, Box(word.box.x0, top, word.box.x1, top + 10), None)
+                for word in line.words
+            ),
+        )
+        for line, top in zip(bare, (230.0, 245.0, 260.0), strict=True)
+    )
+    later = tuple(
+        Line(
+            Box(line.box.x0, line.box.top + 45, line.box.x1, line.box.bottom + 45),
+            tuple(
+                Word(
+                    word.text,
+                    Box(
+                        word.box.x0,
+                        word.box.top + 45,
+                        word.box.x1,
+                        word.box.bottom + 45,
+                    ),
+                    None,
+                )
+                for word in line.words
+            ),
+        )
+        for line in notes[12:]
+    )
+    page = PageLayout(0, (_region(*notes[:12], *shifted, *later),), ())
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert tuple(marker for marker, _ in _endnotes(blocks)) == tuple(
+        f"{n}." for n in range(1, 10)
+    )
+    assert not any(note.group for note in blocks.notes)
