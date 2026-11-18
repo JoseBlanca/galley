@@ -453,7 +453,7 @@ def test_haskins_front_page_12_gives_its_words_exactly(
 # (the back of plate 64) and 68;
 # Domesday's maps 39 and 40; Kadesh 34 and 35, the back of plate 34.
 # Each has its image, and nothing else is in
-# images/ but the cover.
+# images/ but the cover and the in-page figures' images.
 EXCERPT_PLATES = frozendict(
     {
         "kadesh_8-17": (9,),
@@ -462,6 +462,9 @@ EXCERPT_PLATES = frozendict(
         "kadesh_29-38": (5, 6),
     }
 )
+# The text pages with one in-page figure (figures spec section 10): Kadesh
+# 29, 33, 36, 37 and 38. tests/test_figures.py checks them.
+EXCERPT_IN_PAGE_FIGURES = frozendict({"kadesh_29-38": (0, 4, 7, 8, 9)})
 
 
 def test_each_excerpt_plate_has_its_whole_page_figure_and_its_image_alone(
@@ -469,11 +472,12 @@ def test_each_excerpt_plate_has_its_whole_page_figure_and_its_image_alone(
 ) -> None:
     for name, folder in excerpt_books.items():
         plates = EXCERPT_PLATES.get(name, ())
+        in_page = EXCERPT_IN_PAGE_FIGURES.get(name, ())
         pages = read_pages(folder.pages_json).pages
         words = read_words(folder.words_json)
         assert tuple(
             page_words.index for page_words in words.pages if page_words.figures
-        ) == (plates), name
+        ) == tuple(sorted((*plates, *in_page))), name
         for index in plates:
             assert words.pages[index].figures == (
                 Figure(
@@ -487,7 +491,11 @@ def test_each_excerpt_plate_has_its_whole_page_figure_and_its_image_alone(
                 assert (plate.format, plate.mode) == ("PNG", "L"), name
         cover = ("cover.png",) if name == KADESH else ()
         assert sorted(path.name for path in folder.images_dir.iterdir()) == sorted(
-            (*cover, *(f"plate-{index:04d}.png" for index in plates))
+            (
+                *cover,
+                *(f"plate-{index:04d}.png" for index in plates),
+                *(f"figure-{index:04d}-1.png" for index in in_page),
+            )
         ), name
 
 
