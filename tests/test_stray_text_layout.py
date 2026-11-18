@@ -42,24 +42,6 @@ from galley_eval.stages import StageOutput
 
 _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "stray_text"
 
-# Layout makes the one-line note the page's band (step 4), but structure
-# takes a region as a band region only when its words are at most 0.85 of
-# the body word height (structure spec section 2), which a note boxed as
-# tall as the body is not: it becomes a paragraph or a margin note. No task
-# of the plan changes that rule.
-_STRUCTURE_FULL_HEIGHT_BAND = (
-    "structure's band region needs small words (structure spec section 2); "
-    "no task of docs/plans/stray-text.md takes a full-height band"
-)
-# Layout makes a band of the notes of Gierke's introduction, small against
-# their page (step 4), but structure takes a region as a band region only
-# when its words are at most 0.85 of the book's body word height
-# (structure spec section 2): the notes are 8 pt against the book's 9.
-_STRUCTURE_PAGE_BAND = (
-    "structure's band region is small against the book's body word height "
-    "(structure spec section 2), not the page's; no task of "
-    "docs/plans/stray-text.md changes it"
-)
 # A margin region of Stubbs is a column of a note, at most about 60 pt wide;
 # a body region spans the text column, 268 pt.
 _MARGIN_REGION_MOST_PT = 120.0
@@ -161,7 +143,6 @@ def test_one_line_note_boxed_as_tall_as_the_body_is_the_last_region_alone(
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.xfail(strict=True, reason=_STRUCTURE_FULL_HEIGHT_BAND)
 @pytest.mark.parametrize("page", [4, 5, 6])
 def test_one_line_note_boxed_as_tall_as_the_body_is_a_footnote(
     excerpt_books: frozendict[str, BookFolder], page: int
@@ -289,7 +270,6 @@ _GIERKE_INTRODUCTION_NOTE_PAGES = frozenset(
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(900)
-@pytest.mark.xfail(strict=True, reason=_STRUCTURE_PAGE_BAND)
 def test_whole_gierke_introduction_footnotes_are_footnotes(
     whole_book_run: Callable[[str], BookFolder],
 ) -> None:
@@ -311,7 +291,6 @@ _ONE_LINE_NOTE_PAGES = {
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(900)
-@pytest.mark.xfail(strict=True, reason=_STRUCTURE_FULL_HEIGHT_BAND)
 @pytest.mark.parametrize("book", sorted(_ONE_LINE_NOTE_PAGES))
 def test_whole_one_line_notes_are_footnotes_and_no_paragraph(
     whole_book_run: Callable[[str], BookFolder], book: str
