@@ -17,6 +17,7 @@ from typing import Final
 
 from galley.model import Box, RenderedPage
 from galley.pdfium import POINTS_PER_INCH
+from galley.wordlist import is_known_word
 
 # Plates spec section 2b: measured on the words of the eight books, whose
 # text-layer boxes sit a few points off the print: of the real words, 2,573
@@ -31,6 +32,10 @@ _LEAST_INK_LEVELS: Final[int] = 20
 # Plates spec section 2b: measured, the inkless pages have 0.88 to 1.00 of
 # their words without ink, the highest page of print 0.10 (Domesday 481).
 _INKLESS_SHARE: Final[float] = 0.5
+# Plates spec section 2b: measured, the words without ink of the inkless
+# pages are at most 0.17 known words (Haynes 9, 1 of 6), those of Gierke
+# 1, a binder's label printed faintly, 0.50 (1 of 2).
+_KNOWN_SHARE_OF_PRINT: Final[float] = 0.5
 
 
 class InkRule(StrEnum):
@@ -53,26 +58,44 @@ class InkTest:
     rule: InkRule
 
 
-def is_inkless(page: RenderedPage, word_boxes: tuple[Box, ...]) -> bool:
+def is_inkless(
+    page: RenderedPage,
+    layer_words: tuple[tuple[str, Box], ...],
+    lower_case_words: frozenset[str],
+) -> bool:
     """Whether the page is inkless by plates spec section 2b: at least half
-    of `word_boxes`, the boxes of the page's text-layer words outside its
-    excluded regions, in points, have no ink on `page`, its 36 dpi render.
-    False when `word_boxes` is empty."""
-    ink_test = measure_ink(page, word_boxes)
+    of `layer_words`, the page's text-layer words outside its excluded
+    regions, each its text and box in points, have no ink on `page`, its
+    36 dpi render, and fewer than half of those without ink are known
+    words (`wordlist.is_known_word`) of `lower_case_words`, the word list
+    as `wordlist.lower_case_word_list` gives it. False when `layer_words`
+    is empty."""
+    ink_test = measure_ink(page, layer_words, lower_case_words)
     return ink_test is not None and ink_test.rule is InkRule.INKLESS
 
 
-def measure_ink(page: RenderedPage, word_boxes: tuple[Box, ...]) -> InkTest | None:
-    """The inkless rule on `page` and `word_boxes`, as `is_inkless` takes
-    them: the share of `word_boxes` without ink and the rule's finding;
-    None when `word_boxes` is empty, a page the rule does not test."""
-    if not word_boxes:
+def measure_ink(
+    page: RenderedPage,
+    layer_words: tuple[tuple[str, Box], ...],
+    lower_case_words: frozenset[str],
+) -> InkTest | None:
+    """The inkless rule on `page` and `layer_words`, as `is_inkless` takes
+    them: the share of `layer_words` without ink and the rule's finding;
+    None when `layer_words` is empty, a page the rule does not test."""
+    if not layer_words:
         return None
-    without_ink = sum(1 for box in word_boxes if not _has_ink(page, box))
-    share = without_ink / len(word_boxes)
+    without_ink = tuple(text for text, box in layer_words if not _has_ink(page, box))
+    share = len(without_ink) / len(layer_words)
+    known_share = (
+        sum(1 for text in without_ink if is_known_word(text, lower_case_words))
+        / len(without_ink)
+        if without_ink
+        else 0.0
+    )
+    inkless = share >= _INKLESS_SHARE and known_share < _KNOWN_SHARE_OF_PRINT
     return InkTest(
         share_without_ink=share,
-        rule=InkRule.INKLESS if share >= _INKLESS_SHARE else InkRule.NOT_INKLESS,
+        rule=InkRule.INKLESS if inkless else InkRule.NOT_INKLESS,
     )
 
 

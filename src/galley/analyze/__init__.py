@@ -14,9 +14,10 @@ covers and endpapers it takes too. On each text page, the same render is
 searched for the figures printed among its lines (`figure_boxes`), whose
 boxes go into pages.json; each page with figures is logged at INFO. The
 same render also tells an inkless page (`is_inkless`): at least half of
-the words of its layer have no ink under them, words the scanner's OCR
-invented where nothing is printed. It is `inkless`, also when the plate
-rule takes it, and each one is logged at WARNING.
+the words of its layer have no ink under them, and fewer than half of
+those are known words, words the scanner's OCR invented where nothing is
+printed. It is `inkless`, also when the plate rule takes it, and each one
+is logged at WARNING.
 """
 
 import logging
@@ -300,10 +301,11 @@ def _measurer(
             else measure_ink(
                 rendered,
                 tuple(
-                    box
-                    for _, box in page_layer_words
+                    (text, box)
+                    for text, box in page_layer_words
                     if not any(box_holds_middle(region, box) for region in region_boxes)
                 ),
+                lower_case_words,
             )
         )
         return _Measurement(
