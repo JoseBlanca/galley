@@ -532,7 +532,15 @@ the others stay in the layer. A layer word is that word when
   lies within 16 pt above or below with letters and digits equal to
   the Tesseract word's, or alike to them by (c), the Tesseract word is
   paired with that word by (b) or (c), and the words under it are left
-  to the other Tesseract words, and otherwise stay in the layer, below. In (b) the pairs
+  to the other Tesseract words, and otherwise stay in the layer, below.
+  "For 3 letters or more" counts the layer word's letters, as (c) does;
+  a Tesseract word over a word the layer glued is not excepted. A layer
+  word "that no other rule matched" is one that rules (a) to (d) leave
+  unmatched as they pair without the exception; the rules are then
+  applied again with the excepted Tesseract words left to (b) and (c),
+  and one of them that (b) and (c) still do not pair (another
+  excepted word nearer took the layer word of its letters) takes the words under it by (a)
+  after all, so that its reading does not stand beside them. In (b) the pairs
   of a layer word and a Tesseract word of the same text are taken
   nearest first (the distance of their middles across plus up or down),
   each word in one pair at most; or else
