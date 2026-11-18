@@ -562,11 +562,16 @@ def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
 # A hyphen join is two parts of a word split at a line end (glossary).
 _HYPHEN_JOIN_PARTS = 2
 # The dashes that may start an epigraph's source line, alone or several
-# (structure spec section 22, rule 3).
+# (structure spec section 22, rule 3). Written here again, not imported
+# from structure's _epigraphs.py: the check states its rules on its own,
+# so that a change to the stage does not change what it is checked
+# against.
 _SOURCE_DASHES = "\u2014\u2013-"
 # A spaced sign is attached to the one word before it, and a word glued
 # at a case change is split in two (structure spec sections 23 and 24).
 _PUNCTUATION_ATTACHED_PARTS = 2
+# Written here again, not imported from structure's _spaced.py, for the
+# reason given for _SOURCE_DASHES.
 _SPACED_SIGNS = frozenset("?;:!")
 _CASE_SPLIT_PARTS = 2
 
@@ -1025,7 +1030,9 @@ _NOTE_GROUP_CLASS = "note-group"
 _ENDNOTE_CLASS = "endnote"
 _DIV = "Div"
 # The dash markdown writes before an epigraph's source, followed by a
-# no-break space, which splits it off as a word of its own.
+# no-break space, which splits it off as a word of its own. Written here
+# again, not imported from the markdown stage, for the reason given for
+# _SOURCE_DASHES.
 _SOURCE_DASH = "\u2014"
 
 
