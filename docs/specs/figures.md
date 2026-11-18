@@ -113,7 +113,7 @@ means page index, from 0, in the whole book.
 | book | in-page figures | what they are | today |
 |---|---|---|---|
 | Haynes | 25, one each on pages 15, 25, 34, 45, 53, 58, 64, 71, 84, 95, 97, 111, 114, 119, 124, 133, 142, 143, 145, 162, 180, 182, 253, 254, 310 | engravings, paintings and photographs, numbered "figure 1" to "figure 25", each with its caption below the picture or in a narrow column beside it | the picture is lost and the caption runs into a paragraph: on page 25, "figure 2. An Alchemist…" sits inside the paragraph that runs from page 24 to 25 (`runs/owner-books/haynes/book.md`, line 139, outside git) |
-| Turney | 14 on 12 pages: 164, 166, 167, 169, 172 to 176, 179, and the back cover, 311 | the book's insert of illustrations, pages 164 to 179, each page one or two pictures with numbered captions ("13. The…") and no running text; 170, 177 and 178 of the insert are plates, and 165, 168 and 171 are excluded by the config | 174 and 175, the reproduced magazine covers and newspaper front pages (figures 14 to 16), are text pages because their captions and the newspapers' lettering hold more than 20 known words, the plate rule's limit (plates §2): the lettering "Inside: Crisis in Portugal" becomes a heading, and so does the Daily Mail's headline |
+| Turney | 14 on 11 pages: 164, 166, 167, 169, 172 to 176, 179, and the back cover, 311 | the book's insert of illustrations, pages 164 to 179, each page one or two pictures with numbered captions ("13. The…") and no running text; 170, 177 and 178 of the insert are plates, and 165, 168 and 171 are excluded by the config | 174 and 175, the reproduced magazine covers and newspaper front pages (figures 14 to 16), are text pages because their captions and the newspapers' lettering hold more than 20 known words, the plate rule's limit (plates §2): the lettering "Inside: Crisis in Portugal" becomes a heading, and so does the Daily Mail's headline |
 | Kadesh | 6 maps on pages 29, 33, 36, 38, 41 and 45; blocks of hieroglyphs on 27, 32, 37, 39, 40, 44, 50 to 53, and of Arabic on 20 and 21 | the maps "MAP III." to "MAP VIII.", three of them narrow, with the text set beside them (36, 38, 41); the blocks, each a numbered quotation of an inscription | the maps' labels ("Kadesh", "Orontes") and the hieroglyphs' junk ("AAAAAA", "\\(t=]") run into the paragraphs; the pictures are lost |
 | the other five | none | Domesday's tables (page 425, "TABLE I.") are text with a text layer, not pictures | |
 
@@ -177,7 +177,9 @@ groups of picture squares; nothing more is rendered.
 pages.json gives each `text` page its figures' boxes, from the top down
 and, at the same top, from the left (section 7). A page of any other
 kind has none: a plate is a figure whole (plates §3), and a page before
-the front-matter end is dropped.
+the front-matter end is dropped. The cover page (the config's
+`cover_page`), an excluded page and a page of `plate_pages` are never
+searched: the plate rule does not render them.
 
 **Measured**, on the text pages of the eight books, with the words of
 words.json:
@@ -433,8 +435,8 @@ def figure_boxes(page: RenderedPage, words: tuple[tuple[str, Box], ...],
     # The boxes of the in-page figures of a text page by section 3, in
     # points, from the top down and then from the left. `words` are the
     # text layer's words, each its text and box in points; a word whose
-    # box lies inside one of `excluded`, the page's exclude_regions, does
-    # not stop a picture square and is not counted.
+    # box has its middle inside one of `excluded`, the page's
+    # exclude_regions, does not stop a picture square and is not counted.
 
 # galley.structure
 
