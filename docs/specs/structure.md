@@ -67,6 +67,15 @@ writes both as lists (section 31). `blocks.json` goes to
 `format_version` 5 (section 7). How it is verified is section 32, and
 its two open points section 33. No code of this revision exists.
 
+Revised on 18 November 2026 for the plan stray-text
+(`docs/plans/stray-text.md`), with two rules and no format change: the
+running heads compared in section 3 may differ in length by up to 14
+letters, not 8, so that a head the OCR damaged is still found alike
+(section 3, "Heads of different lengths"); and a sign followed by
+punctuation, "servus*.", is a reference candidate (section 11,
+"References"). Layout changes with it (`docs/specs/layout.md` §3,
+steps 2b to 4).
+
 It builds on `docs/architecture.md` (cited as "architecture §8") and
 `docs/glossary.md`, and on the layout spec, whose terms (body column,
 footnote band, margin note, row, body word height, body line pitch) it
@@ -412,6 +421,24 @@ is one on the page image: Gierke's 58 ("Analytical Snnittniry. liii"),
 72 and 78, and 10 of Mariéjol's garbled heads (48, 63, 77, 106, 250,
 296, 300, 311, 329, 409); it loses none and changes nothing on the
 owner's books.
+
+**Heads of different lengths.** Two head lines are compared only
+when their letters differ in number by at most **14**: a pair further
+apart is not alike, without computing its ratio. The limit was 8, set
+for speed (section 9), and it left two of Gierke's running heads in
+the text, each damaged by the OCR: page 16's head reads "s
+Introduction.", 13 letters, where the OCR dropped "Translator'" and
+the page number, against the 23 of "Translator's Introduction." on
+the other pages, and page 84's reads "JH if ex to List of
+slntlioritic*. Ixxix", 31 letters with the page number read with a
+capital "I", which is then no roman form and stays among the letters,
+against 22. Their ratios to the nearest head are 0.72 and 0.717, above
+0.70. Measured on 18 November 2026 on the eight books' `lines.json` at
+main a0a1675, over every head line within the 2 pitches that section 3
+did not take: with 14 the rule takes Gierke's 16 and 84 and Mariéjol's
+158, each a running head on the page image, and no other line. The
+test of section 14 that keeps a line alike to a running head from
+being a heading keeps its limit of 8, which was not measured at 14.
 
 **A short region beside the head.** Some books print the page number
 outside the body column, level with the running head. Layout then makes
@@ -1221,7 +1248,8 @@ entries, the quotes and the placing of margin notes. The output does not
 depend on the number of workers.
 Comparing every head line with every other is about 150,000 comparisons
 for Domesday's 546 pages; heads whose letters differ in length by more
-than 8 are not compared, and its cost is measured against the speed
+than 14 are not compared (section 3, "Heads of different lengths"; 8
+until 18 November 2026), and its cost is measured against the speed
 budget of the `coding` skill in the plan.
 
 **The cases.**
@@ -1856,9 +1884,27 @@ reading order:
 - a **bracketed number**: an opening bracket, 1 or 2 digits or letters
   read as digits (above), a closing bracket, and only punctuation after
   ("(1)", "(i).", "{2).");
-- a **sign**: the word "^", "*" or "•", or a letter, any punctuation and
-  one of them at the word's end ("rulers.^", "Normandy.*"). A lone "'"
-  or "t" is not one: in Domesday such a match was right 28 times in 82.
+- a **sign**: the word "^", "*" or "•"; or a word that has a letter,
+  then any punctuation, then one of these three signs at its end
+  ("rulers.^", "Normandy.*"); or such a word with punctuation only after
+  the sign ("servus*.", Domesday page 55; "burh*." page 219), as a
+  glued number may have. Punctuation here is Unicode's (categories P),
+  as for the glued number; a word with no letter before the sign, such
+  as "*.", is no candidate. A lone "'" or "t" is
+  not one: in Domesday such a match was right 28 times in 82. The sign
+  followed by punctuation was added on 18 November 2026: by the
+  evaluation of that day, 178 of Domesday's notes were not linked to
+  their reference, and at 20 of them the reference was a sign followed
+  by punctuation. Words of this form, counted over every line of the
+  eight books' `lines.json` at main a0a1675 (body, bands and margins
+  alike, so more than the body's candidates): Domesday 53, Kadesh 42,
+  Gierke 22, Haskins 4, Stubbs and Turney 1 each, Haynes none, and
+  Mariéjol 413, where the book's reference form, the bracketed number,
+  leaves signs out of the matching (below). Structure run on copies of
+  those runs with the form (spec review, 18 November 2026): Domesday's
+  linked references go from 1,493 to 1,516, 23 notes gained and none
+  lost, though on page 77 note 2's reference moves to a "*" and note
+  3 takes the "8"; Kadesh, Gierke and Haskins do not change.
 
 **The book's reference form.** A first pass of the matching below, over
 every page and with every candidate, counts for each kind of candidate
@@ -1901,7 +1947,8 @@ reference these rules split off has it.
 
 **What is changed.** A matched glued candidate, a number or a sign at
 the end of a word, is split by a `note_marker` word change, ("land3.",)
-to ("land", "3", "."), ("rulers.^",) to ("rulers.", "^"), and its block
+to ("land", "3", "."), ("rulers.^",) to ("rulers.", "^"), ("servus*.",)
+to ("servus", "*", "."), and its block
 gets two or three spans, the reference one with `note_ref` the note's
 id; the spaces stay with the spans around it. A bracketed number or a
 sign that is a word of its own becomes the reference span, with any
