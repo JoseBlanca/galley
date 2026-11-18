@@ -720,12 +720,12 @@ def _junk_under(
     """The positions in `layer_words` of the junk under a freed Tesseract
     word that (b) or (c) paired, `under_freed` mapping each word under one
     to that word's position in `ocr_words`: those `is_junk` takes for junk
-    under that word, of letters unlike its own."""
+    under that word. Their letters are unlike its own, or it would not
+    have been freed."""
     return frozenset(
         index
         for index, position in under_freed.items()
         if is_junk(layer_words[index], ocr_words[position])
-        and not _letters_read_by(layer_words[index], ocr_words[position])
     )
 
 
