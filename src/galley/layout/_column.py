@@ -142,6 +142,13 @@ _RUNNING_HEAD_GAP_PITCHES: Final[float] = 1.3
 # row of its own 0.2 to 0.5 pitch below the rest of the head (pages 20,
 # 100, 152, 158, 186, 202 and 210).
 _HEAD_SKEW_PITCHES: Final[float] = 0.5
+# Layout spec section 3, step 3: the head row's top leaves out its words of
+# a page-number form (structure spec section 1: 1 to 3 digits or a roman
+# numeral in lower case, with at most one "." or "," after it), which the
+# OCR may box lower than the head's words (Domesday's "134", page 159).
+_PAGE_NUMBER_FORM = re.compile(
+    r"(?:[0-9]{1,3}|(?=[ivxlcdm])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))[.,]?"
+)
 # Measured on 17 November 2026 (layout spec section 3, step 2): Turney's
 # notes at the back hang their numbers 6 to 14 pt left of their text, left
 # of the page's left edge; a number up to 15 pt from the word right of it
@@ -205,6 +212,16 @@ def _median_top(row: Line) -> float:
     return statistics.median(word.box.top for word in row.words)
 
 
+def _head_row_top(row: Line) -> float:
+    """The head row's top for step 3, in points: the median top of its
+    words that are no page-number form, so that a page number boxed low
+    ("134") does not move it; of all its words when every one is."""
+    kept = tuple(
+        word for word in row.words if _PAGE_NUMBER_FORM.fullmatch(word.text) is None
+    )
+    return statistics.median(word.box.top for word in kept or row.words)
+
+
 def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
     """How many of the column's `rows`, from the top, form the running-head
     region (step 3): the head row, the first with a letter or a digit, the
@@ -212,14 +229,15 @@ def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
     `_HEAD_SKEW_PITCHES` times `pitch` below its top, when the next row
     with a letter or a digit has its top at least
     `_RUNNING_HEAD_GAP_PITCHES` times `pitch` below the head row's. A
-    row's top is the median of its words' tops. 0 when there is no such
-    region."""
+    row's top is the median of its words' tops, the head row's of its
+    words that are no page-number form (`_head_row_top`). 0 when there is
+    no such region."""
     first = next(
         (index for index, row in enumerate(rows) if has_letter_or_digit(row)), None
     )
     if first is None:
         return 0
-    head_top = _median_top(rows[first])
+    head_top = _head_row_top(rows[first])
     end = first + 1
     while (
         end < len(rows)
