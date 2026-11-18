@@ -49,16 +49,30 @@ class MarkdownWord:
     block_id: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class ContentsLink:
+    """A link in the div of a contents entry of book.md, as Pandoc reads it:
+    the id of that div, and the link's target as written, `#b-p0036-001`."""
+
+    block_id: str | None
+    target: str
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class MarkdownWords:
     """The words of book.md as Pandoc reads it, in order; the number of
     notes Pandoc found (its Note elements), which references to footnotes
-    become; and the number of links marked `epub:type="noteref"`, which
-    references to endnotes become."""
+    become; the number of links marked `epub:type="noteref"`, which
+    references to endnotes become; the number of items of the lists of
+    list items, each a list item of blocks.json; and the links of the
+    contents entries, in order (structure spec section 31)."""
 
     words: tuple[MarkdownWord, ...]
     note_count: int
     note_link_count: int
+    # Defaults, so that a reader of book.md without lists need not name them.
+    list_item_count: int = 0
+    contents_links: tuple[ContentsLink, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,16 +275,24 @@ type _BlocksBoundary = Literal[FidelityBoundary.STRUCTURE, FidelityBoundary.MARK
 def _block_words(
     block: Block, boundary: _BlocksBoundary, endnote_ids: frozenset[str]
 ) -> tuple[_PlacedWord, ...]:
-    """The words of a block: its label, whatever its kind, then its spans
-    split one by one, then an epigraph's source, and at the structure
-    boundary a contents entry's page number, which markdown does not
-    write (structure spec section 31). A note reference span is replaced
+    """The words of a block: its label, whatever its kind but at the
+    markdown boundary a list item's, which markdown does not write, then
+    its spans split one by one, then an epigraph's source, and at the
+    structure boundary a contents entry's page number, which markdown does
+    not write (structure spec section 31). A note reference span is replaced
     by a space in the block's text,
     so that it does not glue to the word before, and counted as a word of
     its own: at the structure boundary every one, at the markdown boundary
     those to the endnotes of `endnote_ids`, whose links keep their text."""
     place = f"block {block.id} {_pages(block.origin)}"
-    label = _placed(block.label, place) if block.label is not None else ()
+    label = (
+        _placed(block.label, place)
+        if block.label is not None
+        and not (
+            boundary is FidelityBoundary.MARKDOWN and block.kind is BlockKind.LIST_ITEM
+        )
+        else ()
+    )
     source = _placed(block.source, place) if block.source is not None else ()
     text = "".join(
         " " if span.note_ref is not None else span.text for span in block.spans
@@ -419,6 +441,66 @@ def _note_count_detail(blocks: BlocksFile, markdown: MarkdownWords) -> str:
         f"references to endnotes in blocks.json: {to_endnotes}; "
         f"note reference links in the Markdown: {markdown.note_link_count}"
     )
+
+
+def _list_count_detail(blocks: BlocksFile, markdown: MarkdownWords) -> str:
+    """Empty when the list items of blocks.json are as many as the items of
+    the lists of list items in the Markdown, and the contents entries with
+    a heading reference as many as the contents links; otherwise the
+    numbers that differ (structure spec section 31)."""
+    every_block = _all_blocks(blocks)
+    list_items = sum(1 for block in every_block if block.kind is BlockKind.LIST_ITEM)
+    linked = sum(1 for block in every_block if block.heading_ref is not None)
+    items_detail = (
+        f"list items in blocks.json: {list_items}; items of lists of list "
+        f"items in the Markdown: {markdown.list_item_count}"
+        if list_items != markdown.list_item_count
+        else ""
+    )
+    links_detail = (
+        f"contents entries with a heading reference in blocks.json: {linked}; "
+        f"contents links in the Markdown: {len(markdown.contents_links)}"
+        if linked != len(markdown.contents_links)
+        else ""
+    )
+    return "; ".join(detail for detail in (items_detail, links_detail) if detail)
+
+
+# Architecture section 9: a link's target in book.md is "#" and an id.
+_LINK_TARGET_PREFIX = "#"
+
+
+def _contents_link_problems(
+    blocks: BlocksFile, markdown: MarkdownWords
+) -> tuple[str, ...]:
+    """The contents links whose target is not "#" and the id of a heading
+    block of blocks.json (structure spec section 31), and those to a
+    heading that is not the one their entry's heading_ref names."""
+    every_block = _all_blocks(blocks)
+    headings = frozenset(
+        _LINK_TARGET_PREFIX + block.id
+        for block in every_block
+        if block.kind is BlockKind.HEADING
+    )
+    references = {
+        block.id: _LINK_TARGET_PREFIX + block.heading_ref
+        for block in every_block
+        if block.heading_ref is not None
+    }
+    not_headings = tuple(
+        f"the contents entry {link.block_id} links to {link.target!r}, which is "
+        "not the id of a heading block"
+        for link in markdown.contents_links
+        if link.target not in headings
+    )
+    other_headings = tuple(
+        f"the contents entry {link.block_id} links to {link.target!r}, and its "
+        f"heading reference is {references.get(link.block_id or '')!r}"
+        for link in markdown.contents_links
+        if link.target in headings
+        and references.get(link.block_id or "") != link.target
+    )
+    return not_headings + other_headings
 
 
 def _places(words: Iterable[_PlacedWord], text: str) -> str:
@@ -819,8 +901,12 @@ def check_stage(
     and without the dash markdown writes before an epigraph's source;
     the number of references to footnotes against Pandoc's notes, and to
     endnotes against the links marked as note references, whose text is
-    the reference's. The words are compared as multisets over the whole
-    book, split on white space, nothing normalised.
+    the reference's; without a list item's label, which is not written,
+    and a contents entry's page number; the number of list items against
+    the items of Pandoc's lists of list items, and of contents entries with
+    a heading reference against the links of contents entries, each of
+    which must target the heading its entry's heading_ref names. The words are compared as multisets over
+    the whole book, split on white space, nothing normalised.
 
     Raises FidelityError with the missing and invented words, their counts,
     and the pages or blocks each came from. At the layout boundary it also
@@ -833,7 +919,10 @@ def check_stage(
     most 3 letters or digits, no white space, "&" or dash, a letter only
     beside a round bracket), or holds a letter without a note_marker word
     change that split it off a word, or when a block that is not an
-    epigraph has a source; and at the structure boundary when a word
+    epigraph has a source; at the markdown boundary when a contents link
+    targets anything but "#" and the id of a heading block, or a heading
+    other than its entry's heading_ref; and at the
+    structure boundary when a word
     change does more than its reason allows (a hyphen join of two parts,
     with the hyphen dropped or kept, a marker split off its word, the
     dashes taken off a source, a spaced sign attached, a word split at a
@@ -875,14 +964,24 @@ def check_stage(
             ):
                 raise _wrong_types(stage, before, after)
             _check_records(
-                stage, _source_problems(before) + _reference_problems(before)
+                stage,
+                _source_problems(before)
+                + _reference_problems(before)
+                + _contents_link_problems(before, after),
             )
             _check_words(
                 stage,
                 _blocks_file_words(before, stage),
                 _markdown_words(after),
                 (),
-                _note_count_detail(before, after),
+                "; ".join(
+                    detail
+                    for detail in (
+                        _note_count_detail(before, after),
+                        _list_count_detail(before, after),
+                    )
+                    if detail
+                ),
             )
         case _:
             assert_never(stage)
@@ -906,13 +1005,14 @@ _PANDOC_ARGUMENTS = (
 
 class _Boundary(StrEnum):
     """Where a word of Pandoc's JSON ends: at a space or line break or the
-    start or end of a block element, at the start of a note, or at the
-    start of a link marked as a note reference; the last two are also
-    counted."""
+    start or end of a block element, at the start of a note, at the start
+    of a link marked as a note reference, or at the start of an item of a
+    list of list items; the last three are also counted."""
 
     BREAK = "break"
     NOTE = "note"
     NOTE_LINK = "note_link"
+    LIST_ITEM = "list_item"
 
 
 # Architecture section 9: a reference to an endnote is a link with this
@@ -937,7 +1037,7 @@ class _Text:
     block_id: str | None
 
 
-type _Token = _Text | _Boundary
+type _Token = _Text | _Boundary | ContentsLink
 
 
 def _not_read(element: str, block_id: str | None) -> ExternalProgramError:
@@ -1048,6 +1148,10 @@ def _block_tokens(block: object, block_id: str | None) -> tuple[_Token, ...]:
             content = _inlines_tokens(inlines, block_id)
         case {"t": "BlockQuote", "c": list() as blocks}:
             content = _blocks_tokens(blocks, block_id)
+        case {"t": "BulletList", "c": list() as items}:
+            content = _list_tokens(items, _ListElement.BULLET_LIST, block_id)
+        case {"t": "OrderedList", "c": [_, list() as items]}:
+            content = _list_tokens(items, _ListElement.ORDERED_LIST, block_id)
         case {
             "t": "Div",
             "c": [[str() as div_id, list() as classes, *_], list() as blocks],
@@ -1187,6 +1291,153 @@ def _note_group_tokens(
             raise ExternalProgramError(message)
 
 
+# Structure spec section 31: the classes of the divs markdown writes for a
+# list item and a contents entry.
+_LIST_ITEM_CLASS = "list-item"
+_CONTENTS_ENTRY_CLASS = "contents-entry"
+
+
+class _ListElement(StrEnum):
+    """The two list elements of Pandoc's JSON that galley's Markdown makes."""
+
+    BULLET_LIST = "BulletList"
+    ORDERED_LIST = "OrderedList"
+
+
+class _ItemForm(StrEnum):
+    """The forms of a list's item that galley's Markdown makes (structure
+    spec section 31): one div of a list item; or one div of a contents
+    entry, alone or followed by a bullet list of contents entries."""
+
+    LIST_ITEM = "list_item"
+    CONTENTS_ENTRY = "contents_entry"
+
+
+def _item_form(item: object) -> _ItemForm | None:
+    """The form of an item of a list, as Pandoc's JSON gives it (a list of
+    block elements); None when it is none of galley's."""
+    match item:
+        case [div] if _LIST_ITEM_CLASS in _div_classes(div):
+            return _ItemForm.LIST_ITEM
+        case [div] if _CONTENTS_ENTRY_CLASS in _div_classes(div):
+            return _ItemForm.CONTENTS_ENTRY
+        case [div, {"t": "BulletList"}] if _CONTENTS_ENTRY_CLASS in _div_classes(div):
+            return _ItemForm.CONTENTS_ENTRY
+        case _:
+            return None
+
+
+def _list_tokens(
+    items: list[object], element: _ListElement, block_id: str | None
+) -> tuple[_Token, ...]:
+    """The tokens of a list's items, each between two breaks: a list item's
+    div after a LIST_ITEM boundary, which counts it; a contents entry's div
+    as _contents_entry_tokens reads it, then its nested list. Raises
+    ExternalProgramError for a list galley's Markdown does not make: an
+    item of none of its forms, items of both forms, or an ordered list of
+    contents entries."""
+    forms = frozenset(_item_form(item) for item in items)
+    match tuple(forms), element:
+        case ((_ItemForm.LIST_ITEM,), _):
+            return tuple(
+                token
+                for item in items
+                for token in _list_item_tokens(item, element, block_id)
+            )
+        case ((_ItemForm.CONTENTS_ENTRY,), _ListElement.BULLET_LIST):
+            return tuple(
+                token
+                for item in items
+                for token in _contents_item_tokens(item, block_id)
+            )
+        case _:
+            raise _not_read(element.value, block_id)
+
+
+def _list_item_tokens(
+    item: object, element: _ListElement, block_id: str | None
+) -> tuple[_Token, ...]:
+    """The tokens of an item of a list of list items, its one div's, after
+    a LIST_ITEM boundary, which counts it."""
+    match item:
+        case [div]:
+            return (_Boundary.LIST_ITEM, *_block_tokens(div, block_id))
+        case _:
+            raise _not_read(element.value, block_id)
+
+
+def _contents_item_tokens(item: object, block_id: str | None) -> tuple[_Token, ...]:
+    """The tokens of an item of a list of contents entries: its entry's
+    div, then the nested list, which must be of contents entries too."""
+    match item:
+        case [
+            {"t": "Div", "c": [[str() as div_id, *_], list() as blocks]},
+            *nested,
+        ]:
+            entry = _contents_entry_tokens(blocks, div_id or block_id)
+            inner = tuple(
+                token
+                for element in nested
+                for token in _nested_contents_tokens(element, block_id)
+            )
+            return (_Boundary.BREAK, *entry, _Boundary.BREAK, *inner)
+        case _:
+            raise _not_read(_ListElement.BULLET_LIST.value, block_id)
+
+
+def _nested_contents_tokens(
+    element: object, block_id: str | None
+) -> tuple[_Token, ...]:
+    """The tokens of a bullet list inside an item of contents entries,
+    which must hold contents entries."""
+    match element:
+        case {"t": "BulletList", "c": list() as items} if all(
+            _item_form(item) is _ItemForm.CONTENTS_ENTRY for item in items
+        ):
+            return _list_tokens(items, _ListElement.BULLET_LIST, block_id)
+        case _:
+            raise _not_read(_ListElement.BULLET_LIST.value, block_id)
+
+
+def _contents_entry_tokens(
+    blocks: list[object], block_id: str | None
+) -> tuple[_Token, ...]:
+    """The tokens of a contents entry's div: its paragraph's inlines, a
+    link with no attributes and no title read as a ContentsLink and its
+    text, between breaks. Any other block in the div is an element galley's
+    Markdown does not make."""
+    tokens: list[_Token] = []
+    for block in blocks:
+        match block:
+            case {"t": "Para" | "Plain", "c": list() as inlines}:
+                tokens.append(_Boundary.BREAK)
+                for inline in inlines:
+                    match inline:
+                        case {
+                            "t": "Link",
+                            "c": [
+                                attributes,
+                                list() as link_inlines,
+                                [str() as target, str() as title],
+                            ],
+                        } if _has_no_attributes(attributes) and title == _NO_TITLE:
+                            tokens.extend(
+                                (
+                                    ContentsLink(block_id, target),
+                                    *_inlines_tokens(link_inlines, block_id),
+                                    _Boundary.BREAK,
+                                )
+                            )
+                        case _:
+                            tokens.extend(_inline_tokens(inline, block_id))
+                tokens.append(_Boundary.BREAK)
+            case {"t": str() as element}:
+                raise _not_read(element, block_id)
+            case _:
+                raise _not_read(repr(block)[:80], block_id)
+    return tuple(tokens)
+
+
 def _joined_words(texts: tuple[_Text, ...]) -> tuple[MarkdownWord, ...]:
     """The words of adjacent Str elements: their text joined, then split on
     white space. Every element of one run is in the same block."""
@@ -1205,7 +1456,13 @@ def _token_words(tokens: tuple[_Token, ...]) -> tuple[MarkdownWord, ...]:
         match token:
             case _Text():
                 run.append(token)
-            case _Boundary.BREAK | _Boundary.NOTE | _Boundary.NOTE_LINK:
+            case (
+                _Boundary.BREAK
+                | _Boundary.NOTE
+                | _Boundary.NOTE_LINK
+                | _Boundary.LIST_ITEM
+                | ContentsLink()
+            ):
                 words.extend(_joined_words(tuple(run)))
                 run = []
             case _:
@@ -1228,6 +1485,10 @@ def _words_of_pandoc_json(pandoc_json: str) -> MarkdownWords:
         words=_token_words(tokens),
         note_count=sum(1 for token in tokens if token is _Boundary.NOTE),
         note_link_count=sum(1 for token in tokens if token is _Boundary.NOTE_LINK),
+        list_item_count=sum(1 for token in tokens if token is _Boundary.LIST_ITEM),
+        contents_links=tuple(
+            token for token in tokens if isinstance(token, ContentsLink)
+        ),
     )
 
 
@@ -1280,21 +1541,29 @@ def read_markdown(markdown: str) -> MarkdownWords:
     """The words of a Markdown text as Pandoc reads it (`pandoc --from
     markdown-smart-auto_identifiers --to json --fail-if-warnings`), each with
     the id of the innermost div or heading with an id it is in, the number
-    of notes, and the number of links marked `epub:type="noteref"`.
+    of notes, the number of links marked `epub:type="noteref"`, the number
+    of items of the lists of list items, and the links of the contents
+    entries.
 
     Words are split at spaces and line breaks, and at the start and end of
     every block, note and link marked as a note reference, whose text is
     read as its own words; emphasis does not split a word. The words of an
     epigraph's source div count to the epigraph, without the dash markdown
     writes first, and those of a note group's div to the endnote whose div
-    follows it. A figure's
+    follows it. A list is read item by item, in the forms markdown writes
+    (structure spec section 31): an item holding one div of class
+    `list-item`, or one div of class `contents-entry` and after it a bullet
+    list of the same form; in a contents entry's div a link with no
+    attributes and no title is read as its text and kept as a contents
+    link. A figure's
     caption is read once, and its image's alt text, which Pandoc copies
     from the caption, not at all. The metadata header, the title and
     authors, gives no words. Raises
     ExternalProgramError, with Pandoc's standard error, when `pandoc` is
     missing, fails or warns (a note definition no reference uses), runs
     longer than 60 s, or reads an element galley's Markdown does not make,
-    such as a list, a link that is no note reference, or an image that is
+    such as a list of another form, a link that is no note reference
+    outside a contents entry's div, or an image that is
     not alone in its paragraph, whose alt text is not its figure's caption,
     or that has a title or attributes; or a div inside an epigraph's div
     that is not its source's, a source's div that does not start with the
