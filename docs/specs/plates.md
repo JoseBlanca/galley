@@ -238,8 +238,18 @@ layer, for each word of the layer whose middle lies outside the page's
    with the first difference alone each would have 0.
 4. A word has **no ink** when its ink is below 20 levels.
 
-A page is **inkless** when at least half of those words have no ink. A
-page with none of those words is not tested.
+A page is **inkless** when at least half of those words have no ink,
+unless at least half of its words without ink are known words (section
+2, `wordlist.is_known_word`, the word list that also guards the joining
+of hyphenated words). The exception keeps a short page of faint real
+print: Gierke's page 1, a binder's label, "HANDBOUND AT THE UNIVERSITY
+OF TORONTO PRESS", has 2 of its 7 words without ink, "HANDBOUND" and
+"OF", a share of 0.29, and a page of 1 to 4 words could reach half;
+"OF" is known, 1 of the 2. The junk of the four inkless pages is not
+made of words: of their words without ink, Haskins 277 has 0 of 10
+known, Haskins 278 0 of 21, Haynes 9 1 of 6 ("SP") and Haynes 421 0 of
+3 (measured on 18 November 2026, as analyze reads them). A page with
+none of those words is not tested.
 
 **What follows.** A page the test finds inkless gets the kind `inkless`
 and the text source `none`, also when the plate rule takes it as a
@@ -312,6 +322,7 @@ configs do not exclude.
 | local background | median of the box grown by 6 pt | guessed, and kept because it absorbs Haynes 9's gradient; the page's median gray, as the plate rule's ink uses, was not tried |
 | no ink | below 20 levels | measured, above: 40 of the 43 junk words, 339 of 1.1 million real ones |
 | inkless page | at least 0.5 of its words | measured, above |
+| a page of print kept | at least 0.5 of its words without ink known | measured, above: the junk of the inkless pages has at most 0.17 known (Haynes 9), Gierke 1's label 0.50 |
 
 **A rule per word was measured and dropped.** Removing each word
 without ink, wherever it is, would also remove real words. Of 12 words
@@ -379,11 +390,14 @@ def is_plate(page: RenderedPage, word_boxes: tuple[Box, ...] | None,
     # Whether the page is a plate by section 2; `word_boxes` is None for
     # a page without a text layer, and `known_words` is then ignored.
 
-def is_inkless(page: RenderedPage, word_boxes: tuple[Box, ...]) -> bool: ...
+def is_inkless(page: RenderedPage, layer_words: tuple[tuple[str, Box], ...],
+               lower_case_words: frozenset[str]) -> bool: ...
     # Whether the page is inkless by section 2b: at least half of
-    # `word_boxes`, the boxes of the page's text-layer words outside its
-    # excluded regions, in points, have no ink on `page`, its 36 dpi
-    # render. False when `word_boxes` is empty.
+    # `layer_words`, the page's text-layer words outside its excluded
+    # regions, each its text and box in points, have no ink on `page`,
+    # its 36 dpi render, and fewer than half of those without ink are
+    # known words of `lower_case_words`. False when `layer_words` is
+    # empty.
 
 # galley.wordlist
 
@@ -462,7 +476,8 @@ over white gives true; with 2 of them each over a black bar 1 pixel
 high across the box's middle, true (half); with 3, false; a black page with a white bar, 1 pixel high, under
 each of 4 boxes gives false (white print on a dark ground); a page whose gray darkens from 200 on
 the left to 120 on the right, with 4 boxes over plain gray, gives true;
-no box gives false. A word box 2 pt left of a black bar 1 pixel wide
+no box gives false; a white page whose 4 words are known 2 of them,
+false, and 1 of them, true. A word box 2 pt left of a black bar 1 pixel wide
 has ink (the box is grown by 3 pt). Excerpt tests, on pages the
 assistant transcribed from their images
 (`tests/fixtures/expected/stray_text/`):
