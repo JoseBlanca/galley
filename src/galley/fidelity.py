@@ -667,16 +667,28 @@ def _margin_note_words_before_changes(
     blocks: BlocksFile,
 ) -> frozenset[tuple[int, str]]:
     """The words of the margin-note blocks, as `_margin_note_words` gives
-    them, and the word that a sign was attached to or a case split was
-    made of to give them (structure spec section 5): a join of a lost
-    hyphen comes before both, so that its word may be one of these."""
+    them, and every word that a chain of signs attached and case splits
+    turned into such words on their page (structure spec section 5): a
+    join of a lost hyphen comes before both, so its word may be one of
+    these ("theWilliam" split into "the" "William", then "William;").
+    A word is added only when every word of the change's `after` already
+    is one, so a join is admitted only when the words its chain ends in
+    are words of a margin note of its page, as without the chain."""
     words = _margin_note_words(blocks)
-    return words | frozenset(
-        (change.page_index, change.before[0])
+    later = tuple(
+        change
         for change in blocks.word_changes
         if change.reason in _CHANGES_AFTER_A_JOIN
-        and all((change.page_index, word) in words for word in change.after)
     )
+    while True:
+        undone = frozenset(
+            (change.page_index, change.before[0])
+            for change in later
+            if all((change.page_index, word) in words for word in change.after)
+        )
+        if undone <= words:
+            return words
+        words |= undone
 
 
 def _source_first_words(blocks: BlocksFile) -> frozenset[tuple[int, str]]:
