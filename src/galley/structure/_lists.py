@@ -4,11 +4,10 @@ that the body stream prints, found in page order across page breaks.
 Positions are PDF points, origin at the top left of the page; the gap is
 in body line pitches."""
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 
+from galley.list_markers import ListMarker, follows, marker_readings, starts_a_list
 from galley.structure._lines import PlacedLine, hyphen_between
 
 # Spec section 29, rule 3: the next item's marker line lies within 3 pt of
@@ -27,102 +26,8 @@ _HANG_SLACK_PT = 3.0
 # (guessed: with no limit the eight books give the same lists).
 _GAP_MAX_PITCHES = 1.5
 
-# Spec section 29, "Terms": a dash, alone or glued before a letter, and the
-# bullets.
-_DASHES = frozenset("—–")
-_BULLETS = frozenset("•·▪■●◦○‣")
-# A number of 1 or 2 digits, a letter, or a roman numeral i to xv, followed
-# by "." or ")" or between round brackets.
-_VALUED = re.compile(r"(?P<open>\(?)(?P<value>[0-9]{1,2}|[a-zA-Z]+)(?P<close>[.)])")
-_ROMAN = re.compile(r"(?P<tens>x?)(?P<units>ix|iv|v?i{0,3})")
-_ROMAN_UNITS = {"": 0, "i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5}
-_ROMAN_UNITS |= {"vi": 6, "vii": 7, "viii": 8, "ix": 9}
-_ROMAN_MAX = 15
-_ALPHABET = "abcdefghijklmnopqrstuvwxyz"
-# Spec section 29, rule 1: the first value of a list of numbers, letters or
-# roman numerals, and the fewest items of a list.
-_FIRST_VALUE = 1
+# Spec section 29, rule 1: the fewest items of a list.
 _LIST_MIN_ITEMS = 2
-
-
-class MarkerKind(StrEnum):
-    """What a list marker is (spec section 29, "Terms")."""
-
-    DASH = "dash"
-    BULLET = "bullet"
-    NUMBER = "number"
-    LETTER = "letter"
-    ROMAN = "roman"
-
-
-@dataclass(frozen=True, slots=True)
-class ListMarker:
-    """A list marker as one reading of a word (spec section 29, "Terms"):
-    `text` the marker as printed ("—", "1.", "(b)"); `kind`; `form` the
-    dash or bullet itself, or the marker with its value written as "1",
-    "a", "A", "i" or "I" ("(b)" has the form "(a)", "iv." the form "i."),
-    so that two markers of one form also share their letters' case; and
-    `value` the number, the letter's place in the alphabet or the
-    numeral's value, None for a dash or a bullet."""
-
-    text: str
-    kind: MarkerKind
-    form: str
-    value: int | None
-
-
-def _roman_value(letters: str) -> int | None:
-    """The value of a roman numeral i to xv in lower case, None when
-    `letters` is none."""
-    match = _ROMAN.fullmatch(letters)
-    if match is None or not letters:
-        return None
-    value = 10 * len(match.group("tens")) + _ROMAN_UNITS[match.group("units")]
-    return value if value <= _ROMAN_MAX else None
-
-
-def marker_readings(word: str) -> tuple[ListMarker, ...]:
-    """The readings of `word` as a list marker (spec section 29, "Terms"),
-    none when it is not one: a dash alone or glued before a letter ("—The"
-    reads as "—"), a bullet alone, or a number, letter or roman numeral
-    with its brackets or sign. A word of the letters i, v and x only, in
-    one case, reads both as a roman numeral and, when it is one letter, as
-    a letter; the list around it decides (`starting_marker`,
-    `following_marker`)."""
-    if word[:1] in _DASHES and (len(word) == 1 or word[1:2].isalpha()):
-        return (ListMarker(word[0], MarkerKind.DASH, word[0], None),)
-    if word in _BULLETS:
-        return (ListMarker(word, MarkerKind.BULLET, word, None),)
-    match = _VALUED.fullmatch(word)
-    if match is None or (match.group("open"), match.group("close")) == ("(", "."):
-        return ()
-    opening = str(match.group("open"))
-    value = str(match.group("value"))
-    closing = str(match.group("close"))
-    readings: list[ListMarker] = []
-
-    def form(placeholder: str) -> str:
-        return opening + placeholder + closing
-
-    if value.isdigit():
-        readings.append(ListMarker(word, MarkerKind.NUMBER, form("1"), int(value)))
-    if value.islower() or value.isupper():
-        upper = value.isupper()
-        roman = _roman_value(value.lower())
-        if roman is not None:
-            readings.append(
-                ListMarker(word, MarkerKind.ROMAN, form("I" if upper else "i"), roman)
-            )
-        if len(value) == 1 and value.isalpha():
-            readings.append(
-                ListMarker(
-                    word,
-                    MarkerKind.LETTER,
-                    form("A" if upper else "a"),
-                    _ALPHABET.index(value.lower()) + 1,
-                )
-            )
-    return tuple(readings)
 
 
 def _rest(line: PlacedLine, marker: ListMarker) -> bool:
@@ -132,40 +37,34 @@ def _rest(line: PlacedLine, marker: ListMarker) -> bool:
     return len(words) > 1 or len(words[0].text) > len(marker.text)
 
 
-def starting_marker(line: PlacedLine) -> ListMarker | None:
+def _starting_marker(line: PlacedLine) -> ListMarker | None:
     """The marker with which `line` can start a list (spec section 29, rule
     1): its first word is a dash, a bullet or the first value of its kind,
     and a word follows it; a word that reads as a roman numeral and as a
     letter is the numeral. None otherwise."""
     if not line.line.words:
         return None
-    readings = marker_readings(line.line.words[0].text)
-    starting = tuple(
-        reading
-        for reading in readings
-        if reading.value in {None, _FIRST_VALUE} and _rest(line, reading)
+    return next(
+        (
+            reading
+            for reading in marker_readings(line.line.words[0].text)
+            if starts_a_list(reading) and _rest(line, reading)
+        ),
+        None,
     )
-    return starting[0] if starting else None
 
 
-def following_marker(line: PlacedLine, before: ListMarker) -> ListMarker | None:
+def _following_marker(line: PlacedLine, before: ListMarker) -> ListMarker | None:
     """The marker of `line` when it follows `before`, the marker of the item
-    before (spec section 29, rule 3): the same kind and form and, for a
-    number, a letter or a roman numeral, the next value; with a word after
-    it. None otherwise."""
+    before (spec section 29, rule 3), with a word after it; None
+    otherwise."""
     if not line.line.words:
         return None
     return next(
         (
             reading
             for reading in marker_readings(line.line.words[0].text)
-            if reading.kind is before.kind
-            and reading.form == before.form
-            and (
-                reading.value is None
-                or (before.value is not None and reading.value == before.value + 1)
-            )
-            and _rest(line, reading)
+            if follows(reading, before) and _rest(line, reading)
         ),
         None,
     )
@@ -221,7 +120,7 @@ def _page_column(
         (
             position
             for position, line in enumerate(page)
-            if following_marker(line.line, last) is not None
+            if _following_marker(line.line, last) is not None
         ),
         None,
     )
@@ -266,7 +165,7 @@ def _grow(
         # Spec section 29, rule 2: the hyphen rule holds, so a line after a
         # hyphen goes on with the item, wherever it lies.
         if not hyphen_between(before.line, here.line):
-            following = following_marker(here.line, items[-1][1])
+            following = _following_marker(here.line, items[-1][1])
             offset = _left(here) - column
             if following is not None and abs(offset) <= _COLUMN_PT:
                 items.append((position, following))
@@ -299,7 +198,7 @@ def list_items(
     position = 0
     while position < len(stream):
         here = stream[position]
-        marker = None if here.closed else starting_marker(here.line)
+        marker = None if here.closed else _starting_marker(here.line)
         if marker is None or (
             position > 0 and hyphen_between(stream[position - 1].line, here.line)
         ):

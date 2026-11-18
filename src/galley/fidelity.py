@@ -20,6 +20,7 @@ from typing import Literal, assert_never, overload
 
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
 from galley.hyphens import LINE_END_HYPHENS
+from galley.list_markers import DASHES
 from galley.model import (
     Block,
     BlockKind,
@@ -666,10 +667,8 @@ _PUNCTUATION_ATTACHED_PARTS = 2
 _SPACED_SIGNS = frozenset("?;:!")
 _CASE_SPLIT_PARTS = 2
 # A list item's dash split off its first word: the dash and the word
-# (structure spec section 29, "Blocks"). Written here again, not imported
-# from structure, for the reason given for _SOURCE_DASHES.
+# (structure spec section 29, "Blocks").
 _LIST_MARKER_PARTS = 2
-_LIST_DASHES = frozenset({"\u2014", "\u2013"})
 # The changes structure makes after the joins of lost hyphens (structure
 # spec section 2, the paragraph after the steps).
 _CHANGES_AFTER_A_JOIN = frozenset(
@@ -748,7 +747,7 @@ def _change_follows_its_reason(change: WordChange) -> bool:
             return (
                 len(change.before) == 1
                 and len(change.after) == _LIST_MARKER_PARTS
-                and change.after[0] in _LIST_DASHES
+                and change.after[0] in DASHES
                 and bool(change.after[1])
                 and change.before[0] == joined_after
             )

@@ -16,6 +16,7 @@ import pytest
 from galley.book_folder import BookFolder
 from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage
+from galley.list_markers import ListMarker, MarkerKind, marker_readings
 from galley.model import (
     BlockKind,
     BlocksFile,
@@ -31,14 +32,7 @@ from galley.model import (
 )
 from galley.structure import make_blocks
 from galley.structure._lines import PlacedLine
-from galley.structure._lists import (
-    ItemLine,
-    ListMarker,
-    MarkerKind,
-    StreamPage,
-    list_items,
-    marker_readings,
-)
+from galley.structure._lists import ItemLine, StreamPage, list_items
 from galley.structure._measures import Edges
 
 _CHAR_PT = 5.0
