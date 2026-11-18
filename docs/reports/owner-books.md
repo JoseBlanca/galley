@@ -87,3 +87,36 @@ on its own line at the right, and the group heading in bold. An EPUB
 built by hand from blocks with a verse epigraph and two note groups
 passes epubcheck. Not in the spec, decided by the writer: an epigraph
 with no source is written as its quotation alone.
+
+## Tasks 1.2 to 1.6: running heads, page numbers, headings (stream `edges`)
+
+Merged at 11f3afe. The decision point passes: on the owner's books
+every chapter is a level-1 heading with its label, Turney 10 of 10 and
+Haynes 16 of 16 (before the plan, 1 and 0 headings in all). Turney has
+60 headings (17 level 1, 43 level 2), Haynes 46 (23 and 23).
+
+At the first count Turney gave 9 and Haynes 15, and the heading rule
+made four false level-1 headings in the public-domain books. Decided by
+the orchestrator and fixed, each with a spec commit first:
+
+- the gap above a tall line skips lines with no letter or digit (a
+  speck above a Turney label); a title's first line may start up to 4.0
+  pitches below a chapter label that stands alone (a Haynes title);
+- the running heads' likeness threshold goes from 0.75 to 0.70, which
+  changes no line of text on the eight books and removes 13 more heads
+  (Gierke 58, 72, 78, ten of Mariéjol's, checked on renders);
+- a line in the head band at least 0.6 alike to the book's running
+  heads is never a heading (Domesday 159 and 552, Kadesh 38, Mariéjol
+  121);
+- the region below the head line may reach 2 pt into it (Stubbs 17
+  keeps "MAPS."; Domesday 398 loses its head and page number, rightly).
+
+Changed by the writer, outside its files: the layout spec (4e080f5,
+the head row's lines), accepted. The hanging-number counts of layout
+§3 corrected to those measured (Turney 99, Gierke 30 of which 2 are
+specks, Domesday 2 of which 1). Page 163 added to the Haskins excerpt
+so that page 195's notes find their chapter.
+
+Checks at 11f3afe: 2,300 passed, 8 xfailed in 60.3 s; the whole-book
+set gave 79 passed and 1 failed, a test fixed in 39e14a8 and rerun
+alone.
