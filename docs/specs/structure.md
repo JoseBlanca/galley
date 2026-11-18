@@ -302,7 +302,7 @@ the references, gets both too.
   of the body word height or at most 0.82 of the page's **median line
   height**, and whose top is at or below the bottom of another region,
   or above it by at most 2 pt, neither the head line nor a margin
-  region, whose median word height is above that (layout's two
+  region, that is not in small type (layout's two
   thresholds for the footnote band, layout §3, step 4). The page's
   median line height is the median, over the lines of the page's
   regions other than the head line's that are at least a quarter as
@@ -353,9 +353,11 @@ the references, gets both too.
   at 8c18e68, the regions this rule takes are exactly the 11 lines of
   layout's rule, Domesday's pages 163, 174, 185, 278, 303, 308, 315,
   347, 472 and 485 and Gierke's 61, and no other region of the eight
-  books has the rule's form. Domesday gets 10 more footnotes (472's was
-  already one, taken from the body by section 11), each linked to its
-  reference, and its notes without a reference stay 323;
+  books has the rule's form, so a second test would change nothing on
+  them. Domesday gets 10 more footnotes on 9 pages (185 prints two on
+  its line; 472's note was already a footnote, taken from the body by
+  section 11), each linked to its reference, and its notes without a
+  reference stay 323;
 - every other region is a **body region**, in layout's order.
 
 ## 3. Running heads and page numbers in the head
@@ -2839,8 +2841,8 @@ is never made a quote by these rules: it is a note that section 11 did
 not take (Mariéjol's page 210), and stays a paragraph; such a block
 never runs on into the next page's body (section 6 is not applied to
 it), and the paragraph the next page starts is a block of its own.
-Inside the endnote section (section 12) the rule of running on is not
-applied: there every note starts with digits, and one that runs over a
+Inside the endnote section (section 12) such a block does run on into
+the next page, as any paragraph does: there every note starts with digits, and one that runs over a
 page break is one paragraph. Gierke's endnotes start with digits ("13.")
 and its marker form is digits since its introduction's notes are band
 regions (section 1); with the rule applied inside the section, 79 of
