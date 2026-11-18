@@ -11,6 +11,7 @@ import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import assert_never
 
 from galley.body_measures import median_word_height
 from galley.model import ChangeReason, WordChange
@@ -33,11 +34,16 @@ _DASHED_SOURCE_HEIGHT_SHARE = 0.92
 # Spec section 22, rule 3: a source set flush right starts at least 60 pt
 # right of the quotation's leftmost left side (Turney: 100.3 to 244.6; a
 # verse turnover line lies 32 pt right in Haynes' page 87) and ends no
-# more than 3 pt left of its rightmost right side.
+# more than 5 pt left of its rightmost right side (Turney's page 229: 4.5).
 _FLUSH_RIGHT_SOURCE_LEFT_PT = 60.0
-_FLUSH_RIGHT_SOURCE_RIGHT_PT = 3.0
-# Spec section 22, rule 5: a page of its own holds at most 10 lines (a
-# preface's last page signed at the right has more; Turney's has 6).
+_FLUSH_RIGHT_SOURCE_RIGHT_PT = 5.0
+# Spec section 22, rule 3, "A source over several lines": a flush-right
+# source's first lines may start only 10 pt right of the quotation's
+# leftmost left side (Turney's page 56: 12.5 and 49.2 pt).
+_SOURCE_FIRST_LINES_LEFT_PT = 10.0
+# Spec section 22, rule 5: a page of its own holds at most 10 lines with a
+# letter or digit (a preface's last page signed at the right has more;
+# Turney's has 6).
 _PAGE_OF_ITS_OWN_MAX_LINES = 10
 # Spec section 22, "Verse": a turnover line lies at least 15 pt right of
 # the quotation's leftmost left side; verse lines end at least 80 pt short
@@ -64,23 +70,23 @@ class Epigraph:
     in the stream: `start`, its first line, which is a stray mark when one
     comes before the quotation; `quotation`, the quotation's lines;
     `stray_marks`, the lines with no letter or digit passed over in it, to
-    be removed as stray marks; `source_line`, the last. `source` is the
-    source line's words joined by single spaces, without its leading dash,
-    and `source_dash` the record of that dash's removal, None when the
-    source starts with none."""
+    be removed as stray marks; `source_lines`, the source's lines, which
+    end it. `source` is the source lines' words joined by single spaces,
+    without the leading dash, and `source_dash` the record of that dash's
+    removal, None when the source starts with none."""
 
     start: int
     quotation: tuple[int, ...]
     stray_marks: tuple[int, ...]
-    source_line: int
+    source_lines: tuple[int, ...]
     form: QuotationForm
     source: str
     source_dash: WordChange | None
 
     @property
     def end(self) -> int:
-        """The position of the line after the source line."""
-        return self.source_line + 1
+        """The position of the line after the last source line."""
+        return self.source_lines[-1] + 1
 
 
 def _line_height(line: PlacedLine) -> float:
@@ -92,22 +98,99 @@ def _starts_with_dash(line: PlacedLine) -> bool:
     return bool(line.line.words) and line.line.words[0].text[:1] in _SOURCE_DASHES
 
 
-def _is_source_line(line: PlacedLine, quotation: Sequence[PlacedLine]) -> bool:
-    """Spec section 22, rule 3: `line`, after the lines `quotation` of its
-    run, starts with a dash and is set in smaller type, or is set flush
-    right under them."""
-    if not quotation:
-        return False
-    if _starts_with_dash(line):
-        quotation_height = statistics.median(_line_height(other) for other in quotation)
-        if _line_height(line) <= _DASHED_SOURCE_HEIGHT_SHARE * quotation_height:
-            return True
-    leftmost = min(other.line.box.x0 for other in quotation)
+class _SourceShape(StrEnum):
+    """How a source line shows it is one (spec section 22, rule 3)."""
+
+    DASHED = "dashed"
+    FLUSH_RIGHT = "flush_right"
+
+
+def _is_smaller(line: PlacedLine, quotation: Sequence[PlacedLine]) -> bool:
+    """Whether `line`'s height is at most 0.92 of the median line height of
+    `quotation`."""
+    quotation_height = statistics.median(_line_height(other) for other in quotation)
+    return _line_height(line) <= _DASHED_SOURCE_HEIGHT_SHARE * quotation_height
+
+
+def _ends_flush_right(line: PlacedLine, quotation: Sequence[PlacedLine]) -> bool:
+    """Whether `line` ends no more than 5 pt left of the rightmost right side
+    of `quotation`."""
     rightmost = max(other.line.box.x1 for other in quotation)
-    return (
-        line.line.box.x0 >= leftmost + _FLUSH_RIGHT_SOURCE_LEFT_PT
-        and line.line.box.x1 >= rightmost - _FLUSH_RIGHT_SOURCE_RIGHT_PT
-    )
+    return line.line.box.x1 >= rightmost - _FLUSH_RIGHT_SOURCE_RIGHT_PT
+
+
+def _starts_right_of(
+    line: PlacedLine, quotation: Sequence[PlacedLine], distance: float
+) -> bool:
+    """Whether `line` starts at least `distance` right of the leftmost left
+    side of `quotation`."""
+    leftmost = min(other.line.box.x0 for other in quotation)
+    return line.line.box.x0 >= leftmost + distance
+
+
+def _source_shape(
+    line: PlacedLine, quotation: Sequence[PlacedLine]
+) -> _SourceShape | None:
+    """Spec section 22, rule 3: `line`, after the lines `quotation` of its
+    run, is a source line when it starts with a dash and is set in smaller
+    type, or is set flush right under them; None when it is neither."""
+    if not quotation:
+        return None
+    if _starts_with_dash(line) and _is_smaller(line, quotation):
+        return _SourceShape.DASHED
+    if _starts_right_of(
+        line, quotation, _FLUSH_RIGHT_SOURCE_LEFT_PT
+    ) and _ends_flush_right(line, quotation):
+        return _SourceShape.FLUSH_RIGHT
+    return None
+
+
+def _continues_source(
+    line: PlacedLine,
+    first: PlacedLine,
+    shape: _SourceShape,
+    quotation: Sequence[PlacedLine],
+) -> bool:
+    """Spec section 22, rule 3, "A source over several lines": `line`, after
+    a source line, keeps the shape of the source, whose first line is
+    `first`: a dashed source's next line is in smaller type, starts with no
+    dash and no more than 3 pt left of `first`; a flush-right source's is
+    set flush right under the quotation and under `first`, at least 60 pt
+    right of the quotation."""
+    match shape:
+        case _SourceShape.DASHED:
+            return (
+                not _starts_with_dash(line)
+                and _is_smaller(line, quotation)
+                and line.line.box.x0 >= first.line.box.x0 - _NEXT_RUN_LEFT_PT
+            )
+        case _SourceShape.FLUSH_RIGHT:
+            return (
+                _starts_right_of(line, quotation, _FLUSH_RIGHT_SOURCE_LEFT_PT)
+                and _ends_flush_right(line, quotation)
+                and _ends_flush_right(line, (first,))
+            )
+        case _:
+            assert_never(shape)
+
+
+def _source_first_lines(lines: Sequence[PlacedLine], quotation: tuple[int, ...]) -> int:
+    """How many of the last lines of `quotation`, before a flush-right
+    source line, are the source's first lines (spec section 22, rule 3, "A
+    source over several lines"): each set flush right under the lines
+    before it and starting at least 10 pt right of them, leaving at least
+    one line of quotation."""
+    count = 0
+    while count < len(quotation) - 1:
+        line = lines[quotation[-1 - count]]
+        before = tuple(lines[number] for number in quotation[: -1 - count])
+        if not (
+            _ends_flush_right(line, before)
+            and _starts_right_of(line, before, _SOURCE_FIRST_LINES_LEFT_PT)
+        ):
+            break
+        count += 1
+    return count
 
 
 def _starts_line(line: PlacedLine) -> str:
@@ -142,19 +225,19 @@ def _form(quotation: Sequence[PlacedLine], column: Edges) -> QuotationForm:
     )
 
 
-def _source(line: PlacedLine) -> tuple[str, WordChange | None]:
-    """The source line's words joined by single spaces without its leading
+def _source(lines: Sequence[PlacedLine]) -> tuple[str, WordChange | None]:
+    """The source lines' words joined by single spaces without the leading
     dashes, and the record of their removal (spec section 22, "The dash is
     look, not text"): the first word, or a word of dashes alone and the
     word after it, become the one word without its leading dashes."""
-    texts = tuple(word.text for word in line.line.words)
+    texts = tuple(word.text for line in lines for word in line.line.words)
     if not texts or texts[0][:1] not in _SOURCE_DASHES:
         return " ".join(texts), None
     count = 2 if not texts[0].strip(_SOURCE_DASHES) and len(texts) > 1 else 1
     before = texts[:count]
     after = "".join(before).lstrip(_SOURCE_DASHES)
     change = WordChange(
-        page_index=line.page_index,
+        page_index=lines[0].page_index,
         before=before,
         after=(after,),
         reason=ChangeReason.SOURCE_DASH,
@@ -164,11 +247,43 @@ def _source(line: PlacedLine) -> tuple[str, WordChange | None]:
 
 @dataclass(frozen=True, slots=True)
 class _Run:
-    """The positions of a run's lines up to its source line."""
+    """The positions of a run's quotation, stray marks and source lines."""
 
     quotation: tuple[int, ...]
     stray_marks: tuple[int, ...]
-    source_line: int
+    source_lines: tuple[int, ...]
+
+
+def _source_run(
+    lines: Sequence[PlacedLine],
+    quotation: tuple[int, ...],
+    stray_marks: tuple[int, ...],
+    source_line: int,
+    end: int,
+    shape: _SourceShape,
+    left_min: float | None,
+) -> _Run:
+    """The run whose first source line, of `shape`, is at `source_line`
+    after the lines `quotation`: a flush-right source takes the last lines
+    of the quotation that are its first lines, and either takes the lines
+    after it before `end`, none left of `left_min`, that keep its shape."""
+    first_lines = (
+        _source_first_lines(lines, quotation)
+        if shape is _SourceShape.FLUSH_RIGHT
+        else 0
+    )
+    kept = quotation[: len(quotation) - first_lines]
+    kept_lines = tuple(lines[number] for number in kept)
+    source = [*quotation[len(kept) :], source_line]
+    number = source_line + 1
+    while (
+        number < end
+        and (left_min is None or lines[number].line.box.x0 >= left_min)
+        and _continues_source(lines[number], lines[source_line], shape, kept_lines)
+    ):
+        source.append(number)
+        number += 1
+    return _Run(kept, stray_marks, tuple(source))
 
 
 def _run(
@@ -177,10 +292,10 @@ def _run(
     end: int,
     left_min: float | None,
 ) -> _Run | None:
-    """The run of `lines` from `start` that ends at a source line before
-    `end` (spec section 22, rules 2 and 3), passing over lines with no
-    letter or digit; None when a line before its source starts left of
-    `left_min` (None for no bound, rule 5) or `end` comes first."""
+    """The run of `lines` from `start` that ends at its source before `end`
+    (spec section 22, rules 2 and 3), passing over lines with no letter or
+    digit; None when a line before its source starts left of `left_min`
+    (None for no bound, rule 5) or `end` comes first."""
     quotation: list[int] = []
     stray_marks: list[int] = []
     for number in range(start, end):
@@ -190,8 +305,17 @@ def _run(
             continue
         if left_min is not None and line.line.box.x0 < left_min:
             return None
-        if _is_source_line(line, tuple(lines[other] for other in quotation)):
-            return _Run(tuple(quotation), tuple(stray_marks), number)
+        shape = _source_shape(line, tuple(lines[other] for other in quotation))
+        if shape is not None:
+            return _source_run(
+                lines,
+                tuple(quotation),
+                tuple(stray_marks),
+                number,
+                end,
+                shape,
+                left_min,
+            )
         quotation.append(number)
     return None
 
@@ -199,12 +323,12 @@ def _run(
 def _epigraph(
     lines: Sequence[PlacedLine], start: int, run: _Run, column: Edges
 ) -> Epigraph:
-    source, source_dash = _source(lines[run.source_line])
+    source, source_dash = _source(tuple(lines[number] for number in run.source_lines))
     return Epigraph(
         start=start,
         quotation=run.quotation,
         stray_marks=run.stray_marks,
-        source_line=run.source_line,
+        source_lines=run.source_lines,
         form=_form(tuple(lines[number] for number in run.quotation), column),
         source=source,
         source_dash=source_dash,
@@ -224,18 +348,33 @@ def _first_line(lines: Sequence[PlacedLine], start: int, end: int) -> int | None
     )
 
 
+def epigraph_column(
+    lines: Sequence[PlacedLine], heading_lines: frozenset[int], column: Edges
+) -> Edges | None:
+    """The edges the epigraph rule measures against on a page whose body
+    stream is `lines` (spec section 22, "The rule"): the left side of its
+    leftmost line with a letter or digit that is not a heading line, one
+    of the positions `heading_lines`, and the right edge of `column`, the
+    page's body column; None when every line is a heading line."""
+    lefts = tuple(
+        line.line.box.x0
+        for number, line in enumerate(lines)
+        if number not in heading_lines and line_has_letter_or_digit(line.line)
+    )
+    return Edges(min(lefts), column.right) if lefts else None
+
+
 def epigraphs_after_heading(
     lines: Sequence[PlacedLine], start: int, end: int, column: Edges
 ) -> tuple[Epigraph, ...]:
     """The epigraphs of `lines`, a page's body stream, from `start`, the
     position right after a level-1 heading block (and its chapter
     summary), to `end` at the latest, the position of the next heading line
-    or the stream's end (spec section 22, rules 1 to 4). `column` is the
-    page's body column. Each run of lines at least 20 pt right of the
-    column's left edge that ends at a source line is an epigraph; the next
-    run starts within 3 pt of the left side of the one before; the first
-    line that starts no run ends them, and a run without a source line is
-    none."""
+    or the stream's end (spec section 22, rules 1 to 4). `column` is what
+    `epigraph_column` gives. Each run of lines at least 20 pt right of the
+    column's left edge that ends at a source is an epigraph; the next run
+    starts within 3 pt of the left side of the one before; the first line
+    that starts no run ends them, and a run without a source is none."""
     epigraphs: list[Epigraph] = []
     left_min = column.left + _RUN_INDENT_MIN_PT
     run_start = start
@@ -250,20 +389,21 @@ def epigraphs_after_heading(
         if run is None:
             break
         epigraphs.append(_epigraph(lines, run_start, run, column))
-        run_start = run.source_line + 1
+        run_start = run.source_lines[-1] + 1
     return tuple(epigraphs)
 
 
 def page_epigraph(lines: Sequence[PlacedLine], column: Edges) -> Epigraph | None:
     """The epigraph that is the whole of `lines`, the body stream of a page
     with no heading line, or None (spec section 22, rule 5): one run of at
-    most 10 lines, a quotation of at least 1 line and a source line by rule
-    3 last, at any indent. `column` is the page's body column."""
+    most 10 lines with a letter or digit, a quotation of at least 1 line
+    and its source last, at any indent. `column` is the page's body
+    column."""
     run = _run(lines, 0, len(lines), None)
     if (
         run is None
-        or run.source_line != len(lines) - 1
-        or len(run.quotation) + 1 > _PAGE_OF_ITS_OWN_MAX_LINES
+        or run.source_lines[-1] != len(lines) - 1
+        or len(run.quotation) + len(run.source_lines) > _PAGE_OF_ITS_OWN_MAX_LINES
     ):
         return None
     return _epigraph(lines, 0, run, column)
