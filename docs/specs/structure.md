@@ -318,7 +318,12 @@ number-like word it also took Gierke's page 8. The excerpts
 `haskins_front` and `domesday_front_flow` (`docs/specs/front-matter.md`
 §6) hold both pages, whose first line their tests assert is a
 `running_head` removal; on the `whole_book` tests, the new rule's
-removals are exactly these two.
+removals are exactly these two. With the likeness at 0.70 (17 November
+2026, below) it also takes Gierke's page 58, "Analytical Snnittniry.
+liii", the running head of its analytical summary, which the rule's
+likeness, 0.70 now too, finds alike to the topmost line of a page
+before it: three lines on the six books, each a running head (measured
+on the `lines.json` of layout §3's new steps).
 
 A number alone does not make a running head: a top line that ends with
 a word that is also a roman form ("vi", "mix", "dix", "d", "c.", "i.")
