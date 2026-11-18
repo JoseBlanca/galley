@@ -200,7 +200,7 @@ tables, so the body pages to add may lie further away.
   evaluation fixtures rewritten at the new versions. Spec: architecture
   §8 and §13; structure §7, the revision of §29 to §33; figures §7.
   Plan's branch. Deliverables 2 to 4. A commit of its own.
-- [ ] Review of work package 1.
+- [x] Review of work package 1.
 
 ## 2. Finding and cutting in-page figures
 
@@ -258,7 +258,7 @@ was checked on Haynes and Turney only.
 - [x] 2.3 The whole-book tests of deliverable 3 and the measurements in
   the report. Spec: figures §2, §3 "Measured", §10 "Whole-book tests".
   Needs 2.2. Stream `figures`. Deliverable 3.
-- [ ] Review of work package 2.
+- [x] Review of work package 2.
 
 ## 3. Figures through layout and structure
 
