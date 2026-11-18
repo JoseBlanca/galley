@@ -9,7 +9,8 @@ common git directory. `scripts/fetch_samples.py` downloads them.
 `excerpt_books` runs `galley2epub run` once per session on a book folder
 for each excerpt, so that the excerpt tests of every stage read the files of
 one run; `whole_book_run` does the same for the whole books, up to
-structure, the first time a test asks for a book.
+structure, the first time a test asks for a book, and `owner_book_run` for
+the owner's two books, which tests of several modules count on.
 """
 
 import functools
@@ -26,6 +27,7 @@ import pytest
 
 from galley.book_folder import BookFolder
 from galley.cli import main
+from galley.model import BlocksFile, read_blocks
 
 EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 
@@ -151,6 +153,20 @@ EXCERPT_CONFIGS = frozendict(
             'language = "en"\n'
         ),
         "domesday_rereads": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+        ),
+        # The excerpts of the plan lists-figures: Kadesh's reference pages
+        # of docs/specs/figures.md section 10, with the whole book's config,
+        # which excludes none of its pages and names none a plate; and
+        # Domesday's tables of structure spec section 32.
+        "kadesh_29-38": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["J. H. Breasted"]\n'
+            'language = "en"\n'
+        ),
+        "domesday_lists": (
             'title = "Domesday Book and Beyond"\n'
             'authors = ["Frederic William Maitland"]\n'
             'language = "en"\n'
@@ -385,6 +401,63 @@ def whole_book_run(
         main(["layout", "--workers", str(_WHOLE_BOOK_LAYOUT_WORKERS), root])
         main(["structure", root])
         return folder
+
+    return run
+
+
+# The owner's two books, which are copyrighted: their whole_book tests
+# count what galley gives and never quote their text.
+# Structure spec section 21, "Their configs", as the survey of 17 November
+# 2026 ran them; the pattern finds each PDF in the samples folder.
+_OWNER_BOOK_PATTERNS = {"turney": "*Turney*.pdf", "haynes": "*Haynes*.pdf"}
+_OWNER_BOOK_CONFIGS = {
+    "turney": (
+        "exclude_pages = [2, 3, 5, 9, 165, 168, 171, 306, 307, 308, 309]\n"
+        "contents_pages = [10]\n"
+    ),
+    "haynes": (
+        "exclude_pages = [0, 1, 3, 7, 11, 13, 329, 389, 431, 432, 434]\n"
+        "contents_pages = [8]\n"
+    ),
+}
+
+
+@pytest.fixture(scope="session")
+def owner_book_run(
+    samples_dir: Path, tmp_path_factory: pytest.TempPathFactory
+) -> Callable[[str], BlocksFile]:
+    """A function that gives blocks.json of one of the owner's books, by
+    the name "turney" or "haynes", run from its PDF to structure the first
+    time a test asks for it and kept for the session. Skips the test when
+    the book's PDF is not in the samples folder. A book's run holds its
+    lock, so that two threads asking for it share one run."""
+    roots = {book: tmp_path_factory.mktemp(book) for book in _OWNER_BOOK_PATTERNS}
+    locks = {book: threading.Lock() for book in _OWNER_BOOK_PATTERNS}
+
+    def run(book: str) -> BlocksFile:
+        pdfs = sorted(samples_dir.glob(_OWNER_BOOK_PATTERNS[book]))
+        if not pdfs:
+            pytest.skip(
+                f"no PDF matching {_OWNER_BOOK_PATTERNS[book]} in {samples_dir}"
+            )
+        with locks[book]:
+            return run_once(book, pdfs[0])
+
+    @functools.cache
+    def run_once(book: str, pdf: Path) -> BlocksFile:
+        folder = BookFolder(roots[book])
+        folder.book_toml.write_text(
+            f"pdf = {json.dumps(str(pdf))}\n"
+            'title = "An owner\'s book"\n'
+            'authors = ["An Author"]\n'
+            'language = "en"\n'
+            'ocr = "trust"\n'
+            f"{_OWNER_BOOK_CONFIGS[book]}",
+            encoding="utf-8",
+        )
+        for stage in ("analyze", "extract", "layout", "structure"):
+            main([stage, str(folder.root)])
+        return read_blocks(folder.blocks_json)
 
     return run
 

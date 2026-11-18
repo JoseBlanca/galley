@@ -1,0 +1,160 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer and its lines as layout gives them at 1b2959f (the words as the OCR read them, their left sides), and docs/specs/structure.md, section 29 (the rules) and section 32 (the table of excerpt tests): each list item's label is its marker as read and its text the words of its lines after the marker. Not yet compared with galley's output, which at 1b2959f makes no list item.",
+  "excerpt": "domesday_lists",
+  "page": 7,
+  "book_page_index": 158,
+  "checks": "four numbered lists of a table, one per vill, rows of one to five holders",
+  "printed": {
+    "running_head": {
+      "words": "Manor and Vill.",
+      "page_number": "133",
+      "number_side": "right"
+    },
+    "vills": [
+      {
+        "heading": "VII. Shepreth. A vill of 5 hides.",
+        "rows": [
+          "1. Four sokemen, men of the King / A sokeman, man of Earl Ælfgar",
+          "2. The Church of Chatteris",
+          "3. Sigar a man of Æsgar the Staller",
+          "4. Heming a man of the King",
+          "5. The Church of Ely"
+        ]
+      },
+      {
+        "heading": "VIII. Orwell. A vill of 4 hides.",
+        "rows": [
+          "1. Two sokemen, men of Edith the Fair / A sokeman, man of Abp Stigand / A sokeman, man of Robert Wimarc's son / A sokeman, man of the King / A sokeman, man of Earl Ælfgar",
+          "2. A sokeman, man of Earl Waltheof / A sokeman, man of the King",
+          "3. Sigar, a man of Æsgar the Staller",
+          "4. Turbert, a man of Edith the Fair",
+          "5. Achil, a man of Earl Harold",
+          "6. A sokeman, man of the King",
+          "7. The Church of Chatteris",
+          "8. The Church of Chatteris"
+        ]
+      },
+      {
+        "heading": "IX. Wratworth. A vill of 4 hides.",
+        "rows": [
+          "1. A sokeman, man of Edith the Fair / A sokeman, man of Abp Stigand / A sokeman, man of Earl Ælfgar / A sokeman, man of Robert Wimarc's son / A sokeman, man of the King",
+          "2. A sokeman, man of Earl Waltheof / A sokeman, man of Robert Wimarc's son",
+          "3. A sokeman, man of Edith the Fair",
+          "4. A sokeman, man of the King",
+          "5. Two sokemen, men of the King"
+        ]
+      },
+      {
+        "heading": "X. Whitwell. A vill of 4 hides.",
+        "rows": [
+          "1. A sokeman, man of Earl Ælfgar / A sokeman, man of Robert Wimarc's son / A sokeman, man of the King",
+          "2. A sokeman, man of Abp Stigand / A sokeman, man of Edith the Fair / [A sokeman]",
+          "3. Six sokemen, men of the King / A sokeman, man of Robert Wimarc's son / A sokeman, man of Earl Ælfgar",
+          "4. Godwin a man of Edith the Fair"
+        ]
+      }
+    ],
+    "row_layout": "as page index 156"
+  },
+  "expected": {
+    "lists": [
+      [
+        {
+          "label": "1.",
+          "text": "Four sokemen, men of the King\") g A sokeman, man of Earl ^ElfgarJ"
+        },
+        {
+          "label": "2.",
+          "text": "The Church of Chatteris 1"
+        },
+        {
+          "label": "3.",
+          "text": "Sigar a man of Msg&r the Staller"
+        },
+        {
+          "label": "4.",
+          "text": "Heming a man of the King"
+        },
+        {
+          "label": "5.",
+          "text": "The Church of Ely"
+        }
+      ],
+      [
+        {
+          "label": "1.",
+          "text": "Two sokemen, men of Edith the Fair A sokeman, man of Abp Stigand A sokeman, man of Robert Wimarc's son A sokeman, man of the King A sokeman, man of Earl ^Elfgar"
+        },
+        {
+          "label": "2.",
+          "text": "A sokeman, man of Earl Waltheof A sokeman, man of the King"
+        },
+        {
+          "label": "3.",
+          "text": "Sigar, a man of JEsgar the Staller"
+        },
+        {
+          "label": "4.",
+          "text": "Turbert, a man of Edith the Fair"
+        },
+        {
+          "label": "5.",
+          "text": "Achil, a man of Earl Harold"
+        },
+        {
+          "label": "6.",
+          "text": "A sokeman, man of the King"
+        },
+        {
+          "label": "7.",
+          "text": "The Church of Chatteris"
+        },
+        {
+          "label": "8.",
+          "text": "The Church of Chatteris"
+        }
+      ],
+      [
+        {
+          "label": "1.",
+          "text": "A sokeman, man of Edith the Fair A sokeman, man of Abp Stigand A sokeman, man of Earl JSlfgar A sokeman, man of Robert Wimarc's son A sokeman, man of the King"
+        },
+        {
+          "label": "2.",
+          "text": "A sokeman, man of Earl Waltheof A sokeman, man of Robert Wimarc's son"
+        },
+        {
+          "label": "3.",
+          "text": "A sokeman, man of Edith the Fair"
+        },
+        {
+          "label": "4.",
+          "text": "A sokeman, man of the King"
+        },
+        {
+          "label": "5.",
+          "text": "Two sokemen, men of the King"
+        }
+      ],
+      [
+        {
+          "label": "1.",
+          "text": "A sokeman, man of Earl ^Elfgar A sokeman, man of Robert Wimarc's son A sokeman, man of the King"
+        },
+        {
+          "label": "2.",
+          "text": "A sokeman, man of Abp Stigand A sokeman, man of Edith the Fair [A sokeman]"
+        },
+        {
+          "label": "3.",
+          "text": "Six sokemen, men of the King A sokeman, man of Robert Wimarc's son A sokeman, man of Earl ^Elfgar"
+        },
+        {
+          "label": "4.",
+          "text": "Godwin a man of Edith the Fair"
+        }
+      ]
+    ]
+  },
+  "known": "In the excerpt, layout finds a right cut-in inset of 58.8 pt that the whole book does not have, and makes margin notes of four runs of numbers of the table's right columns (\"1 0 2 3\", \"1 0 4 3 4\", \"1 4\", \"4\"); the lists are the same as the whole book's."
+}

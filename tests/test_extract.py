@@ -445,13 +445,15 @@ def test_haskins_front_page_12_gives_its_words_exactly(
 # The plates of the excerpts (plates spec section 6), by page index in the
 # excerpt: Kadesh 17 (16, the scan of a cover, is excluded); Kadesh 64, 65
 # (the back of plate 64) and 68;
-# Domesday's maps 39 and 40. Each has its image, and nothing else is in
+# Domesday's maps 39 and 40; Kadesh 34 and 35, the back of plate 34.
+# Each has its image, and nothing else is in
 # images/ but the cover.
 EXCERPT_PLATES = frozendict(
     {
         "kadesh_8-17": (9,),
         "kadesh_59-68": (5, 6, 9),
         "domesday_headings_quotes": (3, 4),
+        "kadesh_29-38": (5, 6),
     }
 )
 

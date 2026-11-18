@@ -57,11 +57,14 @@ EXPECTED_EXCERPT_PAGES = {
     "stubbs_heads": 18,
     "gierke_intro_heads": 13,
     "domesday_rereads": 11,
+    "kadesh_29-38": 10,
+    "domesday_lists": 11,
 }
 
 # The pages of each excerpt, by index in the excerpt, that have no word in
 # their text layer, as scripts/fetch_samples.py describes them: Kadesh's
-# blank page and Haskins' blank page before the index. Every other page
+# blank page, the back of Kadesh's plate 34 and Haskins' blank page before
+# the index. Every other page
 # has words.
 PAGES_WITHOUT_WORDS = {
     "kadesh_8-17": (9,),
@@ -82,6 +85,8 @@ PAGES_WITHOUT_WORDS = {
     "stubbs_heads": (),
     "gierke_intro_heads": (),
     "domesday_rereads": (),
+    "kadesh_29-38": (6,),
+    "domesday_lists": (),
 }
 
 

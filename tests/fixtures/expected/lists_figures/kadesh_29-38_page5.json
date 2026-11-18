@@ -1,0 +1,19 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"); the frames and ink extents in points were measured on that render (the outermost rule of a map's frame, 300 pixels to 72 pt). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/specs/figures.md, sections 3 and 5 and the table of section 10. Not yet compared with galley's output, which at 1b2959f finds no in-page figure.",
+  "excerpt": "kadesh_29-38",
+  "page": 5,
+  "book_page_index": 34,
+  "checks": "a plate with a text layer (the series head above the relief): a plate, not searched for in-page figures",
+  "printed": {
+    "plate": "a relief of Ramses in his chariot, the whole page, a fold-out; the series head \"Decennial Publications, V\" above it",
+    "figures": []
+  },
+  "expected": {
+    "figures": [
+      {
+        "kind": "plate"
+      }
+    ]
+  },
+  "known": "The whole book removes \"DECENNIAL PUBLICATIONS, V\" as a running head; the excerpt keeps it as the plate's caption (structure spec section 18), as kadesh_59-68 does."
+}

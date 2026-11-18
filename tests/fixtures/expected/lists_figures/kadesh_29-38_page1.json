@@ -1,0 +1,19 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"); the frames and ink extents in points were measured on that render (the outermost rule of a map's frame, 300 pixels to 72 pt). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/specs/figures.md, sections 3 and 5 and the table of section 10. Not yet compared with galley's output, which at 1b2959f finds no in-page figure.",
+  "excerpt": "kadesh_29-38",
+  "page": 1,
+  "book_page_index": 30,
+  "checks": "a text page with no picture: no figure, its rows of hieroglyphs too small",
+  "printed": {
+    "running_head": {
+      "words": "James Henry Breasted",
+      "page_number": "21",
+      "number_side": "right"
+    },
+    "figures": [],
+    "hieroglyphs": "a quotation \"3.\" of two rows and a variant row \"Var.\", with its translation under it"
+  },
+  "expected": {
+    "figures": []
+  }
+}

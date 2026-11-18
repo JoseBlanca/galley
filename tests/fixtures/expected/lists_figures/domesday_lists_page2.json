@@ -1,0 +1,26 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer and its lines as layout gives them at 1b2959f (the words as the OCR read them, their left sides), and docs/specs/structure.md, section 29 (the rules) and section 32 (the table of excerpt tests): each list item's label is its marker as read and its text the words of its lines after the marker. Not yet compared with galley's output, which at 1b2959f makes no list item.",
+  "excerpt": "domesday_lists",
+  "page": 2,
+  "book_page_index": 143,
+  "checks": "enumerations \"(iv)\" to \"(viii)\" whose first value is on the page before, outside the excerpt: no list",
+  "printed": {
+    "running_head": {
+      "words": "Domesday Book.",
+      "page_number": "118",
+      "number_side": "left"
+    },
+    "enumeration": [
+      "(iii) … (continued from the page before)",
+      "(iv) Three free men and their mother",
+      "(v) In Rincham",
+      "(vi) In Wenham",
+      "(vii) In Torp",
+      "(viii) In Tudenham"
+    ]
+  },
+  "expected": {
+    "list_items": []
+  },
+  "known": "A marker line starts a list only with a first value (structure spec section 29, rule 1); \"(iv)\" is none."
+}
