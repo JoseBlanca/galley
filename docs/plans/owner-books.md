@@ -503,7 +503,7 @@ books.
   exports; the excerpt and whole-book tests; the changed reference
   pages. Spec: structure §2, steps 2.4 and 3.2; §8; §23; §24. Needs 5.1
   and WP 4. Plan's branch. Deliverables 1 to 3.
-- [ ] Review of work package 5.
+- [x] Review of work package 5.
 
 ## 6. Markdown and the EPUB
 
@@ -531,7 +531,7 @@ style sheet sets the epigraph in and its source to the right.
   in markdown, and their rules in the style sheet, with the tests.
   Spec: structure §25; architecture §9, the markdown and epub stages.
   Stream `markdown`. Deliverables 1, 2.
-- [ ] Review of work package 6.
+- [x] Review of work package 6.
 
 ## 7. The measurement and the EPUBs
 
