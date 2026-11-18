@@ -44,7 +44,7 @@ In:
    gap in gray level between the local background and any pixel of the
    word's box grown by 3 pt, either way (so white print on a dark cover
    counts). Real words: of 1.1 million, 339 fall below 20; junk words:
-   41 of 43 below 20. Junk pages have 0.92 to 1.00 of their words below
+   41 of 43 below 20. Junk pages have 0.88 to 1.00 of their words below
    20; the highest real page, Domesday 481 (a rotated table), 0.10. It
    catches Haynes 9 and 421 and Haskins 277 and 278. A rule per word was
    measured and dropped: 7 of 12 inkless words checked by eye on
@@ -229,10 +229,10 @@ Deliverables:
 
 Tasks (stream `analyze`):
 
-- [ ] 2.1 The ink measure and the page's mark in analyze, where the
+- [x] 2.1 The ink measure and the page's mark in analyze, where the
   36 dpi render and the text layer's words are already at hand. Spec:
   the analyze amendment of 1.1.
-- [ ] 2.2 extract's removals for a marked page, as it does for an
+- [x] 2.2 extract's removals for a marked page, as it does for an
   excluded page, and the tests of deliverables 1 and 2.
 - [ ] Review of work package 2.
 
