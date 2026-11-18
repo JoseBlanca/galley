@@ -68,6 +68,14 @@ def test_the_evaluation_set_has_the_four_books_of_the_spec() -> None:
         (18, 448),
     ]
     assert books[1].rules.summary_after == (parse_selector("div.chapter"),)
+    # docs/specs/evaluation.md section 3: Stubbs' reference ends where its
+    # publisher's lists begin; the others run to the end.
+    assert [book.reference_ends_at for book in books] == [
+        None,
+        "Page_301",
+        None,
+        None,
+    ]
     assert {1, 2, 457, 458} <= set(mariejol.exclude_pages)
     assert books[2].expected_counts == ExpectedCounts(
         notes=1729,
@@ -92,6 +100,7 @@ def test_book_with_only_required_keys_takes_the_defaults(tmp_path: Path) -> None
         contents_pages=(),
         plate_pages=(),
         not_in_reference=(),
+        reference_ends_at=None,
         margin_notes_moved=False,
         body_pages=(16, 279),
         html_sha256=HASKINS_SHA256,
@@ -117,11 +126,13 @@ def test_rules_are_added_to_or_replace_the_defaults(tmp_path: Path) -> None:
     text = (
         MINIMAL_BOOK
         + "not_in_reference = [14, 16]\nmargin_notes_moved = true\n"
+        + "reference_ends_at = 'Page_301'\n"
         + "[book.rules.add]\nheading = ['p.ph3']\ndrop_text = ['Note \\d+:']\n"
         + "[book.rules.replace]\nstart = ['h1']\nnote_reference = ['#footnote\\d+']\n"
     )
     (book,) = read_books(_write(tmp_path, text))
     assert book.not_in_reference == (14, 16)
+    assert book.reference_ends_at == "Page_301"
     assert book.margin_notes_moved
     assert book.rules.heading == (*DEFAULT_RULES.heading, parse_selector("p.ph3"))
     assert book.rules.start == (parse_selector("h1"),)
@@ -177,6 +188,8 @@ def test_selector_of_another_form_is_a_value_error(text: str) -> None:
         ("not_in_reference = 14", "book[0].not_in_reference", "expected a list"),
         ("contents_pages = [-1]", "book[0].contents_pages[0]", "counts from 0"),
         ("plate_pages = 23", "book[0].plate_pages", "expected a list"),
+        ("reference_ends_at = 301", "book[0].reference_ends_at", "a string"),
+        ("reference_ends_at = ''", "book[0].reference_ends_at", "must not be empty"),
         ("margin_notes_moved = 1", "book[0].margin_notes_moved", "true or false"),
         ("body_pages = [279, 16]", "book[0].body_pages", "above the last"),
         ("body_pages = [16]", "book[0].body_pages", "two page indices"),
