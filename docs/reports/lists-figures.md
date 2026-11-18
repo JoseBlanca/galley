@@ -230,3 +230,76 @@ three EPUBs; all 56 figures have their image and caption.
 
 Checks at e5c58ea: 2,776 passed in 72.9 s; with 8 threads in 116 s;
 figure whole_book tests 21 passed.
+
+## Task 7.1: the measurement
+
+Scores at blocks (`galley-eval run`, galley at eaed36b, whose `src` is
+the final code's) against `runs/owner-books-final/`:
+
+| book | body error rate | paragraph precision / recall | headings in heading blocks | notes whose reference is right | margin notes as margin notes |
+|---|---|---|---|---|---|
+| Haskins | 0.020 → 0.020 | 0.908 / 0.902 → same | 18 → 18 | 66 → 66 | – |
+| Stubbs | 0.033 → 0.033 | 0.809 / 0.801 → 0.818 / 0.848 | 26 → 26 | – | 291 → 291 |
+| Domesday | 0.058 → 0.058 | 0.861 / 0.897 → same | 23 → 23 | 1,277 → 1,277 | 577 → 577 |
+| Mariéjol | 0.310 → 0.310 | 0.727 / 0.753 → 0.730 / 0.765 | 26 → 26 | 567 → 567 | – |
+
+Every tolerance of the plan holds, and every target of reocr §9.
+Domesday's tables (page indices 156 to 159) show only in the scorer's
+tables part, as expected. Two smaller falls, both by design:
+
+- Haskins and Stubbs lose 9 and 10 tokens: printed page numbers of their
+  contents pages, which the EPUB no longer shows (structure §31).
+- "Blocks of the right kind" fell on Stubbs (424 → 386) and Mariéjol
+  (1,104 → 1,090) because the scorer had no kind for a contents entry. A
+  row was added to `docs/specs/evaluation.md` and to galley-eval (a
+  contents entry holding a reference paragraph or quote is of the right
+  kind); rescored, Stubbs gives 427 and Mariéjol 1,105.
+
+`uv run pytest -m whole_book`, the owner's PDFs present: 144 passed in
+585 s. The eight EPUBs in `runs/lists-figures/` of the main checkout
+pass epubcheck 5.4.0 with 0 errors and 0 warnings; build times Haskins
+18 s, Stubbs 52 s, Domesday 99 s, Mariéjol 27 s, Kadesh 6 s, Gierke 66 s,
+Turney 12 s, Haynes 16 s.
+
+The default run: 2,777 passed in 69.0 to 69.8 s (three runs, idle
+machine), under the plan's 70 s by less than a second; 62.6 s on `main`
+for 2,494 tests. The 7 s of growth is spread out: the excerpt runs take
+2.9 s more, about 280 new tests about 4 s. Cutting the two new excerpts
+would save under 1 s (Kadesh's tests use 9 of its 10 pages), so they
+were not cut; two epubcheck calls were merged into the one-call checks
+instead (8198ec4, 129caaf), saving about 2.5 s.
+
+## Task 7.2: the checks by eye
+
+A subagent rendered every figure page of Kadesh, Haynes and Turney with
+the figure's box drawn on it, and read the lists and the contents
+against their pages. Counts only for the owner's books.
+
+| book | picture whole | caption | place | lists | contents entries / links |
+|---|---|---|---|---|---|
+| Kadesh | 17 / 17 | 17 / 17 (6 maps; 11 uncaptioned by design) | 17 / 17 | – | – |
+| Haynes | 25 / 25 | 25 / 25 | 25 / 25 | 11 / 11 items | 22 / 22, 22 / 22 |
+| Turney | 11 / 14 | 13 / 14 | 12 / 14 | none printed | 16 / 16, 16 / 16 |
+
+Wrong, and not fixed in this plan:
+
+- **Turney's insert of reproduced pages (164 to 179).** The rule finds a
+  picture as ink no word touches, and a reproduced newspaper or cartoon
+  is full of printed words. On page 175 the masthead, headline and photo
+  caption fall outside the picture and become a paragraph, two headings,
+  a margin note and a quote; on 167 a film still's label and on 176 a
+  cartoon's caption line are cut off the image; caption 5 on page 167 is
+  merged into one 163-word paragraph with the captions of facing plates;
+  the second figure of 176 and the figure of 179 come after page 180's
+  first paragraph, which gains 9 words from the cartoon. A rule that
+  takes printed text inside a picture's frame into the figure is a plan
+  of its own; until then the owner can fix these pages with
+  `exclude_regions` in Turney's config.
+- **Haynes' contents**: pen circles on the scan around chapter numbers
+  1, 6 and 7 are read as text, and the first two numbers are lost into
+  the title; the closing chapter's page number, read "3x3", stays in
+  its title.
+
+Nothing lost, gained or reordered next to a figure in Kadesh or Haynes;
+the garbled text of Kadesh pages 38 and 51 is the same in the previous
+run.

@@ -534,10 +534,10 @@ passing epubcheck, and the default run's time.
 
 **Stands on:** WPs 1 to 6.
 
-- [ ] 7.1 The measurement: deliverables 1 to 4. Spec: structure §32,
+- [x] 7.1 The measurement: deliverables 1 to 4. Spec: structure §32,
   "Measured by `galley-eval run`"; figures §10; `docs/specs/evaluation.md`
   §9.
-- [ ] 7.2 The checks by eye, and the fixes they call for. Spec:
+- [x] 7.2 The checks by eye, and the fixes they call for. Spec:
   figures §10, "Reference pages"; structure §32, "Excerpt tests", the
   owner's check done as "Changed reference pages" says. Needs 7.1.
   Deliverable 5.
