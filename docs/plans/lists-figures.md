@@ -246,16 +246,16 @@ other streams.
 12 squares and 5 known words; the growth of a box into the outer band
 was checked on Haynes and Turney only.
 
-- [ ] 2.1 `figure_boxes` in analyze, on the 36 dpi render the plate
+- [x] 2.1 `figure_boxes` in analyze, on the 36 dpi render the plate
   rule already makes, with the excluded regions; the boxes in
   pages.json, empty on other kinds; the INFO log per page; with the
   unit tests. Spec: figures §3; §6, `figure_boxes`; §9; §10, its first
   bullet. Stream `figures`. Deliverable 1.
-- [ ] 2.2 extract's cut at 300 dpi in the PDFium thread, the file
+- [x] 2.2 extract's cut at 300 dpi in the PDFium thread, the file
   names, `Figure.kind` on every figure; with the unit tests and the
   excerpt test of the boxes. Spec: figures §4; §5, "Which figures are
   in-page"; §9. Needs 2.1. Stream `figures`. Deliverable 2.
-- [ ] 2.3 The whole-book tests of deliverable 3 and the measurements in
+- [x] 2.3 The whole-book tests of deliverable 3 and the measurements in
   the report. Spec: figures §2, §3 "Measured", §10 "Whole-book tests".
   Needs 2.2. Stream `figures`. Deliverable 3.
 - [ ] Review of work package 2.
@@ -303,7 +303,7 @@ layout takes the figure's words out may differ (figures §5,
 "Measured"). The head-line case of Turney 174 depends on structure §3
 not making that row a running head.
 
-- [ ] 3.1 layout's step before its step 1 on a page with in-page
+- [x] 3.1 layout's step before its step 1 on a page with in-page
   figures: the words inside each box made the figure's region, never
   re-read; `kind` copied through; with the unit tests. Spec: figures
   §5, "layout: the figure's words kept apart". Needs 2.2. Stream

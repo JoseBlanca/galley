@@ -904,9 +904,10 @@ def check_stage(
     the reference's; without a list item's label, which is not written,
     and a contents entry's page number; the number of list items against
     the items of Pandoc's lists of list items, and of contents entries with
-    a heading reference against the links of contents entries, each of
-    which must target the heading its entry's heading_ref names. The words are compared as multisets over
-    the whole book, split on white space, nothing normalised.
+    a heading reference against the links of contents entries, each of which
+    must target the heading its entry's heading_ref names. The words are
+    compared as multisets over the whole book, split on white space, nothing
+    normalised.
 
     Raises FidelityError with the missing and invented words, their counts,
     and the pages or blocks each came from. At the layout boundary it also

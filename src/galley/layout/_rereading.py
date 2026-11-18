@@ -55,6 +55,7 @@ from galley.layout._reread import (
 )
 from galley.model import (
     Box,
+    FigureKind,
     PageLayout,
     PageWords,
     Reread,
@@ -62,6 +63,7 @@ from galley.model import (
     TextSource,
     Word,
     WordsFile,
+    box_holds_middle,
     take_out_once,
     words_after_rereads,
 )
@@ -274,13 +276,40 @@ def _page_readings(
     rereading: Rereading,
 ) -> tuple[RegionReading, ...]:
     """The regions of `page` read with Tesseract, as `_read_regions` gives
-    them; a failure of Tesseract is an ExternalProgramError that names the
-    page and the PDF."""
+    them, each without the words whose middle lies inside one of the
+    page's in-page figures, Tesseract's and the layer's it may replace
+    (figures spec section 5): a crop may run across a figure, whose words
+    are its region's and never read again. A failure of Tesseract is an
+    ExternalProgramError that names the page and the PDF."""
     try:
-        return _read_regions(page, parts, measures, rereading)
+        readings = _read_regions(page, parts, measures, rereading)
     except ExternalProgramError as err:
         msg = f"re-reading page {page.index} of {rereading.pdf}: {err}"
         raise ExternalProgramError(msg) from err
+    boxes = tuple(
+        figure.box for figure in page.figures if figure.kind is FigureKind.IN_PAGE
+    )
+    if not boxes:
+        return readings
+    return tuple(_outside_figures(reading, boxes) for reading in readings)
+
+
+def _outside_figures(reading: RegionReading, boxes: tuple[Box, ...]) -> RegionReading:
+    """`reading` without its words, Tesseract's and the layer's, whose
+    middle lies inside one of `boxes`, edges included."""
+
+    def outside(words: tuple[Word, ...]) -> tuple[Word, ...]:
+        return tuple(
+            word
+            for word in words
+            if not any(box_holds_middle(box, word.box) for box in boxes)
+        )
+
+    return replace(
+        reading,
+        ocr_words=outside(reading.ocr_words),
+        layer_words=outside(reading.layer_words),
+    )
 
 
 def _read_regions(

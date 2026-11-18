@@ -1,5 +1,5 @@
 """extract: the words of every page, written to words.json (walking
-skeleton spec section 6, plates spec section 3).
+skeleton spec section 6, plates spec section 3, figures spec section 4).
 
 extract reads the words of each text page, and of each plate page that
 has a text layer, from the PDF's text layer with pdfplumber, one document
@@ -8,10 +8,14 @@ per worker thread. The words of an excluded page, of a front-matter page
 the config excludes, become removals, so that no word is dropped without
 a record. A plate page is rendered whole at 300 dpi
 into `images/plate-<page index, 4 digits>.png`, and the page gets one
-figure, the whole page. The cover is rendered as `images/cover.png`.
+figure, the whole page. A text page with figure boxes in pages.json is
+rendered at 300 dpi and each box cut into
+`images/figure-<page index, 4 digits>-<n>.png`, one in-page figure each.
+The cover is rendered as `images/cover.png`.
 """
 
 import logging
+import math
 from collections.abc import Callable
 from contextlib import closing
 from pathlib import Path
@@ -37,13 +41,14 @@ from galley.model import (
     TextSource,
     Word,
     WordsFile,
+    box_holds_middle,
     read_checked_pages,
     write_words,
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 from galley.text_layer import layer_words, open_pdf
 
-__all__ = ["page_words", "plate_image", "run"]
+__all__ = ["figure_crop_px", "figure_image", "page_words", "plate_image", "run"]
 
 _logger = logging.getLogger(__name__)
 
@@ -52,21 +57,24 @@ _logger = logging.getLogger(__name__)
 # spec section 3).
 _COVER_DPI: Final[int] = 300
 _PLATE_DPI: Final[int] = 300
+# Figures spec section 4: an in-page figure is cut from a render at 300 dpi.
+_FIGURE_DPI: Final[int] = 300
 
 
 def run(
     folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS
 ) -> None:
     """Writes `folder.words_json`, the words of every page of `config.pdf`
-    as `folder.pages_json` describes them, the image of each plate page in
-    `images/`, and `images/cover.png` when the config has a `cover_page`.
+    as `folder.pages_json` describes them, the image of each plate page and
+    of each in-page figure in `images/`, and `images/cover.png` when the
+    config has a `cover_page`.
 
     Deletes words.json, images/ and every later stage's file first
     (lines.json, blocks.json, book.md, book.epub), then always creates
-    images/, empty without a cover or a plate. Raises InputFileError when
+    images/, empty without a cover, a plate or a figure. Raises InputFileError when
     pages.json is missing, malformed, made from another PDF, or holds a
     page read by OCR, which extract cannot read yet. `workers` is the
-    number of threads that read the pages and write the plates' images;
+    number of threads that read the pages and write the figures' images;
     the renders are made in the one PDFium thread.
     """
     delete_stage_outputs(folder, Stage.EXTRACT)
@@ -128,6 +136,12 @@ def _page_reader(
                 pdfium.render(pdf_path, page.index, _PLATE_DPI),
                 book_root / plate_image(page.index),
             )
+        if page.kind is PageKind.TEXT and page.figure_boxes:
+            _save_figures(
+                pdfium.render(pdf_path, page.index, _FIGURE_DPI),
+                page,
+                book_root,
+            )
         return page_words(page, page_layer_words)
 
     return read_page
@@ -138,6 +152,68 @@ def plate_image(page_index: int) -> str:
     the book folder: `images/plate-0016.png` for page 16 (plates spec
     section 3)."""
     return f"images/plate-{page_index:04d}.png"
+
+
+def figure_image(page_index: int, number: int) -> str:
+    """The path of the image of the in-page figure `number`, from 1 in the
+    order of pages.json, on page `page_index`, relative to the book folder:
+    `images/figure-0025-1.png` for the first on page index 25 (figures spec
+    section 4)."""
+    return f"images/figure-{page_index:04d}-{number}.png"
+
+
+def figure_crop_px(box: Box, dpi: int) -> tuple[int, int, int, int]:
+    """The pixels of a render at `dpi` that `box`, in points, covers, as
+    (left, top, right, bottom), right and bottom excluded: each side
+    rounded outwards to a whole pixel (figures spec section 4)."""
+    scale = dpi / pdfium.POINTS_PER_INCH
+    return (
+        math.floor(box.x0 * scale),
+        math.floor(box.top * scale),
+        math.ceil(box.x1 * scale),
+        math.ceil(box.bottom * scale),
+    )
+
+
+def _save_figures(rendered: RenderedPage, page: PageInfo, book_root: Path) -> None:
+    """Saves the image of each in-page figure of `page`, cut from
+    `rendered`, the page at 300 dpi, as an 8-bit grayscale PNG. A box that
+    runs past the render is cut to it, with a warning that names the page:
+    analyze's boxes lie on the page, so it is a box made from another
+    render or a page of another size."""
+    image = Image.frombytes(
+        "L", (rendered.width_px, rendered.height_px), rendered.pixels
+    )
+    for number, box in enumerate(page.figure_boxes, start=1):
+        left, top, right, bottom = figure_crop_px(box, rendered.dpi)
+        if (
+            left < 0
+            or top < 0
+            or right > rendered.width_px
+            or bottom > rendered.height_px
+        ):
+            _logger.warning(
+                "extract: page index %d, figure %d: its box (%.1f, %.1f, %.1f, "
+                "%.1f) pt runs past the page's render, %d by %d pixels at %d "
+                "dpi; the image is cut to the render",
+                page.index,
+                number,
+                box.x0,
+                box.top,
+                box.x1,
+                box.bottom,
+                rendered.width_px,
+                rendered.height_px,
+                rendered.dpi,
+            )
+        image.crop(
+            (
+                max(0, left),
+                max(0, top),
+                min(rendered.width_px, right),
+                min(rendered.height_px, bottom),
+            )
+        ).save(book_root / figure_image(page.index, number), format="PNG")
 
 
 def _layer_words(pdf: pdfplumber.PDF, page_index: int) -> tuple[Word, ...]:
@@ -171,12 +247,14 @@ def page_words(
     those whose centre is inside one of its `exclude_regions`, edges
     included, which are removals with the reason `excluded_region`. Every
     word of an excluded page is a removal with the reason `excluded_page`,
-    and of a front-matter page one with the reason `front_matter`.
-    A blank page has neither. A plate page has one figure, the whole page,
-    at 300 dpi, whose image is `plate_image(page.index)`; no other page
-    has one. Raises ValueError for a page read by OCR, which extract
-    cannot read yet, and for a blank page or a plate without a text layer
-    given words, which would be lost.
+    and of a front-matter page one with the reason `front_matter`. A blank
+    page has neither. A plate page has one figure, the whole page, at 300
+    dpi, whose image is `plate_image(page.index)`, of kind `plate`; a text
+    page has one for each of its `figure_boxes`, in their order, with that
+    box, at 300 dpi, whose image is `figure_image(page.index, n)`, n from 1,
+    of kind `in_page`; no other page has one. Raises ValueError for a page
+    read by OCR, which extract cannot read yet, and for a blank page or a
+    plate without a text layer given words, which would be lost.
     """
     if page.text_source is TextSource.OCR:
         message = f"page {page.index} is read by OCR, which extract cannot read yet"
@@ -185,6 +263,15 @@ def page_words(
     match page.kind:
         case PageKind.TEXT:
             kept, removals = _kept_and_region_removals(page, layer_words)
+            figures = tuple(
+                Figure(
+                    box=box,
+                    image=figure_image(page.index, number),
+                    dpi=_FIGURE_DPI,
+                    kind=FigureKind.IN_PAGE,
+                )
+                for number, box in enumerate(page.figure_boxes, start=1)
+            )
         case PageKind.PLATE:
             if page.text_source is TextSource.NONE and layer_words:
                 message = (
@@ -258,10 +345,5 @@ def _removal(page: PageInfo, layer_word: Word, reason: RemovalReason) -> Removal
 
 
 def _in_a_region(box: Box, regions: tuple[Box, ...]) -> bool:
-    """Whether the centre of `box` is inside one of `regions`, edges included."""
-    centre_x = (box.x0 + box.x1) / 2
-    centre_y = (box.top + box.bottom) / 2
-    return any(
-        region.x0 <= centre_x <= region.x1 and region.top <= centre_y <= region.bottom
-        for region in regions
-    )
+    """Whether the middle of `box` is inside one of `regions`, edges included."""
+    return any(box_holds_middle(region, box) for region in regions)

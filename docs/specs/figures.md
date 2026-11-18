@@ -112,7 +112,7 @@ means page index, from 0, in the whole book.
 | book | in-page figures | what they are | today |
 |---|---|---|---|
 | Haynes | 25, one each on pages 15, 25, 34, 45, 53, 58, 64, 71, 84, 95, 97, 111, 114, 119, 124, 133, 142, 143, 145, 162, 180, 182, 253, 254, 310 | engravings, paintings and photographs, numbered "figure 1" to "figure 25", each with its caption below the picture or in a narrow column beside it | the picture is lost and the caption runs into a paragraph: on page 25, figure 2's caption sits inside the paragraph that runs from page 24 to 25 (`runs/owner-books/haynes/book.md`, line 139, outside git) |
-| Turney | 14 on 12 pages: 164, 166, 167, 169, 172 to 176, 179, and the back cover, 311 | the book's insert of illustrations, pages 164 to 179, each page one or two pictures with numbered captions ("13. The…") and no running text; 170, 177 and 178 of the insert are plates, and 165, 168 and 171 are excluded by the config | 174 and 175, the reproduced magazine covers and newspaper front pages (figures 14 to 16), are text pages because their captions and the newspapers' lettering hold more than 20 known words, the plate rule's limit (plates §2): the lettering "Inside: Crisis in Portugal" becomes a heading, and so does the Daily Mail's headline |
+| Turney | 14 on 11 pages: 164, 166, 167, 169, 172 to 176, 179, and the back cover, 311 | the book's insert of illustrations, pages 164 to 179, each page one or two pictures with numbered captions ("13. The…") and no running text; 170, 177 and 178 of the insert are plates, and 165, 168 and 171 are excluded by the config | 174 and 175, the reproduced magazine covers and newspaper front pages (figures 14 to 16), are text pages because their captions and the newspapers' lettering hold more than 20 known words, the plate rule's limit (plates §2): the lettering "Inside: Crisis in Portugal" becomes a heading, and so does the Daily Mail's headline |
 | Kadesh | 6 maps on pages 29, 33, 36, 38, 41 and 45; blocks of hieroglyphs on 27, 32, 37, 39, 40, 44, 50 to 53, and of Arabic on 20 and 21 | the maps "MAP III." to "MAP VIII.", three of them narrow, with the text set beside them (36, 38, 41); the blocks, each a numbered quotation of an inscription | the maps' labels ("Kadesh", "Orontes") and the hieroglyphs' junk ("AAAAAA", "\\(t=]") run into the paragraphs; the pictures are lost |
 | the other five | none | Domesday's tables (page 425, "TABLE I.") are text with a text layer, not pictures | |
 
@@ -149,15 +149,36 @@ groups of picture squares; nothing more is rendered.
    (spec review, 18 November 2026). They never count as squares of the
    group. The box can then take in a strip of the scan's dark edge,
    24 pt at most.
-3. A group is a **figure** when both hold:
+3. A group is **cut at a rule**: where a band of at least **6 pt**
+   (3 pixel rows) without ink runs across all its squares, and one of
+   the two pixel rows next to the band, above or below it, holds a run
+   of ink pixels side by side, in the group's squares, at least **72 pt**
+   long, a rule or a frame's edge. Each square goes to the side of the
+   cut that holds most of its ink, the upper on a tie; the squares on
+   each side that touch side by side are a group, measured by step 2
+   with the ink on its side of the cut only. Without the cut, the rule
+   under the running heads of Kadesh 40, 44 and 53 joined the
+   hieroglyphs below it, and the hieroglyphs above Kadesh 41's map
+   joined the map's frame, whose box then took in the quotation number
+   "19." and the left third of three rows of hieroglyphs (review, 18
+   November 2026).
+4. A group is a **figure** when both hold:
    - it has at least **120 squares**;
    - at most **12 known words** have the middle of their box inside the
      group's box (the box before it is grown into the band).
+5. A group that is not a figure and whose box has its middle inside a
+   figure's box, edges included, grows the figure's box to hold its own:
+   the words read on a picture stop the squares they touch, and can cut
+   a part of it off, as the right ends of hieroglyph rows on Kadesh 50
+   and 51 and a corner of the photograph on Turney 173. The figure's
+   squares and known words are its own, as step 4 counted them.
 
 pages.json gives each `text` page its figures' boxes, from the top down
 and, at the same top, from the left (section 7). A page of any other
 kind has none: a plate is a figure whole (plates §3), and a page before
-the front-matter end is dropped.
+the front-matter end is dropped. The cover page (the config's
+`cover_page`), an excluded page and a page of `plate_pages` are never
+searched: the plate rule does not render them.
 
 **Measured**, on the text pages of the eight books, with the words of
 words.json:
@@ -172,7 +193,7 @@ words.json:
 | Kadesh 74, the library's card pocket on the last page | 130 | 17 |
 | Domesday 553, a library stamp at the top of the page | 100 | 0 |
 | Mariéjol 92, a running head printed as a picture, the layer holding no word of it | 68 | 0 |
-| Kadesh's rules under the running heads | fewer than 40 | |
+| Kadesh's rules under the running heads | fewer than 40, or 8 to 16 once cut from the hieroglyphs below (step 3) | |
 
 | threshold | value | from |
 |---|---|---|
@@ -181,6 +202,7 @@ words.json:
 | outer band | 24 pt | measured: with 12 pt, the dark edges of the scan made groups on 7 pages (Mariéjol 181, 375, 381, 429, 452; Domesday 427; Stubbs 248) |
 | ink, inked square, word box grown | 25 levels, 6%, 2 pt | plates §2's, for pages with a text layer |
 | group | at least 120 squares | measured: the smallest figure is Kadesh 38's map, 132; the largest group that is not a picture and has few known words is Domesday 553's stamp, 100 |
+| cut: band, line | 6 pt, 72 pt | measured: in the 56 figures, the bands without ink across a group are 6 to 12 pt (between rows of hieroglyphs, Kadesh 53's 12 pt as wide as the one above Kadesh 41's map), so the band alone does not tell a rule from a row; the runs of ink next to them are 30 pt at most (Kadesh 53), the rules and the frame 96 to 154 pt (Kadesh 53, 44, 41 and 40). On the eight books the cut changes the box of these four figures only, and the count of none |
 | known words in the box | at most 12 | measured: the figures hold 7 or fewer (Haynes 53); of the groups of 120 squares or more that are not pictures, Kadesh 74's card pocket holds 17 and Mariéjol 265 and 57 hold 29 and 52 |
 
 The two thresholds leave margins of 12 squares below the smallest map
@@ -233,16 +255,33 @@ A word of the text layer printed inside a picture lies on the same rows
 as the text beside it: Kadesh's map labels beside the lines set to the
 right of the map, Turney's caption beside a cover. Grouped with them,
 it joins their lines, and structure cannot take it back out. So layout,
-first of all on a page with in-page figures, before its step 1 (layout
-§3, "Per page"), takes out of the page's words those whose middle lies
-inside an in-page figure's box, but for the words of the page's first
-row (the row with the smallest top, as layout §1 makes rows), which may
-be the head line and stay with the page's words as today. The words
-taken out make one region per figure, whose box is the figure's box
-exactly, its lines grouped as layout groups any region's; a figure
-with no such word has no region. Steps 1 to the end then run on the
-words left, as today. A figure's region is never re-read with Tesseract
-(`docs/specs/reocr.md`).
+on a page with in-page figures, first lays the page out with all its
+words, as today (layout §3, "Per page", steps 1 to the end, and the
+re-reading), and then takes out of its regions' lines the words whose
+middle lies inside an in-page figure's box, but for the words of the
+page's first row (the row with the smallest top, as layout §1 makes
+rows), which may be the head line and stay where they are. A line left
+with no word is dropped, and so is a region left with no line; a line
+or region that lost a word has again the smallest box that holds what
+is left. The words taken out make one region per figure, after the
+page's other regions, whose box is the figure's box exactly, its lines
+grouped as layout groups any region's; a figure with no such word has
+no region. The page's other regions are then those it has today, less
+the figure's words. The words are taken out after the layout, not
+before it, because the bands and columns are found on all the page's
+rows: taken out before step 1, as a draft of this section did, the
+hieroglyphs among the footnotes of Kadesh page 52 left gaps that turned
+its 7 footnotes into 4, three of them into quotations of the body, and
+whole Kadesh had 148 footnotes against 152 (review, 18 November 2026).
+
+A figure's region is never re-read with Tesseract
+(`docs/specs/reocr.md`): no region read again replaces a word of the
+text layer whose middle lies inside an in-page figure's box, and of
+Tesseract's words, those whose middle lies inside one are dropped
+before the reading is scored. A footnote band's crop runs across the
+page's width, and on Kadesh page 51 it crosses the hieroglyphs: without
+this, Tesseract's reading of them would enter the notes, a second copy
+of words the figure's region holds.
 
 ### structure: removing the figure text
 
@@ -395,8 +434,8 @@ def figure_boxes(page: RenderedPage, words: tuple[tuple[str, Box], ...],
     # The boxes of the in-page figures of a text page by section 3, in
     # points, from the top down and then from the left. `words` are the
     # text layer's words, each its text and box in points; a word whose
-    # box lies inside one of `excluded`, the page's exclude_regions, does
-    # not stop a picture square and is not counted.
+    # box has its middle inside one of `excluded`, the page's
+    # exclude_regions, does not stop a picture square and is not counted.
 
 # galley.structure
 
@@ -447,7 +486,8 @@ of what this spec changed there.
   `in_page`."
 - §8, lines.json, after `Region`: "On a page with in-page figures, the
   words whose middle lies inside a figure's box, but for those of the
-  page's first row, are a region of their own whose box is the figure's
+  page's first row, are taken out of the regions the page's layout made
+  with them and are a region of their own whose box is the figure's
   box (`docs/specs/figures.md` §5)."
 - §8, the versions: pages.json 3, words.json 3, lines.json 4, blocks.json
   5, with the sentence on what each change added.
@@ -574,7 +614,7 @@ the test:
 
 | page | expected |
 |---|---|
-| 29 | one figure, its box within 6 pt of the map's frame; caption "MAP 111. The OrootH V«llt-> In tbo Vicimljr of Kadc>.li. 1:500,000 (after Blmekwhorn)" as read; "<•" and "/ifr,yrafex*^Tx" removed as `figure_text`; the paragraph before and after the map one block if the text runs on |
+| 29 | one figure, its box within 6 pt of the map's frame at the top and sides, and at the foot reaching the scale bars printed under the frame (step 2: their squares touch the frame's); caption "MAP 111. The OrootH V«llt-> In tbo Vicimljr of Kadc>.li. 1:500,000 (after Blmekwhorn)" as read; "<•" and "/ifr,yrafex*^Tx" removed as `figure_text`; the paragraph before and after the map one block if the text runs on |
 | 33 | one figure, caption "MAP IV. Fint Portions" |
 | 36 | the map a figure with caption "MAP V. Second Positions", the footnote's words on its row kept in the footnote; the two lines of hieroglyphs (85 and 82 squares) no figure |
 | 37 | the block of hieroglyphs a figure without caption (371 squares) |
@@ -586,7 +626,7 @@ their order, the removed words; by kind, the blocks in order.
 
 **Whole-book tests**, `whole_book`:
 
-- Kadesh: the 17 figures of section 2, on pages 20, 27 (two), 29, 33, 36, 37, 38, 40, 41, 44 (two), 45, 50, 51, 52 and 53, by page and count, the 6 maps with their captions' first two words.
+- Kadesh: the 17 figures of section 2, on pages 20, 27 (two), 29, 33, 36, 37, 38, 40, 41, 44 (two), 45, 50, 51, 52 and 53, by page and count, the 6 maps with their captions' first two words; the boxes of 40, 41, 44, 50, 51 and 53 to 1 pt, the cases of steps 3 and 5.
 - Haynes and Turney, each skipped when its PDF is absent from
   `samples/`: Haynes has 25 figures, one on each page of section 2,
   each with a caption whose first words are "figure" (any case) and its
