@@ -3054,7 +3054,7 @@ re-reading):
 | page numbers made margin notes | 289 | | 3 |
 | page numbers at the foot left in the text | 15 | | 4 |
 | notes linked | 0 of about 620 (notes and bibliography: four `quote` blocks) | 127 of 633, 120 to another chapter's note | 6, 12 |
-| epigraphs | 11, run into the text | 21, run into the text | 22 |
+| epigraphs | 13, run into the text | 21, run into the text | 22 |
 | a paragraph run over a page with an epigraph alone | pages 12 to 14 | | 6 |
 
 **What remains wrong after this plan**: the bibliographies come out as
@@ -3514,7 +3514,7 @@ when the PDF is absent. They assert counts only, never text:
 | endnotes, and note groups (notes with a `group`) | at least 580, 11 | at least 620, 18 |
 | endnotes linked | at least 450 | at least 550 |
 | links from a reference to a note of another group's chapter | 0 | 0 |
-| `epigraph` blocks, and those with line feeds | 11, 0 | 21, 8 |
+| `epigraph` blocks, and those with line feeds | 13, 0 | 21, 8 |
 | `source_dash` changes | 0 | 21 |
 
 The targets are set below the survey's and the prototypes' counts:
