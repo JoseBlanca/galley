@@ -2635,6 +2635,7 @@ def test_reread_scores_the_junk_under_a_word_not_its_copy_beside_it() -> None:
     )
     assert record.kept
     assert record.layer_words == (produce, conjunction, junk, copy)
+    assert record.junk_words == (junk,)
     assert (record.layer_score, record.ocr_score) == (1, 3)
 
 

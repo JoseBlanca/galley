@@ -1891,23 +1891,19 @@ def test_layout_with_one_ocr_word_the_only_reading_of_two_lines_words_fails() ->
     assert "the only ocr word that can read 'Domini'" in raised.value.detail
 
 
-def test_layout_with_one_ocr_word_reading_the_junk_under_it_and_its_copy_passes() -> (
-    None
-):
-    # Domesday page 36: the layer's junk "&g" lies under Tesseract's "seat-"
-    # and its copy "scat'" 6 pt below, out of the widened box; both are
-    # readings of the printed "scat-" (reocr spec, section 4, the exception
-    # in (a)).
-    junk = Word("&g", Box(10.0, 101.0, 30.0, 109.0), None)
-    copy = Word("scat'", Box(10.0, 107.0, 30.0, 115.0), None)
-    ocr = (Word("seat-", Box(10.0, 100.0, 30.0, 108.0), 80.0),)
+def _junk_and_copy_files(
+    under: Word, copy: Word, ocr_word: Word, junk_words: tuple[Word, ...]
+) -> tuple[WordsFile, LinesFile]:
+    """words.json and lines.json of one page whose layer words `under` and
+    `copy` a kept margin-note record replaces by `ocr_word`, naming
+    `junk_words` as junk."""
     words = WordsFile(
         source_pdf_sha256=_SHA,
         pages=(
             PageWords(
                 index=0,
                 text_source=TextSource.TEXT_LAYER,
-                words=(junk, copy),
+                words=(under, copy),
                 figures=(),
             ),
         ),
@@ -1917,24 +1913,86 @@ def test_layout_with_one_ocr_word_reading_the_junk_under_it_and_its_copy_passes(
         page_index=0,
         kind=RereadKind.MARGIN_NOTE,
         box=Box(0.0, 90.0, 40.0, 120.0),
-        layer_words=(junk, copy),
-        ocr_words=ocr,
+        layer_words=(under, copy),
+        ocr_words=(ocr_word,),
         layer_score=-1,
         ocr_score=-1,
         kept=True,
         dropped_junk_count=0,
+        junk_words=junk_words,
     )
     lines = LinesFile(
         source_pdf_sha256=_SHA,
         pages=(
             PageLayout(
-                index=0, regions=(Region(_BOX, (Line(_BOX, ocr),)),), figures=()
+                index=0,
+                regions=(Region(_BOX, (Line(_BOX, (ocr_word,)),)),),
+                figures=(),
             ),
         ),
         rereads=(reread,),
     )
+    return words, lines
 
-    check_stage(FidelityBoundary.LAYOUT, words, lines)
+
+# Domesday page 36: the layer's junk "&g" lies under Tesseract's "seat-"
+# and its copy "scat'" 6 pt below, out of the widened box; both are
+# readings of the printed "scat-" (reocr spec, section 4, the exception in
+# (a)).
+_UNDER_BOX = Box(10.0, 101.0, 30.0, 106.5)  # of a line above the copy's
+_SCAT = Word("scat'", Box(10.0, 107.0, 30.0, 115.0), None)
+_SEAT = Word("seat-", Box(10.0, 100.0, 30.0, 108.0), 80.0)
+
+
+def test_layout_with_one_ocr_word_reading_the_junk_under_it_and_its_copy_passes() -> (
+    None
+):
+    junk = Word("&g", _UNDER_BOX, None)
+    check_stage(
+        FidelityBoundary.LAYOUT, *_junk_and_copy_files(junk, _SCAT, _SEAT, (junk,))
+    )
+
+
+@pytest.mark.parametrize("under_text", ["&g", "the", "Ælfric"])
+def test_layout_with_a_word_under_the_copys_ocr_word_not_named_junk_fails(
+    under_text: str,
+) -> None:
+    # The check has no word list: it takes as junk only the words the
+    # record names, so a known word, or junk layout did not name, under
+    # Tesseract's word is read by no rule.
+    under = Word(under_text, _UNDER_BOX, None)
+    with pytest.raises(FidelityError) as raised:
+        check_stage(
+            FidelityBoundary.LAYOUT, *_junk_and_copy_files(under, _SCAT, _SEAT, ())
+        )
+    assert f"replaces {under_text!r}" in raised.value.detail
+
+
+def test_layout_with_a_word_of_the_next_line_under_the_copys_ocr_word_fails() -> None:
+    # Gierke page 127: the layer's "vacant", of the next line, lies under
+    # Tesseract's "Empire." beside the layer's copy "Empire."; a record
+    # that has Tesseract's "Empire." read it lets "Empire." stand for two
+    # printed words.
+    vacant = Word("vacant", Box(10.0, 105.0, 30.0, 113.0), None)
+    copy = Word("Empire.", Box(10.0, 92.0, 30.0, 100.0), None)
+    empire = Word("Empire.", Box(10.0, 100.0, 30.0, 108.0), 80.0)
+    with pytest.raises(FidelityError) as raised:
+        check_stage(
+            FidelityBoundary.LAYOUT, *_junk_and_copy_files(vacant, copy, empire, ())
+        )
+    assert "replaces 'vacant'" in raised.value.detail
+
+
+def test_layout_with_junk_named_outside_the_layer_words_fails() -> None:
+    junk = Word("&g", _UNDER_BOX, None)
+    words, lines = _junk_and_copy_files(junk, _SCAT, _SEAT, (junk,))
+    stray = Word("~", Box(50.0, 101.0, 60.0, 109.0), None)
+    (reread,) = lines.rereads
+    lines = replace(lines, rereads=(replace(reread, junk_words=(junk, stray)),))
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.LAYOUT, words, lines)
+    assert "names '~'" in raised.value.detail
+    assert "not among its layer words" in raised.value.detail
 
 
 # The plan owner-books (structure spec sections 22 to 25, architecture

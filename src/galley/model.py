@@ -35,7 +35,7 @@ from galley.errors import EditError, InputFileError
 # (architecture section 8).
 PAGES_FORMAT_VERSION = 2
 WORDS_FORMAT_VERSION = 2
-LINES_FORMAT_VERSION = 2
+LINES_FORMAT_VERSION = 3
 # 4 since the plan owner-books, 17 November 2026: epigraphs, note groups and
 # three word change reasons (architecture section 8).
 BLOCKS_FORMAT_VERSION = 4
@@ -258,6 +258,10 @@ class Reread:
     letter or digit, not punctuation or a sign the books print, dropped
     before `ocr_words`, and of its words stripped of an underscore at
     either end ("_and" is "and" in `ocr_words`; reocr spec, section 4).
+    `junk_words` are those of `layer_words` that layout replaced as the
+    layer's junk under a Tesseract word paired with the layer's copy of
+    its word (`junk_layer_words`), which the fidelity check, having no
+    word list, takes from the record.
     """
 
     page_index: int
@@ -269,6 +273,8 @@ class Reread:
     ocr_score: int
     kept: bool
     dropped_junk_count: int = 0
+    # A default, so that the records of regions with no junk need not name it.
+    junk_words: tuple[Word, ...] = ()
 
 
 # A kept Reread replaces a layer word that is the same printed word as one
@@ -544,28 +550,31 @@ class _Paired:
     `taken`, the positions of the Tesseract words that read one. `copies`
     are the positions of the layer words that the exception in (a) paired
     by (b) or (c) with a Tesseract word freed from the words under it, and
-    `under_freed` those of the layer words of that word's line under it.
+    `under_freed` those of the layer words of that word's line under it,
+    and `junk` those of them replaced as junk.
     """
 
     matched: tuple[bool, ...]
     taken: frozenset[int]
     copies: frozenset[int]
     under_freed: frozenset[int]
+    junk: frozenset[int]
 
 
 def _pairing(
     layer_words: Sequence[Word],
     ocr_words: Sequence[Word],
     is_known: Callable[[str], bool],
+    is_junk: Callable[[Word, Word], bool],
 ) -> _Paired:
     """The pairing of `layer_words` and `ocr_words` by the rules of
     `replaced_layer_words`: the rules applied once, then again with the
     Tesseract words of the exception in (a) freed, when there are any."""
-    first = _pairing_freeing(layer_words, ocr_words, is_known, frozenset())
+    first = _pairing_freeing(layer_words, ocr_words, is_known, is_junk, frozenset())
     freed = _unlike_over_free_letters(layer_words, ocr_words, first.matched)
     if not freed:
         return first
-    return _pairing_freeing(layer_words, ocr_words, is_known, freed)
+    return _pairing_freeing(layer_words, ocr_words, is_known, is_junk, freed)
 
 
 def _unlike_over_free_letters(
@@ -598,6 +607,7 @@ def _pairing_freeing(
     layer_words: Sequence[Word],
     ocr_words: Sequence[Word],
     is_known: Callable[[str], bool],
+    is_junk: Callable[[Word, Word], bool],
     freed: frozenset[int],
 ) -> _Paired:
     """The pairing of `layer_words` and `ocr_words` by the rules of
@@ -691,36 +701,44 @@ def _pairing_freeing(
         for position in sorted(paired_freed)
         for index in _under_line(layer_words, ocr_words[position])
     }
-    junk = _junk_under(layer_words, ocr_words, is_known, under_freed)
+    junk = _junk_under(layer_words, ocr_words, is_junk, under_freed)
     return _Paired(
         tuple(is_matched or index in junk for index, is_matched in enumerate(matched)),
         frozenset(taken),
         frozenset(copies),
         frozenset(under_freed),
+        frozenset(index for index in junk if not matched[index]),
     )
 
 
 def _junk_under(
     layer_words: Sequence[Word],
     ocr_words: Sequence[Word],
-    is_known: Callable[[str], bool],
+    is_junk: Callable[[Word, Word], bool],
     under_freed: Mapping[int, int],
 ) -> frozenset[int]:
     """The positions in `layer_words` of the junk under a freed Tesseract
     word that (b) or (c) paired, `under_freed` mapping each word under one
-    to that word's position in `ocr_words`: a word whose letters are
-    unlike the Tesseract word's and that is no known word, so not another
-    printed word the layer read rightly, or that holds the first digits of
-    the Tesseract word's number only."""
+    to that word's position in `ocr_words`: those `is_junk` takes for junk
+    under that word, of letters unlike its own."""
     return frozenset(
         index
         for index, position in under_freed.items()
-        if (
-            not is_known(layer_words[index].text)
-            or _is_digits_begun(layer_words[index], ocr_words[position])
-        )
+        if is_junk(layer_words[index], ocr_words[position])
         and not _letters_read_by(layer_words[index], ocr_words[position])
     )
+
+
+def _junk_by_word_list(is_known: Callable[[str], bool]) -> Callable[[Word, Word], bool]:
+    """Layout's test of the junk under a Tesseract word, by `is_known`:
+    a layer word that is no known word, so not another printed word the
+    layer read rightly, or that holds the first digits of the Tesseract
+    word's number only."""
+
+    def is_junk(word: Word, ocr_word: Word) -> bool:
+        return not is_known(word.text) or _is_digits_begun(word, ocr_word)
+
+    return is_junk
 
 
 def _is_digits_begun(word: Word, ocr_word: Word) -> bool:
@@ -738,11 +756,32 @@ def _is_digits_begun(word: Word, ocr_word: Word) -> bool:
     )
 
 
+def _junk_test(
+    is_known: Callable[[str], bool], is_junk: Callable[[Word, Word], bool] | None
+) -> Callable[[Word, Word], bool]:
+    """`is_junk`, or, when None, layout's test by `is_known`."""
+    return _junk_by_word_list(is_known) if is_junk is None else is_junk
+
+
+def junk_layer_words(
+    layer_words: Sequence[Word],
+    ocr_words: Sequence[Word],
+    *,
+    is_known: Callable[[str], bool],
+) -> tuple[Word, ...]:
+    """The words of `layer_words` that `replaced_layer_words` replaces as
+    the layer's junk under a Tesseract word of the exception in (a), by
+    `is_known`, in their order: a Reread's `junk_words`."""
+    junk = _pairing(layer_words, ocr_words, is_known, _junk_by_word_list(is_known)).junk
+    return tuple(word for index, word in enumerate(layer_words) if index in junk)
+
+
 def replaced_layer_words(
     layer_words: Sequence[Word],
     ocr_words: Sequence[Word],
     *,
     is_known: Callable[[str], bool],
+    is_junk: Callable[[Word, Word], bool] | None = None,
 ) -> tuple[Word, ...]:
     """The words of `layer_words`, the text layer's words a region read
     again may replace, that a kept Reread with Tesseract's `ocr_words`
@@ -775,14 +814,18 @@ def replaced_layer_words(
     above or below with letters equal or alike to its own, it is left to
     (b) and (c), and the words under it to the other `ocr_words`; if
     neither pairs it, it reads the words under it after all, and if one
-    does, it also replaces the junk under it that no rule matched: a word
-    `is_known` says is no known word, of letters unlike its own. In (b)
+    does, it also replaces the junk under it that no rule matched, of
+    letters unlike its own: a word `is_junk(word, ocr_word)` takes for
+    junk under it, or, when `is_junk` is None, a word `is_known` says is
+    no known word, or a number whose digits begin its own. In (b)
     and (c) the pairs of a layer word and a
     Tesseract word are taken nearest first, by the distance of their
     middles across plus up or down, each word in one pair at most. A layer
     word matched by none stays in the layer. Boxes in points.
     """
-    matched = _pairing(layer_words, ocr_words, is_known).matched
+    matched = _pairing(
+        layer_words, ocr_words, is_known, _junk_test(is_known, is_junk)
+    ).matched
     return tuple(
         word
         for word, is_matched in zip(layer_words, matched, strict=True)
@@ -795,12 +838,15 @@ def matched_ocr_positions(
     ocr_words: Sequence[Word],
     *,
     is_known: Callable[[str], bool],
+    is_junk: Callable[[Word, Word], bool] | None = None,
 ) -> frozenset[int]:
     """The positions in `ocr_words`, Tesseract's, of the words that read a
     word of `layer_words` by the rules of `replaced_layer_words`: those
     with a layer word under them or glued over them, and those paired by
     (b) or (c)."""
-    return _pairing(layer_words, ocr_words, is_known).taken
+    return _pairing(
+        layer_words, ocr_words, is_known, _junk_test(is_known, is_junk)
+    ).taken
 
 
 def scored_layer_words(
@@ -808,6 +854,7 @@ def scored_layer_words(
     ocr_words: Sequence[Word],
     *,
     is_known: Callable[[str], bool],
+    is_junk: Callable[[Word, Word], bool] | None = None,
 ) -> tuple[Word, ...]:
     """The words of `layer_words` whose reading score is set against that
     of `ocr_words` (reocr spec, section 3), in their order: those that
@@ -816,7 +863,7 @@ def scored_layer_words(
     that it pairs with. That word and the junk under it are two readings of
     one printed word, and the junk is the one rule (a) alone would have
     scored, so the exception changes the words replaced, not the choice."""
-    paired = _pairing(layer_words, ocr_words, is_known)
+    paired = _pairing(layer_words, ocr_words, is_known, _junk_test(is_known, is_junk))
     return tuple(
         word
         for index, (word, is_matched) in enumerate(
