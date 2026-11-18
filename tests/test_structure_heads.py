@@ -224,6 +224,16 @@ def test_chapter_label_stays_in_the_text_as_its_headings_label() -> None:
     assert all(_removed(blocks, page) == () for page in (14, 15, 16))
 
 
+def test_chapter_label_word_with_a_colon_after_it_is_no_running_head() -> None:
+    pages = (
+        *(_page_with_head(index, "THE BOOK") for index in range(10, 14)),
+        _page_with_head(14, "Chapter: One"),
+        _page_with_head(15, "Chapter: Two"),
+    )
+    survey = survey_book(_lines_of(*pages), workers=1)
+    assert survey.running_heads == frozenset(range(10, 14))
+
+
 def test_head_whose_first_word_only_starts_with_a_chapter_label_word_stays_a_head() -> (
     None
 ):
@@ -667,7 +677,7 @@ def test_whole_book_no_running_head_removed_starts_with_a_chapter_label_word(
     )
     assert heads
     assert not any(
-        head.split()[0].rstrip(".,").lower() in _LABEL_WORDS for head in heads
+        head.split()[0].rstrip(".,:;").lower() in _LABEL_WORDS for head in heads
     )
 
 

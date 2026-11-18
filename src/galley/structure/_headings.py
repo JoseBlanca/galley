@@ -13,7 +13,7 @@ from enum import StrEnum
 
 from galley.body_measures import median_word_height
 from galley.model import BlockKind, Line
-from galley.structure._heads import CHAPTER_LABEL_WORDS
+from galley.structure._heads import starts_with_chapter_label_word
 from galley.structure._lines import PlacedLine, is_centred
 from galley.structure._measures import Edges
 from galley.structure._runs import CHAPTER_LEVEL, SECTION_LEVEL, BodyRun, LabelLine
@@ -108,10 +108,9 @@ def _is_chapter_label(line: PlacedLine) -> bool:
 
 
 def _starts_with_label_word(line: PlacedLine) -> bool:
-    """Whether the line's first word, without the punctuation after it, is
-    one of the label words, in any case."""
-    texts = _texts(line)
-    return bool(texts) and texts[0].rstrip(".,:;").lower() in CHAPTER_LABEL_WORDS
+    """Whether the line's first word is a chapter label word (spec section
+    3)."""
+    return starts_with_chapter_label_word(_texts(line))
 
 
 def _has_long_word(texts: Sequence[str]) -> bool:
