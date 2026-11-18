@@ -443,8 +443,16 @@ def _short_page_end(
         and not before_page.index_lines
         and not page.index_lines
         and bool(page.body)
+        and not _note_led(before)
         and ends_paragraph_at_page_break(before, page.body[0])
     )
+
+
+def _note_led(line: PlacedLine) -> bool:
+    """Whether `line` starts with a note's marker followed by text: the
+    first line of a footnote left in the body (spec section 6, "A short
+    last line at a page break")."""
+    return len(line.line.words) > 1 and marker_form(first_word(line)) is not None
 
 
 def _block(lines: Sequence[PlacedLine], run: BodyRun | None) -> BodyBlock:

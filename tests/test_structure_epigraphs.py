@@ -662,6 +662,19 @@ def test_page_break_before_a_line_starting_in_lower_case_continues_the_paragraph
     assert _kinds(blocks) == (BlockKind.PARAGRAPH,)
 
 
+@pytest.mark.parametrize(
+    ("last", "kinds"),
+    [("8 Companies Act , sec. 4.", 1), ("Companies Act , sec. 4.", 2), ("8.", 2)],
+)
+def test_page_break_after_a_line_led_by_a_note_marker_continues_the_paragraph(
+    last: str, kinds: int
+) -> None:
+    # A footnote left in the body ends the page with its first line; the
+    # sentence it interrupts runs on with a capital (spec section 6).
+    blocks = _blocks(_page_ending_with(20, last), _flush_left_page(21))
+    assert len(_kinds(blocks)) == kinds
+
+
 def test_page_break_inside_a_verse_block_keeps_it_one_block() -> None:
     # Verse lines inset at least 30 pt from both edges (spec section 16,
     # rule 4), the last of page 20 ending a sentence.
