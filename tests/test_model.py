@@ -2280,6 +2280,25 @@ def test_unlike_junk_under_an_ocr_word_is_replaced_with_its_letters_word() -> No
     )
 
 
+def test_unlike_junk_under_an_ocr_word_stays_its_pair_beside_a_glued_alike_word() -> (
+    None
+):
+    # Domesday page 90: the layer glued the body's "of" to the note's
+    # "demesne" as "ofdemesne-", alike to Tesseract's "demesne." with 2
+    # letters more; replacing it would lose "of". The Tesseract word reads
+    # the junk under it, as rule (a) has it.
+    junk, glued = _layer("rSoyal", 10, 101), _layer("ofdemesne-", 10, 107)
+    ocr = (_tesseract("demesne.", 10, 100),)
+    assert model.replaced_layer_words((junk, glued), ocr, is_known=_unknown) == (junk,)
+    # One letter more is a copy: "the" beside Tesseract's "th" (page 107).
+    copy = _layer("the", 10, 107)
+    ocr = (_tesseract("th", 10, 100),)
+    assert model.replaced_layer_words((junk, copy), ocr, is_known=_unknown) == (
+        junk,
+        copy,
+    )
+
+
 def test_unlike_known_word_under_an_ocr_word_paired_by_letters_stays() -> None:
     # A known word under it may be another printed word the layer read
     # rightly ("14." under Tesseract's "146", Gierke page 63).
