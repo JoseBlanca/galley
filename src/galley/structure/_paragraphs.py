@@ -14,6 +14,7 @@ from typing import assert_never
 from galley.model import (
     BlockKind,
     Box,
+    FigureKind,
     Line,
     PageLayout,
     PageNumber,
@@ -81,7 +82,8 @@ class PageParts:
     in the body"), none until they are taken. On an index page,
     `index_lines` are the lines of its columns, left then right, and
     `index_starts` the positions of those that start an entry (spec
-    section 17)."""
+    section 17). `in_page_figures` are the boxes of the page's in-page
+    figures (`docs/specs/figures.md` §5)."""
 
     index: int
     removals: tuple[Removal, ...]
@@ -96,6 +98,7 @@ class PageParts:
     body_notes: tuple[PlacedLine, ...] = ()
     index_lines: tuple[PlacedLine, ...] = ()
     index_starts: frozenset[int] = frozenset()
+    in_page_figures: tuple[Box, ...] = ()
 
 
 def _pieces(lines: tuple[PlacedLine, ...]) -> tuple[Piece, ...]:
@@ -368,6 +371,9 @@ def page_parts(
         runs=page_runs.runs,
         index_lines=index_lines,
         index_starts=index.starts if index is not None else frozenset(),
+        in_page_figures=tuple(
+            figure.box for figure in page.figures if figure.kind is FigureKind.IN_PAGE
+        ),
     )
 
 

@@ -653,6 +653,7 @@ def _line_roles(
                 or page.index_lines
                 or page.index in section_pages
                 else _run_lines(page),
+                page.in_page_figures,
             )
             for page in pages
         ),
