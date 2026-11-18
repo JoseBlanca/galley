@@ -482,19 +482,20 @@ def test_paragraph_after_a_contents_page_starts_a_block() -> None:
 
 
 # The whole books (spec section 32, "Whole-book tests"): contents entries
-# linked to a heading, at least.
-_LINKED_AT_LEAST = {
+# linked to a heading, as section 30's table gives them at 0.7 (Gierke's
+# two runs 5 and 10).
+_LINKED = {
     "normansineuropea00hask": 9,
     "earlyplantagenet01stub": 13,
     "domesdaybook00maituoft": 23,
-    "politicaltheorie00gieruoft": 13,
-    "catherinedemedic00mariuoft": 9,
+    "politicaltheorie00gieruoft": 15,
+    "catherinedemedic00mariuoft": 12,
 }
 
 
 @pytest.mark.whole_book
 @pytest.mark.timeout(900)
-@pytest.mark.parametrize("book", list(_LINKED_AT_LEAST))
+@pytest.mark.parametrize("book", list(_LINKED))
 def test_whole_book_contents_entries_linked_to_headings(
     whole_book_run: Callable[[str], BookFolder], book: str
 ) -> None:
@@ -505,7 +506,7 @@ def test_whole_book_contents_entries_linked_to_headings(
         for block in blocks.blocks
         if block.kind is BlockKind.CONTENTS_ENTRY and block.heading_ref is not None
     )
-    assert len(refs) >= _LINKED_AT_LEAST[book]
+    assert len(refs) == _LINKED[book]
     assert all(ref in headings for ref in refs)
 
 

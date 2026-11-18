@@ -575,31 +575,29 @@ def test_kadesh_numbered_paragraphs_stay_paragraphs(
     )
 
 
-# The whole books (spec section 32, "Whole-book tests"): list items in
-# Domesday's tables, at least 36 (the prototype found 40), and none in the
-# five other public-domain books.
-_LIST_ITEMS_AT_LEAST = {"domesdaybook00maituoft": 36}
-_NO_LISTS = (
-    "normansineuropea00hask",
-    "earlyplantagenet01stub",
-    "politicaltheorie00gieruoft",
-    "catherinedemedic00mariuoft",
-    "battleofkadeshst00breauoft",
-)
+# The whole books (spec section 32, "Whole-book tests"): the list items
+# and lists the code gives, as section 29 measured them: Domesday's tables
+# 40 items in 8 lists, none in the five other public-domain books.
+_LIST_ITEMS = {
+    "domesdaybook00maituoft": (40, 8),
+    "normansineuropea00hask": (0, 0),
+    "earlyplantagenet01stub": (0, 0),
+    "politicaltheorie00gieruoft": (0, 0),
+    "catherinedemedic00mariuoft": (0, 0),
+    "battleofkadeshst00breauoft": (0, 0),
+}
 
 
 @pytest.mark.whole_book
 @pytest.mark.timeout(900)
-@pytest.mark.parametrize("book", [*_LIST_ITEMS_AT_LEAST, *_NO_LISTS])
+@pytest.mark.parametrize("book", list(_LIST_ITEMS))
 def test_whole_book_list_items(
     whole_book_run: Callable[[str], BookFolder], book: str
 ) -> None:
     blocks = read_blocks(whole_book_run(book).blocks_json)
-    items = sum(block.kind is BlockKind.LIST_ITEM for block in blocks.blocks)
-    if book in _LIST_ITEMS_AT_LEAST:
-        assert items >= _LIST_ITEMS_AT_LEAST[book]
-    else:
-        assert items == 0
+    items = tuple(block for block in blocks.blocks if block.kind is BlockKind.LIST_ITEM)
+    # Domesday's lists are numbered; each starts at "1.".
+    assert (len(items), sum(item.label == "1." for item in items)) == _LIST_ITEMS[book]
 
 
 # Spec section 29, "The rules": the pages and runs whose lines the list
