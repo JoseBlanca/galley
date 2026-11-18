@@ -15,7 +15,11 @@ from galley.structure._bibliography import (
     with_band_as_body,
 )
 from galley.structure._body_notes import take_body_notes
-from galley.structure._endnotes import EndnoteSection, endnote_groups, endnote_section
+from galley.structure._endnotes import (
+    EndnoteSection,
+    endnote_paragraphs,
+    endnote_section,
+)
 from galley.structure._ids import numbered
 from galley.structure._index_entries import with_index_breaks, with_index_entries
 from galley.structure._lines import Piece, PlacedLine, first_word
@@ -175,13 +179,12 @@ def _note_sources(
     section 7): by their first page and, on a page, the endnotes, which
     come from the body, before the footnotes of the band. The endnotes are
     the groups of the endnote section `section` of `entries`."""
-    groups = endnote_groups(entries, section) if section is not None else ()
     endnotes = tuple(
         _Endnote(
-            group.marker,
-            tuple(entries[position].piece for position in group.paragraphs),
+            endnote.marker,
+            tuple(entries[position].piece for position in endnote.paragraphs),
         )
-        for group in groups
+        for endnote in (endnote_paragraphs(section) if section is not None else ())
     )
     keyed = [
         (note.paragraphs[0].lines[0].page_index, 0, position, note)
@@ -263,9 +266,11 @@ def _taken_body_notes(
     )
 
 
-def _section_pages(entries: Sequence[Entry]) -> range:
+def _section_pages(
+    entries: Sequence[Entry], contents_pages: frozenset[int], body_line_pitch: float
+) -> range:
     """The page indices of the endnote section, empty without one."""
-    section = endnote_section(entries)
+    section = endnote_section(entries, contents_pages, body_line_pitch)
     if section is None:
         return range(0)
     last = entries[section.paragraphs[-1]].piece.lines[0].page_index
@@ -439,7 +444,9 @@ def assemble(
     # the endnote section, which the notes left in the body (step 2.5) skip
     # and whose first page starts a paragraph; both change the paragraphs,
     # so the section's paragraphs are taken from the second.
-    section_pages = _section_pages(body_entries(parts, form))
+    section_pages = _section_pages(
+        body_entries(parts, form), contents_pages, body_line_pitch
+    )
     pages = _taken_body_notes(
         parts,
         band_notes,
@@ -455,7 +462,7 @@ def assemble(
         numbering,
     )
     entries = body_entries(pages, form, section_pages)
-    section = endnote_section(entries)
+    section = endnote_section(entries, contents_pages, body_line_pitch)
     section_pieces = frozenset(
         entries[position].piece for position in (section.paragraphs if section else ())
     )
