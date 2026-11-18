@@ -2053,6 +2053,51 @@ def test_structure_source_dash_of_several_dashes_read_by_the_ocr_passes() -> Non
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+@pytest.mark.parametrize(
+    ("lines", "blocks"),
+    [
+        # A dash taken off a word of the body: no epigraph has the word.
+        (
+            _lines_file((("—Thomas Hobbes, 1651",),)),
+            _blocks_file(
+                (_block("b-p0000-001", (0,), (_span("Thomas Hobbes, 1651"),)),),
+                word_changes=(_SOURCE_DASH,),
+            ),
+        ),
+        # An epigraph whose source starts with another word.
+        (
+            _lines_file((("The life of man.", "Hobbes", "—Thomas 1651"),)),
+            _blocks_file(
+                (
+                    _epigraph("Hobbes"),
+                    _block("b-p0000-003", (0,), (_span("Thomas 1651"),)),
+                ),
+                word_changes=(_SOURCE_DASH,),
+            ),
+        ),
+        # The epigraph's one part is on another page.
+        (
+            _lines_file(((), ("The life of man.", "—Thomas Hobbes, 1651"))),
+            _blocks_file(
+                (replace(_epigraph("Thomas Hobbes, 1651"), origin=(Origin(1, _BOX),)),),
+                word_changes=(_SOURCE_DASH,),
+            ),
+        ),
+    ],
+    ids=["body-word", "other-source", "other-page"],
+)
+def test_structure_source_dash_not_at_an_epigraphs_source_fails(
+    lines: LinesFile, blocks: BlocksFile
+) -> None:
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert raised.value.detail == (
+        "word change on page 0: ('Thomas',), a source_dash, is not the first word "
+        "of an epigraph's source"
+    )
+
+
 def test_structure_epigraph_source_dropped_from_the_block_is_missing() -> None:
     blocks = _blocks_file((_epigraph("Thomas Hobbes,"),), word_changes=(_SOURCE_DASH,))
 
