@@ -41,7 +41,11 @@ from galley.structure._regions import RegionKind, head_line, region_kinds
 from galley.structure._removals import foot_removals, head_removals
 from galley.structure._runs import BodyRun, LabelLine
 from galley.structure._summaries import summary_run
-from galley.structure._survey import BookSurvey, like_a_running_head
+from galley.structure._survey import (
+    BookSurvey,
+    in_head_band,
+    like_a_running_head,
+)
 from galley.structure._verse import verse_runs
 
 
@@ -149,11 +153,6 @@ def _runs(
     )
 
 
-# Spec section 3: running heads lie at most 2 pitches below the median top
-# of the book's head lines.
-_HEAD_TOP_PITCHES = 2.0
-
-
 def kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
     """The text line of the page's head line when section 3 left it in the
     text and its top lies at most 2 pitches below the median top of the
@@ -168,10 +167,7 @@ def kept_head_line(page: PageLayout, survey: BookSurvey) -> Line | None:
     ):
         return None
     line = head.region.lines[-1]
-    within = (
-        line.box.top - survey.median_head_top
-        <= _HEAD_TOP_PITCHES * survey.body_line_pitch
-    )
+    within = in_head_band(line.box.top, survey.median_head_top, survey.body_line_pitch)
     return line if within else None
 
 
@@ -184,11 +180,11 @@ def _like_running_heads(
     and whose letters are at least 0.6 alike to a running head's."""
     if survey.median_head_top is None:
         return frozenset()
-    limit = survey.median_head_top + _HEAD_TOP_PITCHES * survey.body_line_pitch
+    median_head_top = survey.median_head_top
     return frozenset(
         number
         for number, line in enumerate(body)
-        if line.line.box.top <= limit
+        if in_head_band(line.line.box.top, median_head_top, survey.body_line_pitch)
         and like_a_running_head(
             letters(words_text(line.line.words)), survey.running_head_letters
         )
