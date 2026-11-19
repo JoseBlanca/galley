@@ -327,7 +327,6 @@ def test_whole_one_line_notes_are_footnotes_and_no_paragraph(
 _FOOTNOTE_PAGES_AT_START = {
     "normansineuropea00hask": 64,
     "earlyplantagenet01stub": 2,
-    "catherinedemedic00mariuoft": 336,
     "domesdaybook00maituoft": 489,
     "politicaltheorie00gieruoft": 35,
     "battleofkadeshst00breauoft": 40,

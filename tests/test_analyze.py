@@ -1569,7 +1569,6 @@ WHOLE_BOOK_PLATES = frozendict(
             (52, TextSource.NONE),
             (54, TextSource.NONE),
         ),
-        "catherinedemedic00mariuoft": (),
         "normansineuropea00hask": (),
         "politicaltheorie00gieruoft": (),
     }
@@ -1659,26 +1658,6 @@ WHOLE_BOOK_PAGE_KINDS_AT_9F012AC = frozendict(
                 (72, PageKind.EXCLUDED),
                 (73, PageKind.EXCLUDED),
                 (75, PageKind.EXCLUDED),
-            ),
-        ),
-        "catherinedemedic00mariuoft": (
-            460,
-            (
-                (0, PageKind.EXCLUDED),
-                (1, PageKind.EXCLUDED),
-                (2, PageKind.EXCLUDED),
-                (3, PageKind.EXCLUDED),
-                (4, PageKind.EXCLUDED),
-                (5, PageKind.EXCLUDED),
-                (17, PageKind.EXCLUDED),
-                (449, PageKind.EXCLUDED),
-                (451, PageKind.EXCLUDED),
-                (453, PageKind.EXCLUDED),
-                (454, PageKind.EXCLUDED),
-                (455, PageKind.EXCLUDED),
-                (456, PageKind.EXCLUDED),
-                (457, PageKind.EXCLUDED),
-                (458, PageKind.EXCLUDED),
             ),
         ),
         "domesdaybook00maituoft": (
@@ -1787,7 +1766,6 @@ WHOLE_BOOK_FRONT_MATTER = frozendict(
         "normansineuropea00hask": (1, 2, 6, 8, 9, 10),
         "earlyplantagenet01stub": (1, 6, 7, 12, 13),
         "domesdaybook00maituoft": (4, 8, 9, 10, 11),
-        "catherinedemedic00mariuoft": (6, 7, 8, 9),
         "politicaltheorie00gieruoft": (1, 6, 7, 8, 9),
         "battleofkadeshst00breauoft": (4, 5, 6, 7),
     }

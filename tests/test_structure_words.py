@@ -549,9 +549,11 @@ def test_make_blocks_splits_a_word_glued_at_a_case_change() -> None:
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
-# Whole books: no sign attached in Mariéjol, a French book, and some in each
-# English one (spec section 26, deliverable 3 of the plan's work package 5).
-_MARIEJOL = "catherinedemedic00mariuoft"
+# Whole books: some signs attached in each English one (spec section 26,
+# deliverable 3 of the plan's work package 5). Mariéjol, the French book,
+# left the whole-book tests on 19 November 2026 (docs/plans/ocr-redo.md);
+# its no-break space before a spaced sign is tested on its excerpt
+# (tests/test_excerpts.py, page 212).
 _ENGLISH_BOOKS = (
     "normansineuropea00hask",
     "earlyplantagenet01stub",
@@ -564,8 +566,8 @@ _ENGLISH_BOOKS = (
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(900)
-@pytest.mark.parametrize("book", [_MARIEJOL, *_ENGLISH_BOOKS])
-def test_whole_book_attaches_spaced_signs_in_english_and_none_in_french(
+@pytest.mark.parametrize("book", _ENGLISH_BOOKS)
+def test_whole_book_attaches_spaced_signs_in_english_with_no_no_break_space(
     whole_book_run: Callable[[str], BookFolder], book: str
 ) -> None:
     blocks = read_blocks(whole_book_run(book).blocks_json)
@@ -578,10 +580,7 @@ def test_whole_book_attaches_spaced_signs_in_english_and_none_in_french(
         )
         for span in block.spans
     )
-    if book == _MARIEJOL:
-        assert (attached, no_break > 0) == (0, True)
-    else:
-        assert (attached > 0, no_break) == (True, 0)
+    assert (attached > 0, no_break) == (True, 0)
 
 
 @pytest.mark.whole_book

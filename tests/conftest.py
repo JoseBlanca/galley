@@ -254,11 +254,15 @@ REDO_EXCERPT_CONFIGS = frozendict(
     }
 )
 
-# The configs of the six whole books, by Internet Archive identifier,
-# without `pdf`, `title` and `authors`: the one place the whole_book tests
-# of every stage take them from. The four books of the evaluation set have
-# the same pages as in evaluation/books.toml, which test_end_to_end.py
-# checks.
+# The configs of the five whole books, by Internet Archive identifier,
+# without `pdf`: the one place the whole_book tests of every stage take
+# them from. Each has the book's title and authors, so that an EPUB made
+# from it is titled as the book is (docs/plans/ocr-redo.md). The three
+# books of the evaluation set have the same title, authors and pages as in
+# evaluation/books.toml, which test_end_to_end.py checks. Mariéjol
+# (catherinedemedic00mariuoft) left the whole-book tests on 19 November
+# 2026: neither its text layer nor Tesseract reads its worn print; its
+# excerpts stay.
 #
 # exclude_pages: the pages without a text layer that are not plates, which
 # analyze refuses unless excluded (the evaluation books' as in
@@ -266,14 +270,12 @@ REDO_EXCERPT_CONFIGS = frozendict(
 # November 2026), and the pages that analyze's plate rule takes wrongly
 # (docs/specs/plates.md, sections 1 and 2): Kadesh 0, the cover, 16, the
 # scan of a cover (the owner, 16 November 2026), and 49 and 65, backs of
-# plates; Mariéjol 1 and 2, marbled endpapers, and 457 and 458,
-# an endpaper and the library's card pocket; Mariéjol 0, its cover, has no
-# layer. The plates without a text layer (Kadesh 17, 23, 35, 43, 57 and 69;
+# plates. The plates without a text layer (Kadesh 17, 23, 35, 43, 57 and 69;
 # Stubbs 9, 11, 52 and 54) are not excluded: analyze takes them as plates
 # (16 November 2026).
 #
 # contents_pages: the printed table of contents, found on 16 November 2026
-# by "CONTENTS" or "TABLE DES MATIERES" at the top of the page and checked
+# by "CONTENTS" at the top of the page and checked
 # by reading each page's text layer. Kadesh has none. Gierke has two more
 # lists of its chapters' parts: the "ANALYTICAL SUMMARY", pages 52 to 60,
 # which centres the ten section headings, and the "SUBJECT MATTER OF THE
@@ -284,6 +286,8 @@ REDO_EXCERPT_CONFIGS = frozendict(
 WHOLE_BOOK_CONFIGS = frozendict(
     {
         "normansineuropea00hask": (
+            'title = "The Normans in European History"\n'
+            'authors = ["Charles Homer Haskins"]\n'
             'language = "en"\n'
             "exclude_pages = [0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279]\n"
             "contents_pages = [14]\n"
@@ -292,6 +296,8 @@ WHOLE_BOOK_CONFIGS = frozendict(
         # are excluded: the heading rule takes their lines for headings
         # (structure spec section 27, point 4, settled 17 November 2026).
         "earlyplantagenet01stub": (
+            'title = "The Early Plantagenets"\n'
+            'authors = ["William Stubbs"]\n'
             'language = "en"\n'
             "exclude_pages = [0, 2, 3, 4, 5, 8, 10, 53, 55, 322, 323, 324, 325, "
             "326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, "
@@ -299,22 +305,22 @@ WHOLE_BOOK_CONFIGS = frozendict(
             "contents_pages = [14, 15, 16]\n"
         ),
         "domesdaybook00maituoft": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
             'language = "en"\n'
             "exclude_pages = [0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557]\n"
             "contents_pages = [14, 15, 16, 17, 18, 19, 20]\n"
         ),
-        "catherinedemedic00mariuoft": (
-            'language = "fr"\n'
-            "exclude_pages = [0, 1, 2, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456, "
-            "457, 458]\n"
-            "contents_pages = [450]\n"
-        ),
         "battleofkadeshst00breauoft": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["James Henry Breasted"]\n'
             'language = "en"\n'
             "exclude_pages = [0, 1, 2, 3, 16, 49, 65, 70, 71, 72, 73, 75]\n"
             "plate_pages = [23]\n"
         ),
         "politicaltheorie00gieruoft": (
+            'title = "Political Theories of the Middle Age"\n'
+            'authors = ["Otto Gierke"]\n'
             'language = "en"\n'
             "exclude_pages = [0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 288, 289]\n"
             "contents_pages = [10, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, "
@@ -494,8 +500,8 @@ def books_dir() -> Path:
 
 @pytest.fixture(scope="session")
 def whole_book_configs() -> frozendict[str, str]:
-    """WHOLE_BOOK_CONFIGS: the configs of the six whole books, by Internet
-    Archive identifier, without `pdf`, `title` and `authors`."""
+    """WHOLE_BOOK_CONFIGS: the configs of the five whole books, by Internet
+    Archive identifier, without `pdf`."""
     return WHOLE_BOOK_CONFIGS
 
 
@@ -505,16 +511,11 @@ def whole_book_toml(
 ) -> frozendict[str, str]:
     """The `book.toml` of each whole book, by Internet Archive identifier:
     its config of WHOLE_BOOK_CONFIGS, with the path of its PDF in
-    `books_dir`, the identifier as its title and one made-up author."""
+    `books_dir`."""
     # TOML basic strings take JSON's escapes, so json.dumps quotes any path.
     return frozendict(
         {
-            book: (
-                f"pdf = {json.dumps(str(books_dir / f'{book}.pdf'))}\n"
-                f"title = {json.dumps(book)}\n"
-                'authors = ["An Author"]\n'
-                f"{toml}"
-            )
+            book: f"pdf = {json.dumps(str(books_dir / f'{book}.pdf'))}\n{toml}"
             for book, toml in whole_book_configs.items()
         }
     )

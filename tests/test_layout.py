@@ -3296,7 +3296,6 @@ def test_reread_whole_stubbs_index_page_312_differs_from_its_transcription_as_fr
     "book",
     [
         "battleofkadeshst00breauoft",
-        "catherinedemedic00mariuoft",
         "domesdaybook00maituoft",
         "earlyplantagenet01stub",
         "normansineuropea00hask",

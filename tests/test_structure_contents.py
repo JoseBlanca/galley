@@ -491,7 +491,6 @@ _LINKED = {
     "earlyplantagenet01stub": 13,
     "domesdaybook00maituoft": 24,
     "politicaltheorie00gieruoft": 15,
-    "catherinedemedic00mariuoft": 12,
 }
 
 

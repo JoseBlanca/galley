@@ -583,7 +583,6 @@ _LIST_ITEMS = {
     "normansineuropea00hask": (0, 0),
     "earlyplantagenet01stub": (0, 0),
     "politicaltheorie00gieruoft": (0, 0),
-    "catherinedemedic00mariuoft": (0, 0),
     "battleofkadeshst00breauoft": (0, 0),
 }
 

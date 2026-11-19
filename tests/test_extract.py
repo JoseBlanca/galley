@@ -851,7 +851,6 @@ WHOLE_BOOK_FRONT_MATTER_REMOVALS = frozendict(
         "normansineuropea00hask": ((1, 2, 6, 8, 9, 10), 108),
         "earlyplantagenet01stub": ((1, 6, 7, 12, 13), 370),
         "domesdaybook00maituoft": ((4, 8, 9, 10, 11), 99),
-        "catherinedemedic00mariuoft": ((6, 7, 8, 9), 95),
         "politicaltheorie00gieruoft": ((1, 6, 7, 8, 9), 100),
         "battleofkadeshst00breauoft": ((4, 5, 6, 7), 91),
     }

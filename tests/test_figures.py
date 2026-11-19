@@ -704,7 +704,6 @@ _WHOLE_BOOK_FIGURES = frozendict(
         "normansineuropea00hask": frozendict(),
         "earlyplantagenet01stub": frozendict(),
         "domesdaybook00maituoft": frozendict(),
-        "catherinedemedic00mariuoft": frozendict(),
         "politicaltheorie00gieruoft": frozendict(),
     }
 )

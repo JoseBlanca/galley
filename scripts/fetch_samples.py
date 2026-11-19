@@ -188,6 +188,38 @@ BOOKS = (
             ),
         ),
     ),
+    # Mariéjol left the evaluation set on 19 November 2026 (docs/plans/ocr-redo.md):
+    # neither its text layer nor Tesseract reads its worn print, but its
+    # excerpts cover rules no other excerpt does.
+    Book(
+        archive_id="catherinedemedic00mariuoft",
+        title="J.-H. Mariéjol, Catherine de Médicis",
+        gutenberg_number=None,
+        excerpts=(
+            Excerpt(
+                name="mariejol_210-219",
+                page_indices=tuple(range(210, 220)),
+                covers=(
+                    "the excerpt of layout's reference pages "
+                    "(docs/specs/layout.md, section 8): page numbers at the "
+                    "foot in parentheses, a foot line holding the signature "
+                    "and the page number (page index 210), and footnotes in "
+                    "poor OCR"
+                ),
+            ),
+            Excerpt(
+                name="mariejol_headings_verse",
+                # Six pages, the cases of docs/specs/structure.md, section 9.
+                page_indices=(18, 51, 52, 142, 229, 430),
+                covers=(
+                    "a chapter opening, CHAPITRE and its title (page index "
+                    "18), verse over a page break (51, 52), a title that fills "
+                    "the column (142), two verse quotes on one page (229), and "
+                    "a heading of three lines (430)"
+                ),
+            ),
+        ),
+    ),
 )
 
 EVALUATION_BOOKS_TOML = REPO / "evaluation" / "books.toml"
@@ -470,30 +502,6 @@ EVALUATION_EXCERPTS = frozendict(
                     "whose column heads are "
                     "printed sideways, a page of print with words without "
                     "ink (481)"
-                ),
-            ),
-        ),
-        "catherinedemedic00mariuoft": (
-            Excerpt(
-                name="mariejol_210-219",
-                page_indices=tuple(range(210, 220)),
-                covers=(
-                    "the excerpt of layout's reference pages "
-                    "(docs/specs/layout.md, section 8): page numbers at the "
-                    "foot in parentheses, a foot line holding the signature "
-                    "and the page number (page index 210), and footnotes in "
-                    "poor OCR"
-                ),
-            ),
-            Excerpt(
-                name="mariejol_headings_verse",
-                # Six pages, the cases of docs/specs/structure.md, section 9.
-                page_indices=(18, 51, 52, 142, 229, 430),
-                covers=(
-                    "a chapter opening, CHAPITRE and its title (page index "
-                    "18), verse over a page break (51, 52), a title that fills "
-                    "the column (142), two verse quotes on one page (229), and "
-                    "a heading of three lines (430)"
                 ),
             ),
         ),

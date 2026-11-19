@@ -5537,23 +5537,6 @@ def test_whole_book_gierke_endnote_section_runs_from_186_to_282(
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
-def test_whole_book_mariejol_210_foot_line_gives_page_number_and_signature_mark(
-    whole_book_structure: WholeBookStructure,
-) -> None:
-    blocks = whole_book_structure("catherinedemedic00mariuoft")[1]
-    assert _removed_on(blocks, 210) == (
-        (RemovalReason.RUNNING_HEAD, "L'EXTERMINATION DU PARTI PROTESTANT"),
-        (RemovalReason.SIGNATURE_MARK, "UAMiàjoL. CmOl da Médidib 13"),
-        (RemovalReason.PAGE_NUMBER, "(l93)"),
-    )
-    assert _numbers_on(blocks, 210) == (
-        PageNumber(210, "(l93)", PageNumberPosition.FOOT),
-    )
-
-
-@pytest.mark.whole_book
-@pytest.mark.thread_unsafe
-@pytest.mark.timeout(600)
 def test_whole_book_haskins_quotes_and_bibliographical_notes(
     whole_book_structure: WholeBookStructure,
 ) -> None:
@@ -5597,7 +5580,6 @@ def test_whole_book_haskins_quotes_and_bibliographical_notes(
 
 _WHOLE_BOOKS = (
     "battleofkadeshst00breauoft",
-    "catherinedemedic00mariuoft",
     "domesdaybook00maituoft",
     "earlyplantagenet01stub",
     "normansineuropea00hask",
@@ -5635,7 +5617,6 @@ def test_whole_book_short_section_rule_removes_only_the_haskins_and_domesday_hea
         for book in _WHOLE_BOOKS
     } == {
         "battleofkadeshst00breauoft": (),
-        "catherinedemedic00mariuoft": (),
         "domesdaybook00maituoft": (13,),
         "earlyplantagenet01stub": (),
         "normansineuropea00hask": (13,),

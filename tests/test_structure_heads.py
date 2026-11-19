@@ -787,7 +787,6 @@ _PUBLIC_DOMAIN_BOOKS = (
     "normansineuropea00hask",
     "earlyplantagenet01stub",
     "domesdaybook00maituoft",
-    "catherinedemedic00mariuoft",
     "battleofkadeshst00breauoft",
     "politicaltheorie00gieruoft",
 )
