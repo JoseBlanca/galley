@@ -7,6 +7,7 @@ test that runs extract on a folder of its own is marked thread_unsafe, so
 that the 8-thread run does it once.
 """
 
+import logging
 import shutil
 from collections.abc import Callable
 from dataclasses import replace
@@ -444,6 +445,121 @@ def test_ocr_page_takes_the_layers_references_into_tesseracts_words() -> None:
         OCR_PAGE,
         (replace(HIM_36_TESSERACT, text="him,88"),),
     )
+
+
+# Layer words Tesseract missed (extract spec section 9). Kadesh's page 11:
+# Tesseract skipped the line "with the accession of new material made the
+# compilation" between "been great ... de Rougé's day" and "of a new
+# composite text". The pairs "been" and "text" give the page's offset,
+# 4.0 and 1.4 pt, median 2.7.
+BEEN_11_TESSERACT = tesseract_word("been", Box(268.3, 575.3, 283.9, 583.7), 95.9)
+ROUGES_11_TESSERACT = tesseract_word(
+    "Roug\u00e9's", Box(342.5, 575.3, 366.7, 583.7), 31.0
+)
+OF_11_TESSERACT = tesseract_word("of", Box(268.1, 591.1, 275.5, 599.5), 96.4)
+COMPOSITE_11_TESSERACT = tesseract_word(
+    "composite", Box(297.6, 592.8, 384.5, 598.6), 53.0
+)
+TEXT_11_TESSERACT = tesseract_word("text", Box(333.1, 591.1, 345.8, 599.5), 87.7)
+BEEN_11_LAYER = word("been", Box(269.0, 580.0, 281.7, 587.0))
+ROUGES_11_LAYER = word("Rouce's", Box(341.5, 580.0, 363.9, 587.0))
+WITH_11_LAYER = word("with", Box(269.3, 585.6, 281.0, 592.6))
+MATERIAL_11_LAYER = word("material", Box(359.5, 585.6, 384.1, 592.6))
+OF_11_LAYER = word("of", Box(268.8, 593.2, 273.8, 600.2))
+COMPOSITE_11_LAYER = word("oosaposite", Box(297.4, 593.2, 327.3, 600.2))
+TEXT_11_LAYER = word("text", Box(332.6, 593.2, 343.2, 600.2))
+PAGE_11_OFFSET = 2.7
+
+
+def moved_up(layer_word: Word, offset: float) -> Word:
+    box = layer_word.box
+    return replace(
+        layer_word, box=Box(box.x0, box.top - offset, box.x1, box.bottom - offset)
+    )
+
+
+def test_layer_line_tesseract_skipped_is_kept_moved_by_the_offset() -> None:
+    kept = extract.with_missed_layer_words(
+        (
+            BEEN_11_TESSERACT,
+            ROUGES_11_TESSERACT,
+            OF_11_TESSERACT,
+            COMPOSITE_11_TESSERACT,
+            TEXT_11_TESSERACT,
+        ),
+        (
+            BEEN_11_LAYER,
+            ROUGES_11_LAYER,
+            WITH_11_LAYER,
+            MATERIAL_11_LAYER,
+            OF_11_LAYER,
+            COMPOSITE_11_LAYER,
+            TEXT_11_LAYER,
+        ),
+    )
+    assert [word.text for word in kept] == [
+        "been",
+        "Roug\u00e9's",
+        "with",
+        "material",
+        "of",
+        "composite",
+        "text",
+    ]
+    assert kept[2].ocr_confidence is None
+    assert kept[2].box == pytest.approx(moved_up(WITH_11_LAYER, PAGE_11_OFFSET).box)
+    assert kept[3].box == pytest.approx(moved_up(MATERIAL_11_LAYER, PAGE_11_OFFSET).box)
+
+
+# Kadesh's page 12: the layer boxes its line up to 25 pt right of
+# Tesseract's, so that its "of" lies beside Tesseract's "of", which covers
+# no layer "of" (unclaimed); the pair "the" gives the offset.
+SIONS_12_TESSERACT = tesseract_word("sions", Box(67.4, 339.4, 89.5, 347.0), 96.3)
+OF_12_TESSERACT = tesseract_word("of", Box(91.9, 339.4, 100.6, 347.0), 96.6)
+THE_12_TESSERACT = tesseract_word("the", Box(104.4, 339.4, 118.3, 347.0), 96.3)
+SIONS_12_LAYER = word("sions", Box(91.9, 340.1, 99.2, 351.1))
+OF_12_LAYER = word("of", Box(100.7, 340.1, 103.6, 351.1))
+THE_12_LAYER = word("the", Box(104.4, 340.1, 116.1, 351.1))
+
+
+def test_layer_copy_of_a_word_tesseract_read_beside_it_is_not_kept() -> None:
+    tesseract_words = (SIONS_12_TESSERACT, OF_12_TESSERACT, THE_12_TESSERACT)
+    assert (
+        extract.with_missed_layer_words(
+            tesseract_words, (SIONS_12_LAYER, OF_12_LAYER, THE_12_LAYER)
+        )
+        == tesseract_words
+    )
+
+
+def test_layer_word_without_a_letter_or_digit_is_not_kept() -> None:
+    # Kadesh page 8's "=", which Tesseract does not read.
+    assert extract.with_missed_layer_words(
+        (BEEN_11_TESSERACT,), (word("=", Box(216.7, 619.5, 219.5, 626.5)),)
+    ) == (BEEN_11_TESSERACT,)
+
+
+def test_layer_word_of_a_page_without_pairs_is_kept_where_the_layer_boxes_it() -> None:
+    # Kadesh page 10's page number "83", which Tesseract does not read; no
+    # word of the two readings pairs, so the offset is 0.
+    page_number = word("83", Box(267.8, 645.2, 275.5, 655.2))
+    assert extract.with_missed_layer_words((BEEN_11_TESSERACT,), (page_number,)) == (
+        BEEN_11_TESSERACT,
+        page_number,
+    )
+
+
+def test_ocr_page_keeps_the_layer_words_tesseract_missed() -> None:
+    # The reference put back first makes "him,88" a pair of the two
+    # readings, which gives the offset.
+    _, words = extract._words_read(
+        OCR_PAGE, (HIM_36_TESSERACT,), (HIM_36_LAYER, WITH_11_LAYER)
+    )
+    offset = (HIM_36_LAYER.box.top + HIM_36_LAYER.box.bottom) / 2 - (
+        HIM_36_TESSERACT.box.top + HIM_36_TESSERACT.box.bottom
+    ) / 2
+    assert [word.text for word in words] == ["him,88", "with"]
+    assert words[1].box == pytest.approx(moved_up(WITH_11_LAYER, offset).box)
 
 
 # The excerpts, from the session fixture.
@@ -1007,7 +1123,22 @@ def test_ocr_pages_are_read_by_tesseract_alike_with_1_worker_and_with_6(
         == ("At", "Megiddo,", "already", "in", "the", "sixteenth", "century", "before")
         for start in range(len(texts))
     )
-    assert all(word.ocr_confidence is not None for word in words.pages[1].words)
+    # The words of page 1 without a confidence are the layer's words of the
+    # line Tesseract skipped, the first of note 8, "CHABAS was conscious of
+    # the thoroughness of his", and "FRANÇOIS" two lines below.
+    assert [
+        word.text for word in words.pages[1].words if word.ocr_confidence is None
+    ] == [
+        ">C||ABA*",
+        "wu",
+        "eocueiou*",
+        "of",
+        "the",
+        "thoroughness",
+        "of",
+        "his",
+        "FftAigou",
+    ]
     assert all(word.ocr_confidence is None for word in words.pages[2].words)
     # The page number 81 in page 0's region, as Tesseract reads it.
     assert [
@@ -1054,3 +1185,42 @@ def test_front_matter_removals_of_each_whole_book_are_the_words_of_its_front_pag
         len(removals),
     ) == (front_matter, word_count)
     assert all(not words.pages[index].words for index in front_matter)
+
+
+@pytest.mark.thread_unsafe
+def test_ocr_page_where_tesseract_finds_no_word_keeps_the_layers_words_and_warns(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Extract spec section 9: Kadesh's page 9 (the excerpt's page 1) marked
+    # `ocr`, with a Tesseract that reads no word on it.
+    pages = read_pages(excerpt_books[KADESH].pages_json)
+    pages = replace(
+        pages,
+        pages=(
+            pages.pages[0],
+            replace(pages.pages[1], text_source=TextSource.OCR),
+            *pages.pages[2:],
+        ),
+    )
+    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], TWO_PAGES_OF_REMOVALS)
+    write_pages(folder.pages_json, pages)
+    monkeypatch.setattr(extract.ocr, "read_image", lambda *_, **__: ())
+
+    with caplog.at_level(logging.WARNING, logger="galley.extract"):
+        extract.run(folder, read_config(folder.book_toml), workers=1)
+
+    page = read_words(folder.words_json).pages[1]
+    layer_page = read_words(excerpt_books[KADESH].words_json).pages[1]
+    assert page.text_source is TextSource.TEXT_LAYER
+    assert page.words == layer_page.words
+    assert "Me^iddo." in [word.text for word in page.words]
+    assert [record.getMessage() for record in caplog.records] == [
+        (
+            "extract: page index 1: Tesseract found no word on it; it keeps "
+            f"the {len(layer_page.words)} words of its text layer"
+        )
+    ]

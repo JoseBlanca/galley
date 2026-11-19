@@ -82,7 +82,20 @@ def test_page_with_a_bad_layer_has_tesseracts_words(
     assert page.text_source is TextSource(expected["text_source"])
     assert [run for run in expected["word_runs"] if not _holds_run(texts, run)] == []
     assert [word for word in expected["absent_words"] if word in texts] == []
-    assert all(word.ocr_confidence is not None for word in page.words)
+    # Every word is Tesseract's but those of the layer it missed: the first
+    # line of note 8, "CHABAS was conscious of the thoroughness of his",
+    # and "FRANÇOIS" (extract spec section 9).
+    assert [word.text for word in page.words if word.ocr_confidence is None] == [
+        ">C||ABA*",
+        "wu",
+        "eocueiou*",
+        "of",
+        "the",
+        "thoroughness",
+        "of",
+        "his",
+        "FftAigou",
+    ]
 
 
 @pytest.mark.tesseract
@@ -160,3 +173,23 @@ def test_rows_of_hieroglyphs_read_by_tesseract_make_no_heading(
         for (page, text), (_, starts) in zip(headings, expected, strict=False)
     ] == expected
     assert len(headings) == len(expected)
+
+
+@pytest.mark.tesseract
+def test_line_tesseract_skipped_is_kept_from_the_layer(
+    redo_excerpt_run: Callable[[str], BookFolder],
+) -> None:
+    # Extract spec section 9, "Layer words Tesseract missed": on Kadesh's
+    # page 11 (the excerpt's page 3) Tesseract skips the line "with the
+    # accession of new material made the compilation" of the right column
+    # (checked on the page at 200 dpi); the layer's words of it are kept,
+    # without a confidence, all but "the" before "compilation", whose
+    # layer word lies beside an unclaimed "the" of Tesseract's.
+    words = read_words(redo_excerpt_run(_EXCERPT).words_json)
+    page = next(page for page in words.pages if page.index == 3)
+    kept = tuple(word.text for word in page.words if word.ocr_confidence is None)
+    assert _holds_run(
+        kept,
+        ("with", "the", "ieeeeslon", "of", "new", "material", "made", "compilation"),
+    )
+    assert page.text_source is TextSource.OCR

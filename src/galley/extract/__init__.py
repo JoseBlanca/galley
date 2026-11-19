@@ -20,6 +20,7 @@ The cover is rendered as `images/cover.png`.
 
 import logging
 import math
+import statistics
 from collections.abc import Callable
 from contextlib import closing
 from dataclasses import replace
@@ -29,7 +30,7 @@ from typing import Final, NamedTuple, assert_never
 import pdfplumber
 from PIL import Image
 
-from galley import ocr, pdfium
+from galley import ocr, pdfium, text_layer
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig, tesseract_language
 from galley.model import (
@@ -51,7 +52,6 @@ from galley.model import (
 )
 from galley.note_references import after_last_letter, glued_reference
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
-from galley.text_layer import layer_words, open_pdf
 
 __all__ = [
     "are_over_each_other",
@@ -61,6 +61,7 @@ __all__ = [
     "plate_image",
     "run",
     "with_layer_references",
+    "with_missed_layer_words",
 ]
 
 _logger = logging.getLogger(__name__)
@@ -78,6 +79,17 @@ _OCR_PAGE_SEGMENTATION: Final[int] = 3
 # other when they overlap by half the lower height and half the narrower
 # width; a third of the height took 4 wrong references on Kadesh.
 _OVER_EACH_OTHER_SHARE: Final[float] = 0.5
+# Extract spec section 9, "Layer words Tesseract missed", measured on the
+# whole Kadesh book: a Tesseract word covers a layer word when they overlap
+# by a quarter of the lower height (half took many words Tesseract read);
+# a layer word is no copy of an unclaimed Tesseract word with its letters
+# within 16 pt (the layer misplaces some boxes by 14 pt); the page's offset
+# is taken over pairs of 3 or more letters whose middles are less than 12
+# pt apart.
+_COVER_HEIGHT_SHARE: Final[float] = 0.25
+_COPY_DISTANCE_PT: Final[float] = 16.0
+_OFFSET_PAIR_MIN_CHARACTERS: Final[int] = 3
+_OFFSET_PAIR_DISTANCE_PT: Final[float] = 12.0
 
 
 def run(
@@ -105,7 +117,7 @@ def run(
     pages_file = read_checked_pages(folder.pages_json, config.pdf)
     folder.images_dir.mkdir()
     results = map_pages_with_source(
-        lambda: open_pdf(config.pdf),
+        lambda: text_layer.open_pdf(config.pdf),
         _page_reader(config, folder.root),
         pages_file.pages,
         workers,
@@ -124,23 +136,26 @@ def run(
     )
     _logger.info(
         "extract: %d words and %d removals from %d pages of %s; %d words read "
-        "by Tesseract took the layer's note reference",
+        "by Tesseract took the layer's note reference, and %d words of the "
+        "layer that Tesseract missed were kept",
         sum(len(result.page.words) for result in results),
         sum(len(result.removals) for result in results),
         len(results),
         config.pdf,
         sum(result.layer_references for result in results),
+        sum(result.layer_words_kept for result in results),
     )
 
 
 class _PageRead(NamedTuple):
-    """What a worker gives for a page: its words, its removals, and how many
-    of Tesseract's words took the layer's note reference (extract spec
-    section 9)."""
+    """What a worker gives for a page: its words, its removals, how many of
+    Tesseract's words took the layer's note reference, and how many words
+    of the layer Tesseract missed were kept (extract spec section 9)."""
 
     page: PageWords
     removals: tuple[Removal, ...]
     layer_references: int
+    layer_words_kept: int
 
 
 def _page_reader(
@@ -198,11 +213,17 @@ def _page_reader(
                 page.index,
                 len(words),
             )
+        # On a page read by Tesseract, its words keep their confidence and
+        # their order; the layer's words kept among them have none.
+        read_by_tesseract = page_read.text_source is TextSource.OCR
         taken = tuple(
             (tesseract_word, taken_word)
-            for tesseract_word, taken_word in zip(tesseract_words, words, strict=False)
-            if page_read.text_source is TextSource.OCR
-            and tesseract_word.text != taken_word.text
+            for tesseract_word, taken_word in zip(
+                tesseract_words,
+                (word for word in words if word.ocr_confidence is not None),
+                strict=False,
+            )
+            if read_by_tesseract and tesseract_word.text != taken_word.text
         )
         for tesseract_word, taken_word in taken:
             _logger.info(
@@ -212,24 +233,44 @@ def _page_reader(
                 tesseract_word.text,
                 taken_word.text,
             )
-        return _PageRead(*page_words(page_read, words), len(taken))
+        kept = tuple(
+            word.text
+            for word in words
+            if read_by_tesseract and word.ocr_confidence is None
+        )
+        if kept:
+            _logger.info(
+                "extract: page index %d: %d words of the layer that Tesseract "
+                "missed are kept: %s",
+                page.index,
+                len(kept),
+                " ".join(kept),
+            )
+        return _PageRead(*page_words(page_read, words), len(taken), len(kept))
 
     return read_page
 
 
 def _words_read(
-    page: PageInfo, tesseract_words: tuple[Word, ...], layer_words: tuple[Word, ...]
+    page: PageInfo,
+    tesseract_words: tuple[Word, ...],
+    page_layer_words: tuple[Word, ...],
 ) -> tuple[PageInfo, tuple[Word, ...]]:
     """The page as extract reads it and its words, given Tesseract's words
     of the page (empty unless its source is `ocr`) and its layer's: a page
-    read by OCR has Tesseract's words, but when Tesseract found none it
-    keeps its layer's, with the source `text_layer`, so that no printed word
-    is lost (extract spec section 9); any other page has its layer's."""
+    read by OCR has Tesseract's words, with the layer's note references put
+    back and the layer words Tesseract missed kept, but when Tesseract found
+    none it keeps its layer's, with the source `text_layer`, so that no
+    printed word is lost (extract spec section 9); any other page has its
+    layer's."""
     if page.text_source is not TextSource.OCR:
-        return page, layer_words
-    if tesseract_words or not layer_words:
-        return page, with_layer_references(tesseract_words, layer_words)
-    return replace(page, text_source=TextSource.TEXT_LAYER), layer_words
+        return page, page_layer_words
+    if tesseract_words or not page_layer_words:
+        return page, with_missed_layer_words(
+            with_layer_references(tesseract_words, page_layer_words),
+            page_layer_words,
+        )
+    return replace(page, text_source=TextSource.TEXT_LAYER), page_layer_words
 
 
 def with_layer_references(
@@ -274,6 +315,139 @@ def _with_layer_reference(ocr_word: Word, layer_word: Word) -> Word:
 
 def _letter_count(text: str) -> int:
     return sum(character.isalpha() for character in text)
+
+
+def with_missed_layer_words(
+    ocr_words: tuple[Word, ...], layer_words: tuple[Word, ...]
+) -> tuple[Word, ...]:
+    """`ocr_words`, a page's words as Tesseract read them, with the layer
+    words Tesseract missed (extract spec section 9) put among them, each
+    with its box moved by the page's offset. Each goes before the first
+    word of `ocr_words` whose top is lower than its own, in the order of
+    `layer_words`."""
+    offset = _layer_offset(ocr_words, layer_words)
+    moved = tuple(_moved_up(layer_word, offset) for layer_word in layer_words)
+    unclaimed = tuple(
+        ocr_word
+        for ocr_word in ocr_words
+        if not any(
+            _letters_and_digits(layer_word.text) == _letters_and_digits(ocr_word.text)
+            and _covers(ocr_word.box, layer_word.box)
+            for layer_word in moved
+        )
+    )
+    missed = tuple(
+        layer_word
+        for layer_word in moved
+        if _letters_and_digits(layer_word.text)
+        and not any(_covers(ocr_word.box, layer_word.box) for ocr_word in ocr_words)
+        and not any(
+            _letters_and_digits(ocr_word.text) == _letters_and_digits(layer_word.text)
+            and _gap(
+                ocr_word.box.top,
+                ocr_word.box.bottom,
+                layer_word.box.top,
+                layer_word.box.bottom,
+            )
+            <= _COPY_DISTANCE_PT
+            and _gap(
+                ocr_word.box.x0, ocr_word.box.x1, layer_word.box.x0, layer_word.box.x1
+            )
+            <= _COPY_DISTANCE_PT
+            for ocr_word in unclaimed
+        )
+    )
+    places = tuple(_place(ocr_words, layer_word) for layer_word in missed)
+    words: list[Word] = []
+    for position, ocr_word in enumerate(ocr_words):
+        words.extend(
+            layer_word
+            for layer_word, place in zip(missed, places, strict=True)
+            if place == position
+        )
+        words.append(ocr_word)
+    words.extend(
+        layer_word
+        for layer_word, place in zip(missed, places, strict=True)
+        if place == len(ocr_words)
+    )
+    return tuple(words)
+
+
+def _place(ocr_words: tuple[Word, ...], layer_word: Word) -> int:
+    """The position in `ocr_words` before which `layer_word` goes: that of
+    the first word whose top is lower than its own, or the end."""
+    return next(
+        (
+            position
+            for position, ocr_word in enumerate(ocr_words)
+            if ocr_word.box.top > layer_word.box.top
+        ),
+        len(ocr_words),
+    )
+
+
+def _layer_offset(ocr_words: tuple[Word, ...], layer_words: tuple[Word, ...]) -> float:
+    """How far the layer's boxes sit below Tesseract's on a page: the median,
+    over the pairs of a layer word and a Tesseract word with the same 3 or
+    more letters and digits, overlapping in width, with middles less than
+    12 pt apart up or down, of the layer word's middle less the Tesseract
+    word's; 0 without a pair (extract spec section 9)."""
+    differences = tuple(
+        _middle(layer_word.box) - _middle(ocr_word.box)
+        for layer_word in layer_words
+        if len(_letters_and_digits(layer_word.text)) >= _OFFSET_PAIR_MIN_CHARACTERS
+        for ocr_word in ocr_words
+        if _letters_and_digits(ocr_word.text) == _letters_and_digits(layer_word.text)
+        and _overlap(
+            ocr_word.box.x0, ocr_word.box.x1, layer_word.box.x0, layer_word.box.x1
+        )
+        > 0
+        and abs(_middle(layer_word.box) - _middle(ocr_word.box))
+        < _OFFSET_PAIR_DISTANCE_PT
+    )
+    return statistics.median(differences) if differences else 0.0
+
+
+def _covers(ocr_box: Box, layer_box: Box) -> bool:
+    """Whether a Tesseract word's box covers a layer word's, already moved
+    by the offset: they overlap in width, and in height by a quarter of the
+    lower height (extract spec section 9)."""
+    height_overlap = _overlap(
+        ocr_box.top, ocr_box.bottom, layer_box.top, layer_box.bottom
+    )
+    return (
+        _overlap(ocr_box.x0, ocr_box.x1, layer_box.x0, layer_box.x1) > 0
+        and height_overlap > 0
+        and height_overlap
+        >= _COVER_HEIGHT_SHARE
+        * min(ocr_box.bottom - ocr_box.top, layer_box.bottom - layer_box.top)
+    )
+
+
+def _moved_up(layer_word: Word, offset: float) -> Word:
+    box = layer_word.box
+    return replace(
+        layer_word, box=Box(box.x0, box.top - offset, box.x1, box.bottom - offset)
+    )
+
+
+def _middle(box: Box) -> float:
+    return (box.top + box.bottom) / 2
+
+
+def _overlap(start: float, end: float, other_start: float, other_end: float) -> float:
+    """The length two intervals share, 0 when they do not meet."""
+    return max(0.0, min(end, other_end) - max(start, other_start))
+
+
+def _gap(start: float, end: float, other_start: float, other_end: float) -> float:
+    """The distance between two intervals, 0 when they meet."""
+    return max(0.0, max(start, other_start) - min(end, other_end))
+
+
+def _letters_and_digits(text: str) -> str:
+    return "".join(character.lower() for character in text if character.isalnum())
 
 
 def are_over_each_other(one: Box, other: Box) -> bool:
@@ -362,7 +536,7 @@ def _layer_words(pdf: pdfplumber.PDF, page_index: int) -> tuple[Word, ...]:
     """The words of the page's text layer, as `text_layer.layer_words`
     reads them (extract spec section 5)."""
     with closing(pdf.pages[page_index]) as pdf_page:
-        return layer_words(pdf_page)
+        return text_layer.layer_words(pdf_page)
 
 
 def _save_cover(pdf: Path, cover_page: int, cover_png: Path) -> None:
@@ -384,9 +558,9 @@ def _image(rendered: RenderedPage) -> Image.Image:
 
 
 def page_words(
-    page: PageInfo, layer_words: tuple[Word, ...]
+    page: PageInfo, read_words: tuple[Word, ...]
 ) -> tuple[PageWords, tuple[Removal, ...]]:
-    """The words of `page` and its removals, given the words pdfplumber read
+    """The words of `page` and its removals, given `read_words`, the words pdfplumber read
     from its text layer, in that order (empty for a blank page and a plate
     without a text layer), or for a page whose text source is `ocr` the
     words Tesseract read, in its order (extract spec section 9).
@@ -408,7 +582,7 @@ def page_words(
     figures: tuple[Figure, ...] = ()
     match page.kind:
         case PageKind.TEXT:
-            kept, removals = _kept_and_region_removals(page, layer_words)
+            kept, removals = _kept_and_region_removals(page, read_words)
             figures = tuple(
                 Figure(
                     box=box,
@@ -419,13 +593,13 @@ def page_words(
                 for number, box in enumerate(page.figure_boxes, start=1)
             )
         case PageKind.PLATE:
-            if page.text_source is TextSource.NONE and layer_words:
+            if page.text_source is TextSource.NONE and read_words:
                 message = (
                     f"page {page.index} is a plate without a text layer, but "
-                    f"{len(layer_words)} words were given for it"
+                    f"{len(read_words)} words were given for it"
                 )
                 raise ValueError(message)
-            kept, removals = _kept_and_region_removals(page, layer_words)
+            kept, removals = _kept_and_region_removals(page, read_words)
             figures = (
                 Figure(
                     box=Box(0.0, 0.0, page.width_pt, page.height_pt),
@@ -437,16 +611,16 @@ def page_words(
         case PageKind.EXCLUDED:
             kept = ()
             removals = tuple(
-                _removal(page, layer_word, RemovalReason.EXCLUDED_PAGE)
-                for layer_word in layer_words
+                _removal(page, read_word, RemovalReason.EXCLUDED_PAGE)
+                for read_word in read_words
             )
         case PageKind.FRONT_MATTER:
             # Front-matter spec, section 3: every word a removal, as on an
             # excluded page.
             kept = ()
             removals = tuple(
-                _removal(page, layer_word, RemovalReason.FRONT_MATTER)
-                for layer_word in layer_words
+                _removal(page, read_word, RemovalReason.FRONT_MATTER)
+                for read_word in read_words
             )
         case PageKind.INKLESS:
             # Plates spec, section 2b: every word a removal, as on an
@@ -456,18 +630,18 @@ def page_words(
             removals = tuple(
                 _removal(
                     page,
-                    layer_word,
+                    read_word,
                     RemovalReason.EXCLUDED_REGION
-                    if _in_a_region(layer_word.box, page.exclude_regions)
+                    if _in_a_region(read_word.box, page.exclude_regions)
                     else RemovalReason.INKLESS_PAGE,
                 )
-                for layer_word in layer_words
+                for read_word in read_words
             )
         case PageKind.BLANK:
-            if layer_words:
+            if read_words:
                 message = (
                     f"page {page.index} is blank, with no text layer, but "
-                    f"{len(layer_words)} words were given for it"
+                    f"{len(read_words)} words were given for it"
                 )
                 raise ValueError(message)
             kept, removals = (), ()
@@ -482,26 +656,26 @@ def page_words(
 
 
 def _kept_and_region_removals(
-    page: PageInfo, layer_words: tuple[Word, ...]
+    page: PageInfo, read_words: tuple[Word, ...]
 ) -> tuple[tuple[Word, ...], tuple[Removal, ...]]:
     """The words of `page` outside its `exclude_regions`, and those inside
     as removals with the reason `excluded_region`."""
     kept = tuple(
-        layer_word
-        for layer_word in layer_words
-        if not _in_a_region(layer_word.box, page.exclude_regions)
+        read_word
+        for read_word in read_words
+        if not _in_a_region(read_word.box, page.exclude_regions)
     )
     removals = tuple(
-        _removal(page, layer_word, RemovalReason.EXCLUDED_REGION)
-        for layer_word in layer_words
-        if _in_a_region(layer_word.box, page.exclude_regions)
+        _removal(page, read_word, RemovalReason.EXCLUDED_REGION)
+        for read_word in read_words
+        if _in_a_region(read_word.box, page.exclude_regions)
     )
     return kept, removals
 
 
-def _removal(page: PageInfo, layer_word: Word, reason: RemovalReason) -> Removal:
+def _removal(page: PageInfo, read_word: Word, reason: RemovalReason) -> Removal:
     return Removal(
-        page_index=page.index, box=layer_word.box, text=layer_word.text, reason=reason
+        page_index=page.index, box=read_word.box, text=read_word.text, reason=reason
     )
 
 
