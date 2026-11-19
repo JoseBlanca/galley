@@ -5237,7 +5237,9 @@ stand which his majesty made while he was sitting on the…", takes the
 chapter, or at the end of `book.md`:
 
 ```
-### Notes {#notes-n-p0011-001 .unlisted .chapter-notes}
+## Notes {#notes-n-p0008-003 .unlisted .chapter-notes}
+
+(the unlinked footnotes of pages 8 to 10, cut here)
 
 :::: {#n-p0011-001 .note}
 ::: {#b-p0011-002}
@@ -5252,8 +5254,11 @@ each written as before: a fenced div with its id and the class `note`
 around its blocks' divs, its marker first in the first block that is
 not a margin note, and after its div the Pandoc definitions of the
 referenced footnotes its blocks refer to (Pandoc moves them to the end
-of the chapter file with its other footnotes). The example is Kadesh's page 11, whose
-printed marker "15" the OCR read as "%": the marker is written as
+of the chapter file with its other footnotes). The example is cut from
+Kadesh's chapter that starts on page 8, a chapter of level 1, so its
+"Notes" is of level 2 and takes the id of the chapter's first unlinked
+footnote, page 8's n-p0008-003; it shows the first note of page 11,
+whose printed marker "15" the OCR read as "%": the marker is written as
 structure has it, as before.
 The heading and its notes come last of what is written at that place:
 after the endnotes that section 10 (b) places there, if any, and just
@@ -5328,8 +5333,9 @@ checked on the page images on 19 November 2026): the 11 notes of the
 two pages are after the last block of the body, under the one level-2
 "Notes" of the excerpt (which holds the excerpt's 43 unlinked notes),
 next to each other in the order printed, from "Called by de Rougé the
-Bulletin." to "Luxor.— On the rear (south side) of Ramses II.'s
-pylon"; and `haskins_heads_notes`, Haskins' page 40 (excerpt page 8),
+Bulletin." to the note of page 12 that ends "On the rear (south side)
+of Ramses II.'s pylon." (printed after its label "Luxor.—", which the
+test does not search); and `haskins_heads_notes`, Haskins' page 40 (excerpt page 8),
 whose note "Corpus Poeticum Boreale, i, p. 265 f." (the OCR reads
 "265/.") moves from after the quotations of that page to just before
 the heading "BIBLIOGRAPHICAL NOTE" of Haskins' page 51 (excerpt page

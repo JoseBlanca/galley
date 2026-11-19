@@ -846,15 +846,18 @@ wait either way.
   is, that calls LM Studio with the 35B model on page 3 of the excerpt
   `kadesh_redo` and checks that the edits turn "puem" into "poem" and
   "Masrvuo's" into "Maspero's", and that no edit holds a note reference.
-- **Note links** (section 9b): unit tests of the answer's references and
-  note lines in each form the recorded answers show, the place and the
-  note on literal tokens and notes, the misread reference taken out of a
-  word and a real quote kept, the links refused (a word another edit
-  changes, a note galley references elsewhere, two links to one note);
-  markdown's rule 5 and a link taking the place of a reference, each
-  with its error; and the excerpt `kadesh_redo` with the 35B model's
-  recorded answers to the prompt of section 9b for its pages 0, 1, 3 and
-  7 (Kadesh's 8, 9, 11 and 15), the link edits written as literals.
+- **Note links** (section 9b). The main test is the excerpt
+  `kadesh_redo` with the 35B model's recorded answers to the prompt of
+  section 9b for its pages 0, 1, 3 and 7 (Kadesh's 8, 9, 11 and 15): the
+  link edits are written as literals, checked against the reference
+  pages, and markdown applies them. The recorded answers do not reach
+  every rule (no endnote, no owner's link, no quote before a number), so
+  the rules are tested one by one too, on literal answers, tokens, notes
+  and blocks, through the module's functions that each rule lives in:
+  the answer's references and note lines in each form the recorded
+  answers show, the place and the note, the misread reference, each
+  refusal, the order of the reference numbers, and markdown's rules 5
+  and 6, each with its error.
 - **Kadesh, the links**, by hand: the whole book; the notes linked before
   and after; each link of the twelve reference pages checked against the
   reference.
