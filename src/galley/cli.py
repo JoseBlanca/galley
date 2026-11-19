@@ -47,9 +47,9 @@ class _Stage:
     """A stage the command runs: its subcommand, its help, its `run`,
     whether it calls Pandoc, whether it needs the word list of the book's
     language, which Tesseract's tools extract the first time, and whether
-    it reads with Tesseract unless the config's `ocr` is `trust`, as layout
+    it reads with Tesseract when the config's `ocr` is `verify`, as layout
     re-reads small print (docs/specs/reocr.md, section 3), needing the
-    word list too when `ocr` is `verify`; and whether it needs Tesseract
+    word list too; and whether it needs Tesseract
     under `ocr = "redo"`, as extract does to read every text page and
     analyze, which runs before it (architecture section 7b)."""
 
@@ -207,7 +207,7 @@ def _check_before_any_stage(
     if reading and config.ocr is OcrMode.VERIFY and shutil.which("tesseract") is None:
         message = (
             f"tesseract is not installed; {reading[0]} reads small print with it "
-            f'unless the config has ocr = "trust": install it with '
+            f'when the config has ocr = "verify", the default: install it with '
             "`brew install tesseract`"
         )
         raise ExternalProgramError(message)

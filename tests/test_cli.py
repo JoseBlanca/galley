@@ -545,8 +545,9 @@ def test_a_command_running_layout_that_rereads_stops_without_tesseract(
         main([command, str(folder.root)])
 
     assert str(raised.value) == (
-        "tesseract is not installed; layout reads small print with it unless "
-        'the config has ocr = "trust": install it with `brew install tesseract`'
+        "tesseract is not installed; layout reads small print with it when "
+        'the config has ocr = "verify", the default: install it with '
+        "`brew install tesseract`"
     )
     # No stage ran: each would have deleted its own file first.
     assert _names(folder) == _files_up_to("epub")

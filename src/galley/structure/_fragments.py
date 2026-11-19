@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from galley.model import Line, PageLayout, Removal, RemovalReason, Word
-from galley.structure._measures import words_removal
+from galley.structure._measures import letters, words_removal
 
 # Condition 1: a fragment has at most 2 characters, at most 1 of them a
 # letter (spec section 35).
@@ -39,15 +39,11 @@ class LetterFragments(StrEnum):
     ABSENT = "absent"
 
 
-def _letters(text: str) -> int:
-    return sum(1 for character in text if character.isalpha())
-
-
 def _may_be_a_fragment(word: Word) -> bool:
     return (
         word.ocr_confidence is None
         and len(word.text) <= _FRAGMENT_MOST_CHARACTERS
-        and _letters(word.text) <= _FRAGMENT_MOST_LETTERS
+        and len(letters(word.text)) <= _FRAGMENT_MOST_LETTERS
     )
 
 
@@ -55,7 +51,7 @@ def _lies_inside(fragment: Word, host: Word) -> bool:
     """Condition 2: `host` has 3 letters or more, covers half of
     `fragment`'s width, overlaps it in height and is at least 1/1.15 of its
     height."""
-    if host is fragment or _letters(host.text) < _HOST_LEAST_LETTERS:
+    if host is fragment or len(letters(host.text)) < _HOST_LEAST_LETTERS:
         return False
     box, host_box = fragment.box, host.box
     width = box.x1 - box.x0
