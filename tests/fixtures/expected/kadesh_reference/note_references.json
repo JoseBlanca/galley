@@ -1,6 +1,6 @@
 {
   "book": "battleofkadeshst00breauoft",
-  "read": "Transcribed by the assistant on 19 November 2026 from the page images, rendered with pypdfium2 at 300 dpi, whole pages and crops enlarged about two times. The raised numbers of the references are blurred on pages 9, 11, 15 and 27; each was read with the help of the sequence, since Kadesh numbers its notes through the article, and checked against the notes' own markers at the foot of the page, which are clearer. 'after' is the word printed just before the reference, with its punctuation, and 'context' the words before it on the same page, as many as make it occur once there; 'starts' the first words of the note after its marker. Page 8's '*' follows the heading's last word. Page 11's note 19 holds the numbered paragraphs 1. to 3.",
+  "read": "Transcribed by the assistant on 19 November 2026 from the page images, rendered with pypdfium2 at 300 dpi, whole pages and crops enlarged about two times. The raised numbers of the references are blurred on pages 9, 11, 15 and 27; each was read with the help of the sequence, since Kadesh numbers its notes through the article, and checked against the notes' own markers at the foot of the page, which are clearer. 'after' is the word printed just before the reference, with its punctuation, and 'context' the words before it on the same page, as many as make it occur once there; 'starts' the first words of the note after its marker. Page 8's '*' follows the heading's last word. Page 11's note 19 holds the numbered paragraphs 1. to 3. Pages 13, 25, 26, 40, 47 and 53 were added the same day, read the same way; page 40's 'beaten' is printed damaged.",
   "pages": [
     {
       "page_index": 8,
@@ -168,6 +168,31 @@
       ]
     },
     {
+      "page_index": 13,
+      "references": [
+        {
+          "number": "22",
+          "after": "Derr.",
+          "context": "Abu Simbel, and Derr."
+        },
+        {
+          "number": "23",
+          "after": "certain.",
+          "context": "year is however, certain."
+        }
+      ],
+      "notes": [
+        {
+          "marker": "22",
+          "starts": "1. Abydos.—On the outside"
+        },
+        {
+          "marker": "23",
+          "starts": "I have examined"
+        }
+      ]
+    },
+    {
       "page_index": 15,
       "references": [
         {
@@ -216,6 +241,110 @@
         {
           "marker": "38",
           "starts": "The Hittite king"
+        }
+      ]
+    },
+    {
+      "page_index": 25,
+      "references": [
+        {
+          "number": "54",
+          "after": "made.",
+          "context": "from which it was made."
+        },
+        {
+          "number": "55",
+          "after": "book,",
+          "context": "In Robinson’s book,"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "54",
+          "starts": "Someone better informed"
+        },
+        {
+          "marker": "55",
+          "starts": "Op. cit., p. 555."
+        }
+      ]
+    },
+    {
+      "page_index": 26,
+      "references": [
+        {
+          "number": "56",
+          "after": "sledges.”",
+          "context": "their barbarous sledges.”"
+        },
+        {
+          "number": "57",
+          "after": "hours",
+          "context": "more than two hours"
+        },
+        {
+          "number": "58",
+          "after": "hour",
+          "context": "distant one hour"
+        },
+        {
+          "number": "59",
+          "after": "Kades.",
+          "context": "the lake of Kades."
+        },
+        {
+          "number": "60",
+          "after": "Hügels.",
+          "context": "Nordseite des Hügels."
+        },
+        {
+          "number": "61",
+          "after": "sides,”",
+          "context": "from all sides,”"
+        },
+        {
+          "number": "62",
+          "after": "streams.",
+          "context": "between the two streams."
+        },
+        {
+          "number": "63",
+          "after": "Libanum.",
+          "context": "Laodicea ad Libanum."
+        }
+      ],
+      "notes": [
+        {
+          "marker": "56",
+          "starts": "Bibliotheca Sacra (1848),"
+        },
+        {
+          "marker": "57",
+          "starts": "He gives it"
+        },
+        {
+          "marker": "58",
+          "starts": "Sachau made it"
+        },
+        {
+          "marker": "59",
+          "starts": "Op. cit., p. 555 and n. 1."
+        },
+        {
+          "marker": "60",
+          "starts": "Op. cit., pp. 58, 59."
+        },
+        {
+          "marker": "61",
+          "starts": "Op. cit., p. 166."
+        },
+        {
+          "marker": "62",
+          "starts": "Orontes and el-Mukadiyeh."
+        },
+        {
+          "marker": "63",
+          "starts": "Op. cit., pp. 555, 556;"
         }
       ]
     },
@@ -284,6 +413,234 @@
         {
           "marker": "74",
           "starts": "Op. cit., pp. 542, 543."
+        }
+      ]
+    },
+    {
+      "page_index": 40,
+      "references": [
+        {
+          "number": "99",
+          "after": "was",
+          "context": "L. P. H., was"
+        },
+        {
+          "number": "100",
+          "after": "(B’wy).",
+          "context": "forest of Baui (B’wy)."
+        },
+        {
+          "number": "101",
+          "after": "camp",
+          "context": "and gone into camp"
+        },
+        {
+          "number": "102",
+          "after": "away.",
+          "context": "being evidently too far away."
+        },
+        {
+          "number": "103",
+          "after": "beaten",
+          "context": "They are being beaten"
+        },
+        {
+          "number": "104",
+          "after": "is.",
+          "context": "chief of Kheta is."
+        }
+      ],
+      "notes": [
+        {
+          "marker": "99",
+          "starts": "This clause shows"
+        },
+        {
+          "marker": "100",
+          "starts": "Abu Simbel: Champ.,"
+        },
+        {
+          "marker": "101",
+          "starts": "This is a march"
+        },
+        {
+          "marker": "102",
+          "starts": "Maspero’s statement (Struggle,"
+        },
+        {
+          "marker": "103",
+          "starts": "Literally, “one is beating"
+        },
+        {
+          "marker": "104",
+          "starts": "Inscription by the scene"
+        }
+      ]
+    },
+    {
+      "page_index": 47,
+      "references": [
+        {
+          "number": "112",
+          "after": "of",
+          "context": "the foe (ḫrw) of"
+        },
+        {
+          "number": "113",
+          "after": "need.",
+          "context": "his hour of need."
+        },
+        {
+          "number": "114",
+          "after": "chariots",
+          "context": "the Hittite chariots"
+        },
+        {
+          "number": "115",
+          "after": "Prēhirunamef.”",
+          "context": "his majesty, Prēhirunamef.”"
+        },
+        {
+          "number": "116",
+          "after": "fourth",
+          "context": "was the fourth"
+        },
+        {
+          "number": "117",
+          "after": "majesty;”",
+          "context": "charioteer of his majesty;”"
+        },
+        {
+          "number": "118",
+          "after": "of",
+          "context": "L. P. H., and of"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "112",
+          "starts": "“Of” meaning “belonging"
+        },
+        {
+          "marker": "113",
+          "starts": "Poem, ll. 34 ff.;"
+        },
+        {
+          "marker": "114",
+          "starts": "They may be recognized"
+        },
+        {
+          "marker": "115",
+          "starts": "There is clearly no"
+        },
+        {
+          "marker": "116",
+          "starts": "Lepsius, Königsb., No. 428."
+        },
+        {
+          "marker": "117",
+          "starts": "Luxor inscription, Rec.,"
+        },
+        {
+          "marker": "118",
+          "starts": "Read a second"
+        }
+      ]
+    },
+    {
+      "page_index": 53,
+      "references": [
+        {
+          "number": "130",
+          "after": "recruits",
+          "context": "arrival of the recruits"
+        },
+        {
+          "number": "131",
+          "after": "from",
+          "context": "Pharaoh, L. P. H., from"
+        },
+        {
+          "number": "132",
+          "after": "found",
+          "context": "Amor. They found"
+        },
+        {
+          "number": "133",
+          "after": "H.,”",
+          "context": "the camp of Pharaoh L. P. H.,”"
+        },
+        {
+          "number": "134",
+          "after": "side,",
+          "context": "his (or its) west side,"
+        },
+        {
+          "number": "135",
+          "after": "Their",
+          "context": "escape. Their"
+        },
+        {
+          "number": "136",
+          "after": "filled",
+          "context": "heart was filled"
+        },
+        {
+          "number": "137",
+          "after": "Pharaoh,",
+          "context": "great valor of Pharaoh,"
+        },
+        {
+          "number": "138",
+          "after": "18).",
+          "context": "(see No. 18)."
+        },
+        {
+          "number": "139",
+          "after": "strength.",
+          "context": "augment his strength."
+        }
+      ],
+      "notes": [
+        {
+          "marker": "130",
+          "starts": "Literally, “youths,”"
+        },
+        {
+          "marker": "131",
+          "starts": "The preposition (m)"
+        },
+        {
+          "marker": "132",
+          "starts": "Certainly miscopied from"
+        },
+        {
+          "marker": "133",
+          "starts": "Luxor omits this"
+        },
+        {
+          "marker": "134",
+          "starts": "The variant is"
+        },
+        {
+          "marker": "135",
+          "starts": "Photo shows sn."
+        },
+        {
+          "marker": "136",
+          "starts": "Photo shows mḥ."
+        },
+        {
+          "marker": "137",
+          "starts": "Photo shows"
+        },
+        {
+          "marker": "138",
+          "starts": "Moreover, they appear"
+        },
+        {
+          "marker": "139",
+          "starts": "The Poem (ll."
         }
       ]
     }
