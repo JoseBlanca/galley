@@ -83,6 +83,12 @@ pieces of letters that Stubbs' text layer gives as words of their own
 are removed as `letter_fragment` (section 35). `blocks.json` stays at
 `format_version` 5.
 
+Revised on 19 November 2026 for the plan note-links
+(`docs/plans/note-links.md`): markdown writes a footnote whose
+reference is not linked at the end of its chapter, under a heading
+"Notes", instead of where it was printed (section 36, the owner's
+decision of that day). structure and `blocks.json` do not change.
+
 It builds on `docs/architecture.md` (cited as "architecture §8") and
 `docs/glossary.md`, and on the layout spec, whose terms (body column,
 footnote band, margin note, row, body word height, body line pitch) it
@@ -1799,7 +1805,9 @@ note, and because the evaluation tool reads a block's kind.
   shows the same text in the same place as (a); the evaluation tool
   scores notes and margin notes from the first plan on.
 
-Chosen: (b).
+Chosen: (b). Since 19 November 2026 a note with `referenced` false
+that is a footnote is written at the end of its chapter instead
+(section 36); an endnote keeps the place (b) gives.
 
 ## 11. Notes and their references
 
@@ -1808,8 +1816,10 @@ it ("8", "(3)", "*"), and the same marker, often as a superscript, at
 the place in the text that refers to it, the **reference**. structure
 cuts the band into notes, takes each note's marker out of its text,
 finds the references in the body and links each to its note. A note
-whose reference is not found stays a note, unreferenced, where it was
-printed; a reference whose note is not found stays in its word.
+whose reference is not found stays a note, unreferenced, with its
+origin where it was printed (markdown writes such a footnote at the end
+of its chapter, section 36); a reference whose note is not found stays
+in its word.
 
 **What the books show.** The marker and the reference are read
 differently by the OCR:
@@ -3521,7 +3531,9 @@ What markdown must do, and how it is checked:
   (its `level`, section 17, rule 5) as well, so that the style sheet
   sets a sub-entry in from its entry;
 - a referenced footnote as a Pandoc footnote at its reference, with its
-  margin notes inside it;
+  margin notes inside it; an unreferenced footnote at the end of its
+  chapter, under a heading "Notes" (section 36, since 19 November
+  2026);
 - the endnotes, referenced or not, where `notes` puts them (section 6,
   "Order"), as one list in the book's order, each a div with its id: a
   margin note printed beside its first block first (section 13, rule
@@ -4725,8 +4737,9 @@ the printed ones because section 29 takes only markers in sequence;
 Pandoc writes `<ol type="i">` for "(i)", so the brackets are lost
 (checked with Pandoc 3.14 on 18 November 2026; section 33, open point
 1, settled). A
-block between two items of a list, a margin note or a note that
-markdown places there (section 6, "Order"), ends the list; the next item
+block between two items of a list, a margin note or an endnote that
+markdown places there (section 6, "Order"; an unlinked footnote is
+written at its chapter's end, section 36), ends the list; the next item
 starts a new one, whose start is its own value. Two lists with nothing
 between them (a list ended by rule 5's gap and a new "1.") are written
 with an empty fenced div of class `list-break` between them, since
@@ -5191,3 +5204,137 @@ with `ocr = "redo"` among them.
 The format: `RemovalReason.letter_fragment`, in `blocks.json`, which
 stays at version 5 (architecture §8). The fidelity check counts it as
 any removal.
+
+## 36. Unlinked footnotes at the end of their chapter
+
+Decided by the owner on 19 November 2026, for the plan note-links
+(`docs/plans/note-links.md`, work package 1), after reading Kadesh,
+whose footnotes stood between its paragraphs: 142 of its 183 footnotes
+have no linked reference. A footnote with `referenced` false is no
+longer written where it was printed: markdown writes it at the end of
+its chapter, under a heading "Notes", in the order printed, with its
+marker and its page as before. This replaces, for such footnotes only,
+the place section 10 (b) gave them; an endnote and a referenced
+footnote are written as before (section 19). Only markdown changes:
+`blocks.json` keeps each note as structure found it, and the ids
+structure gives keep counting each note where it was printed (section
+6, "Ids and origins"), so no id changes.
+
+**The chapter of a note.** A chapter is the run of blocks from a
+heading of level 1 or 2 to the next heading of level 1 or 2, or to the
+book's end; the blocks before the first such heading are a chapter too,
+which no heading starts. A footnote's chapter is the one that holds its
+printed place, the place section 6, "Order", gives a note: after the
+last block, in the order of `blocks`, whose first page is the note's
+first page or an earlier one. Its chapter ends at the first heading of
+level 1 or 2 after that place, or at the book's end. A heading of level
+3 or deeper ends no chapter. A heading structure found wrongly ends a
+chapter as a right one does: Kadesh's level-2 heading on page 39, "The
+stand which his majesty made while he was sitting on the…", takes the
+74 unlinked notes of pages 8 to 38.
+
+**What markdown writes there.** Just before the heading that ends the
+chapter, or at the end of `book.md`:
+
+```
+### Notes {#notes-n-p0011-001 .unlisted .chapter-notes}
+
+:::: {#n-p0011-001 .note}
+::: {#b-p0011-002}
+\% Called by de Rougé the Bulletin\.
+:::
+::::
+```
+
+then each unlinked footnote of the chapter in the order of `notes`,
+which is the printed order (by page, then as section 11 cuts the band),
+each written as before: a fenced div with its id and the class `note`
+around its blocks' divs, its marker first in the first block that is
+not a margin note, and after its div the Pandoc definitions of the
+referenced footnotes its blocks refer to (Pandoc moves them to the end
+of the chapter file with its other footnotes). The example is Kadesh's page 11, whose
+printed marker "15" the OCR read as "%": the marker is written as
+structure has it, as before.
+The heading and its notes come last of what is written at that place:
+after the endnotes that section 10 (b) places there, if any, and just
+before the heading that ends the chapter. A chapter with no unlinked
+footnote gets no heading.
+
+**The heading.** It is a Pandoc heading one level below the heading
+that starts its chapter, level 2 in a chapter of level 1 and level 3
+in one of level 2, and level 2 in the chapter before the first
+heading. It is never level 1, because Pandoc starts a new file of the
+EPUB at each level-1 heading. The class `unlisted` keeps it out of the
+EPUB's table of contents: checked with Pandoc 3.14 on 19 November
+2026, a level-2 "Notes" without it is listed in `nav.xhtml` under its
+chapter, and with it is in neither `nav.xhtml` nor `toc.ncx`. A heading
+was chosen over a div of a class of its own, as a note group's heading
+is (section 25): a reader's navigation and a screen reader take a
+heading as the start of a part of the chapter, and the class keeps the
+table of contents as it was. The class `chapter-notes` names what the
+heading is, for the style sheet and the fidelity check. Its id is
+`notes-` and the id of the first of the chapter's unlinked footnotes, which no block or note id can
+equal, since those start with `b-` or `n-`.
+
+The word is "Notes" in every book, whatever its language: Mariéjol, in
+French, spells it the same; a book in another language is for later.
+It is not a word of the book, so `galley.fidelity.read_markdown`,
+which reads `book.md` for the fidelity check at the markdown boundary
+and for the evaluation tool, gives no word for a heading of class
+`chapter-notes` whose text is exactly "Notes", and raises an error at
+one with any other text (architecture §13).
+
+**Cases.**
+
+- *Before the first heading.* The unlinked footnotes of the pages
+  before the first heading of level 1 or 2, those of an excerpt that
+  starts inside a chapter or of the front matter, go just before that
+  heading, under a level-2 "Notes". A note with no block on or before
+  its page (section 6, "Order": first of all) belongs to that chapter
+  too; when the first block is itself such a heading, the "Notes" and
+  the note come first in `book.md`, before it.
+- *A chapter that starts inside a page.* The notes of the page where a
+  heading of level 1 or 2 stands below the page's first line are placed
+  by the page's foot, where they were printed, so they go to the
+  chapter the heading starts, although some refer to the text above it.
+  Without a linked reference galley cannot tell which; the rule keeps
+  the printed order. Measured on 19 November 2026 on the runs of the
+  plan notes-vision: 4 unlinked notes of Kadesh (pages 39 and 66) and
+  12 of Domesday (pages 42, 156, 470 and 481). Kadesh's page 66's notes
+  go to the end of the book, after its "ADDENDUM", whose text is below
+  them on the page.
+- *No heading of level 1 or 2.* Every unlinked footnote goes to the
+  end of `book.md`, under one "Notes" of level 2.
+- *Lists.* The notes are written before a heading or at the end, never
+  between two list items. Two runs of list items that an unlinked
+  footnote used to stand between are now one list when their markers
+  follow each other (section 31: only an endnote ends a list now);
+  none of the seven books had such a footnote on 19 November 2026.
+- *A footnote inside a footnote.* An unlinked footnote is not a Pandoc
+  footnote, so it may still refer to a referenced one, whose definition
+  follows it under "Notes".
+
+**How it is verified.** Unit tests of `render_markdown` with literal
+blocks: two chapters each get their own notes at their end and their
+own "Notes"; a chapter without unlinked footnotes gets none; the notes
+before the first heading go before it at level 2; the level under a
+chapter of level 2 is 3, and a level-3 heading ends no chapter; a
+referenced footnote and an endnote stay where they were; the fidelity
+check passes on the result, and `read_markdown` fails on a heading of
+class `chapter-notes` whose text is not "Notes"; a heading in the
+middle of a page takes that page's notes. Excerpt tests:
+`kadesh_redo`, Kadesh's pages 11 and 12 (its excerpt pages 3 and 4,
+checked on the page images on 19 November 2026): the 11 notes of the
+two pages are after the last block of the body, under the one level-2
+"Notes" of the excerpt (which holds the excerpt's 43 unlinked notes),
+next to each other in the order printed, from "Called by de Rougé the
+Bulletin." to "Luxor.— On the rear (south side) of Ramses II.'s
+pylon"; and `haskins_heads_notes`, Haskins' page 40 (excerpt page 8),
+whose note "Corpus Poeticum Boreale, i, p. 265 f." (the OCR reads
+"265/.") moves from after the quotations of that page to just before
+the heading "BIBLIOGRAPHICAL NOTE" of Haskins' page 51 (excerpt page
+10), under a level-2 "Notes", since the excerpt starts inside the
+chapter; it passes the three blocks of excerpt pages 9 and 10 between. The fidelity
+check runs on both, as on every excerpt. Whole books: the number of
+footnotes moved in each of the seven books, and each EPUB through
+epubcheck.
