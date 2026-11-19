@@ -664,7 +664,8 @@ is laid out as one region, as the skeleton did.
    before, small, above the note "1") and Haynes' index page 422 then
    have no band, as before the gapless start.
    On a page whose every row is small, such as a page of the index, there
-   is no band: the rows are the body.
+   is no band: the rows are the body, which step 5 cuts with the band's
+   run edges.
 
    **Small against the page.** Gierke's introduction (pages 13 to 49)
    is set larger than the translation that fills most of the book: its
@@ -764,7 +765,29 @@ is laid out as one region, as the skeleton did.
    252 pt, the strip 245.5 to 251.5), and as the edge of the run it would
    be read across both columns. Word spaces do not tell the two apart:
    Kadesh's prose has gaps of 6 pt or more within 12 pt of the gutter on
-   19 of the 26 rows of page 28 with a word across it. A run is cut
+   19 of the 26 rows of page 28 with a word across it. On a page whose
+   every row is small (step 4), the body's runs too may start or end at
+   any compatible row; they keep the body's 8 open rows and its gutter
+   anywhere in the middle third. Such a page has no line of prose in
+   body type for a run to take. Domesday's index page 552, read again
+   by Tesseract as small print (`docs/specs/reocr.md`), has its right
+   column sloping 2 pt up across the page, so that its last rows,
+   "Villani and Servi, 26, 30, 172" on the left, "Young, Arthur, 378,
+   438" on the right and "Vineyards, 375" on the left, lie below the
+   last open row, each a row of one side; from an open row to an open
+   row they were left out of the run and made a region across both
+   columns, and the entry was read as "Villani, Teams of, 416 and" and
+   "Villani Servi, 26, 30, 172". (Before "A page number boxed apart",
+   step 3, the row "Index." was the page's first row and full size, and
+   the rows below it a band, cut with the band's edges.) Laid out with
+   and without the rule on 19 November 2026 on the eight books'
+   `words.json`, re-read as the runs re-read them, the regions differ on
+   Domesday's index pages 550 and 552, Haskins' 271 and 273 and Haynes'
+   426 and 430, each by the last rows of a column, which now end their
+   column instead of making a region across both or a row of their own
+   ("Mujiae, 31", Domesday's page 550; "Jurassic Park, 205", Haynes'
+   page 426); `blocks.json` differs on Domesday's 552 and Haynes' 426
+   only, where those rows were a block of their own. A run is cut
    when it holds at least 8 open rows in the body, or 3
    in the band, and in the band only when the gutter's middle lies within
    10 pt of the middle of the body column (two columns of notes are set
