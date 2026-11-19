@@ -1424,6 +1424,30 @@ def test_signature_mark_limits(
     assert bool(blocks.removals) is removed
 
 
+@pytest.mark.parametrize(
+    ("words", "removed"),
+    [
+        ((("M.", 37), ("c", 266)), True),
+        ((("M.", 37), ("IT", 266)), True),
+        ((("M.", 37), ("c", 173)), False),
+        ((("m.", 37), ("c", 266)), False),
+        ((("Mr.", 37), ("c", 266)), False),
+    ],
+    ids=["M. c", "M. IT", "less than half the column", "lower case", "two letters"],
+)
+def test_signature_mark_without_a_digit_is_a_capital_and_a_word_set_far_apart(
+    words: tuple[tuple[str, float], ...], removed: bool
+) -> None:
+    # Gierke signs its introduction with letters, "M." at the left and "c"
+    # at the right (page 38). The column is 274 pt wide: the second word
+    # must start 137 pt or more right of the first's left side.
+    foot = _foot_line(_FOOT_TOP_PT, *words)
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
+    assert [removal.reason for removal in blocks.removals] == (
+        [RemovalReason.SIGNATURE_MARK] if removed else []
+    )
+
+
 def _page_with_mark_beside(mark_top: float) -> PageLayout:
     """Domesday's page 428 (spec section 4): a table's column whose last
     line, "Norfolk", has the mark "26—2" at `mark_top` below it, and

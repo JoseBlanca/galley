@@ -57,6 +57,14 @@ _SIGNATURE_MARK_MAX_CHARACTERS = 6
 _SIGNATURE_MARK_FROM_LEFT_SHARE = 0.3
 # Spec section 4: digits around a dash or a space, "4—2", "12 2".
 _DIGITS_AROUND_A_DASH_OR_SPACE = re.compile(r"[0-9]+ ?[-–—] ?[0-9]+|[0-9]+ [0-9]+")
+# Spec section 4: a signature mark without a digit, "M. c", is two words,
+# the first a capital and a full stop, the second starting at least half
+# the column's width right of the first's left side (Gierke's
+# introduction, signed with letters: 256 pt in a column of 297 on page
+# 38, where the OCR boxed "M." 128 pt wide).
+_SIGNATURE_INITIAL = re.compile(r"[A-Z]\.")
+_SIGNATURE_SPREAD_WORDS = 2
+_SIGNATURE_GAP_SHARE = 0.5
 # Spec section 4: a signature mark beside the lowest line lies less than a
 # pitch above it and 2 pitches or more below its region's line before it
 # (Domesday's page 428: "26—2" 5.2 pt above the table's "[0", which the
@@ -156,6 +164,18 @@ def head_removals(page: PageLayout, survey: BookSurvey) -> LineRemovals:
     )
 
 
+def _is_spread_signature(line: Line, column: Edges) -> bool:
+    """Whether a line is two words, the first a capital and a full stop
+    ("M."), the second starting at least half of `column`'s width right of
+    the first's left side (spec section 4)."""
+    words = sorted(line.words, key=lambda word: word.box.x0)
+    return (
+        len(words) == _SIGNATURE_SPREAD_WORDS
+        and _SIGNATURE_INITIAL.fullmatch(words[0].text) is not None
+        and words[1].box.x0 - words[0].box.x0 >= _SIGNATURE_GAP_SHARE * column.width
+    )
+
+
 def _is_signature_mark(line: Line, column: Edges) -> bool:
     """Whether a line is a printer's signature mark (spec section 4)."""
     text = words_text(line.words)
@@ -165,10 +185,18 @@ def _is_signature_mark(line: Line, column: Edges) -> bool:
     return (
         len(line.words) <= _SIGNATURE_MARK_MAX_WORDS
         and len(characters) <= _SIGNATURE_MARK_MAX_CHARACTERS
-        and has_digit
-        # Letters and digits, or digits around a dash or a space: so not a
-        # number alone, "1900.".
-        and (has_letter or _DIGITS_AROUND_A_DASH_OR_SPACE.fullmatch(text) is not None)
+        and (
+            (
+                has_digit
+                # Letters and digits, or digits around a dash or a space:
+                # so not a number alone, "1900.".
+                and (
+                    has_letter
+                    or _DIGITS_AROUND_A_DASH_OR_SPACE.fullmatch(text) is not None
+                )
+            )
+            or _is_spread_signature(line, column)
+        )
         and middle(line.box)
         >= column.left + _SIGNATURE_MARK_FROM_LEFT_SHARE * column.width
     )
