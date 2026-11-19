@@ -59,17 +59,21 @@ _SIGNATURE_MARK_FROM_LEFT_SHARE = 0.3
 _DIGITS_AROUND_A_DASH_OR_SPACE = re.compile(r"[0-9]+ ?[-–—] ?[0-9]+|[0-9]+ [0-9]+")
 # Spec section 4: a signature mark without a digit, "M. c", is two words,
 # the first a capital and a full stop, the second starting at least half
-# the column's width right of the first's left side (Gierke's
-# introduction, signed with letters: 256 pt in a column of 297 on page
-# 38, where the OCR boxed "M." 128 pt wide).
+# the column's width right of the first's left side. Half is chosen, not
+# measured: the one gap measured, in Gierke's introduction signed with
+# letters, is 256 pt in a column of 297, 0.86 of it, on page index 38,
+# where the OCR boxed "M." 128 pt wide.
 _SIGNATURE_INITIAL = re.compile(r"[A-Z]\.")
 _SIGNATURE_SPREAD_WORDS = 2
 _SIGNATURE_GAP_SHARE = 0.5
 # Spec section 4: a signature mark beside the lowest line lies less than a
-# pitch above it and 2 pitches or more below its region's line before it
-# (Domesday's page 428: "26—2" 5.2 pt above the table's "[0", which the
-# text layer boxes at the foot, and 2.9 pitches below "Norfolk"; the last
-# lines of an index's other column, 0.7 pitch apart, are not set apart).
+# pitch above it and 2 pitches or more below its region's line before it.
+# The 2 pitches are chosen, not measured, between the two gaps measured on
+# 19 November 2026: on Domesday's page index 428, "26—2" lies 2.9 pitches
+# below "Norfolk" (and 5.2 pt above the table's "[0", which the text layer
+# boxes at the foot); the last lines of an index's other column, on
+# Stubbs' page index 315 and Haskins' 268, lie 0.7 pitch below the lines
+# before them and are not set apart.
 _SET_APART_PITCHES = 2.0
 
 
@@ -208,6 +212,11 @@ def _signature_mark_removals(
     """The line at `place` removed as a signature mark when it is one."""
     if place is None or not _is_signature_mark(line_at(page, place), column):
         return _NOTHING_REMOVED
+    return _removed_as_signature_mark(page, place)
+
+
+def _removed_as_signature_mark(page: PageLayout, place: LinePlace) -> LineRemovals:
+    """The line at `place`, known to be a signature mark, removed as one."""
     removal = words_removal(
         page.index, line_at(page, place).words, RemovalReason.SIGNATURE_MARK
     )
@@ -268,9 +277,11 @@ def _is_set_apart_beside(
     page: PageLayout, place: LinePlace, lowest: Line, pitch: float
 ) -> bool:
     """Whether the line at `place` lies beside `lowest`, the page's lowest
-    line, its bottom less than `pitch` above, and set apart below its
-    region's line before it, its top `_SET_APART_PITCHES` times `pitch`
-    or more below that line's top (spec section 4)."""
+    line, in height: its bottom less than `pitch` above `lowest`'s bottom,
+    wherever it lies across the page; and set apart below its region's
+    line before it, its top `_SET_APART_PITCHES` times `pitch` or more
+    below that line's top. A line first in its region is not set apart
+    (spec section 4). `pitch` is in points."""
     region_number, line_number = place
     if line_number == 0:
         return False
@@ -318,7 +329,7 @@ def foot_removals(
     if page.index in survey.signature_lines and position is not None:
         return _signature_line_removals(page, place, position)
     if _is_signature_mark(line, column):
-        return _signature_mark_removals(page, place, column)
+        return _removed_as_signature_mark(page, place)
     above = lowest_line(page, head | {place})
     if above is None or not _is_set_apart_beside(
         page, above, line, survey.body_line_pitch
