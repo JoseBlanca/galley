@@ -35,6 +35,7 @@ __all__ = [
     "running_head_row_count",
     "split_at_column",
     "wide_rows_edges",
+    "width_per_character",
     "without_cut_in_notes",
 ]
 
@@ -258,6 +259,7 @@ def _set_apart_head_end(
 
 
 def _has_letter(row: Line) -> bool:
+    """Whether a word of `row` holds a letter."""
     return any(char.isalpha() for word in row.words for char in word.text)
 
 
@@ -297,14 +299,16 @@ def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
             ),
             None,
         )
-        head_words_top = None if head_words is None else _median_top(rows[head_words])
-        if (
-            head_words is not None
-            and head_words_top is not None
-            and head_words_top - _median_top(head_row)
-            <= _BOXED_APART_HEAD_MOST_PITCHES * pitch
-        ):
-            end = _set_apart_head_end(rows, head_words, head_words_top, pitch)
+        if head_words is not None:
+            head_words_top = _median_top(rows[head_words])
+            near = head_words_top - _median_top(head_row) <= (
+                _BOXED_APART_HEAD_MOST_PITCHES * pitch
+            )
+            end = (
+                _set_apart_head_end(rows, head_words, head_words_top, pitch)
+                if near
+                else None
+            )
             if end is not None:
                 return end
     end = _set_apart_head_end(rows, first, _head_row_top(head_row), pitch)
@@ -471,8 +475,8 @@ _CUT_IN_BODY_GAP_PT: Final[float] = 5.0
 # alignment, 143 of at most 2 letters, 82 others (perhaps 10 body words);
 # with no test of size, 30 more clear body words move.
 _STRIP_WORD_LETTERS: Final[int] = 2
-_PAGE_SIZE_WORD_LETTERS: Final[int] = 3
-_PAGE_SIZE_LEAST_WORDS: Final[int] = 50
+_BODY_TYPE_WORD_LETTERS: Final[int] = 3
+_BODY_TYPE_LEAST_WORDS: Final[int] = 50
 _SHORTENED_HEIGHT_SHARE: Final[float] = 0.9
 _SHORTENED_CHARACTER_SHARE: Final[float] = 0.9
 
@@ -551,66 +555,71 @@ def _is_cut_row(row: tuple[_SideWord, ...], at: float, least_span: float) -> boo
 
 
 @dataclass(frozen=True, slots=True)
-class _PageSize:
-    """The size of a page's body type, in points: the median height of its
-    words' boxes and their width per character (step 2b, rule 2)."""
+class _BodyType:
+    """The size of a set of words' type, in points: the median height of
+    their boxes and their width per character (step 2b, rule 2)."""
 
     word_height: float
-    point_per_character: float
+    width_per_character: float
 
 
 def _letters(word: Word) -> int:
+    """The number of letters in `word`'s text."""
     return sum(char.isalpha() for char in word.text)
 
 
-def _size_of(words: tuple[Word, ...]) -> _PageSize:
-    """The size of `words`, which are not empty: the median height of their
-    boxes, and the sum of their box widths over the characters of their
-    texts."""
-    return _PageSize(
-        median_word_height(words),
-        sum(word.box.x1 - word.box.x0 for word in words)
-        / sum(len(word.text) for word in words),
+def width_per_character(words: Iterable[Word]) -> float:
+    """The width per character of `words`, which hold at least one
+    character, in points: the sum of their box widths over the number of
+    characters of their texts (layout spec section 3, steps 2b and 4)."""
+    kept = tuple(words)
+    return sum(word.box.x1 - word.box.x0 for word in kept) / sum(
+        len(word.text) for word in kept
     )
 
 
-def _page_size(column: tuple[Word, ...]) -> _PageSize | None:
+def _type_of(words: tuple[Word, ...]) -> _BodyType:
+    """The size of `words`' type, which are not empty."""
+    return _BodyType(median_word_height(words), width_per_character(words))
+
+
+def _body_type(column: tuple[Word, ...]) -> _BodyType | None:
     """The size of the body type of a page whose column holds `column`'s
     words (step 2b, rule 2), taken on its words of
-    `_PAGE_SIZE_WORD_LETTERS` letters or more. None on a page of fewer
-    than `_PAGE_SIZE_LEAST_WORDS` words, or with no such word."""
+    `_BODY_TYPE_WORD_LETTERS` letters or more. None on a page of fewer
+    than `_BODY_TYPE_LEAST_WORDS` words, or with no such word."""
     measured = tuple(
-        word for word in column if _letters(word) >= _PAGE_SIZE_WORD_LETTERS
+        word for word in column if _letters(word) >= _BODY_TYPE_WORD_LETTERS
     )
-    if len(column) < _PAGE_SIZE_LEAST_WORDS or not measured:
+    if len(column) < _BODY_TYPE_LEAST_WORDS or not measured:
         return None
-    return _size_of(measured)
+    return _type_of(measured)
 
 
 def _is_shortened(
     row: tuple[_SideWord, ...],
     strip_end: float,
     column: tuple[Word, ...],
-    page_size: _PageSize | None,
+    body_type: _BodyType | None,
 ) -> bool:
     """Whether the cut row `row`, seen from its side, is shortened (step 2b,
     rule 2): no word of it ends at or before `strip_end`, or, on a page
-    of `page_size`, its strip words, those that do and hold
+    whose body type is `body_type`, its strip words, those that do and hold
     `_STRIP_WORD_LETTERS` letters, are none or set smaller than the page's
     body type. `column` gives a word by its index."""
     strip = tuple(column[word.index] for word in row if word.end <= strip_end)
     if not strip:
         return True
-    if page_size is None:
+    if body_type is None:
         return False
     strip_words = tuple(word for word in strip if _letters(word) >= _STRIP_WORD_LETTERS)
     if not strip_words:
         return True
-    size = _size_of(strip_words)
+    strip_type = _type_of(strip_words)
     return (
-        size.word_height <= _SHORTENED_HEIGHT_SHARE * page_size.word_height
-        and size.point_per_character
-        <= _SHORTENED_CHARACTER_SHARE * page_size.point_per_character
+        strip_type.word_height <= _SHORTENED_HEIGHT_SHARE * body_type.word_height
+        and strip_type.width_per_character
+        <= _SHORTENED_CHARACTER_SHARE * body_type.width_per_character
     )
 
 
@@ -639,13 +648,13 @@ def _cut_in_zones(
         else:
             chains.append([row])
     strip_end = at - _CUT_IN_STRIP_PT
-    page_size = _page_size(column)
+    body_type = _body_type(column)
     zones = []
     for chain in chains:
         shortened = tuple(
             position
             for position, row in enumerate(chain)
-            if _is_shortened(row, strip_end, column, page_size)
+            if _is_shortened(row, strip_end, column, body_type)
         )
         if len(chain) < _CUT_IN_CHAIN_ROWS or not shortened:
             continue

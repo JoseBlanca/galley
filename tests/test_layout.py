@@ -1391,14 +1391,14 @@ def _prose_rows(count: int) -> tuple[Word, ...]:
 
 
 def _one_line_note(
-    texts: tuple[str, ...], point_per_character: float, top: float
+    texts: tuple[str, ...], width_per_character: float, top: float
 ) -> tuple[Word, ...]:
-    """A row of words `texts` as high as the body, each `point_per_character`
+    """A row of words `texts` as high as the body, each `width_per_character`
     wide for each character, 4 pt apart from 50."""
     words = []
     left = 50.0
     for text in texts:
-        right = left + point_per_character * len(text)
+        right = left + width_per_character * len(text)
         words.append(_word(text, left, top, right, top + _ROW_HEIGHT))
         left = right + 4
     return tuple(words)
@@ -1408,7 +1408,7 @@ _ONE_LINE_NOTE = ("1", "D.", "B.", "i.", "141", "b.")
 
 
 @pytest.mark.parametrize(
-    ("texts", "point_per_character", "band"),
+    ("texts", "width_per_character", "band"),
     [
         (_ONE_LINE_NOTE, 6.0, True),
         (_ONE_LINE_NOTE, 7.1, True),
@@ -1419,12 +1419,12 @@ _ONE_LINE_NOTE = ("1", "D.", "B.", "i.", "141", "b.")
     ],
 )
 def test_one_line_note_with_narrow_characters_is_a_band(
-    texts: tuple[str, ...], point_per_character: float, *, band: bool
+    texts: tuple[str, ...], width_per_character: float, *, band: bool
 ) -> None:
     # Domesday's page 163: "1 D. B. i. 141 b.", boxed as tall as the body
     # and 1 pitch below it, at 0.70 of the body's width per character; the
     # limit is 0.9, 7.2 pt here.
-    note = _one_line_note(texts, point_per_character, _LAST_BODY_TOP + _PITCH)
+    note = _one_line_note(texts, width_per_character, _LAST_BODY_TOP + _PITCH)
     result = layout_page(_page(0, (*_prose_rows(20), *note)), _MEASURES)
     expected = ((texts,),) if band else ()
     assert _region_texts(result)[1:] == expected

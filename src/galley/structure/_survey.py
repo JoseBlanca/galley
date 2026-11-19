@@ -234,16 +234,20 @@ def _alike_to_any(line_letters: str, others: tuple[str, ...], alike: _Alike) -> 
     return False
 
 
+# Spec sections 3, 14 and 18: the tests of a line alike to a head other
+# than the survey's own head lines (a line like a running head, the head of
+# a short section, a plate's topmost line) compare letters only within 8
+# of each other, the limit of section 3 before it was raised to 14 on 18
+# November 2026 for the survey's head lines alone; they were not measured
+# at 14.
+_NOT_SURVEY_HEAD_LENGTH_DIFFERENCE = 8
 # Spec section 14: a line in the head band at least 0.6 alike to a running
-# head is never a heading (Domesday's page 159, Kadesh's 38). Its letters
-# are compared only within 8 of the head's: section 3 raised its own limit
-# to 14 on 18 November 2026, and this test was not measured at 14.
+# head is never a heading (Domesday's page 159, Kadesh's 38).
 _LIKE_A_HEAD_RATIO = 0.6
-_LIKE_A_HEAD_LENGTH_DIFFERENCE = 8
 _LIKE_A_HEAD = _Alike(
     min_letters=_HEAD_MIN_LETTERS,
     ratio=_LIKE_A_HEAD_RATIO,
-    max_length_difference=_LIKE_A_HEAD_LENGTH_DIFFERENCE,
+    max_length_difference=_NOT_SURVEY_HEAD_LENGTH_DIFFERENCE,
 )
 
 
@@ -255,14 +259,11 @@ def like_a_running_head(line_letters: str, running_letters: tuple[str, ...]) -> 
 
 
 # Spec section 3: the head of a short section and a plate's topmost line
-# (section 18, rule 1) compare letters only within 8 of each other, the
-# limit of section 3 before it was raised to 14 on 18 November 2026 for the
-# survey's head lines alone; these two tests were not measured at 14.
-_OTHER_HEAD_LENGTH_DIFFERENCE = 8
+# (section 18, rule 1), within `_NOT_SURVEY_HEAD_LENGTH_DIFFERENCE`.
 _OTHER_HEADS_ALIKE = _Alike(
     min_letters=_HEAD_MIN_LETTERS,
     ratio=_HEAD_ALIKE_RATIO,
-    max_length_difference=_OTHER_HEAD_LENGTH_DIFFERENCE,
+    max_length_difference=_NOT_SURVEY_HEAD_LENGTH_DIFFERENCE,
 )
 
 

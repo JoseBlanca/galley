@@ -27,6 +27,7 @@ from galley.layout._column import (
     is_small_row,
     running_head_row_count,
     split_at_column,
+    width_per_character,
     without_cut_in_notes,
 )
 from galley.model import (
@@ -126,7 +127,7 @@ _FULL_SIZE_ROWS_LEAST_SHARE: Final[float] = 0.25
 # The rule takes Domesday's 163, 174, 185, 278, 303, 308, 315, 347, 472 and
 # 485 (0.70 to 0.854) and Gierke's 61 (0.83), and no other row of the
 # eight books; none lies between 0.854 and 1.05.
-_ONE_LINE_NOTE_MARKER: Final[str] = "1"
+_ONE_LINE_NOTE_MARKER = re.compile("1")
 _ONE_LINE_NOTE_CHARACTER_SHARE: Final[float] = 0.9
 _ONE_LINE_NOTE_ROW_CHARACTERS: Final[int] = 20
 # Measured on the six books (layout spec section 3, "Where the thresholds
@@ -193,14 +194,17 @@ class _AtGutter(StrEnum):
     BLOCKED = "blocked"
 
 
-def _opens_with_note_marker(row: Line) -> bool:
-    """Whether `row` opens with a note marker (step 4): its first word is 1
-    to 3 digits with an optional "." or 1 or 2 of the signs `* ^ • † ‡ §`,
-    and its second word starts with a capital letter."""
+def _opens_with_note_marker(row: Line, marker: re.Pattern[str]) -> bool:
+    """Whether `row` opens with a note marker of the form `marker` (step
+    4): its first word, from the left, is wholly of that form, and its
+    second word starts with a capital letter. The band's marker is
+    `_NOTE_MARKER`, 1 to 3 digits with an optional "." or 1 or 2 of the
+    signs `* ^ • † ‡ §`; a one-line note's is `_ONE_LINE_NOTE_MARKER`,
+    "1"."""
     words = sorted(row.words, key=lambda word: word.box.x0)
     return (
         len(words) >= _MARKER_ROW_WORDS
-        and _NOTE_MARKER.fullmatch(words[0].text) is not None
+        and marker.fullmatch(words[0].text) is not None
         and words[1].text[:1].isupper()
     )
 
@@ -252,13 +256,6 @@ def _page_row_height(rows: tuple[Line, ...], measures: BookMeasures) -> float:
     return statistics.median(heights)
 
 
-def _point_per_character(row: Line) -> float:
-    """The width per character of `row`, in points: the sum of its words'
-    box widths over the characters of their texts."""
-    characters = sum(len(word.text) for word in row.words)
-    return sum(word.box.x1 - word.box.x0 for word in row.words) / characters
-
-
 def _one_line_note_start(rows: tuple[Line, ...]) -> int | None:
     """The index in `rows` of a footnote of one line boxed as tall as the
     body (step 4), when there is one: the last row with a letter or a
@@ -277,22 +274,17 @@ def _one_line_note_start(rows: tuple[Line, ...]) -> int | None:
     )
     if last is None or last == 0:
         return None
-    words = sorted(rows[last].words, key=lambda word: word.box.x0)
-    if (
-        len(words) < _MARKER_ROW_WORDS
-        or words[0].text != _ONE_LINE_NOTE_MARKER
-        or not words[1].text[:1].isupper()
-    ):
+    if not _opens_with_note_marker(rows[last], _ONE_LINE_NOTE_MARKER):
         return None
     above = tuple(
-        _point_per_character(row)
+        width_per_character(row.words)
         for row in rows[:last]
         if sum(len(word.text) for word in row.words) >= _ONE_LINE_NOTE_ROW_CHARACTERS
     )
     if not above:
         return None
-    narrow = _point_per_character(
-        rows[last]
+    narrow = width_per_character(
+        rows[last].words
     ) <= _ONE_LINE_NOTE_CHARACTER_SHARE * statistics.median(above)
     return last if narrow else None
 
@@ -334,7 +326,7 @@ def _gap_or_marker_band_start(
                 >= _BAND_GAP_PITCHES * measures.body_line_pitch
                 or (
                     not _after_small_row(rows, small, index)
-                    and _opens_with_note_marker(rows[index])
+                    and _opens_with_note_marker(rows[index], _NOTE_MARKER)
                 )
             )
         ),

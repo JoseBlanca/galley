@@ -230,6 +230,24 @@ def _is_one_line_note(
     )
 
 
+def _kind(
+    *, one_line_note: bool, margin: bool, small: Small, below_large: bool
+) -> RegionKind:
+    """The kind of a region out of the head line (spec section 2), by the
+    rules in this order: a one-line note region is a band region, whatever
+    it is by the others; else a margin region is a margin region; else a
+    region in small type whose top lies at or below the bottom of a region
+    that is neither in small type nor a margin region nor a one-line note
+    (2 pt slack), `below_large`, is a band region; else a body region."""
+    if one_line_note:
+        return RegionKind.BAND
+    if margin:
+        return RegionKind.MARGIN
+    if small is Small.SMALL and below_large:
+        return RegionKind.BAND
+    return RegionKind.BODY
+
+
 def region_kinds(
     page: PageLayout, body_word_height: float, running_heads: frozenset[int]
 ) -> tuple[RegionKind, ...]:
@@ -282,14 +300,14 @@ def region_kinds(
         if not margin and not note and height > small_limit
     )
     other_kinds = {
-        number: RegionKind.BAND
-        if note
-        else RegionKind.MARGIN
-        if margin
-        else RegionKind.BAND
-        if height <= small_limit
-        and any(region.box.top >= bottom - _BELOW_SLACK_PT for bottom in large_bottoms)
-        else RegionKind.BODY
+        number: _kind(
+            one_line_note=note,
+            margin=margin,
+            small=Small.SMALL if height <= small_limit else Small.NOT_SMALL,
+            below_large=any(
+                region.box.top >= bottom - _BELOW_SLACK_PT for bottom in large_bottoms
+            ),
+        )
         for (number, region), margin, height, note in zip(
             numbered, margins, heights, one_line_note, strict=True
         )
