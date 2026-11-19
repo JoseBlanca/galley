@@ -248,7 +248,8 @@ A text, the model's answer or a span's text, is cut into tokens:
    marker glued after a word (any digits, "*", "†" or "‡" after two
    letters or more and any of that punctuation: "Greece,1", "Kadesh,12",
    but not "A1"), and less one to three digits, "*", "†" or "‡" glued
-   before a capital ("3There"), then less the ordinary punctuation at its
+   before a capital and another letter ("3There"; not "1X", which is
+   "IX" misread, and whose "1" a replacement would keep), then less the ordinary punctuation at its
    ends again. A core with no letter or digit, as "—" or "*", makes no
    token.
 4. Its comparison form: Unicode NFC; curly quotes made straight; the
@@ -272,13 +273,19 @@ markers around a core are never edited.
 ## 7. The alignment, and the edits it gives
 
 The model's tokens of a page are lined up with galley's reading of the
-page by least edits: a pair of tokens costs 0 when equal and 1 when not,
-and a token of either side left unpaired costs 1. Of alignments of equal
-cost, the backtrace (from the end) takes a pair before an unpaired token
-of galley's, and that before an unpaired token of the model's. This is
-the measurement's alignment (its `common.align` without the wildcard).
-Since pairing two unequal tokens costs less than leaving both unpaired,
-two tokens that stand at the same place pair up whatever their letters.
+page by least edits: a pair of tokens costs 0 when equal, and when not 1
+less a tenth of their **likeness**, the number of distinct characters
+the two forms share over the number in the form that has more; a token
+of either side left unpaired costs 1. Of alignments of equal cost, the
+backtrace (from the end) takes a pair before an unpaired token of
+galley's, and that before an unpaired token of the model's. This is the
+measurement's alignment (its `common.align` without the wildcard) but for
+the tenth, which only decides between alignments the measurement's costs
+made equal: on a note "…is a puem." followed by the model's next note
+number "15", unit costs pair "puem" with "15" as readily as with "poem",
+and the likeness takes "poem". Since pairing two unequal tokens costs
+less than leaving both unpaired, two tokens that stand at the same place
+pair up whatever their letters.
 
 From the pairs:
 
@@ -305,12 +312,15 @@ From the pairs:
   notes' own numbers, which the model prints and galley holds as markers
   (83 of Kadesh's 183 note markers give no token, empty or "*" or "%"),
   and the page number the model prints between two note columns. The
-  run's other words, joined by one space, go into the note: after the
-  last word of the note before the run that the stage may change, in the
-  same block, or, when there is none (the run comes right after the
-  marker or a note reference), before the first such word after the run
-  in the same block. When neither exists, the run is not put in, and the
-  stage logs it. A run elsewhere, in the body, before the page's first
+  run's other words, joined by one space, go into the note: after
+  galley's token just before the run when the stage may change it; when
+  it is fixed (the run comes right after the marker or a note reference),
+  before the first word after the run that the stage may change, in the
+  same note, or else after the last such word before the run, in the same
+  note. The run goes after or before the whole word, with its
+  punctuation: "the." and "Bulletin" give "the. Bulletin". When the note
+  has no word the stage may change, the run is not put in, and the stage
+  logs it. A run elsewhere, in the body, before the page's first
   token or after its last, is not put in: there it is page numbers and
   running heads.
 - A pair with a fixed token, a pair less alike than 0.3, and a galley
