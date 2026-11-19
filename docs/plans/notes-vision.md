@@ -137,7 +137,7 @@ Deliverables:
 
 - [x] 4.1 The stage and its tests.
 - [x] 4.2 Kadesh measured with it.
-- [ ] Review of work packages 3 and 4.
+- [x] Review of work packages 3 and 4.
 
 ## 5. The EPUBs
 

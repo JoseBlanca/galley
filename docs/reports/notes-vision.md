@@ -87,3 +87,39 @@ ones.
 
 After the merge pytest 3,167 passed in 82 s: the stage's excerpt test
 takes 12.5 s; the review looks at it.
+
+## Review of the correct stage
+
+Two reviewers read 1d9c16d..700d652. What mattered, all fixed (f9f53f4
+to de66c8d), spec first where a rule changed:
+
+- **Edits lost printed words**, about 20 on Kadesh ("pp. 542, 543." to
+  "pp, 543.)"): a galley word holding two printed words was replaced by
+  one of the model's. No replacement now when galley's word has more
+  separators or digits than the model's; where galley glued two words,
+  the edit takes both of the model's. The last case, "1%The" to "The"
+  (page 53, a misread note marker), is refused by a rule that keeps any
+  piece of digits and marker signs glued to a word.
+- **Closing quotes and a note marker dropped** ("him.”’!7" to "him"):
+  the set of punctuation before a glued marker is now the spec's.
+- **Insertions repeating words** a note already held: refused.
+- **Nonsense replacements** where galley's reading order was wrong (page
+  14, "his" to "Mashawasha"): a block part whose unequal pairs average
+  under 0.3 alike gets no edit (page 14's measure 0.00 to 0.19; the
+  reference pages 0.36 to 0.93).
+- **The page images could go through a proxy** set on the machine: the
+  stage now ignores proxies and redirects, tested with `http_proxy` set.
+- **The excerpt test passed while the stage invented about 230 words**:
+  it now pins the 475 edits, literal edits and page order, which found a
+  real bug (the edits file was not in page order). Other unguarded
+  rules are pinned.
+
+Kadesh's third run with the final rules: 1,029 edits on 44 pages in
+666 s; on the six reference pages 1.4 wrong words per 100 in the body
+and 5.5 in the notes (2.7 and 26.8 without the stage); 11 fluent wrong
+words; no edit drops a printed word (5 replacements with fewer words
+are junk inside a word, "P#@igns" to "campaigns"). pytest 3,199 passed
+in 76 s, over the minute.
+
+During the review fixes the agent unloaded the Qwen 27B model in LM
+Studio, which another session may have loaded; it was told not to.
