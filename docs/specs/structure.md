@@ -699,8 +699,10 @@ such as "1G-2", and about 19 in Gierke ("£ 2", "d2"), none in Haskins,
 Stubbs and Kadesh.
 
 **A signature mark of letters.** A line is also a printer's signature
-mark, with no digit, when it has the position and the limits above and
-is two words, the first a capital letter and a full stop, the second
+mark, with no digit, when it is the lowest line (or the line above a
+page number), has at most 6 letters and its middle at least 0.3 of the
+column width right of the column's left edge, as above, and is two
+words, the first a capital letter and a full stop, the second
 starting at least half the column's width right of the first's left
 side. Gierke signs the gatherings of its introduction with letters,
 "M." at the left and "c", "d", "e" at the right (pages 38, 54 and 70),
@@ -721,7 +723,8 @@ none of these, the line above it (the lowest of the lines left) is
 removed as a printer's signature mark when it is one by the rule above,
 its bottom lies less than one body line pitch above the lowest line's
 bottom, and its top lies at least 2 pitches below the top of the line
-before it in its region. On Domesday's page 428 the text layer boxes
+before it in its region (a line first in its region is not taken). On
+Domesday's page 428 the text layer boxes
 the "[0" of a table's last row, "[0 17 1]", at the foot of the page,
 5.2 pt below the signature mark "26—2" beside it, so "[0" was the
 lowest line and the mark stayed in the text, glued to the table's last
