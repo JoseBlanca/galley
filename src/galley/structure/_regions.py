@@ -2,6 +2,7 @@
 margin or band. lines.json does not say; structure decides from where each
 region lies and the height of its words."""
 
+import statistics
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -16,12 +17,25 @@ from galley.structure._measures import (
 # Spec section 2: a margin region is narrower than a quarter of the widest.
 _MARGIN_WIDTH_SHARE = 0.25
 # Spec section 2, from layout section 3, step 4: a band's words are at most
-# 0.85 of the body word height (measured, layout section 2).
+# 0.85 of the body word height (measured, layout section 2), or at most 0.82
+# of the page's median line height (layout's "Small against the page":
+# Gierke's introduction notes, 8 pt against its 10 to 11 pt body and the
+# book's 9.0 pt; at 0.85 the last rows of two printed contents were small).
 _SMALL_WORD_SHARE = 0.85
+_SMALL_PAGE_SHARE = 0.82
+# Spec section 2, from layout section 3, step 4, "A page whose notes
+# outnumber its text": the page's median line height is taken on its lines
+# of at least 0.9 of the body word height when they are a quarter of its
+# lines (Gierke's page 50, 13 lines of text above 25 of notes).
+_FULL_SIZE_LINE_SHARE = 0.9
+_FULL_SIZE_LINES_LEAST_SHARE = 0.25
 # Spec section 2: a band region may reach 2 pt into the region above it;
 # Domesday's note "1 See above, p. 359." (page 535) reaches 0.8 pt into the
 # text above it, and was a margin region.
 _BELOW_SLACK_PT = 2.0
+# Spec section 2, from layout section 3, step 4, "A note of one line boxed
+# as tall as the body": a one-line note region's first word.
+_ONE_LINE_NOTE_MARKER = "1"
 # Spec section 3, "A short region beside the head": one line of at most 5
 # characters (a roman number up to "lxxiv", or a speck) whose top lies
 # within 4 pt of the head's (Turney's numbers 0 to 0.8 pt, Gierke's 0 to
@@ -36,7 +50,8 @@ _HEAD_OVERLAP_PT = 2.0
 
 class Small(StrEnum):
     """Whether a region is set in small type: its median word height at
-    most `_SMALL_WORD_SHARE` of the body word height."""
+    most `_SMALL_WORD_SHARE` of the body word height, or at most
+    `_SMALL_PAGE_SHARE` of the page's median line height."""
 
     SMALL = "small"
     NOT_SMALL = "not small"
@@ -159,6 +174,80 @@ def _is_margin(
     )
 
 
+def _page_line_height(
+    regions: tuple[Region, ...], widest: Region, body_word_height: float
+) -> float:
+    """The page's median line height (spec section 2), in points: the median,
+    over the lines of `regions` not narrower than a quarter of `widest`, of
+    each line's median word height, taken over those of at least
+    `_FULL_SIZE_LINE_SHARE` of `body_word_height` when they are
+    `_FULL_SIZE_LINES_LEAST_SHARE` of the lines or more; 0 without such a
+    line."""
+    heights = tuple(
+        median_word_height(line.words)
+        for region in regions
+        if _width(region) >= _MARGIN_WIDTH_SHARE * _width(widest)
+        for line in region.lines
+    )
+    if not heights:
+        return 0.0
+    full_size = tuple(
+        height
+        for height in heights
+        if height >= _FULL_SIZE_LINE_SHARE * body_word_height
+    )
+    if len(full_size) >= _FULL_SIZE_LINES_LEAST_SHARE * len(heights):
+        return statistics.median(full_size)
+    return statistics.median(heights)
+
+
+def _is_one_line_note(
+    number: int,
+    page: PageLayout,
+    numbered: tuple[tuple[int, Region], ...],
+    margins: tuple[bool, ...],
+) -> bool:
+    """Whether region `number` of `page` is a one-line note region (spec
+    section 2): the page's last region, one line whose first word is "1" and
+    whose second starts with a capital, lying below every other region of
+    `numbered` (the regions out of the head line) that is not a margin
+    region, as `margins` says, and there is one."""
+    region = page.regions[number]
+    if number != len(page.regions) - 1 or len(region.lines) != 1:
+        return False
+    texts = tuple(word.text for word in region.lines[0].words)
+    above = tuple(
+        other
+        for (other_number, other), margin in zip(numbered, margins, strict=True)
+        if other_number != number and not margin
+    )
+    return (
+        texts[:1] == (_ONE_LINE_NOTE_MARKER,)
+        and texts[1:2] != ()
+        and texts[1][:1].isupper()
+        and bool(above)
+        and all(_lies_below(region, other) for other in above)
+    )
+
+
+def _kind(
+    *, one_line_note: bool, margin: bool, small: Small, below_large: bool
+) -> RegionKind:
+    """The kind of a region out of the head line (spec section 2), by the
+    rules in this order: a one-line note region is a band region, whatever
+    it is by the others; else a margin region is a margin region; else a
+    region in small type whose top lies at or below the bottom of a region
+    that is neither in small type nor a margin region nor a one-line note
+    (2 pt slack), `below_large`, is a band region; else a body region."""
+    if one_line_note:
+        return RegionKind.BAND
+    if margin:
+        return RegionKind.MARGIN
+    if small is Small.SMALL and below_large:
+        return RegionKind.BAND
+    return RegionKind.BODY
+
+
 def region_kinds(
     page: PageLayout, body_word_height: float, running_heads: frozenset[int]
 ) -> tuple[RegionKind, ...]:
@@ -186,7 +275,10 @@ def region_kinds(
     if not others:
         return tuple(head_kind for _ in page.regions)
     widest = max(others, key=_width)
-    small_limit = _SMALL_WORD_SHARE * body_word_height
+    small_limit = max(
+        _SMALL_WORD_SHARE * body_word_height,
+        _SMALL_PAGE_SHARE * _page_line_height(others, widest, body_word_height),
+    )
     heights = tuple(median_word_height(region_words(region)) for region in others)
     margins = tuple(
         _is_margin(
@@ -197,20 +289,27 @@ def region_kinds(
         )
         for region, height in zip(others, heights, strict=True)
     )
+    one_line_note = tuple(
+        _is_one_line_note(number, page, numbered, margins) for number, _ in numbered
+    )
     large_bottoms = tuple(
         region.box.bottom
-        for region, margin, height in zip(others, margins, heights, strict=True)
-        if not margin and height > small_limit
+        for region, margin, height, note in zip(
+            others, margins, heights, one_line_note, strict=True
+        )
+        if not margin and not note and height > small_limit
     )
     other_kinds = {
-        number: RegionKind.MARGIN
-        if margin
-        else RegionKind.BAND
-        if height <= small_limit
-        and any(region.box.top >= bottom - _BELOW_SLACK_PT for bottom in large_bottoms)
-        else RegionKind.BODY
-        for (number, region), margin, height in zip(
-            numbered, margins, heights, strict=True
+        number: _kind(
+            one_line_note=note,
+            margin=margin,
+            small=Small.SMALL if height <= small_limit else Small.NOT_SMALL,
+            below_large=any(
+                region.box.top >= bottom - _BELOW_SLACK_PT for bottom in large_bottoms
+            ),
+        )
+        for (number, region), margin, height, note in zip(
+            numbered, margins, heights, one_line_note, strict=True
         )
     }
     return tuple(

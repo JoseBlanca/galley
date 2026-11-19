@@ -1,0 +1,14 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/plans/stray-text.md with the specs it amends (docs/specs/plates.md, section 2b). Compared with galley's output at be06218 (the starting commit's code): as expected.",
+  "excerpt": "gierke_notes_heads",
+  "page": 6,
+  "book_page_index": 63,
+  "checks": "a contents page whose text-layer boxes sit 5 to 20 pt off the print: not an inkless page",
+  "printed": {
+    "title": "SUBJECT MATTER OF THE NOTES, in two columns of numbered titles with page numbers"
+  },
+  "expected": {
+    "kind": "text",
+    "no_removal_reason": "inkless_page"
+  }
+}

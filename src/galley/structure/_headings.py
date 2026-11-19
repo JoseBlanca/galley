@@ -174,11 +174,10 @@ def _gap_branch(lines: Sequence[PlacedLine], number: int, pitch: float) -> bool:
     return True
 
 
-def _is_flush_left(line: PlacedLine) -> bool:
+def _is_flush_left(line: PlacedLine, edges: Edges) -> bool:
     """Spec section 14, rule 1: the line's left side lies within 4 pt of the
-    left edge of its centring edges, and its right side a quarter of their
-    width or more short of the right edge."""
-    edges = line.centring_edges
+    left edge of `edges`, and its right side a quarter of their width or
+    more short of the right edge."""
     return (
         abs(line.line.box.x0 - edges.left) <= _FLUSH_LEFT_PT
         and edges.right - line.line.box.x1 >= _FLUSH_LEFT_SHORT_SHARE * edges.width
@@ -194,7 +193,8 @@ def _is_heading_line(
 ) -> bool:
     """Spec section 14, rules 1 to 4, for the line at `number` of a page's
     body stream `lines`. `side_edges` are the sides of the page's body and
-    band lines when its body holds fewer than 5 lines, else None;
+    band lines when its body holds fewer than 5 lines, else None, between
+    which the line may also be centred or flush left;
     `kept_head` is the position in `lines` of the page's head line when
     section 3 left it in the text in its band of the head lines, which is
     not flush left unless it starts with a chapter label word."""
@@ -205,7 +205,10 @@ def _is_heading_line(
     )
     flush_left = (
         not centred
-        and _is_flush_left(line)
+        and (
+            _is_flush_left(line, line.centring_edges)
+            or (side_edges is not None and _is_flush_left(line, side_edges))
+        )
         and (number != kept_head or _starts_with_label_word(line))
     )
     return (

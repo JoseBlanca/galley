@@ -1,5 +1,6 @@
 """analyze: what each page of the PDF is, written to pages.json (walking
-skeleton spec section 6, plates spec section 2, figures spec section 3).
+skeleton spec section 6, plates spec sections 2 and 2b, figures spec
+section 3).
 
 analyze measures every page with pdfplumber, its size in points and the
 words of its text layer, and renders every page that is neither excluded
@@ -8,10 +9,15 @@ is `excluded` when the config excludes it, a `plate` when the config's
 `plate_pages` names it or the plate rule takes it, `text` when its layer
 has a word, and `blank` otherwise. It has no OCR, so a blank page stops
 the run: the owner checks it and adds it to `exclude_pages`. Each page the
-plate rule takes is logged at WARNING, so that the owner sees the covers
-and endpapers it takes too. On each text page, the same render is searched
-for the figures printed among its lines (`figure_boxes`), whose boxes go
-into pages.json; each page with figures is logged at INFO.
+plate rule makes a plate is logged at WARNING, so that the owner sees the
+covers and endpapers it takes too. On each text page, the same render is
+searched for the figures printed among its lines (`figure_boxes`), whose
+boxes go into pages.json; each page with figures is logged at INFO. The
+same render also tells an inkless page (`is_inkless`): at least half of
+the words of its layer have no ink under them, and fewer than a third of
+those are known words, words the scanner's OCR invented where nothing is
+printed. It is `inkless`, also when the plate rule takes it, and each one
+is logged at WARNING.
 """
 
 import logging
@@ -27,6 +33,7 @@ import pdfplumber
 
 from galley import pdfium, wordlist
 from galley.analyze._figures import PictureGroup, figure_boxes, figure_groups
+from galley.analyze._inkless import InkRule, InkTest, is_inkless, measure_ink
 from galley.analyze._plates import (
     PLATE_RENDER_DPI,
     PictureArea,
@@ -45,6 +52,7 @@ from galley.model import (
     PagesFile,
     RenderedPage,
     TextSource,
+    box_holds_middle,
     pdf_sha256,
     write_pages,
 )
@@ -52,6 +60,7 @@ from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 from galley.text_layer import layer_words, open_pdf
 
 __all__ = [
+    "InkRule",
     "PageStart",
     "PictureArea",
     "PlateRule",
@@ -59,6 +68,7 @@ __all__ = [
     "classify_page",
     "figure_boxes",
     "front_matter_end",
+    "is_inkless",
     "is_plate",
     "picture_area",
     "require_text_layer",
@@ -142,14 +152,16 @@ class _Measurement:
     """What analyze measures of one page: its size in points from
     pdfplumber, the number of words of its text layer, the words of the
     layer's topmost row (empty without words), the plate rule's test,
-    None for a page it does not test, and the in-page figures found on a
-    page it tests that has a text layer and is not a plate."""
+    None for a page it does not test, the inkless rule's test, None for a
+    page it does not test, and the in-page figures found on a page the
+    plate rule tests that has a text layer and is not a plate."""
 
     width_pt: float
     height_pt: float
     layer_word_count: int
     first_row: tuple[str, ...]
     plate_test: _PlateTest | None
+    ink_test: InkTest | None
     figures: tuple[PictureGroup, ...]
 
 
@@ -163,9 +175,11 @@ def run(
     run leaves none and no later file outlives the pages.json it came from.
     Takes the word list of the book's language from its cache folder,
     extracting it with Tesseract's tools the first time. The text pages
-    before the front-matter end (`front_matter_end`) are `front_matter`.
-    Raises ConfigError when the config asks for OCR, names a page past the
-    end of the PDF or a contents page before its `front_matter_end`, and
+    before the front-matter end (`front_matter_end`) are `front_matter`. A
+    page the inkless rule takes (`is_inkless`) is `inkless`, or
+    `front_matter` before the front-matter end. Raises ConfigError when the
+    config asks for OCR, names a page past the end of the PDF or a contents
+    page before its `front_matter_end`, and
     PdfError when a page that the config does not exclude
     has no text layer and is not a plate. `workers` is the number of
     threads that measure the pages; the renders are made in the one PDFium
@@ -194,6 +208,9 @@ def run(
                     plate_rule=PlateRule.NOT_PLATE
                     if measurement.plate_test is None
                     else measurement.plate_test.rule,
+                    ink_rule=InkRule.NOT_INKLESS
+                    if measurement.ink_test is None
+                    else measurement.ink_test.rule,
                     front_matter_end=end,
                 ),
                 measurement.figures,
@@ -212,9 +229,12 @@ def run(
     )
     end, step = _front_matter_end_and_step(starts, config)
     pages = classify(end)
-    for index, measurement in enumerate(measurements):
-        _log_plate_taken(index, measurement.plate_test)
+    for page, measurement in zip(pages, measurements, strict=True):
+        _log_plate_taken(page, measurement.plate_test)
     _log_front_matter(end, step, pages, config)
+    for page, measurement in zip(pages, measurements, strict=True):
+        if page.kind is PageKind.INKLESS and measurement.ink_test is not None:
+            _log_inkless(page.index, measurement.ink_test)
     for page, measurement in zip(pages, measurements, strict=True):
         if page.figure_boxes:
             _log_figures(page.index, measurement.figures)
@@ -239,7 +259,7 @@ def _measurer(
     """The function a worker thread runs on each page: it reads the page's
     text layer with the worker's pdfplumber document and, on a page the
     plate rule tests, has the PDFium thread render it and tests the render
-    in the worker."""
+    in the worker, for a plate and for an inkless page."""
 
     def measure(pdf: pdfplumber.PDF, page_index: int) -> _Measurement:
         with closing(pdf.pages[page_index]) as page:
@@ -249,6 +269,11 @@ def _measurer(
             words = layer_words(page)
         page_layer_words = tuple((word.text, word.box) for word in words)
         rows = group_rows(words)
+        region_boxes = tuple(
+            region.box
+            for region in config.exclude_regions
+            if region.page_index == page_index
+        )
         rendered = (
             pdfium.render(config.pdf, page_index, PLATE_RENDER_DPI)
             if _plate_rule_tests(page_index, config)
@@ -268,12 +293,18 @@ def _measurer(
             or plate_test.rule is PlateRule.PLATE
             or not page_layer_words
             else figure_groups(
+                rendered, page_layer_words, region_boxes, lower_case_words
+            )
+        )
+        ink_test = (
+            None
+            if rendered is None
+            else measure_ink(
                 rendered,
-                page_layer_words,
                 tuple(
-                    region.box
-                    for region in config.exclude_regions
-                    if region.page_index == page_index
+                    (text, box)
+                    for text, box in page_layer_words
+                    if not any(box_holds_middle(region, box) for region in region_boxes)
                 ),
                 lower_case_words,
             )
@@ -284,6 +315,7 @@ def _measurer(
             layer_word_count=len(page_layer_words),
             first_row=tuple(word.text for word in rows[0].words) if rows else (),
             plate_test=plate_test,
+            ink_test=ink_test,
             figures=figures,
         )
 
@@ -321,6 +353,20 @@ def _test_plate(
     )
     return _PlateTest(
         area=area, known_words=known_words, has_layer=bool(layer_words), rule=rule
+    )
+
+
+def _log_inkless(page_index: int, ink_test: InkTest) -> None:
+    """Logs at WARNING a page made `inkless`, with its share of words without
+    ink and how many of those are known words of 2 letters or more, so that
+    the owner sees a page taken wrongly (plates spec, section 2b)."""
+    _logger.warning(
+        "analyze: page index %d is inkless, its words removed: %.2f of its words "
+        "have no ink under them, %d of those are known words of 2 letters or "
+        "more",
+        page_index,
+        ink_test.share_without_ink,
+        ink_test.known_words,
     )
 
 
@@ -375,15 +421,21 @@ def _log_front_matter(
         )
 
 
-def _log_plate_taken(page_index: int, plate_test: _PlateTest | None) -> None:
-    """Logs at WARNING a page the plate rule takes, with what it measured."""
-    if plate_test is None or plate_test.rule is PlateRule.NOT_PLATE:
+def _log_plate_taken(page: PageInfo, plate_test: _PlateTest | None) -> None:
+    """Logs at WARNING a page the plate rule takes, with what it measured,
+    when its kind is `plate`: not an inkless page the rule also takes, which
+    is `inkless` or `front_matter` (plates spec section 2b)."""
+    if (
+        plate_test is None
+        or plate_test.rule is PlateRule.NOT_PLATE
+        or page.kind is not PageKind.PLATE
+    ):
         return
     if plate_test.has_layer:
         _logger.warning(
             "analyze: page index %d taken for a plate: a picture of %d squares, "
             "%d known words; add it to `exclude_pages` if it is not one",
-            page_index,
+            page.index,
             plate_test.area.largest_group,
             plate_test.known_words,
         )
@@ -392,7 +444,7 @@ def _log_plate_taken(page_index: int, plate_test: _PlateTest | None) -> None:
             "analyze: page index %d, without a text layer, taken for a plate: a "
             "picture of %d of its %d squares; add it to `exclude_pages` if it "
             "is not one",
-            page_index,
+            page.index,
             plate_test.area.largest_group,
             plate_test.area.squares,
         )
@@ -406,19 +458,24 @@ def classify_page(
     config: BookConfig,
     *,
     plate_rule: PlateRule,
+    ink_rule: InkRule,
     front_matter_end: int,
 ) -> PageInfo:
     """What page `index` (from 0) is, given its size in points, the number
-    of words of its text layer and what the plate rule found on it.
+    of words of its text layer and what the plate rule and the inkless
+    rule found on it.
 
     A page in the config's `exclude_pages` is `excluded`; else a page in
-    `plate_pages`, or one the plate rule takes that is not the
-    `cover_page`, is a `plate`, read from its layer when it has a word;
-    else a page with a layer word is `front_matter`, with no text source,
-    when its index is below `front_matter_end`, and `text`, read from the
-    layer, otherwise; else it is `blank`. `exclude_regions` holds the boxes of the config's regions
-    on this page, in the config's order. No page is checked by OCR and
-    none has a score.
+    `plate_pages` is a `plate`; else a page the inkless rule takes is
+    `front_matter` when its index is below `front_matter_end` and
+    `inkless` otherwise, both with no text source, also when the plate
+    rule takes it; else a page the plate rule takes that is not the
+    `cover_page` is a `plate`; a plate is read from its layer when it has
+    a word; else a page with a layer word is `front_matter`, with no text
+    source, when its index is below `front_matter_end`, and `text`, read
+    from the layer, otherwise; else it is `blank`. `exclude_regions` holds
+    the boxes of the config's regions on this page, in the config's order.
+    No page is checked by OCR and none has a score.
     """
     match plate_rule:
         case PlateRule.PLATE:
@@ -427,10 +484,23 @@ def classify_page(
             taken_by_rule = False
         case _:
             assert_never(plate_rule)
+    match ink_rule:
+        case InkRule.INKLESS:
+            inkless = layer_word_count > 0
+        case InkRule.NOT_INKLESS:
+            inkless = False
+        case _:
+            assert_never(ink_rule)
     layer_source = TextSource.TEXT_LAYER if layer_word_count > 0 else TextSource.NONE
     if index in config.exclude_pages:
         kind, text_source = PageKind.EXCLUDED, TextSource.NONE
-    elif index in config.plate_pages or taken_by_rule:
+    elif index in config.plate_pages:
+        kind, text_source = PageKind.PLATE, layer_source
+    elif inkless and index < front_matter_end:
+        kind, text_source = PageKind.FRONT_MATTER, TextSource.NONE
+    elif inkless:
+        kind, text_source = PageKind.INKLESS, TextSource.NONE
+    elif taken_by_rule:
         kind, text_source = PageKind.PLATE, layer_source
     elif layer_word_count > 0 and index < front_matter_end:
         kind, text_source = PageKind.FRONT_MATTER, TextSource.NONE

@@ -151,6 +151,26 @@ BOOKS = (
                     "takes"
                 ),
             ),
+            Excerpt(
+                name="gierke_notes_heads",
+                # Page index 78, whose running head "List of slnthoriti* ixxiii"
+                # is the one 84's is alike to; 83, which the plan named for
+                # it, is the index's title page, and 82's head "List of
+                # Authorities." is not alike enough (0.70) to 84's.
+                page_indices=(14, 15, 16, 17, 18, 40, 63, 78, 84, 146),
+                covers=(
+                    "the cases of the plan stray-text (docs/plans/stray-text.md): "
+                    "footnotes of the translator's introduction, set in 8 pt "
+                    "under a body of 10 to 11 pt, which no band holds at "
+                    "a0a1675 (page indices 15 to 18, 40), and the translator's "
+                    'footnote marked "*" (146); running heads the OCR damaged '
+                    'beyond the survey\'s length limit, "s Introduction." (16) '
+                    'and "JH if ex to List of slntlioritic*. Ixxix" (84), with '
+                    "the alike heads of 14, 15, 17, 18 and 78; and a contents "
+                    "page whose text-layer boxes sit off the print, which "
+                    "must not be taken for an inkless page (63)"
+                ),
+            ),
         ),
     ),
 )
@@ -248,6 +268,17 @@ EVALUATION_EXCERPTS = frozendict(
                     "from 28"
                 ),
             ),
+            Excerpt(
+                name="haskins_endpapers",
+                page_indices=(275, 276, 277, 278),
+                covers=(
+                    "the inkless pages of docs/specs/plates.md, section 2b: "
+                    "the printer's colophon, a page of print (page index "
+                    "275), a page without a text layer, which the book's config excludes (276), and the "
+                    "patterned back endpapers whose text layer holds only OCR "
+                    "junk (277, 278)"
+                ),
+            ),
         ),
         "earlyplantagenet01stub": (
             Excerpt(
@@ -272,6 +303,19 @@ EVALUATION_EXCERPTS = frozendict(
                     "(157), and the index: guide words, columns read as a band, "
                     "rows across the columns, letter initials and spaced "
                     "letters (312 to 321)"
+                ),
+            ),
+            Excerpt(
+                name="stubbs_cut_in",
+                page_indices=(19, 34, 37, 120, 125, 143),
+                covers=(
+                    "cut-in margin notes whose lines share the body's "
+                    "baselines, which the test by size of "
+                    "docs/specs/layout.md, step 2b, takes (page indices 19, "
+                    "37) or leaves in the body (34, where the text layer "
+                    "mixes the rows; 143, a gap under 8 pt), and body lines "
+                    "with a wide space at the inset beside a note, whose "
+                    'words must stay ("The same", 120; "open war.", 125)'
                 ),
             ),
             Excerpt(
@@ -392,6 +436,25 @@ EVALUATION_EXCERPTS = frozendict(
                     'enumerations "(i)" to "(vi)" set as paragraphs (141), '
                     'and "(iv)" to "(viii)", which start with no first value '
                     "(143)"
+                ),
+            ),
+            Excerpt(
+                name="domesday_notes",
+                # Page index 430, whose running head "Domesday Statistics." is
+                # the one 428's is alike to.
+                page_indices=(24, 35, 55, 89, 163, 174, 278, 428, 430, 481),
+                covers=(
+                    "the cases of the plan stray-text (docs/plans/stray-text.md): "
+                    "one-line footnotes boxed as tall as the body (page "
+                    "indices 163, 174, 278); references the OCR glued to a "
+                    'number ("£16,0002", 24), followed by punctuation '
+                    '("servus*.", 55) or read as a letter ("villV", 89); '
+                    "three notes kept as one (35); a page number boxed "
+                    'apart above its running head ("403" over "Domesday '
+                    "Statistics.\", 428, alike to 430's head); and a table "
+                    "whose column heads are "
+                    "printed sideways, a page of print with words without "
+                    "ink (481)"
                 ),
             ),
         ),

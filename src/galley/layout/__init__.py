@@ -95,6 +95,7 @@ __all__ = [
     "layout_page_with_rereads",
     "measure_book",
     "note_bands",
+    "page_measures",
     "reading_score",
     "run",
 ]
@@ -267,6 +268,18 @@ def _cut_in_inset(insets: tuple[int, ...]) -> float | None:
     return peak / _CUT_IN_INSET_TENTHS if has_notes else None
 
 
+def page_measures(
+    measures: BookMeasures | None, page_index: int, contents_pages: frozenset[int]
+) -> BookMeasures | None:
+    """The measures the page of `page_index` is laid out with: `measures`,
+    the book's, without cut-in insets when the page is one of
+    `contents_pages`, the config's pages of the printed contents, on
+    which step 2b takes no cut-in note (layout spec section 3)."""
+    if measures is None or page_index not in contents_pages:
+        return measures
+    return replace(measures, cut_in_inset_left=None, cut_in_inset_right=None)
+
+
 def run(
     folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS
 ) -> None:
@@ -309,9 +322,13 @@ def run(
         if page.kind is PageKind.TEXT and page.text_source is TextSource.TEXT_LAYER
     )
 
+    contents_pages = frozenset(config.contents_pages)
+
     def lay_out(page: PageWords) -> tuple[PageLayout, tuple[Reread, ...]]:
         return layout_page_with_figures(
-            page, measures, rereading if page.index in readable else None
+            page,
+            page_measures(measures, page.index, contents_pages),
+            rereading if page.index in readable else None,
         )
 
     laid_out = map_pages(lay_out, words.pages, workers)

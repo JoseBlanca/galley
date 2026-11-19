@@ -67,6 +67,15 @@ writes both as lists (section 31). `blocks.json` goes to
 `format_version` 5 (section 7). How it is verified is section 32, and
 its two open points section 33. No code of this revision exists.
 
+Revised on 18 November 2026 for the plan stray-text
+(`docs/plans/stray-text.md`), with two rules and no format change: the
+running heads compared in section 3 may differ in length by up to 14
+letters, not 8, so that a head the OCR damaged is still found alike
+(section 3, "Heads of different lengths"); and a sign followed by
+punctuation, "servus*.", is a reference candidate (section 11,
+"References"). Layout changes with it (`docs/specs/layout.md` §3,
+steps 2b to 4).
+
 It builds on `docs/architecture.md` (cited as "architecture §8") and
 `docs/glossary.md`, and on the layout spec, whose terms (body column,
 footnote band, margin note, row, body word height, body line pitch) it
@@ -144,7 +153,11 @@ there; these are used in several:
   1,269), Haskins and Stubbs (its index and lists), sign in Kadesh (24
   of its band blocks start with a sign, 14 with digits and 142 with
   neither, measured on 16 November 2026). A book whose band blocks start
-  with no such word, as Gierke's 11, has none.
+  with no such word has none. Gierke had none until its introduction's
+  notes became band regions (section 2); it now has digits, 61 of its 71
+  band blocks (measured on 19 November 2026 at the plan stray-text's
+  c62dcb1, with the page's median line height taken on its full-size
+  lines).
 
 ## 2. What structure does, in order
 
@@ -286,12 +299,48 @@ the references, gets both too.
   above that region's bottom. Margin notes are about 30
   pt wide against columns of 266 to 317 pt; each column of an index is
   about half the width, so it is not a margin region;
-- a **band region** is any other region, not the head line, whose
-  median word height (over its words) is at most 0.85 of the body word
-  height and whose top is at or below the bottom of another region,
+- a **band region** is any other region, not the head line, that is in
+  **small type**, its median word height (over its words) at most 0.85
+  of the body word height or at most 0.82 of the page's **median line
+  height**, and whose top is at or below the bottom of another region,
   or above it by at most 2 pt, neither the head line nor a margin
-  region, whose median word height is above that (layout's threshold
-  for the footnote band, layout §3, step 4). The 2 pt are for a note
+  region, that is not in small type (layout's two
+  thresholds for the footnote band, layout §3, step 4). The page's
+  median line height is the median, over the lines of the page's
+  regions other than the head line's that are at least a quarter as
+  wide as the widest of them (so that no margin region counts), of
+  each line's median word height, taken over the lines of at least 0.9
+  of the body word height when they are at least a quarter of those
+  lines: layout's median row height (layout §3, step 4, "A page whose
+  notes outnumber its text"), taken on structure's lines. Gierke's page
+  50 holds 13 lines of text and 25 of notes, so the median of all its
+  lines is a note line's and its five footnotes were body regions;
+  measured on 19 November 2026 on the eight books laid out with
+  layout's rule, the blocks change on that page alone, which gets its
+  five footnotes.
+
+  The test against the page is for notes set small against their own
+  page but not against the book. Gierke's introduction (pages 13 to 49)
+  is set in 10 to 11 pt, its notes in 8 pt, and the book's body word
+  height is 9.0 pt, set by the translation: the notes are 0.89 of it,
+  so layout made them a band (layout §3, step 4, "Small against the
+  page") and structure, with the book's measure alone, made them body
+  regions, their text paragraphs between the text's. Measured on 19
+  November 2026 on the eight books laid out at 8c18e68, the test
+  against the page makes band regions on Gierke's 31 pages 15 to 18, 23
+  to 31, 34 to 45, 48 and 49 (the introduction's footnotes) and 109,
+  146, 147 and 156 (the translator's notes marked "*"), and on
+  Mariéjol's 25, 34, 159, 245 and 323, the pages where layout's test
+  against the page made or moved a band; no other region of the eight
+  books changes kind. Gierke gets 67 more footnotes (2 before, 69
+  after), Mariéjol 6, and the paragraphs before and after them now run
+  on over the page break; on Mariéjol's 34, 159 and 323 the notes were
+  already taken from the body (section 11) and no block changes. With
+  the median line height taken on the full-size lines (above), Gierke
+  has 74 footnotes, 5 of them on page 50 (measured again on 19
+  November 2026 at the plan stray-text's c62dcb1).
+
+  The 2 pt are for a note
   that layout starts close under the text (layout §3, step 4, the
   gapless start): Domesday's note "1 See above, p. 359." on page 535,
   one line 66 pt wide, reaches 0.8 pt into the text above it and was a
@@ -299,6 +348,30 @@ the references, gets both too.
   eight books: with them, Domesday's pages 443 and 535 get their notes
   (443's two lines were paragraphs), and Kadesh's 40, on the layout of
   before the review, three; no other block changes;
+- a **one-line note region** is a band region whatever its height and
+  width, and whether or not it is narrow enough to be a margin region:
+  the page's last region, not the head line, that holds one line whose
+  first word is "1" and whose second word starts with a capital letter,
+  and whose top lies below, as above (2 pt), the bottom of every other
+  region that is neither the head line nor a margin region, of which
+  there is at least one. Layout makes such a line a region of its own,
+  after the body's and the margins', only when it is the page's band
+  (layout §3, step 4, "A note of one line boxed as tall as the body"):
+  the text layer boxes the line as tall as the body, 9 to 10 pt in
+  Domesday, so no test of height can find it, and on Domesday's page
+  163 the line, "1 D. B. i. 141 b.", is 55 pt wide, centred, and was a
+  margin region. Structure does not repeat layout's test of width per
+  character: measured on 19 November 2026 on the eight books laid out
+  at 8c18e68 (and again at the review's fixes, the same day), 36
+  regions have the rule's form, Domesday's 26, Haskins' 7 and Gierke's
+  3 (pages 28, 48 and 61), and 11 of them change kind by it, exactly
+  the lines of layout's rule: Domesday's pages 163, 174, 185, 278, 303,
+  308, 315, 347, 472 and 485 and Gierke's 61. The other 25 are band
+  regions by their height already, so a second test would change
+  nothing on these books. Domesday gets 10 more footnotes on 9 pages (185 prints two on
+  its line; 472's note was already a footnote, taken from the body by
+  section 11), each linked to its reference, and its notes without a
+  reference stay 323;
 - every other region is a **body region**, in layout's order.
 
 ## 3. Running heads and page numbers in the head
@@ -412,6 +485,27 @@ is one on the page image: Gierke's 58 ("Analytical Snnittniry. liii"),
 72 and 78, and 10 of Mariéjol's garbled heads (48, 63, 77, 106, 250,
 296, 300, 311, 329, 409); it loses none and changes nothing on the
 owner's books.
+
+**Heads of different lengths.** Two head lines are compared only
+when their letters differ in number by at most **14**: a pair further
+apart is not alike, without computing its ratio. The limit was 8, set
+for speed (section 9), and it left two of Gierke's running heads in
+the text, each damaged by the OCR: page 16's head reads "s
+Introduction.", 13 letters, where the OCR dropped "Translator'" and
+the page number, against the 23 of "Translator's Introduction." on
+the other pages, and page 84's reads "JH if ex to List of
+slntlioritic*. Ixxix", 31 letters with the page number read with a
+capital "I", which is then no roman form and stays among the letters,
+against 22. Their ratios to the nearest head are 0.72 and 0.717, above
+0.70. Measured on 18 November 2026 on the eight books' `lines.json` at
+main a0a1675, over every head line within the 2 pitches that section 3
+did not take: with 14 the rule takes Gierke's 16 and 84 and Mariéjol's
+158, each a running head on the page image, and no other line. The
+test of section 14 that keeps a line alike to a running head from
+being a heading keeps its limit of 8, which was not measured at 14, and
+so do the two other tests that compare by this likeness: the head of a
+short section, below, and the topmost line of a plate page (section 18,
+rule 1).
 
 **A short region beside the head.** Some books print the page number
 outside the body column, level with the running head. Layout then makes
@@ -603,6 +697,47 @@ short and at the left edge, and the middles of the signature marks found
 by the research lie from 0.42 to 0.83 of the page width. The research found 53 in Domesday, every 16 pages, with OCR forms
 such as "1G-2", and about 19 in Gierke ("£ 2", "d2"), none in Haskins,
 Stubbs and Kadesh.
+
+**A signature mark of letters.** A line is also a printer's signature
+mark, with no digit, when it is the lowest line (or the line above a
+page number), has at most 6 letters and its middle at least 0.3 of the
+column width right of the column's left edge, as above, and is two
+words, the first a capital letter and a full stop, the second
+starting at least half the column's width right of the first's left
+side. Gierke signs the gatherings of its introduction with letters,
+"M." at the left and "c", "d", "e" at the right (pages 38, 54 and 70),
+and the OCR reads some numbered marks without their digits ("M. IT",
+Gierke's page 246; "M. H", Domesday's page 234). Each stayed in the
+text, in a note's last line or as a block of its own: on page 38, where
+layout makes the foot a band, "M. C" became a footnote without a
+marker, and the closing quotation mark of the body a reference to it.
+The OCR boxes Gierke's "M." 128 pt wide on page 38, so the distance is
+measured from its left side: 256 pt there, in a column of 297. A line
+of text has no such gap between two words. Measured on 19 November
+2026 on the eight books' `lines.json`, the rule removes those five
+marks and no other line; one more lowest line of this kind, Gierke's
+page 166, has its "M." read as '"^T"' and stays.
+
+**A signature mark beside the lowest line.** When the lowest line is
+none of these, the line above it (the lowest of the lines left) is
+removed as a printer's signature mark when it is a printer's signature
+mark by either rule above,
+its bottom lies less than one body line pitch above the lowest line's
+bottom, and its top lies at least 2 pitches below the top of the line
+before it in its region (a line first in its region is not taken). On
+Domesday's page 428 the text layer boxes
+the "[0" of a table's last row, "[0 17 1]", at the foot of the page,
+5.2 pt below the signature mark "26—2" beside it, so "[0" was the
+lowest line and the mark stayed in the text, glued to the table's last
+word, "Norfolk26—2" (the "[0" had been taken for a page number at the
+foot until "A page number boxed apart", layout §3, step 3, left the
+page's body the heading alone and the body column too narrow to centre
+it). The mark lies 2.9 pitches below the line before it, "Norfolk".
+The 2 pitches keep out the last line of an index's other column: without
+them the rule took "of, 282" on Stubbs' page 315 and "204 f." on
+Haskins' 268, 0.7 pitch below the lines before them. Measured on 19
+November 2026 on the eight books' `lines.json`, the rule removes the
+mark of Domesday's page 428 and no other line.
 
 A word of a lowest line that is none of these stays in the text. A page
 with no body region has no body column, and nothing is removed at its
@@ -1221,7 +1356,8 @@ entries, the quotes and the placing of margin notes. The output does not
 depend on the number of workers.
 Comparing every head line with every other is about 150,000 comparisons
 for Domesday's 546 pages; heads whose letters differ in length by more
-than 8 are not compared, and its cost is measured against the speed
+than 14 are not compared (section 3, "Heads of different lengths"; 8
+until 18 November 2026), and its cost is measured against the speed
 budget of the `coding` skill in the plan.
 
 **The cases.**
@@ -1856,9 +1992,37 @@ reading order:
 - a **bracketed number**: an opening bracket, 1 or 2 digits or letters
   read as digits (above), a closing bracket, and only punctuation after
   ("(1)", "(i).", "{2).");
-- a **sign**: the word "^", "*" or "•", or a letter, any punctuation and
-  one of them at the word's end ("rulers.^", "Normandy.*"). A lone "'"
-  or "t" is not one: in Domesday such a match was right 28 times in 82.
+- a **sign**: the word "^", "*" or "•"; or a word that has a letter,
+  then any punctuation, then one of these three signs at its end
+  ("rulers.^", "Normandy.*"); or such a word with punctuation only after
+  the sign ("servus*.", Domesday page 55; "burh*." page 219), as a
+  glued number may have. Punctuation here is Unicode's (categories P),
+  as for the glued number; a word with no letter before the sign, such
+  as "*.", is no candidate. A lone "'" or "t" is
+  not one: in Domesday such a match was right 28 times in 82. The sign
+  followed by punctuation was added on 18 November 2026: by the
+  evaluation of that day, 178 of Domesday's notes were not linked to
+  their reference, and at 20 of them the reference was a sign followed
+  by punctuation. Words of this form, counted over every line of the
+  eight books' `lines.json` at main a0a1675 (body, bands and margins
+  alike, so more than the body's candidates): Domesday 53, Kadesh 42,
+  Gierke 22, Haskins 4, Stubbs and Turney 1 each, Haynes none, and
+  Mariéjol 413, where the book's reference form, the bracketed number,
+  leaves signs out of the matching (below). Structure run on copies of
+  those runs with the form (spec review, 18 November 2026), before the
+  exclusion of "S*." below: Domesday's linked references go from 1,493
+  to 1,516, 23 notes gained and none lost, though on page 77 note 2's
+  reference moves to a "*" and note 3 takes the "8"; Kadesh, Gierke and
+  Haskins do not change. A word with punctuation after the sign whose
+  part before the sign holds one letter alone, "S*.", is no candidate:
+  Domesday prints "St." with a raised "t", which the OCR reads "S*." 28
+  times, and checked on the page images, 21 of those 23 new links were
+  right and the 2 wrong were "S*." on pages 285 and 333 (18 November
+  2026). With that exclusion, Domesday's linked references go from
+  1,493 to 1,514: 21 notes gained, none lost, and one reference moved,
+  on page 77, to the right note. A sign at the end of a
+  word of one letter, "T*", stays a candidate: the rule changed on all
+  eight books would also unlink a reference of Kadesh's page 39.
 
 **The book's reference form.** A first pass of the matching below, over
 every page and with every candidate, counts for each kind of candidate
@@ -1901,7 +2065,8 @@ reference these rules split off has it.
 
 **What is changed.** A matched glued candidate, a number or a sign at
 the end of a word, is split by a `note_marker` word change, ("land3.",)
-to ("land", "3", "."), ("rulers.^",) to ("rulers.", "^"), and its block
+to ("land", "3", "."), ("rulers.^",) to ("rulers.", "^"), ("servus*.",)
+to ("servus", "*", "."), and its block
 gets two or three spans, the reference one with `note_ref` the note's
 id; the spaces stay with the spans around it. A bracketed number or a
 sign that is a word of its own becomes the reference span, with any
@@ -2378,14 +2543,23 @@ when all of these hold:
    within 4 pt of the left edge its centring is measured against (its
    region's, or the page's body column for a line of a region of fewer
    than 5 lines, section 6, rule 2), and its right side at least a
-   quarter of that width short of the right edge, and it is not a
-   head line that section 3 left in the text in the band where it looks
+   quarter of that width short of the right edge, or is so between the
+   sides of the page's body and band lines on a page whose body regions
+   hold fewer than 5 lines, as it may be centred between them; and it is
+   not a head line that section 3 left in the text in the band where it looks
    for running heads (at most 2 pitches below the median top of the
    book's head lines, or anywhere above it), unless it starts with a
    chapter label word; for a flush-left line, rule 4's second branch also asks that its last word not end
    with ".", ",", ";", ":", "?" or "!" (Turney introduces a block quote
    with a flush-left line set apart by 2.0 pitches above and below on
-   its pages 93, 99, 100 and 160, each ending with such a sign);
+   its pages 93, 99, 100 and 160, each ending with such a sign).
+   Domesday sets the headings "STATISTICS." and "AVERAGES." flush left
+   above its tables on pages 426 and 428, which layout makes bands, so
+   each heading is its page's body alone and as wide as the body column
+   it is measured against; they were paragraphs, and "AVERAGES." ran on
+   into the table that ends the page before. Measured on 19 November 2026 on the eight books'
+   `lines.json`, flush left between the body and band lines makes these
+   two lines headings and no other;
 2. at least half of its characters other than spaces are letters, and
    one of its words has at least 4 letters and is not a roman numeral
    ("(VIII)", a page number of Mariéjol's preface, and the garbage of a
@@ -2731,6 +2905,13 @@ is never made a quote by these rules: it is a note that section 11 did
 not take (Mariéjol's page 210), and stays a paragraph; such a block
 never runs on into the next page's body (section 6 is not applied to
 it), and the paragraph the next page starts is a block of its own.
+Inside the endnote section (section 12) such a block does run on into
+the next page, as any paragraph does: there every note starts with digits, and one that runs over a
+page break is one paragraph. Gierke's endnotes start with digits ("13.")
+and its marker form is digits since its introduction's notes are band
+regions (section 1); with the rule applied inside the section, 79 of
+its 299 endnotes were cut at a page break in mid-sentence (measured on
+19 November 2026).
 Measured on 16 November 2026 on the first plan's blocks of Domesday's
 and Mariéjol's body ranges, against the reference text: of the quotes
 rules 1 to 3 make there, the exclusion takes 28 of Domesday's 30 notes
@@ -3279,9 +3460,14 @@ What they show that the public-domain books did not:
 - **A left cut-in inset** (layout §3): the indented epigraphs and
   headings give Turney one of 44.3 pt and Haynes one of 30.0 pt, so
   layout takes both books for books with cut-in notes. Step 2b moves no
-  word in either: laid out with and without the insets, every page of
-  both gives the same regions (measured on 17 November 2026). A trap
-  for the next change to step 2b.
+  word of Haynes. It would move the labels of Turney's contents page,
+  10, set smaller beside titles that start at the inset, since the cut
+  row's test by size (layout §3, step 2b), and does not only because
+  Turney's config names that page in `contents_pages`; a book without
+  `contents_pages` set for such a page has its contents labels taken as
+  margin notes (layout §6). Laid out with and without the insets, every
+  page of both gave the same regions on 17 November 2026, before the
+  test by size. A trap for the next change to step 2b.
 
 **Their configs**, as the survey ran them, with `ocr = "trust"` (no
 re-reading):
@@ -4286,7 +4472,7 @@ to the entry before (no count changes):
 | Turney | 16 | 0 | 16 | 16 | 16 | 16 | 16 |
 | Haskins | 9 | 0 | 9 | 9 | 9 | 9 | 9 |
 | Stubbs | 25 | 12 | 9 | 13 | 13 | 13 | 13 |
-| Domesday | 59 | 32 | 22 | 27 | 23 | 23 | 23 |
+| Domesday | 59 | 32 | 22 | 27 | 24 | 24 | 23 |
 | Gierke, page 10 | 8 | 0 | 3 | 7 | 6 | 5 | 4 |
 | Gierke, pages 52 to 67 | 348 | 45 | 33 | 275 | 10 | 10 | 10 |
 | Mariéjol | 16 | 0 | 1 | 16 | 13 | 12 | 9 |
@@ -4319,8 +4505,13 @@ the books gave no other title between 0.6 and 0.7 to judge by, and the
 lowest right link in the books that matter, Haynes' "(TjEvil Alchemists
 and Doctor Faustus" to "EVIL ALCHEMISTS AMD DOCTOR FAUSTUS", is 0.94.
 The candidates Domesday leaves unlinked are its front matter ("TABLE OF
-CONTEXTS", "LIST OF ABBREVIATIONS"), which has no heading in the body,
-and "Statistical Tables" (page 19). Haynes' 22 entries are its 16
+CONTEXTS", "LIST OF ABBREVIATIONS"), which has no heading in the body.
+Its "Statistical Tables" (page 19) links at 0.71 to "STATISTICS.", the
+heading flush left above the table of page index 426 (section 14,
+condition 1), the right-hand half of the title "TABLE I. STATISTICS." set across
+the tables' first two pages, 400 and 401; measured on 19 November 2026,
+it is unlinked at 0.8, and was unlinked at every threshold while that
+line was a paragraph. Haynes' 22 entries are its 16
 chapters and 6 front and back matter titles, each linked to its
 heading; Turney's 16 likewise.
 

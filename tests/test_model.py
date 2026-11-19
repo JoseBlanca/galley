@@ -351,7 +351,7 @@ def test_pages_json_is_written_in_field_order_with_indent_one(tmp_path: Path) ->
     path = tmp_path / "pages.json"
     write_pages(path, PAGES)
     text = path.read_text(encoding="utf-8")
-    assert text.startswith('{\n "format_version": 3,\n "source_pdf_sha256": "aaaa')
+    assert text.startswith('{\n "format_version": 4,\n "source_pdf_sha256": "aaaa')
     assert text.endswith("}\n")
     assert list(json.loads(text)) == [
         "format_version",
@@ -623,13 +623,14 @@ def test_truncated_file_names_the_line_and_column(tmp_path: Path, name: str) -> 
 
 
 # For each file, a format_version this galley does not read, and the one it
-# reads: since the plan lists-figures, pages.json at 3 with the boxes of
-# in-page figures, words.json at 3 and lines.json at 4 with the kind of a
-# figure, blocks.json at 5 with list items and contents entries; the
-# version before is the case the owner meets (architecture section 8).
+# reads: since the plan stray-text, pages.json at 4 with the page kind
+# inkless; since the plan lists-figures, words.json at 3 and lines.json at
+# 4 with the kind of a figure, blocks.json at 5 with list items and
+# contents entries; the version before is the case the owner meets
+# (architecture section 8).
 UNSUPPORTED_VERSION: frozendict[str, tuple[int, int]] = frozendict(
     {
-        "pages.json": (2, 3),
+        "pages.json": (3, 4),
         "words.json": (2, 3),
         "lines.json": (3, 4),
         "blocks.json": (4, 5),
@@ -657,7 +658,7 @@ def test_unsupported_format_version_names_both_versions(
 def test_format_version_0_or_true_is_an_error(tmp_path: Path, version: object) -> None:
     path = _written(tmp_path, "pages.json")
     _set(path, ("format_version",), version)
-    with pytest.raises(InputFileError, match="format version 3"):
+    with pytest.raises(InputFileError, match="format version 4"):
         read_pages(path)
 
 
@@ -1170,13 +1171,14 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
         )
     }
     assert values == {
-        "PageKind": ["blank", "text", "plate", "excluded", "front_matter"],
+        "PageKind": ["blank", "text", "plate", "excluded", "front_matter", "inkless"],
         "TextSource": ["text_layer", "ocr", "none"],
         "OcrVerdict": ["layer_kept", "layer_doubtful"],
         "RemovalReason": [
             "excluded_page",
             "excluded_region",
             "front_matter",
+            "inkless_page",
             "running_head",
             "page_number",
             "signature_mark",
@@ -1773,14 +1775,14 @@ def test_note_places_counts_the_blocks_written_before_each_note(
 # the re-reading of small print (reocr spec, section 4, "The record").
 
 
-def test_pages_and_words_json_are_format_version_3_and_lines_json_4() -> None:
+def test_pages_json_is_format_version_4_words_json_3_and_lines_json_4() -> None:
     assert (
         model.PAGES_FORMAT_VERSION,
         model.WORDS_FORMAT_VERSION,
         model.LINES_FORMAT_VERSION,
-    ) == (3, 3, 4)
+    ) == (4, 3, 4)
     assert (PAGES.format_version, WORDS.format_version, LINES.format_version) == (
-        3,
+        4,
         3,
         4,
     )
@@ -2700,8 +2702,9 @@ def test_contents_entry_without_a_depth_from_1_names_the_file_and_block(
 def test_file_before_figure_boxes_figure_kind_and_contents_entry_names_the_stage(
     tmp_path: Path, name: str
 ) -> None:
-    # The version before the plan lists-figures, which an earlier run left:
-    # the reader refuses it and names the stage that writes it again.
+    # The version before the current one, which an earlier run left (for
+    # pages.json the plan stray-text's, for the others lists-figures'): the
+    # reader refuses it and names the stage that writes it again.
     path = _written(tmp_path, name)
     before, current = UNSUPPORTED_VERSION[name]
     _set(path, ("format_version",), before)
@@ -2714,7 +2717,7 @@ def test_file_before_figure_boxes_figure_kind_and_contents_entry_names_the_stage
         f"{current}; run `galley2epub {WRITING_STAGE[name]}` again"
     )
     assert (before, current) == {
-        "pages.json": (2, 3),
+        "pages.json": (3, 4),
         "words.json": (2, 3),
         "lines.json": (3, 4),
         "blocks.json": (4, 5),
@@ -2751,3 +2754,56 @@ def test_box_holds_middle_by_the_middle_of_the_inner_box_edges_included(
     inner: Box, held: bool
 ) -> None:
     assert box_holds_middle(Box(0.0, 0.0, 100.0, 100.0), inner) is held
+
+
+# The plan stray-text: the inkless page (plates spec, section 2b;
+# architecture section 8).
+
+
+def test_pages_json_of_version_3_from_before_the_inkless_page_is_refused(
+    tmp_path: Path,
+) -> None:
+    # A pages.json written before the page kind inkless says nothing of a
+    # page whose words have no ink: the owner runs analyze again.
+    path = tmp_path / "pages.json"
+    write_pages(path, PAGES)
+    _set(path, ("format_version",), 3)
+
+    with pytest.raises(InputFileError) as caught:
+        read_pages(path)
+
+    assert str(caught.value) == (
+        f"{path}: is format version 3; this galley reads format version 4; "
+        "run `galley2epub analyze` again"
+    )
+
+
+def test_inkless_page_is_written_as_its_kind_and_read_back(tmp_path: Path) -> None:
+    inkless_page = replace(
+        PAGES.pages[0], kind=PageKind.INKLESS, text_source=TextSource.NONE
+    )
+    pages = replace(PAGES, pages=(inkless_page,))
+    write_pages(tmp_path / "pages.json", pages)
+
+    content = json.loads((tmp_path / "pages.json").read_text(encoding="utf-8"))
+    assert content["pages"][0]["kind"] == "inkless"
+    assert content["pages"][0]["text_source"] == "none"
+    assert read_pages(tmp_path / "pages.json") == pages
+
+
+def test_inkless_page_removal_is_written_as_its_reason_and_read_back(
+    tmp_path: Path,
+) -> None:
+    # A word the OCR read in the pattern of Haskins' back endpaper.
+    junk_word = Removal(
+        page_index=0,
+        box=Box(120.0, 300.0, 160.0, 312.0),
+        text="fiyj.",
+        reason=RemovalReason.INKLESS_PAGE,
+    )
+    words = replace(WORDS, removals=(junk_word,))
+    write_words(tmp_path / "words.json", words)
+
+    content = json.loads((tmp_path / "words.json").read_text(encoding="utf-8"))
+    assert content["removals"][0]["reason"] == "inkless_page"
+    assert read_words(tmp_path / "words.json").removals == (junk_word,)

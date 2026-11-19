@@ -59,11 +59,16 @@ EXPECTED_EXCERPT_PAGES = {
     "domesday_rereads": 11,
     "kadesh_29-38": 10,
     "domesday_lists": 11,
+    "haskins_endpapers": 4,
+    "domesday_notes": 10,
+    "gierke_notes_heads": 10,
+    "stubbs_cut_in": 6,
 }
 
 # The pages of each excerpt, by index in the excerpt, that have no word in
 # their text layer, as scripts/fetch_samples.py describes them: Kadesh's
-# blank page, the back of Kadesh's plate 34 and Haskins' blank page before
+# blank page, the back of Kadesh's plate 34, Haskins' page index 276 (in
+# haskins_endpapers) and Haskins' blank page before
 # the index. Every other page
 # has words.
 PAGES_WITHOUT_WORDS = {
@@ -87,6 +92,10 @@ PAGES_WITHOUT_WORDS = {
     "domesday_rereads": (),
     "kadesh_29-38": (6,),
     "domesday_lists": (),
+    "haskins_endpapers": (1,),
+    "domesday_notes": (),
+    "gierke_notes_heads": (),
+    "stubbs_cut_in": (),
 }
 
 
@@ -909,12 +918,13 @@ def test_chapter_summary_stubbs_51_is_one_block_and_very_few_starts_a_paragraph(
         for block in blocks.blocks
         if block.origin[0].page_index == 0
     )
-    # "accession.", the end of the cut-in note beside "Very few…", goes
-    # before that paragraph (section 13).
+    # The cut-in note beside "Very few…", "Importance attached by
+    # contemporaries to Henry's accession.", goes before that paragraph
+    # (section 13).
     assert kinds[1:5] == (
         (BlockKind.HEADING, "THE"),
         (BlockKind.CHAPTER_SUMMARY, "Terms"),
-        (BlockKind.MARGIN_NOTE, "accession."),
+        (BlockKind.MARGIN_NOTE, "Importance"),
         (BlockKind.PARAGRAPH, "Very"),
     )
 

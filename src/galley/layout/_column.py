@@ -35,6 +35,7 @@ __all__ = [
     "running_head_row_count",
     "split_at_column",
     "wide_rows_edges",
+    "width_per_character",
     "without_cut_in_notes",
 ]
 
@@ -149,6 +150,18 @@ _HEAD_SKEW_PITCHES: Final[float] = 0.5
 _PAGE_NUMBER_FORM = re.compile(
     r"(?:[0-9]{1,3}|(?=[ivxlcdm])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))[.,]?"
 )
+# Layout spec section 3, step 3, "A page number boxed apart": a head row
+# that is one word of 2 or 3 digits, with or without a "." or "," (measured
+# on the eight books' words.json on 18 November 2026: it joins the head of
+# Kadesh's page 38 and Domesday's 200, 428 and 552; with any page-number
+# form it also read specks above six of Stubbs' heads, "1", "6", "d", as
+# page numbers).
+_BOXED_APART_NUMBER = re.compile(r"[0-9]{2,3}[.,]?")
+# Measured on the eight books' words.json on 19 November 2026: the
+# head-word rows taken lie 0.59 to 1.61 pitches below the number (Kadesh's
+# page 38 the farthest); 2 is a guess above it, which keeps a chapter
+# heading set lower on the page apart from the number.
+_BOXED_APART_HEAD_MOST_PITCHES: Final[float] = 2.0
 # Measured on 17 November 2026 (layout spec section 3, step 2): Turney's
 # notes at the back hang their numbers 6 to 14 pt left of their text, left
 # of the page's left edge; a number up to 15 pt from the word right of it
@@ -222,6 +235,34 @@ def _head_row_top(row: Line) -> float:
     return statistics.median(word.box.top for word in kept or row.words)
 
 
+def _set_apart_head_end(
+    rows: tuple[Line, ...], head: int, head_top: float, pitch: float
+) -> int | None:
+    """The end, in `rows`, of the head whose row is `rows[head]`, of top
+    `head_top`, and of the rows of its skew below it, those whose tops lie
+    less than `_HEAD_SKEW_PITCHES` times `pitch` below `head_top`, when
+    the next row with a letter or a digit has its top at least
+    `_RUNNING_HEAD_GAP_PITCHES` times `pitch` below `head_top` (step 3).
+    None when it is nearer or there is no such row."""
+    end = head + 1
+    while (
+        end < len(rows)
+        and _median_top(rows[end]) - head_top < _HEAD_SKEW_PITCHES * pitch
+    ):
+        end += 1
+    below = next((row for row in rows[end:] if has_letter_or_digit(row)), None)
+    if below is None or _median_top(below) - head_top < (
+        _RUNNING_HEAD_GAP_PITCHES * pitch
+    ):
+        return None
+    return end
+
+
+def _has_letter(row: Line) -> bool:
+    """Whether a word of `row` holds a letter."""
+    return any(char.isalpha() for word in row.words for char in word.text)
+
+
 def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
     """How many of the column's `rows`, from the top, form the running-head
     region (step 3): the head row, the first with a letter or a digit, the
@@ -231,24 +272,47 @@ def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
     `_RUNNING_HEAD_GAP_PITCHES` times `pitch` below the head row's. A
     row's top is the median of its words' tops, the head row's of its
     words that are no page-number form (`_head_row_top`). 0 when there is
-    no such region."""
+    no such region.
+
+    When the head row is a page number boxed apart, one word of
+    `_BOXED_APART_NUMBER`'s form, and the next row with a letter has its
+    top at most `_BOXED_APART_HEAD_MOST_PITCHES` times `pitch` below the
+    number's and, with the rows of its skew, lies
+    `_RUNNING_HEAD_GAP_PITCHES` times `pitch` or more above the next row
+    with a letter or a digit, the region runs down to them instead ("A
+    page number boxed apart")."""
     first = next(
         (index for index, row in enumerate(rows) if has_letter_or_digit(row)), None
     )
     if first is None:
         return 0
-    head_top = _head_row_top(rows[first])
-    end = first + 1
-    while (
-        end < len(rows)
-        and _median_top(rows[end]) - head_top < _HEAD_SKEW_PITCHES * pitch
+    head_row = rows[first]
+    if (
+        len(head_row.words) == 1
+        and _BOXED_APART_NUMBER.fullmatch(head_row.words[0].text) is not None
     ):
-        end += 1
-    below = next((row for row in rows[end:] if has_letter_or_digit(row)), None)
-    if below is None:
-        return 0
-    gap = _median_top(below) - head_top
-    return end if gap >= _RUNNING_HEAD_GAP_PITCHES * pitch else 0
+        head_words = next(
+            (
+                index
+                for index in range(first + 1, len(rows))
+                if _has_letter(rows[index])
+            ),
+            None,
+        )
+        if head_words is not None:
+            head_words_top = _median_top(rows[head_words])
+            near = head_words_top - _median_top(head_row) <= (
+                _BOXED_APART_HEAD_MOST_PITCHES * pitch
+            )
+            end = (
+                _set_apart_head_end(rows, head_words, head_words_top, pitch)
+                if near
+                else None
+            )
+            if end is not None:
+                return end
+    end = _set_apart_head_end(rows, first, _head_row_top(head_row), pitch)
+    return 0 if end is None else end
 
 
 # Measured: the median height of a line's words over the book's is at
@@ -401,6 +465,20 @@ _CUT_IN_CHAIN_ROWS: Final[int] = 2
 _CUT_IN_STRIP_PT: Final[float] = 4.0
 _CUT_IN_ZONE_PT: Final[float] = 1.0
 _CUT_IN_BODY_GAP_PT: Final[float] = 5.0
+# Simulated on Stubbs' whole book on 18 November 2026 with this code, its
+# zones changed in a copy (layout spec section 3, step 2b, rule 2, and
+# section 9): a cut row is shortened also when its strip words of 2
+# letters or more are at most 0.9 of the page's body word height and 0.9
+# of its width per character, the page's measures taken on the column's
+# words of 3 letters or more, on a page of 50 words or more (guessed). It
+# moves 590 more words on 120 pages: 365 note words by the evaluation's
+# alignment, 143 of at most 2 letters, 82 others (perhaps 10 body words);
+# with no test of size, 30 more clear body words move.
+_STRIP_WORD_LETTERS: Final[int] = 2
+_BODY_TYPE_WORD_LETTERS: Final[int] = 3
+_BODY_TYPE_LEAST_WORDS: Final[int] = 50
+_SHORTENED_HEIGHT_SHARE: Final[float] = 0.9
+_SHORTENED_CHARACTER_SHARE: Final[float] = 0.9
 
 
 @dataclass(frozen=True, slots=True)
@@ -476,14 +554,88 @@ def _is_cut_row(row: tuple[_SideWord, ...], at: float, least_span: float) -> boo
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _BodyType:
+    """The size of a set of words' type, in points: the median height of
+    their boxes and their width per character (step 2b, rule 2)."""
+
+    word_height: float
+    width_per_character: float
+
+
+def _letters(word: Word) -> int:
+    """The number of letters in `word`'s text."""
+    return sum(char.isalpha() for char in word.text)
+
+
+def width_per_character(words: Iterable[Word]) -> float:
+    """The width per character of `words`, which hold at least one
+    character, in points: the sum of their box widths over the number of
+    characters of their texts (layout spec section 3, steps 2b and 4)."""
+    kept = tuple(words)
+    return sum(word.box.x1 - word.box.x0 for word in kept) / sum(
+        len(word.text) for word in kept
+    )
+
+
+def _type_of(words: tuple[Word, ...]) -> _BodyType:
+    """The size of `words`' type, which are not empty."""
+    return _BodyType(median_word_height(words), width_per_character(words))
+
+
+def _body_type(column: tuple[Word, ...]) -> _BodyType | None:
+    """The size of the body type of a page whose column holds `column`'s
+    words (step 2b, rule 2), taken on its words of
+    `_BODY_TYPE_WORD_LETTERS` letters or more. None on a page of fewer
+    than `_BODY_TYPE_LEAST_WORDS` words, or with no such word."""
+    measured = tuple(
+        word for word in column if _letters(word) >= _BODY_TYPE_WORD_LETTERS
+    )
+    if len(column) < _BODY_TYPE_LEAST_WORDS or not measured:
+        return None
+    return _type_of(measured)
+
+
+def _is_shortened(
+    row: tuple[_SideWord, ...],
+    strip_end: float,
+    column: tuple[Word, ...],
+    body_type: _BodyType | None,
+) -> bool:
+    """Whether the cut row `row`, seen from its side, is shortened (step 2b,
+    rule 2): no word of it ends at or before `strip_end`, or, on a page
+    whose body type is `body_type`, its strip words, those that do and hold
+    `_STRIP_WORD_LETTERS` letters, are none or set smaller than the page's
+    body type. `column` gives a word by its index."""
+    strip = tuple(column[word.index] for word in row if word.end <= strip_end)
+    if not strip:
+        return True
+    if body_type is None:
+        return False
+    strip_words = tuple(word for word in strip if _letters(word) >= _STRIP_WORD_LETTERS)
+    if not strip_words:
+        return True
+    strip_type = _type_of(strip_words)
+    return (
+        strip_type.word_height <= _SHORTENED_HEIGHT_SHARE * body_type.word_height
+        and strip_type.width_per_character
+        <= _SHORTENED_CHARACTER_SHARE * body_type.width_per_character
+    )
+
+
 def _cut_in_zones(
-    rows: tuple[tuple[_SideWord, ...], ...], at: float, least_span: float, pitch: float
+    rows: tuple[tuple[_SideWord, ...], ...],
+    at: float,
+    least_span: float,
+    pitch: float,
+    column: tuple[Word, ...],
 ) -> tuple[tuple[float, float], ...]:
     """The cut-in zones of a page's `rows`, seen from one side, as (top,
     bottom) in points (step 2b, rule 2): each chain of at least
     `_CUT_IN_CHAIN_ROWS` cut rows, each within `_CUT_IN_CHAIN_PITCHES`
-    pitches of the one before, that holds a shortened row, trimmed to its
-    first and last shortened rows."""
+    pitches of the one before, that holds a shortened row
+    (`_is_shortened`), trimmed to its first and last shortened rows.
+    `column` gives a word by its index."""
     chains: list[list[tuple[_SideWord, ...]]] = []
     for row in rows:
         if not _is_cut_row(row, at, least_span):
@@ -496,12 +648,13 @@ def _cut_in_zones(
         else:
             chains.append([row])
     strip_end = at - _CUT_IN_STRIP_PT
+    body_type = _body_type(column)
     zones = []
     for chain in chains:
         shortened = tuple(
             position
             for position, row in enumerate(chain)
-            if all(word.end > strip_end for word in row)
+            if _is_shortened(row, strip_end, column, body_type)
         )
         if len(chain) < _CUT_IN_CHAIN_ROWS or not shortened:
             continue
@@ -555,7 +708,11 @@ def _cut_in(
     rows = tuple(_side_words(row, side, index_of) for row in group_rows(column))
     at = _seen_from(side, edge) + inset
     zones = _cut_in_zones(
-        rows, at, _CUT_ROW_SPAN_SHARE * measures.column_width, measures.body_line_pitch
+        rows,
+        at,
+        _CUT_ROW_SPAN_SHARE * measures.column_width,
+        measures.body_line_pitch,
+        column,
     )
     in_zones = frozenset(
         word.index

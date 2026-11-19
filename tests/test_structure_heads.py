@@ -30,6 +30,7 @@ from galley.model import (
 )
 from galley.structure import make_blocks, survey_book
 from galley.structure._regions import RegionKind, region_kinds
+from galley.structure._survey import alike_to_a_head
 
 _HASH = "a" * 64
 _NO_WORDS: frozenset[str] = frozenset()
@@ -511,6 +512,31 @@ def test_flush_left_head_line_above_the_head_top_is_no_heading(
     assert len(_headings(blocks)) == headings
 
 
+def test_head_line_9_letters_longer_than_a_running_head_and_0_6_alike_is_a_heading() -> (
+    None
+):
+    # Spec section 3, "Heads of different lengths": section 14's test of a
+    # line alike to a running head keeps its limit of 8 letters. Page 14's
+    # head line, centred in capitals at 40 pt, has the 8 letters of the
+    # running head "MY THINGS" and 9 more, 0.64 alike to it: under the 0.70
+    # of a running head, and 9 letters apart, so it is a heading.
+    line = "MY THINGS ABCDEFGHI"
+    page = PageLayout(
+        14,
+        (
+            _region(_line(line, 122.5 - _CHAR_PT * len(line) / 2, 40)),
+            _region(*_running_text(100, 12)),
+        ),
+        (),
+    )
+    lines = _lines_of(
+        *(_page_with_head(index, "MY THINGS") for index in range(10, 14)),
+        page,
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _headings(blocks) == ((1, None, line),)
+
+
 @pytest.mark.parametrize(
     ("line", "headings"),
     [("A BOOK OF WINTERS", ()), ("A NEW BEGINNING", ((1, None, "A NEW BEGINNING"),))],
@@ -562,6 +588,115 @@ def test_note_line_reaching_into_the_text_above_by_0_8_pt_is_a_band_region(
         RegionKind.BODY,
         RegionKind(kind),
     )
+
+
+@pytest.mark.parametrize(("note_height", "kind"), [(8.0, "band"), (10.0, "body")])
+def test_notes_small_against_their_page_but_not_the_book_are_a_band_region(
+    note_height: float, kind: str
+) -> None:
+    # Gierke's introduction: text in 11 pt, notes in 8 pt, the book's body
+    # word height 9.0 pt (0.89). 8/11 is 0.73 of the page's median line
+    # height, at most 0.82; 10/11 is 0.91.
+    body = _region(
+        *(_line(text, 50, 70 + 15 * n, 11) for n, text in enumerate(_BODY_TEXTS))
+    )
+    notes = _region(
+        *(
+            _line("1 A note of the page in small", 50, 170 + 10 * n, note_height)
+            for n in range(2)
+        )
+    )
+    page = PageLayout(15, (body, notes), ())
+    assert region_kinds(page, 9.0, frozenset()) == (RegionKind.BODY, RegionKind(kind))
+
+
+@pytest.mark.parametrize(("body_lines", "kind"), [(6, "band"), (3, "body")])
+def test_notes_outnumbering_the_text_are_small_against_its_full_size_lines(
+    body_lines: int, kind: str
+) -> None:
+    # Gierke's page 50: text in 10 pt above more lines of notes in 8 pt,
+    # the book's body word height 9.0 pt. The page's median line height is
+    # that of its lines of at least 8.1 pt, when they are a quarter of its
+    # lines: 6 of 16 are, 10 pt, and 8/10 is at most 0.82; 3 of 13 are
+    # not, and against the median of all lines, 8 pt, the notes are not
+    # small.
+    body = _region(
+        *(
+            _line(text, 50, 70 + 15 * n, 10)
+            for n, text in enumerate(_BODY_TEXTS[:body_lines])
+        )
+    )
+    notes = _region(
+        *(
+            _line("1 A note of the page in small", 50, 170 + 10 * n, 8)
+            for n in range(10)
+        )
+    )
+    page = PageLayout(50, (body, notes), ())
+    assert region_kinds(page, 9.0, frozenset()) == (RegionKind.BODY, RegionKind(kind))
+
+
+def test_page_line_height_leaves_out_the_lines_of_a_margin_region() -> None:
+    # Text in 10 pt, two note lines in 8 pt (0.89 of the book's 9.0), and a
+    # margin note of 20 lines boxed 8.5 pt tall. Counted, the margin's
+    # lines would make the page's median line height 8.5, against which
+    # the notes are not small (0.94); over the lines at least a quarter as
+    # wide as the widest it is 10, and they are (0.80).
+    body = _region(
+        *(_line(text, 50, 70 + 15 * n, 10) for n, text in enumerate(_BODY_TEXTS))
+    )
+    notes = _region(
+        *(_line("1 A note of the page in small", 50, 170 + 10 * n, 8) for n in range(2))
+    )
+    margin = _region(*(_line("men.", 10, 70 + 10 * n, 8.5) for n in range(20)))
+    page = PageLayout(15, (body, margin, notes), ())
+    assert region_kinds(page, 9.0, frozenset()) == (
+        RegionKind.BODY,
+        RegionKind.MARGIN,
+        RegionKind.BAND,
+    )
+
+
+def test_one_line_note_below_the_head_line_alone_is_a_body_region() -> None:
+    # A page of a head line, no running head, and one line opening "1" and
+    # a capital below it: no region but the head line lies above that
+    # line, so it is no one-line note.
+    page = PageLayout(
+        30,
+        (
+            _region(_line("A HEADING", 70, 40)),
+            _region(_line("1 The only line", 50, 70)),
+        ),
+        (),
+    )
+    assert region_kinds(page, _WORD_HEIGHT_PT, frozenset()) == (
+        RegionKind.BODY,
+        RegionKind.BODY,
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "last", "kind"),
+    [
+        ("1 Id.", True, "band"),
+        ("2 Id.", True, "margin"),
+        ("1 id.", True, "margin"),
+        ("1 Id.", False, "margin"),
+    ],
+)
+def test_one_line_note_as_tall_as_the_body_last_on_the_page_is_a_band_region(
+    text: str, last: bool, kind: str
+) -> None:
+    # Domesday's page 163: a note of one line ("1 D. B. i. 141 b."), boxed
+    # 10 pt tall as the body, narrower than a quarter of the column, under
+    # the text and 0.9 pt into it. Not the page's last region, or with
+    # other first words, it is a margin region.
+    body = _body(70, *_BODY_TEXTS)
+    note = _region(_line(text, 90, body.box.bottom - 0.9))
+    margin = _region(_line("men.", 10, 70, 5))
+    regions = (body, margin, note) if last else (body, note, margin)
+    kinds = region_kinds(PageLayout(30, regions, ()), _WORD_HEIGHT_PT, frozenset())
+    assert kinds[regions.index(note)] is RegionKind(kind)
 
 
 @pytest.mark.parametrize(("indent", "headings"), [(3.0, 1), (10.0, 0)])
@@ -731,3 +866,11 @@ def test_whole_book_haskins_195_notes_set_close_under_the_text_are_notes(
         for note in blocks.notes
         if note.origin[0].page_index == 195
     ) == (("^", 195), ("^", 195))
+
+
+def test_alike_to_a_head_compares_letters_only_within_8_of_each_other() -> None:
+    # Gierke 16's damaged head against the others, 0.72 alike: section 3's
+    # survey compares them (within 14), the short section's and the plate's
+    # tests keep their limit of 8 (structure spec section 3).
+    assert not alike_to_a_head("sintroduction", ("translatorsintroduction",))
+    assert alike_to_a_head("translatorsintroduct", ("translatorsintroduction",))
