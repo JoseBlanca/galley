@@ -57,6 +57,24 @@ _SIGNATURE_MARK_MAX_CHARACTERS = 6
 _SIGNATURE_MARK_FROM_LEFT_SHARE = 0.3
 # Spec section 4: digits around a dash or a space, "4—2", "12 2".
 _DIGITS_AROUND_A_DASH_OR_SPACE = re.compile(r"[0-9]+ ?[-–—] ?[0-9]+|[0-9]+ [0-9]+")
+# Spec section 4: a signature mark without a digit, "M. c", is two words,
+# the first a capital and a full stop, the second starting at least half
+# the column's width right of the first's left side. Half is chosen, not
+# measured: the one gap measured, in Gierke's introduction signed with
+# letters, is 256 pt in a column of 297, 0.86 of it, on page index 38,
+# where the OCR boxed "M." 128 pt wide.
+_SIGNATURE_INITIAL = re.compile(r"[A-Z]\.")
+_SIGNATURE_SPREAD_WORDS = 2
+_SIGNATURE_GAP_SHARE = 0.5
+# Spec section 4: a signature mark beside the lowest line lies less than a
+# pitch above it and 2 pitches or more below its region's line before it.
+# The 2 pitches are chosen, not measured, between the two gaps measured on
+# 19 November 2026: on Domesday's page index 428, "26—2" lies 2.9 pitches
+# below "Norfolk" (and 5.2 pt above the table's "[0", which the text layer
+# boxes at the foot); the last lines of an index's other column, on
+# Stubbs' page index 315 and Haskins' 268, lie 0.7 pitch below the lines
+# before them and are not set apart.
+_SET_APART_PITCHES = 2.0
 
 
 def _running_head_removals(
@@ -150,6 +168,18 @@ def head_removals(page: PageLayout, survey: BookSurvey) -> LineRemovals:
     )
 
 
+def _is_spread_signature(line: Line, column: Edges) -> bool:
+    """Whether a line is two words, the first a capital and a full stop
+    ("M."), the second starting at least half of `column`'s width right of
+    the first's left side (spec section 4)."""
+    words = sorted(line.words, key=lambda word: word.box.x0)
+    return (
+        len(words) == _SIGNATURE_SPREAD_WORDS
+        and _SIGNATURE_INITIAL.fullmatch(words[0].text) is not None
+        and words[1].box.x0 - words[0].box.x0 >= _SIGNATURE_GAP_SHARE * column.width
+    )
+
+
 def _is_signature_mark(line: Line, column: Edges) -> bool:
     """Whether a line is a printer's signature mark (spec section 4)."""
     text = words_text(line.words)
@@ -159,10 +189,18 @@ def _is_signature_mark(line: Line, column: Edges) -> bool:
     return (
         len(line.words) <= _SIGNATURE_MARK_MAX_WORDS
         and len(characters) <= _SIGNATURE_MARK_MAX_CHARACTERS
-        and has_digit
-        # Letters and digits, or digits around a dash or a space: so not a
-        # number alone, "1900.".
-        and (has_letter or _DIGITS_AROUND_A_DASH_OR_SPACE.fullmatch(text) is not None)
+        and (
+            (
+                has_digit
+                # Letters and digits, or digits around a dash or a space:
+                # so not a number alone, "1900.".
+                and (
+                    has_letter
+                    or _DIGITS_AROUND_A_DASH_OR_SPACE.fullmatch(text) is not None
+                )
+            )
+            or _is_spread_signature(line, column)
+        )
         and middle(line.box)
         >= column.left + _SIGNATURE_MARK_FROM_LEFT_SHARE * column.width
     )
@@ -174,6 +212,11 @@ def _signature_mark_removals(
     """The line at `place` removed as a signature mark when it is one."""
     if place is None or not _is_signature_mark(line_at(page, place), column):
         return _NOTHING_REMOVED
+    return _removed_as_signature_mark(page, place)
+
+
+def _removed_as_signature_mark(page: PageLayout, place: LinePlace) -> LineRemovals:
+    """The line at `place`, known to be a signature mark, removed as one."""
     removal = words_removal(
         page.index, line_at(page, place).words, RemovalReason.SIGNATURE_MARK
     )
@@ -230,6 +273,26 @@ def _is_foot_number_by_value(
     return value is not None and offset is not None and value + offset == page_index
 
 
+def _is_set_apart_beside(
+    page: PageLayout, place: LinePlace, lowest: Line, pitch: float
+) -> bool:
+    """Whether the line at `place` lies beside `lowest`, the page's lowest
+    line, in height: its bottom less than `pitch` above `lowest`'s bottom,
+    wherever it lies across the page; and set apart below its region's
+    line before it, its top `_SET_APART_PITCHES` times `pitch` or more
+    below that line's top. A line first in its region is not set apart
+    (spec section 4). `pitch` is in points."""
+    region_number, line_number = place
+    if line_number == 0:
+        return False
+    line = line_at(page, place)
+    before = page.regions[region_number].lines[line_number - 1]
+    return (
+        lowest.box.bottom - line.box.bottom < pitch
+        and line.box.top - before.box.top >= _SET_APART_PITCHES * pitch
+    )
+
+
 def foot_removals(
     page: PageLayout,
     kinds: tuple[RegionKind, ...],
@@ -238,8 +301,9 @@ def foot_removals(
     """The removals at the foot of a page (spec section 4), on its lowest
     line once the running head is removed: a page number, a signature line
     (on the pages of `survey.signature_lines`), or a printer's signature
-    mark, which may also be the line above a page number. `kinds` are
-    those of the page's regions, in their order."""
+    mark, which may also be the line above a page number, or the line
+    beside a lowest line that is none of these (`_is_set_apart_beside`).
+    `kinds` are those of the page's regions, in their order."""
     column = body_column(page, kinds)
     head = running_head_lines(page, kinds)
     place = lowest_line(page, head)
@@ -264,4 +328,11 @@ def foot_removals(
     position = signature_page_number(line, column)
     if page.index in survey.signature_lines and position is not None:
         return _signature_line_removals(page, place, position)
-    return _signature_mark_removals(page, place, column)
+    if _is_signature_mark(line, column):
+        return _removed_as_signature_mark(page, place)
+    above = lowest_line(page, head | {place})
+    if above is None or not _is_set_apart_beside(
+        page, above, line, survey.body_line_pitch
+    ):
+        return _NOTHING_REMOVED
+    return _signature_mark_removals(page, above, column)

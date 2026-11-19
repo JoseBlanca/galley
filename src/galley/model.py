@@ -34,8 +34,10 @@ from galley.errors import EditError, InputFileError
 # pages.json 3 with the boxes of in-page figures, words.json 3 and
 # lines.json 4 with the kind of a figure, blocks.json 5 with list items,
 # contents entries and their fields, and the reasons list_marker,
-# leader_dots and figure_text.
-PAGES_FORMAT_VERSION = 3
+# leader_dots and figure_text. Since the plan stray-text, 18 November 2026:
+# pages.json 4 with the page kind inkless (plates spec, section 2b); words.json
+# stays at 3, its reason inkless_page coming only from a pages.json of 4.
+PAGES_FORMAT_VERSION = 4
 WORDS_FORMAT_VERSION = 3
 LINES_FORMAT_VERSION = 4
 BLOCKS_FORMAT_VERSION = 5
@@ -58,24 +60,28 @@ class Box:
 
 class PageKind(StrEnum):
     """What a page is, as analyze finds it: blank, text, a plate (mostly a
-    picture), excluded by the config, or front matter: a page before the
-    book's text that would otherwise be a text page (front-matter spec)."""
+    picture), excluded by the config, front matter: a page before the
+    book's text that would otherwise be a text page (front-matter spec), or
+    inkless: a page that prints nothing while its text layer holds words
+    with no ink under them (plates spec, section 2b). A blank page has no
+    text layer; an inkless page has one."""
 
     BLANK = "blank"
     TEXT = "text"
     PLATE = "plate"  # mostly a picture
     EXCLUDED = "excluded"
     FRONT_MATTER = "front_matter"  # before the front-matter end, dropped
+    INKLESS = "inkless"  # prints nothing; its layer's words are OCR junk
 
 
 class TextSource(StrEnum):
     """Where a page's words come from: the book's own text layer, galley's
-    OCR, or none (blank, excluded and front-matter pages, and plates without
-    a text layer)."""
+    OCR, or none (blank, excluded, front-matter and inkless pages, and plates
+    without a text layer)."""
 
     TEXT_LAYER = "text_layer"
     OCR = "ocr"
-    NONE = "none"  # blank, excluded and front-matter pages
+    NONE = "none"  # blank, excluded, front-matter and inkless pages
 
 
 class OcrVerdict(StrEnum):
@@ -189,6 +195,7 @@ class RemovalReason(StrEnum):
     EXCLUDED_PAGE = "excluded_page"
     EXCLUDED_REGION = "excluded_region"
     FRONT_MATTER = "front_matter"  # a word of a page before the book's text
+    INKLESS_PAGE = "inkless_page"  # a word the OCR invented on an inkless page
     RUNNING_HEAD = "running_head"
     PAGE_NUMBER = "page_number"
     SIGNATURE_MARK = "signature_mark"

@@ -200,6 +200,36 @@ def test_front_matter_page_gives_a_front_matter_removal_per_word_and_no_words() 
     )
 
 
+def test_inkless_page_gives_an_inkless_removal_per_word_but_in_a_region() -> None:
+    # Plates spec, section 2b: the words the OCR read in an endpaper's
+    # pattern, in the layer's order; a word in an excluded region keeps
+    # the reason excluded_region, as on any page.
+    inkless = page(PageKind.INKLESS, TextSource.NONE, (REGION,))
+    words = (
+        word("SP", Box(150.0, 200.0, 170.0, 216.0)),
+        word("fiyj.", Box(12.0, 12.0, 18.0, 18.0)),
+        word("v", Box(185.0, 200.0, 195.0, 216.0)),
+    )
+
+    assert page_words(inkless, words) == (
+        PageWords(index=4, text_source=TextSource.NONE, words=(), figures=()),
+        tuple(
+            Removal(
+                page_index=4, box=layer_word.box, text=layer_word.text, reason=reason
+            )
+            for layer_word, reason in zip(
+                words,
+                (
+                    RemovalReason.INKLESS_PAGE,
+                    RemovalReason.EXCLUDED_REGION,
+                    RemovalReason.INKLESS_PAGE,
+                ),
+                strict=True,
+            )
+        ),
+    )
+
+
 def test_blank_page_has_no_words_and_no_removals() -> None:
     assert page_words(page(PageKind.BLANK, TextSource.NONE), ()) == (
         PageWords(index=4, text_source=TextSource.NONE, words=(), figures=()),

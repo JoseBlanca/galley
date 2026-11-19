@@ -1,0 +1,24 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/plans/stray-text.md with the specs it amends (docs/specs/layout.md, section 3, step 3, \"A page number boxed apart\"). Compared with galley's output at be06218 (the starting commit's code): not as expected: \"403\" and \"Domesday Statistics.\" are two paragraphs. On 19 November 2026 the heading below the head and the signature mark at the foot were added from the same rendering: \"AVERAGES.\" is a section heading set flush left above a table, and \"26—2\", printed below the table at the right, is the printer's signature mark (docs/specs/structure.md, sections 4 and 14).",
+  "excerpt": "domesday_notes",
+  "page": 7,
+  "book_page_index": 428,
+  "checks": "a running head whose page number the text layer boxes 8 pt above its words",
+  "printed": {
+    "running_head": {
+      "words": "Domesday Statistics.",
+      "page_number": "403",
+      "number_side": "right"
+    },
+    "first_line_below": "AVERAGES.",
+    "signature_mark": "26—2"
+  },
+  "expected": {
+    "head_line": "Domesday Statistics. 403",
+    "running_head": "Domesday Statistics.",
+    "page_number": "403",
+    "heading": "AVERAGES.",
+    "signature_mark": "26—2"
+  },
+  "known": "The table below the head (\"Total valet …\") is read as notes today and is not part of this test."
+}

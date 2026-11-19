@@ -11,7 +11,9 @@ import hashlib
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from enum import StrEnum
 from pathlib import Path
+from typing import assert_never
 
 import pytest
 
@@ -1317,14 +1319,14 @@ def test_head_below_the_median_by_pitches(pitches: float, running: bool) -> None
         (
             (
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDE",
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLM",
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRS",
             ),
             True,
         ),
         (
             (
                 "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDE",
-                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMN",
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRST",
             ),
             False,
         ),
@@ -1335,8 +1337,8 @@ def test_head_below_the_median_by_pitches(pitches: float, running: bool) -> None
         "0.65 alike",
         "4 letters",
         "3 letters",
-        "31 and 39 letters",
-        "31 and 40 letters",
+        "31 and 45 letters",
+        "31 and 46 letters",
     ],
 )
 def test_heads_alike_at_the_bounds(heads: tuple[str, str], running: bool) -> None:
@@ -1422,6 +1424,105 @@ def test_signature_mark_limits(
     foot = _foot_line(_FOOT_TOP_PT, *words)
     blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
     assert bool(blocks.removals) is removed
+
+
+@pytest.mark.parametrize(
+    ("words", "removed"),
+    [
+        ((("M.", 37), ("c", 266)), True),
+        ((("M.", 37), ("IT", 266)), True),
+        ((("M.", 25), ("c", 25 + 0.9 * 274)), True),
+        ((("M.", 37), ("c", 37 + 0.5 * 274)), True),
+        ((("M.", 37), ("c", 173)), False),
+        ((("m.", 37), ("c", 266)), False),
+        ((("Mr.", 37), ("c", 266)), False),
+    ],
+    ids=[
+        "M. c",
+        "M. IT",
+        "0.9 of the column",
+        "half the column",
+        "less than half the column",
+        "lower case",
+        "two letters",
+    ],
+)
+def test_signature_mark_without_a_digit_is_a_capital_and_a_word_set_far_apart(
+    words: tuple[tuple[str, float], ...], removed: bool
+) -> None:
+    # Gierke signs its introduction with letters, "M." at the left and "c"
+    # at the right (page 38). The column is 274 pt wide: the second word
+    # must start 137 pt or more right of the first's left side.
+    foot = _foot_line(_FOOT_TOP_PT, *words)
+    blocks = make_blocks(_lines_of(_page_with_foot(4, foot)), _NO_WORDS, workers=1)
+    assert [removal.reason for removal in blocks.removals] == (
+        [RemovalReason.SIGNATURE_MARK] if removed else []
+    )
+
+
+class _MarkRegion(StrEnum):
+    """Where the mark lies on `_page_with_mark_beside`'s page: below the
+    line before it in the same region, or first in a region of its own."""
+
+    WITH_THE_LINE_BEFORE = "with the line before"
+    OF_ITS_OWN = "of its own"
+
+
+def _page_with_mark_beside(
+    pitches_below_the_line_before: float,
+    lowest_below_the_mark_pt: float,
+    mark_region: _MarkRegion,
+) -> PageLayout:
+    """Domesday's page index 428 (spec section 4): a table's column whose
+    last line, "Norfolk", has the mark "26—2" at the foot, the given
+    pitches below it, and another column whose lowest word, "[0", the text
+    layer boxes `lowest_below_the_mark_pt` lower than the mark (5 pt on
+    that page)."""
+    body = _region(*(_column_line(70 + _PITCH_PT * number) for number in range(6)))
+    before = _foot_line(
+        _FOOT_TOP_PT - pitches_below_the_line_before * _PITCH_PT, ("Norfolk", 252)
+    )
+    mark = _foot_line(_FOOT_TOP_PT, ("26—2", 252))
+    lower = _region(_foot_line(_FOOT_TOP_PT + lowest_below_the_mark_pt, ("[0", 40)))
+    match mark_region:
+        case _MarkRegion.WITH_THE_LINE_BEFORE:
+            table: tuple[Region, ...] = (_region(before, mark),)
+        case _MarkRegion.OF_ITS_OWN:
+            table = (_region(before), _region(mark))
+        case _:
+            assert_never(mark_region)
+    return PageLayout(4, (body, *table, lower), ())
+
+
+@pytest.mark.parametrize(
+    ("pitches_below", "lowest_below_pt", "mark_region", "removed"),
+    [
+        (3.0, 5.0, _MarkRegion.WITH_THE_LINE_BEFORE, True),
+        (1.9, 5.0, _MarkRegion.WITH_THE_LINE_BEFORE, False),
+        (3.0, _PITCH_PT, _MarkRegion.WITH_THE_LINE_BEFORE, False),
+        (3.0, 5.0, _MarkRegion.OF_ITS_OWN, False),
+    ],
+    ids=[
+        "3 pitches below the line before",
+        "1.9 pitches below the line before",
+        "a pitch above the lowest line",
+        "first in its region",
+    ],
+)
+def test_signature_mark_beside_a_lower_line_is_removed_when_set_apart(
+    pitches_below: float,
+    lowest_below_pt: float,
+    mark_region: _MarkRegion,
+    removed: bool,
+) -> None:
+    # The mark is removed only when its bottom lies less than a pitch above
+    # the lowest line's and its top 2 pitches or more below the top of the
+    # line before it in its region; each case but the first breaks one.
+    page = _page_with_mark_beside(pitches_below, lowest_below_pt, mark_region)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert [(removal.text, removal.reason) for removal in blocks.removals] == (
+        [("26—2", RemovalReason.SIGNATURE_MARK)] if removed else []
+    )
 
 
 @pytest.mark.parametrize(("shift", "removed"), [(0.05, True), (-0.05, False)])
@@ -2830,6 +2931,13 @@ def test_footnote_lines_in_the_body_of_a_book_with_digit_markers_stay() -> None:
         ("{2).", Reference("", "{2)", ".", ReferenceForm.BRACKETED, 2)),
         ("rulers.^", Reference("rulers.", "^", "", ReferenceForm.SIGN, None)),
         ("^", Reference("", "^", "", ReferenceForm.SIGN, None)),
+        ("servus*.", Reference("servus", "*", ".", ReferenceForm.SIGN, None)),
+        ("rulers.^),", Reference("rulers.", "^", "),", ReferenceForm.SIGN, None)),
+        ("*.", None),
+        ("^,", None),
+        ("land*£", None),
+        ("S*.", None),
+        ("S.*", Reference("S.", "*", "", ReferenceForm.SIGN, None)),
         ("p.12", None),
         ("pp.3", None),
         ("vol.3", None),
@@ -2926,6 +3034,25 @@ def test_referenced_sign_alone_is_linked_to_a_note_marked_by_a_sign() -> None:
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert _references(blocks) == (("^", "*"),)
     assert blocks.word_changes == ()
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_referenced_sign_followed_by_punctuation_is_split_from_its_word() -> None:
+    # Spec section 11, "References": Domesday 55's "servus*.".
+    lines = _lines_of(_referenced_page(0, "the servus*. was", "* A note."))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("*", "*"),)
+    paragraph = blocks.blocks[0]
+    assert tuple(span.text for span in paragraph.spans)[1:] == ("*", ". was")
+    assert paragraph.spans[0].text.endswith(" servus")
+    assert blocks.word_changes == (
+        WordChange(
+            page_index=0,
+            before=("servus*.",),
+            after=("servus", "*", "."),
+            reason=ChangeReason.NOTE_MARKER,
+        ),
+    )
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
@@ -3119,6 +3246,35 @@ def test_endnote_section_does_not_run_on_over_blank_pages() -> None:
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert _endnotes_of(blocks)[-1][1][-1].endswith("and runs on")
     assert block_text(blocks.blocks[-1]) == "PLEASE DO NOT REMOVE CARDS"
+
+
+def test_endnote_runs_on_over_a_page_break_in_a_book_of_digit_markers() -> None:
+    # A footnote "1 …" in small type on page 0 makes the book's marker form
+    # digits (Gierke once its introduction's notes are band regions); the
+    # section's endnote "12. …" ends page 1 with a full line and runs on
+    # into page 2 as one paragraph (structure spec, section 16).
+    section = _endnote_pages(1, 12)
+    first = section.pages[0]
+    band = _region(_spread("1 A note in small type.", 50, 300, 300, height=7.0))
+    last = section.pages[1]
+    region = last.regions[0]
+    full_end = replace(region, lines=(*region.lines[:-1], _full("and runs on", 640)))
+    lines = _lines_of(
+        replace(first, regions=(*first.regions, band)),
+        replace(last, regions=(full_end,)),
+        _body_page(
+            2,
+            _short("over the page.", 70),
+            _indented("13. The note 13 which", 85),
+            _full("goes on over a full line", 100),
+            _short("ends.", 115),
+        ),
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _endnotes_of(blocks)[-2] == (
+        "12.",
+        ("The note 12 which goes on over a full line and runs on over the page.",),
+    )
 
 
 def test_endnote_section_of_12_paragraphs_gives_12_endnotes() -> None:

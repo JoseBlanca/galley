@@ -48,13 +48,16 @@ def in_head_band(top: float, median_head_top: float, pitch: float) -> bool:
 
 
 # Spec section 3: heads alike by at least 0.70 of their letters, which are
-# at least 4; heads whose letters differ in length by more than 8 are not
-# compared (spec section 9, for speed). 0.70, not 0.75 (17 November 2026):
-# it takes 13 more running heads on the six books, Gierke's damaged 72 and
-# 78 among them, and no line of text.
+# at least 4; heads whose letters differ in length by more than 14 are not
+# compared (spec sections 3, "Heads of different lengths", and 9). 0.70,
+# not 0.75 (17 November 2026): it takes 13 more running heads on the six
+# books, Gierke's damaged 72 and 78 among them, and no line of text. 14,
+# not 8 (18 November 2026, measured on the eight books at main a0a1675):
+# it takes Gierke's damaged heads of pages 16 and 84 and Mariéjol's 158,
+# and no other line.
 _HEAD_ALIKE_RATIO = 0.70
 _HEAD_MIN_LETTERS = 4
-_HEAD_LENGTH_DIFFERENCE = 8
+_HEAD_LENGTH_DIFFERENCE = 14
 # Spec section 3, the head of a short section: its likeness is to the
 # topmost line of one of the 2 pages before it, not 1, so that a blank page
 # or a plate between does not hide the heading (a guess: on the six books
@@ -231,13 +234,20 @@ def _alike_to_any(line_letters: str, others: tuple[str, ...], alike: _Alike) -> 
     return False
 
 
+# Spec sections 3, 14 and 18: the tests of a line alike to a head other
+# than the survey's own head lines (a line like a running head, the head of
+# a short section, a plate's topmost line) compare letters only within 8
+# of each other, the limit of section 3 before it was raised to 14 on 18
+# November 2026 for the survey's head lines alone; they were not measured
+# at 14.
+_NOT_SURVEY_HEAD_LENGTH_DIFFERENCE = 8
 # Spec section 14: a line in the head band at least 0.6 alike to a running
 # head is never a heading (Domesday's page 159, Kadesh's 38).
 _LIKE_A_HEAD_RATIO = 0.6
 _LIKE_A_HEAD = _Alike(
     min_letters=_HEAD_MIN_LETTERS,
     ratio=_LIKE_A_HEAD_RATIO,
-    max_length_difference=_HEAD_LENGTH_DIFFERENCE,
+    max_length_difference=_NOT_SURVEY_HEAD_LENGTH_DIFFERENCE,
 )
 
 
@@ -248,11 +258,21 @@ def like_a_running_head(line_letters: str, running_letters: tuple[str, ...]) -> 
     return _alike_to_any(line_letters, running_letters, _LIKE_A_HEAD)
 
 
+# Spec section 3: the head of a short section and a plate's topmost line
+# (section 18, rule 1), within `_NOT_SURVEY_HEAD_LENGTH_DIFFERENCE`.
+_OTHER_HEADS_ALIKE = _Alike(
+    min_letters=_HEAD_MIN_LETTERS,
+    ratio=_HEAD_ALIKE_RATIO,
+    max_length_difference=_NOT_SURVEY_HEAD_LENGTH_DIFFERENCE,
+)
+
+
 def alike_to_a_head(line_letters: str, others: tuple[str, ...]) -> bool:
     """Whether `line_letters`, the letters of a line, are alike to any of
     `others` by section 3's rule for running heads: at least 4 letters,
-    0.70 alike."""
-    return _alike_to_any(line_letters, others, _HEADS_ALIKE)
+    0.70 alike, compared only with letters at most 8 more or fewer, as the
+    head of a short section and a plate's topmost line are."""
+    return _alike_to_any(line_letters, others, _OTHER_HEADS_ALIKE)
 
 
 def _alike_pages(

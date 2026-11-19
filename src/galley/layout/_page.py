@@ -7,6 +7,7 @@ Positions are PDF points from the page's top left.
 
 import math
 import re
+import statistics
 from dataclasses import dataclass
 from enum import StrEnum
 from itertools import groupby
@@ -14,6 +15,7 @@ from typing import Final, assert_never
 
 from galley.body_measures import (
     group_rows,
+    median_word_height,
 )
 from galley.layout._column import (
     HANGING_NUMBER,
@@ -25,6 +27,7 @@ from galley.layout._column import (
     is_small_row,
     running_head_row_count,
     split_at_column,
+    width_per_character,
     without_cut_in_notes,
 )
 from galley.model import (
@@ -101,6 +104,32 @@ _BAND_GAP_PITCHES: Final[float] = 1.1
 # Kadesh 3, Haynes 1), none in Stubbs, Mariéjol, Gierke or Turney.
 _NOTE_MARKER = re.compile(r"[0-9]{1,3}\.?|[*^•†‡§]{1,2}")
 _MARKER_ROW_WORDS: Final[int] = 2
+# Measured on 18 November 2026 on the eight books' words.json (layout spec
+# section 3, step 4, "Small against the page"): a row at most 0.82 of the
+# page's median row height is small, which gains the band of 30 of
+# Gierke's pages (its introduction is set larger than the book) and 4 of
+# Mariéjol's, and loses none; at 0.85 the last rows of two printed
+# contents (Haskins 14, Turney 10) became a band.
+_BAND_PAGE_ROW_HEIGHT_SHARE: Final[float] = 0.82
+# Measured on 19 November 2026 on the eight books' words.json (layout spec
+# section 3, step 4, "A page whose notes outnumber its text"): the page's
+# median row height is taken on its rows of at least 0.9 of the body word
+# height when they are a quarter of its rows, which gains the band of
+# Gierke's page 50 (13 such rows of 38) and changes no other page; the
+# quarter is a guess that keeps Turney's notes pages 262 and 271 (1 such
+# row of about 50) as they were.
+_FULL_SIZE_ROW_SHARE: Final[float] = 0.9
+_FULL_SIZE_ROWS_LEAST_SHARE: Final[float] = 0.25
+# Measured the same day (step 4, "A note of one line boxed as tall as the
+# body"): the last row of a page with no band, opening "1" and a capital,
+# at most 0.9 of the median width per character of the rows above it of
+# 20 characters (20 guessed, to leave out short rows), begins the band.
+# The rule takes Domesday's 163, 174, 185, 278, 303, 308, 315, 347, 472 and
+# 485 (0.70 to 0.854) and Gierke's 61 (0.83), and no other row of the
+# eight books; none lies between 0.854 and 1.05.
+_ONE_LINE_NOTE_MARKER = re.compile("1")
+_ONE_LINE_NOTE_CHARACTER_SHARE: Final[float] = 0.9
+_ONE_LINE_NOTE_ROW_CHARACTERS: Final[int] = 20
 # Measured on the six books (layout spec section 3, "Where the thresholds
 # come from"): a gutter is a strip 6 pt wide in the middle third of the
 # column; a word across it whose middle is more than 6 pt from the strip's
@@ -136,20 +165,51 @@ _DROP_CAPITAL_EDGE_PT: Final[float] = 3.0
 
 
 class _Part(StrEnum):
-    """The part of the column that is cut into columns: the body or the
-    footnote band, which need different numbers of open rows."""
+    """The part of the column that is cut into columns (step 5): the body;
+    the footnote band, which needs fewer open rows, may start and end a
+    run at any compatible row and has its gutter near the column's
+    middle; or the body of a page whose every row is small and which so
+    has no band, cut with the body's open rows and the band's run
+    edges."""
 
     BODY = "body"
     BAND = "band"
+    ALL_SMALL_BODY = "all small body"
 
 
 def _open_rows_to_cut(part: _Part) -> int:
     """The open rows a run of `part` needs to be cut into columns."""
     match part:
-        case _Part.BODY:
+        case _Part.BODY | _Part.ALL_SMALL_BODY:
             return _BODY_OPEN_ROWS
         case _Part.BAND:
             return _BAND_OPEN_ROWS
+        case _:
+            assert_never(part)
+
+
+def _ends_at_open_rows(part: _Part) -> bool:
+    """Whether a run of `part` starts and ends at an open row (step 5): in
+    the body; in the band, and on a page whose every row is small, it may
+    start and end at any compatible row."""
+    match part:
+        case _Part.BODY:
+            return True
+        case _Part.BAND | _Part.ALL_SMALL_BODY:
+            return False
+        case _:
+            assert_never(part)
+
+
+def _gutter_near_the_middle(part: _Part) -> bool:
+    """Whether `part` is cut only at a gutter within
+    `_BAND_GUTTER_OFF_CENTRE_PT` of the column's middle (step 5): in the
+    band, not in the body."""
+    match part:
+        case _Part.BAND:
+            return True
+        case _Part.BODY | _Part.ALL_SMALL_BODY:
+            return False
         case _:
             assert_never(part)
 
@@ -165,14 +225,17 @@ class _AtGutter(StrEnum):
     BLOCKED = "blocked"
 
 
-def _opens_with_note_marker(row: Line) -> bool:
-    """Whether `row` opens with a note marker (step 4): its first word is 1
-    to 3 digits with an optional "." or 1 or 2 of the signs `* ^ • † ‡ §`,
-    and its second word starts with a capital letter."""
+def _opens_with_note_marker(row: Line, marker: re.Pattern[str]) -> bool:
+    """Whether `row` opens with a note marker of the form `marker` (step
+    4): its first word, from the left, is wholly of that form, and its
+    second word starts with a capital letter. The band's marker is
+    `_NOTE_MARKER`, 1 to 3 digits with an optional "." or 1 or 2 of the
+    signs `* ^ • † ‡ §`; a one-line note's is `_ONE_LINE_NOTE_MARKER`,
+    "1"."""
     words = sorted(row.words, key=lambda word: word.box.x0)
     return (
         len(words) >= _MARKER_ROW_WORDS
-        and _NOTE_MARKER.fullmatch(words[0].text) is not None
+        and marker.fullmatch(words[0].text) is not None
         and words[1].text[:1].isupper()
     )
 
@@ -193,15 +256,104 @@ def _after_small_row(
     )
 
 
-def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
+def _is_small_on_page(
+    row: Line, measures: BookMeasures, page_row_height: float
+) -> bool:
+    """Whether `row` is small for the footnote band (step 4): small against
+    the book (`is_small_row`), or its median word height at most
+    `_BAND_PAGE_ROW_HEIGHT_SHARE` of `page_row_height`, the page's median
+    row height."""
+    return (
+        is_small_row(row, measures)
+        or median_word_height(row.words)
+        <= _BAND_PAGE_ROW_HEIGHT_SHARE * page_row_height
+    )
+
+
+def _page_row_height(rows: tuple[Line, ...], measures: BookMeasures) -> float:
+    """The page's median row height (step 4), in points, of `rows`, which
+    are not empty: the median of the rows' median word heights, over its
+    full-size rows, those of at least `_FULL_SIZE_ROW_SHARE` of the body
+    word height, when they are `_FULL_SIZE_ROWS_LEAST_SHARE` of the rows
+    or more, else over all of them."""
+    heights = tuple(median_word_height(row.words) for row in rows)
+    full_size = tuple(
+        height
+        for height in heights
+        if height >= _FULL_SIZE_ROW_SHARE * measures.body_word_height
+    )
+    if len(full_size) >= _FULL_SIZE_ROWS_LEAST_SHARE * len(heights):
+        return statistics.median(full_size)
+    return statistics.median(heights)
+
+
+def _one_line_note_start(rows: tuple[Line, ...]) -> int | None:
+    """The index in `rows` of a footnote of one line boxed as tall as the
+    body (step 4), when there is one: the last row with a letter or a
+    digit, not the first of `rows`, whose first word is "1", whose second
+    starts with a capital, and whose width per character is at most
+    `_ONE_LINE_NOTE_CHARACTER_SHARE` of the median of the rows above it
+    that hold `_ONE_LINE_NOTE_ROW_CHARACTERS` characters. None otherwise,
+    and when no row above holds so many."""
+    last = next(
+        (
+            index
+            for index in range(len(rows) - 1, -1, -1)
+            if has_letter_or_digit(rows[index])
+        ),
+        None,
+    )
+    if last is None or last == 0:
+        return None
+    if not _opens_with_note_marker(rows[last], _ONE_LINE_NOTE_MARKER):
+        return None
+    above = tuple(
+        width_per_character(row.words)
+        for row in rows[:last]
+        if sum(len(word.text) for word in row.words) >= _ONE_LINE_NOTE_ROW_CHARACTERS
+    )
+    if not above:
+        return None
+    narrow = width_per_character(
+        rows[last].words
+    ) <= _ONE_LINE_NOTE_CHARACTER_SHARE * statistics.median(above)
+    return last if narrow else None
+
+
+def _small_rows(rows: tuple[Line, ...], measures: BookMeasures) -> tuple[bool, ...]:
+    """For each of `rows`, whether it is small for the footnote band (step
+    4, `_is_small_on_page`); an empty tuple when `rows` is."""
+    if not rows:
+        return ()
+    page_row_height = _page_row_height(rows, measures)
+    return tuple(_is_small_on_page(row, measures, page_row_height) for row in rows)
+
+
+def _band_start(
+    rows: tuple[Line, ...], small: tuple[bool, ...], measures: BookMeasures
+) -> int:
     """The index in `rows` of the first row of the footnote band (step 4),
-    or len(rows) when there is no band: the first small row, not the
-    first of `rows`, from which on two thirds of the rows are small, and
-    which lies `_BAND_GAP_PITCHES` below the row before or opens with a
-    note marker below a row that is not small (`_after_small_row`)."""
-    small = tuple(is_small_row(row, measures) for row in rows)
+    or len(rows) when there is no band: the first small row (`small` says
+    which of `rows` are, `_small_rows`), not the first of `rows`, from
+    which on two thirds of the rows are small, and which lies
+    `_BAND_GAP_PITCHES` below the row before or opens with a note marker
+    below a row that is not small (`_after_small_row`). Without such a
+    row, a footnote of one line boxed as tall as the body
+    (`_one_line_note_start`)."""
     if all(small):
         return len(rows)
+    start = _gap_or_marker_band_start(rows, small, measures)
+    if start < len(rows):
+        return start
+    one_line_note = _one_line_note_start(rows)
+    return len(rows) if one_line_note is None else one_line_note
+
+
+def _gap_or_marker_band_start(
+    rows: tuple[Line, ...], small: tuple[bool, ...], measures: BookMeasures
+) -> int:
+    """`_band_start` by its small rows, `small` saying which rows are, or
+    len(rows) when they give no band."""
     return next(
         (
             index
@@ -213,7 +365,7 @@ def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
                 >= _BAND_GAP_PITCHES * measures.body_line_pitch
                 or (
                     not _after_small_row(rows, small, index)
-                    and _opens_with_note_marker(rows[index])
+                    and _opens_with_note_marker(rows[index], _NOTE_MARKER)
                 )
             )
         ),
@@ -338,15 +490,17 @@ def _cut_run(rows: tuple[Line, ...], middle: float) -> tuple[Region, Region]:
 def _column_cut_regions(
     rows: tuple[Line, ...], left: float, width: float, part: _Part
 ) -> tuple[Region, ...]:
-    """The regions of the body or the band, top to bottom: each run of
-    rows cut at the gutter gives its left and its right column, and the
-    rows between such runs a region each (step 5). A run is a stretch of
-    compatible rows, in the body from an open row to an open row."""
+    """The regions of `part`, top to bottom: each run of rows cut at the
+    gutter gives its left and its right column, and the rows between such
+    runs a region each (step 5). A run is a stretch of compatible rows,
+    from an open row to an open row where `part` needs it
+    (`_ends_at_open_rows`), else the whole stretch; the band is cut only at
+    a gutter near the column's middle (`_gutter_near_the_middle`)."""
     if not rows:
         return ()
     middle = _gutter_middle(rows, left, width)
     if middle is None or (
-        part is _Part.BAND
+        _gutter_near_the_middle(part)
         and abs(middle - (left + width / 2)) > _BAND_GUTTER_OFF_CENTRE_PT
     ):
         return (_region_of_rows(rows),)
@@ -363,10 +517,9 @@ def _column_cut_regions(
         if not (compatible and opened):
             pending.extend(row for row, _ in stretch)
             continue
-        if part is _Part.BAND:
+        if not _ends_at_open_rows(part):
             opened = (0, len(stretch) - 1)
-        # In the body a run starts and ends at an open row; the rows before
-        # and after it in the stretch stay rows.
+        # The rows of the stretch before and after the run stay rows.
         pending.extend(row for row, _ in stretch[: opened[0]])
         column_run = stretch[opened[0] : opened[-1] + 1]
         if _run_is_cut(column_run, part):
@@ -402,20 +555,25 @@ def _column_regions(
     the running-head region and the body's regions, then the band's (steps
     3 to 5 and 7). With `band`, the words of a footnote band re-read with
     Tesseract, step 4 does not look for the band in `words`: `band` is
-    the band, and the rows of `words` below the running head the body."""
+    the band, and the rows of `words` below the running head the body.
+    Without `band`, when every row below the running head is small, there
+    is no band and the body is cut as `_Part.ALL_SMALL_BODY`."""
     rows = group_rows(words)
     head_count = running_head_row_count(rows, measures.body_line_pitch)
     head, rest = rows[:head_count], rows[head_count:]
     if band is None:
-        band_start = _band_start(rest, measures)
+        small = _small_rows(rest, measures)
+        band_start = _band_start(rest, small, measures)
         body_rows, band_rows = rest[:band_start], rest[band_start:]
+        body_part = _Part.ALL_SMALL_BODY if rest and all(small) else _Part.BODY
     else:
         body_rows, band_rows = rest, group_rows(band)
+        body_part = _Part.BODY
     width = measures.column_width
     return (
         (
             *((_head_region(head),) if head else ()),
-            *_column_cut_regions(body_rows, left, width, _Part.BODY),
+            *_column_cut_regions(body_rows, left, width, body_part),
         ),
         _column_cut_regions(band_rows, left, width, _Part.BAND),
     )

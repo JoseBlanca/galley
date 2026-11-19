@@ -132,6 +132,14 @@ indent**). A block kind. A **sub-entry**, a heading under an entry that
 Haskins and Stubbs print inline after a ";" ("Amari, M., 216, 248;
 quoted, 234."), is an index entry of its own, of depth 2.
 
+**inkless page**: a page of the scan that prints nothing, or only
+another page showing through or a patterned endpaper, while its text
+layer holds words the OCR invented there ("SP I fiyj." on a blank page).
+analyze finds it by the ink under each word on a small render: on an
+inkless page at least half the words have none. Its words are removed
+with a record (`docs/specs/plates.md` §2b). Not a **blank page**, which
+has no text layer at all.
+
 **known word**: a word the word list holds (at least two letters), or a
 number; `wordlist.is_known_word` decides. An **unknown word** holds a
 letter or a digit and is not known.
@@ -207,7 +215,7 @@ layout; what each region is, structure decides.
 box and reason: a running head, a page number, a signature mark, a stray
 mark, guide words, a plate's stray words, the figure text of an in-page
 figure, the leader dots of a contents entry, an excluded page or
-region, a page of the front matter.
+region, a page of the front matter, the words of an inkless page.
 
 **re-reading**: reading a region of a page again with Tesseract, from a
 300-dpi render, and keeping Tesseract's words only where their reading

@@ -1,0 +1,28 @@
+{
+  "read": "Transcribed from the image by the assistant on 18 November 2026: the page rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading, the excerpt's text layer (the words as the OCR read them) and docs/plans/stray-text.md with the specs it amends (docs/specs/plates.md, section 2b). Compared with galley's output at be06218 (the starting commit's code): as expected.",
+  "excerpt": "haskins_endpapers",
+  "page": 0,
+  "book_page_index": 275,
+  "checks": "a page of print on the last leaves: not inkless, its words kept",
+  "printed": {
+    "lines": [
+      "The Riverside Press",
+      "CAMBRIDGE . MASSACHUSETTS",
+      "U . S . A"
+    ],
+    "note": "\"The Riverside Press\", in black letter, is not in the text layer"
+  },
+  "expected": {
+    "kind": "text",
+    "kept_words": [
+      "CAMBRIDGE",
+      ".",
+      "MASSACHUSETTS",
+      "U",
+      ".",
+      "S",
+      ".",
+      "A"
+    ]
+  }
+}

@@ -557,7 +557,8 @@ def body_entries(
     page (`PageParts.runs`) is a block of its own, and the line after it
     starts a block; a verse block that ends a page's body stream goes on
     into a verse run that starts the next. A paragraph whose first word has
-    the book's marker form `form` does not run on into the next page, and
+    the book's marker form `form` does not run on into the next page, but
+    inside `section_pages` (an endnote that runs over a page break), and
     no paragraph runs on into or out of `section_pages`, the pages of the
     endnote section (spec section 12): the first line of its first page,
     and the first body line after its last page, start a paragraph. A
@@ -589,7 +590,7 @@ def body_entries(
                 starts = run is None or run.start == number or number == 0
             else:
                 note_break = number == 0 and (
-                    _marker_led(current, form)
+                    (_marker_led(current, form) and page.index not in section_pages)
                     or _crosses_section_edge(before, line, section_pages)
                     or _short_page_end(before, before_page, page)
                 )

@@ -157,6 +157,11 @@ _INTO_MARGIN_PT: Final[float] = 2.0
 # the inset; a note word's place is layout's (_column.in_cut_in_zone and
 # _column.ends_short_of_inset).
 _CUT_IN_LINE_AT_INSET_PT: Final[float] = 3.0
+# A Tesseract word reaching within 3 pt of a cut-in crop's top or bottom
+# reads a body line the crop's edge cuts (reocr spec, section 3, kind 3):
+# on whole Stubbs 5 such words lay within 1.6 pt of the bottom, each the
+# tops of a cut body line, and the next 10.7 pt inside it.
+_CUT_IN_CUT_LINE_PT: Final[float] = 3.0
 
 
 # The reading score
@@ -616,6 +621,15 @@ def _reaches_inset_side(word: Word, side: Side, crop: Box) -> bool:
             assert_never(side)
 
 
+def _at_top_or_bottom(word: Word, crop: Box) -> bool:
+    """Whether `word` reaches within 3 pt of the top or the bottom of
+    `crop`: the crop's edge cuts the line it reads."""
+    return (
+        word.box.top <= crop.top + _CUT_IN_CUT_LINE_PT
+        or word.box.bottom >= crop.bottom - _CUT_IN_CUT_LINE_PT
+    )
+
+
 def cut_in_reading(
     side: Side,
     crop: CutInCrop,
@@ -637,7 +651,8 @@ def cut_in_reading(
     a zone of the crop and ends 4 pt or more short of the inset; every
     other column word overlapping the crop is a body word. Of Tesseract's
     words, a line with a word ending within 3 pt of the crop's side toward
-    the inset is dropped, and so is a word overlapping a body word. The
+    the inset is dropped, and so is a word overlapping a body word or
+    reaching within 3 pt of the crop's top or bottom. The
     crop may replace the cut-in words in its zones, give or take 1 pt, and
     the column words it may replace; never a body word.
     """
@@ -657,7 +672,8 @@ def cut_in_reading(
         for line in ocr_lines
         if not any(_reaches_inset_side(word, side, crop.box) for word in line)
         for word in line
-        if not any(_overlap(word.box, body_word.box) for body_word in body)
+        if not _at_top_or_bottom(word, crop.box)
+        and not any(_overlap(word.box, body_word.box) for body_word in body)
     )
     return RegionReading(
         kind=RereadKind.CUT_IN_NOTE,
