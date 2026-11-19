@@ -4921,8 +4921,10 @@ nations", and "." and "m", the dots of the "i" of "English" and
 owner's examples, 19 November 2026). So in a book with letter
 fragments, on a page that is not an index page, a line every word of
 which meets condition 1, and that no other rule removed, is removed
-whole when each of its words lies by a word of the line just above or
-just below it in the same region: a word with at least 3 letters that
+whole when each of its words lies by a word of the nearest line above
+or below it in the same region that is not itself made only of such
+words (page 29's "." has the line "m" below it, then "English kings,"):
+a word with at least 3 letters that
 overlaps it across at least half of its width, is at least 1/1.15 of
 its height, and overlaps it in height or lies at most **1.5 pt** above
 or below it (page 29's "." sits 1.0 pt above "English"). Each of its
@@ -4933,10 +4935,10 @@ pieces. The book's share of pages with fragments (below) is counted
 with the rule inside a line alone, as it was measured.
 
 Measured on 19 November 2026 on the `lines.json` of the seven books
-run by the plan ocr-redo: such lines hold 171 words on Stubbs' pages
-21 to 307 (147 with a gap of 0 pt, 167 with 1 pt, 175 with 2 pt and
-188 with 3 pt), each looked at on the page rendered at 250 dpi: all
-171 are a piece of a letter of the word beside them (the dot of an
+run by the plan ocr-redo: such lines hold 172 words on Stubbs' pages
+21 to 307 (149 with a gap of 0 pt, 168 with 1 pt, 176 with 2 pt and
+193 with 3 pt), each looked at on the page rendered at 250 dpi: all
+172 are a piece of a letter of the word beside them (the dot of an
 "i", the tail of a "g", "p" or "y", the top of a "d", "f", "l" or
 "k") or a speck between two lines; none is a printed word or a mark
 of punctuation. The other six books, where the rule does not run,
