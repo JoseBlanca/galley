@@ -120,7 +120,7 @@ model's address and name in the config, how it is called, what it reads,
 what an edit records, how markdown applies it). Check: the
 `first-reader` and `spec-reviewer` subagents.
 
-- [ ] 3.1 The spec.
+- [x] 3.1 The spec.
 
 ## 4. The correct stage
 
@@ -135,8 +135,8 @@ Deliverables:
 3. Kadesh with `correct = true`: word error rate on the reference pages
    against work package 2's numbers, invented words counted.
 
-- [ ] 4.1 The stage and its tests.
-- [ ] 4.2 Kadesh measured with it.
+- [x] 4.1 The stage and its tests.
+- [x] 4.2 Kadesh measured with it.
 - [ ] Review of work packages 3 and 4.
 
 ## 5. The EPUBs

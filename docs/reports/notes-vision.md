@@ -56,3 +56,34 @@ the body whole, but "Coronation" stays; tests that passed for the wrong
 reason, or guarded nothing of the 7.8 pt cut's size test and of the
 fidelity check's sign join; a constant written twice. pytest 3,117
 passed in 73 s; the Stubbs and Haskins whole-book tests 49 passed.
+
+## Work packages 3 and 4: the correct stage
+
+Merged: 7170489 and e290a0b (`docs/specs/correct.md` and the
+architecture's parts on correct, edits and the config), 8350806 (the
+stage: `galley2epub correct`, run by `run` when `correct = true`;
+markdown applies its edits; config keys `correct_model`,
+`correct_server`, localhost only, and `correct_second_model`; a pytest
+marker `vision_model`, excluded by default), 69a46a2 (Kadesh's numbers).
+
+Kadesh with `correct = true` (Qwen 3.6 35B-A3B through LM Studio): 1,218
+edits on 44 text pages in 474 s, the machine shared with other
+sessions. On the six reference pages, wrong words per 100:
+
+| | body | notes |
+|---|---|---|
+| before correct | 2.7 | 26.8 |
+| after correct | 1.3 | 5.5 |
+| the measurement's estimate | 0.7 | 3.4 |
+
+The gap to the estimate is a guard added while building: no
+replacement when the two words are less than 0.3 alike. It costs the
+notes 3.8 to 5.3 on the recorded answers and removes 3 wrong words that
+read as real ("Borchardt" for "Brugsch" twice, "Med." for "Hist.");
+kept, since a fluent wrong word is worse than visible junk. Fluent wrong
+words left: 11 in 3,331, about 1 in 300. The optional second reading
+(Qwen 3.6 27B) flags 18 of the 21 wrong note edits and 27 of 324 right
+ones.
+
+After the merge pytest 3,167 passed in 82 s: the stage's excerpt test
+takes 12.5 s; the review looks at it.
