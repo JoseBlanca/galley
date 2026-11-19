@@ -113,8 +113,23 @@ made from `plan/ocr-redo`:
 | `redo` | 2, then 3 | `src/galley/analyze/`, `src/galley/extract/`, `src/galley/ocr.py`, `src/galley/structure/` only for task 3.2, their tests, `tests/test_stray_text_*.py` and Kadesh's expected files |
 | `fragments` | 4 | `src/galley/structure/` except what 3.2 changes, structure's tests |
 
-Task 3.2 and work package 4 both touch structure; 3.2 starts after work
-package 4 is merged, or the two name their files before they start.
+Work package 3 and work package 4 both touch structure (3.1 moves the
+glued-reference test out of `structure/_markers.py` into extract), so
+work package 3 starts after work package 4 is merged. Work package 4 may
+change the expected files of `stubbs_summaries_index` and `stubbs_heads`
+where fragments leave them.
+
+**Changed by work package 1** (the specs hold the rules): the note
+references are taken from the layer in extract (structure §34 and
+extract §9); a line of Tesseract's words with a median confidence below
+60 is never a heading (structure §35; the 12 junk headings have medians
+0 to 50.5, real ones 85 to 96); a letter fragment is a layer word of at
+most 2 characters and 1 letter inside a word of 3 letters or more,
+alone in its row, not on an index page, and the rule runs only in a
+book where at least 0.15 of the pages have one (Stubbs 0.410, 251
+words; the others at most 0.030). Kadesh's page 74, the library's card
+pocket, goes into Kadesh's `exclude_pages` in task 2.2.
+`docs/specs/evaluation.md` drops Mariéjol in task 5.1.
 Work package 5 runs after both.
 
 ## 1. The specs, the excerpt, the titles and Mariéjol
@@ -148,10 +163,10 @@ Deliverables:
 
 Tasks:
 
-- [ ] 1.1 The spec amendments of deliverable 1, in commits of their own,
+- [x] 1.1 The spec amendments of deliverable 1, in commits of their own,
   then the two subagents.
-- [ ] 1.2 The excerpt and its expected files (deliverable 2).
-- [ ] 1.3 Titles and Mariéjol (deliverables 3 and 4).
+- [x] 1.2 The excerpt and its expected files (deliverable 2).
+- [x] 1.3 Titles and Mariéjol (deliverables 3 and 4).
 - [ ] Review of work package 1 (with work package 2).
 
 ## 2. Redo in analyze and extract
