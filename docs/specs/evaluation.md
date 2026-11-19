@@ -32,7 +32,11 @@ reference prints its words, and the same day to
 score the margin notes' words as a part of their own (section 6), so
 that re-reading small print (`docs/specs/reocr.md`) is measured by the
 tool; revised on 18 November 2026 to end the reference where a book's
-excluded last pages begin (`reference_ends_at`, section 3). It builds
+excluded last pages begin (`reference_ends_at`, section 3); revised
+on 19 November 2026 to drop Mariéjol from the evaluation set (section
+3): `evaluation/books.toml` has no entry for it. "The four books" in
+sections 1 to 9, and the rules and examples that name Mariéjol, are the
+set as it was measured before then, Mariéjol included. It builds
 on `docs/architecture.md` and `docs/glossary.md`; "architecture §8" is
 a section of that document, "section 6" a section of this spec. No
 code of the tool exists. galley exists as the walking skeleton
@@ -286,14 +290,18 @@ gives:
   to `reference_ends_at` when the book has it: Stubbs' 322 page anchors
   and 37 headings become 306 and 35 without its publisher's lists.
 
-The first four books (owner, 15 November 2026):
+The set, three books. The owner chose four on 15 November 2026; the
+fourth, Mariéjol's *Catherine de Médicis* (`catherinedemedic00mariuoft`,
+Gutenberg 36315), left it on 19 November 2026 at the owner's word,
+because neither its text layer nor Tesseract reads its worn print
+(`docs/plans/ocr-redo.md`). The measurements this spec took on it
+before then are kept as they were taken.
 
 | name | book | Gutenberg | Internet Archive | what it tests |
 |---|---|---|---|---|
 | haskins | Haskins, *The Normans in European History*, 1915 | 72514 | `normansineuropea00hask` | 72 footnotes, running heads, index; the cleanest text layer |
 | stubbs | Stubbs, *The Early Plantagenets*, 1900 | 70828 | `earlyplantagenet01stub` | 467 margin notes, no footnotes, running heads with dates, a scrambled index |
 | domesday | Maitland, *Domesday Book and Beyond*, 1897 | 43255 | `domesdaybook00maituoft` | 1,729 footnotes, 593 margin notes, Latin, about 46 tables |
-| mariejol | Mariéjol, *Catherine de Médicis*, 1920, French | 36315 | `catherinedemedic00mariuoft` | 1,432 footnotes, a text layer with many misread letters |
 
 Three more books were found and checked to be the same edition as their
 scans: Vinogradoff's *Villainage in England*, Bryce's *The Holy Roman
