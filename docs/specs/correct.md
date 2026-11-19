@@ -318,11 +318,23 @@ From the pairs:
   "542,543.)" made "543.)", "fiveminutes." made "minutes.", "12-18)."
   made "18)."). That is when galley's core has (a) more commas, full stops,
   hyphens or en dashes between two letters or digits than the model's
-  core; or (b) more digits than the model's core; or (c) more letters and
-  digits than the model's core while the model's token just before or
-  just after the paired one pairs with nothing, the model's reading of
-  the word galley glued. Junk inside a word is not such a mark:
+  core; or (b) more digits than the model's core and two digits side by
+  side (a lone digit is often a letter misread, "a3" for "as", "V1" for
+  "VI", which stay fixable). Junk inside a word is not such a mark:
   "maje=ty," still becomes "majesty,".
+
+  **Two printed words galley glued.** When galley's core has more letters
+  and digits than the model's paired token, and that token joined with
+  the unpaired model token just before or just after it is more alike
+  galley's form than the token alone, galley glued the two printed words
+  the model reads apart: galley's core is replaced by the model's text
+  from the first token's core to the second's, with what stands between
+  them ("fiveminutes." becomes "five minutes.", "tothe" "to the"), and
+  the unpaired token is not put in elsewhere. This is checked before (a)
+  and (b). Measured with the recorded answers on the six pages, 19
+  November 2026: refusing such pairs, as (a) and (b) do, took the notes
+  from 5.3 wrong words in 100 to 6.3, since "tothe" stayed where "the" had
+  been put; taking both words brings them back to 5.3, with no word lost.
 - **A block whose words are out of place.** When galley's reading of a
   block on a page is in another order than the model's, the alignment
   pairs words that have nothing to do with each other, and each such pair
