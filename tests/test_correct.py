@@ -963,7 +963,7 @@ EXCERPT_EDITS = (
 # The number of edits on the excerpt with the recorded answers, so that a
 # change of the rules shows: without the split of a block printed on two
 # pages the stage made about 230 more (review of 19 November 2026).
-EXCERPT_EDIT_COUNT = 476
+EXCERPT_EDIT_COUNT = 475
 
 
 # Renders with PDFium.
