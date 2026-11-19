@@ -110,6 +110,15 @@ _MARKER_ROW_WORDS: Final[int] = 2
 # Mariéjol's, and loses none; at 0.85 the last rows of two printed
 # contents (Haskins 14, Turney 10) became a band.
 _BAND_PAGE_ROW_HEIGHT_SHARE: Final[float] = 0.82
+# Measured on 19 November 2026 on the eight books' words.json (layout spec
+# section 3, step 4, "A page whose notes outnumber its text"): the page's
+# median row height is taken on its rows of at least 0.9 of the body word
+# height when they are a quarter of its rows, which gains the band of
+# Gierke's page 50 (13 such rows of 38) and changes no other page; the
+# quarter is a guess that keeps Turney's notes pages 262 and 271 (1 such
+# row of about 50) as they were.
+_FULL_SIZE_ROW_SHARE: Final[float] = 0.9
+_FULL_SIZE_ROWS_LEAST_SHARE: Final[float] = 0.25
 # Measured the same day (step 4, "A note of one line boxed as tall as the
 # body"): the last row of a page with no band, opening "1" and a capital,
 # at most 0.9 of the median width per character of the rows above it of
@@ -226,6 +235,23 @@ def _is_small_on_page(
     )
 
 
+def _page_row_height(rows: tuple[Line, ...], measures: BookMeasures) -> float:
+    """The page's median row height (step 4), in points, of `rows`, which
+    are not empty: the median of the rows' median word heights, over its
+    full-size rows, those of at least `_FULL_SIZE_ROW_SHARE` of the body
+    word height, when they are `_FULL_SIZE_ROWS_LEAST_SHARE` of the rows
+    or more, else over all of them."""
+    heights = tuple(median_word_height(row.words) for row in rows)
+    full_size = tuple(
+        height
+        for height in heights
+        if height >= _FULL_SIZE_ROW_SHARE * measures.body_word_height
+    )
+    if len(full_size) >= _FULL_SIZE_ROWS_LEAST_SHARE * len(heights):
+        return statistics.median(full_size)
+    return statistics.median(heights)
+
+
 def _point_per_character(row: Line) -> float:
     """The width per character of `row`, in points: the sum of its words'
     box widths over the characters of their texts."""
@@ -281,7 +307,7 @@ def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
     boxed as tall as the body (`_one_line_note_start`)."""
     if not rows:
         return 0
-    page_row_height = statistics.median(median_word_height(row.words) for row in rows)
+    page_row_height = _page_row_height(rows, measures)
     small = tuple(_is_small_on_page(row, measures, page_row_height) for row in rows)
     if all(small):
         return len(rows)

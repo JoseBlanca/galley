@@ -262,9 +262,11 @@ def test_whole_head_with_its_page_number_boxed_apart_is_removed(
 
 # The pages of Gierke's introduction that print footnotes (layout spec,
 # section 3, step 4, "Small against the page"), page 40 among them: at
-# a0a1675 only page 40 had a footnote, a speck "£ 2" read as one.
+# a0a1675 only page 40 had a footnote, a speck "£ 2" read as one. Page 50,
+# whose notes outnumber its text, is step 4's "A page whose notes
+# outnumber its text".
 _GIERKE_INTRODUCTION_NOTE_PAGES = frozenset(
-    (*range(15, 19), *range(23, 32), *range(34, 46), 48, 49)
+    (*range(15, 19), *range(23, 32), *range(34, 46), 48, 49, 50)
 )
 
 

@@ -1364,6 +1364,21 @@ def test_band_rows_are_small_at_0_82_of_the_pages_median_row_height(
     assert len(result.regions) == regions
 
 
+@pytest.mark.parametrize(("body_rows", "regions"), [(13, 2), (7, 1)])
+def test_band_rows_outnumbering_the_text_are_small_against_its_full_size_rows(
+    body_rows: int, regions: int
+) -> None:
+    # Gierke's page 50: 13 rows of text 10 pt high above 25 rows of notes
+    # 7 pt high, 0.875 of the book's 8 pt, so not small against the book.
+    # The page's median row height is the full-size rows' (at least 0.9 of
+    # the book's), 10 pt, when they are a quarter of the rows: 13 of 38
+    # are, 7 of 32 are not, and against the median of all rows, 7 pt, the
+    # notes are not small.
+    band = _rows_of_height(25, 100 + (body_rows - 1 + 1.5) * _PITCH, 7.0)
+    result = layout_page(_page(0, (*_tall_rows(body_rows, 10.0), *band)), _MEASURES)
+    assert len(result.regions) == regions
+
+
 def _prose_rows(count: int) -> tuple[Word, ...]:
     """`count` full rows of the column of `_MEASURES`, 12 pt apart from 100,
     of three words of 8 characters: 24 characters at 8 pt each."""
