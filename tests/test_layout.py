@@ -1854,6 +1854,36 @@ def test_cut_in_strip_of_single_letters_counts_as_shortened() -> None:
     assert margin == (("B",), ("n",))
 
 
+def test_cut_in_page_body_type_leaves_out_words_of_fewer_than_3_letters() -> None:
+    # 80 words "of" in 20 rows below the text, 6 pt high, outnumbering the
+    # 60 longer words: counted, they would make the page's body word height
+    # 6 pt, and the strip words, 7 pt high, would not be smaller.
+    full = tuple(
+        word
+        for word in _prose_rows(20)
+        if word.box.top not in {_row_top(10), _row_top(11)}
+    )
+    short = tuple(
+        _word(
+            "of", 50 + 20 * column, _row_top(row), 58 + 20 * column, _row_top(row) + 6
+        )
+        for row in range(21, 41)
+        for column in range(4)
+    )
+    cut = tuple(
+        word
+        for row, text in ((10, "Coinage"), (11, "debased."))
+        for word in (
+            *_cut_row(row),
+            _word(text, 55, _row_top(row) + 1, 55 + 5.0 * len(text), _row_top(row) + 8),
+        )
+    )
+    _, *margins = _region_texts(
+        layout_page(_page(0, (*full, *cut, *short)), _CUT_IN_MEASURES)
+    )
+    assert (("Coinage",), ("debased.",)) in margins
+
+
 def test_cut_in_page_of_fewer_than_50_words_has_no_test_of_size() -> None:
     # 14 rows: 12 full ones of 3 words and the two cut rows, 42 words.
     (body,) = _size_page((("Coinage", 7.0, 5.0), ("debased.", 7.0, 5.0)), 14)
