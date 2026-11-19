@@ -403,8 +403,13 @@ is laid out as one region, as the skeleton did.
       Stubbs, Haynes and Turney have a cut-in inset, and the rule changes
       Stubbs' layout alone, on 11 pages (34, 68, 82, 102, 108, 154, 270,
       274, 280, 298 and 308), each now taking a note's words out of the
-      body ("Hugh Bigot humbled, 1157.", page 68; "Coronation of the
-      young Henry, 1170.", page 102), looked at on the page images; with
+      body, whole or in part: all of "Hugh Bigot humbled, 1157." on page
+      68; on page 102 the note "Coronation of the young Henry, 1170."
+      loses "of the young Henry, 1170." to the margin while its first
+      word, "Coronation", stays in the body; on page 82 the note's
+      words in the text layer are only "the Conquest", and they go to
+      the margin. Looked at on the
+      page images; with
       the gap at 7.5 pt it takes body words too ("it will be", page 219;
       "history. It", page 21), and a gap of 7.8 pt for every row, without
       the test by size, takes the body word "concerned," on page 245 with
