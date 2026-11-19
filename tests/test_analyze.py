@@ -1751,6 +1751,9 @@ WHOLE_BOOK_PAGE_KINDS_AT_9F012AC = frozendict(
                 (71, PageKind.EXCLUDED),
                 (72, PageKind.EXCLUDED),
                 (73, PageKind.EXCLUDED),
+                # The library's card pocket, a text page at 9f012ac, excluded
+                # by the config since 19 November 2026 (docs/plans/ocr-redo.md).
+                (74, PageKind.EXCLUDED),
                 (75, PageKind.EXCLUDED),
             ),
         ),

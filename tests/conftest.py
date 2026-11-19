@@ -311,11 +311,15 @@ WHOLE_BOOK_CONFIGS = frozendict(
             "exclude_pages = [0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557]\n"
             "contents_pages = [14, 15, 16, 17, 18, 19, 20]\n"
         ),
+        # Kadesh is read with ocr = "redo": its text layer is bad throughout
+        # (docs/plans/ocr-redo.md). Its page 74 is the library's card pocket,
+        # excluded on 19 November 2026.
         "battleofkadeshst00breauoft": (
             'title = "The Battle of Kadesh"\n'
             'authors = ["James Henry Breasted"]\n'
             'language = "en"\n'
-            "exclude_pages = [0, 1, 2, 3, 16, 49, 65, 70, 71, 72, 73, 75]\n"
+            'ocr = "redo"\n'
+            "exclude_pages = [0, 1, 2, 3, 16, 49, 65, 70, 71, 72, 73, 74, 75]\n"
             "plate_pages = [23]\n"
         ),
         "politicaltheorie00gieruoft": (

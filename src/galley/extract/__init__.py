@@ -1,9 +1,13 @@
 """extract: the words of every page, written to words.json (walking
-skeleton spec section 6, plates spec section 3, figures spec section 4).
+skeleton spec section 6, plates spec section 3, figures spec section 4,
+extract spec section 9).
 
 extract reads the words of each text page, and of each plate page that
 has a text layer, from the PDF's text layer with pdfplumber, one document
-per worker thread. The words of an excluded page, of a front-matter page
+per worker thread. A page whose text source is `ocr`, every text page
+under `ocr = "redo"`, is rendered at 300 dpi in the PDFium thread and read
+with Tesseract in the worker; when Tesseract finds no word on it, the
+page keeps the layer's words. The words of an excluded page, of a front-matter page
 (front-matter spec section 3), and those whose centre falls in a region
 the config excludes, become removals, so that no word is dropped without
 a record. A plate page is rendered whole at 300 dpi
@@ -18,16 +22,16 @@ import logging
 import math
 from collections.abc import Callable
 from contextlib import closing
+from dataclasses import replace
 from pathlib import Path
 from typing import Final, assert_never
 
 import pdfplumber
 from PIL import Image
 
-from galley import pdfium
+from galley import ocr, pdfium
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
-from galley.config import BookConfig
-from galley.errors import InputFileError
+from galley.config import BookConfig, tesseract_language
 from galley.model import (
     Box,
     Figure,
@@ -59,6 +63,8 @@ _COVER_DPI: Final[int] = 300
 _PLATE_DPI: Final[int] = 300
 # Figures spec section 4: an in-page figure is cut from a render at 300 dpi.
 _FIGURE_DPI: Final[int] = 300
+# Extract spec section 9: Tesseract finds the blocks of the whole page.
+_OCR_PAGE_SEGMENTATION: Final[int] = 3
 
 
 def run(
@@ -69,30 +75,25 @@ def run(
     of each in-page figure in `images/`, and `images/cover.png` when the
     config has a `cover_page`.
 
+    A page whose text source is `ocr` is read with Tesseract (extract spec
+    section 9); one where Tesseract finds no word keeps its layer's words,
+    with the source `text_layer`, and is logged at WARNING.
+
     Deletes words.json, images/ and every later stage's file first
     (lines.json, blocks.json, book.md, book.epub), then always creates
-    images/, empty without a cover, a plate or a figure. Raises InputFileError when
-    pages.json is missing, malformed, made from another PDF, or holds a
-    page read by OCR, which extract cannot read yet. `workers` is the
-    number of threads that read the pages and write the figures' images;
-    the renders are made in the one PDFium thread.
+    images/, empty without a cover, a plate or a figure. Raises
+    InputFileError when pages.json is missing, malformed or made from
+    another PDF, and ExternalProgramError when Tesseract fails on a page.
+    `workers` is the number of threads that read the pages, run Tesseract
+    and write the figures' images; the renders are made in the one PDFium
+    thread.
     """
     delete_stage_outputs(folder, Stage.EXTRACT)
     pages_file = read_checked_pages(folder.pages_json, config.pdf)
-    unreadable = tuple(
-        page.index for page in pages_file.pages if page.text_source is TextSource.OCR
-    )
-    if unreadable:
-        message = (
-            f"{folder.pages_json}: page indices "
-            f"{', '.join(str(index) for index in unreadable)} are read by OCR, "
-            "which extract cannot read yet; run `galley2epub analyze` again"
-        )
-        raise InputFileError(message)
     folder.images_dir.mkdir()
     results = map_pages_with_source(
         lambda: open_pdf(config.pdf),
-        _page_reader(config.pdf, folder.root),
+        _page_reader(config, folder.root),
         pages_file.pages,
         workers,
     )
@@ -116,11 +117,15 @@ def run(
 
 
 def _page_reader(
-    pdf_path: Path, book_root: Path
+    config: BookConfig, book_root: Path
 ) -> Callable[[pdfplumber.PDF, PageInfo], tuple[PageWords, tuple[Removal, ...]]]:
     """The function a worker thread runs on each page: it reads the page's
-    text layer with the worker's pdfplumber document and, on a plate page,
-    has the PDFium thread render it and saves the image from the worker."""
+    text layer with the worker's pdfplumber document; on a page read by
+    OCR, has the PDFium thread render it and runs Tesseract on the render;
+    and on a plate page or a page with figures, has it rendered and saves
+    the images from the worker."""
+    pdf_path = config.pdf
+    language = tesseract_language(config.language)
 
     def read_page(
         pdf: pdfplumber.PDF, page: PageInfo
@@ -131,6 +136,22 @@ def _page_reader(
             page.kind is PageKind.PLATE and page.text_source is TextSource.NONE
         )
         page_layer_words = () if unread else _layer_words(pdf, page.index)
+        ocr_render = (
+            pdfium.render(pdf_path, page.index, ocr.OCR_DPI)
+            if page.text_source is TextSource.OCR
+            else None
+        )
+        tesseract_words = (
+            ()
+            if ocr_render is None
+            else ocr.read_image(
+                _image(ocr_render),
+                origin=(0.0, 0.0),
+                dpi=ocr_render.dpi,
+                psm=_OCR_PAGE_SEGMENTATION,
+                language=language,
+            )
+        )
         if page.kind is PageKind.PLATE:
             _save_png(
                 pdfium.render(pdf_path, page.index, _PLATE_DPI),
@@ -138,13 +159,38 @@ def _page_reader(
             )
         if page.kind is PageKind.TEXT and page.figure_boxes:
             _save_figures(
-                pdfium.render(pdf_path, page.index, _FIGURE_DPI),
+                ocr_render
+                if ocr_render is not None and ocr_render.dpi == _FIGURE_DPI
+                else pdfium.render(pdf_path, page.index, _FIGURE_DPI),
                 page,
                 book_root,
             )
-        return page_words(page, page_layer_words)
+        page_read, words = _words_read(page, tesseract_words, page_layer_words)
+        if page_read.text_source is not page.text_source:
+            _logger.warning(
+                "extract: page index %d: Tesseract found no word on it; it keeps "
+                "the %d words of its text layer",
+                page.index,
+                len(words),
+            )
+        return page_words(page_read, words)
 
     return read_page
+
+
+def _words_read(
+    page: PageInfo, tesseract_words: tuple[Word, ...], layer_words: tuple[Word, ...]
+) -> tuple[PageInfo, tuple[Word, ...]]:
+    """The page as extract reads it and its words, given Tesseract's words
+    of the page (empty unless its source is `ocr`) and its layer's: a page
+    read by OCR has Tesseract's words, but when Tesseract found none it
+    keeps its layer's, with the source `text_layer`, so that no printed word
+    is lost (extract spec section 9); any other page has its layer's."""
+    if page.text_source is not TextSource.OCR:
+        return page, layer_words
+    if tesseract_words or not layer_words:
+        return page, tesseract_words
+    return replace(page, text_source=TextSource.TEXT_LAYER), layer_words
 
 
 def plate_image(page_index: int) -> str:
@@ -181,9 +227,7 @@ def _save_figures(rendered: RenderedPage, page: PageInfo, book_root: Path) -> No
     runs past the render is cut to it, with a warning that names the page:
     analyze's boxes lie on the page, so it is a box made from another
     render or a page of another size."""
-    image = Image.frombytes(
-        "L", (rendered.width_px, rendered.height_px), rendered.pixels
-    )
+    image = _image(rendered)
     for number, box in enumerate(page.figure_boxes, start=1):
         left, top, right, bottom = figure_crop_px(box, rendered.dpi)
         if (
@@ -231,8 +275,13 @@ def _save_cover(pdf: Path, cover_page: int, cover_png: Path) -> None:
 
 def _save_png(rendered: RenderedPage, path: Path) -> None:
     """Saves `rendered` as an 8-bit grayscale PNG at `path`."""
-    Image.frombytes("L", (rendered.width_px, rendered.height_px), rendered.pixels).save(
-        path, format="PNG"
+    _image(rendered).save(path, format="PNG")
+
+
+def _image(rendered: RenderedPage) -> Image.Image:
+    """`rendered` as an 8-bit grayscale Pillow image."""
+    return Image.frombytes(
+        "L", (rendered.width_px, rendered.height_px), rendered.pixels
     )
 
 
@@ -241,7 +290,8 @@ def page_words(
 ) -> tuple[PageWords, tuple[Removal, ...]]:
     """The words of `page` and its removals, given the words pdfplumber read
     from its text layer, in that order (empty for a blank page and a plate
-    without a text layer).
+    without a text layer), or for a page whose text source is `ocr` the
+    words Tesseract read, in its order (extract spec section 9).
 
     A text page, and a plate page with a text layer, keep every word but
     those whose centre is inside one of its `exclude_regions`, edges
@@ -254,13 +304,9 @@ def page_words(
     dpi, whose image is `plate_image(page.index)`, of kind `plate`; a text
     page has one for each of its `figure_boxes`, in their order, with that
     box, at 300 dpi, whose image is `figure_image(page.index, n)`, n from 1,
-    of kind `in_page`; no other page has one. Raises ValueError for a page
-    read by OCR, which extract cannot read yet, and for a blank page or a
-    plate without a text layer given words, which would be lost.
+    of kind `in_page`; no other page has one. Raises ValueError for a blank
+    page or a plate without a text layer given words, which would be lost.
     """
-    if page.text_source is TextSource.OCR:
-        message = f"page {page.index} is read by OCR, which extract cannot read yet"
-        raise ValueError(message)
     figures: tuple[Figure, ...] = ()
     match page.kind:
         case PageKind.TEXT:

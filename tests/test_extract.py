@@ -292,16 +292,64 @@ def test_plate_page_without_a_layer_has_its_figure_and_no_words() -> None:
     [
         (PageKind.BLANK, TextSource.NONE, (word("lost", Box(1.0, 1.0, 2.0, 2.0)),)),
         (PageKind.PLATE, TextSource.NONE, (word("lost", Box(1.0, 1.0, 2.0, 2.0)),)),
-        (PageKind.TEXT, TextSource.OCR, ()),
-        (PageKind.PLATE, TextSource.OCR, ()),
     ],
-    ids=["blank_with_words", "plate_without_layer_with_words", "ocr", "plate_ocr"],
+    ids=["blank_with_words", "plate_without_layer_with_words"],
 )
-def test_page_extract_cannot_read_or_whose_words_would_be_lost_is_a_value_error(
+def test_page_whose_words_would_be_lost_is_a_value_error(
     kind: PageKind, text_source: TextSource, layer_words: tuple[Word, ...]
 ) -> None:
     with pytest.raises(ValueError, match=r"^page 4 "):
         page_words(page(kind, text_source), layer_words)
+
+
+# Pages read by Tesseract under ocr = "redo" (extract spec section 9)
+
+
+def tesseract_word(text: str, box: Box, confidence: float) -> Word:
+    return Word(text, box, confidence)
+
+
+OCR_PAGE = page(PageKind.TEXT, TextSource.OCR, (REGION,))
+MEGIDDO = tesseract_word("Megiddo,", Box(100.0, 50.0, 140.0, 60.0), 96.0)
+LAYER_MEGIDDO = word("Me^iddo.", Box(100.0, 53.0, 140.0, 64.0))
+PAGE_NUMBER = tesseract_word("81", Box(12.0, 12.0, 16.0, 16.0), 91.0)
+
+
+def test_ocr_page_keeps_tesseracts_words_but_those_in_a_region() -> None:
+    assert page_words(OCR_PAGE, (MEGIDDO, PAGE_NUMBER)) == (
+        PageWords(index=4, text_source=TextSource.OCR, words=(MEGIDDO,), figures=()),
+        (
+            Removal(
+                page_index=4,
+                box=PAGE_NUMBER.box,
+                text="81",
+                reason=RemovalReason.EXCLUDED_REGION,
+            ),
+        ),
+    )
+
+
+def test_ocr_page_where_tesseract_reads_words_is_read_from_them() -> None:
+    assert extract._words_read(OCR_PAGE, (MEGIDDO,), (LAYER_MEGIDDO,)) == (
+        OCR_PAGE,
+        (MEGIDDO,),
+    )
+
+
+def test_ocr_page_where_tesseract_reads_no_word_falls_back_to_the_layer() -> None:
+    # Extract spec section 9: no printed word is lost; the page's source
+    # becomes the layer, and its regions apply to the layer's words.
+    page_read, words = extract._words_read(OCR_PAGE, (), (LAYER_MEGIDDO,))
+
+    assert page_read == replace(OCR_PAGE, text_source=TextSource.TEXT_LAYER)
+    assert words == (LAYER_MEGIDDO,)
+
+
+def test_page_read_from_the_layer_keeps_the_layers_words() -> None:
+    assert extract._words_read(TEXT_PAGE, (), (LAYER_MEGIDDO,)) == (
+        TEXT_PAGE,
+        (LAYER_MEGIDDO,),
+    )
 
 
 # The excerpts, from the session fixture.
@@ -814,33 +862,65 @@ def test_kadesh_plates_with_1_worker_and_with_6_give_the_same_bytes(
         ).read_bytes(), name
 
 
+@pytest.mark.tesseract
 @pytest.mark.thread_unsafe
-def test_extract_on_pages_json_with_an_ocr_page_names_it_and_analyze(
+@pytest.mark.usefixtures("tesseract_of_the_literals")
+def test_ocr_pages_are_read_by_tesseract_alike_with_1_worker_and_with_6(
     tmp_path: Path,
     excerpt_pdf: frozendict[str, Path],
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], "")
-    pages = _pages_with_plates_8_and_9(read_pages(excerpt_books[KADESH].pages_json))
-    write_pages(
-        folder.pages_json,
-        replace(
-            pages,
-            pages=(
-                replace(pages.pages[0], text_source=TextSource.OCR),
-                *pages.pages[1:],
+    # Extract spec section 9: Kadesh's excerpt pages 0 and 1 (book pages 8
+    # and 9) marked `ocr`, as analyze marks them under ocr = "redo"; page
+    # 1's layer reads "Me^iddo. already in tli.- sixti-fiith century".
+    # Page 0's region is moved to the page number 81 where it is printed
+    # and Tesseract reads it, 634.8 to 641.8 pt from the top; the layer
+    # puts it at 622.5 to 629.5.
+    pages = read_pages(excerpt_books[KADESH].pages_json)
+    pages = replace(
+        pages,
+        pages=(
+            replace(
+                pages.pages[0],
+                text_source=TextSource.OCR,
+                exclude_regions=(Box(240.0, 632.0, 252.0, 644.0),),
             ),
+            replace(pages.pages[1], text_source=TextSource.OCR),
+            *pages.pages[2:],
         ),
     )
+    folders = []
+    for workers in (1, 6):
+        folder = kadesh_folder(
+            tmp_path / str(workers), excerpt_pdf[KADESH], TWO_PAGES_OF_REMOVALS
+        )
+        write_pages(folder.pages_json, pages)
+        extract.run(folder, read_config(folder.book_toml), workers=workers)
+        folders.append(folder)
 
-    with pytest.raises(InputFileError) as raised:
-        extract.run(folder, read_config(folder.book_toml))
-
-    assert str(raised.value) == (
-        f"{folder.pages_json}: page indices 0 are read by OCR, which extract "
-        "cannot read yet; run `galley2epub analyze` again"
+    one, six = folders
+    assert one.words_json.read_bytes() == six.words_json.read_bytes()
+    words = read_words(one.words_json)
+    texts = tuple(word.text for word in words.pages[1].words)
+    assert [page.text_source for page in words.pages[:3]] == [
+        TextSource.OCR,
+        TextSource.OCR,
+        TextSource.TEXT_LAYER,
+    ]
+    assert "Me^iddo." not in texts
+    assert any(
+        texts[start : start + 8]
+        == ("At", "Megiddo,", "already", "in", "the", "sixteenth", "century", "before")
+        for start in range(len(texts))
     )
-    assert not folder.words_json.exists()
+    assert all(word.ocr_confidence is not None for word in words.pages[1].words)
+    assert all(word.ocr_confidence is None for word in words.pages[2].words)
+    # The page number 81 in page 0's region, as Tesseract reads it.
+    assert [
+        (removal.text, removal.reason)
+        for removal in words.removals
+        if removal.page_index == 0
+    ] == [("81", RemovalReason.EXCLUDED_REGION)]
 
 
 # The whole books (front-matter spec sections 4 and 6): the pages of each
