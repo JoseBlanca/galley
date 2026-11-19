@@ -358,14 +358,15 @@ def _test_plate(
 
 def _log_inkless(page_index: int, ink_test: InkTest) -> None:
     """Logs at WARNING a page made `inkless`, with its share of words without
-    ink and the share of those that are known words, so that the owner sees
-    a page taken wrongly (plates spec, section 2b)."""
+    ink and how many of those are known words of 2 letters or more, so that
+    the owner sees a page taken wrongly (plates spec, section 2b)."""
     _logger.warning(
         "analyze: page index %d is inkless, its words removed: %.2f of its words "
-        "have no ink under them, %.2f of those are known words",
+        "have no ink under them, %d of those are known words of 2 letters or "
+        "more",
         page_index,
         ink_test.share_without_ink,
-        ink_test.known_share,
+        ink_test.known_words,
     )
 
 

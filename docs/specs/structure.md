@@ -154,8 +154,10 @@ there; these are used in several:
   of its band blocks start with a sign, 14 with digits and 142 with
   neither, measured on 16 November 2026). A book whose band blocks start
   with no such word has none. Gierke had none until its introduction's
-  notes became band regions (section 2); it now has digits, 56 of its 66
-  band blocks (measured on 19 November 2026).
+  notes became band regions (section 2); it now has digits, 61 of its 71
+  band blocks (measured on 19 November 2026 at the plan stray-text's
+  c62dcb1, with the page's median line height taken on its full-size
+  lines).
 
 ## 2. What structure does, in order
 
@@ -333,7 +335,10 @@ the references, gets both too.
   books changes kind. Gierke gets 67 more footnotes (2 before, 69
   after), Mariéjol 6, and the paragraphs before and after them now run
   on over the page break; on Mariéjol's 34, 159 and 323 the notes were
-  already taken from the body (section 11) and no block changes.
+  already taken from the body (section 11) and no block changes. With
+  the median line height taken on the full-size lines (above), Gierke
+  has 74 footnotes, 5 of them on page 50 (measured again on 19
+  November 2026 at the plan stray-text's c62dcb1).
 
   The 2 pt are for a note
   that layout starts close under the text (layout §3, step 4, the
@@ -3405,9 +3410,14 @@ What they show that the public-domain books did not:
 - **A left cut-in inset** (layout §3): the indented epigraphs and
   headings give Turney one of 44.3 pt and Haynes one of 30.0 pt, so
   layout takes both books for books with cut-in notes. Step 2b moves no
-  word in either: laid out with and without the insets, every page of
-  both gives the same regions (measured on 17 November 2026). A trap
-  for the next change to step 2b.
+  word of Haynes. It would move the labels of Turney's contents page,
+  10, set smaller beside titles that start at the inset, since the cut
+  row's test by size (layout §3, step 2b), and does not only because
+  Turney's config names that page in `contents_pages`; a book without
+  `contents_pages` set for such a page has its contents labels taken as
+  margin notes (layout §6). Laid out with and without the insets, every
+  page of both gave the same regions on 17 November 2026, before the
+  test by size. A trap for the next change to step 2b.
 
 **Their configs**, as the survey ran them, with `ocr = "trust"` (no
 re-reading):
