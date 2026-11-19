@@ -287,6 +287,20 @@ def test_differing_words_are_replaced_and_words_missing_from_a_note_put_in() -> 
     assert {edit.second_reading for edit in edits} == {None}
 
 
+def test_words_the_page_already_holds_are_not_put_in_again() -> None:
+    # Section 7: the model reading a line twice (Kadesh page 32), or words of
+    # the body placed in a note (page 51).
+    raw = (
+        "THE BATTLE OF KADESH 6 The Poem, which is a poem. "
+        "Called by de Rouge the. de Rouge the. Struggle of Nations, p."
+    )
+    edits = _changes_and_edits(PAGE, raw)
+    assert [(edit.old, edit.new) for edit in edits] == [
+        ("Tue", "The"),
+        ("puem.", "poem."),
+    ]
+
+
 def test_no_words_are_put_in_the_body() -> None:
     raw = (
         "THE BATTLE OF KADESH 6 Tue Poem, which is truly a poem. "

@@ -120,6 +120,27 @@ def may_hold_more_words(
     )
 
 
+# Section 7: a run of this many words or more that the page already holds
+# is not put in again; one word, "the", is everywhere.
+_LEAST_REPEATED = 2
+
+
+def _forms(words: Sequence[str]) -> tuple[str, ...]:
+    return tuple(token.form for word in words for token in tokens(word))
+
+
+def _holds(forms: Sequence[str], run: tuple[str, ...]) -> bool:
+    """Whether `forms` hold `run`, of two words or more, one after the
+    other (section 7: a run the page already holds is not put in again)."""
+    if len(run) < _LEAST_REPEATED:
+        return False
+    length = len(run)
+    return any(
+        tuple(forms[start : start + length]) == run
+        for start in range(len(forms) - length + 1)
+    )
+
+
 def _runs(pairs: Sequence[Pair]) -> tuple[tuple[int | None, tuple[int, ...]], ...]:
     """Each run of the model's tokens that pair with none of galley's: the
     position of galley's token before it (None at the start) and the
@@ -222,6 +243,7 @@ def page_changes(
     unpaired = frozenset(
         pair.second for pair in pairs if pair.first is None and pair.second is not None
     )
+    reading_forms = tuple(token.form for token in reading)
     changes: list[tuple[float, Change]] = []
     for pair in pairs:
         if pair.first is None or pair.second is None:
@@ -262,6 +284,13 @@ def page_changes(
             continue
         words = _gap_words(model_answer, run)
         if not words:
+            continue
+        if _holds(reading_forms, _forms(words)):
+            _logger.info(
+                "page %d: %r is already in galley's reading; not put in again",
+                page_index,
+                " ".join(words),
+            )
             continue
         anchor = _anchor(reading, before, after)
         if anchor is None:
