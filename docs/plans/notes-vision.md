@@ -25,7 +25,8 @@ speck read as "*" at a line-end hyphen so the halves do not join, and
 "p by 5*invasion", words of a margin note left in a body line.
 
 The owner said to go on without waiting. Dated 19 November 2026.
-State: approved; under way.
+State: done on 19 November 2026; approved the same day (the owner
+said to go on).
 
 Page means page index of the whole PDF, from 0.
 
@@ -141,7 +142,7 @@ Deliverables:
 
 ## 5. The EPUBs
 
-- [ ] 5.1 All checks, `pytest -m whole_book`, the evaluation against
+- [x] 5.1 All checks, `pytest -m whole_book`, the evaluation against
   `runs/ocr-redo-final/`, the seven EPUBs in `runs/notes-vision/`
   through epubcheck, Kadesh with and without `correct`.
-- [ ] 5.2 The pages of each change checked by eye.
+- [x] 5.2 The pages of each change checked by eye.

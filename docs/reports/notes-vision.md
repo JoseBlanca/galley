@@ -1,5 +1,71 @@
 # Report: paragraphs cut by notes, and a local vision model
 
+## Summary
+
+The plan is done on branch `plan/notes-vision`, on 19 November 2026,
+and waits for the owner's order to merge it into `main`. The EPUBs are
+in `runs/notes-vision/<folder>/` of the main checkout; Kadesh read with
+the vision model is in `runs/notes-vision/battleofkadeshst00breauoft-correct/`.
+
+What changed for a reader:
+
+- **Paragraphs are no longer cut at a page break by notes.** A rule
+  kept a paragraph that opens with a number ("1. Of the three…") from
+  running on to the next page, because the number looked like a note's.
+  Kadesh (`battleofkadeshst00breauoft`) now reads "…collated with the
+  original of the Sallier Papyrus…" as one paragraph, with the notes
+  after it; Domesday (`domesdaybook00maituoft`) "No doubt, the medieval
+  sheep" likewise.
+- **Stubbs (`earlyplantagenet01stub`)**: "aggressive" is whole, and the
+  margin note "First invasion by the Scots." no longer sits inside "David
+  had taken Newcastle". Stubbs' margin notes left in the text fell from
+  46 to 36.
+- **The correct stage exists**, off by default. With `correct = true`
+  in a book's `book.toml`, galley asks a vision model running in LM
+  Studio on this machine (Qwen 3.6 35B-A3B; no text leaves the machine)
+  to read each page image, and replaces galley's word with the model's
+  where the two line up and differ. Every change is written to
+  `edits/correct.jsonl`. On six Kadesh pages transcribed by hand, wrong
+  words per 100 fall from 2.7 to 1.4 in the text and from 26.8 to 5.5 in
+  the notes; the whole book takes about 8 minutes.
+
+Checked: all tests (3,199 quick ones, in 75 s, over the minute; 159 on
+whole books); the seven EPUBs pass epubcheck with no error or warning;
+the evaluation against the Project Gutenberg texts of Haskins, Stubbs
+and Domesday: every score that changed got better. The joined
+paragraphs, the Stubbs lines and 20 random edits of the correct stage
+were checked on the page images (19 right, 1 half right).
+
+Still wrong:
+
+- **About 1 word in 300 that the correct stage writes is wrong but looks
+  right**: 11 on the six pages, among them "orientalis" for the printed
+  "orientalists" twice. A dictionary rule against such cuts was measured
+  and dropped: it refused 12 right edits for 1 wrong one.
+- Combining the scan's text with Tesseract was measured and not built:
+  even a perfect choice between them would leave 12 wrong words per 100
+  in Kadesh's notes.
+- The quick tests take 75 s.
+
+**Decision asked of the owner** (the spec's open point 1): how to use
+the correct stage, given the fluent wrong words.
+
+- (a) On, as it is: about 37 such words in Kadesh, not flagged.
+- (b) On, with the second reading by Qwen 3.6 27B
+  (`correct_second_model` in `book.toml`): about 20 more minutes a run;
+  on the six pages it flags 19 of the 21 wrong note edits and 38 of the
+  308 right ones, so about 150 flagged edits to look at in Kadesh.
+- (c) Off.
+
+Recommended: (b) for Kadesh; off for books whose OCR is already good,
+until a second book is measured.
+
+Also asked: the merge, and a look on the Kindle at
+`runs/notes-vision/battleofkadeshst00breauoft-correct/book.epub` beside
+`runs/notes-vision/battleofkadeshst00breauoft/book.epub`, pages 11 to 13
+and their notes.
+
+
 The work report of `docs/plans/notes-vision.md`, for the owner. Started on
 19 November 2026, at main df72ba4.
 
@@ -123,3 +189,25 @@ in 76 s, over the minute.
 
 During the review fixes the agent unloaded the Qwen 27B model in LM
 Studio, which another session may have loaded; it was told not to.
+
+## Work package 5: the runs and the checks by eye
+
+At 66e7bf7 plus the fix of "1%The" (de66c8d): pytest 3,199 passed in 75 s,
+`pytest -m whole_book` 159 passed; the seven EPUBs in
+`runs/notes-vision/` pass epubcheck; Kadesh with `correct = true` in
+488 s, 1,027 edits, 1.4 and 5.5 wrong words per 100 on the reference
+pages, 11 fluent wrong words, no printed word dropped. The evaluation,
+copied to `runs/notes-vision-final/`, against `runs/ocr-redo-final/`:
+Stubbs' margin notes as margin notes 413 to 423, left in the body 46 to
+36, its body error rate 0.0251 to 0.0248; Domesday's paragraph precision
+0.8825 to 0.8837; Haskins one split word fewer. Checked by eye: Kadesh
+pages 11 to 13, Domesday 467 to 468, Stubbs pages 24 and 34, right; 20
+random edits, 19 right and 1 half right ("Neb!" to "Nebi!", printed
+"Nebi").
+
+A rule against cut-short words ("orientalists" to "orientalis") was
+measured: refuse a replacement when galley's word is in the dictionary
+and the model's is not. Tesseract's English list lacks "orientalists"
+and "inscriptional" and has galley's misreadings ("rowe", "pare"), so
+the rule caught none of its targets and refused 12 right edits for 1
+wrong one on the six pages. Not built.
