@@ -1,0 +1,291 @@
+{
+  "book": "battleofkadeshst00breauoft",
+  "read": "Transcribed by the assistant on 19 November 2026 from the page images, rendered with pypdfium2 at 300 dpi, whole pages and crops enlarged about two times. The raised numbers of the references are blurred on pages 9, 11, 15 and 27; each was read with the help of the sequence, since Kadesh numbers its notes through the article, and checked against the notes' own markers at the foot of the page, which are clearer. 'after' is the word printed just before the reference, with its punctuation, and 'context' the words before it on the same page, as many as make it occur once there; 'starts' the first words of the note after its marker. Page 8's '*' follows the heading's last word. Page 11's note 19 holds the numbered paragraphs 1. to 3.",
+  "pages": [
+    {
+      "page_index": 8,
+      "references": [
+        {
+          "number": "*",
+          "after": "STRATEGY",
+          "context": "KNOWN MILITARY STRATEGY"
+        },
+        {
+          "number": "1",
+          "after": "Greece,",
+          "context": "battlefields of Greece,"
+        },
+        {
+          "number": "2",
+          "after": "investigation.",
+          "context": "needs special investigation."
+        },
+        {
+          "number": "3",
+          "after": "forces.",
+          "context": "manipulation of forces."
+        }
+      ],
+      "notes": [
+        {
+          "marker": "*",
+          "starts": "Paper read before"
+        },
+        {
+          "marker": "1",
+          "starts": "J. Kromayer,"
+        },
+        {
+          "marker": "2",
+          "starts": "In Ramses III.'s day"
+        },
+        {
+          "marker": "3",
+          "starts": "There is, however,"
+        }
+      ]
+    },
+    {
+      "page_index": 9,
+      "references": [
+        {
+          "number": "4",
+          "after": "Salvolini",
+          "context": "was that of Salvolini"
+        },
+        {
+          "number": "5",
+          "after": "Lenormant,",
+          "context": "battle by Lenormant,"
+        },
+        {
+          "number": "6",
+          "after": "Chabas",
+          "context": "exposed by Chabas"
+        },
+        {
+          "number": "7",
+          "after": "“Record”",
+          "context": "the “Record”"
+        },
+        {
+          "number": "8",
+          "after": "thoroughness.",
+          "context": "modern for thoroughness."
+        },
+        {
+          "number": "9",
+          "after": "poem",
+          "context": "admirable study of the so-called poem"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "4",
+          "starts": "Campagne de Rhamsès-le-Grand"
+        },
+        {
+          "marker": "5",
+          "starts": "In Correspondant,"
+        },
+        {
+          "marker": "6",
+          "starts": "Rev. arch.,"
+        },
+        {
+          "marker": "7",
+          "starts": "This and the other"
+        },
+        {
+          "marker": "8",
+          "starts": "Chabas was conscious"
+        },
+        {
+          "marker": "9",
+          "starts": "First published as"
+        }
+      ]
+    },
+    {
+      "page_index": 11,
+      "references": [
+        {
+          "number": "15",
+          "after": "Record",
+          "context": "brief Record"
+        },
+        {
+          "number": "16",
+          "after": "Poem,",
+          "context": "like the Poem,"
+        },
+        {
+          "number": "17",
+          "after": "Brugsch",
+          "context": "said by Brugsch"
+        },
+        {
+          "number": "18",
+          "after": "Karnak.”",
+          "context": "at Luxor, at Karnak.”"
+        },
+        {
+          "number": "19",
+          "after": "Abydos;",
+          "context": "Karnak and Abydos;"
+        },
+        {
+          "number": "20",
+          "after": "hieratic",
+          "context": "of the hieratic"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "15",
+          "starts": "Called by de Rougé"
+        },
+        {
+          "marker": "16",
+          "starts": "Maspero's statement"
+        },
+        {
+          "marker": "17",
+          "starts": "Geogr. Inschr.,"
+        },
+        {
+          "marker": "18",
+          "starts": "Struggle of the Nations,"
+        },
+        {
+          "marker": "19",
+          "starts": "1. The Luxor copy"
+        },
+        {
+          "marker": "20",
+          "starts": "Papyrus Raifet contains"
+        }
+      ]
+    },
+    {
+      "page_index": 15,
+      "references": [
+        {
+          "number": "34",
+          "after": "enemy;",
+          "context": "of the enemy;"
+        },
+        {
+          "number": "35",
+          "after": "2,052",
+          "context": "and captured 2,052"
+        },
+        {
+          "number": "36",
+          "after": "soldiers;",
+          "context": "of whom 2,000 were soldiers;"
+        },
+        {
+          "number": "37",
+          "after": "soldiers.”",
+          "context": "of whom 4,000 were soldiers.”"
+        },
+        {
+          "number": "38",
+          "after": "certain.",
+          "context": "tolerably certain."
+        }
+      ],
+      "notes": [
+        {
+          "marker": "34",
+          "starts": "The inscription is unpublished;"
+        },
+        {
+          "marker": "35",
+          "starts": "On the back of"
+        },
+        {
+          "marker": "36",
+          "starts": "Champ., Not. descr.,"
+        },
+        {
+          "marker": "37",
+          "starts": "LD., III, 223e."
+        },
+        {
+          "marker": "38",
+          "starts": "The Hittite king"
+        }
+      ]
+    },
+    {
+      "page_index": 27,
+      "references": [
+        {
+          "number": "64",
+          "after": "Zahi",
+          "context": "was in Zahi"
+        },
+        {
+          "number": "65",
+          "after": "H.,”",
+          "context": "Kadesh. Then his majesty, L. P. H.,”"
+        },
+        {
+          "number": "66",
+          "after": "ford",
+          "context": "crossed the ford"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "64",
+          "starts": "Western Syria within"
+        },
+        {
+          "marker": "65",
+          "starts": "Common abbreviation of"
+        },
+        {
+          "marker": "66",
+          "starts": "it may possibly mean"
+        }
+      ]
+    },
+    {
+      "page_index": 29,
+      "references": [
+        {
+          "number": "72",
+          "after": "line.”",
+          "context": "the sky line.”"
+        },
+        {
+          "number": "73",
+          "after": "southwest.”",
+          "context": "except the southwest.”"
+        },
+        {
+          "number": "74",
+          "after": "advanced.”",
+          "context": "we advanced.”"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "72",
+          "starts": "Op. cit., p. 166."
+        },
+        {
+          "marker": "73",
+          "starts": "Op. cit., p. 543."
+        },
+        {
+          "marker": "74",
+          "starts": "Op. cit., pp. 542, 543."
+        }
+      ]
+    }
+  ]
+}
