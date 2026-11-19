@@ -328,7 +328,7 @@ Deliverables:
 
 Tasks:
 
-- [ ] 5.1 The runs, the evaluation and epubcheck: deliverables 1 to 3.
+- [x] 5.1 The runs, the evaluation and epubcheck: deliverables 1 to 3.
 - [ ] 5.2 The checks by eye of deliverable 4, and the fixes they call
   for, each with a test.
 - [ ] 5.3 The quick tests back to about a minute: the four excerpts add
