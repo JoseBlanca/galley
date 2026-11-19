@@ -4472,7 +4472,7 @@ to the entry before (no count changes):
 | Turney | 16 | 0 | 16 | 16 | 16 | 16 | 16 |
 | Haskins | 9 | 0 | 9 | 9 | 9 | 9 | 9 |
 | Stubbs | 25 | 12 | 9 | 13 | 13 | 13 | 13 |
-| Domesday | 59 | 32 | 22 | 27 | 23 | 23 | 23 |
+| Domesday | 59 | 32 | 22 | 27 | 24 | 24 | 23 |
 | Gierke, page 10 | 8 | 0 | 3 | 7 | 6 | 5 | 4 |
 | Gierke, pages 52 to 67 | 348 | 45 | 33 | 275 | 10 | 10 | 10 |
 | Mariéjol | 16 | 0 | 1 | 16 | 13 | 12 | 9 |
@@ -4505,8 +4505,13 @@ the books gave no other title between 0.6 and 0.7 to judge by, and the
 lowest right link in the books that matter, Haynes' "(TjEvil Alchemists
 and Doctor Faustus" to "EVIL ALCHEMISTS AMD DOCTOR FAUSTUS", is 0.94.
 The candidates Domesday leaves unlinked are its front matter ("TABLE OF
-CONTEXTS", "LIST OF ABBREVIATIONS"), which has no heading in the body,
-and "Statistical Tables" (page 19). Haynes' 22 entries are its 16
+CONTEXTS", "LIST OF ABBREVIATIONS"), which has no heading in the body.
+Its "Statistical Tables" (page 19) links at 0.71 to "STATISTICS.", the
+heading flush left above the table of page index 426 (section 14,
+condition 1), the right-hand half of the title "TABLE I. STATISTICS." set across
+the tables' first two pages, 400 and 401; measured on 19 November 2026,
+it is unlinked at 0.8, and was unlinked at every threshold while that
+line was a paragraph. Haynes' 22 entries are its 16
 chapters and 6 front and back matter titles, each linked to its
 heading; Turney's 16 likewise.
 
