@@ -16,7 +16,7 @@ wrong words per 100 words of the transcription. On those six pages the
 recommended way takes galley's notes from 26.5 wrong words in 100 to 3.4,
 and the body from 2.0 to 0.7. Its cost is the **fluent wrong words**: a
 wrong word that reads as a real word, so that nothing on the page shows it
-is wrong, about 1 in 300 words (**Open 1**, at the end). Page means the
+is wrong, about 1 in 300 words (section 16). Page means the
 page index of the PDF, from 0.
 
 No code of the stage exists: `src/galley/correct/__init__.py` is empty,
@@ -301,7 +301,7 @@ From the pairs:
   fluent wrong words; with 0.3, 5.3 and 11 ("Borchardt" for "Brugsch"
   twice and "Med." for "Hist." no longer); with 0.5, 6.7 and 8. 0.3 is
   kept, since a fluent wrong word costs the reader more than a visible
-  one (**Open 1**). The model's core replaces galley's core in the span, and the
+  one (section 16). The model's core replaces galley's core in the span, and the
   punctuation and any glued marker around galley's core stay. One rule
   touches the model's word: the models write small capitals as capitals,
   "MASPERO's" where galley has "Masrvuo's". When the model's core, less a
@@ -531,7 +531,7 @@ wrong words in 100 to 1.3 in the body and from 26.8 to 5.5 in the notes,
 and bring 11 fluent wrong words among 3,331 words ("orientalis" for
 "orientalists" twice, "Rev." for "Rec." twice, "Egyptian" for the
 misprint "Eygptian"); at that rate about 37 in the book, too many to
-find by reading, which is why the stage is off by default (**Open 1**).
+find by reading, which is why the stage is off by default (section 16).
 
 ## 12. The public interface
 
@@ -647,21 +647,17 @@ wait either way.
   note edits the second reading would flag, from the recorded 27B
   answers; and the time for the book.
 
-## 16. Open points
+## 16. Decided
 
-1. **Whether a fluent wrong word in about 300 is acceptable**, against
-   about 3 wrong words in 10 in Kadesh's blurred notes today. The options:
-   (a) the stage as specified, off by default, and `correct = true` for
-   Kadesh only, every edit in `edits/correct.jsonl`: 1,218 edits, about 37
-   of them fluent wrong words (estimated from the six pages), none
-   flagged; (b) the same with the second reading on, for about 20 more
-   minutes a run: on the six pages it flags 18 of the 21 wrong note edits
-   and 27 of the 324 right ones, so the owner checks about 1 edit in 8,
-   some 150 for the book (estimated), and the body's edits stay
-   unflagged; (c) the stage not used. Recommended: (b) for Kadesh, (c) for
-   a book whose OCR is good, until the stage is measured on a second
-   book. Meanwhile the stage is off by default and
-   every edit is in its file.
+1. **How the stage is used, given about 1 fluent wrong word in 300**:
+   decided by the owner on 19 November 2026, option (b) of the three
+   put to them (the stage as specified; with the second reading; not
+   used). Kadesh runs with `correct = true` and the second reading
+   (`correct_second_model`), and the doubtful edits are checked against
+   the page images by the assistant, which writes the ones it rejects to
+   `edits/owner.jsonl` (section 11); a book whose OCR is good keeps the
+   stage off until the stage is measured on a second book. The stage
+   stays off by default.
 
 ## 17. Not in this spec
 
