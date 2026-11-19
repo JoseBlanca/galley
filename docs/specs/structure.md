@@ -4935,13 +4935,16 @@ pieces. The book's share of pages with fragments (below) is counted
 with the rule inside a line alone, as it was measured.
 
 Measured on 19 November 2026 on the `lines.json` of the seven books
-run by the plan ocr-redo: such lines hold 172 words on Stubbs' pages
-21 to 307 (149 with a gap of 0 pt, 168 with 1 pt, 176 with 2 pt and
-193 with 3 pt), each looked at on the page rendered at 250 dpi: all
-172 are a piece of a letter of the word beside them (the dot of an
+run by the plan ocr-redo: on lines made only of such pieces, 172 words
+of Stubbs' pages 21 to 307 lie by a word as above (149 with a gap of 0
+pt, 168 with 1 pt, 176 with 2 pt and 193 with 3 pt), each looked at on
+the page rendered at 250 dpi: all 172 are a piece of a letter of the word beside them (the dot of an
 "i", the tail of a "g", "p" or "y", the top of a "d", "f", "l" or
 "k") or a speck between two lines; none is a printed word or a mark
-of punctuation. The other six books, where the rule does not run,
+of punctuation. The rule, which asks it of every word of the line,
+removes 116 of them on the whole book; the other 56 share their line
+with a piece that lies by no word (page 56's "com- . . . piler"), and
+stay. The other six books, where the rule does not run,
 hold 71 such words in Domesday, 53 in Gierke, 4 in Turney, 2 in Haynes
 and none in Haskins or Kadesh read with `ocr = "redo"`.
 
