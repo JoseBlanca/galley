@@ -90,7 +90,18 @@ Notes (structure spec, section 19; architecture sections 9 and 13):
   numbers its notes. Pandoc cannot put a footnote in a footnote, so a
   reference to one inside one is refused.
 - A footnote with `referenced` false is a fenced div with its id and the
-  class `note` around its blocks' divs.
+  class `note` around its blocks' divs, written at the end of its chapter
+  (structure spec, section 36; the owner, 19 November 2026). A chapter
+  runs from a heading of level 1 or 2, or the book's start, to the next
+  such heading or the book's end; a note's chapter is the one that holds
+  the place where the note was printed (below). Just before the heading
+  that ends it, or at the end of the book, a chapter with such notes gets
+  a heading "Notes", one level below the heading that starts the chapter
+  or 2 when none does, `## Notes {#notes-n-p0012-001 .unlisted
+  .chapter-notes}`, with the id of its first note; `unlisted` keeps it out
+  of the EPUB's table of contents. Then come the chapter's unlinked
+  footnotes in the order of blocks.json, each followed by the definitions
+  of the footnotes it refers to, after the endnotes written at that place.
 - An endnote, referenced or not, is a fenced div with its id and the
   class `endnote` around its blocks' divs, and the endnotes that follow
   each other are one list, a div of class `endnotes` around theirs. A
@@ -104,8 +115,8 @@ Notes (structure spec, section 19; architecture sections 9 and 13):
   table of contents (structure spec, sections 25 and 27). Only an endnote
   may have one: the fidelity check reads a group's div only before an
   endnote's.
-- A note written where it was printed, an unreferenced footnote or an
-  endnote, follows the last block, in the order of blocks.json, whose
+- An endnote is written where it was printed, and an unlinked footnote's
+  chapter is found from there: it follows the last block, in the order of blocks.json, whose
   first origin is on the note's first page or an earlier one, or comes
   first of all (structure spec, sections 6 and 10, option b). Its marker
   is first in the text of its first block that is not a margin note, so
@@ -871,6 +882,75 @@ def _with_footnotes(
     )
 
 
+def _is_unlinked_footnote(note: Note) -> bool:
+    """Whether a note is a footnote with `referenced` false, which is
+    written at the end of its chapter (structure spec, section 36)."""
+    return note.kind is NoteKind.FOOTNOTE and not note.referenced
+
+
+# Structure spec section 36: the levels of heading that start a chapter,
+# and the level of the "Notes" heading of a chapter that no heading starts,
+# the one before the first.
+_CHAPTER_LEVELS = frozenset({1, 2})
+_NOTES_LEVEL_BEFORE_THE_FIRST_HEADING = 2
+# The heading's text, the same in every book, and its classes: `unlisted`
+# keeps it out of the EPUB's table of contents (Pandoc 3.14).
+_NOTES_TITLE = "Notes"
+_NOTES_CLASSES = ".unlisted .chapter-notes"
+
+
+def _starts_a_chapter(block: Block) -> bool:
+    """Whether a block is a heading of level 1 or 2."""
+    return block.kind is BlockKind.HEADING and block.level in _CHAPTER_LEVELS
+
+
+def _chapter_end(blocks: tuple[Block, ...], place: int) -> int:
+    """The number of blocks written before the end of the chapter that
+    holds `place`, a number of blocks written before a note: the index of
+    the first heading of level 1 or 2 from `place` on, or the number of
+    blocks when there is none."""
+    return next(
+        (
+            index
+            for index in range(place, len(blocks))
+            if _starts_a_chapter(blocks[index])
+        ),
+        len(blocks),
+    )
+
+
+def _notes_level(blocks: tuple[Block, ...], end: int) -> int:
+    """The level of the "Notes" heading of the chapter that ends before
+    block `end`: one below the heading that starts it, or 2 when no heading
+    does."""
+    opening = next(
+        (block for block in reversed(blocks[:end]) if _starts_a_chapter(block)),
+        None,
+    )
+    if opening is None or opening.level is None:
+        return _NOTES_LEVEL_BEFORE_THE_FIRST_HEADING
+    return opening.level + 1
+
+
+def _chapter_notes(
+    chapter: tuple[Note, ...], level: int, notes: frozendict[str, Note]
+) -> tuple[str, ...]:
+    """The "Notes" heading of a chapter, with the id of its first note,
+    then each of its unlinked footnotes' divs, each followed by the
+    definitions of the footnotes it refers to."""
+    heading = (
+        f"{'#' * level} {_NOTES_TITLE} {{#notes-{chapter[0].id} {_NOTES_CLASSES}}}\n"
+    )
+    return (
+        heading,
+        *(
+            part
+            for note in chapter
+            for part in _with_footnotes(_note_div(note, notes), note.blocks, notes)
+        ),
+    )
+
+
 def _printed_notes(group: tuple[Note, ...], notes: frozendict[str, Note]) -> str:
     """Notes written where they were printed, each a div; a run of
     endnotes is one list, a div of class `endnotes` around theirs."""
@@ -909,13 +989,18 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     blocks' divs, margin notes among them, without its marker. Every other
     note, an unreferenced footnote or an endnote, is a div with its id and
     the class `note` or `endnote` around its blocks' divs, its marker first
-    in the first that is not a margin note; it follows the last block, in
-    the order of blocks.json, whose first origin is on the note's first
-    page or an earlier one, or comes first of all when there is none. A
-    note's group heading is a div of class `note-group` before its div.
-    Notes written at the same place keep the order of blocks.json, and the
-    endnotes among them that follow each other are one list, a div of class
-    `endnotes`. A reference to an endnote is a link to it with the
+    in the first that is not a margin note. An endnote follows the last
+    block, in the order of blocks.json, whose first origin is on the note's
+    first page or an earlier one, or comes first of all when there is none;
+    its group heading is a div of class `note-group` before its div.
+    Endnotes written at the same place keep the order of blocks.json, and
+    those that follow each other are one list, a div of class `endnotes`.
+    An unreferenced footnote goes from that place to the end of its
+    chapter, just before the next heading of level 1 or 2 or at the end,
+    after a heading "Notes" of class `unlisted` and `chapter-notes`, one
+    level below the chapter's heading or 2 before the first; the chapter's
+    unreferenced footnotes keep the order of blocks.json and come after
+    the endnotes written there. A reference to an endnote is a link to it with the
     reference's text, marked `epub:type="noteref"`.
 
     The title and each author are escaped by escape_markdown too. Raises
@@ -943,6 +1028,7 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
         note for note in blocks.notes if not _is_footnote_at_its_reference(note)
     )
     printed_at: dict[int, list[Note]] = {}
+    chapter_notes_at: dict[int, list[Note]] = {}
     for note, position in zip(
         printed,
         note_places(
@@ -954,7 +1040,13 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
         ),
         strict=True,
     ):
-        printed_at.setdefault(position, []).append(note)
+        if _is_unlinked_footnote(note):
+            chapter_notes_at.setdefault(
+                _chapter_end(blocks.blocks, position), []
+            ).append(note)
+        else:
+            printed_at.setdefault(position, []).append(note)
+    notes_written_at = frozenset(printed_at) | frozenset(chapter_notes_at)
 
     def notes_at(position: int) -> tuple[str, ...]:
         groups = (
@@ -963,6 +1055,7 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
                 printed_at.get(position, ()), key=lambda note: note.kind
             )
         )
+        chapter = tuple(chapter_notes_at.get(position, ()))
         return tuple(
             part
             for group in groups
@@ -971,11 +1064,15 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
                 tuple(block for note in group for block in note.blocks),
                 notes,
             )
+        ) + (
+            _chapter_notes(chapter, _notes_level(blocks.blocks, position), notes)
+            if chapter
+            else ()
         )
 
     runs = _runs(
         blocks.blocks,
-        frozenset(position - 1 for position in printed_at if position > 0),
+        frozenset(position - 1 for position in notes_written_at if position > 0),
     )
     body: list[str] = []
     position = 0
@@ -984,7 +1081,7 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
             run[0].kind is BlockKind.LIST_ITEM
             and position > 0
             and blocks.blocks[position - 1].kind is BlockKind.LIST_ITEM
-            and position not in printed_at
+            and position not in notes_written_at
         ):
             body.append(_LIST_BREAK)
         position += len(run)

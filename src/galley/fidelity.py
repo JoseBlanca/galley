@@ -1319,6 +1319,11 @@ def _block_tokens(block: object, block_id: str | None) -> tuple[_Token, ...]:
             content = _div_tokens(classes, blocks, div_id or block_id)
         case {
             "t": "Header",
+            "c": [int(), [str(), list() as classes, *_], list() as inlines],
+        } if _CHAPTER_NOTES_CLASS in classes:
+            content = _chapter_notes_tokens(inlines, block_id)
+        case {
+            "t": "Header",
             "c": [int(), [str() as heading_id, *_], list() as inlines],
         }:
             content = _inlines_tokens(inlines, heading_id or block_id)
@@ -1327,6 +1332,30 @@ def _block_tokens(block: object, block_id: str | None) -> tuple[_Token, ...]:
         case _:
             raise _not_read(repr(block)[:80], block_id)
     return (_Boundary.BREAK, *content, _Boundary.BREAK)
+
+
+# Structure spec section 36: the class of the heading markdown writes before
+# a chapter's unlinked footnotes, and its one word, which is no word of the
+# book. Written here again, not imported from the markdown stage, for the
+# reason given for _SOURCE_DASHES.
+_CHAPTER_NOTES_CLASS = "chapter-notes"
+_CHAPTER_NOTES_TITLE = ({"t": "Str", "c": "Notes"},)
+
+
+def _chapter_notes_tokens(
+    inlines: list[object], block_id: str | None
+) -> tuple[_Token, ...]:
+    """No token for the "Notes" heading of a chapter's unlinked footnotes
+    (structure spec section 36). Raises ExternalProgramError when its text
+    is anything but "Notes", so that no word of the book hides in it."""
+    if tuple(inlines) == _CHAPTER_NOTES_TITLE:
+        return ()
+    where = f"in block {block_id}" if block_id is not None else "outside any block"
+    message = (
+        f"a chapter-notes heading {where} reads {inlines!r:.80}, not "
+        "'Notes', which galley's Markdown does not make"
+    )
+    raise ExternalProgramError(message)
 
 
 def _blocks_tokens(blocks: list[object], block_id: str | None) -> tuple[_Token, ...]:
@@ -1752,7 +1781,9 @@ def read_markdown(markdown: str) -> MarkdownWords:
     read as its own words; emphasis does not split a word. The words of an
     epigraph's source div count to the epigraph, without the dash markdown
     writes first, and those of a note group's div to the endnote whose div
-    follows it. A list is read item by item, in the forms markdown writes
+    follows it. A heading of class `chapter-notes` whose text is "Notes",
+    which markdown writes before a chapter's unlinked footnotes, gives no
+    word (structure spec section 36). A list is read item by item, in the forms markdown writes
     (structure spec section 31): an item holding one div of class
     `list-item`, or one div of class `contents-entry` and after it a bullet
     list of the same form; in a contents entry's div a link with no
@@ -1769,6 +1800,7 @@ def read_markdown(markdown: str) -> MarkdownWords:
     not alone in its paragraph, whose alt text is not its figure's caption,
     or that has a title or attributes; or a div inside an epigraph's div
     that is not its source's, a source's div that does not start with the
-    dash, or a note group's div not followed by an endnote's.
+    dash, or a note group's div not followed by an endnote's, or a
+    heading of class `chapter-notes` whose text is not "Notes".
     """
     return _words_of_pandoc_json(_pandoc_json(markdown))
