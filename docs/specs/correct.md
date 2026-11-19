@@ -291,10 +291,15 @@ From the pairs:
 
 - **A replacement**: a pair whose tokens differ, whose galley token is not
   fixed, and whose comparison forms are at least 0.3 alike by difflib's
-  `SequenceMatcher.ratio` (guessed, to be measured in work package 4: the
-  pairs that a word out of place makes, "Kadesh" with "city" on page 27,
-  are 0; "puem" and "poem" are 0.75, "ia" and "in" 0.5, "3%" and "305"
-  0.5). The model's core replaces galley's core in the span, and the
+  `SequenceMatcher.ratio`: the pairs that a word out of place makes,
+  "Kadesh" with "city" on page 27, are 0; "puem" and "poem" are 0.75,
+  "ia" and "in" 0.5, "3%" and "305" 0.5. Measured on the six pages with
+  the measurement's recorded answers, 19 November 2026: without the
+  limit the notes come to 3.8 wrong words in 100 and the edits bring 14
+  fluent wrong words; with 0.3, 5.3 and 11 ("Borchardt" for "Brugsch"
+  twice and "Med." for "Hist." no longer); with 0.5, 6.7 and 8. 0.3 is
+  kept, since a fluent wrong word costs the reader more than a visible
+  one (**Open 1**). The model's core replaces galley's core in the span, and the
   punctuation and any glued marker around galley's core stay. One rule
   touches the model's word: the models write small capitals as capitals,
   "MASPERO's" where galley has "Masrvuo's". When the model's core, less a
@@ -401,9 +406,11 @@ logs how many there are, and the owner decides (section 11). What the
 measurement found is for a nearby setup only: with both models reading
 the footnote bands, Qwen 3.6 27B read differently 24 of the 35B model's 33
 wrong note words and 9 of its 1,330 right ones. For this stage, where the
-35B model reads whole pages and its merge made 41 wrong note edits on the
-six pages, the share flagged is measured in work package 4 from the
-recorded answers. The second reading costs about 28 s a page on the
+35B model reads whole pages, the measurement's recorded answers give on
+the six pages 345 note edits, of which 21 wrong: the second reading
+makes doubtful 18 of the 21 and 27 of the 324 right ones, 45 edits to
+check (an edit counted right when its words are words of the reference
+at that place). The second reading costs about 28 s a page on the
 owner's Mac, about 20 minutes for Kadesh's 43 pages with notes.
 
 ## 10. How markdown applies the edits
@@ -458,10 +465,15 @@ is turned off or reads a word differently on a later run, such an edit may
 no longer apply, and markdown stops and lists it (section 10), as it does
 when structure changes.
 
-On Kadesh the stage should make about 3,000 edits, of which about 80
-fluent wrong words, both estimated from the six pages (the measurement):
-too many to check one by one, which is why the stage is off by default
-(**Open 1**).
+On the whole of Kadesh, run on 19 November 2026 with the 35B model, the
+stage made 1,218 edits on its 44 text pages in 474 s (the Mac shared with
+other work; about 11 s a page), and markdown applied all of them. On the
+six pages of the measurement those edits take galley's reading from 2.7
+wrong words in 100 to 1.3 in the body and from 26.8 to 5.5 in the notes,
+and bring 11 fluent wrong words among 3,331 words ("orientalis" for
+"orientalists" twice, "Rev." for "Rec." twice, "Egyptian" for the
+misprint "Eygptian"); at that rate about 37 in the book, too many to
+find by reading, which is why the stage is off by default (**Open 1**).
 
 ## 12. The public interface
 
@@ -582,14 +594,15 @@ wait either way.
 1. **Whether a fluent wrong word in about 300 is acceptable**, against
    about 3 wrong words in 10 in Kadesh's blurred notes today. The options:
    (a) the stage as specified, off by default, and `correct = true` for
-   Kadesh only, every edit in `edits/correct.jsonl`: about 80 fluent wrong
-   words in Kadesh against about 2,900 right edits, none flagged; (b) the
-   same with the second reading on, which flags for the owner's check the
-   edits the two models disagree on, for 20 more minutes a run, the share
-   of wrong edits flagged and the number to check to be measured in work
-   package 4; (c) the stage not used. Recommended: (b) for Kadesh once its
-   share is measured, (c) for a book whose OCR is good, until the stage is
-   measured on a second book. Meanwhile the stage is off by default and
+   Kadesh only, every edit in `edits/correct.jsonl`: 1,218 edits, about 37
+   of them fluent wrong words (estimated from the six pages), none
+   flagged; (b) the same with the second reading on, for about 20 more
+   minutes a run: on the six pages it flags 18 of the 21 wrong note edits
+   and 27 of the 324 right ones, so the owner checks about 1 edit in 8,
+   some 150 for the book (estimated), and the body's edits stay
+   unflagged; (c) the stage not used. Recommended: (b) for Kadesh, (c) for
+   a book whose OCR is good, until the stage is measured on a second
+   book. Meanwhile the stage is off by default and
    every edit is in its file.
 
 ## 17. Not in this spec
