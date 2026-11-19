@@ -16,3 +16,29 @@ about 1 word in 300 is wrong but looks right ("Borchardt" for
 "Brugsch"). Combining the layer and Tesseract is not built; work
 packages 3 and 4 build the correct stage with that model, reading whole
 pages, merged word by word, off by default.
+
+## Work package 1: paragraphs cut by notes, and Stubbs
+
+Merged: 4338e8e (specs), e081685 (code and tests). pytest 3,108 passed
+in 69 s; `pytest -m whole_book` 159 passed.
+
+- **Paragraphs cut at a page break.** The notes were not the cause:
+  structure §16 never let a block run on to the next page when its
+  first word looked like a note marker, and Kadesh numbers its
+  paragraphs "1.", "3." with the same digits as its notes. Such a block
+  now runs on when it is in body-size type and its page's last line does
+  not end a sentence; the notes then follow the joined paragraph.
+  Paragraphs ending without punctuation right before a note block:
+  Kadesh 7 to 5, Domesday 5 to 4, Stubbs 1, the others 0; the 10 left
+  were each checked on the page image, and none is a cut at a page break.
+  Not fixed: Domesday page 473, where a line of two notes stands in the
+  body at full height (in the spec). New excerpt `domesday_run_on`.
+- **Stubbs "aggres* sive"**: a hyphen read as "*". The halves are joined
+  when the word list knows the whole word, and the "*" is recorded with a
+  new removal reason, `misread_hyphen`, which the fidelity check
+  requires. On the seven books it joins "aggressive" and Haskins'
+  "pilgrims" (page 226).
+- **Stubbs "p by 5*invasion"**: a margin note 7.9 pt from the text, under
+  the 8 pt gap. A row whose strip words are in small type is now cut at
+  7.8 pt; 11 Stubbs pages change, all margin-note words; at 7.5 pt or
+  without the type test body words move. Stubbs' margin notes 434 to 443.

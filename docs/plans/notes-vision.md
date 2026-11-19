@@ -78,9 +78,9 @@ Deliverables:
 
 Tasks:
 
-- [ ] 1.1 The spec amendments of deliverables 1 and 4.
-- [ ] 1.2 The paragraph fix, deliverables 2 and 3.
-- [ ] 1.3 The Stubbs faults, deliverable 4.
+- [x] 1.1 The spec amendments of deliverables 1 and 4.
+- [x] 1.2 The paragraph fix, deliverables 2 and 3.
+- [x] 1.3 The Stubbs faults, deliverable 4.
 - [ ] Review of work package 1.
 
 ## 2. The measurement
