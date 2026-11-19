@@ -761,7 +761,8 @@ def with_layer_heights(ocr_words: tuple[Word, ...],
 ```
 
 On an `ocr` page extract applies `with_layer_references` first, then
-`with_missed_layer_words` to its result and the same layer words, then
+`with_missed_layer_words` to its result and the layer words whose box
+overlaps no in-page figure's box (condition 3 above), then
 `with_layer_heights` to that result and the same layer words; the
 caption numbers are put back with the references, before the missed
 words.
