@@ -109,8 +109,8 @@ Deliverables, in `docs/reports/notes-vision-measure.md`:
 
 Tasks:
 
-- [ ] 2.1 The reference transcription.
-- [ ] 2.2 The measurement and the report.
+- [x] 2.1 The reference transcription.
+- [x] 2.2 The measurement and the report.
 
 ## 3. The spec of the correct stage
 
