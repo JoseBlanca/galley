@@ -489,7 +489,7 @@ def test_paragraph_after_a_contents_page_starts_a_block() -> None:
 _LINKED = {
     "normansineuropea00hask": 9,
     "earlyplantagenet01stub": 13,
-    "domesdaybook00maituoft": 23,
+    "domesdaybook00maituoft": 24,
     "politicaltheorie00gieruoft": 15,
     "catherinedemedic00mariuoft": 12,
 }
