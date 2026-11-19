@@ -3,8 +3,11 @@ application of edits (its section 10), with the model's answers recorded:
 no model runs here but in the test marked vision_model."""
 
 import base64
+import dataclasses
 import hashlib
+import io
 import json
+import logging
 import shutil
 import socket
 import threading
@@ -15,11 +18,12 @@ from pathlib import Path
 from typing import override
 
 import pytest
+from PIL import Image
 
 from galley import correct, pdfium
 from galley.book_folder import BookFolder
 from galley.config import BookConfig, read_config
-from galley.correct import edits_of, page_png, token_cores
+from galley.correct import edits_of, footnote_band_top, page_png, token_cores
 from galley.correct._align import Pair, align, align_free_tail
 from galley.correct._lmstudio import (
     PROMPT,
@@ -31,7 +35,7 @@ from galley.correct._merge import answer, cased, page_changes
 from galley.correct._reading import page_reading, split_counts
 from galley.correct._tokens import clean_answer, comparison_form, tokens
 from galley.errors import EditError, ExternalProgramError
-from galley.markdown import FiledEdit, apply_edits
+from galley.markdown import FiledEdit, apply_edits, read_edits_files
 from galley.model import (
     Block,
     BlockKind,
@@ -46,6 +50,7 @@ from galley.model import (
     PageWords,
     Removal,
     RemovalReason,
+    RenderedPage,
     Span,
     TextSource,
     Word,
@@ -56,6 +61,7 @@ from galley.model import (
     read_edits,
     read_pages,
     read_words,
+    write_edits,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "correct"
@@ -402,6 +408,127 @@ def test_second_reading_is_recorded_on_note_edits_only() -> None:
         ("Tue", "The", None),
         ("the.", "thee.", "them"),
     ]
+
+
+def test_second_reading_of_an_insertion_is_what_it_read_in_the_same_gap() -> None:
+    raw = (
+        "THE BATTLE OF KADESH 6 The Poem, which is a puem. "
+        "Called by de Rouge the Bulletin. Struggle of Nations, p."
+    )
+    second = "Called by de Rouge the Bullein. Struggle of Nations, p."
+    edits = _changes_and_edits(PAGE, raw, second)
+    assert [(edit.old, edit.new, edit.second_reading) for edit in edits][-1] == (
+        "the.",
+        "the. Bulletin",
+        "Bullein",
+    )
+
+
+def test_words_between_the_last_note_and_the_page_number_at_the_foot_are_not_put_in() -> (
+    None
+):
+    # Section 7: the run is not inside a note when the token after it is the
+    # page number at the foot, a removal.
+    foot = Removal(
+        page_index=1,
+        box=Box(200, 600, 220, 610),
+        text="82",
+        reason=RemovalReason.PAGE_NUMBER,
+    )
+    blocks = dataclasses.replace(PAGE, removals=(*PAGE.removals, foot))
+    raw = (
+        "THE BATTLE OF KADESH 6 The Poem, which is a poem. "
+        "Called by de Rouge the. Struggle of Nations, p. truly 82"
+    )
+    edits = _changes_and_edits(blocks, raw)
+    assert [(edit.old, edit.new) for edit in edits] == [
+        ("Tue", "The"),
+        ("puem.", "poem."),
+    ]
+
+
+def test_a_note_reference_label_source_page_number_and_marker_are_never_edited() -> (
+    None
+):
+    heading = dataclasses.replace(
+        _block("b-p0001-001", _span("THE CAMPAIGN"), _span("3J", "n-p0001-001")),
+        kind=BlockKind.HEADING,
+        level=1,
+        label="CHAPTER Il.",
+    )
+    entry = dataclasses.replace(
+        _block("b-p0001-002", _span("The Poem")),
+        kind=BlockKind.CONTENTS_ENTRY,
+        level=1,
+        label="Il.",
+        page_number="1O",
+    )
+    epigraph = dataclasses.replace(
+        _block("b-p0001-003", _span("All is lost")),
+        kind=BlockKind.EPIGRAPH,
+        source="Ramses Il.",
+    )
+    note = _note(
+        "n-p0001-001",
+        "Il",
+        _block("b-p0001-004", _span("Called by"), origin=NOTE_ORIGIN),
+    )
+    blocks = _blocks((heading, entry, epigraph), (note,))
+    raw = (
+        "THE BATTLE OF KADESH 6 CHAPTER II. THE CAMPAIGN 3 II. The Poem 10 "
+        "All is lost Ramses II. 11 Called by"
+    )
+    assert _changes_and_edits(blocks, raw) == ()
+
+
+def test_a_run_after_a_reference_at_a_notes_end_goes_after_the_word_before() -> None:
+    # Section 7: the token before the run is fixed and no word of the note
+    # follows it, so the run goes after the last word before it.
+    note = _note(
+        "n-p0001-001",
+        "%",
+        _block(
+            "b-p0001-002",
+            _span("see the"),
+            _span("4", "n-p0001-009"),
+            origin=NOTE_ORIGIN,
+        ),
+    )
+    second = _note(
+        "n-p0001-002",
+        "",
+        _block("b-p0001-003", _span("Struggle of"), origin=NOTE_ORIGIN),
+    )
+    blocks = _blocks((_block("b-p0001-001", _span("Tue Poem")),), (note, second))
+    edits = _changes_and_edits(
+        blocks, "THE BATTLE OF KADESH 6 The Poem see the 4 Nations Struggle of"
+    )
+    assert [(edit.old, edit.new) for edit in edits] == [
+        ("Tue", "The"),
+        ("the", "the Nations"),
+    ]
+
+
+def test_a_pair_between_0_3_and_0_5_alike_is_replaced() -> None:
+    # Section 7: the limit is 0.3; "abcd" and "axyzd" are 0.44 alike.
+    blocks = _blocks((_block("b-p0001-001", _span("the abcd here")),))
+    edits = _changes_and_edits(blocks, "THE BATTLE OF KADESH 6 the axyzd here")
+    assert [(edit.old, edit.new) for edit in edits] == [("abcd", "axyzd")]
+
+
+def test_the_footnote_band_starts_4_pt_above_the_highest_note() -> None:
+    assert footnote_band_top(PAGE, 1) == 396.0
+    assert footnote_band_top(_blocks((_block("b-p0001-001", _span("x")),)), 1) is None
+
+
+def test_a_page_cut_to_its_footnote_band_keeps_what_is_below_the_band_top() -> None:
+    rendered = RenderedPage(
+        page_index=0, dpi=144, width_px=10, height_px=100, pixels=bytes(range(100)) * 10
+    )
+    with Image.open(io.BytesIO(page_png(rendered, 10.0))) as band:
+        assert band.size == (10, 80)
+    with Image.open(io.BytesIO(page_png(rendered, None))) as page:
+        assert page.size == (10, 100)
 
 
 def test_a_word_twice_in_its_block_gets_the_words_beside_it() -> None:
@@ -855,6 +982,46 @@ def test_excerpt_edits_are_the_same_with_1_and_2_workers_and_markdown_applies_th
     assert set(EXCERPT_EDITS) <= found
     markdown.run(folder, config)
     assert "a poem in rhymed" in folder.book_md.read_text(encoding="utf-8")
+
+
+# Renders with PDFium.
+@pytest.mark.thread_unsafe
+@pytest.mark.tesseract
+def test_pages_whose_answers_are_cut_short_get_no_edits_and_are_logged(
+    tmp_path: Path,
+    redo_excerpt_run: Callable[[str], BookFolder],
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Section 4: an answer cut short leaves its page as galley read it.
+    fake, server = lm_studio(finish="length")
+    folder, config = _excerpt_folder(tmp_path, redo_excerpt_run, server)
+    fake.in_order.extend(_recorded_answers(folder))
+    with caplog.at_level(logging.WARNING, logger="galley.correct"):
+        correct.run(folder, config, workers=2)
+    assert read_edits(folder.correct_jsonl) == ()
+    assert "page 3: the model's answer was cut short" in caplog.text
+
+
+def test_markdown_reads_correct_first_then_agents_by_name_then_the_owner(
+    tmp_path: Path,
+) -> None:
+    # Architecture section 10.
+    folder = BookFolder(tmp_path)
+    folder.edits_dir.mkdir()
+    edit = _edit("Tue", "The")
+    for name in ("owner.jsonl", "zeta.jsonl", "correct.jsonl", "alpha.jsonl"):
+        write_edits(folder.edits_dir / name, (edit, edit))
+    assert [(filed.path.name, filed.line) for filed in read_edits_files(folder)] == [
+        ("correct.jsonl", 1),
+        ("correct.jsonl", 2),
+        ("alpha.jsonl", 1),
+        ("alpha.jsonl", 2),
+        ("zeta.jsonl", 1),
+        ("zeta.jsonl", 2),
+        ("owner.jsonl", 1),
+        ("owner.jsonl", 2),
+    ]
 
 
 # One page of Kadesh read by the model in LM Studio (section 15).

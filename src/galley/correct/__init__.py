@@ -42,7 +42,14 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
 
-__all__ = ["check_server", "edits_of", "page_png", "run", "token_cores"]
+__all__ = [
+    "check_server",
+    "edits_of",
+    "footnote_band_top",
+    "page_png",
+    "run",
+    "token_cores",
+]
 
 _logger = logging.getLogger(__name__)
 
@@ -83,7 +90,9 @@ class _PageResult:
     cut_short: bool
 
 
-def _band_top(blocks: BlocksFile, page_index: int) -> float | None:
+def footnote_band_top(blocks: BlocksFile, page_index: int) -> float | None:
+    """The top of the page's footnote band in points (section 2): 4 pt above
+    the highest note block printed on it; None when no note is."""
     tops = [
         origin.box.top
         for note in blocks.notes
@@ -204,7 +213,7 @@ def run(
                     page_index=page.index,
                     reading=reading,
                     cores=token_cores(blocks, reading),
-                    band_top=_band_top(blocks, page.index),
+                    band_top=footnote_band_top(blocks, page.index),
                 )
             )
     results = map_pages(lambda item: _read_page(config, item), work, workers)
