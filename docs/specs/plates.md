@@ -269,8 +269,8 @@ but for a word inside one of the page's `exclude_regions`, which keeps
 the reason `excluded_region` as on any page;
 it has no kept word and no figure, so layout gives it no region and
 structure no block. analyze logs each inkless page at WARNING, with its
-share of words without ink, so that the owner sees a page taken
-wrongly. No config key keeps such a page: the rule takes no page of
+share of words without ink and the share of those that are known words,
+so that the owner sees a page taken wrongly. No config key keeps such a page: the rule takes no page of
 print in the eight books (below), and a key is added when a book needs
 one.
 
