@@ -11,7 +11,7 @@ from typing import assert_never
 
 from galley.correct._align import Pair, align
 from galley.correct._reading import GalleyToken, Place
-from galley.correct._tokens import Token, alike, clean_answer, tokens
+from galley.correct._tokens import Token, alike, clean_answer, comparison_form, tokens
 from galley.model import Block, Edit, block_sha256
 
 _logger = logging.getLogger(__name__)
@@ -100,29 +100,85 @@ def cased(model_core: str, galley_core: str) -> str:
 _SEPARATOR = re.compile(r"(?<=[^\W_])[,.\-\u2013](?=[^\W_])")
 
 
+_DIGIT_RUN = re.compile(r"\d\d")
+
+
 def _alphanumerics(core: str) -> int:
     return sum(character.isalnum() for character in core)
 
 
-def may_hold_more_words(
-    galley_core: str, model_core: str, *, beside_unpaired: bool
-) -> bool:
+def may_hold_more_words(galley_core: str, model_core: str) -> bool:
     """Whether galley's core may hold more printed words than the model's
     (section 7): more commas, full stops, hyphens or en dashes between two
-    letters or digits, more digits, or more letters and digits when a model
-    token beside the paired one pairs with nothing."""
-    return (
-        len(_SEPARATOR.findall(galley_core)) > len(_SEPARATOR.findall(model_core))
-        or sum(c.isdigit() for c in galley_core) > sum(c.isdigit() for c in model_core)
-        or (
-            beside_unpaired and _alphanumerics(galley_core) > _alphanumerics(model_core)
-        )
+    letters or digits, or more digits when it has two side by side (a lone
+    digit is often a letter misread: "a3", "V1")."""
+    return len(_SEPARATOR.findall(galley_core)) > len(
+        _SEPARATOR.findall(model_core)
+    ) or (
+        _DIGIT_RUN.search(galley_core) is not None
+        and sum(c.isdigit() for c in galley_core) > sum(c.isdigit() for c in model_core)
     )
+
+
+def glued_span(
+    galley_core: str, model_answer: Answer, position: int, unpaired: frozenset[int]
+) -> tuple[int, int] | None:
+    """The first and last positions of the model's tokens that read the two
+    printed words galley glued into one (section 7): the token at
+    `position` and an unpaired one beside it, when galley's core has more
+    letters and digits than the token alone and the two joined are more
+    alike galley's than the token alone; None otherwise."""
+    if _alphanumerics(galley_core) <= _alphanumerics(_core(model_answer, position)):
+        return None
+    forms = [token.form for token in model_answer.tokens]
+    galley_form = comparison_form(galley_core)
+    alone = alike(galley_form, forms[position])
+    best = None
+    for first, last in ((position - 1, position), (position, position + 1)):
+        beside = first if first != position else last
+        if beside not in unpaired:
+            continue
+        likeness = alike(galley_form, forms[first] + forms[last])
+        if likeness > alone and (best is None or likeness > best[0]):
+            best = (likeness, first, last)
+    return None if best is None else (best[1], best[2])
 
 
 # Section 7: a run of this many words or more that the page already holds
 # is not put in again; one word, "the", is everywhere.
 _LEAST_REPEATED = 2
+
+
+# Section 7: a block part with at least this many unequal pairs whose mean
+# likeness is below _LEAST_MEAN_ALIKE has its words out of place. Measured
+# with the recorded answers on 19 November 2026: Kadesh page 14's note
+# blocks 0.00 to 0.19, the six reference pages 0.36 to 0.93 but for page
+# 27's rotated words, 0.22.
+_LEAST_UNEQUAL = 3
+_LEAST_MEAN_ALIKE = 0.3
+
+
+def _out_of_place(
+    reading: Sequence[GalleyToken], model_answer: Answer, pairs: Sequence[Pair]
+) -> frozenset[str]:
+    """The blocks whose words on the page are out of place against the
+    model's: 3 unequal pairs or more, less than 0.3 alike on average."""
+    likeness: dict[str, list[float]] = {}
+    for pair in pairs:
+        if pair.first is None or pair.second is None:
+            continue
+        token = reading[pair.first]
+        model_form = model_answer.tokens[pair.second].form
+        if token.place is not None and token.form != model_form:
+            likeness.setdefault(token.place.block_id, []).append(
+                alike(token.form, model_form)
+            )
+    return frozenset(
+        block_id
+        for block_id, values in likeness.items()
+        if len(values) >= _LEAST_UNEQUAL
+        and sum(values) / len(values) < _LEAST_MEAN_ALIKE
+    )
 
 
 def _forms(words: Sequence[str]) -> tuple[str, ...]:
@@ -224,61 +280,41 @@ def _next_galley(pairs: Sequence[Pair], before: int | None) -> int | None:
     )
 
 
-def page_changes(
+def _replacement(
+    galley_core: str, model_answer: Answer, position: int, unpaired: frozenset[int]
+) -> tuple[str, int | None] | None:
+    """The core that replaces galley's, from the model's token at
+    `position`, and the unpaired model token it also takes when galley glued
+    two words; None when the pair may hold more words on galley's side."""
+    glued = glued_span(galley_core, model_answer, position, unpaired)
+    if glued is not None:
+        first, last = glued
+        model_core = model_answer.text[
+            model_answer.tokens[first].start : model_answer.tokens[last].end
+        ]
+        return cased(model_core, galley_core), first if first != position else last
+    model_core = _core(model_answer, position)
+    if may_hold_more_words(galley_core, model_core):
+        return None
+    return cased(model_core, galley_core), None
+
+
+def _insertions(
     page_index: int,
     reading: Sequence[GalleyToken],
     model_answer: Answer,
-    galley_text: Mapping[Place, str],
-    second_answer: Answer | None = None,
-) -> tuple[Change, ...]:
-    """The changes the model's answer makes to galley's reading of a page,
-    in the order of the reading. `galley_text` gives the core of each
-    changeable token, by its place. With `second_answer`, the second
-    model's reading of the page's footnote band, each change in a note
-    records what it read there."""
-    pairs = align(
-        [token.form for token in reading], [t.form for t in model_answer.tokens]
-    )
-    second = _second_reading(reading, second_answer)
-    unpaired = frozenset(
-        pair.second for pair in pairs if pair.first is None and pair.second is not None
-    )
+    pairs: Sequence[Pair],
+    consumed: frozenset[int],
+    out_of_place: frozenset[str],
+    second: _Second,
+) -> tuple[tuple[float, Change], ...]:
+    """The insertions of section 7, each with its place in the reading: the
+    model's runs inside a note, less the tokens a replacement took, the
+    digits, a run the page holds already and a block out of place."""
     reading_forms = tuple(token.form for token in reading)
     changes: list[tuple[float, Change]] = []
-    for pair in pairs:
-        if pair.first is None or pair.second is None:
-            continue
-        token = reading[pair.first]
-        model_form = model_answer.tokens[pair.second].form
-        if (
-            token.place is None
-            or token.form == model_form
-            or alike(token.form, model_form) < _LEAST_ALIKE
-        ):
-            continue
-        model_core = _core(model_answer, pair.second)
-        if may_hold_more_words(
-            galley_text[token.place],
-            model_core,
-            beside_unpaired=bool({pair.second - 1, pair.second + 1} & unpaired),
-        ):
-            continue
-        new_core = cased(model_core, galley_text[token.place])
-        changes.append(
-            (
-                pair.first,
-                Change(
-                    kind=ChangeKind.REPLACE,
-                    page_index=page_index,
-                    place=token.place,
-                    text=new_core,
-                    second_reading=second.replaced(pair.first)
-                    if token.note_id is not None
-                    else None,
-                ),
-            )
-        )
-    for before, run in _runs(pairs):
+    for before, whole_run in _runs(pairs):
+        run = tuple(position for position in whole_run if position not in consumed)
         after = _next_galley(pairs, before)
         if before is None or after is None or not _inside_note(reading, before, after):
             continue
@@ -302,6 +338,8 @@ def page_changes(
             )
             continue
         kind, place = anchor
+        if place.block_id in out_of_place:
+            continue
         changes.append(
             (
                 before + 0.5,
@@ -314,6 +352,83 @@ def page_changes(
                 ),
             )
         )
+    return tuple(changes)
+
+
+def page_changes(
+    page_index: int,
+    reading: Sequence[GalleyToken],
+    model_answer: Answer,
+    galley_text: Mapping[Place, str],
+    second_answer: Answer | None = None,
+) -> tuple[Change, ...]:
+    """The changes the model's answer makes to galley's reading of a page,
+    in the order of the reading. `galley_text` gives the core of each
+    changeable token, by its place. With `second_answer`, the second
+    model's reading of the page's footnote band, each change in a note
+    records what it read there."""
+    pairs = align(
+        [token.form for token in reading], [t.form for t in model_answer.tokens]
+    )
+    second = _second_reading(reading, second_answer)
+    unpaired = frozenset(
+        pair.second for pair in pairs if pair.first is None and pair.second is not None
+    )
+    out_of_place = _out_of_place(reading, model_answer, pairs)
+    for block_id in sorted(out_of_place):
+        _logger.info(
+            "page %d: the words of block %s are out of place against the "
+            "model's; no edit there",
+            page_index,
+            block_id,
+        )
+    changes: list[tuple[float, Change]] = []
+    consumed: set[int] = set()
+    for pair in pairs:
+        if pair.first is None or pair.second is None:
+            continue
+        token = reading[pair.first]
+        model_form = model_answer.tokens[pair.second].form
+        if (
+            token.place is None
+            or token.place.block_id in out_of_place
+            or token.form == model_form
+            or alike(token.form, model_form) < _LEAST_ALIKE
+        ):
+            continue
+        replacement = _replacement(
+            galley_text[token.place], model_answer, pair.second, unpaired
+        )
+        if replacement is None:
+            continue
+        new_core, beside = replacement
+        if beside is not None:
+            consumed.add(beside)
+        changes.append(
+            (
+                pair.first,
+                Change(
+                    kind=ChangeKind.REPLACE,
+                    page_index=page_index,
+                    place=token.place,
+                    text=new_core,
+                    second_reading=second.replaced(pair.first)
+                    if token.note_id is not None
+                    else None,
+                ),
+            )
+        )
+    changes.extend(
+        _insertions(
+            page_index,
+            reading,
+            model_answer,
+            pairs,
+            frozenset(consumed),
+            out_of_place,
+            second,
+        )
+    )
     return tuple(change for _, change in sorted(changes, key=lambda item: item[0]))
 
 

@@ -318,14 +318,13 @@ def test_a_pair_less_alike_than_0_3_is_no_edit() -> None:
 @pytest.mark.parametrize(
     ("galley", "model"),
     [
-        ("pp. 542,543.) here", "pp. 542, 543.) here"),
-        ("one hour fiveminutes. here", "one hour five minutes. here"),
+        ("pp. 542,543.) here", "pp. 543.) here"),
         ("see 12-18). here", "see 18). here"),
         ("see (1.58). here", "see (58). here"),
         ("see %24+in here", "see in here"),
         ("the llast-two here", "the last here"),
     ],
-    ids=["comma", "glued", "hyphen", "full_stop", "digits", "hyphen_letters"],
+    ids=["comma", "hyphen", "full_stop", "digits", "hyphen_letters"],
 )
 def test_a_galley_word_that_may_hold_two_printed_words_is_not_replaced(
     galley: str, model: str
@@ -335,10 +334,64 @@ def test_a_galley_word_that_may_hold_two_printed_words_is_not_replaced(
     assert _changes_and_edits(blocks, f"THE BATTLE OF KADESH 6 {model}") == ()
 
 
+@pytest.mark.parametrize(
+    ("galley", "model", "expected"),
+    [
+        (
+            "one hour fiveminutes. here",
+            "one hour five minutes. here",
+            ("fiveminutes.", "five minutes."),
+        ),
+        ("pp. 542,543.) here", "pp. 542, 543.) here", ("542,543.)", "542, 543.)")),
+    ],
+    ids=["glued", "comma"],
+)
+def test_a_galley_word_glued_from_two_takes_the_models_two_words(
+    galley: str, model: str, expected: tuple[str, str]
+) -> None:
+    # Section 7: the model's token and the unpaired one beside it, joined,
+    # are more alike galley's word than the token alone; the unpaired one
+    # is not put in again elsewhere.
+    blocks = _blocks((_block("b-p0001-001", _span(galley)),))
+    edits = _changes_and_edits(blocks, f"THE BATTLE OF KADESH 6 {model}")
+    assert [(edit.old, edit.new) for edit in edits] == [expected]
+
+
+def test_the_model_word_a_glued_replacement_takes_is_not_put_in_a_note() -> None:
+    note = _note(
+        "n-p0001-001",
+        "%",
+        _block("b-p0001-002", _span("Called by deRouge the."), origin=NOTE_ORIGIN),
+    )
+    blocks = _blocks((_block("b-p0001-001", _span("Tue Poem")),), (note,))
+    edits = _changes_and_edits(
+        blocks, "THE BATTLE OF KADESH 6 The Poem 7 Called by de Rouge the."
+    )
+    assert [(edit.old, edit.new) for edit in edits] == [
+        ("Tue", "The"),
+        ("deRouge", "de Rouge"),
+    ]
+
+
 def test_junk_inside_a_word_is_no_mark_of_two_words() -> None:
     blocks = _blocks((_block("b-p0001-001", _span("his maje=ty, here")),))
     edits = _changes_and_edits(blocks, "THE BATTLE OF KADESH 6 his majesty, here")
     assert [(edit.old, edit.new) for edit in edits] == [("maje=ty,", "majesty,")]
+
+
+def test_a_block_whose_unequal_pairs_are_little_alike_gets_no_edit() -> None:
+    # Section 7: words out of place (Kadesh page 14, mean likeness 0.00 to
+    # 0.19); "his" and "Mashawasha" pass 0.3 alone. The other block keeps
+    # its edit.
+    blocks = _blocks(
+        (
+            _block("b-p0001-001", _span("his use cat dog here")),
+            _block("b-p0001-002", _span("a puem"), origin=NOTE_ORIGIN),
+        )
+    )
+    raw = "THE BATTLE OF KADESH 6 Mashawasha assumes xyz qqq here a poem"
+    edits = _changes_and_edits(blocks, raw)
+    assert [(edit.old, edit.new) for edit in edits] == [("puem", "poem")]
 
 
 def test_a_note_marker_and_a_reference_are_never_changed() -> None:
