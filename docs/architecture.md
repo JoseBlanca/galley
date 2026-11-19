@@ -251,13 +251,17 @@ book). analyze runs no audit and writes
 `ocr_audit` `None`. extract reads each `ocr` page with Tesseract
 (`docs/specs/extract.md` §9), and keeps the layer's words where
 Tesseract read none, a line or a word it skipped, so that no printed
-word is lost (on Kadesh 79 words, 55 of them printed text); the words of an excluded, front-matter or
+word is lost (on Kadesh 45 words, each a printed word as the layer reads it); the words of an excluded, front-matter or
 inkless page are the layer's, recorded as removals, as with `verify`.
 layout re-reads nothing. `cli.py` looks for Tesseract before analyze or
 extract starts under `redo` and stops when it is missing (sections 12
 and 16), so that a run does not stop at extract after analyze has
-written its file; analyze itself calls Tesseract on no page. Measured on 19 November 2026 on the whole Kadesh book, 45
-text pages: Tesseract took 0.95 s a page and the 54 pages it was tried
+written its file; analyze itself calls Tesseract on no page. An excluded region
+drawn against the layer's boxes is checked on the page's render under
+`redo`, since Tesseract boxes a word where it is printed and the layer
+may box it elsewhere (Kadesh's "81" on page 8, 12 pt apart). Measured
+on 19 November 2026 on the whole Kadesh book, 45 text pages before page
+74 was excluded (44 since): Tesseract took 0.95 s a page and the 54 pages it was tried
 on about 11 s with 6 threads, on an M5 Pro; page 9, whose layer reads
 "Me^iddo. already in tli.- sixti-fiith century ln-forr Christ", reads
 "At Megiddo, already in the sixteenth century before Christ".
@@ -817,6 +821,7 @@ A stage imports these and nothing else of galley.
 | `ocr.py` | Tesseract: `read_image(image, origin, dpi, psm, language)`, the words of an image cropped from a page, with boxes in points and Tesseract's confidence, and `words_of_tsv`, its pure part; `read_image_lines` and `lines_of_tsv`, the same words grouped by Tesseract's lines; `point_box(box, origin, dpi)`, a box in pixels of a crop as a box in points on the page; `OCR_DPI` (300). Tesseract runs with `OMP_THREAD_LIMIT=1`, one core each, so that the parallelism is galley's; output without Tesseract's tsv header is an `ExternalProgramError` (`docs/specs/reocr.md` §5). layout uses it now, extract for the text pages under `ocr = "redo"` (`docs/specs/extract.md` §9), analyze's audit later |
 | `fidelity.py` | the fidelity check, section 13 |
 | `list_markers.py` | the readings of a list marker (`docs/specs/structure.md` §29, "Terms"): `marker_readings(word)`, its kind, form and value, a roman numeral before a letter; `starts_a_list`, `follows` and `is_bulleted`; and `DASHES`, which structure's list rules, markdown's lists and the fidelity check share, so that the three read a marker alike |
+| `caption_labels.py` | the caption labels of `docs/specs/figures.md` §1: `LABEL_NAMES` ("figure", "fig.", "fig", "plate", "map"), `is_numeral(text)`, a numeral as the OCR reads one, and `is_well_formed_numeral(text)`, one as printed (1 to 3 digits or a well-formed roman numeral in capitals). Moved from `structure/_figures.py` on 19 November 2026, so that structure's caption labels and extract's caption numbers under `redo` (`docs/specs/extract.md` §9) read a numeral alike |
 | `note_references.py` | `glued_reference(word) -> Reference \| None`: the glued number of `docs/specs/structure.md` §11, "Candidates", both its forms, a letter, any punctuation or none, 1 to 3 digits and only punctuation, not after a citation's abbreviation ("land3.", "Kadesh,12"; not "p.12"), and punctuation, 1 to 3 digits and only punctuation (";13"), with its parts; `Reference` and `ReferenceForm`, the values it gives; and the helpers structure's other reference forms share with it, `PUNCTUATION`, `is_punctuation` and `after_last_letter`. Moved whole from `structure/_markers.py` on 19 November 2026 (its private `_glued` and the two values), and structure's `reference_candidate` calls it, so that extract puts back under `redo` exactly the references structure looks for (`docs/specs/extract.md` §9) |
 | `hyphens.py` | `LINE_END_HYPHENS`, "-" and "¬", the hyphens that end a printed line in the OCR's text, which layout's reading score, structure's hyphen joins and the fidelity check share (`docs/specs/structure.md` §5) |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |

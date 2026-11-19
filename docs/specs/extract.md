@@ -433,14 +433,18 @@ keep their layer under `redo`; the plates hold no note reference.
   are removals with the reason `excluded_region`, as on a page read
   from the layer; the in-page figures are cut as on any text page
   (`docs/specs/figures.md` §4), from the boxes analyze found with the
-  layer's words.
+  layer's words. An excluded region drawn against the layer's boxes is
+  checked on the page's render under `redo`: Tesseract boxes a word
+  where it is printed, and the layer may box it elsewhere (Kadesh's
+  page number "81" on page 8 lies 12 pt below the layer's box).
 - The page's text layer is read too, by `text_layer.layer_words`, for
   the references below, for the words Tesseract missed (below), and for
   one case: when Tesseract finds no word
   on a page whose layer has words, the page keeps the layer's words and
   its `PageWords.text_source` is `text_layer`, so that no printed word
   is lost, and extract logs a warning naming the page. None of Kadesh's
-  45 text pages is such a page.
+  44 text pages under the whole book's config (page 74, the library's
+  card pocket, is excluded) is such a page.
 - An `ocr` page's `PageWords.text_source` is `ocr`; a text page whose
   words fell back to the layer, as above, has `text_layer`, and the
   page's `exclude_regions` apply to those words as to any. A text page
@@ -489,9 +493,13 @@ these hold:
 2. the two words are over each other, and neither is over any other
    word of the other reading;
 3. the Tesseract word holds no digit and at least one letter;
-4. both words hold as many letters (`str.isalpha`): the layer's digits
-   stand where Tesseract read a mark or nothing, never where it read a
-   letter.
+4. both words hold as many letters (`str.isalpha`), and in lower case
+   they differ in at most one place: the layer's digits stand where
+   Tesseract read a mark or nothing, never where it read a letter, and
+   the layer word is the same word ("Hugels" under "Higels", page 26,
+   one letter apart; not "flui1" under "find", page 13, three apart,
+   where the page prints no reference; amended on 19 November 2026
+   after the review of work package 3).
 
 The Tesseract word's text then becomes its text up to its last letter,
 followed by the layer word's text after its last letter: "Kadesh,”"
@@ -501,19 +509,22 @@ Tesseract's. extract logs each change at INFO, with the page, the two
 words and the result, and their number per book; words.json has no
 record of it, since no format changes (architecture §8).
 
-**What it gives.** On Kadesh the rule changes 57 words, and the notes
+**What it gives.** On Kadesh the rule changes 56 words, and the notes
 linked to their reference rise from 2 to 34, against 31 with the layer.
-Each of the 57 was looked at on the page rendered at 200 dpi: 56 are
+Each of them was looked at on the page rendered at 200 dpi: all 56 are
 words the page prints with a reference after them, though the layer's
 digits are often not the printed number (page 31's "Orontes,0" for 61,
 page 54's 'sixth"3' for 143; structure's matching allows for such
-misreadings, `docs/specs/structure.md` §11, "Matching"). The wrong one
-is page 13's "find", which becomes "find1" from the layer's "flui1":
-the page prints no reference there.
+misreadings, `docs/specs/structure.md` §11, "Matching"). Before the
+letters were compared, 57 words changed: the 57th was page 13's "find",
+which became "find1" from the layer's "flui1". Of the 55 other words
+changed, the letters were the same; one, "Higels", differs from the
+layer's "Hugels" in one letter.
 
 | variant, all else as the rule | words changed | right | notes linked |
 |---|---|---|---|
-| the rule | 57 | 56 | 34 |
+| the rule | 56 | 56 | 34 |
+| condition 4 counting letters only, not comparing them | 57 | 56 | 34 |
 | without condition 4 | 62 | 56 | 34 |
 | an overlap in height of a third, not a half | 75 | 70 | 38 |
 | also a sign the layer reads ("hieratic*"), not only digits | 170 | not counted: most are the layer's misreadings of a letter ("feat*" for "feats") | 39 |
@@ -548,8 +559,10 @@ the page ("Ramraw-um" for "Ramesseum").
 word is **missed by Tesseract**, and kept among the page's words, when
 all of these hold:
 
-1. it holds a letter or a digit (a layer word of signs only, "=" or
-   "!", is dropped as Tesseract's reading of the page drops it);
+1. it holds 2 letters or more: a layer word of signs, digits or one
+   letter is the layer's junk or a page number ("=", "83", "•J4", "w"),
+   or a copy of a letter Tesseract read ("a" beside Tesseract's
+   "makesa", page 14);
 2. no Tesseract word **covers** it: once the layer word's box is moved
    up by the page's **offset**, the two boxes overlap in width and
    overlap in height by at least a quarter of the lower of the two
@@ -561,17 +574,30 @@ all of these hold:
    §5), and at its edge it made a note of junk, page 52's "UJ" under
    its hieroglyphs (24 layer words of Kadesh, all junk or the scales of
    maps);
-4. no **unclaimed** Tesseract word with the same letters and digits
-   (compared in lower case) lies within 16 pt of it, up, down or
-   across (the gap between the two boxes, 0 when they overlap). A
-   Tesseract word is unclaimed when no layer word with its letters and
-   digits is covered by it.
+4. it is no copy of an **unclaimed** Tesseract word: no Tesseract word
+   with the same letters and digits (compared in lower case) lies on
+   its line (the two boxes, the layer's moved, overlap in height) less
+   than 16 pt across from it (the gap between the two boxes, 0 when
+   they overlap). A Tesseract word is unclaimed when no layer word with
+   its letters and digits is covered by it. For a word on a **short
+   row** (5 below), the reach is 16 pt up or down as well;
+5. a word on a short row, of at most 2 words that pass conditions 1
+   and 2 (those that overlap it in height by half its height, it
+   counted), holds 4 letters or more, and letters are at least 0.7 of
+   its characters. A skipped line is a row of many such words; a word
+   alone or with one other is the layer's junk on Kadesh ("US" on
+   page 55, "inn" on page 44, "AA/^AA^" on page 38, ".L+JI" and "o-a"
+   on page 21), or a page number, unless it is a long word
+   ("FftAigou", page 9's "FRANÇOIS"; "throueh" and "paper*", page 21).
 
 The page's **offset** is the median, over the pairs of a layer word and
 a Tesseract word with the same letters and digits, 3 or more, that
 overlap in width and whose middles are less than 12 pt apart up or
-down, of the layer word's middle less the Tesseract word's, in height;
-0 when the page has no such pair. On Kadesh it is 1.2 to 5.4 pt: the
+down (about a body line pitch, 12.96 pt on Kadesh, so that a word of
+the next line pairs with none), of the layer word's middle less the
+Tesseract word's, in height; 0 when the page has no such pair. It is
+taken once a page, on Tesseract's words alone, and the missed words
+and the heights below use the same. On Kadesh it is 1.2 to 5.4 pt: the
 layer's boxes sit lower than Tesseract's, and are taller, so that a
 layer word of a skipped line touches the Tesseract lines above and
 below it.
@@ -589,8 +615,9 @@ format changes, but `ocr_confidence` `None` on an `ocr` page marks
 them.
 
 **Why these measures.** Measured on 19 November 2026 on the whole
-Kadesh book with redo, on the 44 `ocr` pages, before condition 3 was
-added (below):
+Kadesh book with redo, on the 44 `ocr` pages, before conditions 1, 3
+and 5 took their present form and when condition 4 reached 16 pt up or
+down on every row (below):
 
 | variant, all else as the rule | words kept | of them a copy of a word Tesseract read |
 |---|---|---|
@@ -609,23 +636,24 @@ page 20). Its claim keeps the short words of a skipped line: the "of"
 of page 9's lost line has an "of" of Tesseract's on the line above,
 which covers the layer's "of" of that line.
 
-**What it gives.** The rule keeps 79 words. Without condition 3 it
-kept 103, each looked at on the page rendered at 150 dpi: 62 printed
-words of the text, the notes, the maps or a page number, and 41 of the
-layer's junk; the 24 that condition 3 takes out are 17 of the junk,
-over hieroglyphs and maps, and the 7 words of the scales of the maps of
-pages 29, 33, 36 and 45 ("5 Km."), which lie inside the maps' boxes. Of
-the 79, 55 are printed words: the lost lines of pages 9, 11, 15, 52 and
-53, "FRANÇOIS" (the layer's "FftAigou", page 9), "Égypte" (page 11),
-"a" (page 14), "through" and "paper" (page 21), "27." and "Var." on
-page 50, and the page numbers of pages 10, 11, 12, 18, 21, 28, 37 and
-67; 24 are the layer's junk over hieroglyphs or Arabic outside the
-figures' boxes (pages 21, 27, 33, 38, 41, 44, 45, 46) or specks (pages
-15, 47, 55, 63, 66), which Tesseract read as junk of its own or not at
-all. The junk stays as text, as the layer's junk does under `verify`. Some words the layer has are still
-lost: page 11's "the" before "compilation" has an unclaimed "the" of
-Tesseract's 9 pt below, and page 9's line keeps the layer's misreadings
-("wu", "eocueiou*" for "was conscious").
+**What it gives.** The rule keeps 45 words, each a printed word as the
+layer reads it, looked at on the page rendered at 150 dpi: the lines
+Tesseract skipped on pages 9 ("CHABAS was conscious of the thoroughness
+of his", as ">C||ABA* wu eocueiou* of the thoroughness of his"), 11
+("with the accession of new material made the compilation", whole), 15
+("other engagements," which is an error for the prisoners as"), 52
+("ing inscription 129 over them:", the "129" as "1TO") and 53 ("Simbel
+and Ramesseum have first form. Since above was"), and "FRANÇOIS" (page
+9), "Égypte" (page 11), "through" and "paper" (page 21). Before the
+review of work package 3, the rule kept 79 words, 24 of them the
+layer's junk ("US", "inn", "•J4", a note of only "w" on page 45),
+8 page numbers and page 14's "a", a copy of Tesseract's "makesa"; and
+it lost page 11's second "the", taken for a copy of a "the" of the line
+below, 9.6 pt lower. The page numbers it no longer keeps are those
+Tesseract missed (pages 10, 11, 12, 18, 21, 28, 37, 67), which
+structure removes as page numbers when it finds them; a number of the
+foot is no word of the text. Some printed words stay lost: page 50's
+"27." beside its hieroglyphs, and short words alone on a row.
 
 ### Word heights from the layer
 
@@ -657,23 +685,49 @@ moved by the offset would put the middle of "MAP" 0.2 pt inside it,
 where it is taken for the map's lettering (`docs/specs/figures.md` §5). A layer word
 covers a Tesseract word by the test of the section above (their boxes
 overlap in width, and in height by at least a quarter of the lower
-height, once the layer's box is moved by the offset); when several do,
-the one whose overlap with it, width times height, is largest; the
-cover test uses the layer's box moved by the offset, the height it
-gives does not. A
-Tesseract word that no layer word covers keeps its box. The rule is
+height, once the layer's box is moved by the offset); the cover test
+uses the layer's box moved by the offset, the height it gives does
+not. The layer words that may give a height are those outside the
+in-page figures' boxes (condition 3 above) and no taller than 1.5
+times the 90th percentile of the page's layer word heights
+(`statistics.quantiles`, 10 parts, inclusive). When several of them
+cover the Tesseract word, those with its letters and digits (in lower
+case) are taken, if any; of the ones taken, the one whose overlap with
+the word is the largest share of its own box. A Tesseract word that no
+such layer word covers keeps its box.
+
+These choices were amended on 19 November 2026 after the review of
+work package 3. Taking the largest overlap of any covering layer word
+gave Tesseract's words the height of the layer's junk over a row of
+hieroglyphs, 16 to 35 pt tall: on pages 27, 38, 41, 44 and 46, 16
+words grew past twice their height, and on pages 38 and 44 two printed
+lines merged into one. The 90th percentile of the page's layer heights
+is 10.4 to 11.3 pt on every page of Kadesh; the median is no limit,
+since on pages 11 and 15, whose notes outnumber the text, it is the
+notes' 7.1 pt, which would keep the text's 11 pt out. A share of the
+layer word's own box, not the area, so that a wide box that covers the
+word in part loses to a word-sized one. The rule is
 applied last, after the references are put back and the missed words
 kept, so that neither of those rules sees the new heights.
 
 **What it gives.** On the whole Kadesh book with redo (measured on 19
-November 2026), the rule changes the height of 23,576 of Tesseract's
-24,570 words; the body word height is 11.0 pt, as with the layer; the
-pages with a footnote are 42, the layer's 40 and pages 29 and 40,
-whose notes ("Op. cit., p. 543", page 29; "This clause shows that the
-statement…", page 40) the page images show printed small at the foot;
-the notes are 184 (148 with the layer, 161 with Tesseract's boxes), 41
-of them linked to their reference; the headings are still the 3 of
-section 34 of the structure spec.
+November 2026, with every rule of this section), the rule changes the
+height of 23,527 of Tesseract's 24,496 words, none to more than twice
+its height and over 14 pt; the body word height is 11.0 pt, as with
+the layer; the pages with a footnote are 42, the layer's 40 and pages
+29 and 40, whose notes ("Op. cit., p. 543", page 29; "This clause
+shows that the statement…", page 40) the page images show printed
+small at the foot; the notes are 185 (148 with the layer, 161 with
+Tesseract's boxes), 40 of them linked to their reference; the headings
+are still the 3 of section 34 of the structure spec. Before the review
+the run linked 42: the two links it no longer makes were false, page
+38's to a sign "^" in the layer's junk "AA/^AA^", kept as a missed
+word, and page 27's from "H.,*" to note 64, where the page prints 65.
+Page 27's three lines "His majesty proceeded northward…" below its
+second block of hieroglyphs then become a note: their words are 9.3
+pt tall in both readings (the scan is skewed there), small against
+the page by structure's band test, and layout gives them a region of
+their own.
 
 The notes' own markers are not taken from the layer, as the plan first
 asked: the footnotes were lost by the heights, not the markers, and
@@ -707,13 +761,19 @@ height), takes the text of the layer word over it, when the two are
 over each other by the test of the references (above, one to one) and
 the layer word is a numeral by figures §1 (1 to 6 characters, each a
 digit or one of i, v, x, l, c in either case, with or without a "." or
-"," after them) other than the Tesseract word's text, and the
-Tesseract word holds no digit. Without that last condition the rule
+"," after them), the Tesseract word holds no digit, and the Tesseract
+word is no numeral as printed: 1 to 3 digits or a well-formed roman
+numeral in capitals ("VI.", not "ILL.", "VIIL" or "Y."), with or
+without a "." or "," after it. The test of a numeral and the caption
+words are `caption_labels` (architecture §12), which structure's
+caption labels use too. Without that last condition the rule
 took the colon of Kadesh page 62's "Plate 30:", where the layer reads
 "30" and ":" as two words, and a character of the page would be lost. Its box and
 confidence stay Tesseract's. extract logs each change at INFO with its
-page. On Kadesh it changes the numbers of pages 29, 36, 38 and 45 into
-the layer's; the text's "(Map IV)" is no caption word, for its bracket.
+page. On Kadesh it changes the numbers of pages 29, 36 and 45 into the
+layer's; page 38's "VI." stays Tesseract's, the printed numeral, where
+the layer reads "vi." (amended after the review of work package 3,
+which found the rule taking the layer's "vi." over it); the text's "(Map IV)" is no caption word, for its bracket.
 
 ### Cases
 
@@ -732,40 +792,39 @@ the layer's; the text's "(Map IV)" is no caption word, for its bracket.
 
 ### The public interface
 
-`page_words` takes an `ocr` page's words as it takes a layer page's,
-and two pure functions are added:
+`page_words` takes an `ocr` page's words as it takes a layer page's.
+The rules of this section are pure functions of `galley.extract`, in
+its module `_redo.py`; the worker calls `ocr_page_words` and logs what
+it returns:
 
 ```python
 # galley.extract
-def with_layer_references(ocr_words: tuple[Word, ...],
-                          layer_words: tuple[Word, ...]) -> tuple[Word, ...]:
-    """`ocr_words`, a page's words as Tesseract read them, each that
-    takes the layer's note reference (extract spec section 9) with its
-    text changed, in the same order."""
+class OcrPageWords(NamedTuple):
+    words: tuple[Word, ...]           # the page's words, kept layer words among them
+    taken: tuple[tuple[Word, str], ...]  # each Tesseract word that took a layer text, with it
+    kept: tuple[Word, ...]            # the layer words kept
 
-def are_over_each_other(one: Box, other: Box) -> bool:
-    """Whether two word boxes overlap by half the lower height and half
-    the narrower width (extract spec section 9)."""
+def ocr_page_words(tesseract_words: tuple[Word, ...],
+                   layer_words: tuple[Word, ...],
+                   figure_boxes: tuple[Box, ...]) -> OcrPageWords:
+    """The words of an `ocr` page: the references and caption numbers
+    put back, then the missed layer words kept, then the heights given,
+    the page's offset taken once (extract spec section 9)."""
 
-def with_missed_layer_words(ocr_words: tuple[Word, ...],
-                            layer_words: tuple[Word, ...]) -> tuple[Word, ...]:
-    """`ocr_words`, a page's words as Tesseract read them, with the layer
-    words Tesseract missed (extract spec section 9) put among them, each
-    with its box moved by the page's offset."""
-
-def with_layer_heights(ocr_words: tuple[Word, ...],
-                       layer_words: tuple[Word, ...]) -> tuple[Word, ...]:
-    """`ocr_words` with each word that carries a confidence and that a
-    layer word covers given that layer word's height about its own
-    middle (extract spec section 9)."""
+def with_layer_references(ocr_words, layer_words) -> tuple[Word, ...]
+def with_caption_numbers(ocr_words, layer_words) -> tuple[Word, ...]
+def layer_offset(ocr_words, layer_words) -> float
+def with_missed_layer_words(ocr_words, layer_words, *, offset: float) -> tuple[Word, ...]
+def with_layer_heights(ocr_words, layer_words, *, offset: float) -> tuple[Word, ...]
+def are_over_each_other(one: Box, other: Box) -> bool
 ```
 
-On an `ocr` page extract applies `with_layer_references` first, then
-`with_missed_layer_words` to its result and the layer words whose box
-overlaps no in-page figure's box (condition 3 above), then
-`with_layer_heights` to that result and the same layer words; the
-caption numbers are put back with the references, before the missed
-words.
+`ocr_page_words` applies `with_layer_references`, then
+`with_caption_numbers`, both with every layer word of the page; then
+`with_missed_layer_words` and `with_layer_heights`, with the layer
+words whose box overlaps no in-page figure's box (condition 3 above)
+and the offset that `layer_offset` takes once on Tesseract's words and
+every layer word.
 
 `run` no longer refuses an `ocr` page.
 
