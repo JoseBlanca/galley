@@ -47,7 +47,14 @@ keeps a line of low Tesseract confidence from being a heading, and
 removes the pieces of letters that Stubbs' text layer gives as words of
 their own, with the removal reason `letter_fragment`
 (`docs/specs/structure.md` §34 and §35). No file changes its
-`format_version` (section 8).
+`format_version` (section 8). Revised the same day for the correct stage
+(`docs/specs/correct.md`, plan notes-vision): a local vision model,
+served by LM Studio, reads each text page, and its words replace
+galley's where the two line up, as edits; the edit format goes to
+version 2 with `page_index`, `model` and `second_reading`; markdown
+applies the edits files; the config gains `correct_model`,
+`correct_server` and `correct_second_model` (sections 4 to 6, 8 to 10,
+12 and 16).
 
 Decisions marked "owner", with a date from 14 to 17 November 2026,
 were taken by the owner in chat; those of 18 November 2026 were taken
@@ -128,14 +135,14 @@ can be built and tested on its own.
 | extract | PDF, config, `pages.json` | `words.json`, `images/` | the words of each page with their boxes; figures and the cover cut out |
 | layout | PDF, config, `pages.json`, `words.json` | `lines.json` | each page's words grouped into regions and lines, in reading order; small print re-read with Tesseract where that reads better (`docs/specs/reocr.md`); the figures carried over |
 | structure | `pages.json`, `lines.json`, config | `blocks.json` | the book as ordered blocks and notes; what was removed |
-| correct | PDF, `words.json`, `blocks.json` | `edits/correct.jsonl` | proposed fixes to OCR errors (optional) |
+| correct | PDF, config, `pages.json`, `words.json`, `blocks.json` | `edits/correct.jsonl` | the words a local vision model reads otherwise than galley, as edits (optional; `docs/specs/correct.md`) |
 | markdown | `blocks.json`, `edits/`, config | `book.md` | Pandoc Markdown with the edits applied |
 | epub | `book.md`, `images/`, config | `book.epub` | built by Pandoc, checked by epubcheck |
 
 analyze, extract and layout work page by page, in parallel threads.
 structure first reads the whole book to find what repeats on every page,
 then works page by page, then joins what runs over page breaks. correct
-works per block. markdown and epub run once.
+works page by page, in parallel threads that wait on the vision model. markdown and epub run once.
 
 Every file a stage writes carries the SHA-256 of the PDF it came from.
 Only analyze computes it, from the PDF; every later stage copies it from
@@ -171,7 +178,11 @@ inputs, deletes its own file and the files of every later stage
 (`book_folder.delete_stage_outputs`), so that no file of a later stage
 can survive from an earlier run: in the review of the walking skeleton,
 markdown run alone after analyze and extract built `book.md` from a stale
-`blocks.json` and lost a word with no error. Edits are never overwritten by a stage. Folders of the owner's
+`blocks.json` and lost a word with no error. The correct stage's file,
+`edits/correct.jsonl`, is deleted with the files of structure and of
+every stage before it, since its edits name blocks by their text as
+structure wrote it. No other edits file is ever written or deleted by a
+stage. Folders of the owner's
 books live outside the repository or under `runs/`, which git ignores;
 tests make theirs under pytest's temporary directory.
 
@@ -188,6 +199,9 @@ An unknown key or a wrong type is an error.
 | `language` | string, required | ISO 639-1 code: `en`, `es`, `fr`, `de`, `it`. `config.py` maps it to Tesseract's code (`eng`, `spa`…) and to the word list; structure treats spaced punctuation by it (`docs/specs/structure.md` §23) |
 | `ocr` | `verify` / `trust` / `redo`, `verify` | how far the book's own OCR is trusted (section 7b), and whether layout re-reads small print: not with `trust` or `redo` (`docs/specs/reocr.md`). With `redo`, every text page is read again with Tesseract and its words replace the text layer's (section 7b; `docs/specs/extract.md` §9): for a book whose layer is bad throughout, as Kadesh's, the only one of the eight books that needs it |
 | `correct` | bool, `false` | whether `galley2epub run` runs the correct stage |
+| `correct_model` | string, `"qwen/qwen3.6-35b-a3b"` | the vision model the correct stage asks, as LM Studio names it (`docs/specs/correct.md` §3) |
+| `correct_server` | string, `"http://localhost:1234"` | LM Studio's address; only `http` on `localhost`, `127.0.0.1` or `[::1]`, so that a book's text never leaves the machine |
+| `correct_second_model` | string, none | a second model whose reading of each page's notes marks the correct stage's doubtful edits; none by default |
 | `exclude_pages` | list of page indices, `[]` | pages left out, as removals |
 | `exclude_regions` | list of `{page, box}`, `[]` | a library stamp, a label |
 | `cover_page` | page index, none | rendered as the EPUB's cover |
@@ -618,9 +632,14 @@ text is, never "noise": a plate's stray text-layer characters are removed
 as `plate_text` by structure, which the owner can review.
 
 **Edit**, one JSON object per line of a file under `edits/`:
-`format_version` (1), `block_id`, `block_sha256` (the first 12 hex digits
+`format_version` (2), `block_id`, `block_sha256` (the first 12 hex digits
 of the SHA-256 of the block's text as structure wrote it), `old`, `new`,
-`author`, `reason`. The version is on every line, not in a header, so that
+`author`, `reason`, and, since version 2 (19 November 2026, the correct
+stage), `page_index` (the page the changed word is printed on), `model`
+(the vision model that read the new text) and `second_reading` (what a
+second model read there, `docs/specs/correct.md` §9), each `null` for an
+edit made by a person or an agent. Only version 2 is read; no file of
+version 1 was ever applied. The version is on every line, not in a header, so that
 `edits-from` and agents can append to a file. A missing `edits/` folder or
 file is no edits; a blank or malformed line is an error that names the
 file and line.
@@ -713,12 +732,16 @@ after the notes, so that a note left in the body is not taken for one;
 and places each margin note just before the paragraph whose line it
 sits beside (`docs/specs/structure.md` §2 gives the order).
 
-**correct** proposes fixes to OCR errors as edits in
-`edits/correct.jsonl`, using the words' boxes and confidences in
-words.json and, possibly, the local vision model reading a word on the
-page image. It is optional. Its spec is written later.
+**correct** has a local vision model, through LM Studio, read each text
+page rendered at 300 dpi; lines the model's words up with galley's words
+of the page, taken from blocks.json in the order they were printed; and,
+where two words that line up differ, writes the model's word as an edit
+in `edits/correct.jsonl`, and in the notes also the model's words galley
+lacks. It never changes a note marker or reference, a label, the order of
+blocks, or a page that is not a text page. It is optional
+(`docs/specs/correct.md`).
 
-**markdown** applies the edits (section 10) and writes `book.md`: a
+**markdown** applies the edits files (section 10) to the blocks and writes `book.md`: a
 metadata header from the config; headings with their block id as anchor;
 every other block as a Pandoc fenced div with its id (`::: {#b-p0012-003}`);
 notes with `referenced` true as Pandoc footnotes, each of their blocks a
@@ -770,13 +793,18 @@ November 2026: patches, usable by agents too).
   checksum of the block's text, and gives the text it replaces, `old`,
   and the new text, `new`, with who made it and why.
 - markdown applies `correct.jsonl` first, then the agents' files by file
-  name, then `owner.jsonl` last, each from its first line to its last.
+  name, then `owner.jsonl` last, each from its first line to its last,
+  whatever the config's `correct` says: that key decides only whether
+  `run` runs the correct stage.
   The owner's edits come last because `edits-from` finds them on a
   `book.md` that already had every other edit applied. A missing file is
   simply no edits.
 - An edit applies when its block exists, the checksum matches the block's
-  text as structure wrote it, and `old` appears exactly once in the
-  block's text as edited so far. Otherwise markdown stops with an error
+  text as structure wrote it, `old` appears exactly once in the block's
+  text as edited so far, and that occurrence lies inside one span that is
+  not a note reference, so that no edit changes a note reference or joins
+  two spans (`docs/specs/correct.md` §10). Then `old` becomes `new` in
+  that span. Otherwise markdown stops with an error
   that lists every edit that did not apply, with its file, line and
   reason. Nothing is skipped.
 - When edits stop applying because structure changed, the owner reruns
@@ -790,6 +818,10 @@ November 2026: patches, usable by agents too).
   again. The spec of `edits-from` is part of the markdown stage's.
 - An agent writes edits the same way, from blocks.json, into
   `edits/<agent name>.jsonl`.
+- The correct stage writes `edits/correct.jsonl` whole on each run, and
+  each of its edits applies whether or not its others do, so that the
+  owner can undo one by deleting its line (`docs/specs/correct.md` §8
+  and §11).
 
 ## 11. The book's index
 
@@ -813,7 +845,7 @@ A stage imports these and nothing else of galley.
 | `model.py` | the formats of section 8, with their read and write functions; and the rules of re-reading (`docs/specs/reocr.md` §4) that layout and the fidelity check share: `replaced_layer_words(layer_words, ocr_words, is_known=..., is_junk=...)`, the layer words a kept `Reread` replaces, and `matched_ocr_positions`, the Tesseract words that read them; `junk_layer_words`, those of them replaced as the layer's junk, a `Reread`'s `junk_words`; `scored_layer_words`, the layer words whose reading score is set against Tesseract's (reocr §3); `is_junk_beside_its_copy(junk, copy, ocr_word)`, the one pair of layer words of two lines a Tesseract word may read (section 13); `is_under_ocr_word` and `may_read`, the tests of rule (a) and of any one rule alone; `words_after_rereads(words, rereads)`, a page's words as lines.json holds them; `take_out_once(groups, taken)`, `word_middle(word)` and `folded_letters_and_digits(text)` |
 | `config.py` | `BookConfig`, `read_config(path)`, the language codes |
 | `book_folder.py` | `BookFolder` |
-| `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract or Pandoc), `EditError`, `FidelityError` |
+| `errors.py` | `GalleyError` and its subclasses: `ConfigError`, `InputFileError` (missing, stale or of another format version), `PdfError`, `ExternalProgramError` (missing or failed Tesseract or Pandoc, or LM Studio not answering or without the model), `EditError`, `FidelityError` |
 | `pdfium.py` | the one thread that calls PDFium, which is not thread-safe. It opens and closes the PDF itself for each request: `page_count(pdf)`, `page_size(pdf, page_index)`, `render(pdf, page_index, dpi) -> RenderedPage`; and `POINTS_PER_INCH` (72), which turns a DPI into pixels per point |
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file. `layer_words(page) -> tuple[Word, ...]`: the one way galley reads a page's words from the text layer, in analyze and extract alike; `Character`, a frozen value (`text`, one character, and `box`), one glyph of the text layer; and `split_glued(characters)`, which cuts one word's characters into the words the OCR glued (`docs/specs/extract.md` §4 and §5) |
@@ -825,7 +857,7 @@ A stage imports these and nothing else of galley.
 | `note_references.py` | `glued_reference(word) -> Reference \| None`: the glued number of `docs/specs/structure.md` §11, "Candidates", both its forms, a letter, any punctuation or none, 1 to 3 digits and only punctuation, not after a citation's abbreviation ("land3.", "Kadesh,12"; not "p.12"), and punctuation, 1 to 3 digits and only punctuation (";13"), with its parts; `Reference` and `ReferenceForm`, the values it gives; and the helpers structure's other reference forms share with it, `PUNCTUATION`, `is_punctuation` and `after_last_letter`. Moved whole from `structure/_markers.py` on 19 November 2026 (its private `_glued` and the two values), and structure's `reference_candidate` calls it, so that extract puts back under `redo` exactly the references structure looks for (`docs/specs/extract.md` §9) |
 | `hyphens.py` | `LINE_END_HYPHENS`, "-" and "¬", the hyphens that end a printed line in the OCR's text, which layout's reading score, structure's hyphen joins and the fidelity check share (`docs/specs/structure.md` §5) |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
-| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc; Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`, and analyze and extract when it is `redo`) and stops naming any that is missing |
+| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc; Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`, and analyze and extract when it is `redo`) and stops naming any that is missing; and, when the command runs correct, LM Studio's server and its models (`correct.check_server`) |
 
 `src/galley/__init__.py` imports gilguard first: a library that stops a
 program at any import that turns Python's global lock back on, and names
@@ -993,6 +1025,7 @@ cost than one every run of `galley2epub` needs.
 | Pandoc | markdown (to read `book.md` back for the fidelity check), epub | every run | writing a valid EPUB 3 with navigation, notes and metadata is a large, well-tested body of work |
 | Tesseract | analyze (the OCR audit), extract (OCR pages, every text page under `ocr = "redo"`), layout (re-reading small print), `wordlist.py` | runs that need OCR: layout unless `ocr` is `trust` or `redo`, and extract on every text page when it is `redo`, which `cli.py` checks before analyze starts; the word list, once per language | OCR is not something to rebuild |
 | epubcheck | the tests of the epub stage and the `whole_book` tests | development only | it is the reference validator of EPUB, and needs Java, which a run of galley should not |
+| LM Studio | correct, through HTTP on the local machine only | runs with `correct = true`; `cli.py` checks that it answers and has the model before the first stage | serving a vision model on the Mac's GPU is a large body of work; galley sends it a page and reads its text (`docs/specs/correct.md` §4) |
 
 The epub stage does not run epubcheck: an EPUB is checked while
 developing, on the excerpts and the whole books, and the tests that need
@@ -1141,7 +1174,7 @@ for the owner by the plan ocr-redo (`docs/plans/ocr-redo.md`):
 - How each stage does its work: the page score threshold, column
   detection, running heads, paragraphs, notes, OCR settings, plate
   recognition and figure cutting. That is in the stage specs.
-- The `correct` stage, with its log and how it calls the vision model; the
-  `index` stage; and `edits-from`. Each is specified later, and section 8
-  gains their formats then.
+- The `correct` stage's rules, in `docs/specs/correct.md`; the `index`
+  stage and `edits-from`, specified later, and section 8 gains their
+  formats then.
 - The style sheet and cover of the EPUB, in the epub stage's spec.
