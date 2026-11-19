@@ -618,6 +618,53 @@ lost: page 11's "the" before "compilation" has an unclaimed "the" of
 Tesseract's 9 pt below, and page 9's line keeps the layer's misreadings
 ("wu", "eocueiou*" for "was conscious").
 
+### Word heights from the layer
+
+Added on 19 November 2026 for task 3.3 of the plan ocr-redo. **What
+Tesseract does.** It boxes a word sometimes to its letters and
+sometimes as tall as its line, ascenders to descenders, on the same
+line: on Kadesh's page 9 "Schéta" is 5.3 pt tall and "Manuscrit", beside
+it in the same note line, 9.1 pt. The median word height, by which
+layout and structure tell the small type of a footnote band from the
+text (layout spec section 3, step 4; `docs/specs/structure.md` section
+2, "band region"), then no longer tells them apart: page 9's notes have
+a median of 9.12 pt against the body's 7.92, and the book's body word
+height falls from the layer's 11.0 pt to 7.68. On the whole Kadesh book
+with Tesseract's boxes, the pages with a footnote fell from 40 (the
+layer) to 35: pages 9, 25, 27, 33, 41 and 50 lost theirs, their notes
+read as body text or run into the body's region. The layer's boxes have
+the height of the type, the same for every word of a line: 11 pt in
+Kadesh's text, 7 to 8 pt in its notes.
+
+**The rule.** On an `ocr` page whose Tesseract words are kept, each
+Tesseract word that a layer word covers takes the top and bottom of
+that layer word, moved up by the page's offset; its left and right
+sides, its text and its confidence stay Tesseract's. A layer word
+covers a Tesseract word by the test of the section above (their boxes
+overlap in width, and in height by at least a quarter of the lower
+height, once the layer's box is moved by the offset); when several do,
+the one whose overlap with it, width times height, is largest. A
+Tesseract word that no layer word covers keeps its box. The rule is
+applied last, after the references are put back and the missed words
+kept, so that neither of those rules sees the new heights.
+
+**What it gives.** On the whole Kadesh book with redo (measured on 19
+November 2026), the rule changes the height of 23,576 of Tesseract's
+24,570 words; the body word height is 11.0 pt, as with the layer; the
+pages with a footnote are 42, the layer's 40 and pages 29 and 40,
+whose notes ("Op. cit., p. 543", page 29; "This clause shows that the
+statement…", page 40) the page images show printed small at the foot;
+the notes are 184 (148 with the layer, 161 with Tesseract's boxes), 41
+of them linked to their reference; the headings are still the 3 of
+section 34 of the structure spec.
+
+The notes' own markers are not taken from the layer, as the plan first
+asked: the footnotes were lost by the heights, not the markers, and
+where Tesseract misreads a marker ("Sin" for "⁵In" on page 9, "1%" on
+pages 51 to 61) the layer word under it holds a digit for 5 of the 62
+notes without a marker; for the others it is a sign ("*In", "»*Tba"), a
+letter ("u", "m"), another word or nothing.
+
 ### Cases
 
 - **Tesseract reads the reference as digits** ("Kadesh,12" both
@@ -655,10 +702,17 @@ def with_missed_layer_words(ocr_words: tuple[Word, ...],
     """`ocr_words`, a page's words as Tesseract read them, with the layer
     words Tesseract missed (extract spec section 9) put among them, each
     with its box moved by the page's offset."""
+
+def with_layer_heights(ocr_words: tuple[Word, ...],
+                       layer_words: tuple[Word, ...]) -> tuple[Word, ...]:
+    """`ocr_words` with each word that carries a confidence and that a
+    layer word covers given that layer word's top and bottom, moved by
+    the page's offset (extract spec section 9)."""
 ```
 
 On an `ocr` page extract applies `with_layer_references` first, then
-`with_missed_layer_words` to its result and the same layer words.
+`with_missed_layer_words` to its result and the same layer words, then
+`with_layer_heights` to that result and the same layer words.
 
 `run` no longer refuses an `ocr` page.
 
