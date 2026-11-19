@@ -63,6 +63,7 @@ EXPECTED_EXCERPT_PAGES = {
     "domesday_notes": 10,
     "gierke_notes_heads": 10,
     "stubbs_cut_in": 6,
+    "kadesh_redo": 11,
 }
 
 # The pages of each excerpt, by index in the excerpt, that have no word in
@@ -96,6 +97,7 @@ PAGES_WITHOUT_WORDS = {
     "domesday_notes": (),
     "gierke_notes_heads": (),
     "stubbs_cut_in": (),
+    "kadesh_redo": (),
 }
 
 
@@ -393,7 +395,13 @@ def test_owner_books_wp1_page_gives_its_removals_numbers_headings_and_notes(
     assert {key: actual[key] for key in case["expected"]} == case["expected"]
 
 
-@pytest.mark.parametrize("name", sorted(EXPECTED_EXCERPT_PAGES))
+# The excerpts read with `ocr = "redo"`, which the session's run of the
+# excerpts leaves out (tests/conftest.py, REDO_EXCERPT_CONFIGS); their
+# tests are in tests/test_ocr_redo.py.
+_REDO_EXCERPTS = frozenset({"kadesh_redo"})
+
+
+@pytest.mark.parametrize("name", sorted(set(EXPECTED_EXCERPT_PAGES) - _REDO_EXCERPTS))
 def test_fidelity_check_passes_on_the_excerpt_at_every_boundary(
     excerpt_books: frozendict[str, BookFolder], name: str
 ) -> None:
@@ -1467,7 +1475,8 @@ def test_front_matter_of_gierke_front_flow_keeps_its_contents_5_and_errata_6(
 
 
 @pytest.mark.parametrize(
-    "name", sorted(set(EXPECTED_EXCERPT_PAGES) - set(FRONT_MATTER_EXCERPTS))
+    "name",
+    sorted(set(EXPECTED_EXCERPT_PAGES) - set(FRONT_MATTER_EXCERPTS) - _REDO_EXCERPTS),
 )
 def test_front_matter_of_an_excerpt_cut_inside_the_book_is_no_page(
     excerpt_books: frozendict[str, BookFolder], name: str

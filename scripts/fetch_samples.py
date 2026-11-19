@@ -107,6 +107,21 @@ BOOKS = (
                     "the back of it, without one"
                 ),
             ),
+            Excerpt(
+                name="kadesh_redo",
+                page_indices=(*range(8, 17), 32, 34),
+                covers=(
+                    'the book read with ocr = "redo" (docs/plans/ocr-redo.md, '
+                    "docs/specs/extract.md, section 9): pages whose text layer "
+                    'is bad and Tesseract good (page index 9: "Me^iddo. '
+                    'already in tli.- sixti-fiith"), note references glued '
+                    "to their words that Tesseract reads as a sign (8, 10, "
+                    "14), footnotes in two columns, running heads, the scan "
+                    "of a cover that the config excludes (16), rows of "
+                    "hieroglyphs that are no figure and that Tesseract reads "
+                    "as centred junk (32), and a plate with a text layer (34)"
+                ),
+            ),
         ),
     ),
     Book(

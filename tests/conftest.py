@@ -234,6 +234,26 @@ EXCERPT_CONFIGS = frozendict(
 )
 
 
+# The excerpts read with `ocr = "redo"` (docs/specs/extract.md, section 9;
+# docs/plans/ocr-redo.md), without `pdf`. They are kept out of
+# EXCERPT_CONFIGS while analyze refuses `redo`, which would stop the
+# session's run of every excerpt; `redo_excerpt_run` runs them, the first
+# time a test asks. Kadesh's excerpt page 8 is its page index 16, the scan
+# of a cover, which the whole book's config excludes, and its region on
+# page 0 holds the journal's page number 81, as in kadesh_8-17.
+REDO_EXCERPT_CONFIGS = frozendict(
+    {
+        "kadesh_redo": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["James Henry Breasted"]\n'
+            'language = "en"\n'
+            'ocr = "redo"\n'
+            "exclude_regions = [{page = 0, box = [240, 620, 252, 632]}]\n"
+            "exclude_pages = [8]\n"
+        ),
+    }
+)
+
 # The configs of the six whole books, by Internet Archive identifier,
 # without `pdf`, `title` and `authors`: the one place the whole_book tests
 # of every stage take them from. The four books of the evaluation set have
@@ -382,6 +402,66 @@ def _run_excerpt(folder: BookFolder) -> None:
     except subprocess.CalledProcessError as err:
         msg = (
             f"galley2epub run failed on {folder.root} with exit status "
+            f"{err.returncode}:\n{err.stderr}"
+        )
+        raise RuntimeError(msg) from err
+
+
+@pytest.fixture(scope="session")
+def redo_excerpt_run(
+    tmp_path_factory: pytest.TempPathFactory, excerpt_pdf: frozendict[str, Path]
+) -> Callable[[str], BookFolder]:
+    """A function that gives the book folder of an excerpt of
+    REDO_EXCERPT_CONFIGS, by name, with the files analyze, extract, layout
+    and structure wrote in it, each stage a process of its own, run the
+    first time a test asks for it and kept for the session. The run is
+    made inside the test, not in the fixture's setup, so that a test of a
+    task not yet done fails as its strict xfail expects instead of
+    erroring. Skips when Tesseract is missing. A test reads the folder and
+    never writes in it."""
+    _require_program("tesseract")
+    roots = frozendict(
+        {name: tmp_path_factory.mktemp(name) for name in REDO_EXCERPT_CONFIGS}
+    )
+    locks = frozendict({name: threading.Lock() for name in REDO_EXCERPT_CONFIGS})
+
+    def run(name: str) -> BookFolder:
+        with locks[name]:
+            return run_once(name)
+
+    @functools.cache
+    def run_once(name: str) -> BookFolder:
+        folder = BookFolder(roots[name])
+        folder.book_toml.write_text(
+            f"pdf = '{excerpt_pdf[name]}'\n{REDO_EXCERPT_CONFIGS[name]}",
+            encoding="utf-8",
+        )
+        for stage in ("analyze", "extract", "layout", "structure"):
+            _run_stage(stage, folder)
+        return folder
+
+    return run
+
+
+def _run_stage(stage: str, folder: BookFolder) -> None:
+    """`galley2epub <stage>` on `folder`, in a process of its own; its error
+    output becomes the message of the failure."""
+    command = [
+        str(Path(sys.executable).parent / "galley2epub"),
+        stage,
+        str(folder.root),
+    ]
+    try:
+        subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=_EXCERPT_RUN_TIMEOUT_S,
+        )
+    except subprocess.CalledProcessError as err:
+        msg = (
+            f"galley2epub {stage} failed on {folder.root} with exit status "
             f"{err.returncode}:\n{err.stderr}"
         )
         raise RuntimeError(msg) from err

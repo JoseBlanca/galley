@@ -1,0 +1,21 @@
+{
+  "read": "Transcribed from the image by the assistant on 19 November 2026: the page of the excerpt rendered at 100 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading and docs/specs/extract.md, section 9, and docs/specs/structure.md, sections 34 and 35, as amended for docs/plans/ocr-redo.md. Compared with galley's output at 9292b17: not run, since analyze refuses ocr = \"redo\" there.",
+  "excerpt": "kadesh_redo",
+  "page": 10,
+  "book_page_index": 34,
+  "checks": "a plate with a text layer, which keeps the layer's words under ocr = \"redo\" (tasks 2.1 and 2.2)",
+  "printed": {
+    "series_head": "DECENNIAL PUBLICATIONS, V",
+    "picture": "a relief: the king in his chariot drawing a bow, rows of chariots above and below"
+  },
+  "expected": {
+    "kind": "plate",
+    "text_source": "text_layer",
+    "words": [
+      "DECENNIAL",
+      "PUBLICATIONS,",
+      "V"
+    ]
+  },
+  "known": "Tesseract reads the picture as 38 junk words and the head as \"DEOCENNIAL PuBLIOATIONS,\"; the layer reads the head as printed."
+}

@@ -2555,8 +2555,19 @@ def _assert_every_word_laid_out(words: WordsFile, lines: LinesFile) -> None:
 _UNMEASURED_EXCERPTS = frozenset({"haskins_endpapers"})
 
 
+# The excerpts read with `ocr = "redo"`, which the session's run of the
+# excerpts leaves out (tests/conftest.py, REDO_EXCERPT_CONFIGS); their
+# tests are in tests/test_ocr_redo.py.
+_REDO_EXCERPTS = frozenset({"kadesh_redo"})
+
+
 @pytest.mark.parametrize(
-    "excerpt", sorted(path.stem for path in _EXCERPTS_DIR.glob("*.pdf"))
+    "excerpt",
+    sorted(
+        path.stem
+        for path in _EXCERPTS_DIR.glob("*.pdf")
+        if path.stem not in _REDO_EXCERPTS
+    ),
 )
 def test_layout_of_an_excerpt_with_rereading_keeps_every_word(
     excerpt: str, excerpt_books: frozendict[str, BookFolder]
