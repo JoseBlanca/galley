@@ -753,8 +753,12 @@ every other block as a Pandoc fenced div with its id (`::: {#b-p0012-003}`);
 notes with `referenced` true as Pandoc footnotes, each of their blocks a
 fenced div with its id inside the footnote, which Pandoc puts at the end
 of each chapter and the Kindle shows as pop-ups (section 17);
-footnotes with `referenced` false as ordinary blocks where they were
-printed, the marker first; endnotes, referenced or not, where they were
+footnotes with `referenced` false, each a div with its id and its
+marker first, at the end of their chapter (the blocks up to the next
+heading of level 1 or 2, or the book's end), after a heading "Notes"
+one level below the chapter's, of class `unlisted`, which keeps it out
+of the EPUB's table of contents, and `chapter-notes`
+(`docs/specs/structure.md` §36; owner, 19 November 2026); endnotes, referenced or not, where they were
 printed, as one list in the book's order, each note a div with its id,
 and each reference to one a link to it marked as a note reference
 (`epub:type="noteref"`), which a Kindle can show as a pop-up (Pandoc
@@ -971,6 +975,11 @@ lists the words, with the pages they came from where the origins say.
   `source`, in its `epigraph-source` div after the dash markdown writes
   there, which is not compared, and a note's `group`, in the
   `note-group` div before the note (`docs/specs/structure.md` §25).
+  A heading of class `chapter-notes`, the "Notes" markdown writes
+  before a chapter's unlinked footnotes, holds no word of the book:
+  `read_markdown` gives no word for it when its text is exactly
+  "Notes", and raises an error with any other text (§36 of the same
+  spec).
   A list in `book.md` is read item by item, each item's blocks as
   blocks, and holds only the forms markdown writes: an item of one div
   of a list item, or of one div of a contents entry followed by a
@@ -1183,6 +1192,13 @@ for the owner by the plan ocr-redo (`docs/plans/ocr-redo.md`):
 - **Stubbs' letter fragments are removals of their own**,
   `letter_fragment`, in a book where they are common
   (`docs/specs/structure.md` §35).
+
+On 19 November 2026, after reading Kadesh, the owner decided:
+
+- **A footnote with no linked reference goes to the end of its
+  chapter**, under a heading "Notes", in the order printed, with its
+  marker; endnotes and linked footnotes stay as they were
+  (`docs/specs/structure.md` §36).
 
 ## 18. Not in this document
 
