@@ -3,6 +3,7 @@
 9), and the edits they become (section 8)."""
 
 import logging
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -93,6 +94,30 @@ def cased(model_core: str, galley_core: str) -> str:
     if galley_core[:1].isupper():
         return model_core[:1] + model_core[1:].lower()
     return model_core.lower()
+
+
+# Section 7: the marks inside a core that part two printed words.
+_SEPARATOR = re.compile(r"(?<=[^\W_])[,.\-\u2013](?=[^\W_])")
+
+
+def _alphanumerics(core: str) -> int:
+    return sum(character.isalnum() for character in core)
+
+
+def may_hold_more_words(
+    galley_core: str, model_core: str, *, beside_unpaired: bool
+) -> bool:
+    """Whether galley's core may hold more printed words than the model's
+    (section 7): more commas, full stops, hyphens or en dashes between two
+    letters or digits, more digits, or more letters and digits when a model
+    token beside the paired one pairs with nothing."""
+    return (
+        len(_SEPARATOR.findall(galley_core)) > len(_SEPARATOR.findall(model_core))
+        or sum(c.isdigit() for c in galley_core) > sum(c.isdigit() for c in model_core)
+        or (
+            beside_unpaired and _alphanumerics(galley_core) > _alphanumerics(model_core)
+        )
+    )
 
 
 def _runs(pairs: Sequence[Pair]) -> tuple[tuple[int | None, tuple[int, ...]], ...]:
@@ -194,6 +219,9 @@ def page_changes(
         [token.form for token in reading], [t.form for t in model_answer.tokens]
     )
     second = _second_reading(reading, second_answer)
+    unpaired = frozenset(
+        pair.second for pair in pairs if pair.first is None and pair.second is not None
+    )
     changes: list[tuple[float, Change]] = []
     for pair in pairs:
         if pair.first is None or pair.second is None:
@@ -206,7 +234,14 @@ def page_changes(
             or alike(token.form, model_form) < _LEAST_ALIKE
         ):
             continue
-        new_core = cased(_core(model_answer, pair.second), galley_text[token.place])
+        model_core = _core(model_answer, pair.second)
+        if may_hold_more_words(
+            galley_text[token.place],
+            model_core,
+            beside_unpaired=bool({pair.second - 1, pair.second + 1} & unpaired),
+        ):
+            continue
+        new_core = cased(model_core, galley_text[token.place])
         changes.append(
             (
                 pair.first,
