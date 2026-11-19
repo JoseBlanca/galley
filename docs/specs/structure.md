@@ -698,6 +698,24 @@ by the research lie from 0.42 to 0.83 of the page width. The research found 53 i
 such as "1G-2", and about 19 in Gierke ("£ 2", "d2"), none in Haskins,
 Stubbs and Kadesh.
 
+**A signature mark of letters.** A line is also a printer's signature
+mark, with no digit, when it has the position and the limits above and
+is two words, the first a capital letter and a full stop, the second
+starting at least half the column's width right of the first's left
+side. Gierke signs the gatherings of its introduction with letters,
+"M." at the left and "c", "d", "e" at the right (pages 38, 54 and 70),
+and the OCR reads some numbered marks without their digits ("M. IT",
+Gierke's page 246; "M. H", Domesday's page 234). Each stayed in the
+text, in a note's last line or as a block of its own: on page 38, where
+layout makes the foot a band, "M. C" became a footnote without a
+marker, and the closing quotation mark of the body a reference to it.
+The OCR boxes Gierke's "M." 128 pt wide on page 38, so the distance is
+measured from its left side: 256 pt there, in a column of 297. A line
+of text has no such gap between two words. Measured on 19 November
+2026 on the eight books' `lines.json`, the rule removes those five
+marks and no other line; one more lowest line of this kind, Gierke's
+page 166, has its "M." read as '"^T"' and stays.
+
 **A signature mark beside the lowest line.** When the lowest line is
 none of these, the line above it (the lowest of the lines left) is
 removed as a printer's signature mark when it is one by the rule above,
