@@ -526,3 +526,69 @@ def test_layer_word_of_one_letter_is_not_kept_even_on_a_long_row() -> None:
 def test_page_offset_takes_no_pair_of_fewer_than_3_letters() -> None:
     # Page 11's "of" with the layer's, 1.4 pt lower: no pair.
     assert layer_offset((OF_11,), (OF_11_LAYER,)) == 0.0
+
+
+# Page 44: "The Poem then proceeds with the attack of the chariotry thus:",
+# which Tesseract reads "... attack of the thus:" with "as", of confidence
+# 0, spanning "chariotry" and the hieroglyphs under it (extract spec
+# section 9, "A word read as junk"). Tesseract reads "chariotry" with
+# confidence 92.66 two lines above.
+CHARIOTRY_ABOVE_44 = tesseract("chariotry", 202.08, 246.5, 243.36, 257.5, 92.66)
+LINE_44_TESSERACT = (
+    tesseract("attack", 309.36, 297.38, 336.24, 308.38, 96.8),
+    tesseract("of", 340.08, 297.38, 348.96, 308.38, 96.63),
+    tesseract("the", 353.76, 297.5, 367.92, 308.5, 97.02),
+    tesseract("as", 356.4, 306.26, 412.56, 317.26, 0.0),
+    tesseract("thus:", 417.12, 297.5, 439.92, 308.5, 96.55),
+)
+LINE_44_LAYER = (
+    layer("attack", 309.12, 302.7, 332.87, 313.7),
+    layer("of", 339.84, 302.7, 347.68, 313.7),
+    layer("the", 353.52, 302.7, 365.26, 313.7),
+    layer("chariotry", 371.52, 302.7, 409.58, 313.7),
+    layer("thus:", 416.88, 302.7, 436.8, 313.7),
+)
+PAGE_44_OFFSET = 1.158
+
+
+def _kept_texts(tesseract_words: tuple[Word, ...]) -> list[str]:
+    return [
+        word.text
+        for word in with_missed_layer_words(
+            tesseract_words, LINE_44_LAYER, offset=PAGE_44_OFFSET
+        )
+        if word.ocr_confidence is None
+    ]
+
+
+def test_word_tesseract_read_as_junk_of_confidence_0_is_kept_from_the_layer() -> None:
+    assert _kept_texts((CHARIOTRY_ABOVE_44, *LINE_44_TESSERACT)) == ["chariotry"]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        # Tesseract reads the word nowhere else on the page.
+        "not elsewhere",
+        # The covering word is read with some confidence.
+        "confidence 1",
+        # The covering word is a misreading of it, 0.5 alike or more.
+        "misreading",
+        # The covering word's letters hold the word's.
+        "inside",
+    ],
+)
+def test_layer_word_under_a_confidence_0_word_is_not_kept_unless_all_hold(
+    change: str,
+) -> None:
+    junk = LINE_44_TESSERACT[3]
+    replaced = {
+        "not elsewhere": junk,
+        "confidence 1": replace(junk, ocr_confidence=1.0),
+        "misreading": replace(junk, text="chanotiy"),
+        "inside": replace(junk, text="xchariotryx"),
+    }[change]
+    above = () if change == "not elsewhere" else (CHARIOTRY_ABOVE_44,)
+    line = (*LINE_44_TESSERACT[:3], replaced, LINE_44_TESSERACT[4])
+
+    assert _kept_texts((*above, *line)) == []

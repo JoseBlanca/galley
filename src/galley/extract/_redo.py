@@ -8,6 +8,7 @@ Pure functions over the page's two readings; extract's worker calls
 `ocr_page_words` and logs what it says.
 """
 
+import difflib
 import statistics
 from dataclasses import replace
 from typing import Final, NamedTuple
@@ -36,6 +37,15 @@ _OFFSET_PAIR_DISTANCE_PT: Final[float] = 12.0
 # A Tesseract word covers a layer word when they overlap by a quarter of
 # the lower height (half took many words Tesseract read, 167 against 103).
 _COVER_HEIGHT_SHARE: Final[float] = 0.25
+# "A word read as junk": a Tesseract word of confidence below 1 does not
+# cover a layer word whose letters Tesseract reads elsewhere on the page
+# with confidence 60 or more, and that are neither inside its letters nor
+# 0.5 alike to them (difflib's ratio). On Kadesh, 19 November 2026, it keeps
+# 10 printed words ("chariotry", page 44) of the 128 layer words that only
+# such words cover; 72 are 0.5 alike or inside, misreadings of the same word.
+_JUNK_CONFIDENCE_BELOW: Final[float] = 1.0
+_READ_ELSEWHERE_CONFIDENCE_LEAST: Final[float] = 60.0
+_MISREADING_LEAST_LIKENESS: Final[float] = 0.5
 # A layer word is the copy of an unclaimed Tesseract word with its letters
 # and digits less than 16 pt across from it; a word of a short row, also
 # 16 pt up or down (the layer boxes page 41's "behind" 14 pt below
@@ -233,11 +243,21 @@ def with_missed_layer_words(
             for layer_word in moved
         )
     )
+    read_well = frozenset(
+        _letters(ocr_word.text)
+        for ocr_word in ocr_words
+        if ocr_word.ocr_confidence is not None
+        and ocr_word.ocr_confidence >= _READ_ELSEWHERE_CONFIDENCE_LEAST
+    )
     candidates = tuple(
         layer_word
         for layer_word in moved
         if len(_letters(layer_word.text)) >= _KEPT_MIN_LETTERS
-        and not any(_covers(ocr_word.box, layer_word.box) for ocr_word in ocr_words)
+        and not any(
+            _covers(ocr_word.box, layer_word.box)
+            and not _read_as_junk(layer_word, ocr_word, read_well)
+            for ocr_word in ocr_words
+        )
     )
     missed = tuple(
         layer_word
@@ -245,6 +265,24 @@ def with_missed_layer_words(
         if _is_kept(layer_word, _row_count(layer_word, candidates), unclaimed)
     )
     return _placed_among(ocr_words, missed)
+
+
+def _read_as_junk(layer_word: Word, ocr_word: Word, read_well: frozenset[str]) -> bool:
+    """Whether `ocr_word`, covering `layer_word`, is junk Tesseract read
+    there in place of it (extract spec section 9, "A word read as junk"):
+    its confidence is below 1, `layer_word`'s letters are among
+    `read_well`, those of the page's words of confidence 60 or more, and
+    they are neither inside `ocr_word`'s letters nor 0.5 alike to them."""
+    letters = _letters(layer_word.text)
+    ocr_letters = _letters(ocr_word.text)
+    return (
+        ocr_word.ocr_confidence is not None
+        and ocr_word.ocr_confidence < _JUNK_CONFIDENCE_BELOW
+        and letters in read_well
+        and letters not in ocr_letters
+        and difflib.SequenceMatcher(None, letters, ocr_letters).ratio()
+        < _MISREADING_LEAST_LIKENESS
+    )
 
 
 def _row_count(layer_word: Word, candidates: tuple[Word, ...]) -> int:
