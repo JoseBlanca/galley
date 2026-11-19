@@ -348,6 +348,29 @@ From the pairs:
   November 2026: refusing such pairs, as (a) and (b) do, took the notes
   from 5.3 wrong words in 100 to 6.3, since "tothe" stayed where "the" had
   been put; taking both words brings them back to 5.3, with no word lost.
+
+  **A word galley left split at a line end.** structure joins a word
+  hyphenated at a line end only when the joined word is known, so a
+  misread half stays as printed, "cam- P#@igns" on Kadesh's page 8, while
+  the model's answer, joined by section 6, holds "campaigns". When
+  galley's word is the second half of such a word, the replacement
+  covers both halves. That is when the whitespace word just before it in
+  the same span ends in a letter and a hyphen (or "¬"), the last token of
+  that word is the token just before in galley's reading of the page,
+  that token pairs with none of the model's, and the two forms joined
+  are more alike the model's form than galley's form alone. Then the
+  model's core replaces the text from the first half's core to the
+  second's, the hyphen and the space between them included: "cam-
+  P#@igns" becomes "campaigns", where the first run of 19 November 2026
+  replaced the second half alone and left "cam- campaigns". (a), (b) and
+  (c) are checked on the two cores joined without the hyphen and the
+  space. The run of 19 November 2026 has 3 such edits among its 1,050
+  ("cam- P#@igns" on page 8, "Dirporr- MCiuer," on page 61, and
+  "com- (Newaey." on page 11, whose first half is on page 10 and which
+  the rule leaves alone). A first half that the model's whole word pairs
+  with, "Erldu-" with "Erläuterungen" on page 20, is not covered: there
+  galley's second half, "Sees...", may also hold the printed "etc.",
+  which a replacement of both halves would lose.
 - **A block whose words are out of place.** When galley's reading of a
   block on a page is in another order than the model's, the alignment
   pairs words that have nothing to do with each other, and each such pair
@@ -601,6 +624,9 @@ wait either way.
   made.
 - **A word hyphenated over a page break.** "com-" at the foot of page 10's
   body is not joined to the first note of the model's answer.
+- **A word split at a line end that structure did not join.** In the
+  note of page 8, galley's "cam- P#@igns" against the model's
+  "campaigns" gives one edit, "cam- P#@igns" to "campaigns".
 - **The hieroglyph rows of page 27.** The words galley read inside the
   figures are removals, not in its reading; the model skips them; nothing
   pairs.
