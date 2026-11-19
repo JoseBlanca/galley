@@ -170,6 +170,99 @@ def test_page_without_layer_words_is_blank_with_no_text_source() -> None:
     )
 
 
+# classify_page under ocr = "redo" (architecture section 7b)
+
+
+def test_text_page_under_redo_is_read_by_ocr() -> None:
+    page = classify_page(
+        3,
+        400.0,
+        600.0,
+        12,
+        replace(CONFIG, ocr=OcrMode.REDO),
+        plate_rule=PlateRule.NOT_PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=0,
+    )
+
+    assert (page.kind, page.text_source) == (PageKind.TEXT, TextSource.OCR)
+    assert page.exclude_regions == (REGION_A, REGION_B)
+
+
+@pytest.mark.parametrize(
+    ("layer_word_count", "plate_rule", "ink_rule", "front_matter_end", "expected"),
+    [
+        (
+            12,
+            PlateRule.PLATE,
+            InkRule.NOT_INKLESS,
+            0,
+            (PageKind.PLATE, TextSource.TEXT_LAYER),
+        ),
+        (0, PlateRule.PLATE, InkRule.NOT_INKLESS, 0, (PageKind.PLATE, TextSource.NONE)),
+        (
+            12,
+            PlateRule.NOT_PLATE,
+            InkRule.NOT_INKLESS,
+            4,
+            (PageKind.FRONT_MATTER, TextSource.NONE),
+        ),
+        (
+            12,
+            PlateRule.NOT_PLATE,
+            InkRule.INKLESS,
+            0,
+            (PageKind.INKLESS, TextSource.NONE),
+        ),
+        (
+            0,
+            PlateRule.NOT_PLATE,
+            InkRule.NOT_INKLESS,
+            0,
+            (PageKind.BLANK, TextSource.NONE),
+        ),
+    ],
+    ids=["plate", "plate_without_layer", "front_matter", "inkless", "blank"],
+)
+def test_page_other_than_text_under_redo_keeps_the_source_of_verify(
+    layer_word_count: int,
+    plate_rule: PlateRule,
+    ink_rule: InkRule,
+    front_matter_end: int,
+    expected: tuple[PageKind, TextSource],
+) -> None:
+    def classified(ocr: OcrMode) -> tuple[PageKind, TextSource]:
+        page = classify_page(
+            3,
+            400.0,
+            600.0,
+            layer_word_count,
+            replace(CONFIG, ocr=ocr),
+            plate_rule=plate_rule,
+            ink_rule=ink_rule,
+            front_matter_end=front_matter_end,
+        )
+        return page.kind, page.text_source
+
+    assert classified(OcrMode.REDO) == expected
+    assert classified(OcrMode.VERIFY) == expected
+
+
+def test_excluded_page_under_redo_is_excluded_with_no_source() -> None:
+    page = classify_page(
+        3,
+        400.0,
+        600.0,
+        12,
+        replace(CONFIG, ocr=OcrMode.REDO, exclude_pages=(3,)),
+        plate_rule=PlateRule.NOT_PLATE,
+        ink_rule=InkRule.NOT_INKLESS,
+        front_matter_end=0,
+    )
+
+    assert (page.kind, page.text_source) == (PageKind.EXCLUDED, TextSource.NONE)
+
+
 # classify_page with the plate rule (plates spec section 2)
 
 
@@ -643,17 +736,8 @@ def test_require_text_layer_accepts_text_excluded_and_plate_pages() -> None:
 # check_config_pages
 
 
-def test_ocr_redo_is_a_config_error() -> None:
-    with pytest.raises(
-        ConfigError,
-        match=r"^ocr = redo needs OCR, which the walking skeleton does not have; "
-        r"use verify or trust$",
-    ):
-        check_config_pages(replace(CONFIG, ocr=OcrMode.REDO), 10)
-
-
-@pytest.mark.parametrize("ocr", [OcrMode.VERIFY, OcrMode.TRUST])
-def test_ocr_verify_and_trust_with_pages_below_the_count_pass(ocr: OcrMode) -> None:
+@pytest.mark.parametrize("ocr", [OcrMode.VERIFY, OcrMode.TRUST, OcrMode.REDO])
+def test_each_ocr_mode_with_pages_below_the_count_passes(ocr: OcrMode) -> None:
     config = replace(
         CONFIG,
         ocr=ocr,
@@ -1395,16 +1479,26 @@ def test_a_page_the_plate_rule_takes_is_logged_as_a_plate_only_when_it_is_one(
 
 
 @pytest.mark.thread_unsafe
-def test_ocr_redo_stops_analyze_before_writing_and_leaves_no_file(
+def test_kadesh_under_ocr_redo_has_its_text_pages_read_by_ocr_and_no_audit(
     tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:
-    folder = kadesh_folder(tmp_path, excerpt_pdf[KADESH], 'ocr = "redo"\n')
-    folder.pages_json.write_text("an old pages.json\n", encoding="utf-8")
+    # Architecture section 7b, `redo`: the pages are classified from the
+    # layer as with `verify`, and every text page then gets the source
+    # `ocr`. Excerpt pages 0 to 7 are text; 8 is the scan of a cover,
+    # excluded, and 9 a plate without a layer.
+    folder = kadesh_folder(
+        tmp_path, excerpt_pdf[KADESH], 'ocr = "redo"\nexclude_pages = [8]\n'
+    )
 
-    with pytest.raises(ConfigError, match=r"^ocr = redo needs OCR"):
-        analyze.run(folder, read_config(folder.book_toml))
+    analyze.run(folder, read_config(folder.book_toml))
 
-    assert not folder.pages_json.exists()
+    pages = read_pages(folder.pages_json)
+    assert [(page.kind, page.text_source) for page in pages.pages] == [
+        *((PageKind.TEXT, TextSource.OCR),) * 8,
+        (PageKind.EXCLUDED, TextSource.NONE),
+        (PageKind.PLATE, TextSource.NONE),
+    ]
+    assert pages.ocr_audit is None
 
 
 @pytest.mark.thread_unsafe

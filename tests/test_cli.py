@@ -578,6 +578,40 @@ def test_layout_that_rereads_stops_without_the_tools_of_a_word_list_not_cached(
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
+@pytest.mark.parametrize(
+    ("command", "first_stage"),
+    [("run", "analyze"), ("analyze", "analyze"), ("extract", "extract")],
+)
+def test_a_command_running_analyze_or_extract_under_redo_stops_without_tesseract(
+    command: str,
+    first_stage: str,
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Architecture section 7b: under ocr = "redo" extract reads every text
+    # page with Tesseract, and the command looks for it before analyze or
+    # extract starts, so that no run stops at extract.
+    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
+    with folder.book_toml.open("a", encoding="utf-8") as toml:
+        toml.write('ocr = "redo"\n')
+    monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", _cached_word_list(tmp_path))
+
+    with pytest.raises(ExternalProgramError) as raised:
+        main([command, str(folder.root)])
+
+    assert str(raised.value) == (
+        f'tesseract is not installed; with ocr = "redo" {first_stage} needs it, '
+        "as extract reads every text page with it: install it with "
+        "`brew install tesseract`"
+    )
+    assert _names(folder) == _files_up_to("epub")
+
+
+# Changes PATH and the word list's cache folder for the whole process.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
 @pytest.mark.parametrize("ocr", ["trust", "redo"])
 def test_layout_with_ocr_trust_or_redo_rereads_nothing_and_runs_without_tesseract(
     ocr: str,
