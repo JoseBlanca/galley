@@ -14,28 +14,33 @@ Mariéjol).
 
 What a reader of the EPUB sees now:
 
-- **Junk of blank pages is gone.** A page that prints nothing but whose
-  scan still carries OCR text (a blank back of a leaf, a patterned
-  endpaper) is recognised because at least half of its words have no
-  ink under them on the page image; its words are left out, each with a
-  record. This removes "SP I fiyj. £ v" after Haynes' contents and the
-  junk of Haynes page 421 and Haskins' back endpapers. A page is kept
-  when 2 or more of its inkless words are real words.
+- **Junk of blank pages is gone.** Some pages print nothing (a blank
+  back of a leaf, a patterned endpaper), yet the scan's own OCR text
+  holds words on them, read from show-through or the pattern. galley now
+  looks at the page image under each such word: when at least half of a
+  page's words have no ink under them, the page is "inkless" and its
+  words are left out, each with a record. This removes "SP I fiyj. £ v"
+  after Haynes' contents and the junk of Haynes page 421 and Haskins'
+  back endpapers.
 - **Running heads boxed apart from their page number** are removed:
   Kadesh 38, Domesday 200, 428 and 552, Gierke 16 and 84.
-- **Footnotes left in the text are notes.** Gierke's introduction (35
-  pages, 74 footnotes) printed its notes in the text; Domesday's ten
-  single-line notes too; 21 more Domesday references are linked
-  ("servus*." on page 55).
-- **Stubbs' margin notes** that sat on the text's own lines: those left
-  in the text fell from 169 to 46 of 467.
+- **Footnotes that were printed as paragraphs are notes, linked from
+  their markers.** Gierke's introduction (35 pages, 74 footnotes) had
+  all its footnotes as paragraphs in the middle of the text; ten
+  Domesday pages had a one-line footnote as a paragraph. Also, 21 more
+  Domesday note markers that the OCR read with punctuation after them
+  ("servus*." on page 55) now link to their notes.
+- **Stubbs' margin notes** cut into the text column, which the OCR
+  had read as part of the text lines beside them, are now margin notes:
+  the notes left inside the text fell from 169 to 46 of the book's 467.
 
 Checked: the quick tests (2,935 in 55 s, back under the minute; they
 took 70 s before this plan) and the 167 whole-book tests pass; the
 eight EPUBs pass epubcheck with no error or warning; the evaluation
 against the Project Gutenberg texts of four books (the scorer of
-`docs/specs/evaluation.md`) shows no score falling beyond the plan's
-limits. The pages of every rule were compared with their images.
+`docs/specs/evaluation.md`) shows no score falling by more than the
+limits the previous plan set (0.005 for a share, for instance); the
+scores of notes and margin notes rose, as the table in "Task 5.1" shows. The pages of every rule were compared with their images.
 
 Still wrong, for later plans:
 
@@ -49,13 +54,21 @@ Still wrong, for later plans:
   the text, as Turney's are, would have the labels taken for margin
   notes. Turney's and Haynes' configs list their contents pages.
 
-Decided while the owner was away, each easy to change: pages.json has a
-new page kind, `inkless`, so books run before the merge must run again
-from the first step, analyze; a page of faint real print is kept when
-2 or more of its inkless words are real words; a contents entry of
-Domesday ("Statistical Tables") now links to the heading "STATISTICS."
-on page 426, the second half of the title "TABLE I. STATISTICS.", one
-page after its start.
+Decided while the owner was away, each easy to change:
+
+- **A new page kind, `inkless`, in pages.json.** Books run before the
+  merge must run again from analyze; galley refuses their old files and
+  names the step to run, and deletes nothing.
+- **When an inkless page is kept anyway:** when 2 or more of its words
+  without ink are real words of the dictionary galley uses, so that a
+  page of faint real print is not dropped. No junk page of the eight
+  books has more than 1 ("SP" on Haynes 9); no real page of them comes
+  near the rule.
+- **A contents link one page late.** Domesday's contents entry
+  "Statistical Tables" now links to the heading "STATISTICS.", which
+  is the right-hand half of a title printed across two facing pages, so
+  the reader lands on the second page of the spread instead of the
+  first. Before, the entry had no link.
 
 Asked of the owner: the order to merge, and a look on the Kindle at
 `runs/stray-text/` of the main checkout: Haynes after the contents,
