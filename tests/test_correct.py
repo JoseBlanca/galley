@@ -371,6 +371,39 @@ def test_a_galley_word_glued_from_two_takes_the_models_two_words(
     assert [(edit.old, edit.new) for edit in edits] == [expected]
 
 
+@pytest.mark.parametrize(
+    ("galley", "model", "expected"),
+    [
+        (
+            "kings in such cam- P#@igns was first",
+            "kings in such cam-\npaigns was first",
+            [("cam- P#@igns", "campaigns")],
+        ),
+        (
+            "see Vol. I, Dirporr- MCiuer, Vol. I",
+            "see Vol. I, DINDORF-\nMÜLLER, Vol. I",
+            [("Dirporr- MCiuer,", "Dindorfmüller,")],
+        ),
+        # Galley's second half alone is nearer the model's word than the
+        # two halves joined: only the second half is replaced.
+        (
+            "the com- (Newaey. Gram., 7)",
+            "the com- (Neuag. Gram., 7)",
+            [("(Newaey.", "(Neuag.")],
+        ),
+    ],
+    ids=["second_half_misread", "small_capitals", "not_the_same_word"],
+)
+def test_a_word_split_at_a_line_end_is_replaced_whole(
+    galley: str, model: str, expected: list[tuple[str, str]]
+) -> None:
+    # Section 7: Kadesh page 8, where the stage replaced "P#@igns" alone and
+    # left "cam- campaigns".
+    blocks = _blocks((_block("b-p0001-001", _span(galley)),))
+    edits = _changes_and_edits(blocks, f"THE BATTLE OF KADESH 6 {model}")
+    assert [(edit.old, edit.new) for edit in edits] == expected
+
+
 def test_the_model_word_a_glued_replacement_takes_is_not_put_in_a_note() -> None:
     note = _note(
         "n-p0001-001",
