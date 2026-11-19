@@ -172,22 +172,34 @@ def test_two_notes_nearly_as_alike_give_no_note() -> None:
 
 
 @pytest.mark.parametrize(
-    ("galley_after", "model_word", "misread"),
+    ("galley_after", "model_word", "number", "misread"),
     [
-        (".3", "forces.", "3"),
-        (";™", "enemy;", "™"),
-        ("“", "Zahi", "“"),
-        (".”", 'advanced."', ""),
-        (".", "forces.", ""),
-        (".abc", "forces.", ""),
-        (".1234", "forces.", ""),
+        (".3", "forces.", "3", "3"),
+        (";™", "enemy;", "34", "™"),
+        ("“", "Zahi", "64", "“"),
+        (".”", 'advanced."', "74", ""),
+        (".", "forces.", "3", ""),
+        (".abc", "forces.", "3", ""),
+        (".1234", "forces.", "3", ""),
+        # The number is in galley's word: the printed quote before it,
+        # which the model left out, stays in the word.
+        (".”37", "soldiers.", "37", "37"),
     ],
-    ids=["digit", "trade_mark", "quote", "real_quote", "none", "letters", "too_long"],
+    ids=[
+        "digit",
+        "trade_mark",
+        "quote",
+        "real_quote",
+        "none",
+        "letters",
+        "too_long",
+        "quote_before_the_number",
+    ],
 )
 def test_the_misread_reference_is_what_galley_has_past_the_models_punctuation(
-    galley_after: str, model_word: str, misread: str
+    galley_after: str, model_word: str, number: str, misread: str
 ) -> None:
-    assert misread_reference(galley_after, model_word) == misread
+    assert misread_reference(galley_after, model_word, number) == misread
 
 
 # The link edits.

@@ -46,6 +46,7 @@ _LEAST_NOTE_LEAD = 0.1
 # A misread reference left in galley's word: 1 to 3 of these characters.
 _MISREAD_LONGEST = 3
 _MISREAD_CHARACTERS = frozenset("0123456789'\"‘’“”*†‡™®^%")
+_QUOTE_CHARACTERS = frozenset("'\"‘’“”")
 _STRAIGHT = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"'})
 
 
@@ -251,11 +252,13 @@ def _words(text: str) -> tuple[_Word, ...]:
     )
 
 
-def misread_reference(galley_after: str, model_word: str) -> str:
+def misread_reference(galley_after: str, model_word: str, number: str) -> str:
     """The misread reference at the end of a galley word (section 9b):
     `galley_after` is what follows the word's core; the characters past
     those the model's word has after its core, when they are 1 to 3 digits
-    or signs; empty otherwise."""
+    or signs; empty otherwise. When they hold the reference's `number`,
+    the quotes before it are no part of the reference: they stay in the
+    word ("soldiers.”37" has the misread reference "37")."""
     model_tokens = tokens(model_word)
     model_after = model_word[model_tokens[-1].end :] if model_tokens else ""
     if not galley_after.translate(_STRAIGHT).startswith(
@@ -265,6 +268,9 @@ def misread_reference(galley_after: str, model_word: str) -> str:
     tail = galley_after[len(model_after) :]
     if len(tail) > _MISREAD_LONGEST or any(c not in _MISREAD_CHARACTERS for c in tail):
         return ""
+    found = tail.find(number) if number else -1
+    if found > 0 and all(c in _QUOTE_CHARACTERS for c in tail[:found]):
+        return tail[found:]
     return tail
 
 
@@ -341,7 +347,9 @@ def _link_edit(
 ) -> Edit | None:
     text = block.spans[link.place.span_index].text
     word = words[position]
-    misread = misread_reference(text[link.place.end : word.end], link.model_word)
+    misread = misread_reference(
+        text[link.place.end : word.end], link.model_word, link.text
+    )
     low = _context(text, words, position, changed, texts)
     if low is None:
         _logger.info(

@@ -586,7 +586,14 @@ whitespace word, gets a reference to that note right after it:
   `' " ‘ ’ “ ” * † ‡ ™ ® ^ %`. They leave the word and become the
   reference's text. Otherwise the word stays whole and the reference's
   text is the model's x. "advanced.”", where the model has
-  `advanced." [4]`, keeps its quote.
+  `advanced." [4]`, keeps its quote. A quote is taken as part of the
+  misread reference only when the reference's number is not in galley's
+  word: in "soldiers.”37" against the model's "soldiers." the reference
+  is "37" and the quote, which the model left out, stays (review of 19
+  November 2026, finding 3). The reference's text is not shown: markdown
+  writes a footnote's reference as Pandoc's `[^n-p0008-004]`, so a quote
+  taken into it is dropped from `book.md` and the EPUB and kept only in
+  the edit, where the owner sees it.
 
 A link is not proposed, and is logged, when:
 
