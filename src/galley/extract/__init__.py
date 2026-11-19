@@ -60,6 +60,7 @@ __all__ = [
     "page_words",
     "plate_image",
     "run",
+    "with_layer_heights",
     "with_layer_references",
     "with_missed_layer_words",
 ]
@@ -87,6 +88,14 @@ _OVER_EACH_OTHER_SHARE: Final[float] = 0.5
 # is taken over pairs of 3 or more letters whose middles are less than 12
 # pt apart.
 _COVER_HEIGHT_SHARE: Final[float] = 0.25
+# Extract spec section 9, "Caption numbers from the layer": the words that
+# open a caption and the numeral after them, as figures spec section 1
+# gives them (structure's own test is not imported: no stage imports
+# another).
+_CAPTION_WORDS = frozenset(("figure", "fig.", "fig", "plate", "map"))
+_NUMERAL_CHARACTERS = frozenset("0123456789ivxlcIVXLC")
+_NUMERAL_ENDINGS = (".", ",")
+_NUMERAL_MAX_CHARACTERS = 6
 _COPY_DISTANCE_PT: Final[float] = 16.0
 _OFFSET_PAIR_MIN_CHARACTERS: Final[int] = 3
 _OFFSET_PAIR_DISTANCE_PT: Final[float] = 12.0
@@ -136,7 +145,8 @@ def run(
     )
     _logger.info(
         "extract: %d words and %d removals from %d pages of %s; %d words read "
-        "by Tesseract took the layer's note reference, and %d words of the "
+        "by Tesseract took the layer's note reference or caption number, and "
+        "%d words of the "
         "layer that Tesseract missed were kept",
         sum(len(result.page.words) for result in results),
         sum(len(result.removals) for result in results),
@@ -149,7 +159,8 @@ def run(
 
 class _PageRead(NamedTuple):
     """What a worker gives for a page: its words, its removals, how many of
-    Tesseract's words took the layer's note reference, and how many words
+    Tesseract's words took the layer's note reference or caption number,
+    and how many words
     of the layer Tesseract missed were kept (extract spec section 9)."""
 
     page: PageWords
@@ -228,7 +239,7 @@ def _page_reader(
         for tesseract_word, taken_word in taken:
             _logger.info(
                 "extract: page index %d: %r, read by Tesseract, takes the "
-                "layer's note reference: %r",
+                "layer's note reference or caption number: %r",
                 page.index,
                 tesseract_word.text,
                 taken_word.text,
@@ -266,8 +277,29 @@ def _words_read(
     if page.text_source is not TextSource.OCR:
         return page, page_layer_words
     if tesseract_words or not page_layer_words:
-        return page, with_missed_layer_words(
-            with_layer_references(tesseract_words, page_layer_words),
+        return page, with_layer_heights(
+            with_missed_layer_words(
+                _with_caption_numbers(
+                    with_layer_references(tesseract_words, page_layer_words),
+                    page_layer_words,
+                ),
+                tuple(
+                    layer_word
+                    for layer_word in page_layer_words
+                    if not any(
+                        _overlap(box.x0, box.x1, layer_word.box.x0, layer_word.box.x1)
+                        > 0
+                        and _overlap(
+                            box.top,
+                            box.bottom,
+                            layer_word.box.top,
+                            layer_word.box.bottom,
+                        )
+                        > 0
+                        for box in page.figure_boxes
+                    )
+                ),
+            ),
             page_layer_words,
         )
     return replace(page, text_source=TextSource.TEXT_LAYER), page_layer_words
@@ -311,6 +343,48 @@ def _with_layer_reference(ocr_word: Word, layer_word: Word) -> Word:
         : len(ocr_word.text) - len(after_last_letter(ocr_word.text))
     ] + after_last_letter(layer_word.text)
     return replace(ocr_word, text=text)
+
+
+def _with_caption_numbers(
+    ocr_words: tuple[Word, ...], layer_words: tuple[Word, ...]
+) -> tuple[Word, ...]:
+    """`ocr_words`, each that follows a caption word on its line taking the
+    numeral of the layer word over it (extract spec section 9, "Caption
+    numbers from the layer")."""
+    over = tuple(
+        tuple(layer_word for layer_word in layer_words if _over(ocr_word, layer_word))
+        for ocr_word in ocr_words
+    )
+    return tuple(
+        replace(ocr_word, text=layer_over[0].text)
+        if position > 0
+        and ocr_words[position - 1].text.lower() in _CAPTION_WORDS
+        and _overlap(
+            ocr_words[position - 1].box.top,
+            ocr_words[position - 1].box.bottom,
+            ocr_word.box.top,
+            ocr_word.box.bottom,
+        )
+        > 0
+        and not any(character.isdigit() for character in ocr_word.text)
+        and len(layer_over) == 1
+        and sum(_over(other, layer_over[0]) for other in ocr_words) == 1
+        and _is_numeral(layer_over[0].text)
+        else ocr_word
+        for position, (ocr_word, layer_over) in enumerate(
+            zip(ocr_words, over, strict=True)
+        )
+    )
+
+
+def _is_numeral(text: str) -> bool:
+    """Whether `text` is a numeral by figures spec section 1: 1 to 6
+    characters, each a digit or one of i, v, x, l, c in either case, with
+    or without a "." or "," after them."""
+    bare = text[:-1] if text.endswith(_NUMERAL_ENDINGS) else text
+    return 0 < len(bare) <= _NUMERAL_MAX_CHARACTERS and all(
+        character in _NUMERAL_CHARACTERS for character in bare
+    )
 
 
 def _letter_count(text: str) -> int:
@@ -372,6 +446,48 @@ def with_missed_layer_words(
         if place == len(ocr_words)
     )
     return tuple(words)
+
+
+def with_layer_heights(
+    ocr_words: tuple[Word, ...], layer_words: tuple[Word, ...]
+) -> tuple[Word, ...]:
+    """`ocr_words` with each word that carries a confidence and that a
+    layer word covers given that layer word's top and bottom, moved by
+    the page's offset (extract spec section 9)."""
+    tesseract_words = tuple(
+        word for word in ocr_words if word.ocr_confidence is not None
+    )
+    offset = _layer_offset(tesseract_words, layer_words)
+    moved = tuple(_moved_up(layer_word, offset).box for layer_word in layer_words)
+    return tuple(
+        word
+        if word.ocr_confidence is None
+        else _with_height_of(
+            word, tuple(box for box in moved if _covers(word.box, box))
+        )
+        for word in ocr_words
+    )
+
+
+def _with_height_of(ocr_word: Word, covering: tuple[Box, ...]) -> Word:
+    """`ocr_word` with the height of the box of `covering`, the moved boxes
+    of the layer words that cover it, that overlaps it most, about its own
+    middle; as it is when none does."""
+    if not covering:
+        return ocr_word
+    box = ocr_word.box
+    largest = max(
+        covering,
+        key=lambda layer_box: (
+            _overlap(box.x0, box.x1, layer_box.x0, layer_box.x1)
+            * _overlap(box.top, box.bottom, layer_box.top, layer_box.bottom)
+        ),
+    )
+    half_height = (largest.bottom - largest.top) / 2
+    middle = _middle(box)
+    return replace(
+        ocr_word, box=Box(box.x0, middle - half_height, box.x1, middle + half_height)
+    )
 
 
 def _place(ocr_words: tuple[Word, ...], layer_word: Word) -> int:

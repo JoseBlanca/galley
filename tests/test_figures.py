@@ -964,35 +964,35 @@ def test_figure_region_follows_the_pages_regions_and_keeps_the_figures() -> None
 
 # Whole Kadesh page 52: hieroglyphs printed among its footnotes, in the
 # figure box (70, 442, 408, 544). Its regions outside the figure, each as
-# its line count, first line and last line, are those layout made on main
-# (83f2754, before in-page figures) less the words read in the hieroglyphs
-# (figures spec section 5); with the figure's words taken out before the
-# layout, its 7 footnotes became 4, their text reordered.
+# its line count and words printed in its first and last lines, read on
+# the page image (19 November 2026): the running head, the text down to
+# the row "30." before the hieroglyphs, the left column of notes 125 and
+# 126, the right column of notes 127 to 129, and the page number (figures
+# spec section 5). The book is read with ocr = "redo" since 19 November
+# 2026, so the words are Tesseract's; the literals are the printed words
+# both readings give right, where the test compared the layer's words
+# before ("thoir" for "their"; Tesseract reads "80." for "30.", which is
+# left out). With the figure's words taken out before the layout, its 7
+# footnotes became 4 on main (83f2754), their text reordered.
 _KADESH_52_REGIONS = (
-    (1, "JAMES HENRY BREASTED 37", "JAMES HENRY BREASTED 37"),
-    (
-        26,
-        (
-            "another with him, and he found that 2,500 spans of chariotry had "
-            "surrounded him m in four"
-        ),
-        "30. &",
-    ),
+    (1, "BREASTED 37", "BREASTED 37"),
+    (26, "spans of chariotry had surrounded", None),
     (
         10,
-        "UJ",
-        "nobles, his infantry, and his chariotry. He overthrew them",
+        "Ramses himself makes a similar statement",
+        "upon their faces; he hurled them",
     ),
-    (
-        8,
-        "'>' Ramses himself repeats this statement, Poem, 1, 88.",
-        "IV and VI.",
-    ),
-    (
-        1,
-        'prostrate upon thoir faces; he hurled them, etc ." as above. 115',
-        'prostrate upon thoir faces; he hurled them, etc ." as above. 115',
-    ),
+    (8, "Ramses himself repeats this statement", "IV and"),
+    (1, "115", "115"),
+)
+# Its notes: the five printed (125 to 129), without the two that main made
+# of the hieroglyphs' words; the words that open each, read on the image.
+_KADESH_52_NOTES = (
+    "Ramses himself makes",
+    "The omitted portion",
+    "Ramses himself repeats",
+    "They will be taken",
+    "Abu Simbel:",
 )
 
 
@@ -1010,28 +1010,21 @@ def test_whole_kadesh_52_regions_outside_the_figure_are_those_laid_out_with_all_
     def text(line: Line) -> str:
         return " ".join(word.text for word in line.words)
 
-    assert (
-        tuple(
-            (len(region.lines), text(region.lines[0]), text(region.lines[-1]))
-            for region in page.regions
-            if region.box not in boxes
-        )
-        == _KADESH_52_REGIONS
+    regions = tuple(region for region in page.regions if region.box not in boxes)
+    assert tuple(len(region.lines) for region in regions) == tuple(
+        count for count, _, _ in _KADESH_52_REGIONS
     )
-    # Its notes: the five printed, without the two that main made of the
-    # hieroglyphs' words.
+    for region, (_, first, last) in zip(regions, _KADESH_52_REGIONS, strict=True):
+        assert first in text(region.lines[0])
+        assert last is None or last in text(region.lines[-1])
     notes = tuple(
         note
         for note in read_blocks(folder.blocks_json).notes
         if note.id.startswith("n-p0052-")
     )
-    assert tuple(note.blocks[0].spans[0].text[:20] for note in notes) == (
-        "; himself makes a si",
-        "l*>The omitted porti",
-        "'>' Ramses himself r",
-        'i" They will be take',
-        "l» Abn Simbel: CHAMP",
-    )
+    assert len(notes) == len(_KADESH_52_NOTES)
+    for note, opening in zip(notes, _KADESH_52_NOTES, strict=True):
+        assert opening in block_text(note.blocks[0])
 
 
 @pytest.mark.pandoc
