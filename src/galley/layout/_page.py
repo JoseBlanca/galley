@@ -165,20 +165,22 @@ _DROP_CAPITAL_EDGE_PT: Final[float] = 3.0
 
 
 class _Part(StrEnum):
-    """The part of the column that is cut into columns: the body, the
-    footnote band, which need different numbers of open rows and runs
-    with different edges, or the body of a page whose every row is small,
-    cut with the body's open rows and the band's edges."""
+    """The part of the column that is cut into columns (step 5): the body;
+    the footnote band, which needs fewer open rows, may start and end a
+    run at any compatible row and has its gutter near the column's
+    middle; or the body of a page whose every row is small and which so
+    has no band, cut with the body's open rows and the band's run
+    edges."""
 
     BODY = "body"
     BAND = "band"
-    SMALL_PAGE = "small page"
+    ALL_SMALL_BODY = "all small body"
 
 
 def _open_rows_to_cut(part: _Part) -> int:
     """The open rows a run of `part` needs to be cut into columns."""
     match part:
-        case _Part.BODY | _Part.SMALL_PAGE:
+        case _Part.BODY | _Part.ALL_SMALL_BODY:
             return _BODY_OPEN_ROWS
         case _Part.BAND:
             return _BAND_OPEN_ROWS
@@ -193,7 +195,20 @@ def _ends_at_open_rows(part: _Part) -> bool:
     match part:
         case _Part.BODY:
             return True
-        case _Part.BAND | _Part.SMALL_PAGE:
+        case _Part.BAND | _Part.ALL_SMALL_BODY:
+            return False
+        case _:
+            assert_never(part)
+
+
+def _gutter_near_the_middle(part: _Part) -> bool:
+    """Whether `part` is cut only at a gutter within
+    `_BAND_GUTTER_OFF_CENTRE_PT` of the column's middle (step 5): in the
+    band, not in the body."""
+    match part:
+        case _Part.BAND:
+            return True
+        case _Part.BODY | _Part.ALL_SMALL_BODY:
             return False
         case _:
             assert_never(part)
@@ -306,23 +321,25 @@ def _one_line_note_start(rows: tuple[Line, ...]) -> int | None:
 
 
 def _small_rows(rows: tuple[Line, ...], measures: BookMeasures) -> tuple[bool, ...]:
-    """Which of `rows`, which are not empty, are small for the footnote
-    band (step 4, `_is_small_on_page`)."""
+    """For each of `rows`, whether it is small for the footnote band (step
+    4, `_is_small_on_page`); an empty tuple when `rows` is."""
+    if not rows:
+        return ()
     page_row_height = _page_row_height(rows, measures)
     return tuple(_is_small_on_page(row, measures, page_row_height) for row in rows)
 
 
-def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
+def _band_start(
+    rows: tuple[Line, ...], small: tuple[bool, ...], measures: BookMeasures
+) -> int:
     """The index in `rows` of the first row of the footnote band (step 4),
-    or len(rows) when there is no band: the first small row
-    (`_is_small_on_page`), not the first of `rows`, from which on two
-    thirds of the rows are small, and which lies `_BAND_GAP_PITCHES` below
-    the row before or opens with a note marker below a row that is not
-    small (`_after_small_row`). Without such a row, a footnote of one line
-    boxed as tall as the body (`_one_line_note_start`)."""
-    if not rows:
-        return 0
-    small = _small_rows(rows, measures)
+    or len(rows) when there is no band: the first small row (`small` says
+    which of `rows` are, `_small_rows`), not the first of `rows`, from
+    which on two thirds of the rows are small, and which lies
+    `_BAND_GAP_PITCHES` below the row before or opens with a note marker
+    below a row that is not small (`_after_small_row`). Without such a
+    row, a footnote of one line boxed as tall as the body
+    (`_one_line_note_start`)."""
     if all(small):
         return len(rows)
     start = _gap_or_marker_band_start(rows, small, measures)
@@ -473,15 +490,17 @@ def _cut_run(rows: tuple[Line, ...], middle: float) -> tuple[Region, Region]:
 def _column_cut_regions(
     rows: tuple[Line, ...], left: float, width: float, part: _Part
 ) -> tuple[Region, ...]:
-    """The regions of the body or the band, top to bottom: each run of
-    rows cut at the gutter gives its left and its right column, and the
-    rows between such runs a region each (step 5). A run is a stretch of
-    compatible rows, in the body from an open row to an open row."""
+    """The regions of `part`, top to bottom: each run of rows cut at the
+    gutter gives its left and its right column, and the rows between such
+    runs a region each (step 5). A run is a stretch of compatible rows,
+    from an open row to an open row where `part` needs it
+    (`_ends_at_open_rows`), else the whole stretch; the band is cut only at
+    a gutter near the column's middle (`_gutter_near_the_middle`)."""
     if not rows:
         return ()
     middle = _gutter_middle(rows, left, width)
     if middle is None or (
-        part is _Part.BAND
+        _gutter_near_the_middle(part)
         and abs(middle - (left + width / 2)) > _BAND_GUTTER_OFF_CENTRE_PT
     ):
         return (_region_of_rows(rows),)
@@ -500,8 +519,7 @@ def _column_cut_regions(
             continue
         if not _ends_at_open_rows(part):
             opened = (0, len(stretch) - 1)
-        # In the body a run starts and ends at an open row; the rows before
-        # and after it in the stretch stay rows.
+        # The rows of the stretch before and after the run stay rows.
         pending.extend(row for row, _ in stretch[: opened[0]])
         column_run = stretch[opened[0] : opened[-1] + 1]
         if _run_is_cut(column_run, part):
@@ -537,20 +555,20 @@ def _column_regions(
     the running-head region and the body's regions, then the band's (steps
     3 to 5 and 7). With `band`, the words of a footnote band re-read with
     Tesseract, step 4 does not look for the band in `words`: `band` is
-    the band, and the rows of `words` below the running head the body."""
+    the band, and the rows of `words` below the running head the body.
+    Without `band`, when every row below the running head is small, there
+    is no band and the body is cut as `_Part.ALL_SMALL_BODY`."""
     rows = group_rows(words)
     head_count = running_head_row_count(rows, measures.body_line_pitch)
     head, rest = rows[:head_count], rows[head_count:]
     if band is None:
-        band_start = _band_start(rest, measures)
+        small = _small_rows(rest, measures)
+        band_start = _band_start(rest, small, measures)
         body_rows, band_rows = rest[:band_start], rest[band_start:]
+        body_part = _Part.ALL_SMALL_BODY if rest and all(small) else _Part.BODY
     else:
         body_rows, band_rows = rest, group_rows(band)
-    body_part = (
-        _Part.SMALL_PAGE
-        if band is None and rest and all(_small_rows(rest, measures))
-        else _Part.BODY
-    )
+        body_part = _Part.BODY
     width = measures.column_width
     return (
         (
