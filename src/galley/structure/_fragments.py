@@ -28,7 +28,8 @@ _ROW_MOST_OTHER_WORDS = 1
 # the nearest line of text above or below, overlapping it in height or at
 # most 1.5 pt from it; Stubbs' page 29 "." lies 1.0 pt above "English". On
 # Stubbs, 149 such words at 0 pt, 168 at 1 pt, 172 at 1.5 pt, 176 at 2 pt
-# (19 November 2026), all 172 pieces of letters or specks.
+# (19 November 2026), all 172 pieces of letters or specks; 116 of them on
+# lines whose every word lies so, which the rule removes.
 _LINE_OF_FRAGMENTS_GAP_PT = 1.5
 # A book has letter fragments when at least 0.15 of its pages of 5 lines or
 # more have one: Stubbs 0.410, the seven other books 0.030 at most (spec
