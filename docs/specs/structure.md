@@ -698,6 +698,25 @@ by the research lie from 0.42 to 0.83 of the page width. The research found 53 i
 such as "1G-2", and about 19 in Gierke ("£ 2", "d2"), none in Haskins,
 Stubbs and Kadesh.
 
+**A signature mark beside the lowest line.** When the lowest line is
+none of these, the line above it (the lowest of the lines left) is
+removed as a printer's signature mark when it is one by the rule above,
+its bottom lies less than one body line pitch above the lowest line's
+bottom, and its top lies at least 2 pitches below the top of the line
+before it in its region. On Domesday's page 428 the text layer boxes
+the "[0" of a table's last row, "[0 17 1]", at the foot of the page,
+5.2 pt below the signature mark "26—2" beside it, so "[0" was the
+lowest line and the mark stayed in the text, glued to the table's last
+word, "Norfolk26—2" (the "[0" had been taken for a page number at the
+foot until "A page number boxed apart", layout §3, step 3, left the
+page's body the heading alone and the body column too narrow to centre
+it). The mark lies 2.9 pitches below the line before it, "Norfolk".
+The 2 pitches keep out the last line of an index's other column: without
+them the rule took "of, 282" on Stubbs' page 315 and "204 f." on
+Haskins' 268, 0.7 pitch below the lines before them. Measured on 19
+November 2026 on the eight books' `lines.json`, the rule removes the
+mark of Domesday's page 428 and no other line.
+
 A word of a lowest line that is none of these stays in the text. A page
 with no body region has no body column, and nothing is removed at its
 foot.
@@ -2502,14 +2521,23 @@ when all of these hold:
    within 4 pt of the left edge its centring is measured against (its
    region's, or the page's body column for a line of a region of fewer
    than 5 lines, section 6, rule 2), and its right side at least a
-   quarter of that width short of the right edge, and it is not a
-   head line that section 3 left in the text in the band where it looks
+   quarter of that width short of the right edge, or is so between the
+   sides of the page's body and band lines on a page whose body regions
+   hold fewer than 5 lines, as it may be centred between them; and it is
+   not a head line that section 3 left in the text in the band where it looks
    for running heads (at most 2 pitches below the median top of the
    book's head lines, or anywhere above it), unless it starts with a
    chapter label word; for a flush-left line, rule 4's second branch also asks that its last word not end
    with ".", ",", ";", ":", "?" or "!" (Turney introduces a block quote
    with a flush-left line set apart by 2.0 pitches above and below on
-   its pages 93, 99, 100 and 160, each ending with such a sign);
+   its pages 93, 99, 100 and 160, each ending with such a sign).
+   Domesday sets the headings "STATISTICS." and "AVERAGES." flush left
+   above its tables on pages 426 and 428, which layout makes bands, so
+   each heading is its page's body alone and as wide as the body column
+   it is measured against; they were paragraphs, and "AVERAGES." ran on
+   into the table that ends the page before. Measured on 19 November 2026 on the eight books'
+   `lines.json`, flush left between the body and band lines makes these
+   two lines headings and no other;
 2. at least half of its characters other than spaces are letters, and
    one of its words has at least 4 letters and is not a roman numeral
    ("(VIII)", a page number of Mariéjol's preface, and the garbage of a
