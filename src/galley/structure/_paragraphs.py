@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import assert_never
 
+from galley.body_measures import median_word_height
 from galley.model import (
     BlockKind,
     Line,
@@ -36,6 +37,7 @@ from galley.structure._lines import (
     Piece,
     PlacedLine,
     ends_paragraph_at_page_break,
+    ends_sentence,
     first_word,
     misread_marker_lines,
     starts_paragraph,
@@ -442,6 +444,26 @@ def _marker_led(lines: Sequence[PlacedLine], form: MarkerForm | None) -> bool:
     )
 
 
+# Spec section 16: a block led by a marker that is set in the body's type,
+# its height ratio above 0.95 (section 11's limit for a note's lines), and
+# whose page's last line ends no sentence is a numbered paragraph that runs
+# on ("1. Of the three…", Kadesh page 11).
+_NOTE_HEIGHT_RATIO_MAX = 0.95
+
+
+def _runs_on_as_paragraph(lines: Sequence[PlacedLine], body_word_height: float) -> bool:
+    """Whether `lines`, a paragraph so far that starts with a word of the
+    book's marker form, is a numbered paragraph that runs on into the next
+    page rather than a note left in the body (spec section 16): its words
+    are not set smaller than the body's, of `body_word_height` points, and
+    its last line ends no sentence."""
+    ratio = (
+        median_word_height(word for line in lines for word in line.line.words)
+        / body_word_height
+    )
+    return ratio > _NOTE_HEIGHT_RATIO_MAX and not ends_sentence(lines[-1])
+
+
 def _crosses_section_edge(
     before: PlacedLine | None, line: PlacedLine, section_pages: range
 ) -> bool:
@@ -560,6 +582,8 @@ def body_entries(
     form: MarkerForm | None = None,
     section_pages: range = range(0),
     roles: frozendict[tuple[int, int], LineRole] = frozendict(),
+    *,
+    body_word_height: float,
 ) -> tuple[Entry, ...]:
     """The blocks of the book's body stream in order, each followed by the
     margin notes of the pages whose body ends in it; the margin notes of a
@@ -568,7 +592,9 @@ def body_entries(
     starts a block; a verse block that ends a page's body stream goes on
     into a verse run that starts the next. A paragraph whose first word has
     the book's marker form `form` does not run on into the next page, but
-    inside `section_pages` (an endnote that runs over a page break), and
+    inside `section_pages` (an endnote that runs over a page break) or when
+    it is a numbered paragraph, set in the body's type, of
+    `body_word_height` points, whose page's last line ends no sentence; and
     no paragraph runs on into or out of `section_pages`, the pages of the
     endnote section (spec section 12): the first line of its first page,
     and the first body line after its last page, start a paragraph. A
@@ -600,7 +626,11 @@ def body_entries(
                 starts = run is None or run.start == number or number == 0
             else:
                 note_break = number == 0 and (
-                    (_marker_led(current, form) and page.index not in section_pages)
+                    (
+                        _marker_led(current, form)
+                        and page.index not in section_pages
+                        and not _runs_on_as_paragraph(current, body_word_height)
+                    )
                     or _crosses_section_edge(before, line, section_pages)
                     or _short_page_end(before, before_page, page)
                 )

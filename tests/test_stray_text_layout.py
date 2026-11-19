@@ -182,7 +182,7 @@ def test_gierke_introduction_footnotes_are_footnotes_from_the_first(
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.parametrize("page", [0, 2])
+@pytest.mark.parametrize("page", [0, 1, 2])
 def test_cut_in_note_on_the_body_baselines_is_taken_into_the_margin(
     excerpt_books: frozendict[str, BookFolder], page: int
 ) -> None:

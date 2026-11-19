@@ -213,6 +213,17 @@ def _starts_in_lower_case(line: PlacedLine) -> bool:
     )
 
 
+def ends_sentence(line: PlacedLine) -> bool:
+    """Whether the last word of `line` ends a sentence: ".", "?", "!" or
+    ":", then any closing quotation marks or brackets, then up to 3 digits
+    of a note reference (spec section 6, "A short last line at a page
+    break", and section 16)."""
+    return (
+        bool(line.line.words)
+        and _SENTENCE_END.search(line.line.words[-1].text) is not None
+    )
+
+
 def ends_paragraph_at_page_break(before: PlacedLine, line: PlacedLine) -> bool:
     """Whether `before`, the last line of a page's body stream, ends its
     paragraph before `line`, the first of the next page's (spec section
@@ -220,9 +231,8 @@ def ends_paragraph_at_page_break(before: PlacedLine, line: PlacedLine) -> bool:
     pt short of its region's right edge and its last word ends a
     sentence, and `line` does not start in lower case."""
     return (
-        bool(before.line.words)
-        and before.edges.right - before.line.box.x1 > _PAGE_END_SHORT_PT
-        and _SENTENCE_END.search(before.line.words[-1].text) is not None
+        before.edges.right - before.line.box.x1 > _PAGE_END_SHORT_PT
+        and ends_sentence(before)
         and not _starts_in_lower_case(line)
     )
 
