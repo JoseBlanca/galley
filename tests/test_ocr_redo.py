@@ -187,3 +187,44 @@ def test_line_tesseract_skipped_is_kept_from_the_layer(
         ("with", "the", "ieeeeslon", "of", "new", "material", "made", "compilation"),
     )
     assert page.text_source is TextSource.OCR
+
+
+# The whole Kadesh book with ocr = "redo" (plan ocr-redo, work package 3,
+# deliverable 2; extract spec section 9; structure spec section 34).
+_KADESH_BOOK = "battleofkadeshst00breauoft"
+# At least the 31 notes the layer links; 42 were measured on 19 November
+# 2026 (34 by the references alone, more with the notes the layer's
+# heights give back).
+_KADESH_LINKED_NOTES_LEAST = 31
+# The layer's 3 headings: the article's title, the caption of the battle
+# plan on page 39 (a false heading with the layer too) and "ADDENDUM".
+_KADESH_HEADING_PAGES = (8, 39, 66)
+
+
+@pytest.mark.whole_book
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+def test_whole_kadesh_with_redo_links_at_least_the_layers_notes(
+    whole_book_run: Callable[[str], BookFolder],
+) -> None:
+    notes = read_blocks(whole_book_run(_KADESH_BOOK).blocks_json).notes
+    assert sum(note.referenced for note in notes) >= _KADESH_LINKED_NOTES_LEAST
+
+
+@pytest.mark.whole_book
+@pytest.mark.tesseract
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+def test_whole_kadesh_with_redo_has_the_layers_headings_and_none_of_hieroglyphs(
+    whole_book_run: Callable[[str], BookFolder],
+) -> None:
+    blocks = read_blocks(whole_book_run(_KADESH_BOOK).blocks_json).blocks
+    assert (
+        tuple(
+            block.origin[0].page_index
+            for block in blocks
+            if block.kind is BlockKind.HEADING
+        )
+        == _KADESH_HEADING_PAGES
+    )
