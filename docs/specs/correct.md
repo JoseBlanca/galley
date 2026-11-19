@@ -667,9 +667,16 @@ follows it in the block: its text x, its emphasis that of the span, its
 replaced text directly, the new one takes its place. Afterwards each note
 whose references a link edit changed, the one it links and the one whose
 reference it replaced, is `referenced` when a block refers to it, and
-not otherwise. markdown's check that a footnote is referenced once
-(markdown spec) then stops the run, as for any other book, when two
-references go to one footnote.
+not otherwise.
+
+6. Once every edit is made, a footnote a link edit links to is referred
+   to by one reference only. A link edit that breaks it, an owner's link
+   to a footnote galley already links, or a link of correct's whose
+   replaced reference came back when another line was deleted, is listed
+   with its file and line like an edit that breaks another rule. It is
+   checked once all the edits are made, since correct's links may each
+   take a reference that another of its links gives back (section 9b,
+   page 9).
 
 An edit that does not apply is not skipped: markdown tries every edit,
 then stops with an `EditError` that lists each one that did not apply,

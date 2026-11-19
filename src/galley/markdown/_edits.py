@@ -3,7 +3,8 @@
 
 import dataclasses
 import re
-from collections.abc import Sequence
+from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -15,6 +16,7 @@ from galley.model import (
     BlocksFile,
     Edit,
     Note,
+    NoteKind,
     Span,
     block_sha256,
     every_block,
@@ -44,6 +46,10 @@ class _Broken(StrEnum):
     NOT_ONCE = "its old text does not occur exactly once in the block's text"
     ACROSS_SPANS = "its old text is not inside one span that is not a note reference"
     NO_NOTE = "its new text links to a note that is not in blocks.json"
+    REFERENCED = (
+        "its new text links to a footnote that, with every edit made, a "
+        "block refers to twice"
+    )
 
 
 # docs/specs/correct.md, section 10: a link edit's new text ends with a link
@@ -146,6 +152,27 @@ def _linked(
     return _Applied((*spans[:index], *made, *rest), frozenset(notes))
 
 
+def _twice_referenced(
+    spans: Mapping[str, tuple[Span, ...]],
+    links: Sequence[tuple[FiledEdit, str]],
+    footnotes: frozenset[str],
+) -> tuple[str, ...]:
+    """The link edits whose footnote a block refers to more than once once
+    every edit is made (section 10, rule 6), each with its file and line."""
+    counts = Counter(
+        span.note_ref
+        for block_spans in spans.values()
+        for span in block_spans
+        if span.note_ref in footnotes
+    )
+    return tuple(
+        f"{filed.path}, line {filed.line} ({filed.edit.block_id}, "
+        f"{filed.edit.old!r}): {_Broken.REFERENCED.value}"
+        for filed, note_id in links
+        if counts[note_id] > 1
+    )
+
+
 def apply_edits(blocks: BlocksFile, edits: Sequence[FiledEdit]) -> BlocksFile:
     """The blocks with `edits` applied in their order (section 10): an edit
     applies when its block exists, its checksum is that of the block as
@@ -160,7 +187,11 @@ def apply_edits(blocks: BlocksFile, edits: Sequence[FiledEdit]) -> BlocksFile:
     originals = {block.id: block for block in every_block(blocks)}
     spans = {block_id: block.spans for block_id, block in originals.items()}
     note_ids = frozenset(note.id for note in blocks.notes)
+    footnotes = frozenset(
+        note.id for note in blocks.notes if note.kind is NoteKind.FOOTNOTE
+    )
     relinked: set[str] = set()
+    links: list[tuple[FiledEdit, str]] = []
     failures = []
     for filed in edits:
         edit = filed.edit
@@ -176,12 +207,15 @@ def apply_edits(blocks: BlocksFile, edits: Sequence[FiledEdit]) -> BlocksFile:
             else:
                 spans[edit.block_id] = result.spans
                 relinked |= result.notes
+                if (link := _link(edit)) is not None:
+                    links.append((filed, link.group(2)))
                 broken = None
         if broken is not None:
             failures.append(
                 f"{filed.path}, line {filed.line} ({edit.block_id}, "
                 f"{edit.old!r}): {broken.value}"
             )
+    failures.extend(_twice_referenced(spans, links, footnotes))
     if failures:
         message = (
             f"{len(failures)} edits do not apply; correct or delete them, or run "

@@ -433,3 +433,27 @@ def test_an_edit_whose_old_text_holds_a_link_is_a_plain_edit() -> None:
         page, [_filed("see [3](#n-p0008-004)", "see [4](#n-p0008-004)", block)]
     )
     assert applied.blocks[0].spans == (_span("see [4](#n-p0008-004) here"),)
+
+
+def test_an_owner_link_to_a_footnote_referenced_already_is_refused() -> None:
+    # Section 10, rule 6: the edit is named with its file and line, not
+    # left for markdown's check of blocks.json.
+    block = _block(
+        "b-p0008-002",
+        _span("by Chabas"),
+        _span("*", "n-p0008-004"),
+        _span(" and by forces.3 here"),
+    )
+    page = _blocks((block,), PAGE.notes)
+    edit = Edit(
+        block_id=block.id,
+        block_sha256=block_sha256(block),
+        old="forces.3",
+        new="forces.[3](#n-p0008-004)",
+        author="owner",
+        reason="page_image",
+    )
+    with pytest.raises(EditError) as raised:
+        apply_edits(page, [FiledEdit(edit, Path("edits/owner.jsonl"), 3)])
+    assert "edits/owner.jsonl, line 3" in str(raised.value)
+    assert "a block refers to twice" in str(raised.value)
