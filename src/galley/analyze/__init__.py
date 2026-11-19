@@ -177,8 +177,9 @@ def run(
     extracting it with Tesseract's tools the first time. The text pages
     before the front-matter end (`front_matter_end`) are `front_matter`. A
     page the inkless rule takes (`is_inkless`) is `inkless`, or
-    `front_matter` before the front-matter end. Raises ConfigError when the config asks for OCR, names a page past the
-    end of the PDF or a contents page before its `front_matter_end`, and
+    `front_matter` before the front-matter end. Raises ConfigError when the
+    config asks for OCR, names a page past the end of the PDF or a contents
+    page before its `front_matter_end`, and
     PdfError when a page that the config does not exclude
     has no text layer and is not a plate. `workers` is the number of
     threads that measure the pages; the renders are made in the one PDFium
@@ -357,13 +358,14 @@ def _test_plate(
 
 def _log_inkless(page_index: int, ink_test: InkTest) -> None:
     """Logs at WARNING a page made `inkless`, with its share of words without
-    ink, so that the owner sees a page taken wrongly (plates spec, section
-    2b)."""
+    ink and the share of those that are known words, so that the owner sees
+    a page taken wrongly (plates spec, section 2b)."""
     _logger.warning(
         "analyze: page index %d is inkless, its words removed: %.2f of its words "
-        "have no ink under them",
+        "have no ink under them, %.2f of those are known words",
         page_index,
         ink_test.share_without_ink,
+        ink_test.known_share,
     )
 
 
@@ -470,9 +472,9 @@ def classify_page(
     `cover_page` is a `plate`; a plate is read from its layer when it has
     a word; else a page with a layer word is `front_matter`, with no text
     source, when its index is below `front_matter_end`, and `text`, read
-    from the layer, otherwise; else it is `blank`. `exclude_regions` holds the boxes of the config's regions
-    on this page, in the config's order. No page is checked by OCR and
-    none has a score.
+    from the layer, otherwise; else it is `blank`. `exclude_regions` holds
+    the boxes of the config's regions on this page, in the config's order.
+    No page is checked by OCR and none has a score.
     """
     match plate_rule:
         case PlateRule.PLATE:
