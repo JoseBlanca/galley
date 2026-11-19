@@ -682,7 +682,17 @@ is laid out as one region, as the skeleton did.
    begins at the first footnote, and the four lines are body text.
    Laid out with and without it the same day, the seven books' (the
    three of the evaluation, Kadesh with redo, Gierke, Haynes and
-   Turney) `lines.json` differ on Kadesh page 27 alone.
+   Turney) `lines.json` differ on Kadesh page 27 alone. Two side effects
+   there are known and left: its left column of footnotes, notes 64, 65
+   and 66, whose markers Tesseract misreads, becomes one note hung on
+   the reference 65, where before the rule the band started higher and
+   the notes came out apart; and the four lines, skewed by about 7 pt
+   across the column, are rowed by their words' middles (layout §1,
+   "Row"), so that "city" at the right end of the third line rows with
+   "(Kadesh).”" of the fourth and "l." with them, and the text reads
+   "the (Kadesh).” 1. city (Poem, 12" for "the city (Kadesh).” (Poem,
+   l. 12". Mending the second would take rows that follow a line's
+   slope, a change to how every book is rowed, not to this rule.
 
    **Small against the page.** Gierke's introduction (pages 13 to 49)
    is set larger than the translation that fills most of the book: its
