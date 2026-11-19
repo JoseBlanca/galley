@@ -4812,18 +4812,29 @@ made 16 heading blocks, against 3 with the layer: the same 3, 12 of
 junk, on pages 21 (2), 30, 32 (2), 39 (3), 41, 44, 46 and 50, and the
 library's card pocket on page 74 (below).
 
-**The rule.** A body line whose words all carry a Tesseract confidence
-(`Word.ocr_confidence`, 0 to 100) and whose median confidence is below
-**60** is not a heading line, by whatever branch of section 14 would
-take it, and is neither a chapter label nor a continuation that joins
-a heading. It stays in its paragraph, and it is still a line of the
-body stream for every other rule of section 14: the line before or
-after another line, from which that line's gaps are measured. A line
-with a word of the layer, whose confidence is `None`, is never kept out
-by this rule. The median is `statistics.median`, the mean of the two
-middle values for an even number of words. The rule holds for every
-line read by Tesseract, also a line layout re-read under `ocr =
-"verify"` (below), though only `redo` makes such junk lines.
+**The rule.** A body line of which at least half the words carry a
+Tesseract confidence (`Word.ocr_confidence`, 0 to 100), and whose median
+confidence over those words is below **60**, is not a heading line, by
+whatever branch of section 14 would take it, and is neither a chapter
+label nor a continuation that joins a heading. It stays in its
+paragraph, and it is still a line of the body stream for every other
+rule of section 14: the line before or after another line, from which
+that line's gaps are measured. A line of which more than half the words
+are the layer's, whose confidence is `None`, is never kept out by this
+rule. The median is `statistics.median`, the mean of the two middle
+values for an even number of words. The rule holds for every line read
+by Tesseract, also a line layout re-read under `ocr = "verify"`
+(below), though only `redo` makes such junk lines.
+
+A line may hold words of both readings because extract keeps, on an
+`ocr` page, the layer's words that Tesseract missed
+(`docs/specs/extract.md` §9, "Layer words Tesseract missed"), and some
+of those are the layer's junk over the same hieroglyphs: on the whole
+Kadesh book with redo, page 41's junk line "19. awe fe Resales a" holds
+one layer word of 5, page 46's "PAIS IIS I IK 282 TD Bm n PST" two of 9,
+and both would be headings if a layer word kept a line out of the rule
+(amended on 19 November 2026, with that rule of extract). Their
+Tesseract words have medians of 8.8 and 20.3.
 
 **Where 60 comes from.** On the whole Kadesh book with Tesseract's
 words, the median confidence of the lines of the 12 junk heading
