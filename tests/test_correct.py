@@ -976,7 +976,7 @@ def test_excerpt_edits_are_the_same_with_1_and_2_workers_and_markdown_applies_th
     edits = read_edits(folder.correct_jsonl)
     assert len(edits) == EXCERPT_EDIT_COUNT
     assert {edit.author for edit in edits} == {"correct"}
-    pages = [edit.page_index for edit in edits]
+    pages = [edit.page_index or 0 for edit in edits]
     assert pages == sorted(pages)
     found = {(edit.block_id, edit.page_index, edit.old, edit.new) for edit in edits}
     assert set(EXCERPT_EDITS) <= found
