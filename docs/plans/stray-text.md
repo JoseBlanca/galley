@@ -209,7 +209,7 @@ Tasks:
   `tests/fixtures/expected/lists_figures/` does. The expected files
   are tests marked to fail (`xfail` with `strict = true`) until their
   work package lands; the task that makes one pass removes its mark.
-- [ ] Review of work package 1.
+- [x] Review of work package 1 (with work package 2).
 
 ## 2. Inkless pages
 
@@ -234,7 +234,7 @@ Tasks (stream `analyze`):
   the analyze amendment of 1.1.
 - [x] 2.2 extract's removals for a marked page, as it does for an
   excluded page, and the tests of deliverables 1 and 2.
-- [ ] Review of work package 2.
+- [x] Review of work package 2.
 
 ## 3. Running heads and footnotes
 
@@ -279,7 +279,7 @@ Tasks:
   bands, and structure still refuses them because their words are above
   0.85 of the book's body height. Spec amendment first; the strict
   xfails of deliverables 2 and 3 pass.
-- [ ] Review of work package 3.
+- [x] Review of work package 3.
 
 ## 4. Stubbs' cut-in notes
 
@@ -306,7 +306,7 @@ Tasks (stream `layout`, after 3.4):
   margin. Find why the re-reading filter (layout §3, "Re-reading small
   print") lets it through, fix it, and pass the strict xfail that asserts
   the clean reading.
-- [ ] Review of work packages 4 with 3's layout half, when they are
+- [x] Review of work packages 4 with 3's layout half, when they are
   reviewed together.
 
 ## 5. The measurement and the EPUBs

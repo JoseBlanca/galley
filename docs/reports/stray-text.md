@@ -194,3 +194,47 @@ footnote pages fell from 65 to 64 because page 277, an endpaper whose
 pattern the text layer read as a footnote, is now inkless.
 After the merge: ruff and ty pass; pytest 2,895 passed, 6 expected
 failures, in 82 s.
+
+## Review of the layout half, task 3.5 and task 4.3
+
+Four reviewers read b3fa355..c45f845. No word was lost without a
+record or invented on the eight books. What mattered, all fixed in 15
+commits (0006c41 to 0acaf21):
+
+- **Turney's contents page broke.** The new size test of cut-in rows
+  took the contents' chapter labels, set smaller than the body on the
+  titles' baselines, for margin notes: six labels left their entries.
+  Cut-in notes are now not looked for on a page of the config's
+  `contents_pages`; Turney's page 10 is as on main and nothing else
+  changes. Two other rules were measured and dropped: the labels are as
+  small as Stubbs' notes (0.69 of the body's height), and asking for two
+  strip words in a row would lose 148 of Stubbs' note words. A book whose
+  contents pages are not in its config could still be hit.
+- **A heading could be taken into a running head.** A page number
+  boxed apart now takes the next row only within 2 pitches; the four
+  real cases lie 0.59 to 1.61 pitches below it.
+- **Gierke's last introduction page (50) kept its 5 footnotes in the
+  body**: its note rows outnumber its text rows. The page's median row
+  height is now taken over full-size rows when they are at least a
+  quarter of the page's; only page 50 changes.
+- A false count in structure §2 (36 regions have the one-line note's
+  form, of which 11 change kind), the thresholds table of layout, five
+  clauses no test guarded, stale whole-book floors (now Mariéjol 336,
+  Domesday 489, Gierke 35 footnote pages; Stubbs at most 51 notes in the
+  body), names that clashed with the PDF page size, code written twice,
+  docstrings; the inkless warning now also gives the share of known
+  words. The known-word limit moved from 0.5 to one third, midway
+  between the junk pages (at most 0.17) and Gierke 1 (0.50).
+
+Not taken: an excerpt mixing Gierke's introduction with its body pages,
+to guard the page-relative rule outside the unit and whole-book tests,
+because the quick tests are already over their minute; a test of one
+clause of structure's region kinds that cannot change any kind (the
+clause stays); a speck on Gierke 147 that opens a footnote, which needs
+a change to margin regions inside a band, for a later plan. Domesday
+428's "26—2" was in the text on main too.
+
+After the fixes: ruff and ty pass; pytest 2,910 passed and 6 expected
+failures in 79 s, and with 8 threads in 126 s (one run of three by the
+fixer ended with one error it did not capture; two reruns and mine
+passed); the plan's whole-book tests 15 passed.
