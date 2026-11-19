@@ -610,6 +610,32 @@ def test_notes_small_against_their_page_but_not_the_book_are_a_band_region(
     assert region_kinds(page, 9.0, frozenset()) == (RegionKind.BODY, RegionKind(kind))
 
 
+@pytest.mark.parametrize(("body_lines", "kind"), [(6, "band"), (3, "body")])
+def test_notes_outnumbering_the_text_are_small_against_its_full_size_lines(
+    body_lines: int, kind: str
+) -> None:
+    # Gierke's page 50: text in 10 pt above more lines of notes in 8 pt,
+    # the book's body word height 9.0 pt. The page's median line height is
+    # that of its lines of at least 8.1 pt, when they are a quarter of its
+    # lines: 6 of 16 are, 10 pt, and 8/10 is at most 0.82; 3 of 13 are
+    # not, and against the median of all lines, 8 pt, the notes are not
+    # small.
+    body = _region(
+        *(
+            _line(text, 50, 70 + 15 * n, 10)
+            for n, text in enumerate(_BODY_TEXTS[:body_lines])
+        )
+    )
+    notes = _region(
+        *(
+            _line("1 A note of the page in small", 50, 170 + 10 * n, 8)
+            for n in range(10)
+        )
+    )
+    page = PageLayout(50, (body, notes), ())
+    assert region_kinds(page, 9.0, frozenset()) == (RegionKind.BODY, RegionKind(kind))
+
+
 @pytest.mark.parametrize(
     ("text", "last", "kind"),
     [

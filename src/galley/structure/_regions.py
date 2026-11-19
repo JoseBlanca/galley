@@ -23,6 +23,12 @@ _MARGIN_WIDTH_SHARE = 0.25
 # book's 9.0 pt; at 0.85 the last rows of two printed contents were small).
 _SMALL_WORD_SHARE = 0.85
 _SMALL_PAGE_SHARE = 0.82
+# Spec section 2, from layout section 3, step 4, "A page whose notes
+# outnumber its text": the page's median line height is taken on its lines
+# of at least 0.9 of the body word height when they are a quarter of its
+# lines (Gierke's page 50, 13 lines of text above 25 of notes).
+_FULL_SIZE_LINE_SHARE = 0.9
+_FULL_SIZE_LINES_LEAST_SHARE = 0.25
 # Spec section 2: a band region may reach 2 pt into the region above it;
 # Domesday's note "1 See above, p. 359." (page 535) reaches 0.8 pt into the
 # text above it, and was a margin region.
@@ -168,17 +174,31 @@ def _is_margin(
     )
 
 
-def _page_line_height(regions: tuple[Region, ...], widest: Region) -> float:
+def _page_line_height(
+    regions: tuple[Region, ...], widest: Region, body_word_height: float
+) -> float:
     """The page's median line height (spec section 2), in points: the median,
     over the lines of `regions` not narrower than a quarter of `widest`, of
-    each line's median word height; 0 without such a line."""
+    each line's median word height, taken over those of at least
+    `_FULL_SIZE_LINE_SHARE` of `body_word_height` when they are
+    `_FULL_SIZE_LINES_LEAST_SHARE` of the lines or more; 0 without such a
+    line."""
     heights = tuple(
         median_word_height(line.words)
         for region in regions
         if _width(region) >= _MARGIN_WIDTH_SHARE * _width(widest)
         for line in region.lines
     )
-    return statistics.median(heights) if heights else 0.0
+    if not heights:
+        return 0.0
+    full_size = tuple(
+        height
+        for height in heights
+        if height >= _FULL_SIZE_LINE_SHARE * body_word_height
+    )
+    if len(full_size) >= _FULL_SIZE_LINES_LEAST_SHARE * len(heights):
+        return statistics.median(full_size)
+    return statistics.median(heights)
 
 
 def _is_one_line_note(
@@ -239,7 +259,7 @@ def region_kinds(
     widest = max(others, key=_width)
     small_limit = max(
         _SMALL_WORD_SHARE * body_word_height,
-        _SMALL_PAGE_SHARE * _page_line_height(others, widest),
+        _SMALL_PAGE_SHARE * _page_line_height(others, widest, body_word_height),
     )
     heights = tuple(median_word_height(region_words(region)) for region in others)
     margins = tuple(
