@@ -357,11 +357,13 @@ the references, gets both too.
   163 the line, "1 D. B. i. 141 b.", is 55 pt wide, centred, and was a
   margin region. Structure does not repeat layout's test of width per
   character: measured on 19 November 2026 on the eight books laid out
-  at 8c18e68, the regions this rule takes are exactly the 11 lines of
-  layout's rule, Domesday's pages 163, 174, 185, 278, 303, 308, 315,
-  347, 472 and 485 and Gierke's 61, and no other region of the eight
-  books has the rule's form, so a second test would change nothing on
-  them. Domesday gets 10 more footnotes on 9 pages (185 prints two on
+  at 8c18e68 (and again at the review's fixes, the same day), 36
+  regions have the rule's form, Domesday's 26, Haskins' 7 and Gierke's
+  3 (pages 28, 48 and 61), and 11 of them change kind by it, exactly
+  the lines of layout's rule: Domesday's pages 163, 174, 185, 278, 303,
+  308, 315, 347, 472 and 485 and Gierke's 61. The other 25 are band
+  regions by their height already, so a second test would change
+  nothing on these books. Domesday gets 10 more footnotes on 9 pages (185 prints two on
   its line; 472's note was already a footnote, taken from the body by
   section 11), each linked to its reference, and its notes without a
   reference stay 323;
