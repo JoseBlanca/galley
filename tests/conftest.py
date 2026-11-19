@@ -21,6 +21,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import threading
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -52,13 +53,20 @@ from galley.model import (
 
 EXCERPTS_DIR = Path(__file__).parent / "fixtures" / "pdf"
 
-# The excerpts' runs go side by side, each with galley's own workers.
-# Measured on 16 November 2026 on an M5 Pro, the eleven excerpts, as the
-# setup time of excerpt_books: 7.5 to 8.1 s one after another, 6.1 to 6.3 s
-# with 2 at once, 4.4 to 4.6 s with 6, 5.2 to 5.4 s with 11. The files
-# written are the same bytes either way, but for book.epub's identifier
-# and date, which differ between any two runs.
-_EXCERPT_RUNS_AT_ONCE = 6
+# The excerpts' runs go side by side, each `galley2epub run` a process of
+# its own with galley's own workers. In one process every PDFium call of
+# every run waits for the one PDFium thread: measured on 19 November 2026
+# on an M5 Pro (18 cores), the 24 excerpts as threads of the test process,
+# 6 at once, took 32.6 s, analyze alone up to 6.4 s on an excerpt that
+# takes 0.3 s by itself. As processes they took 14.3 and 18.9 s with 6 at
+# once, 11.7 and 12.3 s with 9, 11.2 and 11.6 s with 12, and 12.3 s with
+# 18 of 2 workers each. The files written are the same bytes either way,
+# but for book.epub's identifier and date, which differ between any two
+# runs.
+_EXCERPT_RUNS_AT_ONCE = 12
+# A whole excerpt's run takes up to 6 s by itself; guessed, not measured,
+# as a bound far above it that still ends a run that hangs.
+_EXCERPT_RUN_TIMEOUT_S = 300
 
 # The configs of spec section 9, "The end-to-end test", without `pdf`.
 # Kadesh's region on page 0 holds the page number 81. Its page 8 (book page
@@ -337,7 +345,7 @@ def excerpt_books(
     in it, book.epub last (spec section 9, "The end-to-end test").
 
     Session-scoped: the stages run once, also under --parallel-threads=8,
-    and the excerpts' runs go side by side in threads.
+    and the excerpts' runs go side by side, each in a process of its own.
     A test reads these folders and never writes in them. Skips every test
     that uses it when Pandoc is missing, which markdown and epub need, or
     Tesseract, with which layout re-reads small print (docs/specs/reocr.md).
@@ -351,8 +359,32 @@ def excerpt_books(
         folder.book_toml.write_text(excerpt_book_toml[name], encoding="utf-8")
     with ThreadPoolExecutor(max_workers=_EXCERPT_RUNS_AT_ONCE) as pool:
         # list() waits for every run and raises the first run's error.
-        list(pool.map(lambda folder: main(["run", str(folder.root)]), folders.values()))
+        list(pool.map(_run_excerpt, folders.values()))
     return frozendict(folders)
+
+
+def _run_excerpt(folder: BookFolder) -> None:
+    """`galley2epub run` on `folder`, in a process of its own; its error
+    output becomes the message of the failure."""
+    command = [
+        str(Path(sys.executable).parent / "galley2epub"),
+        "run",
+        str(folder.root),
+    ]
+    try:
+        subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=_EXCERPT_RUN_TIMEOUT_S,
+        )
+    except subprocess.CalledProcessError as err:
+        msg = (
+            f"galley2epub run failed on {folder.root} with exit status "
+            f"{err.returncode}:\n{err.stderr}"
+        )
+        raise RuntimeError(msg) from err
 
 
 @pytest.fixture(scope="session")
