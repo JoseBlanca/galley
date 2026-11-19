@@ -42,3 +42,17 @@ in 69 s; `pytest -m whole_book` 159 passed.
   the 8 pt gap. A row whose strip words are in small type is now cut at
   7.8 pt; 11 Stubbs pages change, all margin-note words; at 7.5 pt or
   without the type test body words move. Stubbs' margin notes 434 to 443.
+
+## Review of work package 1
+
+Two reviewers (spec and fidelity; tests and conventions) ran the seven
+books before and after: no word lost, duplicated, reordered or invented;
+the run-on joins only three real sentences cut at a page break (Kadesh
+11 to 12 and 12 to 13, Domesday 467 to 468), the misread-hyphen join
+only "aggressive" and "pilgrims". Fixed (af08956 to 235ad95): a chain of
+two joins over a sign that would have stopped structure on a whole book
+(no book has one); the layout spec claimed Stubbs page 102's note leaves
+the body whole, but "Coronation" stays; tests that passed for the wrong
+reason, or guarded nothing of the 7.8 pt cut's size test and of the
+fidelity check's sign join; a constant written twice. pytest 3,117
+passed in 73 s; the Stubbs and Haskins whole-book tests 49 passed.
