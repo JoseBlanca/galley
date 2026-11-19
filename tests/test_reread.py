@@ -758,6 +758,26 @@ def test_cut_in_crop_drops_tesseract_words_within_3_pt_of_its_top_or_bottom() ->
     assert reading.ocr_words == (below_top, above_bottom)
 
 
+def test_cut_in_crop_drops_tesseract_words_2_to_3_pt_inside_its_top_or_bottom() -> None:
+    # The crop runs from 165 to 255 pt: a word ending 2.3 pt above its
+    # bottom, or starting 2.3 pt below its top, lies within the 3 pt and is
+    # dropped; one 3.5 pt inside is kept.
+    near_bottom = _ocr("[dy", 60, 246, 66, 252.7)
+    near_top = _ocr("'", 52, 167.3, 56, 172)
+    kept = _ocr("of", 52, 200, 60, 206)
+    inside_bottom = _ocr("an", 52, 245, 60, 251.5)
+    reading = cut_in_reading(
+        Side.LEFT,
+        _CROP,
+        ((near_top,), (kept,), (inside_bottom,), (near_bottom,)),
+        edge=50,
+        inset=60,
+        cut_in_words=(),
+        column_words=(),
+    )
+    assert reading.ocr_words == (kept, inside_bottom)
+
+
 def test_cut_in_reading_with_no_word_left_replaces_nothing() -> None:
     # The layer's note word is unknown, so an empty reading would score
     # higher; every word of Tesseract's lies over a body word, so no
