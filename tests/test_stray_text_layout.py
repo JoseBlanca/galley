@@ -268,16 +268,21 @@ def test_whole_head_with_its_page_number_boxed_apart_is_removed(
 _GIERKE_INTRODUCTION_NOTE_PAGES = frozenset(
     (*range(15, 19), *range(23, 32), *range(34, 46), 48, 49, 50)
 )
+# The translator's notes marked "*", set small against their page too.
+_GIERKE_TRANSLATOR_NOTE_PAGES = frozenset((109, 146, 147, 156))
 
 
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(900)
-def test_whole_gierke_introduction_footnotes_are_footnotes(
+def test_whole_gierke_introduction_and_translator_footnotes_are_footnotes(
     whole_book_run: Callable[[str], BookFolder],
 ) -> None:
     blocks = _whole_blocks(whole_book_run, "politicaltheorie00gieruoft")
-    assert _GIERKE_INTRODUCTION_NOTE_PAGES <= _footnote_pages(blocks)
+    assert (
+        _GIERKE_INTRODUCTION_NOTE_PAGES | _GIERKE_TRANSLATOR_NOTE_PAGES
+        <= _footnote_pages(blocks)
+    )
 
 
 # The one-line notes boxed as tall as the body (step 4): at a0a1675 each
@@ -312,19 +317,19 @@ def test_whole_one_line_notes_are_footnotes_and_no_paragraph(
     )
 
 
-# The number of pages with a footnote at a0a1675, by book, which may not
-# fall: no page loses its band. Gierke had 3, but its page 40's footnote
-# was a speck, "£ 2", above the notes, where step 4 now starts the band at
-# their first; that page is not counted. Haskins had 65, but its page 277
-# is an endpaper whose pattern the text layer read as words, "f. t/>. *v a
-# <?* V W", one of them a footnote; work package 2 removes the words of
-# that inkless page, so that page is not counted either.
+# The number of pages with a footnote, by book, which may not fall: no
+# page loses its band. Counted on 19 November 2026 on the eight books laid
+# out and structured after the review's fixes of the plan; at a0a1675
+# Mariéjol had 334, Domesday 480 and Gierke 2 (its page 40's footnote a
+# speck, "£ 2", above the notes), and Haskins 65, one of them on page
+# 277, an endpaper whose pattern the text layer read as words, which work
+# package 2 removes.
 _FOOTNOTE_PAGES_AT_START = {
     "normansineuropea00hask": 64,
     "earlyplantagenet01stub": 2,
-    "catherinedemedic00mariuoft": 334,
-    "domesdaybook00maituoft": 480,
-    "politicaltheorie00gieruoft": 2,
+    "catherinedemedic00mariuoft": 336,
+    "domesdaybook00maituoft": 489,
+    "politicaltheorie00gieruoft": 35,
     "battleofkadeshst00breauoft": 40,
 }
 
@@ -344,9 +349,11 @@ def test_whole_no_page_loses_its_footnotes(
 # deliverable 2), by the evaluation tool (tools/galley-eval) against the
 # Gutenberg edition. At a0a1675 (runs/lists-figures/), 169 of the
 # reference's 467 margin notes were in the body, 291 margin notes; on 18
-# November 2026 with the shortened-row test by size, 46 and 413.
+# November 2026 with the shortened-row test by size, 46 and 413, and 46
+# again on 19 November after the review's fixes. The limit is 46 and 5
+# more.
 _STUBBS = "earlyplantagenet01stub"
-_STUBBS_NOTES_IN_BODY_MOST = 110
+_STUBBS_NOTES_IN_BODY_MOST = 51
 # Layout's cut-in words that the words' alignment pairs with the
 # reference's body, not a margin note: 24 at a0a1675, of 922 cut-in words;
 # 31 of 1,512 with the test by size, the 7 added on pages 37, 51, 96, 175,
@@ -373,7 +380,7 @@ def _gutenberg_html(books_dir: Path, book: EvaluationBook) -> Path:
 @pytest.mark.pandoc
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(900)
-def test_whole_stubbs_cut_in_notes_left_in_the_body_are_at_most_110(
+def test_whole_stubbs_cut_in_notes_left_in_the_body_are_at_most_51(
     whole_book_run: Callable[[str], BookFolder], books_dir: Path, tmp_path: Path
 ) -> None:
     book = _stubbs_evaluation_book()

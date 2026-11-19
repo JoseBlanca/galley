@@ -2800,11 +2800,10 @@ def test_reread_stubbs_excerpt_leaves_every_line_without_a_replaced_word_as_trus
         assert layer_lines_reread == layer_lines_trusted, page_reread.index
     assert "one, to be maintained only by caution ;" in _line_texts(reread.pages[7])[1]
     # One more region: the note "Coronation.", which the layer did not read
-    # (page 8). Page 1, whose reading keeps junk (the test above), is left
-    # out.
-    assert sum(
-        len(page.regions) for page in reread.pages if page.index != 1
-    ) == 1 + sum(len(page.regions) for page in trusted.pages if page.index != 1)
+    # (page 8).
+    assert sum(len(page.regions) for page in reread.pages) == 1 + sum(
+        len(page.regions) for page in trusted.pages
+    )
 
 
 @pytest.mark.tesseract
