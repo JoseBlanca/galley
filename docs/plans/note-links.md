@@ -44,10 +44,10 @@ than half of the unlinked notes with under 1 wrong link in 20, write the
 rule into the correct spec and build it; otherwise report and stop.
 
 - [x] 3.1 The measurement.
-- [ ] 3.1b The same prompt on six other Kadesh pages, their references
+- [x] 3.1b The same prompt on six other Kadesh pages, their references
   read from the images and committed; build only if the twelve pages
   together pass the bar.
-- [ ] 3.2 The rule and its code, if 3.1 says so.
+- [x] 3.2 The rule and its code, if 3.1 says so.
 - [ ] Review of work packages 2 and 3.
 
 ## 4. The EPUBs

@@ -49,3 +49,29 @@ right, 2 of 2 right links kept; 31 s a page on average. That is exactly
 half, the plan's bar, on 13 links, too few to show a wrong rate under 1
 in 20. Decided: measure the same prompt on six other Kadesh pages
 before building (task 3.1b).
+
+## Tasks 3.1b and 3.2: note links from the vision model
+
+Six more Kadesh pages read from the images (bf8568b; 62 references on
+twelve pages). On the twelve pages the first prompt made 25 links, none
+wrong, but linked only 20 of 43 unlinked notes, under the plan's bar of
+half: the model followed the answer format on about half the pages.
+Decided: a link that is always right is worth having, so the bar became
+"at least 20 links, at most 1 wrong in 20". A second prompt without an
+example line, accepting raised digits, made 32 links with none wrong
+(the first, read more loosely, 36 with 1 wrong); the second is built.
+
+Built (2fc2482, b4e57b4, 5567153): a link is an edit of
+`edits/correct.jsonl` whose new text ends with a link to the note;
+markdown makes it a reference after the word. On whole Kadesh, notes
+with a reference rise from 41 to 111 of 183; on the twelve reference
+pages all 27 new links go to the right note, and galley's wrong links
+fall from 6 to 4. 11 links are refused and logged (the word changed by
+another edit, two links to one note, and others). The 52 links outside
+the twelve pages are not checked yet. The run took 3,808 s, against
+474 s without links, with the owner's other model generating at the
+same time: links need a second request on each page where a note
+starts.
+
+Open: a link cannot yet be rejected for good (an owner edit cannot
+remove a reference, and the stage proposes it again on its next run).
