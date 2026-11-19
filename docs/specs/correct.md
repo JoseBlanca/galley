@@ -317,7 +317,7 @@ From the pairs:
   (review of 19 November 2026: about 40 such edits in the Kadesh run,
   "542,543.)" made "543.)", "fiveminutes." made "minutes.", "12-18)."
   made "18)."). That is when galley's core has (a) more commas, full stops,
-  hyphens or en dashes between two letters or digits than the model's
+  colons, hyphens or en dashes between two letters or digits than the model's
   core; or (b) more digits than the model's core and two digits side by
   side (a lone digit is often a letter misread, "a3" for "as", "V1" for
   "VI", which stay fixable). Junk inside a word is not such a mark:
@@ -331,7 +331,11 @@ From the pairs:
   from the first token's core to the second's, with what stands between
   them ("fiveminutes." becomes "five minutes.", "tothe" "to the"), and
   the unpaired token is not put in elsewhere. This is checked before (a)
-  and (b). Measured with the recorded answers on the six pages, 19
+  and (b), and then (a) holds for the two words with the space between
+  them counted as one more mark: "1l.1.2.and", three marks, does not
+  become "2, and", which would lose "1l.1." (the second Kadesh run, 19
+  November 2026, page 47; and "7:3" became "35" on page 33 before the
+  colon was a mark). Measured with the recorded answers on the six pages, 19
   November 2026: refusing such pairs, as (a) and (b) do, took the notes
   from 5.3 wrong words in 100 to 6.3, since "tothe" stayed where "the" had
   been put; taking both words brings them back to 5.3, with no word lost.
