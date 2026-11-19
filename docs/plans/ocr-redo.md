@@ -21,7 +21,8 @@ after reading the EPUBs of the stray-text plan:
   reads its worn print.
 
 The owner said to write the plan and go on without waiting. Dated 19
-November 2026. State: approved; under way.
+November 2026. State: done on 19 November 2026; approved the same day (the owner
+said to go on without waiting).
 
 It is built from two investigations of 19 November 2026 at main 9292b17
 (their notes are in `tmp/investigation/` of the plan's worktree, not
@@ -254,8 +255,8 @@ Deliverables:
 
 Tasks:
 
-- [ ] 5.1 The runs, the evaluation and epubcheck.
-- [ ] 5.2 The checks by eye, and the fixes they call for.
+- [x] 5.1 The runs, the evaluation and epubcheck.
+- [x] 5.2 The checks by eye, and the fixes they call for.
 
 ## How the whole plan is checked at the end
 
