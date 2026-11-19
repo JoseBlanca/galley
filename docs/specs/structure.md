@@ -903,9 +903,13 @@ them and whose `after` is the joined word followed by the sign:
 the joined word; the sign is removed, with the reason `misread_hyphen`
 (architecture §8), its page that of the change and its box that of the
 word it ended: the first line of that page in `lines.json` whose last
-word is the change's first word, which the join was made on (no earlier
-step changes a line's last word that ends with such a sign; were none
-found, structure stops with an error, as for any fault of its own). The
+word is the change's first word, which the join was made on. A word
+that an earlier join made ends no line of `lines.json`, so it is not
+joined over a sign: in "con-" "tinu*" "ally", a line of one word between
+a hyphen and the sign, the first join gives "continu*" and the sign
+stays where it is. No other step before the joins changes a line's last
+word; were no line found, structure stops with an error, as for any
+fault of its own. The
 fidelity check accepts such changes only when the `misread_hyphen`
 removals of each page and sign number exactly the changes over that sign
 on that page, so that a sign is never dropped without a record and no

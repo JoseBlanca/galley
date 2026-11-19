@@ -282,3 +282,31 @@ def test_misread_hyphen_removal_without_its_join_fails_the_fidelity_check() -> N
     doubled = replace(blocks, removals=(*blocks.removals, replace(removal, text="^")))
     with pytest.raises(FidelityError, match="misread_hyphen"):
         check_stage(FidelityBoundary.STRUCTURE, lines, doubled)
+
+
+def test_sign_ending_a_word_an_earlier_join_made_is_not_joined() -> None:
+    # "con-" / "tinu*" / "ally": the first join makes "continu*", which ends
+    # no line of lines.json, so a sign join after it would have no box for
+    # the sign's removal. The sign stays (spec section 5).
+    filler = _NEXT.replace("sive ", "here ")
+    full = _FULL.replace("aggres*", "con-")
+    lines = tuple(
+        _line(text, row)
+        for row, text in enumerate(
+            (filler, full, "tinu*", _NEXT.replace("sive ", "ally "), filler)
+        )
+    )
+    box = Box(_LEFT_PT, lines[0].box.top, _RIGHT_PT, lines[-1].box.bottom)
+    chained = LinesFile(
+        source_pdf_sha256=_HASH,
+        pages=(PageLayout(index=3, regions=(Region(box, lines),), figures=()),),
+        rereads=(),
+    )
+    blocks = make_blocks(chained, frozenset({"continually"}), workers=1)
+    assert [change.before for change in blocks.word_changes] == [("con-", "tinu*")]
+    assert not [
+        removal
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.MISREAD_HYPHEN
+    ]
+    check_stage(FidelityBoundary.STRUCTURE, chained, blocks)

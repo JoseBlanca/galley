@@ -227,7 +227,8 @@ def join_lines(
     first word. A line of one word between two hyphens is joined twice. A
     line that holds only a reference sign ("^") after a line ending with a
     hyphen is passed over, and the sign goes after the word the join gives
-    (spec section 5). A line whose position is in `unjoined` is never
+    (spec section 5). A word a join made is not joined over a sign it ends
+    with (`join_sign_hyphen`). A line whose position is in `unjoined` is never
     joined to the line before. With `lost_hyphens` JOINED, as in a margin
     note, a line whose last word `join_hyphen` does not join is joined by
     `join_lost_hyphen`, against `common_inner_words`, when it gives a
@@ -255,7 +256,11 @@ def join_lines(
             if joinable
             else None
         )
-        if joined is None and joinable:
+        # A sign join's removal takes its box from the line the first part
+        # ends, so a first part an earlier join made is not joined over its
+        # sign (spec section 5).
+        made_by_a_join = bool(positions) and positions[-1] == len(words) - 1
+        if joined is None and joinable and not made_by_a_join:
             joined = join_sign_hyphen(words[-1], texts[0], book_words, word_list)
         if joined is None and joinable:
             match lost_hyphens:
