@@ -569,23 +569,24 @@ def test_is_inkless_false_without_word_boxes() -> None:
 
 
 @pytest.mark.parametrize(
-    ("known_words", "word_count", "inkless"),
-    [(2, 4, False), (1, 3, False), (1, 4, True)],
-    ids=["half", "a_third", "a_quarter"],
+    ("texts", "inkless"),
+    [
+        (("HANDBOUND", "PRESS", "^v./v", "t/>."), False),
+        (("HANDBOUND", "PRESS"), False),
+        (("HANDBOUND", "^v./v", "t/>.", "^v./v"), True),
+        (("HANDBOUND", "^v./v", "t/>."), True),
+        (("HANDBOUND", "16", "17]", "^v./v"), True),
+    ],
+    ids=["2_of_4", "2_of_2", "1_of_4", "1_of_3", "1_and_2_numbers"],
 )
-def test_is_inkless_false_when_a_third_of_the_words_without_ink_are_known(
-    known_words: int, word_count: int, inkless: bool
+def test_is_inkless_false_when_2_words_without_ink_are_known_words_of_2_letters(
+    texts: tuple[str, ...], *, inkless: bool
 ) -> None:
     # Gierke's page 1, a binder's label, has "HANDBOUND" and "OF" without
-    # ink, 0.50 known; the junk of the inkless pages at most 0.17 (plates
-    # spec section 2b). Here the words have no ink.
-    texts = ("HANDBOUND", "PRESS", "^v./v", "t/>.")[:word_count]
-    words = tuple(
-        (text if position < known_words else "^v./v", box)
-        for position, (text, box) in enumerate(
-            zip(texts, INK_WORD_BOXES[:word_count], strict=True)
-        )
-    )
+    # ink, 2 known words; the junk of the inkless pages at most 1 (Haynes
+    # 9's "SP"). Numbers, which `is_known_word` counts as known, do not
+    # count (plates spec section 2b). Here the words have no ink.
+    words = tuple(zip(texts, INK_WORD_BOXES[: len(texts)], strict=True))
 
     assert (
         is_inkless(ink_render(lambda _across, _down: WHITE), words, INK_WORD_LIST)
@@ -1315,8 +1316,8 @@ def test_each_inkless_page_is_logged_at_warning_with_its_shares_without_ink_and_
             logging.WARNING,
             (
                 f"analyze: page index {index} is inkless, its words removed: "
-                f"{share} of its words have no ink under them, 0.00 of those "
-                "are known words"
+                f"{share} of its words have no ink under them, 0 of those "
+                "are known words of 2 letters or more"
             ),
         )
         for index, share in ((2, "1.00"), (3, "0.88"))
@@ -1344,7 +1345,7 @@ def test_words_in_an_excluded_region_are_left_out_of_the_share_without_ink(
 
     assert [record.getMessage() for record in caplog.records][-1] == (
         "analyze: page index 3 is inkless, its words removed: 1.00 of its words "
-        "have no ink under them, 0.00 of those are known words"
+        "have no ink under them, 0 of those are known words of 2 letters or more"
     )
 
 
