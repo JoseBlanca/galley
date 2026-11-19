@@ -9,6 +9,8 @@ excerpt tests list each fragment of the four Stubbs excerpts as the task
 with the words around it as printed.
 """
 
+from collections.abc import Callable
+
 import pytest
 
 from galley.book_folder import BookFolder
@@ -308,3 +310,63 @@ def test_no_letter_fragment_is_removed_in_an_excerpt_of_another_book(
     }
 
     assert {name: count for name, count in removed.items() if count} == {}
+
+
+# Whole books (spec section 35, "How it is verified"): Stubbs' fragments
+# removed, at least 240 of the 251 the rule took on the runs of the plan
+# stray-text, and none in the other books.
+_STUBBS_FRAGMENTS_AT_LEAST = 240
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+def test_whole_book_stubbs_letter_fragments_are_removed(
+    whole_book_run: Callable[[str], BookFolder],
+) -> None:
+    blocks = read_blocks(whole_book_run("earlyplantagenet01stub").blocks_json)
+
+    removed = sum(
+        1
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.LETTER_FRAGMENT
+    )
+
+    assert removed >= _STUBBS_FRAGMENTS_AT_LEAST
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize(
+    "book",
+    [
+        "normansineuropea00hask",
+        "domesdaybook00maituoft",
+        "battleofkadeshst00breauoft",
+        "politicaltheorie00gieruoft",
+    ],
+)
+def test_whole_book_other_than_stubbs_has_no_letter_fragment_removed(
+    whole_book_run: Callable[[str], BookFolder], book: str
+) -> None:
+    blocks = read_blocks(whole_book_run(book).blocks_json)
+
+    assert not any(
+        removal.reason is RemovalReason.LETTER_FRAGMENT for removal in blocks.removals
+    )
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize("book", ["turney", "haynes"])
+def test_whole_book_owner_book_has_no_letter_fragment_removed(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    # The owner's books are copyrighted: the test counts and quotes nothing.
+    blocks = owner_book_run(book)
+
+    assert not any(
+        removal.reason is RemovalReason.LETTER_FRAGMENT for removal in blocks.removals
+    )
