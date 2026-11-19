@@ -667,6 +667,23 @@ is laid out as one region, as the skeleton did.
    is no band: the rows are the body, which step 5 cuts with the band's
    run edges.
 
+   **A row inside a picture.** The band never begins at a row each of
+   whose words has its middle inside the box of one of the page's
+   in-page figures (`docs/specs/figures.md` §5), edges included; such
+   a row still counts among the rows that are small or not. Layout lays
+   a page out with the words of its figures and takes them out
+   afterwards (figures §5), and under `ocr = "redo"` Tesseract reads a
+   figure of hieroglyphs as rows of junk, some of them small. On Kadesh
+   page 27 one such row, 6 pt high and 2.5 pitches below the row above,
+   began the band, and the four lines of text printed under the figure
+   went into it with the footnotes; structure made them a note, where
+   with the text layer, which reads nothing in that figure, they were
+   a quotation in the body (19 November 2026). With the rule the band
+   begins at the first footnote, and the four lines are body text.
+   Laid out with and without it the same day, the seven books' (the
+   three of the evaluation, Kadesh with redo, Gierke, Haynes and
+   Turney) `lines.json` differ on Kadesh page 27 alone.
+
    **Small against the page.** Gierke's introduction (pages 13 to 49)
    is set larger than the translation that fills most of the book: its
    body rows are 10 to 11 pt high and its notes 8 pt, while the book's

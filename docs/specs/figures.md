@@ -273,6 +273,9 @@ rows: taken out before step 1, as a draft of this section did, the
 hieroglyphs among the footnotes of Kadesh page 52 left gaps that turned
 its 7 footnotes into 4, three of them into quotations of the body, and
 whole Kadesh had 148 footnotes against 152 (review, 18 November 2026).
+One step looks at the figures while the page is laid out: the footnote
+band never begins at a row whose every word lies inside a figure
+(layout §3, step 4, "A row inside a picture"; 19 November 2026).
 
 A figure's region is never re-read with Tesseract
 (`docs/specs/reocr.md`): no region read again replaces a word of the
