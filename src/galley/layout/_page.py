@@ -165,20 +165,36 @@ _DROP_CAPITAL_EDGE_PT: Final[float] = 3.0
 
 
 class _Part(StrEnum):
-    """The part of the column that is cut into columns: the body or the
-    footnote band, which need different numbers of open rows."""
+    """The part of the column that is cut into columns: the body, the
+    footnote band, which need different numbers of open rows and runs
+    with different edges, or the body of a page whose every row is small,
+    cut with the body's open rows and the band's edges."""
 
     BODY = "body"
     BAND = "band"
+    SMALL_PAGE = "small page"
 
 
 def _open_rows_to_cut(part: _Part) -> int:
     """The open rows a run of `part` needs to be cut into columns."""
     match part:
-        case _Part.BODY:
+        case _Part.BODY | _Part.SMALL_PAGE:
             return _BODY_OPEN_ROWS
         case _Part.BAND:
             return _BAND_OPEN_ROWS
+        case _:
+            assert_never(part)
+
+
+def _ends_at_open_rows(part: _Part) -> bool:
+    """Whether a run of `part` starts and ends at an open row (step 5): in
+    the body; in the band, and on a page whose every row is small, it may
+    start and end at any compatible row."""
+    match part:
+        case _Part.BODY:
+            return True
+        case _Part.BAND | _Part.SMALL_PAGE:
+            return False
         case _:
             assert_never(part)
 
@@ -289,6 +305,13 @@ def _one_line_note_start(rows: tuple[Line, ...]) -> int | None:
     return last if narrow else None
 
 
+def _small_rows(rows: tuple[Line, ...], measures: BookMeasures) -> tuple[bool, ...]:
+    """Which of `rows`, which are not empty, are small for the footnote
+    band (step 4, `_is_small_on_page`)."""
+    page_row_height = _page_row_height(rows, measures)
+    return tuple(_is_small_on_page(row, measures, page_row_height) for row in rows)
+
+
 def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
     """The index in `rows` of the first row of the footnote band (step 4),
     or len(rows) when there is no band: the first small row
@@ -299,8 +322,7 @@ def _band_start(rows: tuple[Line, ...], measures: BookMeasures) -> int:
     boxed as tall as the body (`_one_line_note_start`)."""
     if not rows:
         return 0
-    page_row_height = _page_row_height(rows, measures)
-    small = tuple(_is_small_on_page(row, measures, page_row_height) for row in rows)
+    small = _small_rows(rows, measures)
     if all(small):
         return len(rows)
     start = _gap_or_marker_band_start(rows, small, measures)
@@ -476,7 +498,7 @@ def _column_cut_regions(
         if not (compatible and opened):
             pending.extend(row for row, _ in stretch)
             continue
-        if part is _Part.BAND:
+        if not _ends_at_open_rows(part):
             opened = (0, len(stretch) - 1)
         # In the body a run starts and ends at an open row; the rows before
         # and after it in the stretch stay rows.
@@ -524,11 +546,16 @@ def _column_regions(
         body_rows, band_rows = rest[:band_start], rest[band_start:]
     else:
         body_rows, band_rows = rest, group_rows(band)
+    body_part = (
+        _Part.SMALL_PAGE
+        if band is None and rest and all(_small_rows(rest, measures))
+        else _Part.BODY
+    )
     width = measures.column_width
     return (
         (
             *((_head_region(head),) if head else ()),
-            *_column_cut_regions(body_rows, left, width, _Part.BODY),
+            *_column_cut_regions(body_rows, left, width, body_part),
         ),
         _column_cut_regions(band_rows, left, width, _Part.BAND),
     )

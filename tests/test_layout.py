@@ -1153,6 +1153,44 @@ def test_word_across_the_middle_of_the_gutter_ends_the_run() -> None:
     assert len(body.lines) == 11
 
 
+# The foot of Domesday's index page 552 (page index), as Tesseract reads it
+# when the page is re-read as small print: the right column slopes up by 2
+# pt across the page, so the last rows of the two columns lie in rows of
+# one side each, below the last open row. The page's every row is small.
+_DOMESDAY_INDEX_FOOT = (
+    Path(__file__).parent / "fixtures" / "layout" / "domesday_index_foot_words.json"
+)
+_DOMESDAY_MEASURES = BookMeasures(
+    column_width=275.0,
+    body_word_height=10.0,
+    body_line_pitch=12.136,
+    usual_left_edge=frozendict({0: 26.0, 1: 83.0}),
+    cut_in_inset_left=None,
+    cut_in_inset_right=None,
+)
+
+
+def test_page_of_small_rows_cuts_its_columns_down_to_their_uneven_ends() -> None:
+    # Transcribed from the page rendered at 300 dpi: the last three entries
+    # of each column.
+    (page,) = read_words(_DOMESDAY_INDEX_FOOT).pages
+    result = layout_page(page, _DOMESDAY_MEASURES)
+    left, right = (
+        tuple(" ".join(word.text for word in line.words) for line in region.lines)
+        for region in result.regions
+    )
+    assert left[-3:] == (
+        "Villani, Teams of, 416",
+        "Villani and Servi, 26, 30, 172",
+        "Vineyards, 375",
+    )
+    assert right[-3:] == (
+        "York, Church of, 87",
+        "Yorkshire, 139, 397, 426, 468, 486",
+        "Young, Arthur, 378, 438",
+    )
+
+
 def test_3_band_rows_with_the_gutter_at_the_middle_are_two_band_columns() -> None:
     band = _two_column_rows(
         3, top=_LAST_BODY_TOP + 1.5 * _PITCH, height=_SMALL_HEIGHT, pitch=9.0
