@@ -17,6 +17,7 @@ from enum import StrEnum
 from typing import assert_never
 
 from galley.body_measures import rows_of
+from galley.caption_labels import LABEL_NAMES, is_numeral
 from galley.model import (
     Box,
     Figure,
@@ -39,13 +40,6 @@ from galley.structure._measures import (
 )
 from galley.structure._regions import HeadLine, head_line
 
-# Figures spec section 1: the words that name a caption's label, in lower
-# case, and a numeral's characters: digits and the letters of a roman
-# numeral the OCR also reads for 1 ("li." for 11, "2i." for 21).
-_LABEL_NAMES = frozenset({"figure", "fig.", "fig", "plate", "map"})
-_NUMERAL_CHARACTERS = frozenset("0123456789ivxlcIVXLC")
-_NUMERAL_ENDINGS = (".", ",")
-_NUMERAL_MAX_CHARACTERS = 6
 # Figures spec section 1: Turney's numbered captions ("13. The", "14 (a)")
 # open with a numeral of at most 3 characters, its "." counted.
 _SHORT_NUMERAL_MAX_CHARACTERS = 3
@@ -85,16 +79,6 @@ _NEXT_ROW_SIDES_SLACK_PT = 12.0
 _SAME_LEFT_PT = 3.0
 
 
-def _is_numeral(text: str) -> bool:
-    """Whether `text` is a numeral (figures spec section 1): 1 to 6 digits
-    or letters i, v, x, l, c in either case, with or without a "." or ","
-    after them."""
-    bare = text[:-1] if text.endswith(_NUMERAL_ENDINGS) else text
-    return 0 < len(bare) <= _NUMERAL_MAX_CHARACTERS and all(
-        character in _NUMERAL_CHARACTERS for character in bare
-    )
-
-
 def _is_capitalised(text: str) -> bool:
     """Whether `text` starts with a capital letter and then a small one."""
     return len(text) > 1 and text[0].isupper() and text[1].islower()
@@ -117,8 +101,8 @@ def is_caption_label(words: tuple[str, ...]) -> bool:
     most 3 characters followed by a word in brackets."""
     named = any(
         len(words) > position + 1
-        and words[position].lower() in _LABEL_NAMES
-        and _is_numeral(words[position + 1])
+        and words[position].lower() in LABEL_NAMES
+        and is_numeral(words[position + 1])
         for position in (0, 1)
     )
     if named:
@@ -126,7 +110,7 @@ def is_caption_label(words: tuple[str, ...]) -> bool:
     if (
         len(words) < _NUMBERED_LABEL_WORDS
         or len(words[0]) > _SHORT_NUMERAL_MAX_CHARACTERS
-        or not _is_numeral(words[0])
+        or not is_numeral(words[0])
     ):
         return False
     return (words[0].endswith(".") and _is_capitalised(words[1])) or _is_bracketed(
