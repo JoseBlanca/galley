@@ -14,7 +14,7 @@ covers and endpapers it takes too. On each text page, the same render is
 searched for the figures printed among its lines (`figure_boxes`), whose
 boxes go into pages.json; each page with figures is logged at INFO. The
 same render also tells an inkless page (`is_inkless`): at least half of
-the words of its layer have no ink under them, and fewer than half of
+the words of its layer have no ink under them, and fewer than a third of
 those are known words, words the scanner's OCR invented where nothing is
 printed. It is `inkless`, also when the plate rule takes it, and each one
 is logged at WARNING.

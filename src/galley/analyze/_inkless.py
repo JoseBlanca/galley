@@ -37,8 +37,8 @@ _LEAST_INK_LEVELS: Final[int] = 20
 _INKLESS_SHARE: Final[float] = 0.5
 # Plates spec section 2b: measured, the words without ink of the inkless
 # pages are at most 0.17 known words (Haynes 9, 1 of 6), those of Gierke
-# 1, a binder's label printed faintly, 0.50 (1 of 2).
-_KNOWN_SHARE_OF_PRINT: Final[float] = 0.5
+# 1, a binder's label printed faintly, 0.50 (1 of 2); a third lies midway.
+_KNOWN_SHARE_OF_PRINT: Final[float] = 1 / 3
 
 
 class InkRule(StrEnum):
@@ -71,7 +71,7 @@ def is_inkless(
     """Whether the page is inkless by plates spec section 2b: at least half
     of `layer_words`, the page's text-layer words outside its excluded
     regions, each its text and box in points, have no ink on `page`, its
-    36 dpi render, and fewer than half of those without ink are known
+    36 dpi render, and fewer than a third of those without ink are known
     words (`wordlist.is_known_word`) of `lower_case_words`, the word list
     as `wordlist.lower_case_word_list` gives it. False when `layer_words`
     is empty."""

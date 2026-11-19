@@ -569,17 +569,22 @@ def test_is_inkless_false_without_word_boxes() -> None:
 
 
 @pytest.mark.parametrize(
-    ("known_words", "inkless"), [(2, False), (1, True)], ids=["half", "a_quarter"]
+    ("known_words", "word_count", "inkless"),
+    [(2, 4, False), (1, 3, False), (1, 4, True)],
+    ids=["half", "a_third", "a_quarter"],
 )
-def test_is_inkless_false_when_at_least_half_the_words_without_ink_are_known(
-    known_words: int, inkless: bool
+def test_is_inkless_false_when_a_third_of_the_words_without_ink_are_known(
+    known_words: int, word_count: int, inkless: bool
 ) -> None:
     # Gierke's page 1, a binder's label, has "HANDBOUND" and "OF" without
-    # ink (plates spec section 2b); here the 4 words have none.
-    texts = ("HANDBOUND", "PRESS", "^v./v", "t/>.")
+    # ink, 0.50 known; the junk of the inkless pages at most 0.17 (plates
+    # spec section 2b). Here the words have no ink.
+    texts = ("HANDBOUND", "PRESS", "^v./v", "t/>.")[:word_count]
     words = tuple(
         (text if position < known_words else "^v./v", box)
-        for position, (text, box) in enumerate(zip(texts, INK_WORD_BOXES, strict=True))
+        for position, (text, box) in enumerate(
+            zip(texts, INK_WORD_BOXES[:word_count], strict=True)
+        )
     )
 
     assert (
