@@ -20,7 +20,7 @@ is said; the owner's decision, 19 November 2026), then code and tests;
 counts per book of notes moved; the seven books' EPUBs through
 epubcheck.
 
-- [ ] 1.1 Spec, code, tests, counts.
+- [x] 1.1 Spec, code, tests, counts.
 - [ ] Review of work package 1.
 
 ## 2. A hyphenated word in the correct stage
