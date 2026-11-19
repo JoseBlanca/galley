@@ -36,10 +36,6 @@ _EXCERPT = "kadesh_redo"
 _EXCLUDED_PAGE = 8
 _PLATE_PAGE = 10
 
-_TASK_3_1 = pytest.mark.xfail(
-    strict=True,
-    reason="task 3.1 of docs/plans/ocr-redo.md: note references from the layer",
-)
 _TASK_3_2 = pytest.mark.xfail(
     strict=True,
     reason="task 3.2 of docs/plans/ocr-redo.md: no heading of low Tesseract confidence",
@@ -125,7 +121,6 @@ def test_layout_rereads_nothing_under_redo(
 
 
 @pytest.mark.tesseract
-@_TASK_3_1
 def test_reference_tesseract_read_as_a_sign_is_linked_from_the_layer(
     redo_excerpt_run: Callable[[str], BookFolder],
 ) -> None:

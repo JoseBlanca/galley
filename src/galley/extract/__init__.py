@@ -24,7 +24,7 @@ from collections.abc import Callable
 from contextlib import closing
 from dataclasses import replace
 from pathlib import Path
-from typing import Final, assert_never
+from typing import Final, NamedTuple, assert_never
 
 import pdfplumber
 from PIL import Image
@@ -49,10 +49,19 @@ from galley.model import (
     read_checked_pages,
     write_words,
 )
+from galley.note_references import after_last_letter, glued_reference
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 from galley.text_layer import layer_words, open_pdf
 
-__all__ = ["figure_crop_px", "figure_image", "page_words", "plate_image", "run"]
+__all__ = [
+    "are_over_each_other",
+    "figure_crop_px",
+    "figure_image",
+    "page_words",
+    "plate_image",
+    "run",
+    "with_layer_references",
+]
 
 _logger = logging.getLogger(__name__)
 
@@ -65,6 +74,10 @@ _PLATE_DPI: Final[int] = 300
 _FIGURE_DPI: Final[int] = 300
 # Extract spec section 9: Tesseract finds the blocks of the whole page.
 _OCR_PAGE_SEGMENTATION: Final[int] = 3
+# Extract spec section 9: a Tesseract word and a layer word are over each
+# other when they overlap by half the lower height and half the narrower
+# width; a third of the height took 4 wrong references on Kadesh.
+_OVER_EACH_OTHER_SHARE: Final[float] = 0.5
 
 
 def run(
@@ -103,22 +116,36 @@ def run(
         folder.words_json,
         WordsFile(
             source_pdf_sha256=pages_file.source_pdf_sha256,
-            pages=tuple(page for page, _ in results),
-            removals=tuple(removal for _, removals in results for removal in removals),
+            pages=tuple(result.page for result in results),
+            removals=tuple(
+                removal for result in results for removal in result.removals
+            ),
         ),
     )
     _logger.info(
-        "extract: %d words and %d removals from %d pages of %s",
-        sum(len(page.words) for page, _ in results),
-        sum(len(removals) for _, removals in results),
+        "extract: %d words and %d removals from %d pages of %s; %d words read "
+        "by Tesseract took the layer's note reference",
+        sum(len(result.page.words) for result in results),
+        sum(len(result.removals) for result in results),
         len(results),
         config.pdf,
+        sum(result.layer_references for result in results),
     )
+
+
+class _PageRead(NamedTuple):
+    """What a worker gives for a page: its words, its removals, and how many
+    of Tesseract's words took the layer's note reference (extract spec
+    section 9)."""
+
+    page: PageWords
+    removals: tuple[Removal, ...]
+    layer_references: int
 
 
 def _page_reader(
     config: BookConfig, book_root: Path
-) -> Callable[[pdfplumber.PDF, PageInfo], tuple[PageWords, tuple[Removal, ...]]]:
+) -> Callable[[pdfplumber.PDF, PageInfo], _PageRead]:
     """The function a worker thread runs on each page: it reads the page's
     text layer with the worker's pdfplumber document; on a page read by
     OCR, has the PDFium thread render it and runs Tesseract on the render;
@@ -127,9 +154,7 @@ def _page_reader(
     pdf_path = config.pdf
     language = tesseract_language(config.language)
 
-    def read_page(
-        pdf: pdfplumber.PDF, page: PageInfo
-    ) -> tuple[PageWords, tuple[Removal, ...]]:
+    def read_page(pdf: pdfplumber.PDF, page: PageInfo) -> _PageRead:
         # A blank page, and a plate without a text layer, are not read: their
         # layer has no word, as analyze found.
         unread = page.kind is PageKind.BLANK or (
@@ -173,7 +198,21 @@ def _page_reader(
                 page.index,
                 len(words),
             )
-        return page_words(page_read, words)
+        taken = tuple(
+            (tesseract_word, taken_word)
+            for tesseract_word, taken_word in zip(tesseract_words, words, strict=False)
+            if page_read.text_source is TextSource.OCR
+            and tesseract_word.text != taken_word.text
+        )
+        for tesseract_word, taken_word in taken:
+            _logger.info(
+                "extract: page index %d: %r, read by Tesseract, takes the "
+                "layer's note reference: %r",
+                page.index,
+                tesseract_word.text,
+                taken_word.text,
+            )
+        return _PageRead(*page_words(page_read, words), len(taken))
 
     return read_page
 
@@ -189,8 +228,67 @@ def _words_read(
     if page.text_source is not TextSource.OCR:
         return page, layer_words
     if tesseract_words or not layer_words:
-        return page, tesseract_words
+        return page, with_layer_references(tesseract_words, layer_words)
     return replace(page, text_source=TextSource.TEXT_LAYER), layer_words
+
+
+def with_layer_references(
+    ocr_words: tuple[Word, ...], layer_words: tuple[Word, ...]
+) -> tuple[Word, ...]:
+    """`ocr_words`, a page's words as Tesseract read them, each that
+    takes the layer's note reference (extract spec section 9) with its
+    text changed, in the same order."""
+    over = tuple(
+        tuple(layer_word for layer_word in layer_words if _over(ocr_word, layer_word))
+        for ocr_word in ocr_words
+    )
+    return tuple(
+        _with_layer_reference(ocr_word, layer_over[0])
+        if len(layer_over) == 1
+        and sum(_over(other, layer_over[0]) for other in ocr_words) == 1
+        else ocr_word
+        for ocr_word, layer_over in zip(ocr_words, over, strict=True)
+    )
+
+
+def _over(ocr_word: Word, layer_word: Word) -> bool:
+    return are_over_each_other(ocr_word.box, layer_word.box)
+
+
+def _with_layer_reference(ocr_word: Word, layer_word: Word) -> Word:
+    """`ocr_word` with the reference glued to `layer_word`, the one layer
+    word over it, when the two words meet conditions 1, 3 and 4 of extract
+    spec section 9; else `ocr_word` as it is."""
+    if (
+        glued_reference(layer_word.text) is None
+        or any(character.isdigit() for character in ocr_word.text)
+        or _letter_count(ocr_word.text) == 0
+        or _letter_count(ocr_word.text) != _letter_count(layer_word.text)
+    ):
+        return ocr_word
+    text = ocr_word.text[
+        : len(ocr_word.text) - len(after_last_letter(ocr_word.text))
+    ] + after_last_letter(layer_word.text)
+    return replace(ocr_word, text=text)
+
+
+def _letter_count(text: str) -> int:
+    return sum(character.isalpha() for character in text)
+
+
+def are_over_each_other(one: Box, other: Box) -> bool:
+    """Whether two word boxes overlap by half the lower height and half
+    the narrower width (extract spec section 9)."""
+    height_overlap = max(0.0, min(one.bottom, other.bottom) - max(one.top, other.top))
+    width_overlap = max(0.0, min(one.x1, other.x1) - max(one.x0, other.x0))
+    return (
+        height_overlap > 0
+        and width_overlap > 0
+        and height_overlap
+        >= _OVER_EACH_OTHER_SHARE * min(one.bottom - one.top, other.bottom - other.top)
+        and width_overlap
+        >= _OVER_EACH_OTHER_SHARE * min(one.x1 - one.x0, other.x1 - other.x0)
+    )
 
 
 def plate_image(page_index: int) -> str:

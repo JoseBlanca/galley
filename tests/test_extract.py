@@ -352,6 +352,100 @@ def test_page_read_from_the_layer_keeps_the_layers_words() -> None:
     )
 
 
+# Note references put back from the layer (extract spec section 9). The
+# words and boxes are Kadesh's, read by Tesseract and by the layer on 19
+# November 2026 (the page index of the whole book in each name).
+KADESH_10_TESSERACT = tesseract_word(
+    "Kadesh,\u201d", Box(250.56, 346.08, 292.32, 355.92), 81.66
+)
+KADESH_10_LAYER = word("Kadesh,12", Box(250.321, 349.911, 288.488, 360.911))
+HIM_36_TESSERACT = tesseract_word("him,", Box(200.88, 187.2, 223.92, 195.84), 40.25)
+HIM_36_LAYER = word("him,88", Box(200.838, 190.137, 221.722, 200.241))
+GREECE_8_TESSERACT = tesseract_word(
+    "Greece,\u2019", Box(275.76, 266.4, 312.0, 276.24), 21.86
+)
+GREECE_8_LAYER = word("Greece,1", Box(275.76, 270.122, 308.962, 281.122))
+THOUSAND_8_TESSERACT = tesseract_word(
+    "thousand", Box(279.6, 279.84, 320.64, 287.52), 96.25
+)
+# Page 13's "Mon., 17": Tesseract reads two words, the layer one, given
+# twice with the same box.
+MON_13_TESSERACT = tesseract_word("Mon..", Box(318.72, 526.08, 336.24, 531.12), 47.21)
+SEVENTEEN_13_TESSERACT = tesseract_word(
+    "17", Box(338.64, 526.08, 343.92, 530.88), 83.06
+)
+MON_13_LAYER = word("Jfem.,17", Box(318.438, 526.076, 341.191, 534.212))
+RAMSES_31_TESSERACT = tesseract_word(
+    "Ramses\u2019s", Box(141.6, 525.6, 182.16, 533.28), 62.66
+)
+RAMSES_31_LAYER = word("Ramses1", Box(141.6, 529.088, 170.595, 540.088))
+CAMPE_62_TESSERACT = tesseract_word(
+    "camp\u00e9", Box(52.56, 395.76, 78.96, 404.16), 92.36
+)
+CAMPE_62_LAYER = word("camp6", Box(52.56, 397.291, 74.415, 408.291))
+
+
+@pytest.mark.parametrize(
+    ("tesseract", "layer", "expected"),
+    [
+        (KADESH_10_TESSERACT, KADESH_10_LAYER, "Kadesh,12"),
+        (HIM_36_TESSERACT, HIM_36_LAYER, "him,88"),
+        (GREECE_8_TESSERACT, GREECE_8_LAYER, "Greece,1"),
+    ],
+    ids=["mark_for_the_digits", "digits_dropped", "quote_for_the_digit"],
+)
+def test_tesseract_word_takes_the_layers_reference_where_it_read_none(
+    tesseract: Word, layer: Word, expected: str
+) -> None:
+    assert extract.with_layer_references(
+        (THOUSAND_8_TESSERACT, tesseract), (layer,)
+    ) == (THOUSAND_8_TESSERACT, replace(tesseract, text=expected))
+
+
+@pytest.mark.parametrize(
+    ("tesseract_words", "layer_words"),
+    [
+        ((MON_13_TESSERACT, SEVENTEEN_13_TESSERACT), (MON_13_LAYER,)),
+        ((MON_13_TESSERACT, SEVENTEEN_13_TESSERACT), (MON_13_LAYER, MON_13_LAYER)),
+        ((RAMSES_31_TESSERACT,), (RAMSES_31_LAYER,)),
+        ((CAMPE_62_TESSERACT,), (CAMPE_62_LAYER,)),
+        ((KADESH_10_TESSERACT,), (GREECE_8_LAYER,)),
+        ((replace(KADESH_10_TESSERACT, text="Kadesh,12"),), (KADESH_10_LAYER,)),
+    ],
+    ids=[
+        "layer_word_over_two",
+        "layer_word_given_twice",
+        "more_letters_than_the_layer",
+        "layer_digit_for_a_letter",
+        "no_layer_word_over_it",
+        "tesseract_read_the_digits",
+    ],
+)
+def test_tesseract_word_keeps_its_text_where_the_rule_does_not_hold(
+    tesseract_words: tuple[Word, ...], layer_words: tuple[Word, ...]
+) -> None:
+    assert extract.with_layer_references(tesseract_words, layer_words) == (
+        tesseract_words
+    )
+
+
+def test_word_boxes_of_the_same_word_are_over_each_other() -> None:
+    assert extract.are_over_each_other(GREECE_8_TESSERACT.box, GREECE_8_LAYER.box)
+
+
+def test_word_box_of_the_layer_is_not_over_the_line_below() -> None:
+    # The layer's box sits 4 pt lower than Tesseract's and touches the
+    # line below, but by less than half the lower height.
+    assert not extract.are_over_each_other(THOUSAND_8_TESSERACT.box, GREECE_8_LAYER.box)
+
+
+def test_ocr_page_takes_the_layers_references_into_tesseracts_words() -> None:
+    assert extract._words_read(OCR_PAGE, (HIM_36_TESSERACT,), (HIM_36_LAYER,)) == (
+        OCR_PAGE,
+        (replace(HIM_36_TESSERACT, text="him,88"),),
+    )
+
+
 # The excerpts, from the session fixture.
 
 
