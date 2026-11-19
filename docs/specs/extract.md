@@ -637,13 +637,21 @@ the height of the type, the same for every word of a line: 11 pt in
 Kadesh's text, 7 to 8 pt in its notes.
 
 **The rule.** On an `ocr` page whose Tesseract words are kept, each
-Tesseract word that a layer word covers takes the top and bottom of
-that layer word, moved up by the page's offset; its left and right
-sides, its text and its confidence stay Tesseract's. A layer word
+Tesseract word that a layer word covers takes the height of that layer
+word, about its own middle: its top and bottom move so that the box
+keeps Tesseract's middle and has the layer word's height; its left and
+right sides, its text and its confidence stay Tesseract's. Keeping the
+middle keeps the word where Tesseract saw it, on its row and on its
+side of a figure's edge: on page 33 the caption "MAP IV." lies 0.3 to
+5.1 pt below the map's box by Tesseract's boxes, and the layer's box
+moved by the offset would put the middle of "MAP" 0.2 pt inside it,
+where it is taken for the map's lettering (`docs/specs/figures.md` §5). A layer word
 covers a Tesseract word by the test of the section above (their boxes
 overlap in width, and in height by at least a quarter of the lower
 height, once the layer's box is moved by the offset); when several do,
-the one whose overlap with it, width times height, is largest. A
+the one whose overlap with it, width times height, is largest; the
+cover test uses the layer's box moved by the offset, the height it
+gives does not. A
 Tesseract word that no layer word covers keeps its box. The rule is
 applied last, after the references are put back and the missed words
 kept, so that neither of those rules sees the new heights.
@@ -664,6 +672,36 @@ where Tesseract misreads a marker ("Sin" for "⁵In" on page 9, "1%" on
 pages 51 to 61) the layer word under it holds a digit for 5 of the 62
 notes without a marker; for the others it is a sign ("*In", "»*Tba"), a
 letter ("u", "m"), another word or nothing.
+
+### Caption numbers from the layer
+
+Added on 19 November 2026 for task 3.3 of the plan ocr-redo. Kadesh's
+six maps are captioned "MAP III." to "MAP VIII." under the map. The
+layer and Tesseract read their numbers so (the page shows "III.",
+"IV.", "V.", "VI.", "VII.", "VIII."):
+
+| page | 29 | 33 | 36 | 38 | 41 | 45 |
+|---|---|---|---|---|---|---|
+| layer | "111." | "IV." | "V." | "vi." | "VII." | "VIII." |
+| Tesseract | "ILL." | "IV." | "Y." | "VI." | "VII." | "VIIL" |
+
+Tesseract's "Y." is no numeral, so the map of page 36 loses its caption
+(`docs/specs/figures.md` §1, "Caption label"), and its "ILL." and "VIIL"
+read as no number; the layer's are the printed numbers but for the case
+of "vi." and the "1" for "I" of "111.", the OCR's usual reading of a
+roman numeral that figures §1 allows.
+
+**The rule.** On an `ocr` page, a Tesseract word that follows a
+**caption word**, "figure", "fig.", "fig", "plate" or "map" in any
+case, in Tesseract's order, on the same line (their boxes overlap in
+height), takes the text of the layer word over it, when the two are
+over each other by the test of the references (above, one to one) and
+the layer word is a numeral by figures §1 (1 to 6 characters, each a
+digit or one of i, v, x, l, c in either case, with or without a "." or
+"," after them) other than the Tesseract word's text. Its box and
+confidence stay Tesseract's. extract logs each change at INFO with its
+page. On Kadesh it changes the numbers of pages 29, 36, 38 and 45 into
+the layer's; the text's "(Map IV)" is no caption word, for its bracket.
 
 ### Cases
 
@@ -706,13 +744,15 @@ def with_missed_layer_words(ocr_words: tuple[Word, ...],
 def with_layer_heights(ocr_words: tuple[Word, ...],
                        layer_words: tuple[Word, ...]) -> tuple[Word, ...]:
     """`ocr_words` with each word that carries a confidence and that a
-    layer word covers given that layer word's top and bottom, moved by
-    the page's offset (extract spec section 9)."""
+    layer word covers given that layer word's height about its own
+    middle (extract spec section 9)."""
 ```
 
 On an `ocr` page extract applies `with_layer_references` first, then
 `with_missed_layer_words` to its result and the same layer words, then
-`with_layer_heights` to that result and the same layer words.
+`with_layer_heights` to that result and the same layer words; the
+caption numbers are put back with the references, before the missed
+words.
 
 `run` no longer refuses an `ocr` page.
 
