@@ -419,3 +419,10 @@ def test_sign_removal_takes_the_box_of_the_first_line_ending_with_the_word() -> 
 def test_sign_removal_of_a_word_that_ends_no_line_stops_structure() -> None:
     with pytest.raises(GalleyError, match="no line ends with 'regres\\*'"):
         sign_removals((_change("regres*"),), _stubbs_lines())
+
+
+def test_join_of_two_words_not_over_a_sign_makes_no_sign_removal() -> None:
+    # The same shape test as the fidelity check's: "aggressive" and "x" is
+    # no join over the sign "*", though it gives two words.
+    change = replace(_change("aggres*"), after=("aggressive", "x"))
+    assert sign_removals((change,), _stubbs_lines()) == ()

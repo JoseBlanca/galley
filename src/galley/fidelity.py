@@ -795,12 +795,12 @@ def _is_source_dash(change: WordChange) -> bool:
     return bool(undashed) and change.after == (undashed,)
 
 
-def _is_sign_join(change: WordChange) -> bool:
-    """Whether a hyphen join is one over a sign read in place of the hyphen
-    (structure spec section 5): two parts, the first ending with a sign of
-    `_HYPHEN_SIGNS` after a letter, become the first without the sign
-    followed by the second, and then the sign, which a removal records
-    (`_sign_problems`)."""
+def is_sign_join(change: WordChange) -> bool:
+    """Whether `change`, a hyphen join, is one over a sign read in place of
+    the hyphen (structure spec section 5): two parts, the first ending with
+    a sign of `_HYPHEN_SIGNS` after a letter, become the first without the
+    sign followed by the second, and then the sign, which a removal records
+    (`_sign_problems`). Structure records those removals by the same test."""
     if len(change.before) != _HYPHEN_JOIN_PARTS:
         return False
     first, second = change.before
@@ -820,7 +820,7 @@ def _sign_problems(blocks: BlocksFile) -> tuple[str, ...]:
     joins = Counter(
         (change.page_index, change.after[-1])
         for change in blocks.word_changes
-        if change.reason is ChangeReason.HYPHEN_JOIN and _is_sign_join(change)
+        if change.reason is ChangeReason.HYPHEN_JOIN and is_sign_join(change)
     )
     removed = Counter(
         (removal.page_index, removal.text)
@@ -852,7 +852,7 @@ def _change_follows_its_reason(change: WordChange) -> bool:
     match change.reason:
         case ChangeReason.NOTE_MARKER:
             return "".join(change.before) == joined_after
-        case ChangeReason.HYPHEN_JOIN if _is_sign_join(change):
+        case ChangeReason.HYPHEN_JOIN if is_sign_join(change):
             return True
         case ChangeReason.HYPHEN_JOIN | ChangeReason.HYPHEN_JOIN_GUESSED:
             return (

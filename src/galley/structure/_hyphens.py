@@ -8,6 +8,7 @@ from enum import StrEnum
 from typing import NamedTuple, assert_never
 
 from galley.errors import GalleyError
+from galley.fidelity import is_sign_join
 from galley.model import (
     Box,
     ChangeReason,
@@ -38,8 +39,6 @@ _LONE_SIGNS = frozenset({("^",), ("*",), ("•",)})
 # (section 11) that the OCR reads in place of a line-end hyphen ("aggres*"
 # "sive", Stubbs page 24; "pil^" "grims", Haskins page 226).
 HYPHEN_SIGNS = frozenset("^*•")
-# A join over such a sign gives the joined word and then the sign.
-_SIGN_JOIN_AFTER = 2
 
 
 class HyphenJoin(NamedTuple):
@@ -308,7 +307,8 @@ def sign_removals(
 ) -> tuple[Removal, ...]:
     """The removals of the signs that `join_sign_hyphen` took off a word
     (spec section 5, "A hyphen read as a sign"), one for each change of
-    `changes` whose `after` ends with the sign: its page, the box of the
+    `changes` that the fidelity check takes for a join over a sign
+    (`galley.fidelity.is_sign_join`): its page, the box of the
     word it ended in `lines` (the last word of a line of that page whose
     text is the change's first word), the sign, and the reason
     `misread_hyphen`."""
@@ -340,6 +340,5 @@ def sign_removals(
             reason=RemovalReason.MISREAD_HYPHEN,
         )
         for change in changes
-        if change.reason is ChangeReason.HYPHEN_JOIN
-        and len(change.after) == _SIGN_JOIN_AFTER
+        if change.reason is ChangeReason.HYPHEN_JOIN and is_sign_join(change)
     )
