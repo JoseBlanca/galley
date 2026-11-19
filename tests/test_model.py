@@ -1187,6 +1187,7 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "guide_words",
             "leader_dots",
             "figure_text",
+            "letter_fragment",
         ],
         "BlockKind": [
             "heading",
@@ -2725,9 +2726,14 @@ def test_file_before_figure_boxes_figure_kind_and_contents_entry_names_the_stage
 
 
 @pytest.mark.parametrize(
-    "reason", [RemovalReason.LEADER_DOTS, RemovalReason.FIGURE_TEXT]
+    "reason",
+    [
+        RemovalReason.LEADER_DOTS,
+        RemovalReason.FIGURE_TEXT,
+        RemovalReason.LETTER_FRAGMENT,
+    ],
 )
-def test_leader_dots_and_figure_text_removals_of_a_contents_entry_or_figure_are_read_back(
+def test_leader_dots_figure_text_and_letter_fragment_removals_are_read_back(
     tmp_path: Path, reason: RemovalReason
 ) -> None:
     removal = replace(BLOCKS.removals[0], reason=reason, text=". . . .")

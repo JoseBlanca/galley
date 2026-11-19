@@ -13,6 +13,7 @@ from galley.model import Line, LinesFile, PageLayout
 from galley.parallel import DEFAULT_WORKERS, map_pages
 from galley.structure._figures import text_page
 from galley.structure._foot import line_at, line_below_head, signature_candidate
+from galley.structure._fragments import LetterFragments, letter_fragments
 from galley.structure._heads import (
     EndNumber,
     arabic_number,
@@ -97,7 +98,8 @@ class BookSurvey:
     (section 4, the local offset); `median_head_top` the median top of the
     book's head lines, in points, None when it has none (section 3);
     `running_head_letters` the letters of each line removed as a running
-    head, each once, sorted (section 14).
+    head, each once, sorted (section 14); `letter_fragments` whether the
+    book has letter fragments (section 35).
     """
 
     running_heads: frozenset[int]
@@ -113,6 +115,7 @@ class BookSurvey:
     head_numbers: frozendict[int, int]
     median_head_top: float | None
     running_head_letters: tuple[str, ...]
+    letter_fragments: LetterFragments
 
 
 @dataclass(frozen=True, slots=True)
@@ -547,6 +550,7 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
         lines.pages,
         workers,
     )
+    indexes = index_pages(lines.pages, kinds)
     candidates = tuple(
         signature_candidate(page, page_kinds)
         for page, page_kinds in zip(lines.pages, kinds, strict=True)
@@ -575,8 +579,9 @@ def survey_book(lines: LinesFile, *, workers: int = DEFAULT_WORKERS) -> BookSurv
             workers,
         ),
         heads_below_specks=head_survey.heads_below_specks,
-        index_pages=index_pages(lines.pages, kinds),
+        index_pages=indexes,
         head_numbers=head_survey.head_numbers,
         median_head_top=head_survey.median_top,
         running_head_letters=head_survey.running_letters,
+        letter_fragments=letter_fragments(lines.pages, indexes),
     )
