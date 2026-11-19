@@ -839,6 +839,25 @@ def test_head_row_of_another_number_form_takes_no_head_below_it(number: str) -> 
     assert _texts(body.lines)[0] == ("The", "Boroughs.")
 
 
+@pytest.mark.parametrize(
+    ("pitches", "joined"), [(1.9, True), (2.1, False), (5.0, False)]
+)
+def test_page_number_boxed_apart_takes_a_head_within_2_pitches_below_it(
+    pitches: float, *, joined: bool
+) -> None:
+    # A chapter heading 5 pitches below the page number is no running
+    # head: the number is a head line alone, the heading stays in the body.
+    number_top = _HEAD_WORDS_TOP - pitches * _PITCH
+    number = _word("27", 230, number_top, 250, number_top + 8)
+    result = layout_page(_page(0, (number, *_head_words(), *_rows(20))), _MEASURES)
+    head_region, body = result.regions
+    if joined:
+        assert _texts(head_region.lines) == (("The", "Boroughs.", "27"),)
+    else:
+        assert _texts(head_region.lines) == (("27",),)
+        assert _texts(body.lines)[0] == ("The", "Boroughs.")
+
+
 def test_page_number_boxed_apart_above_a_head_close_to_the_body_is_a_head_alone() -> (
     None
 ):

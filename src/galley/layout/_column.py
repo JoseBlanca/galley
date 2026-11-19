@@ -156,6 +156,11 @@ _PAGE_NUMBER_FORM = re.compile(
 # form it also read specks above six of Stubbs' heads, "1", "6", "d", as
 # page numbers).
 _BOXED_APART_NUMBER = re.compile(r"[0-9]{2,3}[.,]?")
+# Measured on the eight books' words.json on 19 November 2026: the
+# head-word rows taken lie 0.59 to 1.61 pitches below the number (Kadesh's
+# page 38 the farthest); 2 is a guess above it, which keeps a chapter
+# heading set lower on the page apart from the number.
+_BOXED_APART_HEAD_MOST_PITCHES: Final[float] = 2.0
 # Measured on 17 November 2026 (layout spec section 3, step 2): Turney's
 # notes at the back hang their numbers 6 to 14 pt left of their text, left
 # of the page's left edge; a number up to 15 pt from the word right of it
@@ -268,9 +273,12 @@ def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
     no such region.
 
     When the head row is a page number boxed apart, one word of
-    `_BOXED_APART_NUMBER`'s form, and the next row with a letter, with the
-    rows of its skew, is set apart so from the rows below it, the region
-    runs down to them instead ("A page number boxed apart")."""
+    `_BOXED_APART_NUMBER`'s form, and the next row with a letter has its
+    top at most `_BOXED_APART_HEAD_MOST_PITCHES` times `pitch` below the
+    number's and, with the rows of its skew, lies
+    `_RUNNING_HEAD_GAP_PITCHES` times `pitch` or more above the next row
+    with a letter or a digit, the region runs down to them instead ("A
+    page number boxed apart")."""
     first = next(
         (index for index, row in enumerate(rows) if has_letter_or_digit(row)), None
     )
@@ -289,10 +297,14 @@ def running_head_row_count(rows: tuple[Line, ...], pitch: float) -> int:
             ),
             None,
         )
-        if head_words is not None:
-            end = _set_apart_head_end(
-                rows, head_words, _median_top(rows[head_words]), pitch
-            )
+        head_words_top = None if head_words is None else _median_top(rows[head_words])
+        if (
+            head_words is not None
+            and head_words_top is not None
+            and head_words_top - _median_top(head_row)
+            <= _BOXED_APART_HEAD_MOST_PITCHES * pitch
+        ):
+            end = _set_apart_head_end(rows, head_words, head_words_top, pitch)
             if end is not None:
                 return end
     end = _set_apart_head_end(rows, first, _head_row_top(head_row), pitch)
