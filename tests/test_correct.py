@@ -79,6 +79,16 @@ def test_tokens_have_the_cores_of_section_6() -> None:
     assert _cores("Kadesh—the end--of") == ["Kadesh", "the", "end", "of"]
 
 
+def test_a_marker_glued_after_any_ordinary_punctuation_is_off_the_core() -> None:
+    # Section 6, step 3: the class of ordinary punctuation; the Kadesh run
+    # replaced "him.”’!7" whole by "him", losing quotes and marker.
+    assert _cores("him.”’!7") == ["him"]
+    assert _cores("Why?12") == ["Why"]
+    assert _cores("ends…3") == ["ends"]
+    assert _cores("[sic]4") == ["sic"]
+    assert _cores("‘Kadesh’4") == ["Kadesh"]
+
+
 def test_tokens_know_where_their_core_is() -> None:
     text = "a “puem ia”"
     assert [(token.start, token.end) for token in tokens(text)] == [

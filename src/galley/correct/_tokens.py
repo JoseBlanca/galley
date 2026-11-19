@@ -20,9 +20,9 @@ class Token:
 # Step 3: the ordinary punctuation taken off a word's ends.
 _ORDINARY = ".,;:!?'\"()[]‘’“”„«»…"
 # A note marker glued after a word of two letters or more and its
-# punctuation ("Greece,1", "Kadesh,12"; not "A1"), as the measurement's
+# ordinary punctuation ("Greece,1", "Kadesh,12", "him.”’!7"; not "A1"), as the measurement's
 # common.tokens cuts it.
-_GLUED_AFTER = re.compile(r"^([^\W\d_].*?[^\W\d_][.,;:'\")’”]*)[\d*†‡]+$")
+_GLUED_AFTER = re.compile(rf"^([^\W\d_].*?[^\W\d_][{re.escape(_ORDINARY)}]*)[\d*†‡]+$")
 # One to three digits or signs glued before a capital and another letter
 # ("3There"); not before a lone letter, as in "1X" for "IX".
 _GLUED_BEFORE = re.compile(r"^[\d*†‡]{1,3}(?=[^\W\d_]{2})")
