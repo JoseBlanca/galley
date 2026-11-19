@@ -7,9 +7,10 @@ invented there. Under a real word there is ink and under these there is
 none, so each word's ink is measured on the render: the largest gap in
 gray between the paper around the word and any pixel near it, either way,
 so that white print on a dark ground counts. A page is inkless when at
-least half of its words have no ink and too few of those are known words
-(`_KNOWN_SHARE_OF_PRINT`): the OCR's junk is not made of words, while
-the words of faint real print, such as a binder's label, are.
+least half of its words have no ink and fewer than
+`_KNOWN_WORDS_OF_PRINT` of those are words of the word list: the OCR's
+junk is not made of words, while the words of faint real print, such as
+a binder's label, are.
 """
 
 import math
@@ -20,7 +21,7 @@ from typing import Final
 
 from galley.model import Box, RenderedPage
 from galley.pdfium import POINTS_PER_INCH
-from galley.wordlist import is_known_word
+from galley.wordlist import is_word_of_list
 
 # Plates spec section 2b: measured on the words of the eight books, whose
 # text-layer boxes sit a few points off the print: of the real words, 2,573
@@ -36,9 +37,11 @@ _LEAST_INK_LEVELS: Final[int] = 20
 # their words without ink, the highest page of print 0.10 (Domesday 481).
 _INKLESS_SHARE: Final[float] = 0.5
 # Plates spec section 2b: measured, the words without ink of the inkless
-# pages are at most 0.17 known words (Haynes 9, 1 of 6), those of Gierke
-# 1, a binder's label printed faintly, 0.50 (1 of 2); a third lies midway.
-_KNOWN_SHARE_OF_PRINT: Final[float] = 1 / 3
+# pages hold at most 1 word of the list of 2 letters or more (Haynes 9's
+# "SP"), those of Gierke 1, a binder's label printed faintly, 2; decided
+# by the assistant on 19 November 2026. Numbers do not count, so that one
+# digit among Haynes 421's 3 junk marks does not keep it.
+_KNOWN_WORDS_OF_PRINT: Final[int] = 2
 
 
 class InkRule(StrEnum):
@@ -54,12 +57,12 @@ class InkRule(StrEnum):
 @dataclass(frozen=True, slots=True)
 class InkTest:
     """What the inkless rule measured on a page it tested: the share of the
-    words outside its excluded regions that have no ink, the share of
-    those without ink that are known words (0 when none is without ink),
-    and the rule's finding."""
+    words outside its excluded regions that have no ink, how many of
+    those without ink are known words of 2 letters or more
+    (`wordlist.is_word_of_list`), and the rule's finding."""
 
     share_without_ink: float
-    known_share: float
+    known_words: int
     rule: InkRule
 
 
@@ -71,10 +74,10 @@ def is_inkless(
     """Whether the page is inkless by plates spec section 2b: at least half
     of `layer_words`, the page's text-layer words outside its excluded
     regions, each its text and box in points, have no ink on `page`, its
-    36 dpi render, and fewer than a third of those without ink are known
-    words (`wordlist.is_known_word`) of `lower_case_words`, the word list
-    as `wordlist.lower_case_word_list` gives it. False when `layer_words`
-    is empty."""
+    36 dpi render, and fewer than 2 of those without ink are known words
+    of 2 letters or more (`wordlist.is_word_of_list`) of
+    `lower_case_words`, the word list as `wordlist.lower_case_word_list`
+    gives it. False when `layer_words` is empty."""
     ink_test = measure_ink(page, layer_words, lower_case_words)
     return ink_test is not None and ink_test.rule is InkRule.INKLESS
 
@@ -85,23 +88,20 @@ def measure_ink(
     lower_case_words: frozenset[str],
 ) -> InkTest | None:
     """The inkless rule on `page` and `layer_words`, as `is_inkless` takes
-    them: the share of `layer_words` without ink, the share of those that
-    are known words, and the rule's finding;
+    them: the share of `layer_words` without ink, how many of those are
+    known words of 2 letters or more, and the rule's finding;
     None when `layer_words` is empty, a page the rule does not test."""
     if not layer_words:
         return None
     without_ink = tuple(text for text, box in layer_words if not _has_ink(page, box))
     share = len(without_ink) / len(layer_words)
-    known_share = (
-        sum(1 for text in without_ink if is_known_word(text, lower_case_words))
-        / len(without_ink)
-        if without_ink
-        else 0.0
+    known_words = sum(
+        1 for text in without_ink if is_word_of_list(text, lower_case_words)
     )
-    inkless = share >= _INKLESS_SHARE and known_share < _KNOWN_SHARE_OF_PRINT
+    inkless = share >= _INKLESS_SHARE and known_words < _KNOWN_WORDS_OF_PRINT
     return InkTest(
         share_without_ink=share,
-        known_share=known_share,
+        known_words=known_words,
         rule=InkRule.INKLESS if inkless else InkRule.NOT_INKLESS,
     )
 
