@@ -115,8 +115,10 @@ A no-break space, U+00A0, which structure puts before a spaced sign in a
 French book (structure spec, section 23), is written as the character,
 which Pandoc keeps inside its word.
 
-Edits are refused, since none can exist before `galley2epub edits-from`
-is built.
+The edits files under edits/ are applied to the blocks first: the
+correct stage's, then the agents', then the owner's, each edit inside one
+span that is not a note reference (architecture section 10;
+docs/specs/correct.md, section 10).
 """
 
 import itertools
@@ -130,9 +132,10 @@ from typing import assert_never
 
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
-from galley.errors import EditError, FidelityBoundary, InputFileError
+from galley.errors import FidelityBoundary, InputFileError
 from galley.fidelity import check_stage, read_markdown
 from galley.list_markers import ListMarker, follows, is_bulleted, marker_readings
+from galley.markdown._edits import FiledEdit, apply_edits, read_edits_files
 from galley.model import (
     Block,
     BlockKind,
@@ -145,11 +148,17 @@ from galley.model import (
     note_places,
     read_blocks,
     read_checked_input,
-    read_edits,
 )
 from galley.parallel import DEFAULT_WORKERS
 
-__all__ = ["escape_markdown", "render_markdown", "run"]
+__all__ = [
+    "FiledEdit",
+    "apply_edits",
+    "escape_markdown",
+    "read_edits_files",
+    "render_markdown",
+    "run",
+]
 
 _logger = logging.getLogger(__name__)
 
@@ -984,27 +993,6 @@ def render_markdown(blocks: BlocksFile, config: BookConfig) -> str:
     return "\n".join((_header(config), *notes_at(0), *body))
 
 
-def _check_no_edits(folder: BookFolder) -> None:
-    """Raise EditError when any edits file holds an edit, or one is
-    malformed (read_edits). A missing edits folder, or empty files, is no
-    edits."""
-    if not folder.edits_dir.exists():
-        return
-    if not folder.edits_dir.is_dir():
-        message = f"{folder.edits_dir} is not a folder; it should hold the edits files"
-        raise EditError(message)
-    with_edits = tuple(
-        path for path in sorted(folder.edits_dir.glob("*.jsonl")) if read_edits(path)
-    )
-    if with_edits:
-        message = (
-            f"{', '.join(str(path) for path in with_edits)} hold edits; markdown "
-            "does not apply edits yet: that comes with the markdown spec, not "
-            "written yet, and with `galley2epub edits-from`, not built yet"
-        )
-        raise EditError(message)
-
-
 def _check_figure_images(folder: BookFolder, blocks: BlocksFile) -> None:
     """Raise InputFileError when the image of a figure of `blocks` is not a
     file inside `folder`, naming each such figure and its image, so that
@@ -1037,8 +1025,9 @@ def run(
     Deletes book.md and book.epub, the file of the stage after it, first.
     Reads pages.json and blocks.json, and raises InputFileError when
     pages.json was not made from `config.pdf` or
-    blocks.json was made from another PDF than pages.json; raises
-    EditError when an edits file holds an edit; raises FidelityError when
+    blocks.json was made from another PDF than pages.json; applies the
+    edits files and raises EditError when one is malformed or an edit does
+    not apply (apply_edits); raises FidelityError when
     the words differ, and ExternalProgramError when Pandoc is missing or
     fails. Raises InputFileError, naming each figure, when a figure's image
     is not a file in the book folder. markdown runs once, so `workers` is
@@ -1046,10 +1035,13 @@ def run(
     """
     del workers  # every stage's run takes it; markdown is not per page
     delete_stage_outputs(folder, Stage.MARKDOWN)
-    _, blocks = read_checked_input(
+    _, written = read_checked_input(
         folder.pages_json, config.pdf, folder.blocks_json, read_blocks
     )
-    _check_no_edits(folder)
+    edits = read_edits_files(folder)
+    blocks = apply_edits(written, edits)
+    for path, count in Counter(filed.path for filed in edits).items():
+        _logger.info("applied %d edits of %s", count, path)
     _check_figure_images(folder, blocks)
     book_markdown = render_markdown(blocks, config)
     check_stage(FidelityBoundary.MARKDOWN, blocks, read_markdown(book_markdown))

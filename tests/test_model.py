@@ -822,7 +822,10 @@ EDITS = (
         old="ii. 4",
         new="ii. 5",
         author="correct",
-        reason="OCR read 5 as 4",
+        reason="vision_word",
+        page_index=3,
+        model="qwen/qwen3.6-35b-a3b",
+        second_reading="4",
     ),
 )
 
@@ -840,8 +843,9 @@ def test_edits_file_is_one_object_per_line_with_the_version_first(
     write_edits(path, EDITS)
     lines = path.read_text(encoding="utf-8").split("\n")
     assert lines[0] == (
-        '{"format_version": 1, "block_id": "b-p0003-002", "block_sha256": "0123456789ab", '
-        '"old": "Greece,", "new": "Grèce,", "author": "owner", "reason": "the owner\'s spelling"}'
+        '{"format_version": 2, "block_id": "b-p0003-002", "block_sha256": "0123456789ab", '
+        '"old": "Greece,", "new": "Grèce,", "author": "owner", "reason": "the owner\'s spelling", '
+        '"page_index": null, "model": null, "second_reading": null}'
     )
     assert len(lines) == 3
     assert lines[2] == ""
@@ -864,26 +868,34 @@ def _edits_with_second_line(tmp_path: Path, second_line: str) -> Path:
 
 def _edit_line(**changes: object) -> str:
     fields = {
-        "format_version": 1,
+        "format_version": 2,
         "block_id": "b-p0003-003",
         "block_sha256": "ba9876543210",
         "old": "ii. 4",
         "new": "ii. 5",
         "author": "correct",
-        "reason": "OCR read 5 as 4",
+        "reason": "vision_word",
+        "page_index": 3,
+        "model": "qwen/qwen3.6-35b-a3b",
+        "second_reading": "4",
     } | changes
     return json.dumps(
-        {key: value for key, value in fields.items() if value is not None}
+        {key: value for key, value in fields.items() if value is not _MISSING}
     )
+
+
+_MISSING = object()
 
 
 @pytest.mark.parametrize(
     "second_line",
     [
-        '{"format_version": 1, "block_id": ',
-        _edit_line(old=None),
-        _edit_line(format_version=2),
-        _edit_line(format_version=None),
+        '{"format_version": 2, "block_id": ',
+        _edit_line(old=_MISSING),
+        _edit_line(format_version=1),
+        _edit_line(format_version=_MISSING),
+        _edit_line(model=_MISSING),
+        _edit_line(page_index="3"),
         _edit_line(colour="red"),
         _edit_line(new=5),
         "",
@@ -892,8 +904,10 @@ def _edit_line(**changes: object) -> str:
     ids=[
         "not_json",
         "lacks_old",
-        "version_2",
+        "version_1",
         "lacks_version",
+        "lacks_model",
+        "page_index_not_a_number",
         "unknown_field",
         "new_not_text",
         "blank",
