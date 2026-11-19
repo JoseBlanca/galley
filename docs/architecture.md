@@ -249,7 +249,9 @@ reads 0 to 140 words, the layer 2 to 24, and "PLATE II" where
 Tesseract reads "Puate II" (measured on 19 November 2026 on the whole
 book). analyze runs no audit and writes
 `ocr_audit` `None`. extract reads each `ocr` page with Tesseract
-(`docs/specs/extract.md` §9); the words of an excluded, front-matter or
+(`docs/specs/extract.md` §9), and keeps the layer's words where
+Tesseract read none, a line or a word it skipped, so that no printed
+word is lost (on Kadesh 103 words, 62 of them printed text); the words of an excluded, front-matter or
 inkless page are the layer's, recorded as removals, as with `verify`.
 layout re-reads nothing. `cli.py` looks for Tesseract before analyze or
 extract starts under `redo` and stops when it is missing (sections 12
@@ -942,7 +944,12 @@ lists the words, with the pages they came from where the origins say.
   element galley's Markdown does not make, and an error, so that no word
   hides where the check does not count it.
 - extract is where the words enter galley, so it has no boundary to check:
-  its excerpt tests compare its words with literals.
+  its excerpt tests compare its words with literals. Under `ocr =
+  "redo"` its words are Tesseract's, which skips a printed line now and
+  then; no check could see that, since nothing before extract holds the
+  words, so extract keeps every layer word with a letter or a digit
+  that no Tesseract word covers, and logs their number per page
+  (`docs/specs/extract.md` §9, "Layer words Tesseract missed").
 - The check stops at `book.md`: turning it into an EPUB is Pandoc's work,
   and epubcheck checks the EPUB's form.
 - The excerpt tests of every stage run the check, and the `whole_book`

@@ -435,7 +435,8 @@ keep their layer under `redo`; the plates hold no note reference.
   (`docs/specs/figures.md` §4), from the boxes analyze found with the
   layer's words.
 - The page's text layer is read too, by `text_layer.layer_words`, for
-  the references below and for one case: when Tesseract finds no word
+  the references below, for the words Tesseract missed (below), and for
+  one case: when Tesseract finds no word
   on a page whose layer has words, the page keeps the layer's words and
   its `PageWords.text_source` is `text_layer`, so that no printed word
   is lost, and extract logs a warning naming the page. None of Kadesh's
@@ -528,6 +529,95 @@ and two words of the layer's junk. A note's own marker, at the start of
 its line, is not put back: Tesseract reads more of them than the layer
 does (108 of 159 notes with a marker against the layer's 84 of 148).
 
+### Layer words Tesseract missed
+
+Added on 19 November 2026, after a review of work package 2 of the plan
+ocr-redo. **What Tesseract does.** It skips a printed line now and then,
+most often a line of small print packed close to the next, and nothing
+recorded it: on the whole Kadesh book, page 9 loses the first line of
+note 8 ("CHABAS was conscious of the thoroughness of his"), page 11
+"with the accession of new material made the compilation", page 15
+"other engagements," which is an error for the prisoners as", page 52
+"ing inscription over them:" and page 53 the line of note 134 "Simbel
+and Ramesseum have first form. Since above was"; it also skips single
+words, page numbers at the foot ("83" on page 10) and the scale of a
+map ("5 Km."). The layer has these words, read as it reads the rest of
+the page ("Ramraw-um" for "Ramesseum").
+
+**The rule.** On an `ocr` page whose Tesseract words are kept, a layer
+word is **missed by Tesseract**, and kept among the page's words, when
+all of these hold:
+
+1. it holds a letter or a digit (a layer word of signs only, "=" or
+   "!", is dropped as Tesseract's reading of the page drops it);
+2. no Tesseract word **covers** it: once the layer word's box is moved
+   up by the page's **offset**, the two boxes overlap in width and
+   overlap in height by at least a quarter of the lower of the two
+   heights;
+3. no **unclaimed** Tesseract word with the same letters and digits
+   (compared in lower case) lies within 16 pt of it, up, down or
+   across (the gap between the two boxes, 0 when they overlap). A
+   Tesseract word is unclaimed when no layer word with its letters and
+   digits is covered by it.
+
+The page's **offset** is the median, over the pairs of a layer word and
+a Tesseract word with the same letters and digits, 3 or more, that
+overlap in width and whose middles are less than 12 pt apart up or
+down, of the layer word's middle less the Tesseract word's, in height;
+0 when the page has no such pair. On Kadesh it is 1.2 to 5.4 pt: the
+layer's boxes sit lower than Tesseract's, and are taller, so that a
+layer word of a skipped line touches the Tesseract lines above and
+below it.
+
+A kept word keeps its text, has `ocr_confidence` `None`, as every word
+of the layer, and its box is the layer's moved up by the offset, so
+that layout rows it with the Tesseract words of its line (layout groups
+words into rows by their boxes, layout spec section 1). It goes into
+the page's words before the first Tesseract word whose top is lower
+than its own. Its middle decides, as for any word, whether it falls in
+an excluded region or an in-page figure. extract logs at INFO, for each
+page, the number of words kept and their text, and the number for the
+book; words.json does not say which word came from where, since no
+format changes, but `ocr_confidence` `None` on an `ocr` page marks
+them.
+
+**Why these measures.** Measured on 19 November 2026 on the whole
+Kadesh book with redo, on the 44 `ocr` pages:
+
+| variant, all else as the rule | words kept | of them a copy of a word Tesseract read |
+|---|---|---|
+| any overlap covers, no offset, no condition 3 | 85 | none, but the lines of pages 9, 11 and 15 stay lost (their layer words touch the lines around them) |
+| the rule | 103 | none found |
+| no offset | 129 | none found, but page 15's line stays lost |
+| condition 3 with any Tesseract word, claimed or not | 99 | none, but "of" and "the" of page 9's lost line go |
+| no condition 3 | 126 | 2 or more: page 18's "over that", which the layer boxes 6 pt below Tesseract's, and page 41's "behind", 14 pt below |
+| half the lower height, not a quarter | 167 | not counted: many layer words of lines Tesseract read |
+
+Condition 3 keeps out the layer's copy of a word Tesseract read where
+the layer misplaces its box: page 12's "of" (the layer's words of the
+line lie up to 25 pt right of Tesseract's), page 41's "behind" and the
+page numbers the layer boxes 10 to 12 pt off ("81" on page 8, "91" on
+page 20). Its claim keeps the short words of a skipped line: the "of"
+of page 9's lost line has an "of" of Tesseract's on the line above,
+which covers the layer's "of" of that line.
+
+**What it gives.** Of the 103 words kept, each looked at on the page
+rendered at 150 dpi, 62 are printed words of the text, the notes, the
+maps or a page number: the lost lines of pages 9, 11, 15, 52 and 53,
+"FRANÇOIS" (the layer's "FftAigou", page 9), "Égypte" (page 11), "a"
+(page 14), "through" and "paper" (page 21), the scales of the maps of
+pages 29, 33, 36 and 45 ("5 Km."), "27." and "Var." on page 50, and the
+page numbers of pages 10, 11, 12, 18, 21, 28, 37 and 67; 41 are the
+layer's junk over hieroglyphs, Arabic or a map (pages 21, 27, 29, 33,
+38, 40, 41, 44, 45, 46, 50, 51, 52) or specks (pages 15, 47, 55, 63, 66),
+which Tesseract read as junk of its own or not at
+all. Most of the junk lies in an in-page figure's box and goes with its
+figure (`docs/specs/figures.md` §5); the rest stays as text, as the
+layer's junk does under `verify`. Some words the layer has are still
+lost: page 11's "the" before "compilation" has an unclaimed "the" of
+Tesseract's 9 pt below, and page 9's line keeps the layer's misreadings
+("wu", "eocueiou*" for "was conscious").
+
 ### Cases
 
 - **Tesseract reads the reference as digits** ("Kadesh,12" both
@@ -559,7 +649,16 @@ def with_layer_references(ocr_words: tuple[Word, ...],
 def are_over_each_other(one: Box, other: Box) -> bool:
     """Whether two word boxes overlap by half the lower height and half
     the narrower width (extract spec section 9)."""
+
+def with_missed_layer_words(ocr_words: tuple[Word, ...],
+                            layer_words: tuple[Word, ...]) -> tuple[Word, ...]:
+    """`ocr_words`, a page's words as Tesseract read them, with the layer
+    words Tesseract missed (extract spec section 9) put among them, each
+    with its box moved by the page's offset."""
 ```
+
+On an `ocr` page extract applies `with_layer_references` first, then
+`with_missed_layer_words` to its result and the same layer words.
 
 `run` no longer refuses an `ocr` page.
 
@@ -573,9 +672,14 @@ def are_over_each_other(one: Box, other: Box) -> bool:
   Tesseract word with no layer word over it stays; and of
   `are_over_each_other` with page 8's "Greece,1" against Tesseract's
   "Greece,’" (over) and "thousand" on the line below (not over).
+- **Unit tests** of `with_missed_layer_words` with Kadesh's words: page
+  11's skipped line ("with", "material") kept, moved by the offset, with
+  the line's Tesseract words around it and their pair's offset; page
+  12's "of", the layer's copy of an unclaimed "of", and page 9's "=",
+  which has no letter, not kept; and a page with no pair, offset 0.
 - **The excerpt `kadesh_redo`** (Kadesh pages 8 to 16, 32 and 34, with
   `ocr = "redo"`; `scripts/fetch_samples.py`): page 9's text read by
-  Tesseract, the plate's words the layer's, the excluded page's the
+  Tesseract, page 11's skipped line kept from the layer, the plate's words the layer's, the excluded page's the
   layer's as removals, and the references after "Greece," (page 8) and
   "Kadesh," (page 10) linked to their notes. Its expected files are in
   `tests/fixtures/expected/ocr_redo/`.
