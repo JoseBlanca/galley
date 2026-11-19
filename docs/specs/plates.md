@@ -239,7 +239,7 @@ layer, for each word of the layer whose middle lies outside the page's
 4. A word has **no ink** when its ink is below 20 levels.
 
 A page is **inkless** when at least half of those words have no ink,
-unless at least half of its words without ink are known words (section
+unless at least a third of its words without ink are known words (section
 2, `wordlist.is_known_word`, the word list that also guards the joining
 of hyphenated words). The exception keeps a short page of faint real
 print: Gierke's page 1, a binder's label, "HANDBOUND AT THE UNIVERSITY
@@ -248,8 +248,12 @@ OF TORONTO PRESS", has 2 of its 7 words without ink, "HANDBOUND" and
 "OF" is known, 1 of the 2. The junk of the four inkless pages is not
 made of words: of their words without ink, Haskins 277 has 0 of 10
 known, Haskins 278 0 of 21, Haynes 9 1 of 6 ("SP") and Haynes 421 0 of
-3 (measured on 18 November 2026, as analyze reads them). A page with
-none of those words is not tested.
+3 (measured on 18 November 2026, as analyze reads them). The limit, a
+third, lies midway between the junk's 0.17 at most and the label's 0.50,
+so that neither lies at it; at a half, the label's share stood exactly on
+the limit (decided on 19 November 2026 after the review of the plan
+stray-text; the inkless pages of the eight books are the same four). A
+page with none of those words is not tested.
 
 **What follows.** A page the test finds inkless gets the kind `inkless`
 and the text source `none`, also when the plate rule takes it as a
@@ -322,7 +326,7 @@ configs do not exclude.
 | local background | median of the box grown by 6 pt | guessed, and kept because it absorbs Haynes 9's gradient; the page's median gray, as the plate rule's ink uses, was not tried |
 | no ink | below 20 levels | measured, above: 40 of the 43 junk words, 339 of 1.1 million real ones |
 | inkless page | at least 0.5 of its words | measured, above |
-| a page of print kept | at least 0.5 of its words without ink known | measured, above: the junk of the inkless pages has at most 0.17 known (Haynes 9), Gierke 1's label 0.50 |
+| a page of print kept | at least a third of its words without ink known | measured, above: the junk of the inkless pages has at most 0.17 known (Haynes 9), Gierke 1's label 0.50; a third lies midway |
 
 **A rule per word was measured and dropped.** Removing each word
 without ink, wherever it is, would also remove real words. Of 12 words
