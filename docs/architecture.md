@@ -38,6 +38,16 @@ stray-text (`docs/plans/stray-text.md`): the page kind `inkless`, a page
 that prints nothing although its text layer holds words
 (`docs/specs/plates.md` §2b), takes `pages.json` to version 4, and the
 removal reason `inkless_page` records those words in `words.json`.
+Revised on 19 November 2026 for the plan ocr-redo
+(`docs/plans/ocr-redo.md`): `ocr = "redo"` is accepted, and makes
+analyze mark every text page `ocr` and extract read it with Tesseract,
+putting back the note references Tesseract loses from the text layer
+(sections 6, 7b, 9 and 16, and `docs/specs/extract.md` §9); structure
+keeps a line of low Tesseract confidence from being a heading, and
+removes the pieces of letters that Stubbs' text layer gives as words of
+their own, with the removal reason `letter_fragment`
+(`docs/specs/structure.md` §34 and §35). No file changes its
+`format_version` (section 8).
 
 Decisions marked "owner", with a date from 14 to 17 November 2026,
 were taken by the owner in chat; those of 18 November 2026 were taken
@@ -176,7 +186,7 @@ An unknown key or a wrong type is an error.
 | `title` | string, required | |
 | `authors` | list of strings, required | |
 | `language` | string, required | ISO 639-1 code: `en`, `es`, `fr`, `de`, `it`. `config.py` maps it to Tesseract's code (`eng`, `spa`…) and to the word list; structure treats spaced punctuation by it (`docs/specs/structure.md` §23) |
-| `ocr` | `verify` / `trust` / `redo`, `verify` | how far the book's own OCR is trusted (section 7b), and whether layout re-reads small print: not with `trust` or `redo` (`docs/specs/reocr.md`) |
+| `ocr` | `verify` / `trust` / `redo`, `verify` | how far the book's own OCR is trusted (section 7b), and whether layout re-reads small print: not with `trust` or `redo` (`docs/specs/reocr.md`). With `redo`, every text page is read again with Tesseract and its words replace the text layer's (section 7b; `docs/specs/extract.md` §9): for a book whose layer is bad throughout, as Kadesh's, the only one of the eight books that needs it |
 | `correct` | bool, `false` | whether `galley2epub run` runs the correct stage |
 | `exclude_pages` | list of page indices, `[]` | pages left out, as removals |
 | `exclude_regions` | list of `{page, box}`, `[]` | a library stamp, a label |
@@ -225,7 +235,30 @@ config's `ocr` key sets how far:
 |---|---|
 | `verify` (default) | the audit below |
 | `trust` | no audit of the text layer; pages without a layer are still checked as in the audit; layout re-reads nothing |
-| `redo` | ignores the text layer and marks every page for OCR |
+| `redo` | marks every text page for OCR; the text layer still decides what each page is |
+
+**`redo`** (decided for the owner on 19 November 2026, plan ocr-redo).
+analyze classifies the pages from the text layer as it does with
+`verify`: the plate, inkless, front-matter and in-page figure rules use
+the layer's word boxes, and a page without a layer is blank or a plate
+as before. Then every page that ends as a `text` page gets the text
+source `ocr`; every other page keeps the source it has with `verify`. A
+plate keeps its layer, because Tesseract reads its picture as junk and
+the layer reads its caption better: on Kadesh's 9 plates Tesseract
+reads 0 to 140 words, the layer 2 to 24, and "PLATE II" where
+Tesseract reads "Puate II" (measured on 19 November 2026 on the whole
+book). analyze runs no audit and writes
+`ocr_audit` `None`. extract reads each `ocr` page with Tesseract
+(`docs/specs/extract.md` §9); the words of an excluded, front-matter or
+inkless page are the layer's, recorded as removals, as with `verify`.
+layout re-reads nothing. `cli.py` looks for Tesseract before analyze or
+extract starts under `redo` and stops when it is missing (sections 12
+and 16), so that a run does not stop at extract after analyze has
+written its file; analyze itself calls Tesseract on no page. Measured on 19 November 2026 on the whole Kadesh book, 45
+text pages: Tesseract took 0.95 s a page and the 54 pages it was tried
+on about 11 s with 6 threads, on an M5 Pro; page 9, whose layer reads
+"Me^iddo. already in tli.- sixti-fiith century ln-forr Christ", reads
+"At Megiddo, already in the sixteenth century before Christ".
 
 The audit runs Tesseract on two sets of pages:
 
@@ -300,7 +333,13 @@ to 3 and `lines.json` to 4, with `Figure.kind` (`docs/specs/figures.md`
 stays at 3 although its removals gain the reason `inkless_page`: a
 words.json of version 3 is made from a pages.json of version 3, which
 layout refuses, so a book run before the change is run again from
-analyze either way. Each has
+analyze either way. `blocks.json` stays at 5 although its removals gain
+the reason `letter_fragment` (19 November 2026,
+`docs/specs/structure.md` §35): a file of version 5 written before has
+no such removal and is read as it was, and only the code that writes the
+reason reads it. Under `ocr = "redo"` no file changes: an `ocr` page's
+words in words.json are Tesseract's, with their confidences, as on any
+page read by OCR. Each has
 one pair of functions
 in `model.py`, `write_<file>(path, value)` and `read_<file>(path)`:
 `write_pages` and `read_pages`, `write_words` and `read_words`, and so on.
@@ -564,7 +603,10 @@ Stubbs prints under the running head of an index page, "BUR CON"),
 its page number, `docs/specs/structure.md` §30), `figure_text` (the
 words the OCR read inside a figure printed on a text page: its
 lettering, labels and shading, which its image shows;
-`docs/specs/figures.md` §5). A stage spec adds a
+`docs/specs/figures.md` §5), `letter_fragment` (a piece of a letter, a
+descender or the dot of an "i", that the text layer gives as a word of
+its own inside a word of the line, in a book where such pieces are
+common: Stubbs; `docs/specs/structure.md` §35). A stage spec adds a
 reason when it removes a new kind of text, and the reason names what the
 text is, never "noise": a plate's stray text-layer characters are removed
 as `plate_text` by structure, which the owner can review.
@@ -613,7 +655,10 @@ pdfplumber, one document per worker thread, by
 them, and words the OCR left glued split at wide gaps
 (`docs/specs/extract.md`). OCR pages are rendered at 300
 dpi by `pdfium.py` and read by Tesseract in parallel; their pixel boxes are
-turned into points. A plate page is rendered whole at 300 dpi into
+turned into points. Under `ocr = "redo"` a text page's layer is read
+too, and where Tesseract lost a note reference the layer reads, the
+layer's reference is put back on Tesseract's word
+(`docs/specs/extract.md` §9). A plate page is rendered whole at 300 dpi into
 `images/`; its text layer, when it has one, is read as a text page's
 is, so that structure can keep the caption and remove the rest. The
 `cover_page` of the config is rendered whole, as `images/cover.png`,
@@ -767,12 +812,13 @@ A stage imports these and nothing else of galley.
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file. `layer_words(page) -> tuple[Word, ...]`: the one way galley reads a page's words from the text layer, in analyze and extract alike; `Character`, a frozen value (`text`, one character, and `box`), one glyph of the text layer; and `split_glued(characters)`, which cuts one word's characters into the words the OCR glued (`docs/specs/extract.md` §4 and §5) |
 | `wordlist.py` | `is_known_word(word, lower_case_words)`, whether a word counts as known on a plate (`docs/specs/plates.md` §2); `lower_case_word_list(language, cache_dir)`, the word list in lower case, made once per language and list folder, which structure, analyze and layout take; `word_list(language, cache_dir) -> frozenset[str]`, with the dictionary's case, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`), layout (re-reading, `docs/specs/reocr.md`) and structure |
-| `ocr.py` | Tesseract: `read_image(image, origin, dpi, psm, language)`, the words of an image cropped from a page, with boxes in points and Tesseract's confidence, and `words_of_tsv`, its pure part; `read_image_lines` and `lines_of_tsv`, the same words grouped by Tesseract's lines; `point_box(box, origin, dpi)`, a box in pixels of a crop as a box in points on the page; `OCR_DPI` (300). Tesseract runs with `OMP_THREAD_LIMIT=1`, one core each, so that the parallelism is galley's; output without Tesseract's tsv header is an `ExternalProgramError` (`docs/specs/reocr.md` §5). layout uses it now, analyze's audit and extract's OCR pages later |
+| `ocr.py` | Tesseract: `read_image(image, origin, dpi, psm, language)`, the words of an image cropped from a page, with boxes in points and Tesseract's confidence, and `words_of_tsv`, its pure part; `read_image_lines` and `lines_of_tsv`, the same words grouped by Tesseract's lines; `point_box(box, origin, dpi)`, a box in pixels of a crop as a box in points on the page; `OCR_DPI` (300). Tesseract runs with `OMP_THREAD_LIMIT=1`, one core each, so that the parallelism is galley's; output without Tesseract's tsv header is an `ExternalProgramError` (`docs/specs/reocr.md` §5). layout uses it now, extract for the text pages under `ocr = "redo"` (`docs/specs/extract.md` §9), analyze's audit later |
 | `fidelity.py` | the fidelity check, section 13 |
 | `list_markers.py` | the readings of a list marker (`docs/specs/structure.md` §29, "Terms"): `marker_readings(word)`, its kind, form and value, a roman numeral before a letter; `starts_a_list`, `follows` and `is_bulleted`; and `DASHES`, which structure's list rules, markdown's lists and the fidelity check share, so that the three read a marker alike |
+| `note_references.py` | `glued_reference(word) -> Reference \| None`: the glued number of `docs/specs/structure.md` §11, "Candidates", both its forms, a letter, any punctuation or none, 1 to 3 digits and only punctuation, not after a citation's abbreviation ("land3.", "Kadesh,12"; not "p.12"), and punctuation, 1 to 3 digits and only punctuation (";13"), with its parts; and `Reference` and `ReferenceForm`, the values it gives. Moved whole from `structure/_markers.py` on 19 November 2026 (its private `_glued` and the two values), and structure's `reference_candidate` calls it, so that extract puts back under `redo` exactly the references structure looks for (`docs/specs/extract.md` §9) |
 | `hyphens.py` | `LINE_END_HYPHENS`, "-" and "¬", the hyphens that end a printed line in the OCR's text, which layout's reading score, structure's hyphen joins and the fidelity check share (`docs/specs/structure.md` §5) |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
-| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc, Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`) and stops naming any that is missing |
+| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc; Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`, and analyze and extract when it is `redo`) and stops naming any that is missing |
 
 `src/galley/__init__.py` imports gilguard first: a library that stops a
 program at any import that turns Python's global lock back on, and names
@@ -933,7 +979,7 @@ cost than one every run of `galley2epub` needs.
 | program | used by | when | why it is not rebuilt |
 |---|---|---|---|
 | Pandoc | markdown (to read `book.md` back for the fidelity check), epub | every run | writing a valid EPUB 3 with navigation, notes and metadata is a large, well-tested body of work |
-| Tesseract | analyze (the OCR audit), extract (OCR pages), layout (re-reading small print), `wordlist.py` | runs that need OCR, and layout unless `ocr` is `trust` or `redo`; the word list, once per language | OCR is not something to rebuild |
+| Tesseract | analyze (the OCR audit), extract (OCR pages, every text page under `ocr = "redo"`), layout (re-reading small print), `wordlist.py` | runs that need OCR: layout unless `ocr` is `trust` or `redo`, and extract on every text page when it is `redo`, which `cli.py` checks before analyze starts; the word list, once per language | OCR is not something to rebuild |
 | epubcheck | the tests of the epub stage and the `whole_book` tests | development only | it is the reference validator of EPUB, and needs Java, which a run of galley should not |
 
 The epub stage does not run epubcheck: an EPUB is checked while
@@ -1062,6 +1108,21 @@ lists-figures):
   `pages.json` to version 4; books run before the change are run again
   from analyze (`docs/specs/plates.md` §2b; decided by the plan
   stray-text, `docs/plans/stray-text.md`).
+
+On 19 November 2026 the owner asked for `ocr = "redo"` on Kadesh, for
+Stubbs' letter fragments to go, and for Mariéjol to leave the tests and
+the evaluation, and said to go on without waiting; these were decided
+for the owner by the plan ocr-redo (`docs/plans/ocr-redo.md`):
+
+- **Under `redo` the text layer still decides what a page is**, and a
+  plate keeps its layer (section 7b).
+- **A note reference Tesseract lost is taken from the layer** where the
+  layer's word under it holds one (`docs/specs/extract.md` §9).
+- **A line of low Tesseract confidence is never a heading**
+  (`docs/specs/structure.md` §34).
+- **Stubbs' letter fragments are removals of their own**,
+  `letter_fragment`, in a book where they are common
+  (`docs/specs/structure.md` §35).
 
 ## 18. Not in this document
 

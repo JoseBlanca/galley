@@ -26,7 +26,8 @@ reads the PDF, the book config and `pages.json` (analyze's file: what
 each page is, text, plate, blank or excluded), and writes `words.json`
 (each page's words with their boxes, and the words it removed) in the
 format of `docs/architecture.md` §8 (cited as "architecture §8"), and
-`images/`. It builds on the architecture and on `docs/glossary.md`.
+`images/`. It builds on the architecture and on `docs/glossary.md`. Section 9, added on 19 November 2026, says how extract reads a page
+with Tesseract when the config's `ocr` is `redo`.
 
 The numbers were measured on 17 November 2026 with pdfplumber 0.11.10
 on the six public-domain books galley is developed on, whole, as
@@ -391,5 +392,194 @@ it takes the words `layer_words` gives.
 - The pages before the preface, which analyze marks and extract records
   as removed: `docs/specs/front-matter.md`.
 - The OCR of pages without a text layer, and Tesseract re-reading small
-  print: the OCR audit (architecture §7b) and its own spec.
+  print: the OCR audit (architecture §7b) and its own spec. The pages
+  read by Tesseract under `ocr = "redo"` are section 9.
 - Plates and the cover: `docs/specs/plates.md` §3 and walking skeleton §6.
+
+## 9. Pages read by Tesseract under `ocr = "redo"`
+
+Added on 19 November 2026 for the plan ocr-redo
+(`docs/plans/ocr-redo.md`). Under `ocr = "redo"` analyze marks every
+text page `ocr` (architecture §7b), and extract reads such a page with
+Tesseract instead of its text layer. Kadesh (`battleofkadeshst00breauoft`)
+is the book that needs it: its layer reads page 9's "At Megiddo,
+already in the sixteenth century before Christ" as "Me^iddo. already in
+tli.- sixti-fiith century ln-forr Christ". Tesseract reads the page
+better everywhere but at the note references, the small raised numbers
+in the text that point to a footnote: it reads them as a sign or drops
+them, and on the whole of Kadesh the notes linked to their reference
+fell from 31 with the layer to 2 with Tesseract's words. So extract puts
+back the layer's reference where Tesseract lost it (below). The numbers
+of this section were measured on 19 November 2026 on the whole Kadesh
+book, run up to structure at main 9292b17 once with the layer and once
+with Tesseract's words in place of the layer's on every text page and
+plate (`ocr = "trust"`, so that layout re-read nothing), with Tesseract
+5 on an M5 Pro. That run differs from the rule on the plates, which
+keep their layer under `redo`; the plates hold no note reference.
+
+### How an `ocr` page is read
+
+- The page is rendered at 300 dpi (`ocr.OCR_DPI`) in the PDFium
+  thread, and a worker reads the render with `ocr.read_image`, origin
+  (0, 0), page segmentation mode 3 (Tesseract finds the blocks of the
+  whole page) and the book's language as Tesseract's code
+  (`config.tesseract_language`). Its words come in Tesseract's order,
+  block, paragraph, line, word, with Tesseract's confidence in
+  `ocr_confidence`. Every word Tesseract gives is kept, its junk too:
+  structure's rules for stray marks, figure text and headings see them
+  (`docs/specs/structure.md` §34); none is dropped without a record.
+  Tesseract took 0.95 s a page on Kadesh's text pages, one core each.
+- The words whose middle lies in one of the page's `exclude_regions`
+  are removals with the reason `excluded_region`, as on a page read
+  from the layer; the in-page figures are cut as on any text page
+  (`docs/specs/figures.md` §4), from the boxes analyze found with the
+  layer's words.
+- The page's text layer is read too, by `text_layer.layer_words`, for
+  the references below and for one case: when Tesseract finds no word
+  on a page whose layer has words, the page keeps the layer's words and
+  its `PageWords.text_source` is `text_layer`, so that no printed word
+  is lost, and extract logs a warning naming the page. None of Kadesh's
+  45 text pages is such a page.
+- An `ocr` page's `PageWords.text_source` is `ocr`; a text page whose
+  words fell back to the layer, as above, has `text_layer`, and the
+  page's `exclude_regions` apply to those words as to any. A text page
+  has a layer with words by analyze's rule, so a page with neither
+  Tesseract's nor the layer's words does not occur.
+- Every other page is read as with `verify`, the default, which reads
+  the layer: a plate page with a layer keeps the layer's words and the
+  source `text_layer` (on Kadesh's 9 plates Tesseract reads 0 to 140
+  words and the layer 2 to 24, and the layer reads the captions better,
+  "PLATE II" where Tesseract reads "Puate II", "THE MODERN MOUND" where
+  it reads "Tae Mopern Movunp"), and the words of an excluded,
+  front-matter or inkless page are the layer's, each a removal with its
+  reason.
+
+### Note references put back from the layer
+
+**What Tesseract does to a reference.** Where the layer reads
+"Kadesh,12", "Greece,1" or "vizier83", Tesseract reads "Kadesh,”",
+"Greece,’" and "vizier®": the raised digits become a quotation mark,
+"*", "®" or "™", or vanish ("it" for the layer's "it69", "him," for
+"him,88"). Of the 106 words of the layer on Kadesh's text pages that
+end with a glued reference (condition 1 below), 68 lie under Tesseract
+words with no digit, 8 under one with a digit, and 30 under no
+Tesseract word by the test below, most of them in the layer's junk over
+hieroglyphs and Greek.
+
+**The rule.** A Tesseract word and a layer word of the same page are
+**over each other** when their boxes overlap in height by at least half
+the smaller of the two heights and in width by at least half the
+narrower of the two widths; an overlap is the length of the
+intersection of the two intervals, top to bottom or left to right, 0
+when they do not meet. (The layer's boxes on Kadesh are about 11 pt tall
+and sit 3 to 4 pt lower than Tesseract's, so that a box of the layer
+also touches the line below; the half of the height keeps that line
+out.) A Tesseract word **takes the layer's reference** when all of
+these hold:
+
+1. the layer word over it ends with a glued reference, by the form of
+   `docs/specs/structure.md` §11, "Candidates": a letter, any
+   punctuation or none, 1 to 3 digits and only punctuation, not after a
+   citation's abbreviation ("p.12"); the test is
+   `note_references.glued_reference` (architecture §12), so that
+   extract puts back only what structure looks for. Its other form,
+   punctuation and digits with no letter (";13"), never passes condition
+   4, since the Tesseract word holds a letter;
+2. the two words are over each other, and neither is over any other
+   word of the other reading;
+3. the Tesseract word holds no digit and at least one letter;
+4. both words hold as many letters (`str.isalpha`): the layer's digits
+   stand where Tesseract read a mark or nothing, never where it read a
+   letter.
+
+The Tesseract word's text then becomes its text up to its last letter,
+followed by the layer word's text after its last letter: "Kadesh,”"
+with "Kadesh,12" gives "Kadesh,12", "Higels.”" with "Hugels.80" gives
+"Higels.80", "him," with "him,88" gives "him,88". Its box and confidence stay
+Tesseract's. extract logs each change at INFO, with the page, the two
+words and the result, and their number per book; words.json has no
+record of it, since no format changes (architecture §8).
+
+**What it gives.** On Kadesh the rule changes 57 words, and the notes
+linked to their reference rise from 2 to 34, against 31 with the layer.
+Each of the 57 was looked at on the page rendered at 200 dpi: 56 are
+words the page prints with a reference after them, though the layer's
+digits are often not the printed number (page 31's "Orontes,0" for 61,
+page 54's 'sixth"3' for 143; structure's matching allows for such
+misreadings, `docs/specs/structure.md` §11, "Matching"). The wrong one
+is page 13's "find", which becomes "find1" from the layer's "flui1":
+the page prints no reference there.
+
+| variant, all else as the rule | words changed | right | notes linked |
+|---|---|---|---|
+| the rule | 57 | 56 | 34 |
+| without condition 4 | 62 | 56 | 34 |
+| an overlap in height of a third, not a half | 75 | 70 | 38 |
+| also a sign the layer reads ("hieratic*"), not only digits | 170 | not counted: most are the layer's misreadings of a letter ("feat*" for "feats") | 39 |
+
+The half of the height misses references whose two boxes overlap by
+less, as page 28's "it" under "it69" (3.1 pt of 7.9); a third takes 16
+more right ones, but also 4 wrong ("Kadesh"
+and "seek" on page 41, where the page prints none) and loses 2, and a
+wrong one leaves a digit in a word of the text. Condition 4 keeps out "campé" (page 62; the layer's "camp6" reads the
+"é" as a digit), "Mon.," (page 13; the layer's "Jfem.,17" holds the
+citation "Mon., 17", which Tesseract reads as two words), "XV-XVII."
+and two words of the layer's junk. A note's own marker, at the start of
+its line, is not put back: Tesseract reads more of them than the layer
+does (108 of 159 notes with a marker against the layer's 84 of 148).
+
+### Cases
+
+- **Tesseract reads the reference as digits** ("Kadesh,12" both
+  ways): the word has a digit, nothing changes.
+- **The layer's word covers two of Tesseract's** ("Jfem.,17" over
+  "Mon.." and "17"): condition 2, nothing changes.
+- **A reference the layer missed too** ("Ramses’s" over the layer's
+  "Ramses1", 7 letters against 6): nothing changes.
+- **A digit of the layer inside a word** ("find" over "flui1"): the one
+  wrong change measured; the reference is matched only if a note on the
+  page reads 1 or a digit confused with it, otherwise "find1" stays in
+  the text as the layer's "flui1" did.
+- **Faint Kadesh page 69**: a plate without a layer; analyze makes it a
+  plate whatever `ocr` is, and Tesseract finds no word on it.
+
+### The public interface
+
+`page_words` takes an `ocr` page's words as it takes a layer page's,
+and two pure functions are added:
+
+```python
+# galley.extract
+def with_layer_references(ocr_words: tuple[Word, ...],
+                          layer_words: tuple[Word, ...]) -> tuple[Word, ...]:
+    """`ocr_words`, a page's words as Tesseract read them, each that
+    takes the layer's note reference (extract spec section 9) with its
+    text changed, in the same order."""
+
+def are_over_each_other(one: Box, other: Box) -> bool:
+    """Whether two word boxes overlap by half the lower height and half
+    the narrower width (extract spec section 9)."""
+```
+
+`run` no longer refuses an `ocr` page.
+
+### How it is verified
+
+- **Unit tests** of `with_layer_references` with literal words copied
+  from Kadesh's two readings: page 10's "Kadesh,”" over "Kadesh,12"
+  becomes "Kadesh,12"; page 36's "him," over "him,88" becomes "him,88";
+  page 13's "Mon.." and "17" under "Jfem.,17", page 31's "Ramses’s" over
+  "Ramses1" and page 62's "campé" over "camp6" stay as they are; a
+  Tesseract word with no layer word over it stays; and of
+  `are_over_each_other` with page 8's "Greece,1" against Tesseract's
+  "Greece,’" (over) and "thousand" on the line below (not over).
+- **The excerpt `kadesh_redo`** (Kadesh pages 8 to 16, 32 and 34, with
+  `ocr = "redo"`; `scripts/fetch_samples.py`): page 9's text read by
+  Tesseract, the plate's words the layer's, the excluded page's the
+  layer's as removals, and the references after "Greece," (page 8) and
+  "Kadesh," (page 10) linked to their notes. Its expected files are in
+  `tests/fixtures/expected/ocr_redo/`.
+- **The whole Kadesh book** with `ocr = "redo"`: at least 31 notes
+  linked, the plan's target; 34 were measured with the prototype, and a
+  count below 34, or a number of changed words far from 57, is explained
+  in the work report page by page.

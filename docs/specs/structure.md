@@ -76,6 +76,13 @@ punctuation, "servus*.", is a reference candidate (section 11,
 "References"). Layout changes with it (`docs/specs/layout.md` §3,
 steps 2b to 4).
 
+Revised on 19 November 2026 for the plan ocr-redo
+(`docs/plans/ocr-redo.md`): a line of low Tesseract confidence is never
+a heading (section 34, for books read with `ocr = "redo"`), and the
+pieces of letters that Stubbs' text layer gives as words of their own
+are removed as `letter_fragment` (section 35). `blocks.json` stays at
+`format_version` 5.
+
 It builds on `docs/architecture.md` (cited as "architecture §8") and
 `docs/glossary.md`, and on the layout spec, whose terms (body column,
 footnote band, margin note, row, body word height, body line pitch) it
@@ -179,7 +186,8 @@ inside it.
    the pages whose lowest line is a signature line (section 4), the
    index pages (section 17), the plate pages (the pages that have a
    figure of kind `plate`; section 18), the book's marker form (section
-   1) and the endnote section (section 12), which is found from the
+   1), whether the book has letter fragments (section 35) and the
+   endnote section (section 12), which is found from the
    lines that start a paragraph by section 6's rules. The region of an
    in-page figure takes no part in the survey (`docs/specs/figures.md`
    §5). The body word height and body line pitch are
@@ -199,7 +207,8 @@ inside it.
       region (`docs/specs/figures.md` §5);
    2. remove the running head, page numbers, signature marks and stray
       marks (sections 3 and 4), the guide words of an index page
-      (section 17), and on a plate page its running head and stray
+      (section 17), the letter fragments in a book that has them
+      (section 35), and on a plate page its running head and stray
       words, keeping its caption (section 18); then, on a text page with
       in-page figures, find each figure's caption, take it out of the
       body stream, and remove the figure's region as `figure_text`
@@ -1250,6 +1259,8 @@ again):
   printed on a text page (`docs/specs/figures.md` §5). It comes from
   the figures spec, written the same day, and goes into the same
   version 5, so that the owner reruns structure once.
+- `RemovalReason.letter_fragment`, added on 19 November 2026 without a
+  new version (section 35, architecture §8).
 
 `label` may now be set on a heading, a list item (always) and a
 contents entry; `level` on a heading, an index entry and a contents
@@ -2637,6 +2648,11 @@ tall line made each a level-1 heading. Measured on 17 November 2026 on
 the eight books, the rule takes away 4 heading blocks, each a running
 head on its page: those two, Domesday's 552 ("Index.", under its page
 number) and Mariéjol's 121 ("rcis CATIir"), and no other.
+
+A line read by Tesseract whose words' median confidence is below 60 is
+never a heading line, a chapter label or a continuation, whatever branch
+takes it (section 34): under `ocr = "redo"` Tesseract reads rows of
+hieroglyphs as centred junk.
 
 Two more kinds of line join a heading:
 
@@ -4775,3 +4791,217 @@ bullet list, which none of the six books prints, to be added when such
 a book is found; linking an entry whose section has no heading in the
 body (Domesday's "LIST OF ABBREVIATIONS", page 21, which structure
 makes a quote).
+
+## 34. Headings from lines read by Tesseract
+
+Added on 19 November 2026 for the plan ocr-redo
+(`docs/plans/ocr-redo.md`). Under `ocr = "redo"` every text page's words
+are Tesseract's (`docs/specs/extract.md` §9), and Tesseract reads a row
+of hieroglyphs or Arabic printed between the lines of the text as a
+line of junk: "KELP IPM DS" and "ver Sih 8 RES BME J" on Kadesh's page
+32, "ialey GIN Lys pt deal Spey ope paadt ope le jell Qaalt Lang" on
+page 21. The layer holds no word over most of these rows, so analyze
+finds no figure there: the rows of hieroglyphs that are no figure hold
+43 to 115 squares of ink, against the 120 of an in-page figure
+(`docs/specs/figures.md` §3 and §8), and Tesseract's
+words over it come to structure as a body line. Centred, such a line
+passes the heading rule (section 14). Run on the whole Kadesh book with
+Tesseract's words (measured on 19 November 2026, at main 9292b17, with
+Tesseract's words in place of the layer's on every text page), structure
+made 16 heading blocks, against 3 with the layer: the same 3, 12 of
+junk, on pages 21 (2), 30, 32 (2), 39 (3), 41, 44, 46 and 50, and the
+library's card pocket on page 74 (below).
+
+**The rule.** A body line whose words all carry a Tesseract confidence
+(`Word.ocr_confidence`, 0 to 100) and whose median confidence is below
+**60** is not a heading line, by whatever branch of section 14 would
+take it, and is neither a chapter label nor a continuation that joins
+a heading. It stays in its paragraph, and it is still a line of the
+body stream for every other rule of section 14: the line before or
+after another line, from which that line's gaps are measured. A line
+with a word of the layer, whose confidence is `None`, is never kept out
+by this rule. The median is `statistics.median`, the mean of the two
+middle values for an even number of words. The rule holds for every
+line read by Tesseract, also a line layout re-read under `ocr =
+"verify"` (below), though only `redo` makes such junk lines.
+
+**Where 60 comes from.** On the whole Kadesh book with Tesseract's
+words, the median confidence of the lines of the 12 junk heading
+blocks is 0 to 50.5 ("6. iT SS 2 APIS", page 39), and that of the
+lines of the real headings 85.0 ("James Henry Breastep", page 8) to
+96.2 ("ADDENDUM", page 66). Over all the book's lines, 1,775 of 2,338
+have a median of 90 or more; lines of the text with a median under 60
+exist (a footnote line, "Seti I.'s: sen was alew * flest chariuvteer of
+his majesty", 47), but none of them is a heading. On the eight books
+run with `ocr = "verify"` (the stray-text runs of 18 November 2026),
+4 heading lines are Tesseract's, re-read by layout, with medians of 83
+to 96 (Haskins' "BIBLIOGRAPHICAL NOTE", page 129; three lines of
+Mariéjol's page 14): the rule changes no heading of those runs.
+
+**What it gives.** On Kadesh with Tesseract's words, the 12 junk
+headings are gone and the 3 of the layer stay: the article's title on
+page 8, the centred caption of the battle plan on page 39 (a false
+heading with the layer too, section 14, "Where it fails") and
+"ADDENDUM" on page 66. One heading comes that the layer did not make:
+"PLEASE DO NOT REMOVE CARDS OR SLIPS FROM THIS POCKET", the library's
+card pocket on page 74, which Tesseract reads at a confidence of 96
+where the layer had no line to centre. It is not the book's: the
+whole book's config excludes page 74 from task 2.2 of the plan on,
+which gives the config `ocr = "redo"`, as it excludes the other pages
+the library added (70 to 73 and 75). The junk lines stay in the text as
+paragraphs, as the layer's junk over hieroglyphs does today; removing
+them is not in this plan.
+
+**The words of an in-page figure.** analyze finds the in-page figures
+from the layer's words (architecture §7b), so a page has the same
+figure boxes under `redo`, and layout takes Tesseract's words whose
+middle lies in a figure's box into that figure's region, which
+structure removes as `figure_text` (`docs/specs/figures.md` §5), as it
+does the layer's. Checked on the same run: the figures of pages 41, 44
+and 50 hold Tesseract's words in their regions. The junk lines beside
+them, outside the boxes ("is? a « Melo eo lb. ZnS" above page 44's
+figure), are kept out of the headings by the rule above and stay
+paragraphs, as the layer's junk over hieroglyphs did (page 21's "uUI
+Ifi. lii JL-JI").
+
+**How it is verified.** A unit test of the heading rule with a centred
+line in capitals whose words have confidences of 8 to 49, which is not
+a heading, and the same line with confidences of 90, which is, and the
+same line with `None`, which is; the excerpt `kadesh_redo`, whose only
+heading is page 8's title, page 32's two rows of hieroglyphs making
+none; and the whole Kadesh book with `ocr = "redo"`: the 3 headings of
+the layer, and none on the pages listed above.
+
+## 35. Letter fragments in Stubbs' text layer
+
+Added on 19 November 2026 for the plan ocr-redo. Stubbs' text layer
+(`earlyplantagenet01stub`) gives the descender of a "g", "p", "y" or
+"j", the dot of an "i" or the top of a letter as a word of its own,
+lying inside the word it was cut from: "Swabia, . and" on page 24,
+where the "." is a piece of the "i" of "Swabia", "only -' to call" on
+page 29, "great °" wherever the "g" of "great" lost its tail. structure
+removes such a piece, a **letter fragment**, as a removal of its own,
+`letter_fragment`, so that the words around it read whole.
+
+**The rule.** In a book with letter fragments (below), on a text page
+that is not an index page (section 17), a word of a line is a letter
+fragment when all of these hold:
+
+1. it is a word of the text layer, whose `ocr_confidence` is `None`,
+   and has at most 2 characters, at most 1 of them a letter;
+2. another word of the same line with at least 3 letters overlaps it
+   across at least half of the fragment's width, overlaps it in height
+   by any length, and is at least 1/1.15 of its height (the fragment is
+   at most 1.15 times as tall);
+3. it is alone in its line's row: fewer than 2 other words of the line
+   have a top and a bottom each within 0.2 pt of its own.
+
+It is removed with the reason `letter_fragment`, its page, box and
+text, at step 2.2 (section 2), after the stray marks and before the
+captions, so that no later rule sees it. A word in an in-page figure's
+region is figure text already.
+
+**A book with letter fragments** is one in which at least **0.15** of
+its pages that hold 5 lines or more in all their regions, counted before
+any removal, index pages left out, have a word that the rule takes. The
+survey, structure's first pass over the whole book (step 1), decides it
+once for the book; as for every rule of the survey, the region of an
+in-page figure counts for neither (`docs/specs/figures.md` §5). The
+measurement below counted them; of the eight books only Kadesh,
+Turney and Haynes have such regions, with 1, 0 and 0 fragments.
+
+**Measured** on 19 November 2026 on the `lines.json` of the eight books
+run by the plan stray-text (main a0a1675 to 9292b17; the rule does not
+depend on the commits between), with structure's index pages:
+
+| book | pages of 5 lines or more | pages with a fragment | share | words the rule takes |
+|---|---|---|---|---|
+| Stubbs | 293 | 120 | 0.410 | 251 |
+| Domesday | 532 | 16 | 0.030 | 31 |
+| Gierke | 269 | 7 | 0.026 | 11 |
+| Kadesh | 46 | 1 | 0.022 | 1 |
+| Mariéjol | 439 | 5 | 0.011 | 7 |
+| Haskins, Haynes, Turney | 252, 409, 286 | 0 | 0 | 0 |
+
+So the rule removes Stubbs' 251 and nothing in the seven other books.
+Condition 1 leaves out Tesseract's words: without it, the rule takes 29
+of Tesseract's words on Kadesh read with `ocr = "redo"` (specks and the
+junk of hieroglyphs, ". " in "examined", "=" in "gives"), on 9 of its
+44 pages of 5 lines, a share of 0.205, which would turn the rule on for
+Kadesh, since every word Tesseract reads has a box of its own and
+condition 3 holds for nearly all (spec review, 19 November 2026). With
+it the counts above are those of the layer's words alone: on the eight
+books it leaves out 3 words of Mariéjol that layout re-read with
+Tesseract, and none of Stubbs' outside its index.
+Of 24 of Stubbs' 251 drawn at random and looked at on the page rendered
+at 200 dpi, all 24 are pieces of a letter of the word they lie in; so
+are all 14 of the 251 that hold a digit, "1", ".1", "3" and "6" (the
+stem of an "h" or "l", the tail of a "g" or "y", pages 58 to 282), each
+looked at. The committed excerpts,
+measured on the same runs restricted to their pages: Stubbs'
+`stubbs_51_56-64` 0.70, `stubbs_cut_in` 0.50, `stubbs_summaries_index`
+0.25 (4 pages of 5 lines that are not index pages) and `stubbs_heads`
+0.22; no other excerpt above 0.11 (`gierke_notes_heads`, 1 page of 9).
+
+**Why each condition.**
+
+- Conditions 1 and 2, with no other, take 261 words on 127 of Stubbs'
+  pages (the investigation of 19 November 2026), but also 89 in
+  Domesday, 66 in Gierke, 123 in Mariéjol and 7 in Kadesh: real words
+  of a row the OCR boxed over a word of another row ("a" over
+  "pluralitas" on Gierke's page 225, whose rows the layer boxes 3.7 pt
+  apart), a table's numbers ("19" and "8" on Domesday's pages 42 and
+  44) and the words of Domesday's page 136, whose climbing words layout
+  mixes (`docs/specs/extract.md` §6).
+- Condition 3 keeps out a word that is one of a row of words: in
+  Domesday, Gierke, Kadesh and Mariéjol the layer gives every word of an
+  OCR line the same top and bottom, and a real word of the row below
+  shares them with its neighbours. A fragment is cut from its word and
+  stands at its own height. It keeps 259 of Stubbs' 261 and leaves 31,
+  12, 10 and 1 in the others, still with real text among them (the
+  table's "19" and "8" are alone in their rows).
+- Index pages are left out because the digits there are page numbers
+  that the scan's skew sets inside an entry's word: "91" in "William"
+  on page 314, "26" in "RANULF" on 319: of the 8 words the rule takes
+  on Stubbs' pages 313 to 321, the 5 that hold a digit are each part of
+  a page number printed there (the 3 words "I" the rule takes there were
+not looked at).
+- The share of pages, not a property of the word, is what separates
+  Stubbs from the others: no condition on the word alone was found that
+  keeps out Domesday's table numbers and Gierke's page 225 and keeps
+  240 of Stubbs' fragments. Taking only the lines beside one of Stubbs'
+  cut-in notes, the plan's first idea, keeps 233 with condition 3 and
+  still takes 5 words of Domesday, 1 of Gierke and 2 of Mariéjol,
+  because their margin notes inside the column count as cut-in notes
+  by section 2's margin rule; and leaving out the words with a digit
+  loses Stubbs' 14 fragments that hold one.
+
+**The threshold 0.15** lies between the books' shares, 0.030 at most
+for the seven books against Stubbs' 0.410, and between the committed
+excerpts', 0.11 against 0.22. An excerpt is a sample of a few pages, so
+its share varies: ten consecutive pages of Domesday hold at most 3 with
+a fragment (0.30), which would pass. When an excerpt of a book other
+than Stubbs is added, its share is measured, and one of 0.15 or more is
+a reason to choose other pages.
+
+**What it does not do.** Stubbs' garble that is not a piece of a
+letter stays: page 37's "j-j^ too anc j", a misreading; page 97, two
+rows the layer merged; pages 102 and 120, notes cut by the column;
+page 236's "r Air ttt".
+
+**How it is verified.** Unit tests of the rule with literal words: page
+24's "." inside "Swabia," removed; a word "a" over "pluralitas" whose
+top and bottom two other words of its line share (Gierke's page 225)
+kept; a fragment on an index page kept; the share of 0.15 met and
+missed; a Tesseract word of the form of a fragment kept. Excerpt tests
+on `stubbs_51_56-64` and `stubbs_cut_in`: the fragments listed in their
+expected files removed with the reason `letter_fragment`, and their
+words whole. `stubbs_summaries_index` (0.25) and `stubbs_heads` (0.22)
+are books with letter fragments too, so their outputs change where a
+fragment is, and their expected values with them. Whole books: at least
+240 of Stubbs' 251 removed, and none on the seven others, Kadesh read
+with `ocr = "redo"` among them.
+
+The format: `RemovalReason.letter_fragment`, in `blocks.json`, which
+stays at version 5 (architecture §8). The fidelity check counts it as
+any removal.
