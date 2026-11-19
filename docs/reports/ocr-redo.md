@@ -24,9 +24,10 @@ What a reader of the EPUB sees now:
   `book.toml`), because the OCR text that came with its scan is poor.
   Page 9 reads "At Megiddo, already in the sixteenth century before
   Christ", where it read "Me^iddo. already in tli.- sixti-fiith century
-  ln-forr Christ". Where Tesseract does worse than the scan's text,
-  galley keeps the scan's: the small raised note numbers, the map
-  numbers, and the lines Tesseract skipped. Kadesh has 40 linked notes
+  ln-forr Christ". The scan's own OCR text (its text layer) is still read, and
+  galley takes from it, word by word, what Tesseract gets wrong: a small
+  raised note number glued to a word, a map's numeral, the height of
+  each word, and any word of a line Tesseract skipped. Kadesh has 40 linked notes
   (31 before) and footnotes on 42 pages (40 before).
 - **Stubbs' letter pieces are gone.** The scan's text had split the
   tail of a "y" or the dot of an "i" off as words of their own: 367 such
@@ -40,8 +41,9 @@ What a reader of the EPUB sees now:
 Checked: all the tests pass (3,079 quick ones in 69 s; 157 on the whole
 books); the seven EPUBs pass epubcheck with no error or warning; the
 evaluation against the Project Gutenberg texts of Haskins, Stubbs and
-Domesday shows no score falling beyond the usual limits (Stubbs' word
-error rate 0.029 to 0.025). The pages each rule changes were compared
+Domesday shows no score falling by more than the limits of the earlier plans
+(0.005 for a share); Stubbs' share of wrong words in its body fell from
+0.029 to 0.025, and every other score stayed or moved by 0.001. The pages each rule changes were compared
 with their images.
 
 Still wrong:
@@ -60,9 +62,10 @@ Still wrong:
 
 Decided while you were away: Mariéjol's excerpts stay as tests; your
 two books keep placeholder titles in the tests (the real ones are in
-your `book.toml`); a new removal reason, `letter_fragment`, in the
-blocks file. Books run before the merge need no new run (no file
-format changed its version), but rerunning gives these changes.
+your `book.toml`); each removed piece is recorded in `blocks.json` with a new
+reason, `letter_fragment`. The file formats are unchanged otherwise, so
+books run before the merge still run; rerunning them gives these
+changes.
 
 Asked of you: the order to merge, and a look on the Kindle at Kadesh
 (`battleofkadeshst00breauoft`), its first pages and its notes, and at
