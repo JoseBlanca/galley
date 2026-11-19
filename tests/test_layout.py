@@ -1936,6 +1936,29 @@ def test_cut_in_strip_words_not_smaller_by_both_measures_stay_in_the_body(
     assert body[10:12] == (("Coinage", "d10", "e10"), ("debased.", "d11", "e11"))
 
 
+def test_cut_in_body_row_7_9_pt_from_the_inset_with_body_type_is_not_cut() -> None:
+    # Rule 1's gap of 7.8 pt holds only for a row whose strip words are set
+    # small. Row 11's strip word, 8 pt high and 8 pt a character like the
+    # body, ends 7.9 pt before the inset at 110 ("it will be", Stubbs page
+    # 219): it is no cut row, so rows 10 and 12, cut and shortened, lie 2
+    # pitches apart and make no chain. Were row 11 cut, the three would make
+    # a zone and "Coin" would go to the margin.
+    full = tuple(
+        word
+        for word in _prose_rows(20)
+        if word.box.top not in {_row_top(10), _row_top(11), _row_top(12)}
+    )
+    top = _row_top(11)
+    rows = (
+        *_cut_row(10),
+        _word("Coin", 70.1, top, 102.1, top + 8),
+        *_cut_row(11),
+        *_cut_row(12),
+    )
+    (body,) = _region_texts(layout_page(_page(0, (*full, *rows)), _CUT_IN_MEASURES))
+    assert body[10:13] == (("d10", "e10"), ("Coin", "d11", "e11"), ("d12", "e12"))
+
+
 def test_cut_in_strip_of_single_letters_counts_as_shortened() -> None:
     # A note the OCR spaced out ("B an i s h"): no strip word of 2 letters.
     body, margin = _size_page((("B", 8.0, 8.0), ("n", 8.0, 8.0)))
