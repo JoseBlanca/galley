@@ -688,6 +688,25 @@ is laid out as one region, as the skeleton did.
    with the book's measure alone, 0.85 of the body word height, as
    before: against the page's own rows such a page is not small.
 
+   **A page whose notes outnumber its text.** The page's median row
+   height is taken over its **full-size rows**, those whose median word
+   height is at least 0.9 of the book's body word height, when they are
+   at least a quarter of the rows left after step 3; otherwise over all
+   those rows. On Gierke's page 50, the last of the introduction, 13
+   rows of text at 10 pt stand above 25 rows of notes at 8 pt: the
+   median of all the rows is a note row's, 8 pt, against which the notes
+   are not small (8 pt is 0.89 of the book's 9.0), and its five
+   footnotes stayed in the body. Against its full-size rows, 10 pt, they
+   are 0.80. The quarter keeps a page of notes with a chapter heading
+   among them as it was: Turney's notes pages 262 and 271 each hold one
+   row of 10 pt among about 50 of 8 pt, against which the notes, made
+   small, would start a band below the heading (a guess between those
+   pages' 1 row in 50 and page 50's 13 in 38). Laid out with and without
+   the rule on 19 November 2026 on the eight books' `words.json`, the
+   regions differ on Gierke's page 50 alone; without the quarter, they
+   differ also on Turney's 262 and 271 and on Gierke's printed contents,
+   page 63, where a second column became a region of its own.
+
    **A note of one line boxed as tall as the body.** On some of
    Domesday's pages the only footnote is one line, which the text layer
    boxes 10 pt high as it boxes the body ("1 D. B. i. 141 b." on page

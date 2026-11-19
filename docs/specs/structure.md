@@ -307,8 +307,15 @@ the references, gets both too.
   median line height is the median, over the lines of the page's
   regions other than the head line's that are at least a quarter as
   wide as the widest of them (so that no margin region counts), of
-  each line's median word height: layout's median row height, taken on
-  structure's lines.
+  each line's median word height, taken over the lines of at least 0.9
+  of the body word height when they are at least a quarter of those
+  lines: layout's median row height (layout §3, step 4, "A page whose
+  notes outnumber its text"), taken on structure's lines. Gierke's page
+  50 holds 13 lines of text and 25 of notes, so the median of all its
+  lines is a note line's and its five footnotes were body regions;
+  measured on 19 November 2026 on the eight books laid out with
+  layout's rule, the blocks change on that page alone, which gets its
+  five footnotes.
 
   The test against the page is for notes set small against their own
   page but not against the book. Gierke's introduction (pages 13 to 49)
