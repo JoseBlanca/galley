@@ -2,8 +2,10 @@
 every stage, and a stage's name runs that stage alone (spec section 9).
 
 The command reads `book.toml` from the folder and calls each stage's `run`.
-Before any stage, it refuses `correct = true` under `run` and checks that
-Pandoc is installed when a stage it runs needs it; Tesseract's tools when
+`run` runs the correct stage only when the config has `correct = true`.
+Before any stage, it checks that LM Studio answers and has the config's
+models when the command runs correct (docs/specs/correct.md, section 4),
+and that Pandoc is installed when a stage it runs needs it; Tesseract's tools when
 analyze or structure runs, or layout re-reads small print, and the word
 list of the book's language is not cached; Tesseract when layout runs
 and the config's `ocr` is `verify`; and Tesseract when analyze or extract
@@ -22,7 +24,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from galley import analyze, epub, extract, layout, markdown, structure, wordlist
+from galley import (
+    analyze,
+    correct,
+    epub,
+    extract,
+    layout,
+    markdown,
+    structure,
+    wordlist,
+)
 from galley.book_folder import BookFolder
 from galley.config import BookConfig, OcrMode, read_config, tesseract_language
 from galley.errors import ConfigError, ExternalProgramError
@@ -51,7 +62,9 @@ class _Stage:
     re-reads small print (docs/specs/reocr.md, section 3), needing the
     word list too; and whether it needs Tesseract
     under `ocr = "redo"`, as extract does to read every text page and
-    analyze, which runs before it (architecture section 7b)."""
+    analyze, which runs before it (architecture section 7b); and whether
+    `run` runs it only when the config has `correct = true`, as the correct
+    stage."""
 
     name: str
     help: str
@@ -60,10 +73,10 @@ class _Stage:
     needs_word_list: bool
     reads_with_tesseract: bool
     needs_tesseract_under_redo: bool
+    only_when_correct: bool = False
 
 
-# The stages in the order `run` calls them. The correct stage and
-# `edits-from` are not in the skeleton. markdown reads book.md back with
+# The stages in the order `run` calls them; `edits-from` is not built. markdown reads book.md back with
 # Pandoc for the fidelity check; epub writes the EPUB with it.
 _STAGES: tuple[_Stage, ...] = (
     _Stage(
@@ -101,6 +114,16 @@ _STAGES: tuple[_Stage, ...] = (
         needs_word_list=True,
         reads_with_tesseract=False,
         needs_tesseract_under_redo=False,
+    ),
+    _Stage(
+        name="correct",
+        help="a local vision model's fixes to the words: edits/correct.jsonl",
+        run=correct.run,
+        needs_pandoc=False,
+        needs_word_list=False,
+        reads_with_tesseract=False,
+        needs_tesseract_under_redo=False,
+        only_when_correct=True,
     ),
     _Stage(
         name="markdown",
@@ -158,10 +181,13 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _stages_of(command: str) -> tuple[_Stage, ...]:
-    """The stages a command runs, in order."""
+def _stages_of(command: str, config: BookConfig) -> tuple[_Stage, ...]:
+    """The stages a command runs, in order: under run, correct only when the
+    config has `correct = true`."""
     if command == _RUN:
-        return _STAGES
+        return tuple(
+            stage for stage in _STAGES if config.correct or not stage.only_when_correct
+        )
     return tuple(stage for stage in _STAGES if stage.name == command)
 
 
@@ -176,22 +202,16 @@ def _book_folder(path: Path) -> BookFolder:
     return BookFolder(path)
 
 
-def _check_before_any_stage(
-    command: str, stages: tuple[_Stage, ...], folder: BookFolder, config: BookConfig
-) -> None:
-    """ConfigError for `correct = true` under run, then ExternalProgramError
-    when a stage needs Pandoc and it is not on the PATH (spec section 9);
+def _check_before_any_stage(stages: tuple[_Stage, ...], config: BookConfig) -> None:
+    """ExternalProgramError when the correct stage runs and LM Studio does
+    not answer or lacks a model of the config; when a stage needs Pandoc and it is not on the PATH (spec section 9);
     when analyze or structure, or layout re-reading small print, needs
     Tesseract's tools to extract the word list; or when layout reads with
     Tesseract, which it does only when the config's `ocr` is `verify`, or
     analyze or extract runs under `ocr = "redo"`, and it is not on the
     PATH."""
-    if command == _RUN and config.correct:
-        message = (
-            f"{folder.book_toml} has correct = true, but the walking skeleton "
-            "has no correct stage; set correct = false"
-        )
-        raise ConfigError(message)
+    if any(stage.only_when_correct for stage in stages):
+        correct.check_server(config)
     if any(stage.needs_pandoc for stage in stages) and shutil.which("pandoc") is None:
         message = "pandoc is not installed; install it with `brew install pandoc`"
         raise ExternalProgramError(message)
@@ -278,8 +298,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     try:
         folder = _book_folder(arguments.folder)
         config = read_config(folder.book_toml)
-        stages = _stages_of(command)
-        _check_before_any_stage(command, stages, folder, config)
+        stages = _stages_of(command, config)
+        _check_before_any_stage(stages, config)
         for stage in stages:
             running = stage.name
             _logger.info("running %s on %s", stage.name, folder.root)

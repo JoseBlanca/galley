@@ -42,6 +42,7 @@ from galley.model import (
     PagesFile,
     Span,
     TextSource,
+    block_sha256,
     write_blocks,
     write_edits,
     write_pages,
@@ -1510,7 +1511,7 @@ EDIT = Edit(
 )
 
 
-def test_run_with_an_edit_raises_naming_the_file_and_leaves_no_book_md(
+def test_run_with_an_edit_that_does_not_apply_raises_naming_the_file_and_leaves_no_book_md(
     tmp_path: Path,
 ) -> None:
     folder, config = _book(tmp_path)
@@ -1519,13 +1520,33 @@ def test_run_with_an_edit_raises_naming_the_file_and_leaves_no_book_md(
     write_edits(folder.edits_dir / "owner.jsonl", (EDIT,))
     folder.book_md.write_text("an old book.md\n", encoding="utf-8")
 
-    with pytest.raises(
-        EditError, match="owner.jsonl.*markdown does not apply edits yet"
-    ) as raised:
+    with pytest.raises(EditError, match=r"owner\.jsonl, line 1") as raised:
         markdown.run(folder, config)
 
     assert "correct.jsonl" not in str(raised.value)
     assert not folder.book_md.exists()
+
+
+@pytest.mark.pandoc
+def test_run_applies_correct_then_owner_edits_to_book_md(tmp_path: Path) -> None:
+    # Architecture section 10: correct.jsonl first, owner.jsonl last, each
+    # on the text the edits before it leave.
+    folder, config = _book(tmp_path)
+    folder.edits_dir.mkdir()
+    checksum = block_sha256(TWO_PARAGRAPHS.blocks[1])
+    write_edits(
+        folder.edits_dir / "owner.jsonl",
+        (replace(EDIT, block_sha256=checksum, old="four", new="five"),),
+    )
+    write_edits(
+        folder.correct_jsonl, (replace(EDIT, block_sha256=checksum, author="correct"),)
+    )
+
+    markdown.run(folder, config)
+
+    assert "1\\. Of the «five» — \\[sic\\]" in folder.book_md.read_text(
+        encoding="utf-8"
+    )
 
 
 @pytest.mark.pandoc

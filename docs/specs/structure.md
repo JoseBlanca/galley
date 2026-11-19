@@ -876,6 +876,59 @@ first join's word as its first word ("pre-" "Anglo-" then "preAnglo-"
 "Saxon"), and the fidelity check, which undoes every change, still
 balances.
 
+**A hyphen read as a sign.** The text layer sometimes reads a line-end
+hyphen as one of the signs of a note reference, "*", "^" or "•"
+(section 11): Stubbs' "the impulse of aggres*" at the foot of page 24,
+whose hyphen the scan prints as a faint dot, before "sive warfare," on
+page 25; Haskins' "pil^" "grims" (page 226), checked on the page
+images on 19 November 2026. The two parts stayed apart with the sign
+between them in `book.md`. In every block, the last word of a line
+that `join_hyphen` does not join is joined with the first word of the
+next line of the block, over a page break too, when all of these hold:
+
+- the first word ends with one such sign after a letter, and has 2
+  letters or more without the sign;
+- the second word starts with a lower-case letter;
+- the joined word, the first without its sign followed by the second,
+  has a key in the word list (with 2 letters or more in the second
+  word) or among the book's own words, as for `hyphen_join`.
+
+The join is never guessed and never keeps a hyphen: without such
+evidence the words stay as they are, since a reference glued to the
+last word of a line is far more common ("justice*" "or", Domesday page
+106; "corpus*" "with", Gierke page 226). It is a `WordChange` of the
+reason `hyphen_join` whose `before` is the two words as the OCR has
+them and whose `after` is the joined word followed by the sign:
+("aggres*", "sive") becomes ("aggressive", "*"). The block holds only
+the joined word; the sign is removed, with the reason `misread_hyphen`
+(architecture §8), its page that of the change and its box that of the
+word it ended: the first line of that page in `lines.json` whose last
+word is the change's first word, which the join was made on. A word
+that an earlier join made ends no line of `lines.json`, so it is not
+joined over a sign: in "con-" "tinu*" "ally", a line of one word between
+a hyphen and the sign, the first join gives "continu*" and the sign
+stays where it is. No other step before the joins changes a line's last
+word; were no line found, structure stops with an error, as for any
+fault of its own. The
+fidelity check accepts such changes only when the `misread_hyphen`
+removals of each page and sign number exactly the changes over that sign
+on that page, so that a sign is never dropped without a record and no
+such removal stands without its join.
+
+Measured on 19 November 2026 on the `lines.json` of the seven books run
+by the plan ocr-redo: 31 lines end with a letter and one of the signs
+(Stubbs 5, Haskins 2, Domesday 8, Gierke 15, Kadesh 1, Haynes and Turney
+none), and the rule joins 2 of them, "aggressive" and "pilgrims", both
+right on the page images. The others give no known word ("Oar*"
+"endon,", Stubbs page 97, a misreading of "Clarendon"; "inter*" "were",
+Gierke page 176) or a next word in capitals.
+Verified by unit tests of the join (the cases above, and "justice*"
+"or", a capital, one letter before the sign, two signs and no evidence
+left apart), of `join_lines` over a page break, of `make_blocks` on two
+literal pages, whose removal `misread_hyphen` holds the "*" with the box
+of "aggres*", and of the fidelity check, which fails when that removal
+is missing or when the sign is dropped from the change's `after` too.
+
 **A hyphen lost in a margin note.** In a margin note the OCR often
 drops the line-end hyphen or reads it as a full stop, and the two parts
 of the word stay apart in the EPUB: "nation" "al" and "unfree" "dom"
@@ -2920,7 +2973,8 @@ A body block whose first word has the book's marker form (section 1)
 is never made a quote by these rules: it is a note that section 11 did
 not take (Mariéjol's page 210), and stays a paragraph; such a block
 never runs on into the next page's body (section 6 is not applied to
-it), and the paragraph the next page starts is a block of its own.
+it), and the paragraph the next page starts is a block of its own,
+unless it is a **numbered paragraph** (below).
 Inside the endnote section (section 12) such a block does run on into
 the next page, as any paragraph does: there every note starts with digits, and one that runs over a
 page break is one paragraph. Gierke's endnotes start with digits ("13.")
@@ -2935,11 +2989,93 @@ and 35 of Mariéjol's 40 (with 3 and 15 more blocks the reference text
 has as neither notes nor quotes, tables and garble), and no real quote
 (Domesday's "(i) A Somersetshire manor…" are bracketed, against its
 digits). False note-quotes remain: 2 in Domesday, 5 in Mariéjol. A
-book whose form is digits and whose paragraphs start with a number
-("1. Of the three…") would have such a paragraph cut at a page break,
-since it never runs on (how often the six books do so was not
-measured). A
 rule here changes a block's kind and no word, so it needs no record.
+
+**A numbered paragraph runs on.** Such a block, led by a word of the
+book's marker form, runs on into the next page as any paragraph does
+(section 6) when both of these hold at the page break:
+
+1. its lines so far are set in the body's type: their height ratio
+   (section 1), the median height of all their words over the body word
+   height, is above 0.95, the limit section 11 sets for a note's lines;
+2. the last word of its page's last line ends no sentence: it does not
+   end with ".", "?", "!" or ":", with closing quotation marks or
+   brackets and 1 to 3 digits allowed after them, as for "A short last
+   line at a page break" (section 6).
+
+Kadesh (`battleofkadeshst00breauoft`) numbers its paragraphs, "1. Of
+the three the most valuable is the Poem…" on page 11 and "3. The
+RELIEFs furnish…" on page 12, and its marker form is digits, so before
+this rule each was cut at the foot of its page in mid-sentence
+("…exhaustively collated with the" / "original of the Sallier
+Papyrus…"; "…by the artists of Ramses II.: Abydos, the" / "Ramesseum
+(twice)…"). Since markdown writes a note after the last block whose
+first page is the note's page or an earlier one (section 6, "Order"),
+the page's unlinked notes, which are band blocks, came between the two
+halves; once the paragraph is joined they follow it, page 11's notes
+and then page 12's after the paragraph that starts on page 11. The cut
+came from this rule, not from where the notes are placed: a paragraph
+that does not start with a marker already ran on over the notes of its
+page, so no rule of the notes' order changes.
+
+Measured on 19 November 2026 on the `lines.json` of the seven books
+run by the plan ocr-redo (`runs/ocr-redo/`): the blocks led by a
+marker that the rule above stopped at a page break, outside the
+endnote section, were 6 in Kadesh, 9 in Domesday, 3 in Gierke and none
+in Stubbs, Haskins, Haynes or Turney (named below by their page). Their
+height ratio is 0.58 to 0.91 for the notes left in the body (Kadesh's
+page 36, "87So Abu Simbel…"; Domesday's 528) and the tables and contents lines (Domesday's 156, 158,
+425 and 479, Gierke's 61 and 62), 1.00 for the paragraphs. Of the
+paragraphs, the two conditions let run on Kadesh's 11 and 12 and
+Domesday's 467 (a paragraph the OCR starts with "295", a number of the
+table above it, "…No doubt, the" / "medieval sheep…"), and Gierke's 56,
+a line of the analytical summary that the contents rules (section 30)
+already joined, so that its output does not change; they keep cut those
+that end a sentence: Kadesh's 20 ("as follows:", before rows of
+hieroglyphs), 31, Domesday's 43 (a table) and 473, a line of two notes
+set at the body's height ("1 D. B. i. 351. 2 D. B. i. 77.") whose next
+page starts in lower case. Condition 1 alone would join that note of
+Domesday's 473 into the body; condition 2 alone would join the tables
+of Domesday's 156, 158, 425 and 479 and Kadesh's page number "121" of
+page 60 with the next page's first line.
+
+The paragraphs that end without a sentence's end right before an
+unlinked note in `book.md` were, by book, before and after the rule:
+Kadesh 7 and 5, Domesday 5 and 4, Stubbs 1 and 1, Haskins, Gierke,
+Haynes and Turney 0 and 0. Each one left was looked at on the page
+image: none is a paragraph cut at a page break. Kadesh's pages 38, 39 and 55
+end a sentence followed by a reference the OCR read apart or as "™";
+its 46 is the junk Tesseract reads in a row of hieroglyphs; its 60 is
+the journal's page number "121" at the foot of page 60, left in the
+body. Domesday's 92 ends "entries:" on the page, a word the OCR set
+elsewhere in the line; its 479 and 489 are tables and its 497 a line cut
+from its paragraph inside the page by a formula. Stubbs' is a line of
+its list of maps (page 17).
+
+**Known and left.** The count above sees only a paragraph right before
+a note. On Domesday's page 473 the paragraph "…'There are 5 hides' says"
+is followed by a line of two notes that layout leaves in the body at the
+body's height ("1 D. B. i. 351. 2 D. B. i. 77.", a paragraph led by a
+marker that ends a sentence, so it stays cut), and page 474 starts "a
+Gloucestershire entry…": the sentence stays in two blocks with the
+notes' line between. Counting the paragraphs followed by a block led by
+a marker and then a page that starts in lower case finds that one in
+Domesday (and its 158, a table, and 481, notes), none in Kadesh or
+Gierke. And on a page whose OCR lines are all set small (Domesday's
+page 139, above), a numbered paragraph fails condition 1 and stays cut;
+none was found.
+
+Verified by unit tests of `body_entries` with literal lines (a block
+led by "1." in the body's type whose page ends "with the" is one
+block over the page break; in type 0.9 of the body's, or ending "it.",
+"follows:" or "it.”", it is two) and by excerpt tests: `kadesh_redo`'s
+pages 3 and 4 (Kadesh's 11 and 12) give one paragraph "…collated with
+the original of the Sallier Papyrus…" whose origins are pages 3 and 4,
+and one "…Abydos, the Ramesseum (twice)…" on pages 4 and 5, and the
+Markdown writes page 3's note "Called by de Rougé the Bulletin." after
+the first; `domesday_run_on` (Domesday's pages 465 to 469) gives one
+paragraph "…No doubt, the medieval sheep were wretched…" on its pages 2
+and 3, and its note "2 See above, p. 76." after it in `book.md`.
 
 1. **Smaller type.** A block with at least 2 wide lines, whose median
    height ratio over all its lines is at most 0.95 and whose median

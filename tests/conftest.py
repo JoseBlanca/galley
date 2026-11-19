@@ -213,6 +213,11 @@ EXCERPT_CONFIGS = frozendict(
             "exclude_pages = [1]\n"
             "front_matter_end = 0\n"
         ),
+        "domesday_run_on": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+        ),
         "domesday_notes": (
             'title = "Domesday Book and Beyond"\n'
             'authors = ["Frederic William Maitland"]\n'

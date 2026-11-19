@@ -7,7 +7,16 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import NamedTuple, assert_never
 
-from galley.model import ChangeReason, WordChange
+from galley.errors import GalleyError
+from galley.fidelity import is_sign_join
+from galley.model import (
+    Box,
+    ChangeReason,
+    LinesFile,
+    Removal,
+    RemovalReason,
+    WordChange,
+)
 from galley.structure._measures import (
     ASCII_DIGITS,
     is_digit_before_hyphen,
@@ -26,14 +35,21 @@ _LOST_HYPHEN_MIN_LETTERS = 2
 # (section 11) between a hyphen and the next line is passed over (Haskins
 # page 71, "fol-" "^" "lows:").
 _LONE_SIGNS = frozenset({("^",), ("*",), ("•",)})
+# Spec section 5, "A hyphen read as a sign": the signs of a note reference
+# (section 11) that the OCR reads in place of a line-end hyphen ("aggres*"
+# "sive", Stubbs page 24; "pil^" "grims", Haskins page 226).
+HYPHEN_SIGNS = frozenset("^*•")
 
 
 class HyphenJoin(NamedTuple):
     """The word two parts make, and why: `hyphen_join`, `hyphen_join_guessed`,
-    `hyphen_kept`, or `hyphen_lost` in a margin note."""
+    `hyphen_kept`, or `hyphen_lost` in a margin note; and `sign`, the sign
+    the OCR read in place of the hyphen, which the join takes off and
+    structure records as removed, or None."""
 
     word: str
     reason: ChangeReason
+    sign: str | None = None
 
 
 def _after_last_apostrophe(key: str) -> str:
@@ -97,6 +113,35 @@ def join_hyphen(
     if any(_is_joined_word(key, second, book_words, word_list) for key in keys):
         return HyphenJoin(joined, ChangeReason.HYPHEN_JOIN)
     return HyphenJoin(joined, ChangeReason.HYPHEN_JOIN_GUESSED)
+
+
+def join_sign_hyphen(
+    first: str, second: str, book_words: frozenset[str], word_list: frozenset[str]
+) -> HyphenJoin | None:
+    """The word made of `first`, the last word of a line, and `second`, the
+    first word of the next, when the OCR read the hyphen between them as a
+    sign of `HYPHEN_SIGNS` (spec section 5, "A hyphen read as a sign"), or
+    None: "aggres*" "sive" gives "aggressive", with the sign "*".
+
+    `first` ends with one such sign after a letter, and has
+    `_LOST_HYPHEN_MIN_LETTERS` letters or more without it; `second` starts
+    with a lower-case letter; and the joined word is known
+    (`_is_joined_word`) against `book_words` and `word_list`, which is in
+    lower case. The join is never guessed and never keeps a hyphen.
+    """
+    stem, sign = first[:-1], first[-1:]
+    if not (
+        sign in HYPHEN_SIGNS
+        and stem[-1:].isalpha()
+        and sum(character.isalpha() for character in stem) >= _LOST_HYPHEN_MIN_LETTERS
+        and second[:1].isalpha()
+        and second[0].islower()
+    ):
+        return None
+    joined = stem + second
+    if _is_joined_word(word_key(joined), second, book_words, word_list):
+        return HyphenJoin(joined, ChangeReason.HYPHEN_JOIN, sign)
+    return None
 
 
 def join_lost_hyphen(
@@ -181,7 +226,8 @@ def join_lines(
     first word. A line of one word between two hyphens is joined twice. A
     line that holds only a reference sign ("^") after a line ending with a
     hyphen is passed over, and the sign goes after the word the join gives
-    (spec section 5). A line whose position is in `unjoined` is never
+    (spec section 5). A word a join made is not joined over a sign it ends
+    with (`join_sign_hyphen`). A line whose position is in `unjoined` is never
     joined to the line before. With `lost_hyphens` JOINED, as in a margin
     note, a line whose last word `join_hyphen` does not join is joined by
     `join_lost_hyphen`, against `common_inner_words`, when it gives a
@@ -209,6 +255,12 @@ def join_lines(
             if joinable
             else None
         )
+        # A sign join's removal takes its box from the line the first part
+        # ends, so a first part an earlier join made is not joined over its
+        # sign (spec section 5).
+        made_by_a_join = bool(positions) and positions[-1] == len(words) - 1
+        if joined is None and joinable and not made_by_a_join:
+            joined = join_sign_hyphen(words[-1], texts[0], book_words, word_list)
         if joined is None and joinable:
             match lost_hyphens:
                 case LostHyphens.JOINED:
@@ -224,7 +276,9 @@ def join_lines(
                 WordChange(
                     page_index=pages[-1],
                     before=(words[-1], texts[0]),
-                    after=(joined.word,),
+                    after=(joined.word,)
+                    if joined.sign is None
+                    else (joined.word, joined.sign),
                     reason=joined.reason,
                 )
             )
@@ -245,4 +299,46 @@ def join_lines(
         tuple(changes),
         tuple(positions),
         tuple(line_starts),
+    )
+
+
+def sign_removals(
+    changes: Sequence[WordChange], lines: LinesFile
+) -> tuple[Removal, ...]:
+    """The removals of the signs that `join_sign_hyphen` took off a word
+    (spec section 5, "A hyphen read as a sign"), one for each change of
+    `changes` that the fidelity check takes for a join over a sign
+    (`galley.fidelity.is_sign_join`): its page, the box of the
+    word it ended in `lines` (the last word of a line of that page whose
+    text is the change's first word), the sign, and the reason
+    `misread_hyphen`."""
+    pages = {page.index: page for page in lines.pages}
+
+    def box_of(change: WordChange) -> Box:
+        page = pages[change.page_index]
+        boxes = tuple(
+            line.words[-1].box
+            for region in page.regions
+            for line in region.lines
+            if line.words and line.words[-1].text == change.before[0]
+        )
+        if not boxes:
+            # join_sign_hyphen joins the last word of a line of this page,
+            # so this is a fault of structure, not of the book.
+            message = (
+                f"page {change.page_index}: no line ends with {change.before[0]!r}, "
+                "the word a sign was taken off"
+            )
+            raise GalleyError(message)
+        return boxes[0]
+
+    return tuple(
+        Removal(
+            page_index=change.page_index,
+            box=box_of(change),
+            text=change.after[-1],
+            reason=RemovalReason.MISREAD_HYPHEN,
+        )
+        for change in changes
+        if change.reason is ChangeReason.HYPHEN_JOIN and is_sign_join(change)
     )

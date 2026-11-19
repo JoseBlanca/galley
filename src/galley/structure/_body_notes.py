@@ -6,26 +6,21 @@ import itertools
 from collections.abc import Sequence
 from dataclasses import replace
 
-from galley.body_measures import median_word_height
 from galley.structure._lines import PlacedLine, first_word
 from galley.structure._markers import MarkerForm, marker_form, note_marker
+from galley.structure._measures import NOTE_HEIGHT_RATIO_MAX, height_ratio
 from galley.structure._notes import PageNote
 from galley.structure._paragraphs import PageParts
 
-# Spec section 11, "Notes left in the body", conditions 2 and 3: the notes'
-# lines have a height ratio of at most 0.95, and the lines above one at
-# least 0.05 higher (Mariéjol's note lines are 9 pt high against 10).
-_NOTE_HEIGHT_RATIO_MAX = 0.95
+# Spec section 11, "Notes left in the body", condition 3: the lines above
+# the notes have a height ratio at least 0.05 higher than theirs.
 _HEIGHT_RATIO_STEP = 0.05
 
 
 def _height_ratio(lines: Sequence[PlacedLine], body_word_height: float) -> float:
-    """The median height of the words of `lines` over the body word height;
-    0 for no line, so that notes with no line above them fail condition 3."""
-    return (
-        median_word_height(word for line in lines for word in line.line.words)
-        / body_word_height
-    )
+    """The height ratio of `lines` (`height_ratio`); 0 for no line, so that
+    notes with no line above them fail condition 3."""
+    return height_ratio((line.line for line in lines), body_word_height)
 
 
 def _marker_value(line: PlacedLine, form: MarkerForm) -> int | None:
@@ -71,7 +66,7 @@ def note_lines_start(
     notes, above = body[start:], body[:start]
     notes_ratio = _height_ratio(notes, body_word_height)
     if (
-        notes_ratio > _NOTE_HEIGHT_RATIO_MAX
+        notes_ratio > NOTE_HEIGHT_RATIO_MAX
         or _height_ratio(above, body_word_height) < notes_ratio + _HEIGHT_RATIO_STEP
     ):
         return None

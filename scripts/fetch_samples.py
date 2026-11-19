@@ -359,8 +359,9 @@ EVALUATION_EXCERPTS = frozendict(
                     "cut-in margin notes whose lines share the body's "
                     "baselines, which the test by size of "
                     "docs/specs/layout.md, step 2b, takes (page indices 19, "
-                    "37) or leaves in the body (34, where the text layer "
-                    "mixes the rows; 143, a gap under 8 pt), and body lines "
+                    "37) or, after a gap of 7.8 to 8 pt, the test by size of "
+                    "rule 1 (34, where the text layer mixes the rows), or "
+                    "leaves in the body (143, a gap under 8 pt), and body lines "
                     "with a wide space at the inset beside a note, whose "
                     'words must stay ("The same", 120; "open war.", 125)'
                 ),
@@ -483,6 +484,19 @@ EVALUATION_EXCERPTS = frozendict(
                     'enumerations "(i)" to "(vi)" set as paragraphs (141), '
                     'and "(iv)" to "(viii)", which start with no first value '
                     "(143)"
+                ),
+            ),
+            Excerpt(
+                name="domesday_run_on",
+                page_indices=(465, 466, 467, 468, 469),
+                covers=(
+                    "a paragraph that runs over a page break past an unlinked "
+                    'note (docs/specs/structure.md, section 16, "A numbered '
+                    'paragraph runs on"): the OCR starts the paragraph of '
+                    "page index 467 with numbers of the table above it, "
+                    '"295 …", the book\'s marker form, and its last line '
+                    '"…No doubt, the" runs on into "medieval sheep…" on '
+                    '468, with the note "2 See above, p. 76." between'
                 ),
             ),
             Excerpt(

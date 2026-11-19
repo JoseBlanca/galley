@@ -63,6 +63,9 @@ def test_config_with_every_key_is_read_into_its_values(
             "contents_pages": "[0, 1]",
             "front_matter_end": "2",
             "reread_footnotes": "true",
+            "correct_model": '"qwen/qwen3.6-27b"',
+            "correct_server": '"http://127.0.0.1:5678/"',
+            "correct_second_model": '"allenai/olmocr-2-7b"',
         },
     )
 
@@ -83,6 +86,9 @@ def test_config_with_every_key_is_read_into_its_values(
         contents_pages=(0, 1),
         front_matter_end=2,
         reread_footnotes=True,
+        correct_model="qwen/qwen3.6-27b",
+        correct_server="http://127.0.0.1:5678",
+        correct_second_model="allenai/olmocr-2-7b",
     )
 
 
@@ -106,6 +112,9 @@ def test_config_with_only_the_required_keys_has_the_defaults(
         contents_pages=(),
         front_matter_end=None,
         reread_footnotes=False,
+        correct_model="qwen/qwen3.6-35b-a3b",
+        correct_server="http://localhost:1234",
+        correct_second_model=None,
     )
 
 
@@ -264,6 +273,11 @@ def test_region_without_its_box_is_an_error(
         ("front_matter_end", "true", "front_matter_end"),
         ("reread_footnotes", '"true"', "reread_footnotes"),
         ("reread_footnotes", "1", "reread_footnotes"),
+        ("correct_model", "35", "correct_model"),
+        ("correct_model", '""', "correct_model"),
+        ("correct_second_model", "true", "correct_second_model"),
+        ("correct_second_model", '""', "correct_second_model"),
+        ("correct_server", "1234", "correct_server"),
         ("exclude_regions", '"x"', "exclude_regions"),
         ("exclude_regions", "[3]", "exclude_regions[0]"),
         (
@@ -399,3 +413,35 @@ def test_box_with_a_number_that_is_not_finite_is_an_error(
     }
     path = _write_config(tmp_path, keys)
     _assert_config_error(path, "exclude_regions[0].box")
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "https://localhost:1234",
+        "http://example.com:1234",
+        "http://192.168.1.5:1234",
+        "http://localhost:1234/v1",
+        "http://user@localhost:1234",
+        "http://localhost:1234?key=x",
+        "http://localhost:1234#part",
+        "http://localhost:99999",
+        "localhost:1234",
+    ],
+)
+def test_correct_server_not_on_this_machine_is_an_error(
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path], address: str
+) -> None:
+    # The book's text never leaves the machine (correct spec, section 3).
+    keys = _required_keys(excerpt_pdf[KADESH]) | {"correct_server": f'"{address}"'}
+    _assert_config_error(_write_config(tmp_path, keys), "correct_server")
+
+
+@pytest.mark.parametrize(
+    "address", ["http://localhost", "http://[::1]:1234", "http://127.0.0.1:1"]
+)
+def test_correct_server_on_this_machine_is_read(
+    tmp_path: Path, excerpt_pdf: frozendict[str, Path], address: str
+) -> None:
+    keys = _required_keys(excerpt_pdf[KADESH]) | {"correct_server": f'"{address}"'}
+    assert read_config(_write_config(tmp_path, keys)).correct_server == address

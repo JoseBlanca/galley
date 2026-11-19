@@ -39,11 +39,13 @@ from galley.errors import EditError, InputFileError
 # stays at 3, its reason inkless_page coming only from a pages.json of 4.
 # Since the plan ocr-redo, 19 November 2026: blocks.json stays at 5 with the
 # reason letter_fragment, which a file written before does not hold.
+# Since the correct stage, 19 November 2026: edits 2, with page_index,
+# model and second_reading (docs/specs/correct.md, section 8).
 PAGES_FORMAT_VERSION = 4
 WORDS_FORMAT_VERSION = 3
 LINES_FORMAT_VERSION = 4
 BLOCKS_FORMAT_VERSION = 5
-EDITS_FORMAT_VERSION = 1
+EDITS_FORMAT_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,6 +212,10 @@ class RemovalReason(StrEnum):
     # was cut from, in a book where such pieces are common (structure spec
     # section 35): Stubbs' "Swabia, . and".
     LETTER_FRAGMENT = "letter_fragment"
+    # A line-end hyphen the OCR read as a sign of a note reference, taken
+    # off when the two parts are joined (structure spec section 5):
+    # Stubbs' "aggres*" "sive".
+    MISREAD_HYPHEN = "misread_hyphen"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1159,8 +1165,13 @@ class BlocksFile:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Edit:
     """A change to the text of one block: `old`, found exactly once in the
-    block's text, becomes `new`. `block_sha256` is block_sha256 of the block
-    as structure wrote it."""
+    block's text and inside one span that is not a note reference, becomes
+    `new`. `block_sha256` is block_sha256 of the block as structure wrote
+    it. The correct stage also gives `page_index`, the page the changed
+    word is printed on, `model`, the vision model that read the new text,
+    and `second_reading`, what a second model read at that place, or None
+    when there was no second reading (docs/specs/correct.md, section 8);
+    an edit of a person or an agent leaves the three None."""
 
     format_version: int = EDITS_FORMAT_VERSION
     block_id: str
@@ -1169,6 +1180,11 @@ class Edit:
     new: str
     author: str
     reason: str
+    # Defaults, so that the authors that are not the correct stage need not
+    # name them; the file holds them, as null, on every line.
+    page_index: int | None = None
+    model: str | None = None
+    second_reading: str | None = None
 
 
 # Not a file: what pdfium.render returns.
@@ -1786,6 +1802,23 @@ def block_text(block: Block) -> str:
     return "".join(span.text for span in block.spans)
 
 
+def every_block(blocks: BlocksFile) -> tuple[Block, ...]:
+    """The blocks of the body, then those of every note, in their order."""
+    return blocks.blocks + tuple(
+        block for note in blocks.notes for block in note.blocks
+    )
+
+
+def only_occurrence(text: str, part: str) -> int | None:
+    """Where `part` starts in `text` when it occurs there exactly once,
+    overlapping occurrences counted; None otherwise and for an empty
+    `part`. An edit's `old` must occur so (architecture section 10)."""
+    first = text.find(part)
+    if part == "" or first == -1 or text.find(part, first + 1) != -1:
+        return None
+    return first
+
+
 def note_places(
     block_first_pages: Sequence[int | None], note_first_pages: Sequence[int]
 ) -> tuple[int, ...]:
@@ -1845,7 +1878,7 @@ def read_edits(path: Path) -> tuple[Edit, ...]:
 
     Raises EditError, naming the file, for a file that is not UTF-8 or
     starts with a byte-order mark; and naming the line too, for a blank
-    line, a line that is not JSON, a format_version other than 1, or an
+    line, a line that is not JSON, a format_version other than 2, or an
     object with a missing, unknown or mistyped field. A missing file is the
     caller's concern: architecture section 10 counts it as no edits."""
     try:

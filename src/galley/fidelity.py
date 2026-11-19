@@ -37,6 +37,7 @@ from galley.model import (
     LinesFile,
     NoteKind,
     Origin,
+    RemovalReason,
     Reread,
     Word,
     WordChange,
@@ -750,6 +751,12 @@ def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
 
 # A hyphen join is two parts of a word split at a line end (glossary).
 _HYPHEN_JOIN_PARTS = 2
+# The signs of a note reference that the OCR reads in place of a line-end
+# hyphen, which a hyphen join takes off and structure records as removed
+# (structure spec section 5, "A hyphen read as a sign"). Written here again,
+# not imported from structure's _hyphens.py, for the reason given for
+# _SOURCE_DASHES below.
+_HYPHEN_SIGNS = frozenset("^*•")
 # The dashes that may start an epigraph's source line, alone or several
 # (structure spec section 22, rule 3). Written here again, not imported
 # from structure's _epigraphs.py: the check states its rules on its own,
@@ -788,6 +795,46 @@ def _is_source_dash(change: WordChange) -> bool:
     return bool(undashed) and change.after == (undashed,)
 
 
+def is_sign_join(change: WordChange) -> bool:
+    """Whether `change`, a hyphen join, is one over a sign read in place of
+    the hyphen (structure spec section 5): two parts, the first ending with
+    a sign of `_HYPHEN_SIGNS` after a letter, become the first without the
+    sign followed by the second, and then the sign, which a removal records
+    (`_sign_problems`). Structure records those removals by the same test."""
+    if len(change.before) != _HYPHEN_JOIN_PARTS:
+        return False
+    first, second = change.before
+    sign = first[-1:]
+    return (
+        sign in _HYPHEN_SIGNS
+        and first[-2:-1].isalpha()
+        and change.after == (first[:-1] + second, sign)
+    )
+
+
+def _sign_problems(blocks: BlocksFile) -> tuple[str, ...]:
+    """The pages and signs whose hyphen joins over a sign and removals of
+    the reason `misread_hyphen` differ in number: each such join needs one
+    removal of its sign on its page, and each such removal its join
+    (structure spec section 5)."""
+    joins = Counter(
+        (change.page_index, change.after[-1])
+        for change in blocks.word_changes
+        if change.reason is ChangeReason.HYPHEN_JOIN and is_sign_join(change)
+    )
+    removed = Counter(
+        (removal.page_index, removal.text)
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.MISREAD_HYPHEN
+    )
+    return tuple(
+        f"page {page}: {joins[page, sign]} hyphen join(s) over the sign "
+        f"{sign!r}, but {removed[page, sign]} misread_hyphen removal(s) of it"
+        for page, sign in sorted(joins.keys() | removed.keys())
+        if removed[page, sign] != joins[page, sign]
+    )
+
+
 def _change_follows_its_reason(change: WordChange) -> bool:
     """Whether a word change keeps every letter as its reason allows: a note
     marker split off its word keeps the text; a hyphen join of two parts,
@@ -805,6 +852,8 @@ def _change_follows_its_reason(change: WordChange) -> bool:
     match change.reason:
         case ChangeReason.NOTE_MARKER:
             return "".join(change.before) == joined_after
+        case ChangeReason.HYPHEN_JOIN if is_sign_join(change):
+            return True
         case ChangeReason.HYPHEN_JOIN | ChangeReason.HYPHEN_JOIN_GUESSED:
             return (
                 len(change.before) == _HYPHEN_JOIN_PARTS
@@ -1044,7 +1093,8 @@ def check_stage(
                 stage,
                 _source_problems(after)
                 + _reference_problems(after)
-                + _change_problems(after),
+                + _change_problems(after)
+                + _sign_problems(after),
             )
             _check_words(
                 stage,

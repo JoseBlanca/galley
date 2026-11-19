@@ -754,7 +754,9 @@ def assemble(
     # and whose first page starts a paragraph; both change the paragraphs,
     # so the section's paragraphs are taken from the second.
     section_pages = _section_pages(
-        body_entries(parts, form), contents_pages, body_line_pitch
+        body_entries(parts, form, body_word_height=body_word_height),
+        contents_pages,
+        body_line_pitch,
     )
     pages = _taken_body_notes(
         parts,
@@ -777,6 +779,7 @@ def assemble(
         form,
         section_pages,
         _line_roles(pages, contents, contents_pages, section_pages, body_line_pitch),
+        body_word_height=body_word_height,
     )
     section = endnote_section(entries, contents_pages, body_line_pitch)
     if section is not None:

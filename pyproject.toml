@@ -89,7 +89,7 @@ all = "error"
 [tool.pytest]
 minversion = "9.0"
 testpaths = ["tests", "tools/galley-eval/tests"]
-addopts = ["-ra", "--import-mode=importlib", "-p", "gilguard", "-m", "not whole_book", "--durations=5"]
+addopts = ["-ra", "--import-mode=importlib", "-p", "gilguard", "-m", "not whole_book and not vision_model", "--durations=5"]
 strict = true
 # A unit test takes milliseconds and an excerpt test about a second; a test
 # that needs more is a whole_book test or a defect.
@@ -105,4 +105,5 @@ markers = [
     "tesseract: needs the tesseract binary",
     "pandoc: needs the pandoc binary",
     "epubcheck: needs epubcheck, a development tool (brew install epubcheck)",
+    "vision_model: calls a vision model in LM Studio on this machine (docs/specs/correct.md); excluded by default, run with -m vision_model",
 ]
