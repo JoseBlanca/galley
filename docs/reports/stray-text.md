@@ -3,6 +3,64 @@
 The work report of `docs/plans/stray-text.md`, written as the work goes,
 for the owner. Started on 18 November 2026.
 
+## Summary
+
+The plan is done on branch `plan/stray-text`, on 19 November 2026, and
+waits for the owner's order to merge it into `main`. It removes four
+kinds of stray text from the middle of a book's text, on the eight books
+galley is tried on: the owner's two (Haynes, Turney) and six
+public-domain scans (Haskins, Domesday, Stubbs, Gierke, Kadesh,
+Mariéjol).
+
+What a reader of the EPUB sees now:
+
+- **Junk of blank pages is gone.** A page that prints nothing but whose
+  scan still carries OCR text (a blank back of a leaf, a patterned
+  endpaper) is recognised because at least half of its words have no
+  ink under them on the page image; its words are left out, each with a
+  record. This removes "SP I fiyj. £ v" after Haynes' contents and the
+  junk of Haynes page 421 and Haskins' back endpapers. A page is kept
+  when 2 or more of its inkless words are real words.
+- **Running heads boxed apart from their page number** are removed:
+  Kadesh 38, Domesday 200, 428 and 552, Gierke 16 and 84.
+- **Footnotes left in the text are notes.** Gierke's introduction (35
+  pages, 74 footnotes) printed its notes in the text; Domesday's ten
+  single-line notes too; 21 more Domesday references are linked
+  ("servus*." on page 55).
+- **Stubbs' margin notes** that sat on the text's own lines: those left
+  in the text fell from 169 to 46 of 467.
+
+Checked: the quick tests (2,935 in 55 s, back under the minute; they
+took 70 s before this plan) and the 167 whole-book tests pass; the
+eight EPUBs pass epubcheck with no error or warning; the evaluation
+against the Project Gutenberg texts of four books (the scorer of
+`docs/specs/evaluation.md`) shows no score falling beyond the plan's
+limits. The pages of every rule were compared with their images.
+
+Still wrong, for later plans:
+
+- Some of Gierke's new footnote links go to the wrong note or none
+  (pages 31, 36, 50, 109, 147). Before this plan those notes were in the
+  text with no links at all.
+- Stubbs' text still holds garble from the margin notes beside it on
+  some pages (19, 37, 56, 97, 102, 120, 236), most of it as before.
+- A book whose contents page is not listed in its `book.toml`
+  (`contents_pages`) and whose contents labels are set smaller than
+  the text, as Turney's are, would have the labels taken for margin
+  notes. Turney's and Haynes' configs list their contents pages.
+
+Decided while the owner was away, each easy to change: pages.json has a
+new page kind, `inkless`, so books run before the merge must run again
+from the first step, analyze; a page of faint real print is kept when
+2 or more of its inkless words are real words; a contents entry of
+Domesday ("Statistical Tables") now links to the heading "STATISTICS."
+on page 426, the second half of the title "TABLE I. STATISTICS.", one
+page after its start.
+
+Asked of the owner: the order to merge, and a look on the Kindle at
+`runs/stray-text/` of the main checkout: Haynes after the contents,
+Gierke's introduction, and Stubbs' pages with margin notes.
+
 ## Before the first task
 
 The plan was written on 18 November 2026 from two investigations of the
@@ -344,3 +402,48 @@ pages that change were each looked at.
   on 120, garble on 236.
 - Pencil specks become margin notes inside footnotes on Gierke 36 and
   147, and a margin note "^" on Gierke 30.
+
+## Task 5.3 and the last fixes
+
+The last review's findings were fixed (bed681f to bbde92c): names and
+docstrings in layout, one test case per guard of the signature-mark
+rule, comments that say a threshold was chosen. The eight books' lines
+and blocks are byte-identical before and after.
+
+The quick tests took 80 s: the session fixture ran the 24 excerpts as
+threads of one process, all waiting on the one PDFium thread. Each
+excerpt now runs as its own process, 12 at a time (ca41c8e); three runs
+before, 79.6, 80.2 and 80.3 s, after, 55.5, 55.8 and 55.6 s. No test was
+dropped.
+
+Final: ruff, ty and `uv lock --check` pass; pytest 2,935 passed, 6
+expected failures, in 55 s (100 s with 8 threads); `pytest -m
+whole_book` 167 passed in 10 min 18 s; the eight EPUBs rebuilt in
+`runs/stray-text/` pass epubcheck 5.4.0 with no error or warning. The
+evaluation run again differs from task 5.1's in one score: Domesday's
+paragraph precision, 0.884 to 0.883, within the limit of 0.005.
+
+The whole-book test of Domesday's contents links failed at 24 against
+23: since b12097e "STATISTICS." on page 426 is a heading, and the entry
+"Statistical Tables" links to it (ratio 0.71). Accepted, and the spec
+and test changed (85bd57b, 0a5fceb).
+
+## For whoever next revises a skill or writes a plan
+
+- The plan's thresholds came from simulations of the investigations;
+  work package 1 changed six of them when it measured them with
+  layout's own code. A plan built on simulated numbers should say they
+  are provisional and point to the spec for the real ones, as this one
+  did after work package 1.
+- Streams limited to their own files twice needed a test file of
+  another stream (`tests/test_layout.py`, `tests/test_excerpts.py`) when
+  a rule changed an excerpt's expected output. A plan should list the
+  excerpt expectations a rule may change as files the stream may touch.
+- Two fixes made in the first review round broke things the checks by
+  eye then found (Domesday 428 and 552): the page-number rule's spec
+  named the pages it changes, but nobody looked at the blocks of those
+  pages until task 5.2. A rule's own task should look at the blocks of
+  every page it changes, not only count them.
+- Rules in layout that structure repeats (the band's size, the one-line
+  note) were specified twice and drifted twice; the stage boundary made
+  it necessary, and both specs now point to each other.

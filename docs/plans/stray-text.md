@@ -20,7 +20,8 @@ finds in the middle of the book's text:
 
 The owner asked for it on 18 November 2026, after reading the EPUBs of
 the lists-figures plan, and said to write it and go on without waiting.
-Dated 18 November 2026. State: approved; under way.
+Dated 18 November 2026. State: done on 19 November 2026; approved (the owner said to go on
+without waiting) on 18 November.
 
 It is built from the measurements of two investigations made on 18
 November 2026 on the runs of the eight books at main a0a1675
@@ -329,9 +330,9 @@ Deliverables:
 Tasks:
 
 - [x] 5.1 The runs, the evaluation and epubcheck: deliverables 1 to 3.
-- [ ] 5.2 The checks by eye of deliverable 4, and the fixes they call
+- [x] 5.2 The checks by eye of deliverable 4, and the fixes they call
   for, each with a test.
-- [ ] 5.3 The quick tests back to about a minute: the four excerpts add
+- [x] 5.3 The quick tests back to about a minute: the four excerpts add
   to a run of 71 s on a0a1675. Find where the time goes
   (`--durations`) and cut it without dropping a check.
 
