@@ -5,8 +5,10 @@ The command reads `book.toml` from the folder and calls each stage's `run`.
 Before any stage, it refuses `correct = true` under `run` and checks that
 Pandoc is installed when a stage it runs needs it; Tesseract's tools when
 analyze or structure runs, or layout re-reads small print, and the word
-list of the book's language is not cached; and Tesseract when layout runs
-and the config's `ocr` is not `trust`.
+list of the book's language is not cached; Tesseract when layout runs
+and the config's `ocr` is `verify`; and Tesseract when analyze or extract
+runs and the config's `ocr` is `redo`, under which extract reads every
+text page with it (architecture section 7b).
 Errors propagate to `main`, which logs them and raises them again
 (architecture section 14).
 """
@@ -45,9 +47,11 @@ class _Stage:
     """A stage the command runs: its subcommand, its help, its `run`,
     whether it calls Pandoc, whether it needs the word list of the book's
     language, which Tesseract's tools extract the first time, and whether
-    it reads with Tesseract unless the config's `ocr` is `trust`, as layout
+    it reads with Tesseract when the config's `ocr` is `verify`, as layout
     re-reads small print (docs/specs/reocr.md, section 3), needing the
-    word list too when `ocr` is `verify`."""
+    word list too; and whether it needs Tesseract
+    under `ocr = "redo"`, as extract does to read every text page and
+    analyze, which runs before it (architecture section 7b)."""
 
     name: str
     help: str
@@ -55,6 +59,7 @@ class _Stage:
     needs_pandoc: bool
     needs_word_list: bool
     reads_with_tesseract: bool
+    needs_tesseract_under_redo: bool
 
 
 # The stages in the order `run` calls them. The correct stage and
@@ -68,6 +73,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=True,
         reads_with_tesseract=False,
+        needs_tesseract_under_redo=True,
     ),
     _Stage(
         name="extract",
@@ -76,6 +82,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=False,
         reads_with_tesseract=False,
+        needs_tesseract_under_redo=True,
     ),
     _Stage(
         name="layout",
@@ -84,6 +91,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=False,
         reads_with_tesseract=True,
+        needs_tesseract_under_redo=False,
     ),
     _Stage(
         name="structure",
@@ -92,6 +100,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=True,
         reads_with_tesseract=False,
+        needs_tesseract_under_redo=False,
     ),
     _Stage(
         name="markdown",
@@ -100,6 +109,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=True,
         needs_word_list=False,
         reads_with_tesseract=False,
+        needs_tesseract_under_redo=False,
     ),
     _Stage(
         name="epub",
@@ -108,6 +118,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=True,
         needs_word_list=False,
         reads_with_tesseract=False,
+        needs_tesseract_under_redo=False,
     ),
 )
 
@@ -172,8 +183,9 @@ def _check_before_any_stage(
     when a stage needs Pandoc and it is not on the PATH (spec section 9);
     when analyze or structure, or layout re-reading small print, needs
     Tesseract's tools to extract the word list; or when layout reads with
-    Tesseract, which it does only when the config's `ocr` is `verify`, and
-    it is not on the PATH."""
+    Tesseract, which it does only when the config's `ocr` is `verify`, or
+    analyze or extract runs under `ocr = "redo"`, and it is not on the
+    PATH."""
     if command == _RUN and config.correct:
         message = (
             f"{folder.book_toml} has correct = true, but the walking skeleton "
@@ -195,7 +207,21 @@ def _check_before_any_stage(
     if reading and config.ocr is OcrMode.VERIFY and shutil.which("tesseract") is None:
         message = (
             f"tesseract is not installed; {reading[0]} reads small print with it "
-            f'unless the config has ocr = "trust": install it with '
+            f'when the config has ocr = "verify", the default: install it with '
+            "`brew install tesseract`"
+        )
+        raise ExternalProgramError(message)
+    reading_under_redo = tuple(
+        stage.name for stage in stages if stage.needs_tesseract_under_redo
+    )
+    if (
+        reading_under_redo
+        and config.ocr is OcrMode.REDO
+        and shutil.which("tesseract") is None
+    ):
+        message = (
+            f'tesseract is not installed; with ocr = "redo" {reading_under_redo[0]} '
+            "needs it, as extract reads every text page with it: install it with "
             "`brew install tesseract`"
         )
         raise ExternalProgramError(message)

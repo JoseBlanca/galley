@@ -1,0 +1,17 @@
+{
+  "read": "The page was not transcribed: it is the scan of a cover (the owner, 16 November 2026), which the excerpt's config excludes as the whole book's does. Its text layer's words were read with galley.text_layer.layer_words at 9292b17 on 19 November 2026.",
+  "excerpt": "kadesh_redo",
+  "page": 8,
+  "book_page_index": 16,
+  "checks": "an excluded page keeps the text layer's words as its removals under ocr = \"redo\" (task 2.2)",
+  "expected": {
+    "removal_reason": "excluded_page",
+    "removed_words": [
+      ",",
+      "'",
+      "..",
+      "^U;L"
+    ]
+  },
+  "known": "Tesseract is not run on an excluded page."
+}

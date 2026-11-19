@@ -21,7 +21,7 @@ import pytest
 from galley.book_folder import BookFolder
 from galley.cli import main
 from galley.layout import measure_book
-from galley.layout._page import page_parts
+from galley.layout._page import in_page_figure_boxes, page_parts
 from galley.model import (
     BlocksFile,
     NoteKind,
@@ -327,7 +327,6 @@ def test_whole_one_line_notes_are_footnotes_and_no_paragraph(
 _FOOTNOTE_PAGES_AT_START = {
     "normansineuropea00hask": 64,
     "earlyplantagenet01stub": 2,
-    "catherinedemedic00mariuoft": 336,
     "domesdaybook00maituoft": 489,
     "politicaltheorie00gieruoft": 35,
     "battleofkadeshst00breauoft": 40,
@@ -408,7 +407,14 @@ def _cut_in_words(words: WordsFile) -> frozenset[tuple[int, int]]:
         (page.index, place)
         for page in words.pages
         if page.words
-        for parts in (page_parts(page.words, page.index, measures),)
+        for parts in (
+            page_parts(
+                page.words,
+                page.index,
+                measures,
+                figure_boxes=in_page_figure_boxes(page.figures),
+            ),
+        )
         for cut_in in ((*parts.left_cut_in, *parts.right_cut_in),)
         for place, word in enumerate(page.words)
         if any(word is moved for moved in cut_in)

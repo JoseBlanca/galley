@@ -534,7 +534,6 @@ WORDS_AFTER_BOTH_RULES = frozendict(
         "normansineuropea00hask": 69_028,
         "earlyplantagenet01stub": 104_429,
         "domesdaybook00maituoft": 251_053,
-        "catherinedemedic00mariuoft": 237_920,
         "politicaltheorie00gieruoft": 112_270,
         "battleofkadeshst00breauoft": 24_188,
     }

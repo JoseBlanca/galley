@@ -70,6 +70,13 @@ _CONTINUATION_GAP_BELOW_MIN_PITCHES = 1.5
 _JOIN_MAX_PITCHES = 2.6
 _JOIN_AFTER_LABEL_MAX_PITCHES = 4.0
 
+# Spec section 34: a line read by Tesseract with a median confidence below
+# 60 is no heading (Kadesh's 12 junk headings had medians of 0 to 50.5, its
+# real ones 85.0 to 96.2); the median is taken when at least half the
+# line's words carry a confidence.
+_HEADING_CONFIDENCE_MIN = 60.0
+_CONFIDENT_WORDS_SHARE_MIN = 0.5
+
 # Spec section 14: a roman numeral alone as the OCR reads one, 1 to 5 of
 # "IVXLCl1" with an optional ".", ("II", "Ill" for III).
 OCR_ROMAN_LABEL = re.compile(r"[IVXLCl1]{1,5}\.?")
@@ -223,6 +230,21 @@ def _is_heading_line(
                 and not (flush_left and texts[-1].endswith(_FLUSH_LEFT_GAP_ENDS))
             )
         )
+    )
+
+
+def _read_poorly(line: PlacedLine) -> bool:
+    """Spec section 34: whether at least half of the line's words carry a
+    Tesseract confidence and their median is below 60."""
+    confidences = tuple(
+        word.ocr_confidence
+        for word in line.line.words
+        if word.ocr_confidence is not None
+    )
+    return (
+        bool(confidences)
+        and len(confidences) >= _CONFIDENT_WORDS_SHARE_MIN * len(line.line.words)
+        and statistics.median(confidences) < _HEADING_CONFIDENCE_MIN
     )
 
 
@@ -403,9 +425,15 @@ def heading_runs(
     section 3 left it in the text in its band of the head lines, else
     None; `never` the
     positions of the lines that are never heading lines, those of the head
-    band alike to a running head."""
+    band alike to a running head; the lines Tesseract read poorly (spec
+    section 34) are never heading lines either."""
+    poorly_read = frozenset(
+        number for number, line in enumerate(lines) if _read_poorly(line)
+    )
     numbers = sorted(
-        _heading_line_numbers(lines, pitch, _side_edges(lines, band), kept_head, never)
+        _heading_line_numbers(
+            lines, pitch, _side_edges(lines, band), kept_head, never | poorly_read
+        )
     )
     groups: list[list[int]] = []
     for number in numbers:

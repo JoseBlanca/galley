@@ -471,8 +471,9 @@ layer, such as Kadesh's page 69, architecture §7b) are not re-read.
 The config's `ocr` key (architecture §7b) turns it off: with `ocr =
 "trust"` layout re-reads nothing, so that a book whose owner trusts its
 layer, or a run that must be fast, has no Tesseract in layout. With
-`verify`, the default, it re-reads as above; with `redo`, every page is
-already Tesseract's, and layout re-reads nothing.
+`verify`, the default, it re-reads as above; with `redo`, every text page
+is already Tesseract's (`docs/specs/extract.md` §9), and layout re-reads
+nothing; a plate keeps its layer and is not re-read either.
 
 ## 4. Which stage, and how words are replaced
 

@@ -234,11 +234,39 @@ EXCERPT_CONFIGS = frozendict(
 )
 
 
-# The configs of the six whole books, by Internet Archive identifier,
-# without `pdf`, `title` and `authors`: the one place the whole_book tests
-# of every stage take them from. The four books of the evaluation set have
-# the same pages as in evaluation/books.toml, which test_end_to_end.py
-# checks.
+# The excerpts read with `ocr = "redo"` (docs/specs/extract.md, section 9;
+# docs/plans/ocr-redo.md), without `pdf`. They are kept out of
+# EXCERPT_CONFIGS: `redo_excerpt_run` runs them the first time a test
+# asks, analyze to structure only, so that the tests of the tasks still
+# to come are strict xfails rather than errors of the session's run of
+# every excerpt. Kadesh's excerpt page 8 is its page index 16, the scan
+# of a cover, which the whole book's config excludes. Its region on page
+# 0 holds the journal's page number 81 where Tesseract boxes it, 634.8 to
+# 641.8 pt from the top, and nothing else (checked on the page at 300 dpi
+# on 19 November 2026); kadesh_8-17's region is 12 pt higher, where the
+# text layer misplaces it.
+REDO_EXCERPT_CONFIGS = frozendict(
+    {
+        "kadesh_redo": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["James Henry Breasted"]\n'
+            'language = "en"\n'
+            'ocr = "redo"\n'
+            "exclude_regions = [{page = 0, box = [240, 632, 252, 644]}]\n"
+            "exclude_pages = [8]\n"
+        ),
+    }
+)
+
+# The configs of the five whole books, by Internet Archive identifier,
+# without `pdf`: the one place the whole_book tests of every stage take
+# them from. Each has the book's title and authors, so that an EPUB made
+# from it is titled as the book is (docs/plans/ocr-redo.md). The three
+# books of the evaluation set have the same title, authors and pages as in
+# evaluation/books.toml, which test_end_to_end.py checks. Mariéjol
+# (catherinedemedic00mariuoft) left the whole-book tests on 19 November
+# 2026: neither its text layer nor Tesseract reads its worn print; its
+# excerpts stay.
 #
 # exclude_pages: the pages without a text layer that are not plates, which
 # analyze refuses unless excluded (the evaluation books' as in
@@ -246,14 +274,12 @@ EXCERPT_CONFIGS = frozendict(
 # November 2026), and the pages that analyze's plate rule takes wrongly
 # (docs/specs/plates.md, sections 1 and 2): Kadesh 0, the cover, 16, the
 # scan of a cover (the owner, 16 November 2026), and 49 and 65, backs of
-# plates; Mariéjol 1 and 2, marbled endpapers, and 457 and 458,
-# an endpaper and the library's card pocket; Mariéjol 0, its cover, has no
-# layer. The plates without a text layer (Kadesh 17, 23, 35, 43, 57 and 69;
+# plates. The plates without a text layer (Kadesh 17, 23, 35, 43, 57 and 69;
 # Stubbs 9, 11, 52 and 54) are not excluded: analyze takes them as plates
 # (16 November 2026).
 #
 # contents_pages: the printed table of contents, found on 16 November 2026
-# by "CONTENTS" or "TABLE DES MATIERES" at the top of the page and checked
+# by "CONTENTS" at the top of the page and checked
 # by reading each page's text layer. Kadesh has none. Gierke has two more
 # lists of its chapters' parts: the "ANALYTICAL SUMMARY", pages 52 to 60,
 # which centres the ten section headings, and the "SUBJECT MATTER OF THE
@@ -264,6 +290,8 @@ EXCERPT_CONFIGS = frozendict(
 WHOLE_BOOK_CONFIGS = frozendict(
     {
         "normansineuropea00hask": (
+            'title = "The Normans in European History"\n'
+            'authors = ["Charles Homer Haskins"]\n'
             'language = "en"\n'
             "exclude_pages = [0, 3, 4, 5, 7, 11, 15, 265, 274, 276, 279]\n"
             "contents_pages = [14]\n"
@@ -272,6 +300,8 @@ WHOLE_BOOK_CONFIGS = frozendict(
         # are excluded: the heading rule takes their lines for headings
         # (structure spec section 27, point 4, settled 17 November 2026).
         "earlyplantagenet01stub": (
+            'title = "The Early Plantagenets"\n'
+            'authors = ["William Stubbs"]\n'
             'language = "en"\n'
             "exclude_pages = [0, 2, 3, 4, 5, 8, 10, 53, 55, 322, 323, 324, 325, "
             "326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, "
@@ -279,22 +309,26 @@ WHOLE_BOOK_CONFIGS = frozendict(
             "contents_pages = [14, 15, 16]\n"
         ),
         "domesdaybook00maituoft": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
             'language = "en"\n'
             "exclude_pages = [0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557]\n"
             "contents_pages = [14, 15, 16, 17, 18, 19, 20]\n"
         ),
-        "catherinedemedic00mariuoft": (
-            'language = "fr"\n'
-            "exclude_pages = [0, 1, 2, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456, "
-            "457, 458]\n"
-            "contents_pages = [450]\n"
-        ),
+        # Kadesh is read with ocr = "redo": its text layer is bad throughout
+        # (docs/plans/ocr-redo.md). Its page 74 is the library's card pocket,
+        # excluded on 19 November 2026.
         "battleofkadeshst00breauoft": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["James Henry Breasted"]\n'
             'language = "en"\n'
-            "exclude_pages = [0, 1, 2, 3, 16, 49, 65, 70, 71, 72, 73, 75]\n"
+            'ocr = "redo"\n'
+            "exclude_pages = [0, 1, 2, 3, 16, 49, 65, 70, 71, 72, 73, 74, 75]\n"
             "plate_pages = [23]\n"
         ),
         "politicaltheorie00gieruoft": (
+            'title = "Political Theories of the Middle Age"\n'
+            'authors = ["Otto Gierke"]\n'
             'language = "en"\n'
             "exclude_pages = [0, 2, 3, 4, 5, 51, 283, 284, 285, 286, 287, 288, 289]\n"
             "contents_pages = [10, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, "
@@ -388,6 +422,66 @@ def _run_excerpt(folder: BookFolder) -> None:
 
 
 @pytest.fixture(scope="session")
+def redo_excerpt_run(
+    tmp_path_factory: pytest.TempPathFactory, excerpt_pdf: frozendict[str, Path]
+) -> Callable[[str], BookFolder]:
+    """A function that gives the book folder of an excerpt of
+    REDO_EXCERPT_CONFIGS, by name, with the files analyze, extract, layout
+    and structure wrote in it, each stage a process of its own, run the
+    first time a test asks for it and kept for the session. The run is
+    made inside the test, not in the fixture's setup, so that a test of a
+    task not yet done fails as its strict xfail expects instead of
+    erroring. Skips when Tesseract is missing. A test reads the folder and
+    never writes in it."""
+    _require_program("tesseract")
+    roots = frozendict(
+        {name: tmp_path_factory.mktemp(name) for name in REDO_EXCERPT_CONFIGS}
+    )
+    locks = frozendict({name: threading.Lock() for name in REDO_EXCERPT_CONFIGS})
+
+    def run(name: str) -> BookFolder:
+        with locks[name]:
+            return run_once(name)
+
+    @functools.cache
+    def run_once(name: str) -> BookFolder:
+        folder = BookFolder(roots[name])
+        folder.book_toml.write_text(
+            f"pdf = '{excerpt_pdf[name]}'\n{REDO_EXCERPT_CONFIGS[name]}",
+            encoding="utf-8",
+        )
+        for stage in ("analyze", "extract", "layout", "structure"):
+            _run_stage(stage, folder)
+        return folder
+
+    return run
+
+
+def _run_stage(stage: str, folder: BookFolder) -> None:
+    """`galley2epub <stage>` on `folder`, in a process of its own; its error
+    output becomes the message of the failure."""
+    command = [
+        str(Path(sys.executable).parent / "galley2epub"),
+        stage,
+        str(folder.root),
+    ]
+    try:
+        subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=_EXCERPT_RUN_TIMEOUT_S,
+        )
+    except subprocess.CalledProcessError as err:
+        msg = (
+            f"galley2epub {stage} failed on {folder.root} with exit status "
+            f"{err.returncode}:\n{err.stderr}"
+        )
+        raise RuntimeError(msg) from err
+
+
+@pytest.fixture(scope="session")
 def samples_dir() -> Path:
     """The samples folder, where the owner's own PDFs sit, for whole_book
     tests: GALLEY_SAMPLES, or samples/ of the main checkout. It does not
@@ -414,8 +508,8 @@ def books_dir() -> Path:
 
 @pytest.fixture(scope="session")
 def whole_book_configs() -> frozendict[str, str]:
-    """WHOLE_BOOK_CONFIGS: the configs of the six whole books, by Internet
-    Archive identifier, without `pdf`, `title` and `authors`."""
+    """WHOLE_BOOK_CONFIGS: the configs of the five whole books, by Internet
+    Archive identifier, without `pdf`."""
     return WHOLE_BOOK_CONFIGS
 
 
@@ -425,16 +519,11 @@ def whole_book_toml(
 ) -> frozendict[str, str]:
     """The `book.toml` of each whole book, by Internet Archive identifier:
     its config of WHOLE_BOOK_CONFIGS, with the path of its PDF in
-    `books_dir`, the identifier as its title and one made-up author."""
+    `books_dir`."""
     # TOML basic strings take JSON's escapes, so json.dumps quotes any path.
     return frozendict(
         {
-            book: (
-                f"pdf = {json.dumps(str(books_dir / f'{book}.pdf'))}\n"
-                f"title = {json.dumps(book)}\n"
-                'authors = ["An Author"]\n'
-                f"{toml}"
-            )
+            book: f"pdf = {json.dumps(str(books_dir / f'{book}.pdf'))}\n{toml}"
             for book, toml in whole_book_configs.items()
         }
     )

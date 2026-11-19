@@ -3978,6 +3978,55 @@ def test_heading_chapter_label_and_its_title_are_one_level_1_heading() -> None:
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+# Structure spec section 34: a line read by Tesseract whose median
+# confidence is below 60 is no heading; the words of Kadesh's junk line of
+# page 32, "KELP IPM DS", had 8 to 25.
+
+
+def _with_confidences(line: Line, *confidences: float | None) -> Line:
+    return replace(
+        line,
+        words=tuple(
+            replace(word, ocr_confidence=confidence)
+            for word, confidence in zip(line.words, confidences, strict=True)
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("confidences", "kind"),
+    [
+        ((8.0, 25.0, 49.0, 30.0), "paragraph"),
+        ((90.0, 90.0, 90.0, 90.0), "heading"),
+        ((None, None, None, None), "heading"),
+        ((90.0, 8.0, 59.0, 70.0), "heading"),
+        ((8.0, 25.0, 49.0, 59.0), "paragraph"),
+        ((54.0, 55.0, 55.0, 56.0), "paragraph"),
+        ((8.0, None, 25.0, None), "paragraph"),
+        ((8.0, None, None, None), "heading"),
+    ],
+    ids=[
+        "low",
+        "high",
+        "layer",
+        "median_64_5",
+        "median_37",
+        "median_55",
+        "half_layer_low",
+        "mostly_layer",
+    ],
+)
+def test_centred_line_in_capitals_is_a_heading_unless_tesseract_read_it_poorly(
+    confidences: tuple[float | None, ...], kind: str
+) -> None:
+    line = _with_confidences(_centred_line("KELP IPM DSRT WORD", 130), *confidences)
+    blocks = make_blocks(_lines_of(_around(line)), _NO_WORDS, workers=1)
+    # The line is in the text either way, in a heading or in a paragraph.
+    assert [
+        block.kind.value for block in blocks.blocks if "KELP" in block_text(block)
+    ] == [kind]
+
+
 def test_heading_of_one_line_has_no_label() -> None:
     blocks = make_blocks(
         _lines_of(_around(_centred_line("INDEX", 130))), _NO_WORDS, workers=1
@@ -5537,23 +5586,6 @@ def test_whole_book_gierke_endnote_section_runs_from_186_to_282(
 @pytest.mark.whole_book
 @pytest.mark.thread_unsafe
 @pytest.mark.timeout(600)
-def test_whole_book_mariejol_210_foot_line_gives_page_number_and_signature_mark(
-    whole_book_structure: WholeBookStructure,
-) -> None:
-    blocks = whole_book_structure("catherinedemedic00mariuoft")[1]
-    assert _removed_on(blocks, 210) == (
-        (RemovalReason.RUNNING_HEAD, "L'EXTERMINATION DU PARTI PROTESTANT"),
-        (RemovalReason.SIGNATURE_MARK, "UAMiàjoL. CmOl da Médidib 13"),
-        (RemovalReason.PAGE_NUMBER, "(l93)"),
-    )
-    assert _numbers_on(blocks, 210) == (
-        PageNumber(210, "(l93)", PageNumberPosition.FOOT),
-    )
-
-
-@pytest.mark.whole_book
-@pytest.mark.thread_unsafe
-@pytest.mark.timeout(600)
 def test_whole_book_haskins_quotes_and_bibliographical_notes(
     whole_book_structure: WholeBookStructure,
 ) -> None:
@@ -5597,7 +5629,6 @@ def test_whole_book_haskins_quotes_and_bibliographical_notes(
 
 _WHOLE_BOOKS = (
     "battleofkadeshst00breauoft",
-    "catherinedemedic00mariuoft",
     "domesdaybook00maituoft",
     "earlyplantagenet01stub",
     "normansineuropea00hask",
@@ -5635,7 +5666,6 @@ def test_whole_book_short_section_rule_removes_only_the_haskins_and_domesday_hea
         for book in _WHOLE_BOOKS
     } == {
         "battleofkadeshst00breauoft": (),
-        "catherinedemedic00mariuoft": (),
         "domesdaybook00maituoft": (13,),
         "earlyplantagenet01stub": (),
         "normansineuropea00hask": (13,),

@@ -1,4 +1,7 @@
 # The evaluation set of galley-eval (docs/specs/evaluation.md, section 3).
+# Mariéjol (catherinedemedic00mariuoft) left it on 19 November 2026, at the
+# owner's word: neither its text layer nor Tesseract reads its worn print
+# (docs/plans/ocr-redo.md).
 #
 # Each book is an Internet Archive scan and the Project Gutenberg edition
 # that Distributed Proofreaders made from it. Page indices count from 0 in
@@ -91,31 +94,3 @@ start = ["h1"]
 # Every note is a p inside the one div.footnote; a note starts at each p
 # that holds an id a note reference points to.
 notes_section = ["div.footnote"]
-
-[[book]]
-name = "mariejol"
-gutenberg_number = 36315
-archive_id = "catherinedemedic00mariuoft"
-title = "Catherine de Médicis"
-authors = ["Jean H. Mariéjol"]
-language = "fr"
-# 1, 2, 457 and 458 have a text layer: marbled endpapers, an endpaper and
-# the library's card pocket.
-exclude_pages = [0, 1, 2, 3, 4, 5, 17, 449, 451, 453, 454, 455, 456, 457, 458]
-contents_pages = [450]
-# Gutenberg leaves out the bibliography.
-not_in_reference = [14, 15, 16]
-body_pages = [18, 448]
-html_sha256 = "33f2ca44a5a04b289494dd378f7b97b93806849edc6440b3383700517acecbee"
-expected_counts = { notes = 1432, margin_notes = 0, note_references = 1432, page_anchors = 0, headings = 34, first_tokens = ["Jean-H.", "MARIÉJOL", "Professeur", "à", "la"] }
-
-[book.rules.add]
-# Each note is a blockquote.footnote after its paragraph.
-note = ["blockquote.footnote"]
-# Gutenberg's label of each note and its link back to the reference. The
-# label of note 230 has no colon.
-drop_text = ['Note \d+:?', '\(retour\)']
-
-[book.rules.replace]
-# The references point to #footnoteN; the links back point to #footnotetagN.
-note_reference = ['#footnote\d+']

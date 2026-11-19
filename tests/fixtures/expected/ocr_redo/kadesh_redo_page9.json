@@ -1,0 +1,16 @@
+{
+  "read": "Transcribed from the image by the assistant on 19 November 2026: the page of the excerpt rendered at 200 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading and docs/specs/extract.md, section 9, and docs/specs/structure.md, sections 34 and 35, as amended for docs/plans/ocr-redo.md. Compared with galley's output at 9292b17: not run, since analyze refuses ocr = \"redo\" there.",
+  "excerpt": "kadesh_redo",
+  "page": 9,
+  "book_page_index": 32,
+  "checks": "rows of hieroglyphs that are no figure, which Tesseract reads as centred junk (task 3.2)",
+  "printed": {
+    "running_head": "JAMES HENRY BREASTED 23",
+    "rows": "quotation 4 in hieroglyphs and its variant (\"Var.\"), two centred rows; quotation 5, two rows; quotation 6, one row; each followed by a line of English text",
+    "first_text_line": "The division of Ptah was on the south of the town of Aranami⁸² (Poem, ll. 17, 18)."
+  },
+  "expected": {
+    "headings": []
+  },
+  "known": "Run with Tesseract's words on the whole book, the rows gave the headings \"KELP IPM DS / ver Sih 8 RES BME J\" and \"6. Tote nit coe TM ASB AKA\" (docs/specs/structure.md, section 34)."
+}

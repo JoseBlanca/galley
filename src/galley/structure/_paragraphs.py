@@ -29,6 +29,7 @@ from galley.structure._figures import (
     without_taken,
 )
 from galley.structure._foot import body_column
+from galley.structure._fragments import without_fragments
 from galley.structure._headings import PageHead, heading_runs
 from galley.structure._index import IndexPage, index_page
 from galley.structure._lines import (
@@ -261,6 +262,14 @@ def page_parts(
     taken = index.taken if index is not None else frozenset()
     if index is not None:
         removed |= index.removed_lines
+    # Spec section 35: the letter fragments, after the head and foot and
+    # before the captions, so that no later rule sees them.
+    fragments = without_fragments(
+        page, removed, survey.letter_fragments, survey.index_pages
+    )
+    page = fragments.page
+    removed |= fragments.removed_lines
+    split = replace(split, text=page)
     column = body_column(page, kinds)
     figures = page_figures(split, removed, taken)
     removed |= figures.head_places
@@ -360,6 +369,7 @@ def page_parts(
         removals=head.removals
         + (index.removals if index is not None else ())
         + foot.removals
+        + fragments.removals
         + figures.removals
         + stray_removals,
         page_numbers=head.page_numbers

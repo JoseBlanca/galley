@@ -107,6 +107,21 @@ BOOKS = (
                     "the back of it, without one"
                 ),
             ),
+            Excerpt(
+                name="kadesh_redo",
+                page_indices=(*range(8, 17), 32, 34),
+                covers=(
+                    'the book read with ocr = "redo" (docs/plans/ocr-redo.md, '
+                    "docs/specs/extract.md, section 9): pages whose text layer "
+                    'is bad and Tesseract good (page index 9: "Me^iddo. '
+                    'already in tli.- sixti-fiith"), note references glued '
+                    "to their words that Tesseract reads as a sign (8, 10, "
+                    "14), footnotes in two columns, running heads, the scan "
+                    "of a cover that the config excludes (16), rows of "
+                    "hieroglyphs that are no figure and that Tesseract reads "
+                    "as centred junk (32), and a plate with a text layer (34)"
+                ),
+            ),
         ),
     ),
     Book(
@@ -169,6 +184,38 @@ BOOKS = (
                     "the alike heads of 14, 15, 17, 18 and 78; and a contents "
                     "page whose text-layer boxes sit off the print, which "
                     "must not be taken for an inkless page (63)"
+                ),
+            ),
+        ),
+    ),
+    # Mariéjol left the evaluation set on 19 November 2026 (docs/plans/ocr-redo.md):
+    # neither its text layer nor Tesseract reads its worn print, but its
+    # excerpts cover rules no other excerpt does.
+    Book(
+        archive_id="catherinedemedic00mariuoft",
+        title="J.-H. Mariéjol, Catherine de Médicis",
+        gutenberg_number=None,
+        excerpts=(
+            Excerpt(
+                name="mariejol_210-219",
+                page_indices=tuple(range(210, 220)),
+                covers=(
+                    "the excerpt of layout's reference pages "
+                    "(docs/specs/layout.md, section 8): page numbers at the "
+                    "foot in parentheses, a foot line holding the signature "
+                    "and the page number (page index 210), and footnotes in "
+                    "poor OCR"
+                ),
+            ),
+            Excerpt(
+                name="mariejol_headings_verse",
+                # Six pages, the cases of docs/specs/structure.md, section 9.
+                page_indices=(18, 51, 52, 142, 229, 430),
+                covers=(
+                    "a chapter opening, CHAPITRE and its title (page index "
+                    "18), verse over a page break (51, 52), a title that fills "
+                    "the column (142), two verse quotes on one page (229), and "
+                    "a heading of three lines (430)"
                 ),
             ),
         ),
@@ -455,30 +502,6 @@ EVALUATION_EXCERPTS = frozendict(
                     "whose column heads are "
                     "printed sideways, a page of print with words without "
                     "ink (481)"
-                ),
-            ),
-        ),
-        "catherinedemedic00mariuoft": (
-            Excerpt(
-                name="mariejol_210-219",
-                page_indices=tuple(range(210, 220)),
-                covers=(
-                    "the excerpt of layout's reference pages "
-                    "(docs/specs/layout.md, section 8): page numbers at the "
-                    "foot in parentheses, a foot line holding the signature "
-                    "and the page number (page index 210), and footnotes in "
-                    "poor OCR"
-                ),
-            ),
-            Excerpt(
-                name="mariejol_headings_verse",
-                # Six pages, the cases of docs/specs/structure.md, section 9.
-                page_indices=(18, 51, 52, 142, 229, 430),
-                covers=(
-                    "a chapter opening, CHAPITRE and its title (page index "
-                    "18), verse over a page break (51, 52), a title that fills "
-                    "the column (142), two verse quotes on one page (229), and "
-                    "a heading of three lines (430)"
                 ),
             ),
         ),

@@ -1,0 +1,27 @@
+{
+  "read": "Transcribed from the image by the assistant on 19 November 2026: the page of the excerpt rendered at 250 dpi with pypdfium2 was read for what is printed (\"printed\"). \"expected\" was written from that reading and docs/specs/extract.md, section 9, and docs/specs/structure.md, sections 34 and 35, as amended for docs/plans/ocr-redo.md. Compared with galley's output at 9292b17: not run, since analyze refuses ocr = \"redo\" there.",
+  "excerpt": "kadesh_redo",
+  "page": 0,
+  "book_page_index": 8,
+  "checks": "a note reference that Tesseract reads as a sign and the layer as a digit (task 3.1), and the article's title as the excerpt's one heading (task 3.2)",
+  "printed": {
+    "title": [
+      "THE BATTLE OF KADESH",
+      "A STUDY IN THE EARLIEST KNOWN MILITARY STRATEGY*",
+      "JAMES HENRY BREASTED"
+    ],
+    "reference_line": "work like that of Kromayer on the battlefields of Greece,¹ but the surviving materials,",
+    "footnote_1": "¹ J. KROMAYER, Antike Schlachtfelder in Griechenland, Berlin, 1903."
+  },
+  "expected": {
+    "reference_after": "Greece,",
+    "note_holds": "Schlachtfelder",
+    "headings": [
+      {
+        "page": 0,
+        "starts": "THE BATTLE OF KADESH"
+      }
+    ]
+  },
+  "known": "Tesseract reads \"Greece,’\" and the layer \"Greece,1\" (docs/specs/extract.md, section 9); the heading is the excerpt's only one: page 9's rows of hieroglyphs (book page index 32) make none (docs/specs/structure.md, section 34)."
+}

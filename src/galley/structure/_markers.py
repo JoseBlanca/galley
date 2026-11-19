@@ -3,11 +3,19 @@
 (section 1)."""
 
 import re
-import unicodedata
 from collections import Counter
 from collections.abc import Iterable
 from enum import StrEnum
 from typing import NamedTuple
+
+from galley.note_references import (
+    PUNCTUATION,
+    Reference,
+    ReferenceForm,
+    after_last_letter,
+    glued_reference,
+    is_punctuation,
+)
 
 # Spec section 11, "Its value": the letters the OCR gives for digits, read
 # as those digits; inside brackets also "a" for 2 and "t" for 1.
@@ -171,81 +179,11 @@ def book_marker_form(first_words: Iterable[str]) -> MarkerForm | None:
     return max(MarkerForm, key=lambda form: counts[form])
 
 
-class ReferenceForm(StrEnum):
-    """The kinds of a note reference in the text (spec section 11,
-    "References"): a number glued after a word, a bracketed number, or a
-    sign."""
-
-    GLUED = "glued"
-    BRACKETED = "bracketed"
-    SIGN = "sign"
-
-
-class Reference(NamedTuple):
-    """A candidate note reference in a word: what comes `before` it in the
-    word ("land" for "land3."), the `reference` itself ("3"), what comes
-    `after` it ("."), its `form`, and the number it reads, digit-like
-    letters inside brackets read as digits, or None (a sign)."""
-
-    before: str
-    reference: str
-    after: str
-    form: ReferenceForm
-    value: int | None
-
-
-# Spec section 11, "References". The patterns take as punctuation a
-# character that is neither a letter, a digit, "_" nor white space;
-# `_is_punctuation` then keeps only Unicode's punctuation, so that "£2"
-# (Domesday page 83, "of this £2 is due") is no candidate.
-_PUNCTUATION = r"[^\w\s]"
-# A letter, any punctuation, 1 to 3 digits, then only punctuation
-# ("land3.", "Kadesh,12", "causa)27.", "12s.2").
-_GLUED_AFTER_A_LETTER = re.compile(
-    rf"(?P<before>.*[^\W\d_]{_PUNCTUATION}*)(?P<reference>[0-9]{{1,3}})"
-    rf"(?P<after>{_PUNCTUATION}*)"
-)
-# Punctuation, 1 to 3 digits and only punctuation after, with no letter
-# (Kadesh page 10's ";13"); a number with punctuation after it only, "13,",
-# is none.
-_GLUED_TO_PUNCTUATION = re.compile(
-    rf"(?P<before>{_PUNCTUATION}*)(?P<reference>[0-9]{{1,3}})"
-    rf"(?P<after>{_PUNCTUATION}*)"
-)
-# The abbreviations a number follows in citations ("p.12", "vol.3"): a
-# word that starts with one of them and has no other letter is no
-# candidate.
-_CITATION_ABBREVIATIONS = frozenset(
-    [
-        "c",
-        "p",
-        "pp",
-        "f",
-        "ff",
-        "n",
-        "nr",
-        "no",
-        "vol",
-        "ch",
-        "cap",
-        "art",
-        "l",
-        "ll",
-        "q",
-        "a",
-        "t",
-        "v",
-        "s",
-        "d",
-        "m",
-    ]
-)
-_CITATION = re.compile(rf"{_PUNCTUATION}*(?P<letters>[^\W\d_]+){_PUNCTUATION}*")
 # An opening bracket, 1 or 2 digits or letters read as digits, a closing
 # bracket, and only punctuation after ("(1)", "(i).", "{2).").
 _BRACKETED_REFERENCE = re.compile(
     rf"(?P<reference>[(\[{{](?P<inner>[0-9A-Za-z]{{1,2}})[)\]}}])"
-    rf"(?P<after>{_PUNCTUATION}*)"
+    rf"(?P<after>{PUNCTUATION}*)"
 )
 # The word "^", "*" or "•", or a letter, any punctuation and one of them,
 # then only punctuation ("rulers.^", "servus*."). A lone "'" or "t" is
@@ -256,51 +194,9 @@ _BRACKETED_REFERENCE = re.compile(
 # "S*." 28 times, made 2 wrong links of those 23 new ones (pages 285 and
 # 333). Without punctuation after, a word of one letter stays a candidate.
 _SIGN_REFERENCE = re.compile(
-    rf"(?P<before>(?:.*[^\W\d_]{_PUNCTUATION}*)?)(?P<reference>[\^*•])"
-    rf"(?P<after>{_PUNCTUATION}*)"
+    rf"(?P<before>(?:.*[^\W\d_]{PUNCTUATION}*)?)(?P<reference>[\^*•])"
+    rf"(?P<after>{PUNCTUATION}*)"
 )
-
-
-def _is_punctuation(text: str) -> bool:
-    """Whether every character of `text` is punctuation in Unicode's sense
-    (category P): "," ")" "'" "/", not "£" or "^"."""
-    return all(unicodedata.category(character).startswith("P") for character in text)
-
-
-def _after_last_letter(text: str) -> str:
-    return text[max(position for position, c in enumerate(text) if c.isalpha()) + 1 :]
-
-
-def _glued(word: str) -> Reference | None:
-    after_letter = _GLUED_AFTER_A_LETTER.fullmatch(word)
-    if after_letter is not None and not (
-        _is_punctuation(_after_last_letter(after_letter.group("before")))
-        and _is_punctuation(after_letter.group("after"))
-    ):
-        return None
-    if after_letter is not None:
-        citation = _CITATION.fullmatch(after_letter.group("before"))
-        if (
-            citation is not None
-            and citation.group("letters").lower() in _CITATION_ABBREVIATIONS
-        ):
-            return None
-        match = after_letter
-    else:
-        match = _GLUED_TO_PUNCTUATION.fullmatch(word)
-        if (
-            match is None
-            or not match.group("before")
-            or not _is_punctuation(match.group("before") + match.group("after"))
-        ):
-            return None
-    return Reference(
-        match.group("before"),
-        match.group("reference"),
-        match.group("after"),
-        ReferenceForm.GLUED,
-        int(match.group("reference")),
-    )
 
 
 def reference_candidate(word: str) -> Reference | None:
@@ -311,7 +207,7 @@ def reference_candidate(word: str) -> Reference | None:
     ("(i)." gives ("", "(i)", ".") of value 1); or a sign ("rulers.^", and
     "servus*." gives ("servus", "*", "."))."""
     bracketed = _BRACKETED_REFERENCE.fullmatch(word)
-    if bracketed is not None and _is_punctuation(bracketed.group("after")):
+    if bracketed is not None and is_punctuation(bracketed.group("after")):
         value = read_number(bracketed.group("inner"), in_brackets=True)
         if value is None:
             return None
@@ -322,7 +218,7 @@ def reference_candidate(word: str) -> Reference | None:
             ReferenceForm.BRACKETED,
             value,
         )
-    glued = _glued(word)
+    glued = glued_reference(word)
     if glued is not None:
         return glued
     sign = _SIGN_REFERENCE.fullmatch(word)
@@ -334,8 +230,8 @@ def reference_candidate(word: str) -> Reference | None:
                 not sign.group("after")
                 or sum(character.isalpha() for character in sign.group("before")) > 1
             )
-            and _is_punctuation(_after_last_letter(sign.group("before")))
-            and _is_punctuation(sign.group("after"))
+            and is_punctuation(after_last_letter(sign.group("before")))
+            and is_punctuation(sign.group("after"))
         )
     ):
         return Reference(

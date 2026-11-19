@@ -36,20 +36,19 @@ def _write(folder: Path, text: str) -> Path:
     return path
 
 
-def test_the_evaluation_set_has_the_four_books_of_the_spec() -> None:
+def test_the_evaluation_set_has_the_three_books_of_the_spec() -> None:
+    # Mariéjol left the set on 19 November 2026 (docs/plans/ocr-redo.md).
     books = read_books(BOOKS_TOML)
-    assert [book.name for book in books] == [
-        "haskins",
-        "stubbs",
-        "domesday",
-        "mariejol",
+    assert [book.name for book in books] == ["haskins", "stubbs", "domesday"]
+    assert [book.gutenberg_number for book in books] == [72514, 70828, 43255]
+    assert [(book.title, book.authors) for book in books] == [
+        ("The Normans in European History", ("Charles Homer Haskins",)),
+        ("The Early Plantagenets", ("William Stubbs",)),
+        ("Domesday Book and Beyond", ("Frederic William Maitland",)),
     ]
-    assert [book.gutenberg_number for book in books] == [72514, 70828, 43255, 36315]
-    mariejol = books[3]
-    assert mariejol.language is Language.FR
-    assert mariejol.not_in_reference == (14, 15, 16)
-    assert mariejol.html_name == "pg36315-images.html"
-    assert mariejol.pdf_name == "catherinedemedic00mariuoft.pdf"
+    assert {book.language for book in books} == {Language.EN}
+    assert books[2].html_name == "pg43255-images.html"
+    assert books[2].pdf_name == "domesdaybook00maituoft.pdf"
     assert books[2].margin_notes_moved
     # docs/specs/plates.md section 2: the printed contents pages, and no
     # plate that analyze's rule misses.
@@ -57,15 +56,13 @@ def test_the_evaluation_set_has_the_four_books_of_the_spec() -> None:
         (14,),
         (14, 15, 16),
         (14, 15, 16, 17, 18, 19, 20),
-        (450,),
     ]
-    assert [book.plate_pages for book in books] == [(), (), (), ()]
+    assert [book.plate_pages for book in books] == [(), (), ()]
     # docs/specs/evaluation.md section 3: the body ranges.
     assert [book.body_pages for book in books] == [
         (16, 279),
         (18, 321),
         (22, 552),
-        (18, 448),
     ]
     assert books[1].rules.summary_after == (parse_selector("div.chapter"),)
     # docs/specs/evaluation.md section 3: Stubbs' reference ends where its
@@ -74,9 +71,7 @@ def test_the_evaluation_set_has_the_four_books_of_the_spec() -> None:
         None,
         "Page_301",
         None,
-        None,
     ]
-    assert {1, 2, 457, 458} <= set(mariejol.exclude_pages)
     assert books[2].expected_counts == ExpectedCounts(
         notes=1729,
         margin_notes=593,

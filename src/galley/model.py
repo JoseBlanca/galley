@@ -37,6 +37,8 @@ from galley.errors import EditError, InputFileError
 # leader_dots and figure_text. Since the plan stray-text, 18 November 2026:
 # pages.json 4 with the page kind inkless (plates spec, section 2b); words.json
 # stays at 3, its reason inkless_page coming only from a pages.json of 4.
+# Since the plan ocr-redo, 19 November 2026: blocks.json stays at 5 with the
+# reason letter_fragment, which a file written before does not hold.
 PAGES_FORMAT_VERSION = 4
 WORDS_FORMAT_VERSION = 3
 LINES_FORMAT_VERSION = 4
@@ -204,6 +206,10 @@ class RemovalReason(StrEnum):
     GUIDE_WORDS = "guide_words"  # "BUR CON" under the running head of an index page
     LEADER_DOTS = "leader_dots"  # between a contents entry's title and page number
     FIGURE_TEXT = "figure_text"  # the words the OCR read inside an in-page figure
+    # A piece of a letter the text layer gives as a word, inside the word it
+    # was cut from, in a book where such pieces are common (structure spec
+    # section 35): Stubbs' "Swabia, . and".
+    LETTER_FRAGMENT = "letter_fragment"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

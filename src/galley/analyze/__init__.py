@@ -7,8 +7,11 @@ words of its text layer, and renders every page that is neither excluded
 nor the cover at 36 dpi to test whether it is a plate (`is_plate`). A page
 is `excluded` when the config excludes it, a `plate` when the config's
 `plate_pages` names it or the plate rule takes it, `text` when its layer
-has a word, and `blank` otherwise. It has no OCR, so a blank page stops
-the run: the owner checks it and adds it to `exclude_pages`. Each page the
+has a word, and `blank` otherwise. It runs no OCR, so a blank page stops
+the run: the owner checks it and adds it to `exclude_pages`. Under
+`ocr = "redo"` the pages are classified from the layer all the same, and
+every text page is then read by OCR: its text source is `ocr`, and
+extract reads it with Tesseract (architecture section 7b). Each page the
 plate rule makes a plate is logged at WARNING, so that the owner sees the
 covers and endpapers it takes too. On each text page, the same render is
 searched for the figures printed among its lines (`figure_boxes`), whose
@@ -177,8 +180,9 @@ def run(
     extracting it with Tesseract's tools the first time. The text pages
     before the front-matter end (`front_matter_end`) are `front_matter`. A
     page the inkless rule takes (`is_inkless`) is `inkless`, or
-    `front_matter` before the front-matter end. Raises ConfigError when the
-    config asks for OCR, names a page past the end of the PDF or a contents
+    `front_matter` before the front-matter end. Under `ocr = "redo"` every
+    text page has the text source `ocr`. Raises ConfigError when the
+    config names a page past the end of the PDF or a contents
     page before its `front_matter_end`, and
     PdfError when a page that the config does not exclude
     has no text layer and is not a plate. `workers` is the number of
@@ -472,8 +476,9 @@ def classify_page(
     rule takes it; else a page the plate rule takes that is not the
     `cover_page` is a `plate`; a plate is read from its layer when it has
     a word; else a page with a layer word is `front_matter`, with no text
-    source, when its index is below `front_matter_end`, and `text`, read
-    from the layer, otherwise; else it is `blank`. `exclude_regions` holds
+    source, when its index is below `front_matter_end`, and `text`
+    otherwise, read from the layer, or by OCR when the config's `ocr` is
+    `redo` (architecture section 7b); else it is `blank`. `exclude_regions` holds
     the boxes of the config's regions on this page, in the config's order.
     No page is checked by OCR and none has a score.
     """
@@ -505,7 +510,7 @@ def classify_page(
     elif layer_word_count > 0 and index < front_matter_end:
         kind, text_source = PageKind.FRONT_MATTER, TextSource.NONE
     elif layer_word_count > 0:
-        kind, text_source = PageKind.TEXT, TextSource.TEXT_LAYER
+        kind, text_source = PageKind.TEXT, _text_page_source(config.ocr)
     else:
         kind, text_source = PageKind.BLANK, TextSource.NONE
     return PageInfo(
@@ -524,6 +529,19 @@ def classify_page(
         figure_boxes=(),
         blank_checked_by_ocr=False,
     )
+
+
+def _text_page_source(ocr: OcrMode) -> TextSource:
+    """The text source of a text page: `ocr` under `redo`, which reads every
+    text page with Tesseract, the layer otherwise (architecture section
+    7b)."""
+    match ocr:
+        case OcrMode.REDO:
+            return TextSource.OCR
+        case OcrMode.VERIFY | OcrMode.TRUST:
+            return TextSource.TEXT_LAYER
+        case _:
+            assert_never(ocr)
 
 
 def front_matter_end(starts: tuple[PageStart, ...], config: BookConfig) -> int:
@@ -600,18 +618,11 @@ def _letters_without_accents(word: str) -> str:
 
 
 def check_config_pages(config: BookConfig, page_count: int) -> None:
-    """Raises ConfigError when the config's `ocr` is `redo`, which needs OCR,
-    or when a page index of `exclude_pages`, `exclude_regions`,
+    """Raises ConfigError when a page index of `exclude_pages`, `exclude_regions`,
     `cover_page`, `plate_pages`, `contents_pages` or `front_matter_end` is
     not below `page_count`, naming the key, the index and the count; and
     when a page of `contents_pages` lies before `front_matter_end`, naming
     both keys (front-matter spec section 2)."""
-    if config.ocr is OcrMode.REDO:
-        message = (
-            "ocr = redo needs OCR, which the walking skeleton does not have; "
-            "use verify or trust"
-        )
-        raise ConfigError(message)
     indices = (
         *(
             (f"exclude_pages[{position}]", index)

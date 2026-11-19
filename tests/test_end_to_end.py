@@ -6,9 +6,10 @@ runs `main(["run", folder])` once per excerpt. The counts are those of spec
 section 2, as literals; the excerpt tests of analyze and extract, in
 test_analyze.py and test_extract.py, read the same folders.
 
-At the end, the configs of the six whole books that tests/conftest.py
-holds for the whole_book tests: the same as evaluation/books.toml for the
-four books of the evaluation set, and taken by analyze on each book.
+At the end, the configs of the five whole books that tests/conftest.py
+holds for the whole_book tests: the same title, authors, language and
+pages as evaluation/books.toml for the three books of the evaluation set,
+and taken by analyze on each book.
 """
 
 import tomllib
@@ -511,7 +512,7 @@ def test_the_excerpt_epubs_of_kadesh_its_figures_and_gierke_pass_epubcheck(
     )
 
 
-# The configs of the six whole books (tests/conftest.py, WHOLE_BOOK_CONFIGS)
+# The configs of the five whole books (tests/conftest.py, WHOLE_BOOK_CONFIGS)
 
 _BOOKS_TOML = Path(__file__).parents[1] / "evaluation" / "books.toml"
 _PAGE_KEYS = ("exclude_pages", "contents_pages", "plate_pages")
@@ -524,10 +525,14 @@ def test_the_evaluation_books_have_the_same_config_in_conftest_and_books_toml(
     whole_book_configs: frozendict[str, str],
 ) -> None:
     books = tomllib.loads(_BOOKS_TOML.read_text(encoding="utf-8"))["book"]
-    assert len(books) == 4
+    assert len(books) == 3
     for book in books:
         config = tomllib.loads(whole_book_configs[book["archive_id"]])
-        assert config["language"] == book["language"]
+        assert (config["title"], config["authors"], config["language"]) == (
+            book["title"],
+            book["authors"],
+            book["language"],
+        ), book["name"]
         for key in _PAGE_KEYS:
             assert config.get(key, []) == book.get(key, []), (book["name"], key)
 
@@ -539,7 +544,6 @@ def test_the_evaluation_books_have_the_same_config_in_conftest_and_books_toml(
     "book",
     [
         "battleofkadeshst00breauoft",
-        "catherinedemedic00mariuoft",
         "domesdaybook00maituoft",
         "earlyplantagenet01stub",
         "normansineuropea00hask",

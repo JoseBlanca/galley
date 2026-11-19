@@ -146,6 +146,12 @@ letter or a digit and is not known.
 
 **leader dots**: see contents entry.
 
+**letter fragment**: a piece of a printed letter, a descender, the dot
+of an "i" or the stem of an "h", that the text layer gives as a word of
+its own inside the word it was cut from ("Swabia, ." on Stubbs' page
+24). structure removes it, with the reason `letter_fragment`, in a
+book where such pieces are common (`docs/specs/structure.md` §35).
+
 **line**: a line of one region of a page, as layout groups the words, left
 to right. Not what pdfplumber calls a line, which runs across columns.
 Once structure has joined hyphens and paragraphs, the book has no lines,

@@ -14,14 +14,12 @@ from galley_eval.reader import ReferenceKind, ReferenceText, read_reference_file
 BOOKS = read_books(Path(__file__).parents[3] / "evaluation" / "books.toml")
 
 # Words that Gutenberg added to a book and its rules leave out, found by
-# reading the HTML. Each guards a rule that no count does: Mariéjol's
-# drop_text labels its notes "Note 1:" and links them back "(retour)".
+# reading the HTML. Each guards a rule that no count does.
 GUTENBERG_TOKENS = frozendict(
     {
         "haskins": frozenset(("FOOTNOTES", "*")),
         "stubbs": frozenset(("workPage",)),
         "domesday": frozenset(("NOTES", "map]")),
-        "mariejol": frozenset(("Note", "(retour)")),
     }
 )
 
