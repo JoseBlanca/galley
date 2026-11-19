@@ -720,7 +720,8 @@ page 166, has its "M." read as '"^T"' and stays.
 
 **A signature mark beside the lowest line.** When the lowest line is
 none of these, the line above it (the lowest of the lines left) is
-removed as a printer's signature mark when it is one by the rule above,
+removed as a printer's signature mark when it is a printer's signature
+mark by either rule above,
 its bottom lies less than one body line pitch above the lowest line's
 bottom, and its top lies at least 2 pitches below the top of the line
 before it in its region (a line first in its region is not taken). On
