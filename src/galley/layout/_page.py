@@ -32,11 +32,14 @@ from galley.layout._column import (
 )
 from galley.model import (
     Box,
+    Figure,
+    FigureKind,
     Line,
     PageLayout,
     PageWords,
     Region,
     Word,
+    box_holds_middle,
 )
 
 # Laying out a page (layout spec section 3, "Per page").
@@ -330,27 +333,57 @@ def _small_rows(rows: tuple[Line, ...], measures: BookMeasures) -> tuple[bool, .
 
 
 def _band_start(
-    rows: tuple[Line, ...], small: tuple[bool, ...], measures: BookMeasures
+    rows: tuple[Line, ...],
+    small: tuple[bool, ...],
+    in_figure: tuple[bool, ...],
+    measures: BookMeasures,
 ) -> int:
     """The index in `rows` of the first row of the footnote band (step 4),
     or len(rows) when there is no band: the first small row (`small` says
-    which of `rows` are, `_small_rows`), not the first of `rows`, from
-    which on two thirds of the rows are small, and which lies
+    which of `rows` are, `_small_rows`), not the first of `rows` and not a
+    row inside a picture (`in_figure` says which are, `_rows_in_figures`),
+    from which on two thirds of the rows are small, and which lies
     `_BAND_GAP_PITCHES` below the row before or opens with a note marker
     below a row that is not small (`_after_small_row`). Without such a
     row, a footnote of one line boxed as tall as the body
-    (`_one_line_note_start`)."""
+    (`_one_line_note_start`), unless that row is inside a picture."""
     if all(small):
         return len(rows)
-    start = _gap_or_marker_band_start(rows, small, measures)
+    start = _gap_or_marker_band_start(rows, small, in_figure, measures)
     if start < len(rows):
         return start
     one_line_note = _one_line_note_start(rows)
-    return len(rows) if one_line_note is None else one_line_note
+    if one_line_note is None or in_figure[one_line_note]:
+        return len(rows)
+    return one_line_note
+
+
+def _rows_in_figures(
+    rows: tuple[Line, ...], figure_boxes: tuple[Box, ...]
+) -> tuple[bool, ...]:
+    """For each of `rows`, whether it is a row inside a picture (step 4, "A
+    row inside a picture"): each of its words has its middle inside one
+    of `figure_boxes`, the boxes of the page's in-page figures."""
+    return tuple(
+        bool(figure_boxes)
+        and all(
+            any(box_holds_middle(box, word.box) for box in figure_boxes)
+            for word in row.words
+        )
+        for row in rows
+    )
+
+
+def in_page_figure_boxes(figures: tuple[Figure, ...]) -> tuple[Box, ...]:
+    """The boxes of the in-page figures of `figures`, in their order."""
+    return tuple(figure.box for figure in figures if figure.kind is FigureKind.IN_PAGE)
 
 
 def _gap_or_marker_band_start(
-    rows: tuple[Line, ...], small: tuple[bool, ...], measures: BookMeasures
+    rows: tuple[Line, ...],
+    small: tuple[bool, ...],
+    in_figure: tuple[bool, ...],
+    measures: BookMeasures,
 ) -> int:
     """`_band_start` by its small rows, `small` saying which rows are, or
     len(rows) when they give no band."""
@@ -359,6 +392,7 @@ def _gap_or_marker_band_start(
             index
             for index in range(1, len(rows))
             if small[index]
+            and not in_figure[index]
             and sum(small[index:]) >= _BAND_SMALL_ROWS_SHARE * (len(rows) - index)
             and (
                 rows[index].box.top - rows[index - 1].box.top
@@ -550,6 +584,7 @@ def _column_regions(
     left: float,
     measures: BookMeasures,
     band: tuple[Word, ...] | None,
+    figure_boxes: tuple[Box, ...],
 ) -> tuple[tuple[Region, ...], tuple[Region, ...]]:
     """The regions of the body column's `words`, a drop capital set aside:
     the running-head region and the body's regions, then the band's (steps
@@ -557,13 +592,17 @@ def _column_regions(
     Tesseract, step 4 does not look for the band in `words`: `band` is
     the band, and the rows of `words` below the running head the body.
     Without `band`, when every row below the running head is small, there
-    is no band and the body is cut as `_Part.ALL_SMALL_BODY`."""
+    is no band and the body is cut as `_Part.ALL_SMALL_BODY`.
+    `figure_boxes` are the boxes of the page's in-page figures, whose rows
+    never begin the band."""
     rows = group_rows(words)
     head_count = running_head_row_count(rows, measures.body_line_pitch)
     head, rest = rows[:head_count], rows[head_count:]
     if band is None:
         small = _small_rows(rest, measures)
-        band_start = _band_start(rest, small, measures)
+        band_start = _band_start(
+            rest, small, _rows_in_figures(rest, figure_boxes), measures
+        )
         body_rows, band_rows = rest[:band_start], rest[band_start:]
         body_part = _Part.ALL_SMALL_BODY if rest and all(small) else _Part.BODY
     else:
@@ -623,16 +662,18 @@ def column_regions_with_drop_capitals(
     left: float,
     measures: BookMeasures,
     band: tuple[Word, ...] | None,
+    figure_boxes: tuple[Box, ...],
 ) -> tuple[tuple[Region, ...], tuple[Region, ...]]:
-    """`_column_regions` of `words` and `band` without the drop capitals at
-    the indices `set_aside` of `words`, each then placed in the line beside
-    it. A capital with no line beside it is laid out again as a word of the
-    body."""
+    """`_column_regions` of `words`, `band` and `figure_boxes` without the
+    drop capitals at the indices `set_aside` of `words`, each then placed
+    in the line beside it. A capital with no line beside it is laid out
+    again as a word of the body."""
     upper, band_regions = _column_regions(
         tuple(word for index, word in enumerate(words) if index not in set_aside),
         left,
         measures,
         band,
+        figure_boxes,
     )
     regions = (*upper, *band_regions)
     unplaced = set()
@@ -644,7 +685,7 @@ def column_regions_with_drop_capitals(
             regions = placed
     if unplaced:
         return column_regions_with_drop_capitals(
-            words, set_aside - unplaced, left, measures, band
+            words, set_aside - unplaced, left, measures, band, figure_boxes
         )
     return regions[: len(upper)], regions[len(upper) :]
 
@@ -656,7 +697,8 @@ class PageParts:
     cut-in words; `column`, the words left in the column, which steps 3 to
     7 lay out; each side's cut-in zones, (top, bottom); and `band`, the
     words of a footnote band re-read with Tesseract, or None when step 4
-    finds the band among `column`."""
+    finds the band among `column`; and `figure_boxes`, the boxes of the
+    page's in-page figures, whose rows never begin the band (step 4)."""
 
     left: float
     right: float
@@ -668,12 +710,18 @@ class PageParts:
     left_zones: tuple[tuple[float, float], ...]
     right_zones: tuple[tuple[float, float], ...]
     band: tuple[Word, ...] | None
+    figure_boxes: tuple[Box, ...]
 
 
 def page_parts(
-    words: tuple[Word, ...], page_index: int, measures: BookMeasures
+    words: tuple[Word, ...],
+    page_index: int,
+    measures: BookMeasures,
+    *,
+    figure_boxes: tuple[Box, ...],
 ) -> PageParts:
-    """The parts of a page of `words` (steps 1, 2 and 2b)."""
+    """The parts of a page of `words` (steps 1, 2 and 2b), whose in-page
+    figures have the boxes `figure_boxes`."""
     split = split_at_column(words, page_index, measures)
     column_words = without_cut_in_notes(split, measures)
     return PageParts(
@@ -687,6 +735,7 @@ def page_parts(
         left_zones=column_words.left_zones,
         right_zones=column_words.right_zones,
         band=None,
+        figure_boxes=figure_boxes,
     )
 
 
@@ -712,6 +761,7 @@ def regions_of_parts(parts: PageParts, measures: BookMeasures) -> tuple[Region, 
         parts.left,
         measures,
         parts.band,
+        parts.figure_boxes,
     )
     # The cut-in notes' words are grouped apart from the outer margin notes
     # of their side, and their regions placed among them by their top.
@@ -737,11 +787,19 @@ def regions_of_parts(parts: PageParts, measures: BookMeasures) -> tuple[Region, 
 
 
 def page_regions(
-    words: tuple[Word, ...], page_index: int, measures: BookMeasures
+    words: tuple[Word, ...],
+    page_index: int,
+    measures: BookMeasures,
+    *,
+    figure_boxes: tuple[Box, ...],
 ) -> tuple[Region, ...]:
-    """The regions of a page of `words`, which are not empty, in reading
-    order (layout spec section 3)."""
-    return regions_of_parts(page_parts(words, page_index, measures), measures)
+    """The regions of a page of `words`, which are not empty, whose in-page
+    figures have the boxes `figure_boxes`, in reading order (layout spec
+    section 3)."""
+    return regions_of_parts(
+        page_parts(words, page_index, measures, figure_boxes=figure_boxes),
+        measures,
+    )
 
 
 def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout:
@@ -756,6 +814,11 @@ def layout_page(page: PageWords, measures: BookMeasures | None) -> PageLayout:
     regions = (
         (_region(group_rows(page.words)),)
         if measures is None
-        else page_regions(page.words, page.index, measures)
+        else page_regions(
+            page.words,
+            page.index,
+            measures,
+            figure_boxes=in_page_figure_boxes(page.figures),
+        )
     )
     return PageLayout(page.index, regions, page.figures)

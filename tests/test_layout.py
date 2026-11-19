@@ -1040,6 +1040,35 @@ def test_small_row_set_apart_but_followed_by_body_rows_is_no_band() -> None:
     assert len(body.lines) == 24
 
 
+def test_band_does_not_start_at_a_small_row_inside_an_in_page_figure() -> None:
+    # Kadesh page 27 read with ocr = "redo": Tesseract reads the hieroglyphs
+    # of a figure below the text as rows of junk, one of them small and
+    # set apart, which would start the band there and take the 3 rows of
+    # text under the figure into it (layout spec section 3, step 4, "A row
+    # inside a picture").
+    figure = Figure(
+        box=Box(40.0, 340.0, 260.0, 375.0),
+        image="images/figure-0000-1.png",
+        dpi=300,
+        kind=FigureKind.IN_PAGE,
+    )
+    junk = tuple(
+        _word(f"j{row}", 60 + 40 * place, top, 90 + 40 * place, top + _SMALL_HEIGHT)
+        for row, top in enumerate((_LAST_BODY_TOP + 1.5 * _PITCH, 360.0))
+        for place in range(3)
+    )
+    text = _rows(3, top=380.0, left=50.0)
+    notes = _small_rows(6, 404 + 1.5 * _PITCH)
+    page = replace(_page(0, (*_rows(20), *junk, *text, *notes)), figures=(figure,))
+    result, records = layout_page_with_figures(page, _MEASURES, None)
+    assert records == ()
+    body, band, figure_region = _region_texts(result)
+    assert len(body) == 23
+    assert body[20:] == (("a0", "b0", "c0"), ("a1", "b1", "c1"), ("a2", "b2", "c2"))
+    assert band == tuple((f"n{row}",) for row in range(6))
+    assert figure_region == (("j0", "j0", "j0"), ("j1", "j1", "j1"))
+
+
 def _two_column_rows(
     count: int, top: float = 100.0, height: float = _ROW_HEIGHT, pitch: float = _PITCH
 ) -> tuple[Word, ...]:

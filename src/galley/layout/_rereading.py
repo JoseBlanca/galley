@@ -29,6 +29,7 @@ from galley.layout._page import (
     PageParts,
     column_regions_with_drop_capitals,
     drop_capital_indices,
+    in_page_figure_boxes,
     layout_page,
     page_parts,
     page_regions,
@@ -162,6 +163,7 @@ def _layer_band_words(parts: PageParts, measures: BookMeasures) -> tuple[Word, .
         parts.left,
         measures,
         None,
+        parts.figure_boxes,
     )
     return tuple(word for region in band for word in words_of(region.lines))
 
@@ -474,7 +476,8 @@ def layout_page_with_rereads(
         or page.text_source is not TextSource.TEXT_LAYER
     ):
         return layout_page(page, measures), ()
-    parts = page_parts(page.words, page.index, measures)
+    figure_boxes = in_page_figure_boxes(page.figures)
+    parts = page_parts(page.words, page.index, measures, figure_boxes=figure_boxes)
     records = page_rereads(
         page.index,
         _page_readings(page, parts, measures, rereading),
@@ -486,7 +489,10 @@ def layout_page_with_rereads(
         return layout_page(page, measures), records
     if kept[0].kind is RereadKind.SMALL_PRINT_PAGE:
         regions = page_regions(
-            words_after_rereads(page.words, kept), page.index, measures
+            words_after_rereads(page.words, kept),
+            page.index,
+            measures,
+            figure_boxes=figure_boxes,
         )
     else:
         regions = regions_of_parts(

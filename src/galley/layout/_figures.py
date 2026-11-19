@@ -16,10 +16,10 @@ from collections import Counter
 
 from galley.body_measures import group_rows
 from galley.layout._column import BookMeasures
+from galley.layout._page import in_page_figure_boxes
 from galley.layout._rereading import Rereading, layout_page_with_rereads
 from galley.model import (
     Box,
-    FigureKind,
     Line,
     PageLayout,
     PageWords,
@@ -36,7 +36,7 @@ def _figure_words(page: PageWords) -> frozendict[Word, int]:
     holds its middle, edges included, unless the word is in the page's
     first row (the row with the smallest top, as `group_rows` makes rows).
     """
-    boxes = _in_page_boxes(page)
+    boxes = in_page_figure_boxes(page.figures)
     owners: dict[Word, int] = {}
     if not boxes or not page.words:
         return frozendict(owners)
@@ -55,13 +55,6 @@ def _figure_words(page: PageWords) -> frozendict[Word, int]:
         if owner is not None:
             owners[word] = owner
     return frozendict(owners)
-
-
-def _in_page_boxes(page: PageWords) -> tuple[Box, ...]:
-    """The boxes of the in-page figures of `page`, in their order."""
-    return tuple(
-        figure.box for figure in page.figures if figure.kind is FigureKind.IN_PAGE
-    )
 
 
 def _enclosing_box(boxes: tuple[Box, ...]) -> Box:
@@ -128,7 +121,7 @@ def figure_regions(page: PageWords, layout: PageLayout) -> PageLayout:
         for region in (region_without(region) for region in layout.regions)
         if region is not None
     )
-    boxes = _in_page_boxes(page)
+    boxes = in_page_figure_boxes(page.figures)
     regions_of_figures = tuple(
         Region(box, group_rows(words))
         for position, box in enumerate(boxes)
