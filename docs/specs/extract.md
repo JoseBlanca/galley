@@ -566,7 +566,14 @@ all of these hold:
 2. no Tesseract word **covers** it: once the layer word's box is moved
    up by the page's **offset**, the two boxes overlap in width and
    overlap in height by at least a quarter of the lower of the two
-   heights;
+   heights. A Tesseract word of **confidence 0** (below 1) does not
+   cover a layer word that Tesseract **did not read** there: one whose
+   letters, compared in lower case, Tesseract reads elsewhere on the
+   page as a word of confidence 60 or more (so the layer word is a
+   word of the page, not the layer's junk), and are neither inside
+   the covering word's letters nor at least 0.5 alike to them (the
+   ratio of Python's `difflib.SequenceMatcher`, so the covering word
+   is no misreading of it);
 3. its box overlaps no in-page figure's box of the page (analyze's
    `figure_boxes`): what the layer reads there is the picture's ink or
    lettering, which the figure's image shows; inside the box it would
@@ -589,6 +596,33 @@ all of these hold:
    page 55, "inn" on page 44, "AA/^AA^" on page 38, ".L+JI" and "o-a"
    on page 21), or a page number, unless it is a long word
    ("FftAigou", page 9's "FRANÇOIS"; "throueh" and "paper*", page 21).
+
+**A word read as junk.** Tesseract sometimes reads a printed word as
+junk of confidence 0 that covers it, so that the layer's reading is
+held back by condition 2 and the word is lost without a record: page
+44's "attack of the chariotry thus:" read "attack of the thus: as",
+whose "as" spans "chariotry" and the hieroglyphs under it (found by the
+checks of work package 5, 19 November 2026). Of the 128 layer words of
+Kadesh that only Tesseract words of confidence 0 cover, and that the
+other conditions would keep, looked at on the pages and in the two
+readings that day: 72 have letters inside or at least 0.5 alike to
+those of the covering word, a misreading of the same printed word
+("callation" over "collation", "Battie" over "BATTLE"), so keeping them
+would print the word twice; 46 others are mostly the layer's own
+junk ("QOIBTUB", the Greek of page 61 read as Latin letters) with a
+few printed words ("convenient", "Orontes,", "situation") that
+Tesseract reads nowhere else on their page; and 10 are printed words
+read rightly by the layer, whose letters Tesseract reads elsewhere on
+the page with confidence 60 or more and whose covering word is junk:
+"chariotry" (page 44, under "as"), "On his" (page 26, under "—_"),
+"Sachau" (26), "for", "but", "not" (page 13, under one junk word over
+"for reference, but it is not"), "walls" (13), "indebted" (11) and
+"Berlin," (20). The exception of condition 2 lets these 10 through
+and none of the other 118; on the whole book run with it the same day,
+7 are kept: "On" and "his" fail condition 5 (a short row of words
+under 4 letters), and "indebted" was not kept for a reason not traced.
+The junk word that covered each stays, as Tesseract's reading, and no
+other word of the book changes.
 
 The page's **offset** is the median, over the pairs of a layer word and
 a Tesseract word with the same letters and digits, 3 or more, that
