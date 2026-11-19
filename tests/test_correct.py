@@ -323,6 +323,8 @@ def test_a_pair_less_alike_than_0_3_is_no_edit() -> None:
         ("the llast-two here", "the last here"),
         ("see 7:3 here", "see 35 here"),
         ("ll 1l.1.2.and here", "ll 2, and here"),
+        ("see 1%The here", "see The here"),
+        ("see Kadesh*† here", "see Kadesh here"),
     ],
     ids=[
         "comma",
@@ -332,6 +334,8 @@ def test_a_pair_less_alike_than_0_3_is_no_edit() -> None:
         "hyphen_letters",
         "colon",
         "glued_with_marks",
+        "marker_before",
+        "marker_after",
     ],
 )
 def test_a_galley_word_that_may_hold_two_printed_words_is_not_replaced(
@@ -351,8 +355,10 @@ def test_a_galley_word_that_may_hold_two_printed_words_is_not_replaced(
             ("fiveminutes.", "five minutes."),
         ),
         ("pp. 542,543.) here", "pp. 542, 543.) here", ("542,543.)", "542, 543.)")),
+        ("the nonLibyan here", "the non-\nLibyan here", ("nonLibyan", "non-Libyan")),
+        ("the fivemen here", "the five\nmen here", ("fivemen", "five men")),
     ],
-    ids=["glued", "comma"],
+    ids=["glued", "comma", "line_break_after_hyphen", "line_break"],
 )
 def test_a_galley_word_glued_from_two_takes_the_models_two_words(
     galley: str, model: str, expected: tuple[str, str]

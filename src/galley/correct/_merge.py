@@ -103,6 +103,12 @@ _SEPARATOR = re.compile(r"(?<=[^\W_])[,.:\-\u2013](?=[^\W_])")
 
 
 _DIGIT_RUN = re.compile(r"\d\d")
+# Section 7, (c): digits and marker signs glued before or after two letters
+# or more, a note marker misread ("1%The", Kadesh page 53).
+# One digit alone is not such a piece: it is often a letter misread
+# ("1bid" for "ibid", "4meni" for "Ameni" on the excerpt kadesh_redo).
+_PIECE = r"(?:[\d*\u2020\u2021%]{2,}|[\d]*[*\u2020\u2021%][\d*\u2020\u2021%]*)"
+_GLUED_PIECE = re.compile(rf"^{_PIECE}(?=[^\W\d_]{{2}})|(?<=[^\W\d_]{{2}}){_PIECE}$")
 
 
 def _alphanumerics(core: str) -> int:
@@ -112,13 +118,19 @@ def _alphanumerics(core: str) -> int:
 def may_hold_more_words(galley_core: str, model_core: str) -> bool:
     """Whether galley's core may hold more printed words than the model's
     (section 7): more commas, full stops, hyphens or en dashes between two
-    letters or digits, or more digits when it has two side by side (a lone
-    digit is often a letter misread: "a3", "V1")."""
-    return len(_SEPARATOR.findall(galley_core)) > len(
-        _SEPARATOR.findall(model_core)
-    ) or (
-        _DIGIT_RUN.search(galley_core) is not None
-        and sum(c.isdigit() for c in galley_core) > sum(c.isdigit() for c in model_core)
+    letters or digits; more digits when it has two side by side (a lone
+    digit is often a letter misread: "a3", "V1"); or a piece of digits and
+    marker signs glued before or after two letters that the model's core
+    lacks ("1%The")."""
+    glued = _GLUED_PIECE.search(galley_core)
+    return (
+        len(_SEPARATOR.findall(galley_core)) > len(_SEPARATOR.findall(model_core))
+        or (
+            _DIGIT_RUN.search(galley_core) is not None
+            and sum(c.isdigit() for c in galley_core)
+            > sum(c.isdigit() for c in model_core)
+        )
+        or (glued is not None and glued.group() not in model_core)
     )
 
 
@@ -294,6 +306,9 @@ def _replacement(
         model_core = model_answer.text[
             model_answer.tokens[first].start : model_answer.tokens[last].end
         ]
+        # The model's line break between the two words is one space, or
+        # nothing after a hyphen ("non-" and "Libyan" are "non-Libyan").
+        model_core = re.sub(r"\s+", " ", model_core).replace("- ", "-")
         # The space between the two words counts as one more mark.
         if (
             len(_SEPARATOR.findall(galley_core))
