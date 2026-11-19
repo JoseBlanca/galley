@@ -132,15 +132,46 @@ _MARKDOWN = re.compile(r"<[^>]*>|[*_#`|]")
 _LINE_END_HYPHEN = re.compile(r"([^\W\d_])[-¬][ \t]*\n[ \t]*(?=[^\W\d_])")
 
 
+@dataclass(frozen=True, slots=True)
+class LineEndJoin:
+    """Where the cleaned answer joined a word broken at a line end: the
+    offset in the cleaned text where the second half starts, and whether
+    both halves were in capitals ("DINDORF-" and "MÜLLER")."""
+
+    offset: int
+    capitals: bool
+
+
 def clean_answer(text: str) -> str:
     """The model's answer ready to be cut into tokens: markdown's marks taken
     out and the words broken at a line end joined (step 1). Superscript
     digits are dropped, since the model writes note markers so."""
+    return cleaned_answer(text)[0]
+
+
+def cleaned_answer(text: str) -> tuple[str, tuple[LineEndJoin, ...]]:
+    """The cleaned answer, as clean_answer gives it, and where it joined
+    the words broken at a line end."""
     text = _MARKDOWN.sub(" ", text)
     text = "".join(
         character for character in text if character not in _SUPERSCRIPT_DIGITS
     )
-    return _LINE_END_HYPHEN.sub(_join, text)
+    pieces = []
+    joins = []
+    length = 0
+    previous = 0
+    for match in _LINE_END_HYPHEN.finditer(text):
+        kept = text[previous : match.start()]
+        pieces.append(kept)
+        length += len(kept)
+        joined = _join(match)
+        pieces.append(joined)
+        length += len(joined)
+        if joined != match.group():
+            joins.append(LineEndJoin(length, capitals=not text[match.end()].islower()))
+        previous = match.end()
+    pieces.append(text[previous:])
+    return "".join(pieces), tuple(joins)
 
 
 def _join(match: re.Match[str]) -> str:

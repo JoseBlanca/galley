@@ -11,7 +11,14 @@ from typing import assert_never
 
 from galley.correct._align import Pair, align
 from galley.correct._reading import GalleyToken, Place
-from galley.correct._tokens import Token, alike, clean_answer, comparison_form, tokens
+from galley.correct._tokens import (
+    LineEndJoin,
+    Token,
+    alike,
+    cleaned_answer,
+    comparison_form,
+    tokens,
+)
 from galley.model import Block, Edit, block_sha256, only_occurrence
 
 _logger = logging.getLogger(__name__)
@@ -58,16 +65,31 @@ class Change:
 
 @dataclass(frozen=True, slots=True)
 class Answer:
-    """A model's answer cut into tokens: `text` as cleaned and its tokens."""
+    """A model's answer cut into tokens: `text` as cleaned and its tokens;
+    `joins` gives, by token position, the line-end join inside the token,
+    for a word the model printed broken at a line end."""
 
     text: str
     tokens: tuple[Token, ...]
+    joins: Mapping[int, LineEndJoin] = frozendict()
 
 
 def answer(raw: str) -> Answer:
     """The model's raw answer as cleaned text and its tokens."""
-    text = clean_answer(raw)
-    return Answer(text, tokens(text))
+    text, joins = cleaned_answer(raw)
+    answer_tokens = tokens(text)
+    return Answer(
+        text,
+        answer_tokens,
+        frozendict(
+            {
+                position: join
+                for join in joins
+                for position, token in enumerate(answer_tokens)
+                if token.start < join.offset < token.end
+            }
+        ),
+    )
 
 
 def _core(reading_answer: Answer, position: int) -> str:
@@ -385,13 +407,14 @@ def _whole_word(
     model_form: str,
     galley_text: Mapping[Place, str],
     paired: Mapping[int, int],
-) -> tuple[Place, str]:
+) -> tuple[Place, str, Place | None]:
     """The place a replacement of galley's token at `position`, whose core
-    is at `place`, covers, and galley's core there for checks (a) to (c):
-    the token's own; or both halves of a word split at a line end, their
-    cores joined without the hyphen, when the token is the second half,
-    the first half is the token before, pairs with nothing, and joined
-    with it is more alike the model's form (section 7)."""
+    is at `place`, covers, galley's core there for checks (a) to (c), and
+    the place of the first half when it covers two: the token's own; or
+    both halves of a word split at a line end, their cores joined without
+    the hyphen, when the token is the second half, the first half is the
+    token before, pairs with nothing, and joined with it is more alike the
+    model's form (section 7)."""
     token = reading[position]
     head = token.first_half
     if (
@@ -402,11 +425,22 @@ def _whole_word(
         or alike(reading[position - 1].form + token.form, model_form)
         <= alike(token.form, model_form)
     ):
-        return place, galley_text[place]
+        return place, galley_text[place], None
     return (
         Place(place.block_id, place.span_index, head.start, place.end),
         galley_text[head][:-1] + galley_text[place],
+        head,
     )
+
+
+def _halves(
+    model_core: str, join: LineEndJoin, start: int, first: str, second: str
+) -> str:
+    """The model's word broken in capitals at a line end, with its hyphen,
+    each half in the case of galley's half: "DINDORF-MÜLLER" against
+    "Dirporr-" and "MCiuer" is "Dindorf-Müller" (section 7)."""
+    cut = join.offset - start
+    return cased(model_core[:cut], first) + "-" + cased(model_core[cut:], second)
 
 
 def page_changes(
@@ -451,13 +485,26 @@ def page_changes(
             or alike(token.form, model_form) < _LEAST_ALIKE
         ):
             continue
-        place, galley_core = _whole_word(
+        place, galley_core, head = _whole_word(
             reading, pair.first, token.place, model_form, galley_text, paired
         )
+        join = model_answer.joins.get(pair.second)
+        if head is not None and join is None:
+            # The model printed the word whole: galley's hyphen may be one
+            # the word has; leave it alone (section 7).
+            continue
         replacement = _replacement(galley_core, model_answer, pair.second, unpaired)
         if replacement is None:
             continue
         new_core, beside = replacement
+        if head is not None and join is not None and join.capitals:
+            new_core = _halves(
+                _core(model_answer, pair.second),
+                join,
+                model_answer.tokens[pair.second].start,
+                galley_text[head][:-1],
+                galley_text[token.place],
+            )
         if beside is not None:
             consumed.add(beside)
         changes.append(

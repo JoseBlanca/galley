@@ -369,7 +369,22 @@ From the pairs:
   P#@igns" becomes "campaigns", where the first run of 19 November 2026
   replaced the second half alone and left "cam- campaigns". (a), (b) and
   (c) are checked on the two cores joined without the hyphen and the
-  space. The run of 19 November 2026 has 3 such edits among its 1,050
+  space. The model's word decides what becomes of galley's hyphen:
+
+  - the model printed the word broken at a line end before a lower-case
+    letter ("cam-" and "paigns"): the hyphen goes, "campaigns";
+  - it printed it broken at a line end with both halves in capitals
+    ("DINDORF-" and "MÜLLER", page 61): the hyphen stays, and each half
+    takes the case of galley's half, so "Dirporr- MCiuer," becomes
+    "Dindorf-Müller,". Section 6 joins such halves without the hyphen
+    for comparing, since in capitals a line-end hyphen may be the
+    printer's ("MARI-" and "ETTE") or the word's; here, where galley also
+    has the hyphen, it is kept (review of 19 November 2026, which found
+    "Dindorfmüller,");
+  - it printed the word whole, with no line end inside: no edit, since
+    galley's hyphen may be the word's own.
+
+  The run of 19 November 2026 has 3 such edits among its 1,050
   ("cam- P#@igns" on page 8, "Dirporr- MCiuer," on page 61, and
   "com- (Newaey." on page 11, whose first half is on page 10 and which
   the rule leaves alone). A first half that the model's whole word pairs
@@ -773,7 +788,9 @@ wait either way.
   body is not joined to the first note of the model's answer.
 - **A word split at a line end that structure did not join.** In the
   note of page 8, galley's "cam- P#@igns" against the model's
-  "campaigns" gives one edit, "cam- P#@igns" to "campaigns".
+  "cam-" and "paigns" gives one edit, "cam- P#@igns" to "campaigns"; on
+  page 61, "Dirporr- MCiuer," against "DINDORF-" and "MÜLLER," gives
+  "Dindorf-Müller,".
 - **The hieroglyph rows of page 27.** The words galley read inside the
   figures are removals, not in its reading; the model skips them; nothing
   pairs.
