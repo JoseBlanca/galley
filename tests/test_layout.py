@@ -1507,6 +1507,28 @@ def test_one_line_note_takes_the_marks_below_it_into_the_band() -> None:
     assert _region_texts(result)[1:] == ((_ONE_LINE_NOTE, ("•",)),)
 
 
+def test_one_line_note_inside_an_in_page_figure_does_not_begin_the_band() -> None:
+    # The row would be a one-line note, but each of its words lies inside a
+    # figure (layout spec section 3, step 4, "A row inside a picture"); the
+    # speck below it shows where the band would have begun.
+    note = _one_line_note(_ONE_LINE_NOTE, 6.0, _LAST_BODY_TOP + _PITCH)
+    speck = _word(
+        "•", 140, _LAST_BODY_TOP + 2 * _PITCH, 142, _LAST_BODY_TOP + 2 * _PITCH + 3
+    )
+    figure = Figure(
+        box=Box(45.0, _LAST_BODY_TOP + _PITCH - 2, 150.0, _LAST_BODY_TOP + _PITCH + 10),
+        image="images/figure-0000-1.png",
+        dpi=300,
+        kind=FigureKind.IN_PAGE,
+    )
+    page = replace(_page(0, (*_prose_rows(20), *note, speck)), figures=(figure,))
+    result, _ = layout_page_with_figures(page, _MEASURES, None)
+    body, figure_region = _region_texts(result)
+    assert len(body) == 21
+    assert body[-1] == ("•",)
+    assert figure_region == (_ONE_LINE_NOTE,)
+
+
 def test_one_line_note_needs_a_row_of_20_characters_above_it() -> None:
     # The rows of _rows hold 6 characters each.
     note = _one_line_note(_ONE_LINE_NOTE, 2.0, _LAST_BODY_TOP + _PITCH)

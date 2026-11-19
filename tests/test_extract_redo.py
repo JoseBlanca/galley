@@ -574,7 +574,9 @@ def test_word_tesseract_read_as_junk_of_confidence_0_is_kept_from_the_layer() ->
         "confidence 1",
         # The covering word is a misreading of it, 0.5 alike or more.
         "misreading",
-        # The covering word's letters hold the word's.
+        # The covering word's letters hold the word's, under 0.5 alike to
+        # them (18 of 37 letters, 0.49), so only the test of letters inside
+        # keeps it out.
         "inside",
     ],
 )
@@ -586,7 +588,7 @@ def test_layer_word_under_a_confidence_0_word_is_not_kept_unless_all_hold(
         "not elsewhere": junk,
         "confidence 1": replace(junk, ocr_confidence=1.0),
         "misreading": replace(junk, text="chanotiy"),
-        "inside": replace(junk, text="xchariotryx"),
+        "inside": replace(junk, text="xxxxxxxxxchariotryxxxxxxxxxx"),
     }[change]
     above = () if change == "not elsewhere" else (CHARIOTRY_ABOVE_44,)
     line = (*LINE_44_TESSERACT[:3], replaced, LINE_44_TESSERACT[4])
