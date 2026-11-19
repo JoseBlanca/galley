@@ -236,11 +236,15 @@ EXCERPT_CONFIGS = frozendict(
 
 # The excerpts read with `ocr = "redo"` (docs/specs/extract.md, section 9;
 # docs/plans/ocr-redo.md), without `pdf`. They are kept out of
-# EXCERPT_CONFIGS while analyze refuses `redo`, which would stop the
-# session's run of every excerpt; `redo_excerpt_run` runs them, the first
-# time a test asks. Kadesh's excerpt page 8 is its page index 16, the scan
-# of a cover, which the whole book's config excludes, and its region on
-# page 0 holds the journal's page number 81, as in kadesh_8-17.
+# EXCERPT_CONFIGS: `redo_excerpt_run` runs them the first time a test
+# asks, analyze to structure only, so that the tests of the tasks still
+# to come are strict xfails rather than errors of the session's run of
+# every excerpt. Kadesh's excerpt page 8 is its page index 16, the scan
+# of a cover, which the whole book's config excludes. Its region on page
+# 0 holds the journal's page number 81 where Tesseract boxes it, 634.8 to
+# 641.8 pt from the top, and nothing else (checked on the page at 300 dpi
+# on 19 November 2026); kadesh_8-17's region is 12 pt higher, where the
+# text layer misplaces it.
 REDO_EXCERPT_CONFIGS = frozendict(
     {
         "kadesh_redo": (
@@ -248,7 +252,7 @@ REDO_EXCERPT_CONFIGS = frozendict(
             'authors = ["James Henry Breasted"]\n'
             'language = "en"\n'
             'ocr = "redo"\n'
-            "exclude_regions = [{page = 0, box = [240, 620, 252, 632]}]\n"
+            "exclude_regions = [{page = 0, box = [240, 632, 252, 644]}]\n"
             "exclude_pages = [8]\n"
         ),
     }
@@ -311,11 +315,15 @@ WHOLE_BOOK_CONFIGS = frozendict(
             "exclude_pages = [0, 1, 2, 3, 5, 6, 7, 38, 41, 554, 555, 557]\n"
             "contents_pages = [14, 15, 16, 17, 18, 19, 20]\n"
         ),
+        # Kadesh is read with ocr = "redo": its text layer is bad throughout
+        # (docs/plans/ocr-redo.md). Its page 74 is the library's card pocket,
+        # excluded on 19 November 2026.
         "battleofkadeshst00breauoft": (
             'title = "The Battle of Kadesh"\n'
             'authors = ["James Henry Breasted"]\n'
             'language = "en"\n'
-            "exclude_pages = [0, 1, 2, 3, 16, 49, 65, 70, 71, 72, 73, 75]\n"
+            'ocr = "redo"\n'
+            "exclude_pages = [0, 1, 2, 3, 16, 49, 65, 70, 71, 72, 73, 74, 75]\n"
             "plate_pages = [23]\n"
         ),
         "politicaltheorie00gieruoft": (

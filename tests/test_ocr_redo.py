@@ -24,6 +24,7 @@ from galley.model import (
     TextSource,
     block_text,
     read_blocks,
+    read_lines,
     read_pages,
     read_words,
 )
@@ -35,13 +36,6 @@ _EXCERPT = "kadesh_redo"
 _EXCLUDED_PAGE = 8
 _PLATE_PAGE = 10
 
-_TASK_2_1 = pytest.mark.xfail(
-    strict=True, reason="task 2.1 of docs/plans/ocr-redo.md: analyze accepts redo"
-)
-_TASK_2_2 = pytest.mark.xfail(
-    strict=True,
-    reason="task 2.2 of docs/plans/ocr-redo.md: extract reads ocr pages with Tesseract",
-)
 _TASK_3_1 = pytest.mark.xfail(
     strict=True,
     reason="task 3.1 of docs/plans/ocr-redo.md: note references from the layer",
@@ -66,7 +60,6 @@ def _holds_run(words: Sequence[str], run: Sequence[str]) -> bool:
 
 
 @pytest.mark.tesseract
-@_TASK_2_1
 def test_redo_marks_text_pages_ocr_and_keeps_the_plate_and_excluded_page(
     redo_excerpt_run: Callable[[str], BookFolder],
 ) -> None:
@@ -83,7 +76,6 @@ def test_redo_marks_text_pages_ocr_and_keeps_the_plate_and_excluded_page(
 
 
 @pytest.mark.tesseract
-@_TASK_2_2
 def test_page_with_a_bad_layer_has_tesseracts_words(
     redo_excerpt_run: Callable[[str], BookFolder],
 ) -> None:
@@ -98,7 +90,6 @@ def test_page_with_a_bad_layer_has_tesseracts_words(
 
 
 @pytest.mark.tesseract
-@_TASK_2_2
 def test_plate_keeps_the_layers_words_under_redo(
     redo_excerpt_run: Callable[[str], BookFolder],
 ) -> None:
@@ -111,7 +102,6 @@ def test_plate_keeps_the_layers_words_under_redo(
 
 
 @pytest.mark.tesseract
-@_TASK_2_2
 def test_excluded_page_keeps_the_layers_words_as_removals_under_redo(
     redo_excerpt_run: Callable[[str], BookFolder],
 ) -> None:
@@ -123,6 +113,15 @@ def test_excluded_page_keeps_the_layers_words_as_removals_under_redo(
         if removal.page_index == _EXCLUDED_PAGE
         and removal.reason is RemovalReason(expected["removal_reason"])
     ] == expected["removed_words"]
+
+
+@pytest.mark.tesseract
+def test_layout_rereads_nothing_under_redo(
+    redo_excerpt_run: Callable[[str], BookFolder],
+) -> None:
+    # Architecture section 7b: under redo every text page is Tesseract's
+    # already, and layout re-reads no region.
+    assert read_lines(redo_excerpt_run(_EXCERPT).lines_json).rereads == ()
 
 
 @pytest.mark.tesseract
