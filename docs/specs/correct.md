@@ -48,7 +48,7 @@ For each text page of the book, in parallel:
    two differ enough, propose the model's word in its place. In a note,
    where the model has words that line up with none of galley's, propose
    to put them in. Each proposal is an edit.
-5. On a page where a note starts, send the page a second time, with the
+5. On a page where a footnote starts, send the page a second time, with the
    prompt of section 9b, which asks for the text with each note
    reference marked; where the model marks a reference after a word of
    galley's and names one of the page's notes, propose a link from that
@@ -522,8 +522,8 @@ section 11); on Kadesh 142 of its 183 notes have no link, and some links
 go to the note before or after the right one. The stage asks the model
 where the references are, and links the notes it can place.
 
-**The request.** On each text page where a note starts (a note whose
-first origin is on the page), a second request, as in section 4 but for
+**The request.** On each text page where a footnote starts (a note of
+kind footnote whose first origin is on the page), a second request, as in section 4 but for
 the prompt:
 
 > This is a page of a book with footnotes. Copy the main text above the
@@ -565,7 +565,11 @@ best candidate is the place when it scores at least 0.5 more than the
 second; else the reference gives no link. A fixed token is never the
 place.
 
-**Which note.** Among the notes that start on the page, the one whose
+An endnote gets no request and no link: Gierke's endnotes start on 93
+pages of its endnote section, where no reference is printed, and its
+references are matched by structure (structure spec, section 12).
+
+**Which note.** Among the footnotes that start on the page, the one whose
 first three words, their comparison forms joined, are most alike the
 note line's first three words: at least 0.6 alike, and 0.1 more than any
 other note. Else no link. A reference whose number has no note line

@@ -1,11 +1,13 @@
 """Tests of the note links of the correct stage (docs/specs/correct.md,
 section 9b) and of how markdown applies a link edit (section 10)."""
 
+import dataclasses
 import logging
 from pathlib import Path
 
 import pytest
 
+from galley.correct import footnotes_starting
 from galley.correct._links import (
     Link,
     MarkedReference,
@@ -469,3 +471,17 @@ def test_an_owner_link_to_a_footnote_referenced_already_is_refused() -> None:
         apply_edits(page, [FiledEdit(edit, Path("edits/owner.jsonl"), 3)])
     assert "edits/owner.jsonl, line 3" in str(raised.value)
     assert "a block refers to twice" in str(raised.value)
+
+
+def test_links_are_asked_for_on_pages_where_a_footnote_starts_only() -> None:
+    # Section 9b: an endnote starts a page of Gierke's endnote section,
+    # where no reference is printed.
+    endnote = dataclasses.replace(
+        _note("n-p0008-009", "Endnote"), kind=NoteKind.ENDNOTE
+    )
+    page = _blocks((BODY_BLOCK,), (*PAGE.notes, endnote))
+    assert [note.id for note in footnotes_starting(page, 8)] == [
+        "n-p0008-003",
+        "n-p0008-004",
+    ]
+    assert footnotes_starting(_blocks((BODY_BLOCK,), (endnote,)), 8) == ()

@@ -33,6 +33,7 @@ from galley.model import (
     BlocksFile,
     Edit,
     Note,
+    NoteKind,
     PageKind,
     RenderedPage,
     check_source_pdf,
@@ -48,6 +49,7 @@ __all__ = [
     "check_server",
     "edits_of",
     "footnote_band_top",
+    "footnotes_starting",
     "page_png",
     "run",
     "token_cores",
@@ -168,6 +170,19 @@ def _read_page(config: BookConfig, work: _PageWork) -> _PageResult:
     )
 
 
+def footnotes_starting(blocks: BlocksFile, page_index: int) -> tuple[Note, ...]:
+    """The footnotes whose first origin is on the page: the notes a link
+    may go to, and on whose pages the model is asked for the references
+    (section 9b). An endnote is not one: Gierke's start on 93 pages."""
+    return tuple(
+        note
+        for note in blocks.notes
+        if note.kind is NoteKind.FOOTNOTE
+        and note.origin
+        and note.origin[0].page_index == page_index
+    )
+
+
 def token_cores(
     blocks: BlocksFile, reading: tuple[GalleyToken, ...]
 ) -> frozendict[Place, str]:
@@ -240,11 +255,7 @@ def run(
                     reading=reading,
                     cores=token_cores(blocks, reading),
                     band_top=footnote_band_top(blocks, page.index),
-                    notes=tuple(
-                        note
-                        for note in blocks.notes
-                        if note.origin and note.origin[0].page_index == page.index
-                    ),
+                    notes=footnotes_starting(blocks, page.index),
                 )
             )
     results = map_pages(lambda item: _read_page(config, item), work, workers)
