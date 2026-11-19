@@ -602,8 +602,12 @@ is laid out as one region, as the skeleton did.
    speck as a page number.
    The limit of 2 pitches keeps a page number apart from a heading set
    lower on the page, such as "CHAPTER IV." 5 pitches below a number at
-   the head of a chapter's page, which would otherwise be joined to the
-   number as a head line and removed as a running head. Measured on 19
+   the head of a chapter's page (an invented case: no page of the eight
+   books is so), which would otherwise be joined to the number as a
+   head line and removed as a running head. When the next row with a
+   letter lies more than 2 pitches below the number, the page number is
+   a head row as any other, by the rule above: a region of its own when
+   the body lies 1.3 pitches or more below it. Measured on 19
    November 2026 on the eight books' `words.json`, by median tops, the
    head-word row lies 1.61 pitches below the number on Kadesh's page 38,
    0.59 and 0.66 on Domesday's 200 and 428, and 1.05 on its 552; no
@@ -1141,10 +1145,19 @@ machine with 6 workers, `galley2epub layout` on the whole book, against
   owner's two modern books give a left cut-in inset (Turney 44.3 pt,
   from the indent of its epigraphs, chapter labels and section
   headings; Haynes 30.0 pt, from its epigraphs and paragraph indents),
-  so step 2b runs on them; it moves no word in either, since no row
-  beside those lines is shortened with words left of the inset
-  (measured on 17 November 2026: every page laid out with and without
-  the insets gives the same regions; structure §21).
+  so step 2b runs on them. It moves no word of Haynes, and none of
+  Turney only because Turney's config names its contents page, 10, in
+  `contents_pages`: since the cut row's test by size (step 2b), the
+  labels of that page, "Two", "Three", set smaller at the column's left
+  edge beside titles that start at the inset, would be taken as a
+  cut-in note (step 2b, "No cut-in notes on a contents page"). A book
+  with a cut-in inset whose config does not name such a page in
+  `contents_pages` has its contents labels taken as margin notes, and
+  its contents broken. Measured on 17 November 2026, before the test by
+  size, every page of both books laid out with and without the insets
+  gave the same regions (structure §21); on 19 November 2026, with the
+  test by size, Turney's page 10 alone changes when it is left out of
+  `contents_pages`.
 - **Index pages**: two columns, each read top to bottom (step 5). An
   index set in small type under a full-size title has the title in the
   body and the columns as the band, which keeps their order.
@@ -1271,7 +1284,23 @@ with their boxes, with a `BookMeasures` given in the test:
   column is no cut row;
 - `measure_book` on pages whose rows start 60 pt in on 60 rows and 0 to
   2 pt in on the rest gives a left inset of 60, and on pages whose rows
-  start 30 pt in as often as 38 pt in gives none.
+  start 30 pt in as often as 38 pt in gives none;
+- two labels, "Two" and "Three", set smaller than the rows beside them
+  at the column's left edge, each on the row of a title that starts at
+  the cut-in inset, stay in the body on a page of `contents_pages` and
+  are a margin region on any other page
+  (`test_cut_in_labels_on_a_contents_page_stay_in_the_body`);
+- a page number "27" boxed apart, 1.9 pitches above a head's words,
+  is joined to them as one head line; 2.1 or 5 pitches above them, it
+  is a head line alone and the head's words begin the body
+  (`test_page_number_boxed_apart_takes_a_head_within_2_pitches_below_it`);
+- 25 rows of notes 7 pt high under 13 rows of text 10 pt high, 1.5
+  pitches apart, with a book body word height of 8 pt, give a band
+  region, since the page's median row height is taken on its full-size
+  rows, 13 of 38, a quarter or more; under 7 rows of text, 7 of 32,
+  less than a quarter, the median is that of all rows and the notes
+  stay in the body
+  (`test_band_rows_outnumbering_the_text_are_small_against_its_full_size_rows`).
 
 An excerpt test asserts that `measure_book` gives no cut-in inset on
 either side for the five excerpts other than `stubbs_51_56-64`: the

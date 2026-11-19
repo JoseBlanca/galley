@@ -239,20 +239,29 @@ layer, for each word of the layer whose middle lies outside the page's
 4. A word has **no ink** when its ink is below 20 levels.
 
 A page is **inkless** when at least half of those words have no ink,
-unless at least a third of its words without ink are known words (section
-2, `wordlist.is_known_word`, the word list that also guards the joining
-of hyphenated words). The exception keeps a short page of faint real
-print: Gierke's page 1, a binder's label, "HANDBOUND AT THE UNIVERSITY
-OF TORONTO PRESS", has 2 of its 7 words without ink, "HANDBOUND" and
-"OF", a share of 0.29, and a page of 1 to 4 words could reach half;
-"OF" is known, 1 of the 2. The junk of the four inkless pages is not
-made of words: of their words without ink, Haskins 277 has 0 of 10
-known, Haskins 278 0 of 21, Haynes 9 1 of 6 ("SP") and Haynes 421 0 of
-3 (measured on 18 November 2026, as analyze reads them). The limit, a
-third, lies midway between the junk's 0.17 at most and the label's 0.50,
-so that neither lies at it; at a half, the label's share stood exactly on
-the limit (decided on 19 November 2026 after the review of the plan
-stray-text; the inkless pages of the eight books are the same four). A
+unless at least 2 of its words without ink are known words of 2 letters
+or more: words of the word list (section 2, `wordlist.is_known_word`,
+the word list that also guards the joining of hyphenated words), but
+not numbers or punctuation, which `is_known_word` also counts as known
+(`wordlist.is_word_of_list`). The exception keeps a short page of faint
+real print: Gierke's page 1, a binder's label, "HANDBOUND AT THE
+UNIVERSITY OF TORONTO PRESS", has 2 of its 7 words without ink,
+"HANDBOUND" and "OF", a share of 0.29, and a page of 1 to 4 words could
+reach half. The junk of the four inkless pages is not made of words: of
+their words without ink, Haynes 9 has 1 known word of 2 letters or more
+("SP", of 6 words), and Haskins 277 (10 words), Haskins 278 (21) and
+Haynes 421 (3) none (measured on 18 November 2026, as analyze reads
+them). So the limit of 2 lies 1 word above Haynes 9 and 2 above the
+other three. A share was the rule before, a page kept when a third of
+its words without ink are known: since `is_known_word` counts any
+number as known, one digit among Haynes 421's 3 junk marks would have
+kept that page, and one more known word among Haynes 9's 6 would have
+kept it. A count of 2 needs two words of the list among the junk. It
+no longer keeps a page whose only word without ink is one known word,
+such as a page of one faint word; no page of the eight books is such
+a page. The assistant decided the count of 2 on 19 November 2026,
+while the owner was away, after the spec review of the plan
+stray-text; the inkless pages of the eight books are the same four. A
 page with none of those words is not tested.
 
 **What follows.** A page the test finds inkless gets the kind `inkless`
@@ -273,8 +282,8 @@ but for a word inside one of the page's `exclude_regions`, which keeps
 the reason `excluded_region` as on any page;
 it has no kept word and no figure, so layout gives it no region and
 structure no block. analyze logs each inkless page at WARNING, with its
-share of words without ink and the share of those that are known words,
-so that the owner sees a page taken wrongly. No config key keeps such a page: the rule takes no page of
+share of words without ink and how many of those are known words of 2
+letters or more, so that the owner sees a page taken wrongly. No config key keeps such a page: the rule takes no page of
 print in the eight books (below), and a key is added when a book needs
 one.
 
@@ -326,7 +335,7 @@ configs do not exclude.
 | local background | median of the box grown by 6 pt | guessed, and kept because it absorbs Haynes 9's gradient; the page's median gray, as the plate rule's ink uses, was not tried |
 | no ink | below 20 levels | measured, above: 40 of the 43 junk words, 339 of 1.1 million real ones |
 | inkless page | at least 0.5 of its words | measured, above |
-| a page of print kept | at least a third of its words without ink known | measured, above: the junk of the inkless pages has at most 0.17 known (Haynes 9), Gierke 1's label 0.50; a third lies midway |
+| a page of print kept | at least 2 of its words without ink known words of 2 letters or more | measured, above: the junk of the inkless pages has at most 1 such word (Haynes 9's "SP"), Gierke 1's label 2; decided by the assistant on 19 November 2026 |
 
 **A rule per word was measured and dropped.** Removing each word
 without ink, wherever it is, would also remove real words. Of 12 words
@@ -399,14 +408,18 @@ def is_inkless(page: RenderedPage, layer_words: tuple[tuple[str, Box], ...],
     # Whether the page is inkless by section 2b: at least half of
     # `layer_words`, the page's text-layer words outside its excluded
     # regions, each its text and box in points, have no ink on `page`,
-    # its 36 dpi render, and fewer than half of those without ink are
-    # known words of `lower_case_words`. False when `layer_words` is
-    # empty.
+    # its 36 dpi render, and fewer than 2 of those without ink are
+    # words of `lower_case_words` of 2 letters or more
+    # (`is_word_of_list`). False when `layer_words` is empty.
 
 # galley.wordlist
 
 def is_known_word(word: str, lower_case_words: frozenset[str]) -> bool: ...
     # `lower_case_words` as `wordlist.lower_case_word_list` gives it.
+
+def is_word_of_list(word: str, lower_case_words: frozenset[str]) -> bool: ...
+    # Whether `word` is a known word of 2 letters or more: `is_known_word`
+    # without the numbers it also counts (section 2b).
 ```
 
 `run` of each stage is unchanged in what it deletes, checks and writes
@@ -481,7 +494,8 @@ high across the box's middle, true (half); with 3, false; a black page with a wh
 each of 4 boxes gives false (white print on a dark ground); a page whose gray darkens from 200 on
 the left to 120 on the right, with 4 boxes over plain gray, gives true;
 no box gives false; a white page whose 4 words are known 2 of them,
-false, and 1 of them, true. A word box 2 pt left of a black bar 1 pixel wide
+false, and 1 of them, true, as with 1 known word and the numbers "16"
+and "17]". A word box 2 pt left of a black bar 1 pixel wide
 has ink (the box is grown by 3 pt). Excerpt tests, on pages the
 assistant transcribed from their images
 (`tests/fixtures/expected/stray_text/`):
