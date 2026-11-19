@@ -1,0 +1,472 @@
+{
+ "format_version": 5,
+ "source_pdf_sha256": "1dd70d2c288fbff1925983fff61ffe1138bfd496b1425e037805196d8d0320f5",
+ "blocks": [
+  {
+   "id": "b-p0010-001",
+   "kind": "paragraph",
+   "level": null,
+   "label": null,
+   "source": null,
+   "page_number": null,
+   "heading_ref": null,
+   "spans": [
+    {
+     "text": "There is a good deal of misunderstanding regarding these sources, and it will be necessary, therefore, to offer a brief statement of them here. They are threefold: (1) The familiar so-called Porm, so long known as the “Poem of Pentaur,” until Erman showed that Pentaur (Pn-t’-Wr-t) was only the copyist and not the author of the com- (Newaey. Gram., 7); we shall refer to the document as the Poem, (2) A position p. brief Recorp” of the campaign, engraved over the temple-reliefs, which depict its chief events; we shall refer to it as the Record. (3) The TempLe-Reviers depicting the campaign, together with the aceompanying short explanatory inscriptions.",
+     "emphasis": "none",
+     "note_ref": null
+    }
+   ],
+   "figure": null,
+   "origin": [
+    {
+     "page_index": 10,
+     "box": [
+      73.67999999999999,
+      514.7,
+      470.64,
+      566.74
+     ]
+    },
+    {
+     "page_index": 11,
+     "box": [
+      62.4,
+      98.63344753999999,
+      457.68,
+      154.1879356
+     ]
+    }
+   ]
+  },
+  {
+   "id": "b-p0011-001",
+   "kind": "paragraph",
+   "level": null,
+   "label": null,
+   "source": null,
+   "page_number": null,
+   "heading_ref": null,
+   "spans": [
+    {
+     "text": "1. Of the three the most valuable is the Poem, which fortunately for us is, for the first twenty-five lines, a suber and careful prose account of Ramses's departure from Egypt, his march to Kadesh and the position of his four divisions up to the moment of the Asiatic attack. The entire so-called Poem does not differ in form from the Reeord and ie not, in the opinion of the present writer, essentially different from the accounts of their victories left by other Pharaohs, such as those of Merneptah and Ramses ie all of which, like the Poem,\" show no poetic form, but in style are poetic, florid, and highly colored —a style which may be traced in similar prose reports of victories a3 far back as the twelfth dynasty. It has survived in two forms; HIBROGLYPHIC and Hipratic. The texts of the hieroglyphic form are said by Brugseh\" to be found in the Ramesseum twice, in Luxor, in Abu Simbel, and Bet el-Walli. Maspero also says: “This Epic reappears everywhere in Nubia and in the Safd, at Abu Simbel, at Beit Wally, at Derr, at Luxor, at Karnak.”\" It is, however, not found at all in Nubia, ner at the Ramesseum, but has survived in three copies: on the temple walls at Luxor, Karnak and Abydos;” while of the hieratic” text but one ‘manuscript is known, a roll which is now in two parts: Papyrus Raifet (Louvre), the beginning; and Papyrus Sallier III (British Museum), the remainder. As J. de Rougé’s composite text omits all reference to the Abydos copy, I arranged all the texts, both hieroglyphic and hieratic, in parallel columns, and the whole was then exhaustively collated with the",
+     "emphasis": "none",
+     "note_ref": null
+    }
+   ],
+   "figure": null,
+   "origin": [
+    {
+     "page_index": 11,
+     "box": [
+      62.879999999999995,
+      150.68634398000006,
+      460.32,
+      399.96693184
+     ]
+    }
+   ]
+  }
+ ],
+ "notes": [
+  {
+   "id": "n-p0011-001",
+   "kind": "footnote",
+   "marker": "%",
+   "blocks": [
+    {
+     "id": "b-p0011-002",
+     "kind": "paragraph",
+     "level": null,
+     "label": null,
+     "source": null,
+     "page_number": null,
+     "heading_ref": null,
+     "spans": [
+      {
+       "text": "Called by de Rougé the Bulletin.",
+       "emphasis": "none",
+       "note_ref": null
+      }
+     ],
+     "figure": null,
+     "origin": [
+      {
+       "page_index": 11,
+       "box": [
+        76.32,
+        406.41999999999996,
+        188.16,
+        414.38
+       ]
+      }
+     ]
+    }
+   ],
+   "origin": [
+    {
+     "page_index": 11,
+     "box": [
+      76.32,
+      406.41999999999996,
+      188.16,
+      414.38
+     ]
+    }
+   ],
+   "referenced": false,
+   "group": null
+  },
+  {
+   "id": "n-p0011-002",
+   "kind": "footnote",
+   "marker": "6",
+   "blocks": [
+    {
+     "id": "b-p0011-003",
+     "kind": "paragraph",
+     "level": null,
+     "label": null,
+     "source": null,
+     "page_number": null,
+     "heading_ref": null,
+     "spans": [
+      {
+       "text": "Masrvuo's statement (Struggle, p. 3%) that it is “a puem ia rhymed struphes.” is totally without foundation.",
+       "emphasis": "none",
+       "note_ref": null
+      }
+     ],
+     "figure": null,
+     "origin": [
+      {
+       "page_index": 11,
+       "box": [
+        64.56,
+        415.87014562999997,
+        255.84,
+        433.24010288
+       ]
+      }
+     ]
+    }
+   ],
+   "origin": [
+    {
+     "page_index": 11,
+     "box": [
+      64.56,
+      415.87014562999997,
+      255.84,
+      433.24010288
+     ]
+    }
+   ],
+   "referenced": false,
+   "group": null
+  },
+  {
+   "id": "n-p0011-003",
+   "kind": "footnote",
+   "marker": "",
+   "blocks": [
+    {
+     "id": "b-p0011-004",
+     "kind": "paragraph",
+     "level": null,
+     "label": null,
+     "source": null,
+     "page_number": null,
+     "heading_ref": null,
+     "spans": [
+      {
+       "text": "i @engr. Imackr., 11, 23.",
+       "emphasis": "none",
+       "note_ref": null
+      }
+     ],
+     "figure": null,
+     "origin": [
+      {
+       "page_index": 11,
+       "box": [
+        76.8,
+        434.38,
+        152.16,
+        442.34
+       ]
+      }
+     ]
+    }
+   ],
+   "origin": [
+    {
+     "page_index": 11,
+     "box": [
+      76.8,
+      434.38,
+      152.16,
+      442.34
+     ]
+    }
+   ],
+   "referenced": false,
+   "group": null
+  },
+  {
+   "id": "n-p0011-004",
+   "kind": "footnote",
+   "marker": "'",
+   "blocks": [
+    {
+     "id": "b-p0011-005",
+     "kind": "paragraph",
+     "level": null,
+     "label": null,
+     "source": null,
+     "page_number": null,
+     "heading_ref": null,
+     "spans": [
+      {
+       "text": "Strugyle of the Nations, p. 1.",
+       "emphasis": "none",
+       "note_ref": null
+      }
+     ],
+     "figure": null,
+     "origin": [
+      {
+       "page_index": 11,
+       "box": [
+        76.8,
+        444.46,
+        181.68,
+        452.88
+       ]
+      }
+     ]
+    }
+   ],
+   "origin": [
+    {
+     "page_index": 11,
+     "box": [
+      76.8,
+      444.46,
+      181.68,
+      452.88
+     ]
+    }
+   ],
+   "referenced": false,
+   "group": null
+  },
+  {
+   "id": "n-p0011-005",
+   "kind": "footnote",
+   "marker": "1.",
+   "blocks": [
+    {
+     "id": "b-p0011-006",
+     "kind": "paragraph",
+     "level": null,
+     "label": null,
+     "source": null,
+     "page_number": null,
+     "heading_ref": null,
+     "spans": [
+      {
+       "text": "The Leser copy oceupies the lower portion of the front (north side) wf beth towers of Ramses IT.'s pylon. There is nu second copy on the south side of the pyluns at Lusor, as stated by J. ve Rower (er. 4g., 111.1%. The inscription was partially cleared by Mariette. which permitted E. de Reugé to capy all but “la fin des derniéres ligues” Goe.cit.:. Tt wae published in bis sen's Inser, kif ragl., TV, 2 os; wm Mevasen, Sec., 11, 42; aud in Rougé's comyonite text ‘soe below), Tho lower cuits of the lines, expensed by beter excuvatiens, were theu published by Dureasy ( Ree. 4y.. 1X, 3%).",
+       "emphasis": "none",
+       "note_ref": null
+      }
+     ],
+     "figure": null,
+     "origin": [
+      {
+       "page_index": 11,
+       "box": [
+        63.839999999999996,
+        453.82,
+        257.52,
+        542.78
+       ]
+      }
+     ]
+    }
+   ],
+   "origin": [
+    {
+     "page_index": 11,
+     "box": [
+      63.839999999999996,
+      453.82,
+      257.52,
+      542.78
+     ]
+    }
+   ],
+   "referenced": false,
+   "group": null
+  },
+  {
+   "id": "n-p0011-006",
+   "kind": "footnote",
+   "marker": "2.",
+   "blocks": [
+    {
+     "id": "b-p0011-007",
+     "kind": "paragraph",
+     "level": null,
+     "label": null,
+     "source": null,
+     "page_number": null,
+     "heading_ref": null,
+     "spans": [
+      {
+       "text": "The Ki e~cn copy is on the outside of the wuth wall of the great bypestyle tall J. oe Rowe says + Ker. dg. 111, 1d) * Mom pare, pordwnt sa misdien en Rcypte fit’ cam. plitement déblayer cette muraille, ce qui permit de cegucr Vimecripaiion eattere.” It was published in bis /nser. eregl. SV 2d); in Bawescn, Rec 11, 2-2; and in Manittn. Karnak, O31; lit af Amatic allies aleo | LD., Test 1TL. Di. Both of these texts show frequent and long lacune; of the Karnak teat I had good photegraghs by Rorebacedt, fer whieh | men rrabetstecd tar the Berlin dictianary. But as de Rougé filled in the débris again after making his copy, the lower ends of the vertical lines are covered in the photugraph.",
+       "emphasis": "none",
+       "note_ref": null
+      }
+     ],
+     "figure": null,
+     "origin": [
+      {
+       "page_index": 11,
+       "box": [
+        64.32,
+        404.74,
+        460.08,
+        632.78
+       ]
+      }
+     ]
+    }
+   ],
+   "origin": [
+    {
+     "page_index": 11,
+     "box": [
+      64.32,
+      404.74,
+      460.08,
+      632.78
+     ]
+    }
+   ],
+   "referenced": false,
+   "group": null
+  },
+  {
+   "id": "n-p0011-007",
+   "kind": "footnote",
+   "marker": "",
+   "blocks": [
+    {
+     "id": "b-p0011-008",
+     "kind": "paragraph",
+     "level": null,
+     "label": null,
+     "source": null,
+     "page_number": null,
+     "heading_ref": null,
+     "spans": [
+      {
+       "text": "3% The ABYDOS copy on the walls of Ramses II.’s mortuary temple there has preserved only the lower ends of the lines, as the wall« are destroyed except the last few courses. Jt was published by Magrertse (Abydos, IT, 6,5); but I had alse a callation vf the original by Korcnarprt, for which I ain again indebted tothe Berlin dictionary. Of the above publications, Betescn aud MaRbetT?E are so incomplete as to be practically unusable; and Roger, while much better, ix far from exhaustive.",
+       "emphasis": "none",
+       "note_ref": null
+      }
+     ],
+     "figure": null,
+     "origin": [
+      {
+       "page_index": 11,
+       "box": [
+        267.36,
+        420.80155906,
+        461.03999999999996,
+        493.15772396
+       ]
+      }
+     ]
+    }
+   ],
+   "origin": [
+    {
+     "page_index": 11,
+     "box": [
+      267.36,
+      420.80155906,
+      461.03999999999996,
+      493.15772396
+     ]
+    }
+   ],
+   "referenced": false,
+   "group": null
+  },
+  {
+   "id": "n-p0011-008",
+   "kind": "footnote",
+   "marker": "*",
+   "blocks": [
+    {
+     "id": "b-p0011-009",
+     "kind": "paragraph",
+     "level": null,
+     "label": null,
+     "source": null,
+     "page_number": null,
+     "heading_ref": null,
+     "spans": [
+      {
+       "text": "Papyrus Raifet contains only one page of ten lines, published by K. ot Rowan (Mec. de Trav., 1); Papyrus Sallier IT] contains eleven pages, published in the Select Papyri (1, 2430. Al these texts. including the hicroglyphic, were once combined by E. de Rougé asd published after his death by J. pe Rowos (Her. 4y.. TI-LX). Althoussh writing in 1985, lony after the publication of Manimrre's Abydos, J. de Rouge makes ne mention of the Abydos text, The lower partion of the Laxor text was also innecessible when he published, The progress of hreratic studies has been great sinee de Rougé's day, and thin fret together with the ieeeeslon of new material made the compilation of anew composite text imperative. As a long passage has been misplaced by the ancient scribe in the hieratic text, it has been neceswary te number the lines fre the hieroglyphie versions, for which the Luaer test wa» found must suitable.",
+       "emphasis": "none",
+       "note_ref": null
+      }
+     ],
+     "figure": null,
+     "origin": [
+      {
+       "page_index": 11,
+       "box": [
+        267.59999999999997,
+        495.08481154000003,
+        462.24,
+        630.98
+       ]
+      }
+     ]
+    }
+   ],
+   "origin": [
+    {
+     "page_index": 11,
+     "box": [
+      267.59999999999997,
+      495.08481154000003,
+      462.24,
+      630.98
+     ]
+    }
+   ],
+   "referenced": false,
+   "group": null
+  }
+ ],
+ "removals": [
+  {
+   "page_index": 11,
+   "box": [
+    62.64,
+    73.08000000000004,
+    324.47999999999996,
+    86.15999999999994
+   ],
+   "text": "} Tur BatTLe or KapEsH#",
+   "reason": "running_head"
+  }
+ ],
+ "word_changes": [],
+ "page_numbers": []
+}

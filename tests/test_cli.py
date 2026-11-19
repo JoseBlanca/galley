@@ -9,6 +9,7 @@ test runs a stage on an excerpt that the fixture has run already.
 import logging
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import zipfile
@@ -22,7 +23,7 @@ import pytest
 from galley import cli, wordlist
 from galley.book_folder import BookFolder
 from galley.cli import main
-from galley.config import BookConfig
+from galley.config import BookConfig, read_config
 from galley.errors import ConfigError, ExternalProgramError, InputFileError
 from galley.model import read_lines
 from galley.parallel import DEFAULT_WORKERS
@@ -102,7 +103,12 @@ def test_the_installed_script_runs_help_with_exit_code_0() -> None:
     usage = completed.stdout.split("\n\n", 1)[0]
     subcommands = re.search(r"\{([a-z,-]+)\}", usage)
     assert subcommands is not None, usage
-    assert tuple(subcommands.group(1).split(",")) == ("run", *STAGES)
+    assert tuple(subcommands.group(1).split(",")) == (
+        "run",
+        *STAGES[:4],
+        "correct",
+        *STAGES[4:],
+    )
 
 
 # Starts a Python process; the 8-thread run would start it 8 times.
@@ -280,7 +286,7 @@ def test_structure_and_markdown_run_again_on_the_same_inputs_write_the_same_byte
 # The arguments argparse rejects
 
 
-@pytest.mark.parametrize("command", ["correct", "edits-from"])
+@pytest.mark.parametrize("command", ["edits-from"])
 def test_a_subcommand_the_skeleton_lacks_is_rejected_by_argparse(
     command: str, tmp_path: Path
 ) -> None:
@@ -315,21 +321,49 @@ def test_layout_without_words_json_raises_naming_extract(
     assert not folder.lines_json.exists()
 
 
-# Empties PATH for the whole process.
-@pytest.mark.thread_unsafe
-def test_run_with_correct_true_raises_config_error_before_pages_json_exists(
-    tmp_path: Path,
-    excerpt_book_toml: frozendict[str, str],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    folder = _book(tmp_path, excerpt_book_toml[KADESH] + "correct = true\n")
-    # The config is refused before Pandoc is looked for.
-    monkeypatch.setenv("PATH", "")
+def _closed_port() -> int:
+    """A port of this machine on which nothing listens, for a moment."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
 
-    with pytest.raises(ConfigError, match="correct = true"):
+
+def test_run_with_correct_true_and_no_lm_studio_stops_before_analyze(
+    tmp_path: Path, excerpt_book_toml: frozendict[str, str]
+) -> None:
+    # Correct spec, section 4: run stops before the first stage.
+    server = f"http://127.0.0.1:{_closed_port()}"
+    folder = _book(
+        tmp_path,
+        excerpt_book_toml[KADESH] + f'correct = true\ncorrect_server = "{server}"\n',
+    )
+
+    with pytest.raises(ExternalProgramError, match="LM Studio's server is not running"):
         main(["run", str(folder.root)])
 
     assert sorted(tmp_path.iterdir()) == [folder.book_toml]
+
+
+def test_run_runs_correct_only_with_correct_true(
+    tmp_path: Path, excerpt_book_toml: frozendict[str, str]
+) -> None:
+    folder = _book(tmp_path, excerpt_book_toml[KADESH])
+    config = read_config(folder.book_toml)
+
+    def names(command: str, config: BookConfig) -> list[str]:
+        return [stage.name for stage in cli._stages_of(command, config)]
+
+    assert "correct" not in names("run", config)
+    assert names("run", replace(config, correct=True)) == [
+        "analyze",
+        "extract",
+        "layout",
+        "structure",
+        "correct",
+        "markdown",
+        "epub",
+    ]
+    assert names("correct", config) == ["correct"]
 
 
 def test_a_words_json_of_the_other_excerpt_raises_naming_extract(

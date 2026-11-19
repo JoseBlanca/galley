@@ -8,6 +8,7 @@ PDF opened: analyze checks it.
 
 import math
 import tomllib
+import urllib.parse
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
@@ -44,6 +45,13 @@ class ExcludedRegion:
     box: Box
 
 
+# The defaults of the correct stage's keys: the model the measurement of
+# the plan notes-vision recommends, and LM Studio's own address
+# (docs/specs/correct.md, section 3).
+DEFAULT_CORRECT_MODEL = "qwen/qwen3.6-35b-a3b"
+DEFAULT_CORRECT_SERVER = "http://localhost:1234"
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class BookConfig:
     """The config of one book. `pdf` is absolute; page indices count from 0.
@@ -53,7 +61,11 @@ class BookConfig:
     which structure makes no heading; `front_matter_end` is the first page
     after the front matter, None when analyze is to find it, 0 to keep
     every page; `reread_footnotes` is whether layout re-reads each page's
-    footnote band with Tesseract (architecture section 6).
+    footnote band with Tesseract (architecture section 6). `correct_model`
+    is the vision model the correct stage asks, as LM Studio names it,
+    `correct_server` LM Studio's address on this machine, and
+    `correct_second_model` the model of the second reading, None for none
+    (docs/specs/correct.md, section 3).
     """
 
     pdf: Path
@@ -69,6 +81,14 @@ class BookConfig:
     contents_pages: tuple[int, ...] = ()
     front_matter_end: int | None = None
     reread_footnotes: bool = False
+    correct_model: str = DEFAULT_CORRECT_MODEL
+    correct_server: str = DEFAULT_CORRECT_SERVER
+    correct_second_model: str | None = None
+
+
+# The hosts LM Studio may be asked on: this machine only, so that a book's
+# text never leaves it (docs/specs/correct.md, section 3).
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
 _REQUIRED_KEYS = ("pdf", "title", "authors", "language")
@@ -82,6 +102,9 @@ _OPTIONAL_KEYS = (
     "contents_pages",
     "front_matter_end",
     "reread_footnotes",
+    "correct_model",
+    "correct_server",
+    "correct_second_model",
 )
 _REGION_KEYS = ("page", "box")
 _BOX_COORDINATES = 4
@@ -162,7 +185,55 @@ def _config_from_toml(content: dict[str, object], path: Path) -> BookConfig:
         reread_footnotes=_bool(
             content.get("reread_footnotes", False), "reread_footnotes", path
         ),
+        correct_model=_not_empty(
+            _string(
+                content.get("correct_model", DEFAULT_CORRECT_MODEL),
+                "correct_model",
+                path,
+            ),
+            "correct_model",
+            path,
+        ),
+        correct_server=_local_server(
+            content.get("correct_server", DEFAULT_CORRECT_SERVER), path
+        ),
+        correct_second_model=None
+        if (second := content.get("correct_second_model")) is None
+        else _not_empty(
+            _string(second, "correct_second_model", path),
+            "correct_second_model",
+            path,
+        ),
     )
+
+
+def _local_server(value: object, path: Path) -> str:
+    """The value of `correct_server`: an `http` address on this machine,
+    with a port or none, and no path, query or user; without a trailing
+    slash."""
+    key = "correct_server"
+    address = _string(value, key, path).removesuffix("/")
+    parts = urllib.parse.urlsplit(address)
+    try:
+        port = parts.port
+    except ValueError as err:
+        raise _error(path, key, f"{address!r} has no valid port") from err
+    del port
+    if (
+        parts.scheme != "http"
+        or parts.hostname not in _LOCAL_HOSTS
+        or parts.username is not None
+        or parts.path
+        or parts.query
+        or parts.fragment
+    ):
+        problem = (
+            f"{address!r} is not an http address on this machine "
+            "(localhost, 127.0.0.1 or [::1], with a port); the book's text "
+            "is sent only to this machine"
+        )
+        raise _error(path, key, problem)
+    return address
 
 
 def _error(path: Path, key: str, problem: str) -> ConfigError:

@@ -97,6 +97,11 @@ figure** is one printed on a text page among its lines.
 picture: its lettering, its labels and the marks of its shading. The
 picture's image shows them, so structure removes them, with a record.
 
+**fluent wrong word**: a wrong word that reads as a real word, so that
+nothing on the page shows it is wrong: "Borchardt" for "Brugsch". The
+risk of the correct stage, whose vision model writes such words where the
+OCR writes visible junk (`docs/specs/correct.md`).
+
 **footnote band**: the footnotes at the foot of a page, set in smaller
 type below the body, in one column or two. A region found by layout.
 
@@ -268,6 +273,9 @@ matches against.
 
 **verse**: the lines of a poem, a block kind whose text keeps the
 printed line breaks; every other block joins its lines.
+
+**vision model**: a language model that reads images, run on the
+owner's Mac by LM Studio; the correct stage has one read each text page.
 
 **whole book**: a complete public-domain book in `samples/public_domain/`,
 used by the `whole_book` tests.

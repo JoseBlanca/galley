@@ -58,6 +58,11 @@ class BookFolder:
         return self.root / "edits"
 
     @property
+    def correct_jsonl(self) -> Path:
+        """Written by correct: its edits, the only edits file a stage writes."""
+        return self.edits_dir / "correct.jsonl"
+
+    @property
     def book_md(self) -> Path:
         """Written by markdown."""
         return self.root / "book.md"
@@ -70,12 +75,14 @@ class BookFolder:
 
 class Stage(StrEnum):
     """The stages that write files in the book folder, in pipeline order.
-    The correct stage, which writes only into edits/, is not one."""
+    The correct stage writes edits/correct.jsonl, the one edits file a stage
+    writes (docs/specs/correct.md, section 8)."""
 
     ANALYZE = "analyze"
     EXTRACT = "extract"
     LAYOUT = "layout"
     STRUCTURE = "structure"
+    CORRECT = "correct"
     MARKDOWN = "markdown"
     EPUB = "epub"
 
@@ -87,6 +94,7 @@ def _stage_outputs(folder: BookFolder) -> tuple[tuple[Stage, tuple[Path, ...]], 
         (Stage.EXTRACT, (folder.words_json, folder.images_dir)),
         (Stage.LAYOUT, (folder.lines_json,)),
         (Stage.STRUCTURE, (folder.blocks_json,)),
+        (Stage.CORRECT, (folder.correct_jsonl,)),
         (Stage.MARKDOWN, (folder.book_md,)),
         (Stage.EPUB, (folder.book_epub,)),
     )
@@ -96,7 +104,8 @@ def delete_stage_outputs(folder: BookFolder, stage: Stage) -> None:
     """Delete the files `stage` writes and those of every later stage, so
     that no file in the folder outlives the file it was made from (spec
     section 3). A file that does not exist is skipped; `images/` is deleted
-    with what it holds. Nothing else is touched: never book.toml or edits/.
+    with what it holds. Nothing else is touched: never book.toml, and of
+    edits/ only correct.jsonl, the correct stage's file.
     """
     outputs = _stage_outputs(folder)
     first = [listed for listed, _ in outputs].index(stage)

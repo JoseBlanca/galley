@@ -20,6 +20,7 @@ def test_every_path_is_the_one_of_the_book_folder() -> None:
     assert folder.lines_json == root / "lines.json"
     assert folder.blocks_json == root / "blocks.json"
     assert folder.edits_dir == root / "edits"
+    assert folder.correct_jsonl == root / "edits" / "correct.jsonl"
     assert folder.book_md == root / "book.md"
     assert folder.book_epub == root / "book.epub"
 
@@ -45,6 +46,7 @@ _DELETED = {
     ],
     Stage.LAYOUT: ["blocks.json", "book.epub", "book.md", "lines.json"],
     Stage.STRUCTURE: ["blocks.json", "book.epub", "book.md"],
+    Stage.CORRECT: ["book.epub", "book.md"],
     Stage.MARKDOWN: ["book.epub", "book.md"],
     Stage.EPUB: ["book.epub"],
 }
@@ -74,13 +76,19 @@ def test_a_stage_deletes_its_own_file_and_every_later_one_and_nothing_else(
     folder.cover_png.write_bytes(b"png")
     folder.edits_dir.mkdir()
     (folder.edits_dir / "owner.jsonl").write_text("", encoding="utf-8")
+    folder.correct_jsonl.write_text("", encoding="utf-8")
 
     delete_stage_outputs(folder, stage)
 
     assert sorted(path.name for path in tmp_path.iterdir()) == sorted(
         set(_EVERY_FILE) - set(_DELETED[stage])
     )
-    assert [path.name for path in folder.edits_dir.iterdir()] == ["owner.jsonl"]
+    # correct.jsonl goes with structure and every stage before it, and with
+    # correct itself (correct spec, section 8); no other edits file ever.
+    deletes_correct = list(Stage).index(stage) <= list(Stage).index(Stage.CORRECT)
+    assert sorted(path.name for path in folder.edits_dir.iterdir()) == (
+        ["owner.jsonl"] if deletes_correct else ["correct.jsonl", "owner.jsonl"]
+    )
 
 
 def test_deleting_from_an_empty_folder_is_no_error(tmp_path: Path) -> None:
