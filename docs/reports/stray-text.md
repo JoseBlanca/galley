@@ -238,3 +238,58 @@ After the fixes: ruff and ty pass; pytest 2,910 passed and 6 expected
 failures in 79 s, and with 8 threads in 126 s (one run of three by the
 fixer ended with one error it did not capture; two reruns and mine
 passed); the plan's whole-book tests 15 passed.
+
+## Spec review of the late amendments
+
+A spec reviewer read the amendments made after the first spec review
+(layout §3, §6, §8; structure §1, §2, §16, §21; plates §2b; reocr §3,
+§8). None makes a rule wrong on the eight books. Fixed in 212111a and
+f78158a:
+
+- **Decided while the owner was away:** the condition that keeps a
+  short page of faint real print. A share of known words (one third)
+  was one word away from keeping Haynes 9, and any number counted as
+  known, so a stray digit could keep Haynes 421. A page is now kept
+  only when at least 2 of its words without ink are known words of 2
+  letters or more. Haynes 9 has 1 ("SP"); Haynes 421 and Haskins 277
+  and 278 have none. The inkless pages of the eight books are
+  unchanged.
+- Layout §6 and structure §21 said the cut-in rule moves no word of
+  Turney or Haynes; it would move Turney's contents labels but for
+  `contents_pages`, which they now say. Architecture's config table
+  names layout's use of the key.
+- Smaller: an invented example marked as such, three unit tests listed
+  in layout §8, and Gierke's counts measured again after the full-size
+  rule (74 footnotes, 5 of them on page 50).
+
+## Task 5.1: the whole-book tests, the EPUBs and the evaluation
+
+At c62dcb1 (the spec fixes above change no output of the eight books):
+
+- `uv run pytest -m whole_book`: 167 passed in 10 min 27 s.
+- The eight books in `runs/stray-text/` of the main checkout, in 5 min
+  42 s; epubcheck 5.4.0 reports no error and no warning on any.
+- The evaluation in `runs/stray-text-final/` (3 min 47 s) against
+  `runs/lists-figures-final/`, with the tolerances of the lists-figures
+  plan (the evaluation spec gives none): no score falls beyond them.
+  The one fall is Mariéjol's paragraph recall, 0.765 to 0.764.
+
+| book | measure | before | after |
+|---|---|---|---|
+| Stubbs | body word error rate | 0.033 | 0.029 |
+| Stubbs | margin notes as margin notes | 291 | 413 |
+| Stubbs | margin notes left in the body | 169 | 46 |
+| Stubbs | margin notes missing | 7 | 8 |
+| Stubbs | paragraph precision | 0.818 | 0.825 |
+| Domesday | notes as notes | 1,705 | 1,715 |
+| Domesday | notes with the right reference | 1,277 | 1,307 |
+| Domesday | notes left in the body | 24 | 14 |
+| Domesday | paragraph precision | 0.861 | 0.884 |
+| Mariéjol | notes as notes | 1,154 | 1,160 |
+| Mariéjol | notes left in the body | 231 | 225 |
+| Haskins | every score | | unchanged |
+
+Gierke, not an evaluation book, counted from its blocks: notes 302 to
+373, of which on the introduction's pages 1 to 62; references in the
+text 208 to 274; notes without a reference 94 to 99; quotes 24 to 0
+(task 5.2 looks at why).
