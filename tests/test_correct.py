@@ -622,6 +622,7 @@ class _FakeLmStudio:
     answers: dict[str, str] = field(default_factory=dict)
     finish: str = "stop"
     status: int = 200
+    redirect: str | None = None
     bodies: list[dict[str, object]] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -651,6 +652,12 @@ def _handler(fake: _FakeLmStudio) -> type[BaseHTTPRequestHandler]:
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             with fake.lock:
                 fake.bodies.append(body)
+            if fake.redirect is not None:
+                self.send_response(302)
+                self.send_header("Location", fake.redirect)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             if fake.status != 200:
                 self._send(fake.status, {"error": "Model is not loaded"})
                 return
@@ -674,9 +681,13 @@ def lm_studio() -> Iterator[Callable[..., tuple[_FakeLmStudio, str]]]:
     servers: list[ThreadingHTTPServer] = []
 
     def start(
-        models: tuple[str, ...] = (MODEL,), *, finish: str = "stop", status: int = 200
+        models: tuple[str, ...] = (MODEL,),
+        *,
+        finish: str = "stop",
+        status: int = 200,
+        redirect: str | None = None,
     ) -> tuple[_FakeLmStudio, str]:
-        fake = _FakeLmStudio(models, finish=finish, status=status)
+        fake = _FakeLmStudio(models, finish=finish, status=status, redirect=redirect)
         server = ThreadingHTTPServer(("127.0.0.1", 0), _handler(fake))
         threading.Thread(target=server.serve_forever, daemon=True).start()
         servers.append(server)
@@ -737,6 +748,31 @@ def test_an_http_error_names_the_page_and_lm_studios_message(
     with pytest.raises(
         ExternalProgramError, match="page 11.*HTTP 400.*Model is not loaded"
     ):
+        read_image(server, MODEL, b"png", "page 11")
+
+
+# Sets http_proxy for the whole process.
+@pytest.mark.thread_unsafe
+def test_a_proxy_in_the_environment_is_not_used(
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Section 4: the image goes to LM Studio on this machine and nowhere else.
+    _, server = lm_studio()
+    proxy = f"http://127.0.0.1:{_closed_port()}"
+    for name in ("http_proxy", "HTTP_PROXY", "all_proxy", "ALL_PROXY"):
+        monkeypatch.setenv(name, proxy)
+    monkeypatch.delenv("no_proxy", raising=False)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    check_models(server, (MODEL,))
+    assert read_image(server, MODEL, b"png", "page 11").text == ""
+
+
+def test_a_redirect_is_an_error(
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+) -> None:
+    _, server = lm_studio(redirect="http://example.com/v1/chat/completions")
+    with pytest.raises(ExternalProgramError, match="redirect"):
         read_image(server, MODEL, b"png", "page 11")
 
 

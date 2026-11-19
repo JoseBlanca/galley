@@ -6,7 +6,8 @@ import json
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Final
+from email.message import Message
+from typing import IO, Final, override
 
 from galley.errors import ExternalProgramError
 
@@ -27,6 +28,31 @@ _LIST_TIMEOUT_S: Final[float] = 10
 _PAGE_TIMEOUT_S: Final[float] = 600
 # How much of an unexpected answer an error message quotes.
 _QUOTED: Final[int] = 200
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuses every redirect: a request goes to LM Studio's address only."""
+
+    @override
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: Message,
+        newurl: str,
+    ) -> urllib.request.Request | None:
+        message = (
+            f"LM Studio's address {req.full_url} answered with a redirect to {newurl}"
+        )
+        raise ExternalProgramError(message)
+
+
+# Section 4: no proxy, though the environment names one (urllib's default
+# opener follows http_proxy), and no redirect, so that a book's text goes
+# to this machine only.
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,7 +81,7 @@ def list_models(server: str) -> tuple[str, ...]:
     list of models."""
     url = f"{server}/v1/models"
     try:
-        with urllib.request.urlopen(url, timeout=_LIST_TIMEOUT_S) as response:
+        with _OPENER.open(url, timeout=_LIST_TIMEOUT_S) as response:
             data = response.read()
     except (urllib.error.URLError, TimeoutError, ConnectionError) as err:
         raise _not_running(server) from err
@@ -115,7 +141,7 @@ def read_image(server: str, model: str, png: bytes, what: str) -> Reading:
         headers={"Content-Type": "application/json"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=_PAGE_TIMEOUT_S) as response:
+        with _OPENER.open(request, timeout=_PAGE_TIMEOUT_S) as response:
             data = response.read()
     except urllib.error.HTTPError as err:
         with err:
