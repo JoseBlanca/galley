@@ -99,7 +99,7 @@ def cased(model_core: str, galley_core: str) -> str:
 
 
 # Section 7: the marks inside a core that part two printed words.
-_SEPARATOR = re.compile(r"(?<=[^\W_])[,.\-\u2013](?=[^\W_])")
+_SEPARATOR = re.compile(r"(?<=[^\W_])[,.:\-\u2013](?=[^\W_])")
 
 
 _DIGIT_RUN = re.compile(r"\d\d")
@@ -294,6 +294,12 @@ def _replacement(
         model_core = model_answer.text[
             model_answer.tokens[first].start : model_answer.tokens[last].end
         ]
+        # The space between the two words counts as one more mark.
+        if (
+            len(_SEPARATOR.findall(galley_core))
+            > len(_SEPARATOR.findall(model_core)) + 1
+        ):
+            return None
         return cased(model_core, galley_core), first if first != position else last
     model_core = _core(model_answer, position)
     if may_hold_more_words(galley_core, model_core):

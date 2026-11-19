@@ -321,8 +321,18 @@ def test_a_pair_less_alike_than_0_3_is_no_edit() -> None:
         ("see (1.58). here", "see (58). here"),
         ("see %24+in here", "see in here"),
         ("the llast-two here", "the last here"),
+        ("see 7:3 here", "see 35 here"),
+        ("ll 1l.1.2.and here", "ll 2, and here"),
     ],
-    ids=["comma", "hyphen", "full_stop", "digits", "hyphen_letters"],
+    ids=[
+        "comma",
+        "hyphen",
+        "full_stop",
+        "digits",
+        "hyphen_letters",
+        "colon",
+        "glued_with_marks",
+    ],
 )
 def test_a_galley_word_that_may_hold_two_printed_words_is_not_replaced(
     galley: str, model: str
@@ -947,7 +957,7 @@ EXCERPT_EDITS = (
 # The number of edits on the excerpt with the recorded answers, so that a
 # change of the rules shows: without the split of a block printed on two
 # pages the stage made about 230 more (review of 19 November 2026).
-EXCERPT_EDIT_COUNT = 477
+EXCERPT_EDIT_COUNT = 476
 
 
 # Renders with PDFium.
