@@ -8,7 +8,7 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from galley.body_measures import commonest
+from galley.body_measures import commonest, median_word_height
 from galley.hyphens import LINE_END_HYPHENS
 from galley.model import Box, Line, Region, Removal, RemovalReason, Word
 
@@ -21,6 +21,22 @@ _ARABIC_FORM = re.compile(r"([0-9]{1,3})[.,]?")
 _ROMAN_FORM = re.compile(
     r"(?=[ivxlcdm])m{0,3}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})[.,]?"
 )
+
+
+# Spec section 11, "Notes left in the body", condition 2: a note's lines
+# have a height ratio of at most 0.95 (Mariéjol's note lines are 9 pt high
+# against 10); section 16 takes a marker-led block above it as a numbered
+# paragraph that may run on ("1. Of the three…", Kadesh page 11).
+NOTE_HEIGHT_RATIO_MAX = 0.95
+
+
+def height_ratio(lines: Iterable[Line], body_word_height: float) -> float:
+    """The median height of the words of `lines` over the body word height,
+    `body_word_height` points; 0 for no line."""
+    return (
+        median_word_height(word for line in lines for word in line.words)
+        / body_word_height
+    )
 
 
 def region_words(region: Region) -> tuple[Word, ...]:

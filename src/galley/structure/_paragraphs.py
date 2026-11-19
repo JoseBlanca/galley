@@ -11,7 +11,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from typing import assert_never
 
-from galley.body_measures import median_word_height
 from galley.model import (
     BlockKind,
     Line,
@@ -46,7 +45,9 @@ from galley.structure._lines import (
 from galley.structure._lists import ItemLine
 from galley.structure._markers import MarkerForm, marker_form
 from galley.structure._measures import (
+    NOTE_HEIGHT_RATIO_MAX,
     Edges,
+    height_ratio,
     is_short,
     letters,
     region_edges,
@@ -444,24 +445,14 @@ def _marker_led(lines: Sequence[PlacedLine], form: MarkerForm | None) -> bool:
     )
 
 
-# Spec section 16: a block led by a marker that is set in the body's type,
-# its height ratio above 0.95 (section 11's limit for a note's lines), and
-# whose page's last line ends no sentence is a numbered paragraph that runs
-# on ("1. Of the three…", Kadesh page 11).
-_NOTE_HEIGHT_RATIO_MAX = 0.95
-
-
 def _runs_on_as_paragraph(lines: Sequence[PlacedLine], body_word_height: float) -> bool:
     """Whether `lines`, a paragraph so far that starts with a word of the
     book's marker form, is a numbered paragraph that runs on into the next
     page rather than a note left in the body (spec section 16): its words
     are not set smaller than the body's, of `body_word_height` points, and
     its last line ends no sentence."""
-    ratio = (
-        median_word_height(word for line in lines for word in line.line.words)
-        / body_word_height
-    )
-    return ratio > _NOTE_HEIGHT_RATIO_MAX and not ends_sentence(lines[-1])
+    ratio = height_ratio((line.line for line in lines), body_word_height)
+    return ratio > NOTE_HEIGHT_RATIO_MAX and not ends_sentence(lines[-1])
 
 
 def _crosses_section_edge(
