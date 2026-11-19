@@ -6,7 +6,10 @@ a patterned endpaper, while its text layer holds words the scanner's OCR
 invented there. Under a real word there is ink and under these there is
 none, so each word's ink is measured on the render: the largest gap in
 gray between the paper around the word and any pixel near it, either way,
-so that white print on a dark ground counts.
+so that white print on a dark ground counts. A page is inkless when at
+least half of its words have no ink and too few of those are known words
+(`_KNOWN_SHARE_OF_PRINT`): the OCR's junk is not made of words, while
+the words of faint real print, such as a binder's label, are.
 """
 
 import math
@@ -51,10 +54,12 @@ class InkRule(StrEnum):
 @dataclass(frozen=True, slots=True)
 class InkTest:
     """What the inkless rule measured on a page it tested: the share of the
-    words outside its excluded regions that have no ink, and the rule's
-    finding."""
+    words outside its excluded regions that have no ink, the share of
+    those without ink that are known words (0 when none is without ink),
+    and the rule's finding."""
 
     share_without_ink: float
+    known_share: float
     rule: InkRule
 
 
@@ -80,7 +85,8 @@ def measure_ink(
     lower_case_words: frozenset[str],
 ) -> InkTest | None:
     """The inkless rule on `page` and `layer_words`, as `is_inkless` takes
-    them: the share of `layer_words` without ink and the rule's finding;
+    them: the share of `layer_words` without ink, the share of those that
+    are known words, and the rule's finding;
     None when `layer_words` is empty, a page the rule does not test."""
     if not layer_words:
         return None
@@ -95,6 +101,7 @@ def measure_ink(
     inkless = share >= _INKLESS_SHARE and known_share < _KNOWN_SHARE_OF_PRINT
     return InkTest(
         share_without_ink=share,
+        known_share=known_share,
         rule=InkRule.INKLESS if inkless else InkRule.NOT_INKLESS,
     )
 

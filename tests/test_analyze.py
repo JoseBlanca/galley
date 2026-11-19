@@ -1289,7 +1289,7 @@ def test_each_page_the_plate_rule_takes_is_logged_at_warning_with_its_measures(
 
 
 @pytest.mark.thread_unsafe
-def test_each_inkless_page_is_logged_at_warning_with_its_share_without_ink(
+def test_each_inkless_page_is_logged_at_warning_with_its_shares_without_ink_and_known(
     tmp_path: Path,
     excerpt_book_toml: frozendict[str, str],
     caplog: pytest.LogCaptureFixture,
@@ -1310,7 +1310,8 @@ def test_each_inkless_page_is_logged_at_warning_with_its_share_without_ink(
             logging.WARNING,
             (
                 f"analyze: page index {index} is inkless, its words removed: "
-                f"{share} of its words have no ink under them"
+                f"{share} of its words have no ink under them, 0.00 of those "
+                "are known words"
             ),
         )
         for index, share in ((2, "1.00"), (3, "0.88"))
@@ -1338,7 +1339,7 @@ def test_words_in_an_excluded_region_are_left_out_of_the_share_without_ink(
 
     assert [record.getMessage() for record in caplog.records][-1] == (
         "analyze: page index 3 is inkless, its words removed: 1.00 of its words "
-        "have no ink under them"
+        "have no ink under them, 0.00 of those are known words"
     )
 
 
