@@ -253,8 +253,17 @@ def is_known_word(word: str, lower_case_words: frozenset[str]) -> bool:
     around them ("16", "17]", "1066-").
     """
     number = _without_punctuation_around(word)
-    if number.isascii() and number.isdigit():
-        return True
+    return (number.isascii() and number.isdigit()) or is_word_of_list(
+        word, lower_case_words
+    )
+
+
+def is_word_of_list(word: str, lower_case_words: frozenset[str]) -> bool:
+    """Whether `word` is a known word of 2 letters or more (plates spec
+    section 2b): `is_known_word` without the numbers it also counts. Its
+    key (`word_key`) has at least 2 letters, holds nothing but letters,
+    apostrophes and hyphens, and is in `lower_case_words`, the word list as
+    `lower_case_word_list` gives it."""
     key = word_key(word)
     return (
         sum(character.isalpha() for character in key) >= _KNOWN_WORD_MIN_LETTERS

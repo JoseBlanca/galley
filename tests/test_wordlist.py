@@ -22,6 +22,7 @@ from galley.wordlist import (
     WORD_LIST_TOOLS,
     is_cached,
     is_known_word,
+    is_word_of_list,
     lower_case_word_list,
     missing_tools,
     tessdata_dir_and_languages,
@@ -254,6 +255,21 @@ def test_known_word_of_2_letters_in_the_list() -> None:
 def test_known_word_is_not_a_digit_outside_ascii() -> None:
     # "²" is a digit to Python, not a number of the book.
     assert not is_known_word("\u00b2", frozenset())
+
+
+# is_word_of_list (plates spec section 2b)
+
+
+@pytest.mark.parametrize("word", ["Kadesh", "(of),", "Vice-Regent,"])
+def test_word_of_list_is_a_known_word_of_2_letters_or_more(word: str) -> None:
+    assert is_word_of_list(word, frozenset({"kadesh", "of", "vice-regent"}))
+
+
+@pytest.mark.parametrize("word", ["16", "17]", "(1066)-", ".", "a", "Fir"])
+def test_word_of_list_is_not_a_number_punctuation_or_a_word_absent(
+    word: str,
+) -> None:
+    assert not is_word_of_list(word, frozenset({"a", "fire"}))
 
 
 # lower_case_word_list
