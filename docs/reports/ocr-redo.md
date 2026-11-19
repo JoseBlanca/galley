@@ -138,3 +138,38 @@ redo, against the layer:
 Not done: on page 25 Tesseract joins two footnote columns into one line,
 and that note stays merged. `pytest -m whole_book -k kadesh`: 22 passed;
 pytest 3,015 passed, 6 expected failures, in 78 s.
+
+## Review of work package 3
+
+Three reviewers read 1f4e9fc..968b83b and ran whole Kadesh with redo.
+What mattered, all fixed (353817d to 3b0c8e2; the redo rules now live in
+`extract/_redo.py`, and the caption numeral test shared by extract and
+structure in `caption_labels.py`):
+
+- **Lines interleaved.** The height rule let a tall junk box over the
+  hieroglyphs (26 to 35 pt) give its height to body words, so two printed
+  lines merged on pages 38 and 44 and body text moved into a note on
+  page 27. A Tesseract word now takes a height only from a layer box no
+  taller than 1.5 times the page's 90th percentile of layer heights
+  (the median failed on pages 11 and 15, where notes outnumber text).
+- **Invented text** from kept layer words ("84", "97", "•J4", "US", "w",
+  "inn") and two copies of a Tesseract word: a kept word now needs 2
+  letters, and 4 with 0.7 of letters when its row holds at most one
+  other kept word; the copy test looks along the word's own line. 45
+  layer words are kept, all printed.
+- **A false reference** ("find" taking the "1" of the layer's "flui1"):
+  the letters must now match, not only their count.
+- **A word lost without a record** (page 11's "the", matched to one a
+  line below): the reach is the word's own line.
+- **A right caption changed** (page 38's "MAP VI." to "vi."): the
+  layer's numeral is taken only when Tesseract's is not one.
+- 13 surviving mutations now pinned; stale wording and counts fixed.
+
+Kadesh with redo now: 40 linked notes (the 2 fewer were false links),
+3 headings, 42 pages with footnotes, 59 words with a layer reference or
+caption numeral. pytest 3,064 passed in 69 s, still over the minute;
+`pytest -m whole_book -k kadesh` 22 passed.
+
+**Still wrong:** page 27's three text lines under the hieroglyphs,
+skewed on the scan, are read 9.3 pt tall and become a note; with the
+layer on main they were a quotation in the text. Task 5.2 looks at it.

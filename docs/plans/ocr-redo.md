@@ -217,7 +217,7 @@ Tasks (stream `redo`, after 2.2):
   3.1 does the references, and keep two note columns apart (pages 9,
   25). The map captions "MAP III." and "MAP V" (`test_figures.py`).
 - [x] 3.4 The whole-book counts of deliverable 2.
-- [ ] Review of work package 3.
+- [x] Review of work package 3.
 
 ## 4. Stubbs' letter fragments
 
