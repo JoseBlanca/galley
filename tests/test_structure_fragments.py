@@ -187,6 +187,116 @@ def test_fragment_is_kept_without_fragments_in_the_book_on_an_index_page_or_a_re
     assert result.removals == ()
 
 
+# Stubbs' page 24, lines 28 to 30 of its body region: "J", the tail of the
+# "y" of "easily,", a line of its own between the two lines of text, which
+# was read "J nations" (the owner's example, 19 November 2026).
+_SYSTEM_LINE = _line(
+    _word("easily,", 29.8302, 396.3773, 58.5858, 403.2238),
+    _word("under", 63.2544, 394.3769, 90.5706, 403.4823),
+    _word("system", 151.4871, 394.3159, 182.9339, 403.0511),
+    _word("J", 155.9796, 400.6729, 158.4950, 404.8653),
+    _word("four", 219.7731, 394.5416, 238.4605, 402.3280),
+)
+_EASILY_TAIL = _line(_word("J", 51.3942, 401.0323, 53.9096, 405.2247))
+
+# Stubbs' page 29, lines 4 to 7: "." and "m", the dots of the "i" of
+# "English" and of "kings,", each a line of its own, which were read
+# "themselves . m English" (the owner's example).
+_ONLY_LINE = _line(
+    _word("careful", 124.5321, 114.8167, 156.8803, 122.5187),
+    _word("only", 186.7083, 114.3244, 207.1941, 122.8601),
+    _word("-'", 199.6467, 120.3409, 204.6776, 124.5333),
+    _word("themselves", 254.8146, 114.5389, 307.1073, 123.2544),
+)
+_ENGLISH_DOT = _line(_word(".", 123.6336, 125.3319, 124.1727, 126.2304))
+_KINGS_DOT = _line(_word("m", 148.9713, 126.1021, 150.4085, 128.4975))
+_ENGLISH_LINE = _line(
+    _word("English", 99.3741, 127.2454, 135.3148, 135.8027),
+    _word("kings,", 142.1427, 127.8262, 170.3549, 135.6629),
+    _word("but", 177.5436, 127.4019, 192.9985, 135.9880),
+)
+
+
+def test_line_of_a_tail_under_its_word_is_removed_whole() -> None:
+    page = _page(24, _SYSTEM_LINE, _EASILY_TAIL, _SWABIA_LINE)
+
+    result = without_fragments(page, frozenset(), LetterFragments.PRESENT, frozenset())
+
+    assert result.removed_lines == frozenset({(0, 1)})
+    assert [(r.text, r.reason) for r in result.removals] == [
+        ("J", RemovalReason.LETTER_FRAGMENT),
+        ("J", RemovalReason.LETTER_FRAGMENT),
+        (".", RemovalReason.LETTER_FRAGMENT),
+    ]
+    assert result.removals[1].box == _EASILY_TAIL.words[0].box
+
+
+def test_lines_of_dots_over_their_words_are_removed_whole() -> None:
+    page = _page(29, _ONLY_LINE, _ENGLISH_DOT, _KINGS_DOT, _ENGLISH_LINE)
+
+    result = without_fragments(page, frozenset(), LetterFragments.PRESENT, frozenset())
+
+    assert result.removed_lines == frozenset({(0, 1), (0, 2)})
+    assert [r.text for r in result.removals] == ["-'", ".", "m"]
+    assert [word.text for word in result.page.regions[0].lines[3].words] == [
+        "English",
+        "kings,",
+        "but",
+    ]
+
+
+@pytest.mark.parametrize(("gap", "removed"), [(1.5, True), (1.6, False)])
+def test_line_of_a_piece_is_removed_at_most_1_5_pt_from_its_word(
+    gap: float, removed: bool
+) -> None:
+    # "upon" spans 200 to 210 pt down; the dot lies `gap` above it.
+    dot = _line(_word(".", 110.0, 200.0 - gap - 1.0, 111.0, 200.0 - gap))
+    page = _page(5, dot, _line(_word("upon", 100.0, 200.0, 130.0, 210.0)))
+
+    result = without_fragments(page, frozenset(), LetterFragments.PRESENT, frozenset())
+
+    assert (result.removed_lines == frozenset({(0, 0)})) is removed
+
+
+@pytest.mark.parametrize(
+    "lone",
+    [
+        # A word of two letters is no piece.
+        _line(_word("Ed", 110.0, 211.0, 118.0, 215.0)),
+        # One piece with no word of 3 letters beside it.
+        _line(_word("J", 150.0, 211.0, 152.0, 215.0)),
+    ],
+)
+def test_line_that_is_not_all_pieces_by_their_words_is_kept(lone: Line) -> None:
+    page = _page(5, _line(_word("upon", 100.0, 200.0, 130.0, 210.0)), lone)
+
+    result = without_fragments(page, frozenset(), LetterFragments.PRESENT, frozenset())
+
+    assert result.removed_lines == frozenset()
+    assert result.removals == ()
+
+
+@pytest.mark.parametrize(
+    ("fragments", "index_pages", "removed"),
+    [
+        (LetterFragments.ABSENT, frozenset(), frozenset()),
+        (LetterFragments.PRESENT, frozenset({24}), frozenset()),
+        (LetterFragments.PRESENT, frozenset(), frozenset({(0, 1)})),
+    ],
+)
+def test_line_of_a_tail_is_kept_without_fragments_on_an_index_page_or_if_removed(
+    fragments: LetterFragments,
+    index_pages: frozenset[int],
+    removed: frozenset[tuple[int, int]],
+) -> None:
+    page = _page(24, _line(_word("easily,", 29.8, 396.4, 58.6, 403.2)), _EASILY_TAIL)
+
+    result = without_fragments(page, removed, fragments, index_pages)
+
+    assert result.removed_lines == frozenset()
+    assert result.removals == ()
+
+
 def _plain_line(top: float) -> Line:
     return _line(
         _word("Stephen", 100.0, top, 140.0, top + 10.0),
@@ -238,28 +348,58 @@ def test_book_without_a_page_of_5_lines_has_no_letter_fragments() -> None:
 STUBBS_FRAGMENTS = {
     "stubbs_51_56-64": (
         (0, ".", "of Simon de Montfort,"),  # the dot of the "i"
+        # Lines of fragments (spec section 35, 19 November 2026): the dot
+        # of the "i" of "Parliament", the tops of the "l" of "scarcely" and
+        # the "h" of "the" on the line below.
+        (0, ".", "Parliament"),
+        (0, ",", "scarcely named"),
+        (0, ",,", "by the contemporary"),
         (0, ",", "scarcely named"),  # a piece of the "d"
         (1, "r", "chaplains, and a"),  # the tail of the "p"
         (2, "x", "acted upon this shameless"),
+        (3, "r", "and the"),  # a line: the tail of the "p" of "presentative"
         (3, "1", "man created for the"),  # the stem of the "d"
         (4, ",", "far-seeing king who recognized"),
         (8, "r", "his powerful kinsman,"),
         (8, "'", "kinsman, who,"),  # the tail of the comma
         (8, "\\", "now busily employed in"),
+        (8, ".", "willed virago"),  # a line: the dot of the "i"
         (9, "°", "and setting at work"),
     ),
     "stubbs_cut_in": (
         (0, "v", "epoch which in"),
         (0, "i", "of Stephen to the"),  # the stem of the "h"
         (2, "J", "the treasury he next"),
+        # Lines of fragments: the tail of the "p" of "preservation", and a
+        # speck and the dot of the "i" over the margin note "Coinage".
+        (2, "r", "in the preservation"),
+        (2, "~", "Coinage debased"),
+        (2, ".", "Coinage debased"),
+        (3, ".", "to find him"),  # a line: the dot of the "i" of "him"
         (3, ",", "William the Good, as"),
     ),
     "stubbs_heads": (
         (1, "°", "country during this epoch"),
         (1, ",", "men and great causes"),
+        # Lines of fragments on page 2 (Stubbs' 98): the dots of the "i" of
+        # "tutions" and "inclined", and the tops of the letters of "no
+        # details for the next six" on the line below (the layer reads
+        # "for" as "tor").
+        (2, ".", "inclined or"),
+        (2, ".", "inclined or"),
+        (2, ".", "inclined or"),
+        (2, ",", "no details"),
+        (2, ".,", "no details"),
+        (2, "r", "the next six"),
+        (2, "..", "the next six"),
+        (2, ".", "the next six"),
         (2, ",", "six months, save that"),
         (4, "J", "held, early in"),
         (9, "'", "issued one, but had"),
+        # A line of fragments: the dots of the "i" of "promises" and
+        # "included".
+        (9, "%", "promises included"),
+        (9, "m", "promises included"),
     ),
     "stubbs_summaries_index": ((1, "J", "that they were one"),),
 }
@@ -333,6 +473,31 @@ def test_whole_book_stubbs_letter_fragments_are_removed(
     )
 
     assert removed >= _STUBBS_FRAGMENTS_AT_LEAST
+
+
+@pytest.mark.whole_book
+@pytest.mark.thread_unsafe
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize(
+    "printed",
+    [
+        # Page 24, read "J nations, Saxony, Franconia, Swabia, . and" before
+        # 19 November 2026 (the owner's example).
+        (
+            "the ancient system of the four nations, Saxony, Franconia, Swabia,"
+            " and Bavaria;"
+        ),
+        # Page 29, read "careful not only -' to call themselves . m English
+        # kings," (the owner's example).
+        "They were careful not only to call themselves English kings, but",
+    ],
+)
+def test_whole_book_stubbs_owner_lines_read_as_printed(
+    whole_book_run: Callable[[str], BookFolder], printed: str
+) -> None:
+    blocks = read_blocks(whole_book_run("earlyplantagenet01stub").blocks_json)
+
+    assert any(printed in text for text in _texts(blocks))
 
 
 @pytest.mark.whole_book

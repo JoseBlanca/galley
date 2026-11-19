@@ -268,6 +268,7 @@ def page_parts(
         page, removed, survey.letter_fragments, survey.index_pages
     )
     page = fragments.page
+    removed |= fragments.removed_lines
     split = replace(split, text=page)
     column = body_column(page, kinds)
     figures = page_figures(split, removed, taken)

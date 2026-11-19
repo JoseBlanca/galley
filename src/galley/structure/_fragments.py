@@ -24,6 +24,12 @@ _FRAGMENT_MOST_TIMES_HOST_HEIGHT = 1.15
 # top and bottom, each within 0.2 pt (spec section 35).
 _ROW_TOLERANCE_PT = 0.2
 _ROW_MOST_OTHER_WORDS = 1
+# A line of fragments (spec section 35): each of its words lies by a word of
+# the nearest line of text above or below, overlapping it in height or at
+# most 1.5 pt from it; Stubbs' page 29 "." lies 1.0 pt above "English". On
+# Stubbs, 149 such words at 0 pt, 168 at 1 pt, 172 at 1.5 pt, 176 at 2 pt
+# (19 November 2026), all 172 pieces of letters or specks.
+_LINE_OF_FRAGMENTS_GAP_PT = 1.5
 # A book has letter fragments when at least 0.15 of its pages of 5 lines or
 # more have one: Stubbs 0.410, the seven other books 0.030 at most (spec
 # section 35, measured on 19 November 2026).
@@ -63,6 +69,43 @@ def _lies_inside(fragment: Word, host: Word) -> bool:
         and box.bottom > host_box.top
         and box.bottom - box.top
         <= (host_box.bottom - host_box.top) * _FRAGMENT_MOST_TIMES_HOST_HEIGHT
+    )
+
+
+def _lies_by(fragment: Word, host: Word) -> bool:
+    """For a line of fragments: `host` has 3 letters or more, covers half
+    of `fragment`'s width, overlaps it in height or lies at most
+    `_LINE_OF_FRAGMENTS_GAP_PT` above or below it, and is at least 1/1.15
+    of its height."""
+    if len(letters(host.text)) < _HOST_LEAST_LETTERS:
+        return False
+    box, host_box = fragment.box, host.box
+    width = box.x1 - box.x0
+    covered = min(box.x1, host_box.x1) - max(box.x0, host_box.x0)
+    gap = max(host_box.top - box.bottom, box.top - host_box.bottom)
+    return (
+        covered > 0
+        and covered >= _HOST_LEAST_SHARE_OF_WIDTH * width
+        and gap <= _LINE_OF_FRAGMENTS_GAP_PT
+        and box.bottom - box.top
+        <= (host_box.bottom - host_box.top) * _FRAGMENT_MOST_TIMES_HOST_HEIGHT
+    )
+
+
+def _only_candidates(line: Line) -> bool:
+    """Whether `line` holds words and each meets condition 1."""
+    return bool(line.words) and all(_may_be_a_fragment(word) for word in line.words)
+
+
+def is_line_of_fragments(line: Line, neighbours: tuple[Line, ...]) -> bool:
+    """Whether `line` is a line of letter fragments (spec section 35, "A
+    line of fragments"): each of its words meets condition 1 and lies by a
+    word of one of `neighbours`, the nearest lines above and below it in
+    its region that are not made only of such words."""
+    return bool(line.words) and all(
+        _may_be_a_fragment(word)
+        and any(_lies_by(word, host) for other in neighbours for host in other.words)
+        for word in line.words
     )
 
 
@@ -131,6 +174,7 @@ class PageWithoutFragments:
 
     page: PageLayout
     removals: tuple[Removal, ...]
+    removed_lines: frozenset[tuple[int, int]]
 
 
 def without_fragments(
@@ -144,13 +188,37 @@ def without_fragments(
     (spec section 35); else `page` as it is. The lines at the (region,
     line) places of `removed`, which another rule removed, keep their
     words. A line keeps the word a fragment lies in, so none is left
-    empty."""
+    empty; a line of fragments keeps its words and is given among
+    `removed_lines`, its words each a removal."""
     if fragments is LetterFragments.ABSENT or page.index in index_pages:
-        return PageWithoutFragments(page, ())
+        return PageWithoutFragments(page, (), frozenset())
     removals: list[Removal] = []
+    removed_lines: set[tuple[int, int]] = set()
 
     def without(region_number: int, line_number: int, line: Line) -> Line:
         if (region_number, line_number) in removed:
+            return line
+        lines = page.regions[region_number].lines
+        neighbours = tuple(
+            nearest
+            for numbers in (
+                range(line_number - 1, -1, -1),
+                range(line_number + 1, len(lines)),
+            )
+            if (
+                nearest := next(
+                    (lines[n] for n in numbers if not _only_candidates(lines[n])),
+                    None,
+                )
+            )
+            is not None
+        )
+        if is_line_of_fragments(line, neighbours):
+            removed_lines.add((region_number, line_number))
+            removals.extend(
+                words_removal(page.index, (word,), RemovalReason.LETTER_FRAGMENT)
+                for word in line.words
+            )
             return line
         numbers = frozenset(fragment_numbers(line))
         if not numbers:
@@ -177,4 +245,6 @@ def without_fragments(
         )
         for region_number, region in enumerate(page.regions)
     )
-    return PageWithoutFragments(replace(page, regions=regions), tuple(removals))
+    return PageWithoutFragments(
+        replace(page, regions=regions), tuple(removals), frozenset(removed_lines)
+    )
