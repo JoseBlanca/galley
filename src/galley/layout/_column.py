@@ -459,6 +459,14 @@ def _hanging_numbers(
 # by the evaluation tool of 16 November 2026, 0.936 without it.
 _CUT_ROW_INSET_PT: Final[float] = 3.0
 _CUT_ROW_GAP_PT: Final[float] = 8.0
+# Layout spec section 3, step 2b, rule 1, measured on 19 November 2026 on
+# Stubbs' words.json of the plan ocr-redo: a row whose strip words are set
+# small (rule 2's test by size) is cut after a gap of 7.8 pt too. Stubbs'
+# page 34 sets its note "First invasion by the Scots." 7.9 pt from "had";
+# the rule moves the words of the notes of 11 pages, all note words on the
+# page images; at 7.5 pt it moves body words too ("it will be", page 219;
+# "history. It", page 21).
+_CUT_ROW_SMALL_GAP_PT: Final[float] = 7.8
 _CUT_ROW_SPAN_SHARE: Final[float] = 0.5
 _CUT_IN_CHAIN_PITCHES: Final[float] = 1.6
 _CUT_IN_CHAIN_ROWS: Final[int] = 2
@@ -537,17 +545,18 @@ def _side_words(
     return tuple(sorted(side_words, key=lambda word: word.start))
 
 
-def _is_cut_row(row: tuple[_SideWord, ...], at: float, least_span: float) -> bool:
+def _is_cut_row(
+    row: tuple[_SideWord, ...], at: float, least_span: float, gap: float
+) -> bool:
     """Whether `row`, seen from its side, is cut at the inset
     `at` (step 2b, rule 1): a word starts within `_CUT_ROW_INSET_PT` of
-    `at`, first in the row or after a gap of `_CUT_ROW_GAP_PT`, and the
+    `at`, first in the row or after a gap of `gap` points, and the
     row's words from it on span `least_span` or more."""
     return any(
         abs(word.start - at) <= _CUT_ROW_INSET_PT
         and (
             position == 0
-            or word.start - max(before.end for before in row[:position])
-            >= _CUT_ROW_GAP_PT
+            or word.start - max(before.end for before in row[:position]) >= gap
         )
         and max(after.end for after in row[position:]) - word.start >= least_span
         for position, word in enumerate(row)
@@ -596,6 +605,34 @@ def _body_type(column: tuple[Word, ...]) -> _BodyType | None:
     return _type_of(measured)
 
 
+def _strip_is_small(
+    row: tuple[_SideWord, ...],
+    strip_end: float,
+    column: tuple[Word, ...],
+    body_type: _BodyType | None,
+) -> bool:
+    """Whether `row`, seen from its side, has strip words, those that end at
+    or before `strip_end` and hold `_STRIP_WORD_LETTERS` letters, set
+    smaller than `body_type`, the page's body type (step 2b, rule 2's test
+    by size); False on a page with no body type. `column` gives a word by
+    its index."""
+    if body_type is None:
+        return False
+    strip_words = tuple(
+        column[word.index]
+        for word in row
+        if word.end <= strip_end and _letters(column[word.index]) >= _STRIP_WORD_LETTERS
+    )
+    if not strip_words:
+        return False
+    strip_type = _type_of(strip_words)
+    return (
+        strip_type.word_height <= _SHORTENED_HEIGHT_SHARE * body_type.word_height
+        and strip_type.width_per_character
+        <= _SHORTENED_CHARACTER_SHARE * body_type.width_per_character
+    )
+
+
 def _is_shortened(
     row: tuple[_SideWord, ...],
     strip_end: float,
@@ -612,15 +649,9 @@ def _is_shortened(
         return True
     if body_type is None:
         return False
-    strip_words = tuple(word for word in strip if _letters(word) >= _STRIP_WORD_LETTERS)
-    if not strip_words:
+    if not any(_letters(word) >= _STRIP_WORD_LETTERS for word in strip):
         return True
-    strip_type = _type_of(strip_words)
-    return (
-        strip_type.word_height <= _SHORTENED_HEIGHT_SHARE * body_type.word_height
-        and strip_type.width_per_character
-        <= _SHORTENED_CHARACTER_SHARE * body_type.width_per_character
-    )
+    return _strip_is_small(row, strip_end, column, body_type)
 
 
 def _cut_in_zones(
@@ -631,14 +662,24 @@ def _cut_in_zones(
     column: tuple[Word, ...],
 ) -> tuple[tuple[float, float], ...]:
     """The cut-in zones of a page's `rows`, seen from one side, as (top,
-    bottom) in points (step 2b, rule 2): each chain of at least
+    bottom) in points (step 2b, rule 2): the cut rows are those cut after
+    a gap of `_CUT_ROW_GAP_PT`, or of `_CUT_ROW_SMALL_GAP_PT` when their
+    strip words are set small (`_strip_is_small`); each chain of at least
     `_CUT_IN_CHAIN_ROWS` cut rows, each within `_CUT_IN_CHAIN_PITCHES`
     pitches of the one before, that holds a shortened row
     (`_is_shortened`), trimmed to its first and last shortened rows.
     `column` gives a word by its index."""
+    strip_end = at - _CUT_IN_STRIP_PT
+    body_type = _body_type(column)
     chains: list[list[tuple[_SideWord, ...]]] = []
     for row in rows:
-        if not _is_cut_row(row, at, least_span):
+        if not (
+            _is_cut_row(row, at, least_span, _CUT_ROW_GAP_PT)
+            or (
+                _is_cut_row(row, at, least_span, _CUT_ROW_SMALL_GAP_PT)
+                and _strip_is_small(row, strip_end, column, body_type)
+            )
+        ):
             continue
         top = min(word.top for word in row)
         if chains and top - min(word.top for word in chains[-1][-1]) <= (
@@ -647,8 +688,6 @@ def _cut_in_zones(
             chains[-1].append(row)
         else:
             chains.append([row])
-    strip_end = at - _CUT_IN_STRIP_PT
-    body_type = _body_type(column)
     zones = []
     for chain in chains:
         shortened = tuple(

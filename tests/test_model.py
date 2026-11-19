@@ -1188,6 +1188,7 @@ def test_every_enum_member_has_the_value_of_architecture_section_8() -> None:
             "leader_dots",
             "figure_text",
             "letter_fragment",
+            "misread_hyphen",
         ],
         "BlockKind": [
             "heading",

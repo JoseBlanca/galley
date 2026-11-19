@@ -2662,7 +2662,7 @@ def test_cut_in_insets_of_the_excerpts_are_stubbs_and_domesday_tables_only(
         "domesday_notes": (43.2, None),
     }
     assert insets == {name: found.get(name, (None, None)) for name in excerpt_books}
-    assert len(insets) == 24
+    assert len(insets) == 25
 
 
 def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(

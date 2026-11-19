@@ -390,7 +390,30 @@ is laid out as one region, as the skeleton did.
       8 pt (the body's word spaces are 8.1 pt at the 95th percentile,
       section 9), and the row's words from it on span at least half the
       column width. The last condition keeps out a speck that happens to
-      stand at the inset (";" on Stubbs' page 51);
+      stand at the inset (";" on Stubbs' page 51).
+      A row is cut also after a gap of at least **7.8 pt** when its
+      strip words (rule 2) are set smaller than the page's body by rule
+      2's test by size. Stubbs' page 34 sets its note "First invasion by
+      the Scots." 7.9 pt to the right of "had", the last word of the one
+      body row beside it, so that row was not cut, the shortened rows
+      above and below it lay too far apart to chain, and the note's
+      words stayed in the body line, which `book.md` printed as "David
+      had p by 5*invasion the Scots. taken". Measured on 19 November 2026 on the `words.json` of
+      the seven books run by the plan ocr-redo (`runs/ocr-redo/`): only
+      Stubbs, Haynes and Turney have a cut-in inset, and the rule changes
+      Stubbs' layout alone, on 11 pages (34, 68, 82, 102, 108, 154, 270,
+      274, 280, 298 and 308), each now taking a note's words out of the
+      body ("Hugh Bigot humbled, 1157.", page 68; "Coronation of the
+      young Henry, 1170.", page 102), looked at on the page images; with
+      the gap at 7.5 pt it takes body words too ("it will be", page 219;
+      "history. It", page 21), and a gap of 7.8 pt for every row, without
+      the test by size, takes the body word "concerned," on page 245 with
+      the notes of 3 more pages (40, 210 and 279). Stubbs' margin-note blocks in `blocks.json`
+      go from 434 to 443, and its words removed as letter fragments
+      (structure §35) from 367 to 370, on the 11 pages whose regions
+      changed. The excerpt
+      `stubbs_cut_in` holds page 34 as its page 1, whose test now asks
+      for the note's words in the margin;
    2. cut rows whose tops lie within 1.6 body line pitches of the one
       before form a chain. A **shortened** row has no word whose right
       side lies at most L + I − 4 pt: nothing stands in the strip beside

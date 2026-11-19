@@ -64,6 +64,7 @@ EXPECTED_EXCERPT_PAGES = {
     "gierke_notes_heads": 10,
     "stubbs_cut_in": 6,
     "kadesh_redo": 11,
+    "domesday_run_on": 5,
 }
 
 # The pages of each excerpt, by index in the excerpt, that have no word in
@@ -98,6 +99,7 @@ PAGES_WITHOUT_WORDS = {
     "gierke_notes_heads": (),
     "stubbs_cut_in": (),
     "kadesh_redo": (),
+    "domesday_run_on": (),
 }
 
 

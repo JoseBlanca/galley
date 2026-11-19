@@ -210,6 +210,10 @@ class RemovalReason(StrEnum):
     # was cut from, in a book where such pieces are common (structure spec
     # section 35): Stubbs' "Swabia, . and".
     LETTER_FRAGMENT = "letter_fragment"
+    # A line-end hyphen the OCR read as a sign of a note reference, taken
+    # off when the two parts are joined (structure spec section 5):
+    # Stubbs' "aggres*" "sive".
+    MISREAD_HYPHEN = "misread_hyphen"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

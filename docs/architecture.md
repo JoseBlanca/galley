@@ -569,7 +569,10 @@ page_numbers)`:
   tuple[str, ...]`, `reason: ChangeReason`: a word that structure changed
   without losing any letter. `hyphen_join`: ("repli-", "cate") becomes
   ("replicate",), because the word list or the book's own words hold the
-  joined word. `hyphen_join_guessed`: the same, when neither holds it
+  joined word; when the OCR read the hyphen as a sign of a note
+  reference, ("aggres*", "sive") becomes ("aggressive", "*"), the sign
+  last, and a removal `misread_hyphen` of that sign on the change's page
+  records it (structure §5). `hyphen_join_guessed`: the same, when neither holds it
   (structure §5), recorded so that the guessed joins can be reviewed.
   `hyphen_kept`: ("Anglo-", "Saxon") becomes ("Anglo-Saxon",), a
   compound the book prints with its hyphen. `hyphen_lost`: ("move.",
@@ -612,7 +615,10 @@ lettering, labels and shading, which its image shows;
 `docs/specs/figures.md` §5), `letter_fragment` (a piece of a letter, a
 descender or the dot of an "i", that the text layer gives as a word of
 its own inside a word of the line, in a book where such pieces are
-common: Stubbs; `docs/specs/structure.md` §35). A stage spec adds a
+common: Stubbs; `docs/specs/structure.md` §35), `misread_hyphen` (a
+line-end hyphen the OCR read as "*", "^" or "•", taken off when
+structure joins the two parts of the word, Stubbs' "aggres*" "sive";
+structure §5). A stage spec adds a
 reason when it removes a new kind of text, and the reason names what the
 text is, never "noise": a plate's stray text-layer characters are removed
 as `plate_text` by structure, which the owner can review.
@@ -867,6 +873,15 @@ lists the words, with the pages they came from where the origins say.
   Before, the check asked for the marker exactly, which left 1,202 of
   Domesday's 1,440 matched references linkable, 182 of Mariéjol's 676
   and none of Gierke's 205 (`docs/specs/structure.md` §11).
+- At the structure boundary each word change must do what its reason
+  allows and no more (a `hyphen_join` drops only the hyphen ending its
+  first part, a `note_marker` keeps every character), since the
+  multiset comparison takes a change on trust. A `hyphen_join` over a
+  sign read in place of the hyphen, ("aggres*", "sive") to
+  ("aggressive", "*"), is accepted only when the `misread_hyphen`
+  removals of each page and sign number exactly such joins over that
+  sign on that page (`docs/specs/structure.md` §5), so that the sign
+  cannot vanish without a record and no such removal stands alone.
 - It compares multisets over the whole book, not page by page, because a
   paragraph or a hyphen join can run over a page break and its words then
   belong to two pages. Order is not part of the check, because columns,

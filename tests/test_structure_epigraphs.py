@@ -40,6 +40,7 @@ from galley.structure._epigraphs import (
     page_epigraphs,
 )
 from galley.structure._lines import PlacedLine
+from galley.structure._markers import MarkerForm
 from galley.structure._measures import Edges
 from galley.structure._paragraphs import PageParts, body_entries
 from galley.structure._runs import BodyRun
@@ -851,7 +852,8 @@ def test_page_break_on_an_index_page_keeps_the_paragraph(index_page: int) -> Non
         (
             _parts(20, page_20, index_page=index_page == 20),
             _parts(21, page_21, index_page=index_page == 21),
-        )
+        ),
+        body_word_height=_HEIGHT_PT,
     )
     assert len(entries) == 1
 
@@ -866,9 +868,53 @@ def test_page_break_off_the_index_pages_ends_the_paragraph() -> None:
         21, *(_line(_SENTENCE_START, _COLUMN.left, row) for row in range(6))
     )
     entries = body_entries(
-        (_parts(20, page_20, index_page=False), _parts(21, page_21, index_page=False))
+        (_parts(20, page_20, index_page=False), _parts(21, page_21, index_page=False)),
+        body_word_height=_HEIGHT_PT,
     )
     assert len(entries) == 2
+
+
+# A numbered paragraph at a page break (spec section 16, "A numbered
+# paragraph runs on"): a block led by a word of the book's marker form,
+# "1.", runs on when it is set in the body's type and its page's last line
+# ends no sentence, as Kadesh's "1. Of the three…" on page 11.
+
+
+def _numbered_page(last: str, height: float) -> tuple[PlacedLine, ...]:
+    return _on_page(
+        20,
+        _line("1. " + _BODY.removesuffix(" ."), _COLUMN.left, 0, height),
+        *(_line(_BODY.removesuffix(" ."), _COLUMN.left, row, height) for row in (1, 2)),
+        _line(_ending(last, 0.0), _COLUMN.left, 3, height),
+    )
+
+
+def _numbered_entries(last: str, height: float) -> int:
+    page_21 = _on_page(21, *(_line(_BODY, _COLUMN.left, row) for row in range(4)))
+    return len(
+        body_entries(
+            (
+                _parts(20, _numbered_page(last, height), index_page=False),
+                _parts(21, page_21, index_page=False),
+            ),
+            MarkerForm.DIGITS,
+            body_word_height=_HEIGHT_PT,
+        )
+    )
+
+
+def test_numbered_paragraph_in_body_type_runs_on_over_the_page_break() -> None:
+    assert _numbered_entries("with the", _HEIGHT_PT) == 1
+
+
+def test_numbered_block_in_smaller_type_is_a_note_and_does_not_run_on() -> None:
+    # Height ratio 0.9: a note left in the body (section 11).
+    assert _numbered_entries("with the", 9.0) == 2
+
+
+@pytest.mark.parametrize("last", ["it.", "follows:", "it.”"])
+def test_numbered_paragraph_ending_a_sentence_does_not_run_on(last: str) -> None:
+    assert _numbered_entries(last, _HEIGHT_PT) == 2
 
 
 # A source's dash and the fidelity check (spec section 22, "The dash is

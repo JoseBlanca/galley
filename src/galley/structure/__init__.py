@@ -34,7 +34,12 @@ from galley.parallel import DEFAULT_WORKERS, map_pages
 from galley.structure._assemble import assemble
 from galley.structure._case_split import split_at_case
 from galley.structure._figures import is_caption_label
-from galley.structure._hyphens import HyphenJoin, join_hyphen, join_lost_hyphen
+from galley.structure._hyphens import (
+    HyphenJoin,
+    join_hyphen,
+    join_lost_hyphen,
+    sign_removals,
+)
 from galley.structure._markers import (
     NoteMarker,
     Reference,
@@ -121,6 +126,7 @@ def make_blocks(
                 (
                     *(removal for page in pages for removal in page.removals),
                     *assembled.removals,
+                    *sign_removals(assembled.word_changes, lines),
                 ),
                 key=lambda removal: removal.page_index,
             )
