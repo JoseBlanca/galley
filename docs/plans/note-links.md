@@ -31,7 +31,7 @@ second half of a word split over a line end, the edit must cover both
 halves. Spec first (`docs/specs/correct.md`), a test that fails first,
 and a count of such cases in Kadesh's edits.
 
-- [ ] 2.1 Spec, code, test, count.
+- [x] 2.1 Spec, code, test, count.
 
 ## 3. Note links from the vision model
 
@@ -43,7 +43,10 @@ are not linked now, links to the wrong note, and time. If it links more
 than half of the unlinked notes with under 1 wrong link in 20, write the
 rule into the correct spec and build it; otherwise report and stop.
 
-- [ ] 3.1 The measurement.
+- [x] 3.1 The measurement.
+- [ ] 3.1b The same prompt on six other Kadesh pages, their references
+  read from the images and committed; build only if the twelve pages
+  together pass the bar.
 - [ ] 3.2 The rule and its code, if 3.1 says so.
 - [ ] Review of work packages 2 and 3.
 
