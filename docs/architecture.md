@@ -814,7 +814,10 @@ November 2026: patches, usable by agents too).
   text as edited so far, and that occurrence lies inside one span that is
   not a note reference, so that no edit changes a note reference or joins
   two spans (`docs/specs/correct.md` §10). Then `old` becomes `new` in
-  that span. Otherwise markdown stops with an error
+  that span. An edit whose `new` ends with a link to a note,
+  `[x](#n-p0008-004)`, puts a note reference after the new text, or in
+  place of the reference that follows it (`docs/specs/correct.md` §9b
+  and §10). Otherwise markdown stops with an error
   that lists every edit that did not apply, with its file, line and
   reason. Nothing is skipped.
 - When edits stop applying because structure changed, the owner reruns

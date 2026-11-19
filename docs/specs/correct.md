@@ -48,6 +48,11 @@ For each text page of the book, in parallel:
    two differ enough, propose the model's word in its place. In a note,
    where the model has words that line up with none of galley's, propose
    to put them in. Each proposal is an edit.
+5. On a page where a note starts, send the page a second time, with the
+   prompt of section 9b, which asks for the text with each note
+   reference marked; where the model marks a reference after a word of
+   galley's and names one of the page's notes, propose a link from that
+   word to that note (section 9b). Each link is an edit too.
 
 Then write the edits of every page, in page order, to
 `edits/correct.jsonl`. markdown applies them before it writes `book.md`
@@ -434,7 +439,7 @@ version 1 exists, since markdown refused every edit until now.
 | `old` | the word that holds the changed core, with the words around it that make it occur once (below) |
 | `new` | `old` with the model's core in place of galley's, or with the inserted words |
 | `author` | `"correct"` |
-| `reason` | `"vision_word"` for a replacement, `"vision_missing_words"` for an insertion |
+| `reason` | `"vision_word"` for a replacement, `"vision_missing_words"` for an insertion, `"vision_note_link"` for a note link (section 9b) |
 | `page_index` | new: the page the word is printed on |
 | `model` | new: `correct_model` |
 | `second_reading` | new: the second model's reading at the same place (section 9), or `null` when there was no second reading or the edit is not in a note |
@@ -494,6 +499,116 @@ check (an edit counted right when its words are words of the reference
 at that place). The second reading costs about 28 s a page on the
 owner's Mac, about 20 minutes for Kadesh's 43 pages with notes.
 
+## 9b. Note links
+
+structure links a note to its reference in the text only when the OCR
+read the reference as a number or sign it can match (structure spec,
+section 11); on Kadesh 142 of its 183 notes have no link, and some links
+go to the note before or after the right one. The stage asks the model
+where the references are, and links the notes it can place.
+
+**The request.** On each text page where a note starts (a note whose
+first origin is on the page), a second request, as in section 4 but for
+the prompt:
+
+> This is a page of a book with footnotes. Copy the main text above the
+> footnotes, line by line, exactly as printed. Write each footnote
+> reference, a small raised number or sign printed after a word, in
+> square brackets where it stands. Then write one line for each footnote
+> at the foot of the page, in reading order: NOTE, its number, a
+> vertical bar, and its first three words. Write nothing else.
+
+An answer cut short gives no links on its page, and is logged as in
+section 4. The prompt has no example line: a prompt with one, measured
+first, had the model copy the example onto a page that does not print it.
+
+**What the answer gives.** Line by line:
+
+- a **reference** is `[x]`, `<sup>x</sup>`, or a run of superscript
+  digits, with x 1 to 4 characters and no space, superscript digits read
+  as digits. With it go the words before it in its line, the last three,
+  and the word after it, the marks of other references taken out. A
+  reference with no word before it in its line gives nothing;
+- a line that holds no reference and is "NOTE" or nothing, then 1 to 3
+  digits or "*", "†", "‡", then any of space, comma, full stop, colon or
+  "|", then text, is a **note line**: the note's number and its first
+  words. The model writes the note lines in other forms than asked
+  ("NOTE, 4, Campagne…", or the notes copied whole, "100 Abu Simbel:…"),
+  and this takes them all. Only the first note line of each number is
+  kept, and only the numbers some reference of the page has.
+
+**Where the reference is.** Among galley's body tokens of the page (its
+reading, section 5, less the notes and the removals), the candidates are
+the tokens at least 0.75 alike the last word before the reference
+(likeness by `difflib`, as section 7). Each is scored: the likeness of
+the words before the reference, from the last back, with galley's tokens
+from the candidate back, summed, plus the likeness of the word after the
+reference with galley's first changeable token after the candidate. The
+best candidate is the place when it scores at least 0.5 more than the
+second; else the reference gives no link. A fixed token is never the
+place.
+
+**Which note.** Among the notes that start on the page, the one whose
+first three words, their comparison forms joined, are most alike the
+note line's first three words: at least 0.6 alike, and 0.1 more than any
+other note. Else no link. A reference whose number has no note line
+gives no link.
+
+**The link.** The galley word that holds the place's token, its
+whitespace word, gets a reference to that note right after it:
+
+- when a reference span follows that word directly and refers to the
+  same note, nothing is proposed: galley has the link;
+- when it refers to another note, the link takes its place;
+- else the link is put in after the word. galley's word may still hold
+  the reference as the OCR misread it, after its punctuation: "forces.3",
+  "enemy;™", "Zahi“". The characters after the core of galley's word
+  (section 6), past as many as the model's word has after its core
+  (quotes made straight on both sides, and equal there), are the
+  misread reference when they are 1 to 3, each a digit or one of
+  `' " ‘ ’ “ ” * † ‡ ™ ® ^ %`. They leave the word and become the
+  reference's text. Otherwise the word stays whole and the reference's
+  text is the model's x. "advanced.”", where the model has
+  `advanced." [4]`, keeps its quote.
+
+A link is not proposed, and is logged, when:
+
+- the stage's word edits (section 7) change that word: each edit must
+  apply whether or not the others do;
+- after all the links of the book, its note would have a reference from
+  galley that no link of the stage takes the place of: a footnote is
+  referenced once (markdown refuses two);
+- two links of the book go to the same note: neither is proposed.
+
+**The edit.** `reason` `"vision_note_link"`; `old` galley's word, with
+the words before it in the same span added one at a time until it
+occurs once, as section 8 says, but only before, so that the reference
+stays at the end of `old`; `new` is `old` less the misread reference,
+followed by the link written as markdown writes a link to a note,
+`[x](#n-p0008-004)`, with the reference's text in the brackets (a `[` or
+`]` in it is left out). `second_reading` is null. The link edits come in
+`edits/correct.jsonl` after all the word edits, in page order and, on a
+page, in the order of the text, so that a word edit applies before the
+link edit beside it splits the span.
+
+**Measured** with the 35B model on the twelve pages of the reference
+`tests/fixtures/expected/kadesh_reference/note_references.json` (pages
+8, 9, 11, 13, 15, 25, 26, 27, 29, 40, 47 and 53, read from the page
+images), 19 November 2026, against galley's links in the run of that
+day: of the 62 references printed there, 57 have a note of galley's of
+their own to go to (galley joined the other 5 notes to the note before);
+galley linked 8 of them rightly, 6 to the wrong note, and left 43
+unlinked. With this prompt and these rules, before the checks against
+two links to one note, the model's answers give 32 links, none wrong: 23
+where galley had none, 3 that put a wrong link of galley's right, and 6
+that galley has already (which propose nothing).
+The model took 21 to 88 s a page, 49 s on average, with another model
+of the owner's running on the same machine. A prompt that asked only
+for each reference's line, with an example line, gave 36 links with 1
+wrong (on page 13 it numbered a note line 22 for the note printed 23).
+On pages 11 and 27 the model marks the references, but no note line of
+its answer matches one of galley's notes, so they get no links.
+
 ## 10. How markdown applies the edits
 
 markdown reads every `*.jsonl` file under `edits/`, `correct.jsonl`
@@ -515,6 +630,22 @@ Then `old` is replaced by `new` in that span. The other spans, the
 block's label, source and page number, and the note's marker are not
 touched. Rule 4 is new with this spec: it keeps an edit, by any author,
 from changing a note reference or joining two spans.
+
+**A link edit** is an edit whose `new` ends with a link to a note,
+`[x](#<note id>)`, x holding no bracket, and whose `old` holds no such
+link. Whoever writes it, it applies when rules 1 to 4 hold and:
+
+5. the note id is the id of a note of blocks.json.
+
+Then `old` is replaced by `new` less the link, and a reference span
+follows it in the block: its text x, its emphasis that of the span, its
+`note_ref` the note id. When a reference span already follows the
+replaced text directly, the new one takes its place. Afterwards each note
+whose references a link edit changed, the one it links and the one whose
+reference it replaced, is `referenced` when a block refers to it, and
+not otherwise. markdown's check that a footnote is referenced once
+(markdown spec) then stops the run, as for any other book, when two
+references go to one footnote.
 
 An edit that does not apply is not skipped: markdown tries every edit,
 then stops with an `EditError` that lists each one that did not apply,
@@ -540,6 +671,13 @@ show in the EPUB.
   `galley2epub edits-from` is built.
 - To undo them all: delete the file, or set `correct = false` and run
   `galley2epub run`.
+- To undo a note link: delete its line, as any edit's. A link that took
+  the place of a wrong link of galley's brings that one back; when
+  another link of the stage gave its note a reference, the footnote is
+  then referenced twice, and markdown stops and names it: delete that
+  line too. A link cannot yet be rejected for good: an edit of the
+  owner's cannot remove a reference (rule 4), and correct proposes the
+  link again on its next run.
 
 The owner's edits made on corrected text depend on correct's: when correct
 is turned off or reads a word differently on a later run, such an edit may
@@ -664,6 +802,18 @@ wait either way.
   is, that calls LM Studio with the 35B model on page 3 of the excerpt
   `kadesh_redo` and checks that the edits turn "puem" into "poem" and
   "Masrvuo's" into "Maspero's", and that no edit holds a note reference.
+- **Note links** (section 9b): unit tests of the answer's references and
+  note lines in each form the recorded answers show, the place and the
+  note on literal tokens and notes, the misread reference taken out of a
+  word and a real quote kept, the links refused (a word another edit
+  changes, a note galley references elsewhere, two links to one note);
+  markdown's rule 5 and a link taking the place of a reference, each
+  with its error; and the excerpt `kadesh_redo` with the 35B model's
+  recorded answers to the prompt of section 9b for its pages 0, 1, 3 and
+  7 (Kadesh's 8, 9, 11 and 15), the link edits written as literals.
+- **Kadesh, the links**, by hand: the whole book; the notes linked before
+  and after; each link of the twelve reference pages checked against the
+  reference.
 - **Kadesh**, by hand, at the end of work package 4: the whole book with
   `correct = true`; on the six pages of the measurement, galley's reading
   of each page (section 5) with the edits applied, scored against the
