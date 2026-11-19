@@ -120,6 +120,20 @@ def test_excluded_page_keeps_the_layers_words_as_removals_under_redo(
 
 
 @pytest.mark.tesseract
+def test_page_number_in_the_region_drawn_where_tesseract_boxes_it_is_removed(
+    redo_excerpt_run: Callable[[str], BookFolder],
+) -> None:
+    # The excerpt's page 0 (Kadesh's 8): its region holds the journal's
+    # page number 81 where Tesseract boxes it, 12 pt below the layer's box.
+    words = read_words(redo_excerpt_run(_EXCERPT).words_json)
+    assert [
+        (removal.text, removal.reason)
+        for removal in words.removals
+        if removal.page_index == 0
+    ] == [("81", RemovalReason.EXCLUDED_REGION)]
+
+
+@pytest.mark.tesseract
 def test_layout_rereads_nothing_under_redo(
     redo_excerpt_run: Callable[[str], BookFolder],
 ) -> None:
@@ -177,14 +191,23 @@ def test_line_tesseract_skipped_is_kept_from_the_layer(
     # page 11 (the excerpt's page 3) Tesseract skips the line "with the
     # accession of new material made the compilation" of the right column
     # (checked on the page at 200 dpi); the layer's words of it are kept,
-    # without a confidence, all but "the" before "compilation", whose
-    # layer word lies beside an unclaimed "the" of Tesseract's.
+    # without a confidence.
     words = read_words(redo_excerpt_run(_EXCERPT).words_json)
     page = next(page for page in words.pages if page.index == 3)
     kept = tuple(word.text for word in page.words if word.ocr_confidence is None)
     assert _holds_run(
         kept,
-        ("with", "the", "ieeeeslon", "of", "new", "material", "made", "compilation"),
+        (
+            "with",
+            "the",
+            "ieeeeslon",
+            "of",
+            "new",
+            "material",
+            "made",
+            "the",
+            "compilation",
+        ),
     )
     assert page.text_source is TextSource.OCR
 

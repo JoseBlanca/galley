@@ -20,7 +20,6 @@ The cover is rendered as `images/cover.png`.
 
 import logging
 import math
-import statistics
 from collections.abc import Callable
 from contextlib import closing
 from dataclasses import replace
@@ -33,6 +32,16 @@ from PIL import Image
 from galley import ocr, pdfium, text_layer
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig, tesseract_language
+from galley.extract._redo import (
+    OcrPageWords,
+    are_over_each_other,
+    layer_offset,
+    ocr_page_words,
+    with_caption_numbers,
+    with_layer_heights,
+    with_layer_references,
+    with_missed_layer_words,
+)
 from galley.model import (
     Box,
     Figure,
@@ -50,16 +59,19 @@ from galley.model import (
     read_checked_pages,
     write_words,
 )
-from galley.note_references import after_last_letter, glued_reference
 from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 
 __all__ = [
+    "OcrPageWords",
     "are_over_each_other",
     "figure_crop_px",
     "figure_image",
+    "layer_offset",
+    "ocr_page_words",
     "page_words",
     "plate_image",
     "run",
+    "with_caption_numbers",
     "with_layer_heights",
     "with_layer_references",
     "with_missed_layer_words",
@@ -76,29 +88,6 @@ _PLATE_DPI: Final[int] = 300
 _FIGURE_DPI: Final[int] = 300
 # Extract spec section 9: Tesseract finds the blocks of the whole page.
 _OCR_PAGE_SEGMENTATION: Final[int] = 3
-# Extract spec section 9: a Tesseract word and a layer word are over each
-# other when they overlap by half the lower height and half the narrower
-# width; a third of the height took 4 wrong references on Kadesh.
-_OVER_EACH_OTHER_SHARE: Final[float] = 0.5
-# Extract spec section 9, "Layer words Tesseract missed", measured on the
-# whole Kadesh book: a Tesseract word covers a layer word when they overlap
-# by a quarter of the lower height (half took many words Tesseract read);
-# a layer word is no copy of an unclaimed Tesseract word with its letters
-# within 16 pt (the layer misplaces some boxes by 14 pt); the page's offset
-# is taken over pairs of 3 or more letters whose middles are less than 12
-# pt apart.
-_COVER_HEIGHT_SHARE: Final[float] = 0.25
-# Extract spec section 9, "Caption numbers from the layer": the words that
-# open a caption and the numeral after them, as figures spec section 1
-# gives them (structure's own test is not imported: no stage imports
-# another).
-_CAPTION_WORDS = frozenset(("figure", "fig.", "fig", "plate", "map"))
-_NUMERAL_CHARACTERS = frozenset("0123456789ivxlcIVXLC")
-_NUMERAL_ENDINGS = (".", ",")
-_NUMERAL_MAX_CHARACTERS = 6
-_COPY_DISTANCE_PT: Final[float] = 16.0
-_OFFSET_PAIR_MIN_CHARACTERS: Final[int] = 3
-_OFFSET_PAIR_DISTANCE_PT: Final[float] = 12.0
 
 
 def run(
@@ -160,8 +149,8 @@ def run(
 class _PageRead(NamedTuple):
     """What a worker gives for a page: its words, its removals, how many of
     Tesseract's words took the layer's note reference or caption number,
-    and how many words
-    of the layer Tesseract missed were kept (extract spec section 9)."""
+    and how many words of the layer Tesseract missed were kept (extract
+    spec section 9)."""
 
     page: PageWords
     removals: tuple[Removal, ...]
@@ -216,368 +205,67 @@ def _page_reader(
                 page,
                 book_root,
             )
-        page_read, words = _words_read(page, tesseract_words, page_layer_words)
-        if page_read.text_source is not page.text_source:
+        read = _words_read(page, tesseract_words, page_layer_words)
+        if read.page.text_source is not page.text_source:
             _logger.warning(
                 "extract: page index %d: Tesseract found no word on it; it keeps "
                 "the %d words of its text layer",
                 page.index,
-                len(words),
+                len(read.words),
             )
-        # On a page read by Tesseract, its words keep their confidence and
-        # their order; the layer's words kept among them have none.
-        read_by_tesseract = page_read.text_source is TextSource.OCR
-        taken = tuple(
-            (tesseract_word, taken_word)
-            for tesseract_word, taken_word in zip(
-                tesseract_words,
-                (word for word in words if word.ocr_confidence is not None),
-                strict=False,
-            )
-            if read_by_tesseract and tesseract_word.text != taken_word.text
-        )
-        for tesseract_word, taken_word in taken:
+        taken = () if read.ocr_words is None else read.ocr_words.taken
+        kept = () if read.ocr_words is None else read.ocr_words.kept
+        for tesseract_word, text in taken:
             _logger.info(
                 "extract: page index %d: %r, read by Tesseract, takes the "
                 "layer's note reference or caption number: %r",
                 page.index,
                 tesseract_word.text,
-                taken_word.text,
+                text,
             )
-        kept = tuple(
-            word.text
-            for word in words
-            if read_by_tesseract and word.ocr_confidence is None
-        )
         if kept:
             _logger.info(
                 "extract: page index %d: %d words of the layer that Tesseract "
                 "missed are kept: %s",
                 page.index,
                 len(kept),
-                " ".join(kept),
+                " ".join(word.text for word in kept),
             )
-        return _PageRead(*page_words(page_read, words), len(taken), len(kept))
+        return _PageRead(*page_words(read.page, read.words), len(taken), len(kept))
 
     return read_page
+
+
+class _WordsRead(NamedTuple):
+    """A page as extract reads it (`page`, whose source may fall back to
+    the layer), its `words`, and on an `ocr` page what the layer gave them
+    (`ocr_words`, None on any other page)."""
+
+    page: PageInfo
+    words: tuple[Word, ...]
+    ocr_words: OcrPageWords | None
 
 
 def _words_read(
     page: PageInfo,
     tesseract_words: tuple[Word, ...],
     page_layer_words: tuple[Word, ...],
-) -> tuple[PageInfo, tuple[Word, ...]]:
+) -> _WordsRead:
     """The page as extract reads it and its words, given Tesseract's words
-    of the page (empty unless its source is `ocr`) and its layer's: a page
-    read by OCR has Tesseract's words, with the layer's note references put
-    back and the layer words Tesseract missed kept, but when Tesseract found
-    none it keeps its layer's, with the source `text_layer`, so that no
-    printed word is lost (extract spec section 9); any other page has its
-    layer's."""
+    of the page (empty unless its source is `ocr`) and its layer's (extract
+    spec section 9). A page read by OCR has Tesseract's words as
+    `ocr_page_words` makes them: the layer's note references and caption
+    numbers put back, the layer words Tesseract missed kept, each word
+    with the height of the layer word over it. When Tesseract found no word
+    on it, it keeps its layer's, with the source `text_layer`, so that no
+    printed word is lost. Any other page has its layer's."""
     if page.text_source is not TextSource.OCR:
-        return page, page_layer_words
+        return _WordsRead(page, page_layer_words, None)
     if tesseract_words or not page_layer_words:
-        return page, with_layer_heights(
-            with_missed_layer_words(
-                _with_caption_numbers(
-                    with_layer_references(tesseract_words, page_layer_words),
-                    page_layer_words,
-                ),
-                tuple(
-                    layer_word
-                    for layer_word in page_layer_words
-                    if not any(
-                        _overlap(box.x0, box.x1, layer_word.box.x0, layer_word.box.x1)
-                        > 0
-                        and _overlap(
-                            box.top,
-                            box.bottom,
-                            layer_word.box.top,
-                            layer_word.box.bottom,
-                        )
-                        > 0
-                        for box in page.figure_boxes
-                    )
-                ),
-            ),
-            page_layer_words,
-        )
-    return replace(page, text_source=TextSource.TEXT_LAYER), page_layer_words
-
-
-def with_layer_references(
-    ocr_words: tuple[Word, ...], layer_words: tuple[Word, ...]
-) -> tuple[Word, ...]:
-    """`ocr_words`, a page's words as Tesseract read them, each that
-    takes the layer's note reference (extract spec section 9) with its
-    text changed, in the same order."""
-    over = tuple(
-        tuple(layer_word for layer_word in layer_words if _over(ocr_word, layer_word))
-        for ocr_word in ocr_words
-    )
-    return tuple(
-        _with_layer_reference(ocr_word, layer_over[0])
-        if len(layer_over) == 1
-        and sum(_over(other, layer_over[0]) for other in ocr_words) == 1
-        else ocr_word
-        for ocr_word, layer_over in zip(ocr_words, over, strict=True)
-    )
-
-
-def _over(ocr_word: Word, layer_word: Word) -> bool:
-    return are_over_each_other(ocr_word.box, layer_word.box)
-
-
-def _with_layer_reference(ocr_word: Word, layer_word: Word) -> Word:
-    """`ocr_word` with the reference glued to `layer_word`, the one layer
-    word over it, when the two words meet conditions 1, 3 and 4 of extract
-    spec section 9; else `ocr_word` as it is."""
-    if (
-        glued_reference(layer_word.text) is None
-        or any(character.isdigit() for character in ocr_word.text)
-        or _letter_count(ocr_word.text) == 0
-        or _letter_count(ocr_word.text) != _letter_count(layer_word.text)
-    ):
-        return ocr_word
-    text = ocr_word.text[
-        : len(ocr_word.text) - len(after_last_letter(ocr_word.text))
-    ] + after_last_letter(layer_word.text)
-    return replace(ocr_word, text=text)
-
-
-def _with_caption_numbers(
-    ocr_words: tuple[Word, ...], layer_words: tuple[Word, ...]
-) -> tuple[Word, ...]:
-    """`ocr_words`, each that follows a caption word on its line taking the
-    numeral of the layer word over it (extract spec section 9, "Caption
-    numbers from the layer")."""
-    over = tuple(
-        tuple(layer_word for layer_word in layer_words if _over(ocr_word, layer_word))
-        for ocr_word in ocr_words
-    )
-    return tuple(
-        replace(ocr_word, text=layer_over[0].text)
-        if position > 0
-        and ocr_words[position - 1].text.lower() in _CAPTION_WORDS
-        and _overlap(
-            ocr_words[position - 1].box.top,
-            ocr_words[position - 1].box.bottom,
-            ocr_word.box.top,
-            ocr_word.box.bottom,
-        )
-        > 0
-        and not any(character.isdigit() for character in ocr_word.text)
-        and len(layer_over) == 1
-        and sum(_over(other, layer_over[0]) for other in ocr_words) == 1
-        and _is_numeral(layer_over[0].text)
-        else ocr_word
-        for position, (ocr_word, layer_over) in enumerate(
-            zip(ocr_words, over, strict=True)
-        )
-    )
-
-
-def _is_numeral(text: str) -> bool:
-    """Whether `text` is a numeral by figures spec section 1: 1 to 6
-    characters, each a digit or one of i, v, x, l, c in either case, with
-    or without a "." or "," after them."""
-    bare = text[:-1] if text.endswith(_NUMERAL_ENDINGS) else text
-    return 0 < len(bare) <= _NUMERAL_MAX_CHARACTERS and all(
-        character in _NUMERAL_CHARACTERS for character in bare
-    )
-
-
-def _letter_count(text: str) -> int:
-    return sum(character.isalpha() for character in text)
-
-
-def with_missed_layer_words(
-    ocr_words: tuple[Word, ...], layer_words: tuple[Word, ...]
-) -> tuple[Word, ...]:
-    """`ocr_words`, a page's words as Tesseract read them, with the layer
-    words Tesseract missed (extract spec section 9) put among them, each
-    with its box moved by the page's offset. Each goes before the first
-    word of `ocr_words` whose top is lower than its own, in the order of
-    `layer_words`."""
-    offset = _layer_offset(ocr_words, layer_words)
-    moved = tuple(_moved_up(layer_word, offset) for layer_word in layer_words)
-    unclaimed = tuple(
-        ocr_word
-        for ocr_word in ocr_words
-        if not any(
-            _letters_and_digits(layer_word.text) == _letters_and_digits(ocr_word.text)
-            and _covers(ocr_word.box, layer_word.box)
-            for layer_word in moved
-        )
-    )
-    missed = tuple(
-        layer_word
-        for layer_word in moved
-        if _letters_and_digits(layer_word.text)
-        and not any(_covers(ocr_word.box, layer_word.box) for ocr_word in ocr_words)
-        and not any(
-            _letters_and_digits(ocr_word.text) == _letters_and_digits(layer_word.text)
-            and _gap(
-                ocr_word.box.top,
-                ocr_word.box.bottom,
-                layer_word.box.top,
-                layer_word.box.bottom,
-            )
-            <= _COPY_DISTANCE_PT
-            and _gap(
-                ocr_word.box.x0, ocr_word.box.x1, layer_word.box.x0, layer_word.box.x1
-            )
-            <= _COPY_DISTANCE_PT
-            for ocr_word in unclaimed
-        )
-    )
-    places = tuple(_place(ocr_words, layer_word) for layer_word in missed)
-    words: list[Word] = []
-    for position, ocr_word in enumerate(ocr_words):
-        words.extend(
-            layer_word
-            for layer_word, place in zip(missed, places, strict=True)
-            if place == position
-        )
-        words.append(ocr_word)
-    words.extend(
-        layer_word
-        for layer_word, place in zip(missed, places, strict=True)
-        if place == len(ocr_words)
-    )
-    return tuple(words)
-
-
-def with_layer_heights(
-    ocr_words: tuple[Word, ...], layer_words: tuple[Word, ...]
-) -> tuple[Word, ...]:
-    """`ocr_words` with each word that carries a confidence and that a
-    layer word covers given that layer word's top and bottom, moved by
-    the page's offset (extract spec section 9)."""
-    tesseract_words = tuple(
-        word for word in ocr_words if word.ocr_confidence is not None
-    )
-    offset = _layer_offset(tesseract_words, layer_words)
-    moved = tuple(_moved_up(layer_word, offset).box for layer_word in layer_words)
-    return tuple(
-        word
-        if word.ocr_confidence is None
-        else _with_height_of(
-            word, tuple(box for box in moved if _covers(word.box, box))
-        )
-        for word in ocr_words
-    )
-
-
-def _with_height_of(ocr_word: Word, covering: tuple[Box, ...]) -> Word:
-    """`ocr_word` with the height of the box of `covering`, the moved boxes
-    of the layer words that cover it, that overlaps it most, about its own
-    middle; as it is when none does."""
-    if not covering:
-        return ocr_word
-    box = ocr_word.box
-    largest = max(
-        covering,
-        key=lambda layer_box: (
-            _overlap(box.x0, box.x1, layer_box.x0, layer_box.x1)
-            * _overlap(box.top, box.bottom, layer_box.top, layer_box.bottom)
-        ),
-    )
-    half_height = (largest.bottom - largest.top) / 2
-    middle = _middle(box)
-    return replace(
-        ocr_word, box=Box(box.x0, middle - half_height, box.x1, middle + half_height)
-    )
-
-
-def _place(ocr_words: tuple[Word, ...], layer_word: Word) -> int:
-    """The position in `ocr_words` before which `layer_word` goes: that of
-    the first word whose top is lower than its own, or the end."""
-    return next(
-        (
-            position
-            for position, ocr_word in enumerate(ocr_words)
-            if ocr_word.box.top > layer_word.box.top
-        ),
-        len(ocr_words),
-    )
-
-
-def _layer_offset(ocr_words: tuple[Word, ...], layer_words: tuple[Word, ...]) -> float:
-    """How far the layer's boxes sit below Tesseract's on a page: the median,
-    over the pairs of a layer word and a Tesseract word with the same 3 or
-    more letters and digits, overlapping in width, with middles less than
-    12 pt apart up or down, of the layer word's middle less the Tesseract
-    word's; 0 without a pair (extract spec section 9)."""
-    differences = tuple(
-        _middle(layer_word.box) - _middle(ocr_word.box)
-        for layer_word in layer_words
-        if len(_letters_and_digits(layer_word.text)) >= _OFFSET_PAIR_MIN_CHARACTERS
-        for ocr_word in ocr_words
-        if _letters_and_digits(ocr_word.text) == _letters_and_digits(layer_word.text)
-        and _overlap(
-            ocr_word.box.x0, ocr_word.box.x1, layer_word.box.x0, layer_word.box.x1
-        )
-        > 0
-        and abs(_middle(layer_word.box) - _middle(ocr_word.box))
-        < _OFFSET_PAIR_DISTANCE_PT
-    )
-    return statistics.median(differences) if differences else 0.0
-
-
-def _covers(ocr_box: Box, layer_box: Box) -> bool:
-    """Whether a Tesseract word's box covers a layer word's, already moved
-    by the offset: they overlap in width, and in height by a quarter of the
-    lower height (extract spec section 9)."""
-    height_overlap = _overlap(
-        ocr_box.top, ocr_box.bottom, layer_box.top, layer_box.bottom
-    )
-    return (
-        _overlap(ocr_box.x0, ocr_box.x1, layer_box.x0, layer_box.x1) > 0
-        and height_overlap > 0
-        and height_overlap
-        >= _COVER_HEIGHT_SHARE
-        * min(ocr_box.bottom - ocr_box.top, layer_box.bottom - layer_box.top)
-    )
-
-
-def _moved_up(layer_word: Word, offset: float) -> Word:
-    box = layer_word.box
-    return replace(
-        layer_word, box=Box(box.x0, box.top - offset, box.x1, box.bottom - offset)
-    )
-
-
-def _middle(box: Box) -> float:
-    return (box.top + box.bottom) / 2
-
-
-def _overlap(start: float, end: float, other_start: float, other_end: float) -> float:
-    """The length two intervals share, 0 when they do not meet."""
-    return max(0.0, min(end, other_end) - max(start, other_start))
-
-
-def _gap(start: float, end: float, other_start: float, other_end: float) -> float:
-    """The distance between two intervals, 0 when they meet."""
-    return max(0.0, max(start, other_start) - min(end, other_end))
-
-
-def _letters_and_digits(text: str) -> str:
-    return "".join(character.lower() for character in text if character.isalnum())
-
-
-def are_over_each_other(one: Box, other: Box) -> bool:
-    """Whether two word boxes overlap by half the lower height and half
-    the narrower width (extract spec section 9)."""
-    height_overlap = max(0.0, min(one.bottom, other.bottom) - max(one.top, other.top))
-    width_overlap = max(0.0, min(one.x1, other.x1) - max(one.x0, other.x0))
-    return (
-        height_overlap > 0
-        and width_overlap > 0
-        and height_overlap
-        >= _OVER_EACH_OTHER_SHARE * min(one.bottom - one.top, other.bottom - other.top)
-        and width_overlap
-        >= _OVER_EACH_OTHER_SHARE * min(one.x1 - one.x0, other.x1 - other.x0)
+        read = ocr_page_words(tesseract_words, page_layer_words, page.figure_boxes)
+        return _WordsRead(page, read.words, read)
+    return _WordsRead(
+        replace(page, text_source=TextSource.TEXT_LAYER), page_layer_words, None
     )
 
 

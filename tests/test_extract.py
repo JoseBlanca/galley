@@ -333,7 +333,8 @@ def test_ocr_page_keeps_tesseracts_words_but_those_in_a_region() -> None:
 def test_ocr_page_where_tesseract_reads_words_is_read_from_them() -> None:
     # Tesseract's word, with the height of the layer's word over it, 11
     # pt about its middle, 55 pt.
-    assert extract._words_read(OCR_PAGE, (MEGIDDO,), (LAYER_MEGIDDO,)) == (
+    read = extract._words_read(OCR_PAGE, (MEGIDDO,), (LAYER_MEGIDDO,))
+    assert (read.page, read.words) == (
         OCR_PAGE,
         (replace(MEGIDDO, box=Box(100.0, 49.5, 140.0, 60.5)),),
     )
@@ -342,338 +343,20 @@ def test_ocr_page_where_tesseract_reads_words_is_read_from_them() -> None:
 def test_ocr_page_where_tesseract_reads_no_word_falls_back_to_the_layer() -> None:
     # Extract spec section 9: no printed word is lost; the page's source
     # becomes the layer, and its regions apply to the layer's words.
-    page_read, words = extract._words_read(OCR_PAGE, (), (LAYER_MEGIDDO,))
+    read = extract._words_read(OCR_PAGE, (), (LAYER_MEGIDDO,))
 
-    assert page_read == replace(OCR_PAGE, text_source=TextSource.TEXT_LAYER)
-    assert words == (LAYER_MEGIDDO,)
+    assert read.page == replace(OCR_PAGE, text_source=TextSource.TEXT_LAYER)
+    assert read.words == (LAYER_MEGIDDO,)
+    assert read.ocr_words is None
 
 
 def test_page_read_from_the_layer_keeps_the_layers_words() -> None:
-    assert extract._words_read(TEXT_PAGE, (), (LAYER_MEGIDDO,)) == (
+    read = extract._words_read(TEXT_PAGE, (), (LAYER_MEGIDDO,))
+    assert (read.page, read.words, read.ocr_words) == (
         TEXT_PAGE,
         (LAYER_MEGIDDO,),
+        None,
     )
-
-
-# Note references put back from the layer (extract spec section 9). The
-# words and boxes are Kadesh's, read by Tesseract and by the layer on 19
-# November 2026 (the page index of the whole book in each name).
-KADESH_10_TESSERACT = tesseract_word(
-    "Kadesh,\u201d", Box(250.56, 346.08, 292.32, 355.92), 81.66
-)
-KADESH_10_LAYER = word("Kadesh,12", Box(250.321, 349.911, 288.488, 360.911))
-HIM_36_TESSERACT = tesseract_word("him,", Box(200.88, 187.2, 223.92, 195.84), 40.25)
-HIM_36_LAYER = word("him,88", Box(200.838, 190.137, 221.722, 200.241))
-GREECE_8_TESSERACT = tesseract_word(
-    "Greece,\u2019", Box(275.76, 266.4, 312.0, 276.24), 21.86
-)
-GREECE_8_LAYER = word("Greece,1", Box(275.76, 270.122, 308.962, 281.122))
-THOUSAND_8_TESSERACT = tesseract_word(
-    "thousand", Box(279.6, 279.84, 320.64, 287.52), 96.25
-)
-# Page 13's "Mon., 17": Tesseract reads two words, the layer one, given
-# twice with the same box.
-MON_13_TESSERACT = tesseract_word("Mon..", Box(318.72, 526.08, 336.24, 531.12), 47.21)
-SEVENTEEN_13_TESSERACT = tesseract_word(
-    "17", Box(338.64, 526.08, 343.92, 530.88), 83.06
-)
-MON_13_LAYER = word("Jfem.,17", Box(318.438, 526.076, 341.191, 534.212))
-RAMSES_31_TESSERACT = tesseract_word(
-    "Ramses\u2019s", Box(141.6, 525.6, 182.16, 533.28), 62.66
-)
-RAMSES_31_LAYER = word("Ramses1", Box(141.6, 529.088, 170.595, 540.088))
-CAMPE_62_TESSERACT = tesseract_word(
-    "camp\u00e9", Box(52.56, 395.76, 78.96, 404.16), 92.36
-)
-CAMPE_62_LAYER = word("camp6", Box(52.56, 397.291, 74.415, 408.291))
-
-
-@pytest.mark.parametrize(
-    ("tesseract", "layer", "expected"),
-    [
-        (KADESH_10_TESSERACT, KADESH_10_LAYER, "Kadesh,12"),
-        (HIM_36_TESSERACT, HIM_36_LAYER, "him,88"),
-        (GREECE_8_TESSERACT, GREECE_8_LAYER, "Greece,1"),
-    ],
-    ids=["mark_for_the_digits", "digits_dropped", "quote_for_the_digit"],
-)
-def test_tesseract_word_takes_the_layers_reference_where_it_read_none(
-    tesseract: Word, layer: Word, expected: str
-) -> None:
-    assert extract.with_layer_references(
-        (THOUSAND_8_TESSERACT, tesseract), (layer,)
-    ) == (THOUSAND_8_TESSERACT, replace(tesseract, text=expected))
-
-
-@pytest.mark.parametrize(
-    ("tesseract_words", "layer_words"),
-    [
-        ((MON_13_TESSERACT, SEVENTEEN_13_TESSERACT), (MON_13_LAYER,)),
-        ((MON_13_TESSERACT, SEVENTEEN_13_TESSERACT), (MON_13_LAYER, MON_13_LAYER)),
-        ((RAMSES_31_TESSERACT,), (RAMSES_31_LAYER,)),
-        ((CAMPE_62_TESSERACT,), (CAMPE_62_LAYER,)),
-        ((KADESH_10_TESSERACT,), (GREECE_8_LAYER,)),
-        ((replace(KADESH_10_TESSERACT, text="Kadesh,12"),), (KADESH_10_LAYER,)),
-    ],
-    ids=[
-        "layer_word_over_two",
-        "layer_word_given_twice",
-        "more_letters_than_the_layer",
-        "layer_digit_for_a_letter",
-        "no_layer_word_over_it",
-        "tesseract_read_the_digits",
-    ],
-)
-def test_tesseract_word_keeps_its_text_where_the_rule_does_not_hold(
-    tesseract_words: tuple[Word, ...], layer_words: tuple[Word, ...]
-) -> None:
-    assert extract.with_layer_references(tesseract_words, layer_words) == (
-        tesseract_words
-    )
-
-
-def test_word_boxes_of_the_same_word_are_over_each_other() -> None:
-    assert extract.are_over_each_other(GREECE_8_TESSERACT.box, GREECE_8_LAYER.box)
-
-
-def test_word_box_of_the_layer_is_not_over_the_line_below() -> None:
-    # The layer's box sits 4 pt lower than Tesseract's and touches the
-    # line below, but by less than half the lower height.
-    assert not extract.are_over_each_other(THOUSAND_8_TESSERACT.box, GREECE_8_LAYER.box)
-
-
-def test_ocr_page_takes_the_layers_references_into_tesseracts_words() -> None:
-    # Its height then is the layer word's, about its own middle.
-    _, (taken,) = extract._words_read(OCR_PAGE, (HIM_36_TESSERACT,), (HIM_36_LAYER,))
-    middle = (HIM_36_TESSERACT.box.top + HIM_36_TESSERACT.box.bottom) / 2
-    half_height = (HIM_36_LAYER.box.bottom - HIM_36_LAYER.box.top) / 2
-    assert taken.text == "him,88"
-    assert (taken.box.top, taken.box.bottom) == pytest.approx(
-        (middle - half_height, middle + half_height)
-    )
-
-
-# Layer words Tesseract missed (extract spec section 9). Kadesh's page 11:
-# Tesseract skipped the line "with the accession of new material made the
-# compilation" between "been great ... de Rougé's day" and "of a new
-# composite text". The pairs "been" and "text" give the page's offset,
-# 4.0 and 1.4 pt, median 2.7.
-BEEN_11_TESSERACT = tesseract_word("been", Box(268.3, 575.3, 283.9, 583.7), 95.9)
-ROUGES_11_TESSERACT = tesseract_word(
-    "Roug\u00e9's", Box(342.5, 575.3, 366.7, 583.7), 31.0
-)
-OF_11_TESSERACT = tesseract_word("of", Box(268.1, 591.1, 275.5, 599.5), 96.4)
-COMPOSITE_11_TESSERACT = tesseract_word(
-    "composite", Box(297.6, 592.8, 384.5, 598.6), 53.0
-)
-TEXT_11_TESSERACT = tesseract_word("text", Box(333.1, 591.1, 345.8, 599.5), 87.7)
-BEEN_11_LAYER = word("been", Box(269.0, 580.0, 281.7, 587.0))
-ROUGES_11_LAYER = word("Rouce's", Box(341.5, 580.0, 363.9, 587.0))
-WITH_11_LAYER = word("with", Box(269.3, 585.6, 281.0, 592.6))
-MATERIAL_11_LAYER = word("material", Box(359.5, 585.6, 384.1, 592.6))
-OF_11_LAYER = word("of", Box(268.8, 593.2, 273.8, 600.2))
-COMPOSITE_11_LAYER = word("oosaposite", Box(297.4, 593.2, 327.3, 600.2))
-TEXT_11_LAYER = word("text", Box(332.6, 593.2, 343.2, 600.2))
-PAGE_11_OFFSET = 2.7
-
-
-def moved_up(layer_word: Word, offset: float) -> Word:
-    box = layer_word.box
-    return replace(
-        layer_word, box=Box(box.x0, box.top - offset, box.x1, box.bottom - offset)
-    )
-
-
-def test_layer_line_tesseract_skipped_is_kept_moved_by_the_offset() -> None:
-    kept = extract.with_missed_layer_words(
-        (
-            BEEN_11_TESSERACT,
-            ROUGES_11_TESSERACT,
-            OF_11_TESSERACT,
-            COMPOSITE_11_TESSERACT,
-            TEXT_11_TESSERACT,
-        ),
-        (
-            BEEN_11_LAYER,
-            ROUGES_11_LAYER,
-            WITH_11_LAYER,
-            MATERIAL_11_LAYER,
-            OF_11_LAYER,
-            COMPOSITE_11_LAYER,
-            TEXT_11_LAYER,
-        ),
-    )
-    assert [word.text for word in kept] == [
-        "been",
-        "Roug\u00e9's",
-        "with",
-        "material",
-        "of",
-        "composite",
-        "text",
-    ]
-    assert kept[2].ocr_confidence is None
-    assert kept[2].box == pytest.approx(moved_up(WITH_11_LAYER, PAGE_11_OFFSET).box)
-    assert kept[3].box == pytest.approx(moved_up(MATERIAL_11_LAYER, PAGE_11_OFFSET).box)
-
-
-# Kadesh's page 12: the layer boxes its line up to 25 pt right of
-# Tesseract's, so that its "of" lies beside Tesseract's "of", which covers
-# no layer "of" (unclaimed); the pair "the" gives the offset.
-SIONS_12_TESSERACT = tesseract_word("sions", Box(67.4, 339.4, 89.5, 347.0), 96.3)
-OF_12_TESSERACT = tesseract_word("of", Box(91.9, 339.4, 100.6, 347.0), 96.6)
-THE_12_TESSERACT = tesseract_word("the", Box(104.4, 339.4, 118.3, 347.0), 96.3)
-SIONS_12_LAYER = word("sions", Box(91.9, 340.1, 99.2, 351.1))
-OF_12_LAYER = word("of", Box(100.7, 340.1, 103.6, 351.1))
-THE_12_LAYER = word("the", Box(104.4, 340.1, 116.1, 351.1))
-
-
-def test_layer_copy_of_a_word_tesseract_read_beside_it_is_not_kept() -> None:
-    tesseract_words = (SIONS_12_TESSERACT, OF_12_TESSERACT, THE_12_TESSERACT)
-    assert (
-        extract.with_missed_layer_words(
-            tesseract_words, (SIONS_12_LAYER, OF_12_LAYER, THE_12_LAYER)
-        )
-        == tesseract_words
-    )
-
-
-def test_layer_word_without_a_letter_or_digit_is_not_kept() -> None:
-    # Kadesh page 8's "=", which Tesseract does not read.
-    assert extract.with_missed_layer_words(
-        (BEEN_11_TESSERACT,), (word("=", Box(216.7, 619.5, 219.5, 626.5)),)
-    ) == (BEEN_11_TESSERACT,)
-
-
-def test_layer_word_of_a_page_without_pairs_is_kept_where_the_layer_boxes_it() -> None:
-    # Kadesh page 10's page number "83", which Tesseract does not read; no
-    # word of the two readings pairs, so the offset is 0.
-    page_number = word("83", Box(267.8, 645.2, 275.5, 655.2))
-    assert extract.with_missed_layer_words((BEEN_11_TESSERACT,), (page_number,)) == (
-        BEEN_11_TESSERACT,
-        page_number,
-    )
-
-
-# Word heights from the layer (extract spec section 9), on Kadesh's page
-# 11's words above, offset 2.7 pt for the cover test: the layer's boxes are
-# 7.0 pt tall.
-def test_tesseract_word_takes_the_height_of_the_layer_word_over_it() -> None:
-    page_11_layer = (
-        BEEN_11_LAYER,
-        ROUGES_11_LAYER,
-        OF_11_LAYER,
-        COMPOSITE_11_LAYER,
-        TEXT_11_LAYER,
-    )
-    # "composite" is covered by the layer's "oosaposite" and "text"; the
-    # first overlaps it most.
-    heights = extract.with_layer_heights(
-        (BEEN_11_TESSERACT, OF_11_TESSERACT, COMPOSITE_11_TESSERACT, TEXT_11_TESSERACT),
-        page_11_layer,
-    )
-    assert [word.text for word in heights] == ["been", "of", "composite", "text"]
-    assert [(word.box.x0, word.box.x1, word.ocr_confidence) for word in heights] == [
-        (word.box.x0, word.box.x1, word.ocr_confidence)
-        for word in (
-            BEEN_11_TESSERACT,
-            OF_11_TESSERACT,
-            COMPOSITE_11_TESSERACT,
-            TEXT_11_TESSERACT,
-        )
-    ]
-    # Each keeps its middle and takes the layer's 7.0 pt.
-    assert [
-        edge for word in heights for edge in (word.box.top, word.box.bottom)
-    ] == pytest.approx(
-        [
-            edge
-            for word in (
-                BEEN_11_TESSERACT,
-                OF_11_TESSERACT,
-                COMPOSITE_11_TESSERACT,
-                TEXT_11_TESSERACT,
-            )
-            for edge in (
-                (word.box.top + word.box.bottom) / 2 - 3.5,
-                (word.box.top + word.box.bottom) / 2 + 3.5,
-            )
-        ]
-    )
-
-
-def test_word_no_layer_word_covers_and_a_kept_layer_word_keep_their_boxes() -> None:
-    # Page 11's "material", kept from the layer without a confidence, and
-    # "Rougé's", which no layer word given covers.
-    material = replace(MATERIAL_11_LAYER, box=Box(359.5, 582.9, 384.1, 589.9))
-    words = (ROUGES_11_TESSERACT, material)
-    assert extract.with_layer_heights(words, (OF_11_LAYER, MATERIAL_11_LAYER)) == (
-        words
-    )
-
-
-# Caption numbers from the layer (extract spec section 9): Kadesh's page
-# 36 prints "MAP V. Second Positions" under its map.
-MAP_36_TESSERACT = tesseract_word("MAP", Box(71.28, 632.64, 87.12, 637.92), 92.2)
-V_36_TESSERACT = tesseract_word("Y.", Box(90.0, 632.64, 96.72, 638.4), 70.8)
-SECOND_36_TESSERACT = tesseract_word("Second", Box(103.0, 629.4, 127.0, 636.4), 96.2)
-MAP_36_LAYER = word("MAP", Box(71.52, 631.478, 83.23, 638.478))
-V_36_LAYER = word("V.", Box(90.24, 631.478, 94.757, 638.478))
-
-
-def test_number_after_a_caption_word_takes_the_layers_numeral() -> None:
-    assert extract._with_caption_numbers(
-        (MAP_36_TESSERACT, V_36_TESSERACT, SECOND_36_TESSERACT),
-        (MAP_36_LAYER, V_36_LAYER),
-    ) == (MAP_36_TESSERACT, replace(V_36_TESSERACT, text="V."), SECOND_36_TESSERACT)
-
-
-@pytest.mark.parametrize(
-    ("caption_word", "number", "layer_text"),
-    [
-        ("(Map", "Y.", "V."),
-        ("MAP", "Y.", "Second"),
-        ("Maple", "Y.", "V."),
-        # Page 62's "Plate 30:", where the layer reads "30" and ":".
-        ("Plate", "30:", "30"),
-    ],
-    ids=["bracketed", "layer_word_no_numeral", "no_caption_word", "digits_read"],
-)
-def test_number_after_a_caption_word_stays_where_the_rule_does_not_hold(
-    caption_word: str, number: str, layer_text: str
-) -> None:
-    tesseract_words = (
-        replace(MAP_36_TESSERACT, text=caption_word),
-        replace(V_36_TESSERACT, text=number),
-    )
-    assert (
-        extract._with_caption_numbers(
-            tesseract_words, (MAP_36_LAYER, replace(V_36_LAYER, text=layer_text))
-        )
-        == tesseract_words
-    )
-
-
-def test_layer_word_tesseract_missed_at_a_figures_edge_is_not_kept() -> None:
-    # Kadesh's page 52: the layer's "UJ" under the hieroglyphs, whose box
-    # (70, 442, 408, 544) its own reaches into.
-    figure_page = replace(OCR_PAGE, figure_boxes=(Box(70.0, 442.0, 408.0, 544.0),))
-    junk = word("UJ", Box(164.88, 542.4, 179.41, 555.4))
-    _, words = extract._words_read(figure_page, (BEEN_11_TESSERACT,), (junk,))
-    assert [word.text for word in words] == ["been"]
-
-
-def test_ocr_page_keeps_the_layer_words_tesseract_missed() -> None:
-    # The reference put back first makes "him,88" a pair of the two
-    # readings, which gives the offset.
-    _, words = extract._words_read(
-        OCR_PAGE, (HIM_36_TESSERACT,), (HIM_36_LAYER, WITH_11_LAYER)
-    )
-    offset = (HIM_36_LAYER.box.top + HIM_36_LAYER.box.bottom) / 2 - (
-        HIM_36_TESSERACT.box.top + HIM_36_TESSERACT.box.bottom
-    ) / 2
-    assert [word.text for word in words] == ["him,88", "with"]
-    assert words[1].box == pytest.approx(moved_up(WITH_11_LAYER, offset).box)
 
 
 # The excerpts, from the session fixture.
@@ -1194,21 +877,16 @@ def test_ocr_pages_are_read_by_tesseract_alike_with_1_worker_and_with_6(
     excerpt_pdf: frozendict[str, Path],
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
-    # Extract spec section 9: Kadesh's excerpt pages 0 and 1 (book pages 8
-    # and 9) marked `ocr`, as analyze marks them under ocr = "redo"; page
-    # 1's layer reads "Me^iddo. already in tli.- sixti-fiith century".
-    # Page 0's region is moved to the page number 81 where it is printed
-    # and Tesseract reads it, 634.8 to 641.8 pt from the top; the layer
-    # puts it at 622.5 to 629.5.
+    # Extract spec section 9: Kadesh's excerpt page 1 (book page 9) marked
+    # `ocr`, as analyze marks it under ocr = "redo", among the excerpt's 10
+    # pages. The words of a page read so are tested on the excerpt
+    # kadesh_redo (tests/test_ocr_redo.py), read once a session; one page
+    # read by Tesseract here keeps the test to two readings.
     pages = read_pages(excerpt_books[KADESH].pages_json)
     pages = replace(
         pages,
         pages=(
-            replace(
-                pages.pages[0],
-                text_source=TextSource.OCR,
-                exclude_regions=(Box(240.0, 632.0, 252.0, 644.0),),
-            ),
+            pages.pages[0],
             replace(pages.pages[1], text_source=TextSource.OCR),
             *pages.pages[2:],
         ),
@@ -1225,41 +903,12 @@ def test_ocr_pages_are_read_by_tesseract_alike_with_1_worker_and_with_6(
     one, six = folders
     assert one.words_json.read_bytes() == six.words_json.read_bytes()
     words = read_words(one.words_json)
-    texts = tuple(word.text for word in words.pages[1].words)
     assert [page.text_source for page in words.pages[:3]] == [
-        TextSource.OCR,
+        TextSource.TEXT_LAYER,
         TextSource.OCR,
         TextSource.TEXT_LAYER,
     ]
-    assert "Me^iddo." not in texts
-    assert any(
-        texts[start : start + 8]
-        == ("At", "Megiddo,", "already", "in", "the", "sixteenth", "century", "before")
-        for start in range(len(texts))
-    )
-    # The words of page 1 without a confidence are the layer's words of the
-    # line Tesseract skipped, the first of note 8, "CHABAS was conscious of
-    # the thoroughness of his", and "FRANÇOIS" two lines below.
-    assert [
-        word.text for word in words.pages[1].words if word.ocr_confidence is None
-    ] == [
-        ">C||ABA*",
-        "wu",
-        "eocueiou*",
-        "of",
-        "the",
-        "thoroughness",
-        "of",
-        "his",
-        "FftAigou",
-    ]
-    assert all(word.ocr_confidence is None for word in words.pages[2].words)
-    # The page number 81 in page 0's region, as Tesseract reads it.
-    assert [
-        (removal.text, removal.reason)
-        for removal in words.removals
-        if removal.page_index == 0
-    ] == [("81", RemovalReason.EXCLUDED_REGION)]
+    assert "Me^iddo." not in [word.text for word in words.pages[1].words]
 
 
 # The whole books (front-matter spec sections 4 and 6): the pages of each

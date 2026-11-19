@@ -2014,7 +2014,9 @@ _KADESH_MAP_CAPTIONS = frozendict(
         29: ("MAP", "111."),
         33: ("MAP", "IV."),
         36: ("MAP", "V."),
-        38: ("MAP", "vi."),
+        # Page 38 prints "VI.": Tesseract reads it so under ocr = "redo",
+        # the layer read "vi." (checked on the image, 19 November 2026).
+        38: ("MAP", "VI."),
         41: ("MAP", "VII."),
         45: ("MAP", "VIII."),
     }
