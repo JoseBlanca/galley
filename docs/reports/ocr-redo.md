@@ -54,3 +54,15 @@ Reviewer findings not taken: a whole-book floor of 34 linked notes (31
 is kept, and a count below 34 must be explained); asking the owner
 about junk Tesseract lines, which stay paragraphs as the layer's junk
 does today.
+
+## Work package 4: Stubbs' letter fragments
+
+Merged: 95bd376 (the rule, `structure/_fragments.py`, a new removal
+reason, a survey field saying whether the book has fragments) and
+c8d1617 (whole-book tests). On the whole books it removes 251 fragments
+from Stubbs (`earlyplantagenet01stub`) and none from Haskins, Domesday,
+Kadesh, Gierke, Turney or Haynes. Twenty of the 251, drawn at random,
+were checked on the page images at 250 dpi: all are pieces of a letter
+or of a comma. The four Stubbs excerpts lose 20 fragments, each checked
+on its image. pytest: 2,962 passed, 12 expected failures; the plan's
+whole-book tests of this work package: 7 passed.

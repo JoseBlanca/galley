@@ -231,9 +231,9 @@ Deliverables:
 
 Tasks (stream `fragments`):
 
-- [ ] 4.1 The rule and the tests of deliverable 1. Spec: structure as
+- [x] 4.1 The rule and the tests of deliverable 1. Spec: structure as
   1.1 amends it.
-- [ ] 4.2 The whole-book counts of deliverable 2.
+- [x] 4.2 The whole-book counts of deliverable 2.
 - [ ] Review of work package 4.
 
 ## 5. The measurement and the EPUBs
