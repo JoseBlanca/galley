@@ -4912,6 +4912,37 @@ text, at step 2.2 (section 2), after the stray marks and before the
 captions, so that no later rule sees it. A word in an in-page figure's
 region is figure text already.
 
+**A line of fragments.** A piece that sticks out of its word's line,
+the tail of a "y" or the dot of an "i" set high, can be a line of its
+own in `lines.json`, which the rule above, looking only inside a line,
+cannot reach: "J" under "easily," on page 24, which was read "J
+nations", and "." and "m", the dots of the "i" of "English" and
+"kings", on page 29, which were read "themselves . m English" (the
+owner's examples, 19 November 2026). So in a book with letter
+fragments, on a page that is not an index page, a line every word of
+which meets condition 1, and that no other rule removed, is removed
+whole when each of its words lies by a word of the line just above or
+just below it in the same region: a word with at least 3 letters that
+overlaps it across at least half of its width, is at least 1/1.15 of
+its height, and overlaps it in height or lies at most **1.5 pt** above
+or below it (page 29's "." sits 1.0 pt above "English"). Each of its
+words is removed with the reason `letter_fragment`, and the line is
+removed as the lines of the running heads are, so that no later rule
+sees it. Condition 3 does not apply, since the line holds nothing but
+pieces. The book's share of pages with fragments (below) is counted
+with the rule inside a line alone, as it was measured.
+
+Measured on 19 November 2026 on the `lines.json` of the seven books
+run by the plan ocr-redo: such lines hold 171 words on Stubbs' pages
+21 to 307 (147 with a gap of 0 pt, 167 with 1 pt, 175 with 2 pt and
+188 with 3 pt), each looked at on the page rendered at 250 dpi: all
+171 are a piece of a letter of the word beside them (the dot of an
+"i", the tail of a "g", "p" or "y", the top of a "d", "f", "l" or
+"k") or a speck between two lines; none is a printed word or a mark
+of punctuation. The other six books, where the rule does not run,
+hold 71 such words in Domesday, 53 in Gierke, 4 in Turney, 2 in Haynes
+and none in Haskins or Kadesh read with `ocr = "redo"`.
+
 **A book with letter fragments** is one in which at least **0.15** of
 its pages that hold 5 lines or more in all their regions, counted before
 any removal, index pages left out, have a word that the rule takes. The
@@ -5004,7 +5035,10 @@ page 236's "r Air ttt".
 24's "." inside "Swabia," removed; a word "a" over "pluralitas" whose
 top and bottom two other words of its line share (Gierke's page 225)
 kept; a fragment on an index page kept; the share of 0.15 met and
-missed; a Tesseract word of the form of a fragment kept. Excerpt tests
+missed; a Tesseract word of the form of a fragment kept; page 24's
+line "J" under "easily," and page 29's lines "." and "m" over
+"English kings," removed whole, and a line of pieces 1.6 pt from its
+word kept. Excerpt tests
 on `stubbs_51_56-64` and `stubbs_cut_in`: the fragments listed in their
 expected files removed with the reason `letter_fragment`, and their
 words whole. `stubbs_summaries_index` (0.25) and `stubbs_heads` (0.22)
