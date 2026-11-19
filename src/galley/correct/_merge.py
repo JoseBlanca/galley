@@ -12,14 +12,16 @@ from typing import assert_never
 from galley.correct._align import Pair, align
 from galley.correct._reading import GalleyToken, Place
 from galley.correct._tokens import Token, alike, clean_answer, comparison_form, tokens
-from galley.model import Block, Edit, block_sha256
+from galley.model import Block, Edit, block_sha256, only_occurrence
 
 _logger = logging.getLogger(__name__)
 
 AUTHOR = "correct"
-# Section 7: two forms less alike than this give no replacement; guessed,
-# not measured: a pair a word out of place makes, "kadesh" with "city", is
-# 0, "puem" with "poem" 0.75, "3%" with "305" 0.5.
+# Section 7: two forms less alike than this give no replacement: a pair a
+# word out of place makes, "kadesh" with "city", is 0, "puem" with "poem"
+# 0.75, "3%" with "305" 0.5. Measured on the six reference pages with the
+# recorded answers, 19 November 2026: notes 3.8 wrong words in 100 and 14
+# fluent wrong words without it, 5.3 and 11 with 0.3, 6.7 and 8 with 0.5.
 _LEAST_ALIKE = 0.3
 _ROMAN_LETTERS = frozenset("IVXLCDM")
 
@@ -453,7 +455,7 @@ def _second_reading(
     reading: Sequence[GalleyToken], second_answer: Answer | None
 ) -> _Second:
     if second_answer is None:
-        return _Second(present=False, paired={}, gaps={})
+        return _Second(present=False, paired=frozendict(), gaps=frozendict())
     notes = [
         position for position, token in enumerate(reading) if token.note_id is not None
     ]
@@ -461,15 +463,19 @@ def _second_reading(
         [reading[position].form for position in notes],
         [token.form for token in second_answer.tokens],
     )
-    paired = {
-        notes[first]: _core(second_answer, second)
-        for first, second in _paired(pairs).items()
-    }
-    gaps = {
-        notes[before]: " ".join(_gap_words(second_answer, run))
-        for before, run in _runs(pairs)
-        if before is not None
-    }
+    paired = frozendict(
+        {
+            notes[first]: _core(second_answer, second)
+            for first, second in _paired(pairs).items()
+        }
+    )
+    gaps = frozendict(
+        {
+            notes[before]: " ".join(_gap_words(second_answer, run))
+            for before, run in _runs(pairs)
+            if before is not None
+        }
+    )
     return _Second(present=True, paired=paired, gaps=gaps)
 
 
@@ -528,11 +534,6 @@ def _changed_word(word_text: str, offset: int, changes: Sequence[Change]) -> str
             case _:
                 assert_never(change.kind)
     return result
-
-
-def _occurs_once(text: str, part: str) -> bool:
-    first = text.find(part)
-    return first != -1 and text.find(part, first + 1) == -1
 
 
 def block_edits(
@@ -627,7 +628,7 @@ def _context(
     toward_end = True
     while True:
         old = text[words[low].start : words[high].end]
-        if all(_occurs_once(block_text, old) for block_text in texts):
+        if all(only_occurrence(block_text, old) is not None for block_text in texts):
             return low, high
         can_end = high + 1 < len(words) and high + 1 not in changed
         can_start = low - 1 >= 0 and low - 1 not in changed

@@ -29,12 +29,12 @@ from galley.correct._merge import (
 )
 from galley.correct._reading import GalleyToken, Place, page_reading, split_counts
 from galley.model import (
-    Block,
     BlocksFile,
     Edit,
     PageKind,
     RenderedPage,
     check_source_pdf,
+    every_block,
     read_blocks,
     read_checked_input,
     read_words,
@@ -42,7 +42,7 @@ from galley.model import (
 )
 from galley.parallel import DEFAULT_WORKERS, map_pages
 
-__all__ = ["check_server", "run"]
+__all__ = ["check_server", "edits_of", "page_png", "run", "token_cores"]
 
 _logger = logging.getLogger(__name__)
 
@@ -83,12 +83,6 @@ class _PageResult:
     cut_short: bool
 
 
-def _all_blocks(blocks: BlocksFile) -> tuple[Block, ...]:
-    return blocks.blocks + tuple(
-        block for note in blocks.notes for block in note.blocks
-    )
-
-
 def _band_top(blocks: BlocksFile, page_index: int) -> float | None:
     tops = [
         origin.box.top
@@ -100,7 +94,7 @@ def _band_top(blocks: BlocksFile, page_index: int) -> float | None:
     return min(tops) - _BAND_MARGIN_PT if tops else None
 
 
-def _png(rendered: RenderedPage, top_pt: float | None) -> bytes:
+def page_png(rendered: RenderedPage, top_pt: float | None) -> bytes:
     """The rendered page as a grayscale PNG, cut from `top_pt` down when it
     is given."""
     image = Image.frombytes(
@@ -120,7 +114,7 @@ def _read_page(config: BookConfig, work: _PageWork) -> _PageResult:
     rendered = pdfium.render(config.pdf, work.page_index, _DPI)
     what = f"page {work.page_index}"
     reading = read_image(
-        config.correct_server, config.correct_model, _png(rendered, None), what
+        config.correct_server, config.correct_model, page_png(rendered, None), what
     )
     if reading.cut_short:
         return _PageResult(work.page_index, (), cut_short=True)
@@ -129,7 +123,7 @@ def _read_page(config: BookConfig, work: _PageWork) -> _PageResult:
         second_reading: Reading = read_image(
             config.correct_server,
             config.correct_second_model,
-            _png(rendered, work.band_top),
+            page_png(rendered, work.band_top),
             f"the footnote band of {what}",
         )
         second = answer(second_reading.text)
@@ -139,15 +133,21 @@ def _read_page(config: BookConfig, work: _PageWork) -> _PageResult:
     return _PageResult(work.page_index, changes, cut_short=False)
 
 
-def _cores(blocks: BlocksFile, reading: tuple[GalleyToken, ...]) -> dict[Place, str]:
-    spans = {block.id: block.spans for block in _all_blocks(blocks)}
-    return {
-        token.place: spans[token.place.block_id][token.place.span_index].text[
-            token.place.start : token.place.end
-        ]
-        for token in reading
-        if token.place is not None
-    }
+def token_cores(
+    blocks: BlocksFile, reading: tuple[GalleyToken, ...]
+) -> frozendict[Place, str]:
+    """The core of each changeable token of `reading`, by its place: the
+    text of the token's span between its start and end."""
+    spans = {block.id: block.spans for block in every_block(blocks)}
+    return frozendict(
+        {
+            token.place: spans[token.place.block_id][token.place.span_index].text[
+                token.place.start : token.place.end
+            ]
+            for token in reading
+            if token.place is not None
+        }
+    )
 
 
 def edits_of(
@@ -158,7 +158,7 @@ def edits_of(
     by_block: dict[str, list[Change]] = {}
     for change in changes:
         by_block.setdefault(change.place.block_id, []).append(change)
-    block_by_id = {block.id: block for block in _all_blocks(blocks)}
+    block_by_id = {block.id: block for block in every_block(blocks)}
     return tuple(
         edit
         for block_id, block_changes in by_block.items()
@@ -187,7 +187,7 @@ def run(
     check_server(config)
     splits = {
         block.id: split_counts(block, words)
-        for block in _all_blocks(blocks)
+        for block in every_block(blocks)
         if len(block.origin) > 1
     }
     work = []
@@ -200,7 +200,7 @@ def run(
                 _PageWork(
                     page_index=page.index,
                     reading=reading,
-                    cores=_cores(blocks, reading),
+                    cores=token_cores(blocks, reading),
                     band_top=_band_top(blocks, page.index),
                 )
             )

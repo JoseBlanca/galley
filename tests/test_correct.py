@@ -19,7 +19,7 @@ import pytest
 from galley import correct, pdfium
 from galley.book_folder import BookFolder
 from galley.config import BookConfig, read_config
-from galley.correct import _png, edits_of
+from galley.correct import edits_of, page_png, token_cores
 from galley.correct._align import Pair, align, align_free_tail
 from galley.correct._lmstudio import (
     PROMPT,
@@ -220,17 +220,7 @@ def _changes_and_edits(
     blocks: BlocksFile, raw: str, second: str | None = None
 ) -> tuple[Edit, ...]:
     reading = page_reading(blocks, 1, {})
-    cores = {
-        token.place: next(
-            b
-            for b in (*blocks.blocks, *(x for n in blocks.notes for x in n.blocks))
-            if b.id == token.place.block_id
-        )
-        .spans[token.place.span_index]
-        .text[token.place.start : token.place.end]
-        for token in reading
-        if token.place is not None
-    }
+    cores = token_cores(blocks, reading)
     changes = page_changes(
         1, reading, answer(raw), cores, None if second is None else answer(second)
     )
@@ -481,17 +471,7 @@ def _kadesh_page_11(second: bool) -> tuple[BlocksFile, tuple[Edit, ...]]:
     on_page_10 = len(tokens(text[: text.index("(Newaey.")]))
     splits = {first.id: (on_page_10, len(tokens(text)) - on_page_10)}
     reading = page_reading(blocks, 11, splits)
-    every = {
-        block.id: block
-        for block in (*blocks.blocks, *(b for n in blocks.notes for b in n.blocks))
-    }
-    cores = {
-        token.place: every[token.place.block_id]
-        .spans[token.place.span_index]
-        .text[token.place.start : token.place.end]
-        for token in reading
-        if token.place is not None
-    }
+    cores = token_cores(blocks, reading)
     raw = (FIXTURES / "kadesh_p011_35b.txt").read_text(encoding="utf-8")
     second_answer = (
         answer((FIXTURES / "kadesh_p011_27b_band.txt").read_text(encoding="utf-8"))
@@ -810,8 +790,8 @@ def _recorded_answers(pdf: Path) -> dict[str, str]:
     answers = {}
     for path in sorted((FIXTURES / KADESH_REDO).glob("p*.txt")):
         page = int(path.stem[1:])
-        answers[_image_key(_png(pdfium.render(pdf, page, 300), None))] = path.read_text(
-            encoding="utf-8"
+        answers[_image_key(page_png(pdfium.render(pdf, page, 300), None))] = (
+            path.read_text(encoding="utf-8")
         )
     return answers
 
@@ -873,17 +853,11 @@ def test_lm_studio_reads_kadesh_page_11_and_its_edits_fix_the_note(
         block.id: block
         for block in (*blocks.blocks, *(b for n in blocks.notes for b in n.blocks))
     }
-    cores = {
-        token.place: every[token.place.block_id]
-        .spans[token.place.span_index]
-        .text[token.place.start : token.place.end]
-        for token in reading
-        if token.place is not None
-    }
+    cores = token_cores(blocks, reading)
     raw = read_image(
         config.correct_server,
         MODEL,
-        _png(pdfium.render(config.pdf, 3, 300), None),
+        page_png(pdfium.render(config.pdf, 3, 300), None),
         "page 3",
     )
     edits = edits_of(blocks, page_changes(3, reading, answer(raw.text), cores), MODEL)

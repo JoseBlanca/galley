@@ -1802,6 +1802,23 @@ def block_text(block: Block) -> str:
     return "".join(span.text for span in block.spans)
 
 
+def every_block(blocks: BlocksFile) -> tuple[Block, ...]:
+    """The blocks of the body, then those of every note, in their order."""
+    return blocks.blocks + tuple(
+        block for note in blocks.notes for block in note.blocks
+    )
+
+
+def only_occurrence(text: str, part: str) -> int | None:
+    """Where `part` starts in `text` when it occurs there exactly once,
+    overlapping occurrences counted; None otherwise and for an empty
+    `part`. An edit's `old` must occur so (architecture section 10)."""
+    first = text.find(part)
+    if part == "" or first == -1 or text.find(part, first + 1) != -1:
+        return None
+    return first
+
+
 def note_places(
     block_first_pages: Sequence[int | None], note_first_pages: Sequence[int]
 ) -> tuple[int, ...]:

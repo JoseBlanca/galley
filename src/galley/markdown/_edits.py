@@ -9,7 +9,16 @@ from pathlib import Path
 
 from galley.book_folder import BookFolder
 from galley.errors import EditError
-from galley.model import Block, BlocksFile, Edit, Span, block_sha256, read_edits
+from galley.model import (
+    Block,
+    BlocksFile,
+    Edit,
+    Span,
+    block_sha256,
+    every_block,
+    only_occurrence,
+    read_edits,
+)
 
 # Architecture section 10: correct's file first, the owner's last.
 _CORRECT = "correct.jsonl"
@@ -55,23 +64,9 @@ def read_edits_files(folder: BookFolder) -> tuple[FiledEdit, ...]:
     )
 
 
-def _all_blocks(blocks: BlocksFile) -> tuple[Block, ...]:
-    return blocks.blocks + tuple(
-        block for note in blocks.notes for block in note.blocks
-    )
-
-
-def _occurs_once(text: str, part: str) -> int | None:
-    """Where `part` starts in `text` when it occurs there exactly once."""
-    first = text.find(part)
-    if part == "" or first == -1 or text.find(part, first + 1) != -1:
-        return None
-    return first
-
-
 def _applied(spans: tuple[Span, ...], edit: Edit) -> tuple[Span, ...] | _Broken:
     """The spans with the edit made, or the rule it breaks (3 or 4)."""
-    start = _occurs_once("".join(span.text for span in spans), edit.old)
+    start = only_occurrence("".join(span.text for span in spans), edit.old)
     if start is None:
         return _Broken.NOT_ONCE
     offset = 0
@@ -97,7 +92,7 @@ def apply_edits(blocks: BlocksFile, edits: Sequence[FiledEdit]) -> BlocksFile:
     so far, inside one span that is not a note reference; then `old`
     becomes `new` in that span. Raises EditError listing every edit that
     does not apply, with its file, line and the rule it breaks."""
-    originals = {block.id: block for block in _all_blocks(blocks)}
+    originals = {block.id: block for block in every_block(blocks)}
     spans = {block_id: block.spans for block_id, block in originals.items()}
     failures = []
     for filed in edits:
