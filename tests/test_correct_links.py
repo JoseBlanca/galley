@@ -422,3 +422,14 @@ def test_a_refused_link_brings_back_galleys_link_and_refuses_the_next() -> None:
         _link(block, "Lenormant", "n-p0009-002", "5", "Lenormant,"),
     )
     assert link_edits(page, links, (), (), MODEL) == ()
+
+
+def test_an_edit_whose_old_text_holds_a_link_is_a_plain_edit() -> None:
+    # Section 10: a link edit's old text holds no link; this one changes
+    # text that happens to look like one.
+    block = _block("b-p0008-002", _span("see [3](#n-p0008-004) here"))
+    page = _blocks((block,), PAGE.notes)
+    applied = apply_edits(
+        page, [_filed("see [3](#n-p0008-004)", "see [4](#n-p0008-004)", block)]
+    )
+    assert applied.blocks[0].spans == (_span("see [4](#n-p0008-004) here"),)

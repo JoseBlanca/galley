@@ -385,6 +385,13 @@ def test_a_galley_word_glued_from_two_takes_the_models_two_words(
             "see Vol. I, DINDORF-\nMÜLLER, Vol. I",
             [("Dirporr- MCiuer,", "Dindorf-M\u00fcller,")],
         ),
+        # The first half pairs with a word of the model's: it stays, and
+        # the second half alone is replaced.
+        (
+            "kings in such cam- P#@igns was first",
+            "kings in such cam\ncam-\npaigns was first",
+            [("P#@igns", "campaigns")],
+        ),
         # The model printed the word whole: galley's hyphen is left alone.
         (
             "kings in such cam- P#@igns was first",
@@ -399,7 +406,13 @@ def test_a_galley_word_glued_from_two_takes_the_models_two_words(
             [("(Newaey.", "(Neuag.")],
         ),
     ],
-    ids=["second_half_misread", "small_capitals", "printed_whole", "not_the_same_word"],
+    ids=[
+        "second_half_misread",
+        "small_capitals",
+        "first_half_paired",
+        "printed_whole",
+        "not_the_same_word",
+    ],
 )
 def test_a_word_split_at_a_line_end_is_replaced_whole(
     galley: str, model: str, expected: list[tuple[str, str]]
