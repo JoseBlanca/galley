@@ -66,3 +66,30 @@ were checked on the page images at 250 dpi: all are pieces of a letter
 or of a comma. The four Stubbs excerpts lose 20 fragments, each checked
 on its image. pytest: 2,962 passed, 12 expected failures; the plan's
 whole-book tests of this work package: 7 passed.
+
+## Work package 2: redo in analyze and extract
+
+Merged: 5da0f3c (analyze accepts redo and marks text pages `ocr`; the
+command stops before analyze or extract when Tesseract is missing),
+9464243 (extract reads `ocr` pages with Tesseract, and a page where
+Tesseract finds no word keeps the layer's; Kadesh's whole-book config
+uses redo and leaves out page 74, the library's card pocket), 57af8f1
+(the excerpt's excluded region moved to where Tesseract boxes page 0's
+"81").
+
+Kadesh's body, share of unknown words (words of 2 letters or more): the
+layer 0.0587 (940 of 16,020), redo 0.0570 (973 of 17,067); in the
+paragraphs 0.0543 to 0.0517; in the notes 0.173 to 0.126. Redo reads
+1,047 more words.
+
+**Not met yet**: 3 of Kadesh's 19 whole-book tests fail under redo, and
+go to work package 3. Tesseract misreads the notes' own markers ("Sin"
+for "⁵In"), so pages 9, 25, 27, 33, 41 and 50 lose their footnotes
+(pages with footnotes 40 to 35), and on pages 9 and 25 two note columns
+merge into one line; Tesseract reads the map caption "MAP III." as
+"ILL." and misses "MAP V". Work package 3 takes the notes' markers from
+the layer as it does the references in the text.
+
+After the merge: ruff and ty pass; pytest 2,979 passed, 8 expected
+failures, in 73 s, over the minute: two excerpt tests run Tesseract
+(about 6 s each). Task 5.1 looks at it.

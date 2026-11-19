@@ -189,9 +189,9 @@ Deliverables:
 
 Tasks (stream `redo`):
 
-- [ ] 2.1 analyze: redo accepted, text pages marked `ocr`, Tesseract
+- [x] 2.1 analyze: redo accepted, text pages marked `ocr`, Tesseract
   required. Spec: architecture §7b as amended.
-- [ ] 2.2 extract: Tesseract's words on OCR pages, the layer's words as
+- [x] 2.2 extract: Tesseract's words on OCR pages, the layer's words as
   removal records where the spec says; the tests of deliverables 1, 2
   and 4; the whole-book config of Kadesh with redo and deliverable 3.
 - [ ] Review of work package 2.
@@ -212,7 +212,12 @@ Tasks (stream `redo`, after 2.2):
 
 - [ ] 3.1 The note-marker rule of item 2. Spec: as 1.1 places it.
 - [ ] 3.2 The heading rule of item 3, and figure text under redo.
-- [ ] 3.3 The whole-book counts of deliverable 2.
+- [ ] 3.3 (added after work package 2) The notes' own markers under
+  redo: Tesseract misreads them ("Sin" for "⁵In"), so Kadesh pages 9,
+  25, 27, 33, 41 and 50 lose their footnotes; take them from the layer as
+  3.1 does the references, and keep two note columns apart (pages 9,
+  25). The map captions "MAP III." and "MAP V" (`test_figures.py`).
+- [ ] 3.4 The whole-book counts of deliverable 2.
 - [ ] Review of work package 3.
 
 ## 4. Stubbs' letter fragments
