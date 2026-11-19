@@ -293,3 +293,54 @@ Gierke, not an evaluation book, counted from its blocks: notes 302 to
 373, of which on the introduction's pages 1 to 62; references in the
 text 208 to 274; notes without a reference 94 to 99; quotes 24 to 0
 (task 5.2 looks at why).
+
+## Task 5.2: the checks by eye
+
+A subagent compared the Markdown of the eight books with the page
+images, on the pages of each rule.
+
+Right: the four inkless pages are gone and the text around them whole;
+the running heads of Kadesh 38, Domesday 200 and 552, Gierke 16 and 84
+are gone; the footnotes of Gierke 15, 16, 30 and 146 and the one-line
+notes of Domesday 55, 163, 174, 185, 278 and 303 are notes, "servus*"
+linked; Stubbs' notes on pages 19, 37, 56, 97, 102, 120, 177 and 236
+are margin notes, whole on 19, 97 and 120; Turney's contents is as on
+main. Gierke's 24 quote blocks of main were all footnotes and are notes
+now; no real quotation was lost.
+
+Made worse by this plan, and fixed (742590a to de04d09):
+
+- **Domesday 428** lost its heading "AVERAGES.", glued to the table of
+  page 427, and kept its signature mark "26—2". Now layout makes the
+  table a band, so the body of the page is that one line; structure §14
+  lets a line of a page with fewer than 5 body lines be flush left
+  between the sides of the body and the band, and §4 takes a signature
+  mark from the line above the lowest when the lowest is nothing to
+  remove. Domesday 426's "STATISTICS." became a heading by the same
+  rule.
+- **Domesday 552**, an index page, had its two columns broken at the
+  bottom. On a page whose every row is small, body runs now end where a
+  band's runs may (layout §3, steps 4 and 5).
+- **Gierke 38**'s signature mark "M. c" (already a junk quote on main)
+  was a footnote with a reference. §4 now also takes a capital with a
+  full stop followed far to the right by a word. Signature marks are
+  also removed on Domesday 234 and Gierke 54, 70 and 246.
+
+These fixes change no other page of the eight books for the worse; the
+pages that change were each looked at.
+
+**Still wrong**, for later plans:
+
+- **Gierke's footnote links.** The introduction's notes are notes, but
+  some references go to the wrong one: on page 36 "incorporation²"
+  links note 3 and note 2 has none; on 31 note 1 is cut in two at
+  "(2)" and two references link one note too early; on 50, 109 and 147
+  a reference is not linked. Before this plan these notes were quotes
+  in the text with no links at all.
+- **Stubbs' body** still holds junk of the margin notes beside it, most
+  of it as on main: "an epoch v which" (19), "they were j-j^ too anc j
+  earnest" (37), "chaplains, r and" (56), a scrambled line order on 97,
+  a note cut in two on 102 ("Coronation of the youpg" in the body), "re_"
+  on 120, garble on 236.
+- Pencil specks become margin notes inside footnotes on Gierke 36 and
+  147, and a margin note "^" on Gierke 30.
