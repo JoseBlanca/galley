@@ -93,3 +93,48 @@ the layer as it does the references in the text.
 After the merge: ruff and ty pass; pytest 2,979 passed, 8 expected
 failures, in 73 s, over the minute: two excerpt tests run Tesseract
 (about 6 s each). Task 5.1 looks at it.
+
+## Review of work packages 1, 2 and 4
+
+Three reviewers (spec; fidelity and tests; conventions) read
+9292b17..1f4e9fc. The one finding that mattered: **under redo, printed
+lines were lost without a record.** Tesseract skips some lines the layer
+has (Kadesh pages 11, 52, 53, and the caption "MAP V"), and extract
+kept only Tesseract's words. Decided and fixed in work package 3 (below):
+a layer word that no Tesseract word covers is kept in its place.
+Letter fragments: 251 on Stubbs, 7 of the riskiest checked again on the
+images, all pieces of letters. The smaller findings (stale wording in
+the command module, a second letter-count helper, a stale count of
+Kadesh's text pages, excluded regions drawn on the layer's boxes, which
+under redo can miss a word Tesseract places elsewhere) are fixed after
+the review of work package 3.
+
+## Work package 3: notes, headings and captions under redo, and lost lines
+
+Commits 3c1fe42 to 968b83b, spec commits first. On whole Kadesh with
+redo, against the layer:
+
+| | layer | redo before | redo now |
+|---|---|---|---|
+| linked notes | 31 | 2 | 42 |
+| headings | 3 | 15 | 3 (pages 8, 39, 66) |
+| pages with footnotes | 40 | 35 | 42 |
+
+- Note references: a Tesseract word takes the layer's reference or
+  caption numeral under it (61 words).
+- Footnotes: they were lost not through their markers but because
+  Tesseract boxes some words as tall as their line, so a note's type no
+  longer looked small (page 9's notes 9.12 pt against a body of 7.92).
+  Each Tesseract word now takes the height of the layer word under it.
+- Junk headings: a line at least half of Tesseract's words is judged on
+  those, and a median confidence below 60 keeps it from being a heading.
+- **Lost lines:** a layer word that no Tesseract word covers is kept,
+  after the layer's boxes are shifted by the page's offset from
+  Tesseract's; 79 words kept on the book, 55 of them printed text, the
+  rest junk the layer had. Pages 9, 11, 15, 52 and 53 regain their lines.
+- Map captions: the layer's numeral is taken after "MAP", "figure" or
+  "plate" when Tesseract's has no digit ("Y." for "V.").
+
+Not done: on page 25 Tesseract joins two footnote columns into one line,
+and that note stays merged. `pytest -m whole_book -k kadesh`: 22 passed;
+pytest 3,015 passed, 6 expected failures, in 78 s.

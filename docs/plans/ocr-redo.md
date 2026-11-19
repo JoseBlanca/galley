@@ -83,8 +83,7 @@ Out: Mariéjol's text; italics and small caps under redo (Tesseract
 misreads small caps, "Breastep"; the layer too); Stubbs' garble the
 fragment rule does not fix (page 37 "j-j^ too anc j", a misreading;
 page 97, two rows merged by the layer; pages 102 and 120, notes cut by
-the column; page 236's "r Air ttt"); faint Kadesh page 69, where
-Tesseract finds no word (it keeps the layer's); a test of which books
+the column; page 236's "r Air ttt");  a test of which books
 want redo (only Kadesh does: on 10 pages each of the other books the
 layer is as good as Tesseract, within 0.02 of the share of known
 words).
@@ -167,7 +166,7 @@ Tasks:
   then the two subagents.
 - [x] 1.2 The excerpt and its expected files (deliverable 2).
 - [x] 1.3 Titles and Mariéjol (deliverables 3 and 4).
-- [ ] Review of work package 1 (with work package 2).
+- [x] Review of work package 1 (with work package 2).
 
 ## 2. Redo in analyze and extract
 
@@ -194,7 +193,7 @@ Tasks (stream `redo`):
 - [x] 2.2 extract: Tesseract's words on OCR pages, the layer's words as
   removal records where the spec says; the tests of deliverables 1, 2
   and 4; the whole-book config of Kadesh with redo and deliverable 3.
-- [ ] Review of work package 2.
+- [x] Review of work package 2.
 
 ## 3. Note markers and headings under redo
 
@@ -210,14 +209,14 @@ Deliverables:
 
 Tasks (stream `redo`, after 2.2):
 
-- [ ] 3.1 The note-marker rule of item 2. Spec: as 1.1 places it.
-- [ ] 3.2 The heading rule of item 3, and figure text under redo.
-- [ ] 3.3 (added after work package 2) The notes' own markers under
+- [x] 3.1 The note-marker rule of item 2. Spec: as 1.1 places it.
+- [x] 3.2 The heading rule of item 3, and figure text under redo.
+- [x] 3.3 (added after work package 2) The notes' own markers under
   redo: Tesseract misreads them ("Sin" for "⁵In"), so Kadesh pages 9,
   25, 27, 33, 41 and 50 lose their footnotes; take them from the layer as
   3.1 does the references, and keep two note columns apart (pages 9,
   25). The map captions "MAP III." and "MAP V" (`test_figures.py`).
-- [ ] 3.4 The whole-book counts of deliverable 2.
+- [x] 3.4 The whole-book counts of deliverable 2.
 - [ ] Review of work package 3.
 
 ## 4. Stubbs' letter fragments
@@ -239,7 +238,7 @@ Tasks (stream `fragments`):
 - [x] 4.1 The rule and the tests of deliverable 1. Spec: structure as
   1.1 amends it.
 - [x] 4.2 The whole-book counts of deliverable 2.
-- [ ] Review of work package 4.
+- [x] Review of work package 4.
 
 ## 5. The measurement and the EPUBs
 
