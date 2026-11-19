@@ -145,20 +145,21 @@ def test_hyphen_read_as_a_sign_is_joined_on_evidence(
 
 
 @pytest.mark.parametrize(
-    ("first", "second"),
+    ("first", "second", "word_list"),
     [
-        ("justice*", "or"),  # a reference: "justiceor" is no word
-        ("aggres*", "Sive"),  # a capital
-        ("C*", "omes"),  # one letter before the sign
-        ("aggres-", "sive"),  # a hyphen, join_hyphen's
-        ("aggres**", "sive"),  # two signs
-        ("aggres*", "sive"),  # no evidence: the word list below is empty
+        # Each case but the last two has the word the join would make in
+        # its word list, so that it fails on its own guard.
+        ("aggres*", "Sive", _WORD_LIST),  # a capital: "aggresSive"
+        ("C*", "omes", frozenset({"comes"})),  # one letter before the sign
+        ("aggres-", "sive", _WORD_LIST),  # a hyphen, join_hyphen's
+        ("aggres**", "sive", frozenset({"aggres*sive"})),  # two signs
+        ("justice*", "or", _WORD_LIST),  # a reference: "justiceor" is no word
+        ("aggres*", "sive", frozenset()),  # no evidence
     ],
 )
 def test_sign_at_a_line_end_without_evidence_is_not_joined(
-    first: str, second: str
+    first: str, second: str, word_list: frozenset[str]
 ) -> None:
-    word_list = frozenset() if first == "aggres*" and second == "sive" else _WORD_LIST
     assert join_sign_hyphen(first, second, frozenset(), word_list) is None
 
 
