@@ -154,16 +154,19 @@ def edits_of(
     blocks: BlocksFile, changes: tuple[Change, ...], model: str
 ) -> tuple[Edit, ...]:
     """The edits of `changes`, in page order and, on a page, in the order of
-    galley's reading: each block's edits come where its first change is."""
+    galley's reading (section 8): a block's edits come where its first
+    change is, and those of a block printed on two pages on each page."""
     by_block: dict[str, list[Change]] = {}
     for change in changes:
         by_block.setdefault(change.place.block_id, []).append(change)
     block_by_id = {block.id: block for block in every_block(blocks)}
-    return tuple(
+    edits = (
         edit
         for block_id, block_changes in by_block.items()
         for edit in block_edits(block_by_id[block_id], block_changes, model)
     )
+    # A stable sort: on a page the order of the reading stays.
+    return tuple(sorted(edits, key=lambda edit: edit.page_index or 0))
 
 
 def run(

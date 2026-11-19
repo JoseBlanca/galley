@@ -42,6 +42,7 @@ from galley.model import (
     Note,
     NoteKind,
     Origin,
+    PageKind,
     PageWords,
     Removal,
     RemovalReason,
@@ -53,6 +54,7 @@ from galley.model import (
     block_text,
     read_blocks,
     read_edits,
+    read_pages,
     read_words,
 )
 
@@ -596,13 +598,16 @@ def test_an_edit_that_breaks_a_rule_is_an_error_naming_file_line_and_rule(
 class _FakeLmStudio:
     """A stand-in for LM Studio on localhost: it lists `models` and answers
     each page from `answers`, by the SHA-256 of the image it is sent, or
-    with `status` when that is not 200."""
+    with `status` when that is not 200. An image it has no answer for takes
+    the first answer of `in_order`, which is then its answer: the answers
+    of a run with one worker, in the order of its requests."""
 
     models: tuple[str, ...]
     answers: dict[str, str] = field(default_factory=dict)
     finish: str = "stop"
     status: int = 200
     redirect: str | None = None
+    in_order: list[str] = field(default_factory=list)
     bodies: list[dict[str, object]] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -643,7 +648,11 @@ def _handler(fake: _FakeLmStudio) -> type[BaseHTTPRequestHandler]:
                 return
             url = body["messages"][0]["content"][1]["image_url"]["url"]
             png = base64.b64decode(url.removeprefix("data:image/png;base64,"))
-            text = fake.answers.get(_image_key(png), "")
+            key = _image_key(png)
+            with fake.lock:
+                if key not in fake.answers and fake.in_order:
+                    fake.answers[key] = fake.in_order.pop(0)
+                text = fake.answers.get(key, "")
             self._send(
                 200,
                 {
@@ -669,7 +678,9 @@ def lm_studio() -> Iterator[Callable[..., tuple[_FakeLmStudio, str]]]:
     ) -> tuple[_FakeLmStudio, str]:
         fake = _FakeLmStudio(models, finish=finish, status=status, redirect=redirect)
         server = ThreadingHTTPServer(("127.0.0.1", 0), _handler(fake))
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        threading.Thread(
+            target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True
+        ).start()
         servers.append(server)
         return fake, f"http://127.0.0.1:{server.server_address[1]}"
 
@@ -786,21 +797,37 @@ def _excerpt_folder(
     return folder, read_config(folder.book_toml)
 
 
-def _recorded_answers(pdf: Path) -> dict[str, str]:
-    answers = {}
-    for path in sorted((FIXTURES / KADESH_REDO).glob("p*.txt")):
-        page = int(path.stem[1:])
-        answers[_image_key(page_png(pdfium.render(pdf, page, 300), None))] = (
-            path.read_text(encoding="utf-8")
-        )
-    return answers
+def _recorded_answers(folder: BookFolder) -> list[str]:
+    """The recorded answers of the excerpt's text pages, in page order: the
+    order of the requests of a run with one worker."""
+    pages = read_pages(folder.pages_json)
+    return [
+        (FIXTURES / KADESH_REDO / f"p{page.index:03d}.txt").read_text(encoding="utf-8")
+        for page in pages.pages
+        if page.kind is PageKind.TEXT
+    ]
 
 
-# Renders with PDFium, and the run is about 10 s.
+# The excerpt's literal edits, checked by eye against the page images and
+# the recorded answers: the two halves of the paragraph b-p0001-001, which
+# runs from excerpt page 1 to page 2, and the note of page 3 (Kadesh's 11).
+EXCERPT_EDITS = (
+    ("b-p0001-001", 1, "Brugsech", "Brugsch"),
+    ("b-p0001-001", 2, "Maller\u2019s", "M\u00fcller's"),
+    ("b-p0003-003", 3, "Masrvuo's", "Maspero's"),
+    ("b-p0003-003", 3, "puem", "poem"),
+)
+# The number of edits on the excerpt with the recorded answers, so that a
+# change of the rules shows: without the split of a block printed on two
+# pages the stage made about 230 more (review of 19 November 2026).
+EXCERPT_EDIT_COUNT = 477
+
+
+# Renders with PDFium.
 @pytest.mark.thread_unsafe
 @pytest.mark.tesseract
 @pytest.mark.pandoc
-def test_excerpt_edits_are_the_same_with_1_and_8_workers_and_markdown_applies_them(
+def test_excerpt_edits_are_the_same_with_1_and_2_workers_and_markdown_applies_them(
     tmp_path: Path,
     redo_excerpt_run: Callable[[str], BookFolder],
     lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
@@ -809,19 +836,23 @@ def test_excerpt_edits_are_the_same_with_1_and_8_workers_and_markdown_applies_th
 
     fake, server = lm_studio()
     written = {}
-    for workers in (1, 8):
+    for workers in (1, 2):
         folder, config = _excerpt_folder(
             tmp_path / str(workers), redo_excerpt_run, server
         )
-        if not fake.answers:
-            fake.answers.update(_recorded_answers(config.pdf))
+        if workers == 1:
+            fake.in_order.extend(_recorded_answers(folder))
         correct.run(folder, config, workers=workers)
         written[workers] = folder.correct_jsonl.read_bytes()
-    assert written[1] == written[8]
+    assert written[1] == written[2]
+    assert fake.in_order == []
     edits = read_edits(folder.correct_jsonl)
-    assert len(edits) > 100
+    assert len(edits) == EXCERPT_EDIT_COUNT
     assert {edit.author for edit in edits} == {"correct"}
-    assert ("puem", "poem") in {(edit.old, edit.new) for edit in edits}
+    pages = [edit.page_index for edit in edits]
+    assert pages == sorted(pages)
+    found = {(edit.block_id, edit.page_index, edit.old, edit.new) for edit in edits}
+    assert set(EXCERPT_EDITS) <= found
     markdown.run(folder, config)
     assert "a poem in rhymed" in folder.book_md.read_text(encoding="utf-8")
 
