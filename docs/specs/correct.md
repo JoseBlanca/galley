@@ -529,7 +529,9 @@ first, had the model copy the example onto a page that does not print it.
   as digits. With it go the words before it in its line, the last three,
   and the word after it, the marks of other references taken out. A
   reference with no word before it in its line gives nothing;
-- a line that holds no reference and is "NOTE" or nothing, then 1 to 3
+- a line that gives no reference (a mark with no word before it, as the
+  raised number that starts a note copied whole, gives none) and is
+  "NOTE" or nothing, then 1 to 3
   digits or "*", "†", "‡", then any of space, comma, full stop, colon or
   "|", then text, is a **note line**: the note's number and its first
   words. The model writes the note lines in other forms than asked
@@ -575,9 +577,16 @@ A link is not proposed, and is logged, when:
 
 - the stage's word edits (section 7) change that word: each edit must
   apply whether or not the others do;
+- a reference span follows the word after white space (";13" in
+  "14) ;13" on page 10): the link would stand beside galley's;
 - after all the links of the book, its note would have a reference from
   galley that no link of the stage takes the place of: a footnote is
-  referenced once (markdown refuses two);
+  referenced once (markdown refuses two). Refusing a link brings back
+  the reference of galley's it would have taken the place of, so this is
+  checked again until no link is refused: on page 9, "Lenormant," to
+  note 5 is refused while galley links note 5 from "Chabas", and then
+  "Salvolini" to note 4 too, since galley's "Lenormant," to note 4
+  stays;
 - two links of the book go to the same note: neither is proposed.
 
 **The edit.** `reason` `"vision_note_link"`; `old` galley's word, with
