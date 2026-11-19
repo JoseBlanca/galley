@@ -111,7 +111,9 @@ default, so that a book needs none of them; they are checked whatever
 ## 4. Calling LM Studio
 
 Every request goes to `correct_server`, over HTTP with the standard
-library's `urllib`, and to no other host.
+library's `urllib`, and to no other host: not through a proxy, though the
+environment names one (`http_proxy`, which `urllib` follows by default),
+and not to the address of a redirect, which is an error.
 
 **Before any page.** The stage asks `GET <server>/v1/models`, with a
 timeout of 10 s, and checks that `correct_model` (and
@@ -309,6 +311,31 @@ From the pairs:
   lower when galley's core starts with a capital, all lower otherwise.
   So "Masrvuo's" becomes "Maspero's". The measurement's scoring folds
   case, so this rule changes none of its numbers.
+
+  A pair that may hold more printed words on galley's side than on the
+  model's gives no replacement, since replacing it would lose a word
+  (review of 19 November 2026: about 40 such edits in the Kadesh run,
+  "542,543.)" made "543.)", "fiveminutes." made "minutes.", "12-18)."
+  made "18)."). That is when galley's core has (a) more commas, full stops,
+  hyphens or en dashes between two letters or digits than the model's
+  core; or (b) more digits than the model's core; or (c) more letters and
+  digits than the model's core while the model's token just before or
+  just after the paired one pairs with nothing, the model's reading of
+  the word galley glued. Junk inside a word is not such a mark:
+  "maje=ty," still becomes "majesty,".
+- **A block whose words are out of place.** When galley's reading of a
+  block on a page is in another order than the model's, the alignment
+  pairs words that have nothing to do with each other, and each such pair
+  can pass the 0.3 limit by chance between short words ("his" with
+  "Mashawasha", 0.31). Such a block part shows it in the mean likeness of
+  its unequal pairs: on Kadesh's page 14, from the notes' blocks
+  b-p0014-005 to b-p0014-011, 0.00 to 0.19; on the six pages of the
+  measurement, 0.36 to 0.93 but for one block of page 27 at 0.22, whose
+  six pairs are the rotated "Kadesh" with "city" (measured with the
+  recorded answers, 19 November 2026). So when a block's unequal pairs on
+  a page are 3 or more and their mean likeness is below 0.3, the stage
+  makes no edit in that block on that page, neither replacement nor
+  insertion, and logs it.
 - **An insertion**: a run of the model's tokens that pair with none of
   galley's, inside a note: the galley token before the run is a token of
   the note (its marker or a word of its blocks), and the one after is a
@@ -325,11 +352,17 @@ From the pairs:
   note. The run goes after or before the whole word, with its
   punctuation: "the." and "Bulletin" give "the. Bulletin". When the note
   has no word the stage may change, the run is not put in, and the stage
-  logs it. A run elsewhere, in the body, before the page's first
-  token or after its last, is not put in: there it is page numbers and
-  running heads.
-- A pair with a fixed token, a pair less alike than 0.3, and a galley
-  token paired with nothing, give nothing: galley's word stays.
+  logs it. A run of two words or more that galley's reading of the page
+  already holds, the same words one after the other, is not put in: it is
+  the model reading a line twice or the alignment placing a line of
+  another block there (page 32 "Read the above is a typographical error"
+  in its note twice; page 51 words of the body put into note 132). A run
+  elsewhere, in the body, before the page's first token or after its
+  last, is not put in: there it is page numbers and running heads.
+- A pair with a fixed token, a pair less alike than 0.3, a pair that may
+  hold more words on galley's side, a pair in a block whose words are out
+  of place, and a galley token paired with nothing, give nothing:
+  galley's word stays.
 
 What the stage never changes, whatever the model reads: a note marker, a
 note reference, a heading's label, an epigraph's source, a contents
@@ -491,7 +524,7 @@ The check `cli.py` makes before any stage when a command runs correct:
 ```python
 def check_server(config: BookConfig) -> None:
     """ExternalProgramError when LM Studio's server at config.correct_server
-    does not answer, or lists config.correct_model or, when given,
+    does not answer, or does not list config.correct_model or, when given,
     config.correct_second_model among its models."""
 ```
 
