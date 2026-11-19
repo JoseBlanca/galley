@@ -18,7 +18,8 @@ from PIL import Image
 from galley import pdfium
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
-from galley.correct._lmstudio import Reading, check_models, read_image
+from galley.correct._links import Link, link_answer, link_edits, page_links
+from galley.correct._lmstudio import LINKS_PROMPT, Reading, check_models, read_image
 from galley.correct._merge import (
     Answer,
     Change,
@@ -31,6 +32,7 @@ from galley.correct._reading import GalleyToken, Place, page_reading, split_coun
 from galley.model import (
     BlocksFile,
     Edit,
+    Note,
     PageKind,
     RenderedPage,
     check_source_pdf,
@@ -81,6 +83,7 @@ class _PageWork:
     reading: tuple[GalleyToken, ...]
     cores: Mapping[Place, str]
     band_top: float | None
+    notes: tuple[Note, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +91,8 @@ class _PageResult:
     page_index: int
     changes: tuple[Change, ...]
     cut_short: bool
+    links: tuple[Link, ...] = ()
+    links_cut_short: bool = False
 
 
 def footnote_band_top(blocks: BlocksFile, page_index: int) -> float | None:
@@ -119,27 +124,48 @@ def page_png(rendered: RenderedPage, top_pt: float | None) -> bytes:
 
 def _read_page(config: BookConfig, work: _PageWork) -> _PageResult:
     """Render the page, have the model read it (and the second model its
-    footnote band), and make its changes."""
+    footnote band), and make its changes; on a page where a note starts,
+    have the model mark the note references too (section 9b)."""
     rendered = pdfium.render(config.pdf, work.page_index, _DPI)
+    png = page_png(rendered, None)
     what = f"page {work.page_index}"
-    reading = read_image(
-        config.correct_server, config.correct_model, page_png(rendered, None), what
-    )
-    if reading.cut_short:
-        return _PageResult(work.page_index, (), cut_short=True)
-    second: Answer | None = None
-    if config.correct_second_model is not None and work.band_top is not None:
-        second_reading: Reading = read_image(
-            config.correct_server,
-            config.correct_second_model,
-            page_png(rendered, work.band_top),
-            f"the footnote band of {what}",
+    reading = read_image(config.correct_server, config.correct_model, png, what)
+    changes: tuple[Change, ...] = ()
+    if not reading.cut_short:
+        second: Answer | None = None
+        if config.correct_second_model is not None and work.band_top is not None:
+            second_reading: Reading = read_image(
+                config.correct_server,
+                config.correct_second_model,
+                page_png(rendered, work.band_top),
+                f"the footnote band of {what}",
+            )
+            second = answer(second_reading.text)
+        changes = page_changes(
+            work.page_index, work.reading, answer(reading.text), work.cores, second
         )
-        second = answer(second_reading.text)
-    changes = page_changes(
-        work.page_index, work.reading, answer(reading.text), work.cores, second
+    links: tuple[Link, ...] = ()
+    links_cut_short = False
+    if work.notes:
+        marked = read_image(
+            config.correct_server,
+            config.correct_model,
+            png,
+            f"the note references of {what}",
+            LINKS_PROMPT,
+        )
+        links_cut_short = marked.cut_short
+        if not marked.cut_short:
+            links = page_links(
+                work.page_index, work.reading, work.notes, link_answer(marked.text)
+            )
+    return _PageResult(
+        work.page_index,
+        changes,
+        cut_short=reading.cut_short,
+        links=links,
+        links_cut_short=links_cut_short,
     )
-    return _PageResult(work.page_index, changes, cut_short=False)
 
 
 def token_cores(
@@ -214,13 +240,33 @@ def run(
                     reading=reading,
                     cores=token_cores(blocks, reading),
                     band_top=footnote_band_top(blocks, page.index),
+                    notes=tuple(
+                        note
+                        for note in blocks.notes
+                        if note.origin and note.origin[0].page_index == page.index
+                    ),
                 )
             )
     results = map_pages(lambda item: _read_page(config, item), work, workers)
     changes = tuple(change for result in results for change in result.changes)
-    edits = edits_of(blocks, changes, config.correct_model)
+    word_edits = edits_of(blocks, changes, config.correct_model)
+    links = link_edits(
+        blocks,
+        tuple(link for result in results for link in result.links),
+        changes,
+        word_edits,
+        config.correct_model,
+    )
+    edits = word_edits + links
     folder.edits_dir.mkdir(exist_ok=True)
     write_edits(folder.correct_jsonl, edits)
+    for result in results:
+        if result.links_cut_short:
+            _logger.warning(
+                "page %d: the model's answer for the note references was cut "
+                "short; no links on it",
+                result.page_index,
+            )
     cut_short = [result.page_index for result in results if result.cut_short]
     for page_index in cut_short:
         _logger.warning(
@@ -230,9 +276,10 @@ def run(
         )
     doubtful = sum(1 for change in changes if is_doubtful(change))
     _logger.info(
-        "wrote %s: %d edits on %d pages%s%s",
+        "wrote %s: %d edits, %d of them note links, on %d pages%s%s",
         folder.correct_jsonl,
         len(edits),
+        len(links),
         len(work),
         f", {doubtful} doubtful by the second reading"
         if config.correct_second_model is not None

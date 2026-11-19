@@ -1171,7 +1171,9 @@ class Edit:
     word is printed on, `model`, the vision model that read the new text,
     and `second_reading`, what a second model read at that place, or None
     when there was no second reading (docs/specs/correct.md, section 8);
-    an edit of a person or an agent leaves the three None."""
+    an edit of a person or an agent leaves the three None. An edit whose
+    `new` ends with a link to a note, "[3](#n-p0008-004)", puts a reference
+    to that note after the new text (docs/specs/correct.md, section 10)."""
 
     format_version: int = EDITS_FORMAT_VERSION
     block_id: str

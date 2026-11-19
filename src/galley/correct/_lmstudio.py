@@ -18,6 +18,17 @@ PROMPT: Final[str] = (
     "do not add anything, no commentary, no formatting. "
     "Skip hieroglyphs and drawings."
 )
+# Section 9b: the prompt that asks for the note references and note lines;
+# it has no example line, which the model copied onto a page in a prompt
+# measured first.
+LINKS_PROMPT: Final[str] = (
+    "This is a page of a book with footnotes. Copy the main text above the "
+    "footnotes, line by line, exactly as printed. Write each footnote "
+    "reference, a small raised number or sign printed after a word, in "
+    "square brackets where it stands. Then write one line for each footnote "
+    "at the foot of the page, in reading order: NOTE, its number, a vertical "
+    "bar, and its first three words. Write nothing else."
+)
 # Section 4: a page of about 600 words took 1,409 tokens (Kadesh page 11);
 # an answer this long is a model repeating itself.
 MAX_TOKENS: Final[int] = 6000
@@ -106,8 +117,9 @@ def check_models(server: str, models: tuple[str, ...]) -> None:
             raise ExternalProgramError(message)
 
 
-def request_body(model: str, png: bytes) -> dict[str, object]:
-    """The JSON body of the request that asks `model` to read the image."""
+def request_body(model: str, png: bytes, prompt: str = PROMPT) -> dict[str, object]:
+    """The JSON body of the request that asks `model` to read the image
+    with `prompt`."""
     image = base64.b64encode(png).decode("ascii")
     return {
         "model": model,
@@ -118,7 +130,7 @@ def request_body(model: str, png: bytes) -> dict[str, object]:
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": PROMPT},
+                    {"type": "text", "text": prompt},
                     {
                         "type": "image_url",
                         "image_url": {"url": f"data:image/png;base64,{image}"},
@@ -129,7 +141,9 @@ def request_body(model: str, png: bytes) -> dict[str, object]:
     }
 
 
-def read_image(server: str, model: str, png: bytes, what: str) -> Reading:
+def read_image(
+    server: str, model: str, png: bytes, what: str, prompt: str = PROMPT
+) -> Reading:
     """`model`'s reading of the PNG image `png`, through LM Studio at
     `server`. `what` names the image in an error ("page 11"). Raises
     ExternalProgramError on a refused connection, a timeout, an HTTP error
@@ -137,7 +151,7 @@ def read_image(server: str, model: str, png: bytes, what: str) -> Reading:
     url = f"{server}/v1/chat/completions"
     request = urllib.request.Request(
         url,
-        data=json.dumps(request_body(model, png)).encode("utf-8"),
+        data=json.dumps(request_body(model, png, prompt)).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
     try:

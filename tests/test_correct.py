@@ -26,6 +26,7 @@ from galley.config import BookConfig, read_config
 from galley.correct import edits_of, footnote_band_top, page_png, token_cores
 from galley.correct._align import Pair, align, align_free_tail
 from galley.correct._lmstudio import (
+    LINKS_PROMPT,
     PROMPT,
     check_models,
     read_image,
@@ -776,7 +777,10 @@ class _FakeLmStudio:
     each page from `answers`, by the SHA-256 of the image it is sent, or
     with `status` when that is not 200. An image it has no answer for takes
     the first answer of `in_order`, which is then its answer: the answers
-    of a run with one worker, in the order of its requests."""
+    of a run with one worker, in the order of its requests. A request with
+    the prompt of the note links (section 9b) is answered the same way
+    from `link_answers` and `links_in_order`, and with nothing when they
+    have no answer for it."""
 
     models: tuple[str, ...]
     answers: dict[str, str] = field(default_factory=dict)
@@ -784,6 +788,8 @@ class _FakeLmStudio:
     status: int = 200
     redirect: str | None = None
     in_order: list[str] = field(default_factory=list)
+    link_answers: dict[str, str] = field(default_factory=dict)
+    links_in_order: list[str] = field(default_factory=list)
     bodies: list[dict[str, object]] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -825,10 +831,13 @@ def _handler(fake: _FakeLmStudio) -> type[BaseHTTPRequestHandler]:
             url = body["messages"][0]["content"][1]["image_url"]["url"]
             png = base64.b64decode(url.removeprefix("data:image/png;base64,"))
             key = _image_key(png)
+            links = body["messages"][0]["content"][0]["text"] == LINKS_PROMPT
+            answers = fake.link_answers if links else fake.answers
+            in_order = fake.links_in_order if links else fake.in_order
             with fake.lock:
-                if key not in fake.answers and fake.in_order:
-                    fake.answers[key] = fake.in_order.pop(0)
-                text = fake.answers.get(key, "")
+                if key not in answers and in_order:
+                    answers[key] = in_order.pop(0)
+                text = answers.get(key, "")
             self._send(
                 200,
                 {
@@ -1118,3 +1127,64 @@ def test_lm_studio_reads_kadesh_page_11_and_its_edits_fix_the_note(
         if span.note_ref is not None
     }
     assert not any(edit.old in references for edit in edits)
+
+
+def _recorded_link_answers(folder: BookFolder) -> list[str]:
+    """The recorded answers to the note links' prompt (section 9b), in the
+    order of the requests of a run with one worker: one for each text page
+    where a note starts, empty where none was recorded."""
+    pages = read_pages(folder.pages_json)
+    blocks = read_blocks(folder.blocks_json)
+    starts = {note.origin[0].page_index for note in blocks.notes if note.origin}
+    folder_of = FIXTURES / "kadesh_redo_links"
+    return [
+        path.read_text(encoding="utf-8")
+        if (path := folder_of / f"p{page.index:03d}.txt").exists()
+        else ""
+        for page in pages.pages
+        if page.kind is PageKind.TEXT and page.index in starts
+    ]
+
+
+# The excerpt's link edits with the recorded answers of its pages 0, 1, 3
+# and 7 (Kadesh's 8, 9, 11 and 15), each checked against the reference
+# tests/fixtures/expected/kadesh_reference/note_references.json.
+# On page 1, "Lenormant," to note 5 is refused, since galley links note 5
+# from "Chabas", for which the model's answer gives no note line; then
+# "Salvolini" to note 4 is refused too, since galley's link from
+# "Lenormant," to note 4 stays.
+EXCERPT_LINKS = (
+    (0, "investigation.\u2019", "investigation.[\u2019](#n-p0000-003)"),
+    (0, "forces.3", "forces.[3](#n-p0000-004)"),
+    (1, "\u201cRecord\u201d", "\u201cRecord\u201d[7](#n-p0001-004)"),
+)
+
+
+# Renders with PDFium.
+@pytest.mark.thread_unsafe
+@pytest.mark.tesseract
+@pytest.mark.pandoc
+def test_excerpt_note_links_are_the_references_the_page_prints(
+    tmp_path: Path,
+    redo_excerpt_run: Callable[[str], BookFolder],
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+) -> None:
+    from galley import markdown
+
+    fake, server = lm_studio()
+    folder, config = _excerpt_folder(tmp_path, redo_excerpt_run, server)
+    fake.in_order.extend(_recorded_answers(folder))
+    fake.links_in_order.extend(_recorded_link_answers(folder))
+    correct.run(folder, config, workers=1)
+    assert fake.in_order == []
+    assert fake.links_in_order == []
+    links = [
+        (edit.page_index, edit.old, edit.new)
+        for edit in read_edits(folder.correct_jsonl)
+        if edit.reason == "vision_note_link"
+    ]
+    assert tuple(links) == EXCERPT_LINKS
+    markdown.run(folder, config)
+    book = folder.book_md.read_text(encoding="utf-8")
+    assert "forces\\.[^n-p0000-004]" in book
+    assert "Record\u201d[^n-p0001-004]" in book
