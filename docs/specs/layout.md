@@ -896,6 +896,12 @@ Where the thresholds come from:
 | cut-in zone | chain within 1.6 pitches, trimmed to its shortened rows, 2 rows | measured on Stubbs, step 2b |
 | cut-in note word | 4 pt short of the inset | measured on Stubbs, step 2b |
 | cut-in note word apart from the body | 5 pt from a body word of its row | measured on Stubbs, step 2b: the body's word spaces are 4.5 pt at the median, three quarters of the gaps beside a note word 5.7 pt or more |
+| cut row shortened by size | strip words of at least 2 letters at most 0.9 of the page's body word height and 0.9 of its width per character; the page's measured on words of at least 3 letters, on a page of at least 50 words | 0.9 and 0.9 measured on Stubbs, step 2b and section 9 (0.85 and 0.95 simulated); 3 letters and 50 words guessed |
+| no cut-in notes on a contents page | the config's `contents_pages` | measured on Turney's page 10, step 2b |
+| a page number boxed apart | one word of 2 or 3 digits, with an optional "." or ","; the head-word row at most 2 pitches below it | measured on the eight books, step 3: any page-number form read Stubbs' specks as numbers; the rows taken lie 0.59 to 1.61 pitches below, 2 guessed |
+| band rows small against the page | 0.82 of the page's median row height | measured on the eight books, step 4: at 0.85 two printed contents and a signature mark became a band |
+| full-size rows for the page's median row height | at least 0.9 of the body word height, when they are a quarter of the rows | measured on Gierke's page 50 and Turney's 262 and 271, step 4; the quarter guessed |
+| one-line note | first word "1", at most 0.9 of the page's width per character, rows of at least 20 characters above it | 0.9 measured on the eight books, step 4 (no candidate between 0.854 and 1.05); 20 characters guessed |
 
 An earlier form of the column rule, which asked every row of a run to
 be open, was run on the skeleton's rows of whole pages (not on the body
