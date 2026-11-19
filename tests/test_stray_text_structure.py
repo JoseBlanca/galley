@@ -1,9 +1,11 @@
 """Excerpt tests of the plan stray-text for the stream structure: running
 heads compared up to 14 letters apart (docs/specs/structure.md, section 3,
-"Heads of different lengths") and a reference followed by punctuation
-(section 11, "References"). The expected output of each page is that of
-its file in tests/fixtures/expected/stray_text/, transcribed from the page
-rendered at 300 dpi. A test whose work package has not landed is a strict
+"Heads of different lengths"), a reference followed by punctuation
+(section 11, "References"), and a heading alone above a table in small
+type and a signature mark beside the table (sections 14 and 4). The
+expected output of each page is that of its file in
+tests/fixtures/expected/stray_text/, transcribed from the page rendered
+at 300 dpi. A test whose work package has not landed is a strict
 xfail naming it; the task that makes it pass removes the mark."""
 
 import json
@@ -81,3 +83,37 @@ def test_whole_book_domesday_signs_followed_by_punctuation_link_their_notes(
     blocks = read_blocks(whole_book_run("domesdaybook00maituoft").blocks_json)
     unreferenced = sum(1 for note in blocks.notes if not note.referenced)
     assert unreferenced <= _DOMESDAY_UNREFERENCED_NOTES_AT_MOST
+
+
+# Domesday's page 428 (excerpt page 7): the heading "AVERAGES." alone in the
+# body above a table that layout makes a band (section 14, rule 1), and the
+# signature mark "26—2" beside the table's "[0", which the text layer boxes
+# lower (section 4).
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+def test_heading_alone_above_a_table_in_the_band_is_a_heading(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    blocks = read_blocks(excerpt_books["domesday_notes"].blocks_json)
+    expected = _expected("domesday_notes", 7)
+    assert [
+        block_text(block)
+        for block in blocks.blocks
+        if block.kind is BlockKind.HEADING and block.origin[0].page_index == 7
+    ] == [expected["heading"]]
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+def test_signature_mark_beside_a_word_boxed_lower_is_removed(
+    excerpt_books: frozendict[str, BookFolder],
+) -> None:
+    blocks = read_blocks(excerpt_books["domesday_notes"].blocks_json)
+    expected = _expected("domesday_notes", 7)
+    assert [
+        removal.text
+        for removal in blocks.removals
+        if removal.page_index == 7 and removal.reason is RemovalReason.SIGNATURE_MARK
+    ] == [expected["signature_mark"]]

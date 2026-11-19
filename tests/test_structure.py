@@ -1424,6 +1424,35 @@ def test_signature_mark_limits(
     assert bool(blocks.removals) is removed
 
 
+def _page_with_mark_beside(mark_top: float) -> PageLayout:
+    """Domesday's page 428 (spec section 4): a table's column whose last
+    line, "Norfolk", has the mark "26—2" at `mark_top` below it, and
+    another column whose lowest word, "[0", the text layer boxes 5 pt
+    lower than the mark."""
+    body = _region(*(_column_line(70 + _PITCH_PT * number) for number in range(6)))
+    table = _region(
+        _foot_line(_FOOT_TOP_PT - 3 * _PITCH_PT, ("Norfolk", 252)),
+        _foot_line(mark_top, ("26—2", 252)),
+    )
+    lower = _region(_foot_line(_FOOT_TOP_PT + 5, ("[0", 40)))
+    return PageLayout(4, (body, table, lower), ())
+
+
+@pytest.mark.parametrize(
+    ("mark_top", "removed"),
+    [(_FOOT_TOP_PT, True), (_FOOT_TOP_PT - 3 * _PITCH_PT + 1.9 * _PITCH_PT, False)],
+    ids=["3 pitches below the line before", "1.9 pitches below"],
+)
+def test_signature_mark_beside_a_lower_line_is_removed_when_set_apart(
+    mark_top: float, removed: bool
+) -> None:
+    page = _page_with_mark_beside(mark_top)
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert [(removal.text, removal.reason) for removal in blocks.removals] == (
+        [("26—2", RemovalReason.SIGNATURE_MARK)] if removed else []
+    )
+
+
 @pytest.mark.parametrize(("shift", "removed"), [(0.05, True), (-0.05, False)])
 def test_signature_mark_at_0_3_of_the_column_from_its_left_edge(
     shift: float, removed: bool

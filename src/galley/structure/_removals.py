@@ -57,6 +57,12 @@ _SIGNATURE_MARK_MAX_CHARACTERS = 6
 _SIGNATURE_MARK_FROM_LEFT_SHARE = 0.3
 # Spec section 4: digits around a dash or a space, "4—2", "12 2".
 _DIGITS_AROUND_A_DASH_OR_SPACE = re.compile(r"[0-9]+ ?[-–—] ?[0-9]+|[0-9]+ [0-9]+")
+# Spec section 4: a signature mark beside the lowest line lies less than a
+# pitch above it and 2 pitches or more below its region's line before it
+# (Domesday's page 428: "26—2" 5.2 pt above the table's "[0", which the
+# text layer boxes at the foot, and 2.9 pitches below "Norfolk"; the last
+# lines of an index's other column, 0.7 pitch apart, are not set apart).
+_SET_APART_PITCHES = 2.0
 
 
 def _running_head_removals(
@@ -230,6 +236,24 @@ def _is_foot_number_by_value(
     return value is not None and offset is not None and value + offset == page_index
 
 
+def _is_set_apart_beside(
+    page: PageLayout, place: LinePlace, lowest: Line, pitch: float
+) -> bool:
+    """Whether the line at `place` lies beside `lowest`, the page's lowest
+    line, its bottom less than `pitch` above, and set apart below its
+    region's line before it, its top `_SET_APART_PITCHES` times `pitch`
+    or more below that line's top (spec section 4)."""
+    region_number, line_number = place
+    if line_number == 0:
+        return False
+    line = line_at(page, place)
+    before = page.regions[region_number].lines[line_number - 1]
+    return (
+        lowest.box.bottom - line.box.bottom < pitch
+        and line.box.top - before.box.top >= _SET_APART_PITCHES * pitch
+    )
+
+
 def foot_removals(
     page: PageLayout,
     kinds: tuple[RegionKind, ...],
@@ -238,8 +262,9 @@ def foot_removals(
     """The removals at the foot of a page (spec section 4), on its lowest
     line once the running head is removed: a page number, a signature line
     (on the pages of `survey.signature_lines`), or a printer's signature
-    mark, which may also be the line above a page number. `kinds` are
-    those of the page's regions, in their order."""
+    mark, which may also be the line above a page number, or the line
+    beside a lowest line that is none of these (`_is_set_apart_beside`).
+    `kinds` are those of the page's regions, in their order."""
     column = body_column(page, kinds)
     head = running_head_lines(page, kinds)
     place = lowest_line(page, head)
@@ -264,4 +289,11 @@ def foot_removals(
     position = signature_page_number(line, column)
     if page.index in survey.signature_lines and position is not None:
         return _signature_line_removals(page, place, position)
-    return _signature_mark_removals(page, place, column)
+    if _is_signature_mark(line, column):
+        return _signature_mark_removals(page, place, column)
+    above = lowest_line(page, head | {place})
+    if above is None or not _is_set_apart_beside(
+        page, above, line, survey.body_line_pitch
+    ):
+        return _NOTHING_REMOVED
+    return _signature_mark_removals(page, above, column)
