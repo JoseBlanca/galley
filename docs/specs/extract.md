@@ -698,7 +698,10 @@ height), takes the text of the layer word over it, when the two are
 over each other by the test of the references (above, one to one) and
 the layer word is a numeral by figures §1 (1 to 6 characters, each a
 digit or one of i, v, x, l, c in either case, with or without a "." or
-"," after them) other than the Tesseract word's text. Its box and
+"," after them) other than the Tesseract word's text, and the
+Tesseract word holds no digit. Without that last condition the rule
+took the colon of Kadesh page 62's "Plate 30:", where the layer reads
+"30" and ":" as two words, and a character of the page would be lost. Its box and
 confidence stay Tesseract's. extract logs each change at INFO with its
 page. On Kadesh it changes the numbers of pages 29, 36, 38 and 45 into
 the layer's; the text's "(Map IV)" is no caption word, for its bracket.
