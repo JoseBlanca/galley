@@ -554,7 +554,14 @@ all of these hold:
    up by the page's **offset**, the two boxes overlap in width and
    overlap in height by at least a quarter of the lower of the two
    heights;
-3. no **unclaimed** Tesseract word with the same letters and digits
+3. its box overlaps no in-page figure's box of the page (analyze's
+   `figure_boxes`): what the layer reads there is the picture's ink or
+   lettering, which the figure's image shows; inside the box it would
+   be the figure's text, removed by structure (`docs/specs/figures.md`
+   §5), and at its edge it made a note of junk, page 52's "UJ" under
+   its hieroglyphs (24 layer words of Kadesh, all junk or the scales of
+   maps);
+4. no **unclaimed** Tesseract word with the same letters and digits
    (compared in lower case) lies within 16 pt of it, up, down or
    across (the gap between the two boxes, 0 when they overlap). A
    Tesseract word is unclaimed when no layer word with its letters and
@@ -582,18 +589,19 @@ format changes, but `ocr_confidence` `None` on an `ocr` page marks
 them.
 
 **Why these measures.** Measured on 19 November 2026 on the whole
-Kadesh book with redo, on the 44 `ocr` pages:
+Kadesh book with redo, on the 44 `ocr` pages, before condition 3 was
+added (below):
 
 | variant, all else as the rule | words kept | of them a copy of a word Tesseract read |
 |---|---|---|
-| any overlap covers, no offset, no condition 3 | 85 | none, but the lines of pages 9, 11 and 15 stay lost (their layer words touch the lines around them) |
-| the rule | 103 | none found |
+| any overlap covers, no offset, no condition 4 | 85 | none, but the lines of pages 9, 11 and 15 stay lost (their layer words touch the lines around them) |
+| the rule without condition 3 (figures) | 103 | none found |
 | no offset | 129 | none found, but page 15's line stays lost |
-| condition 3 with any Tesseract word, claimed or not | 99 | none, but "of" and "the" of page 9's lost line go |
-| no condition 3 | 126 | 2 or more: page 18's "over that", which the layer boxes 6 pt below Tesseract's, and page 41's "behind", 14 pt below |
+| condition 4 with any Tesseract word, claimed or not | 99 | none, but "of" and "the" of page 9's lost line go |
+| no condition 4 | 126 | 2 or more: page 18's "over that", which the layer boxes 6 pt below Tesseract's, and page 41's "behind", 14 pt below |
 | half the lower height, not a quarter | 167 | not counted: many layer words of lines Tesseract read |
 
-Condition 3 keeps out the layer's copy of a word Tesseract read where
+Condition 4 keeps out the layer's copy of a word Tesseract read where
 the layer misplaces its box: page 12's "of" (the layer's words of the
 line lie up to 25 pt right of Tesseract's), page 41's "behind" and the
 page numbers the layer boxes 10 to 12 pt off ("81" on page 8, "91" on
@@ -601,19 +609,20 @@ page 20). Its claim keeps the short words of a skipped line: the "of"
 of page 9's lost line has an "of" of Tesseract's on the line above,
 which covers the layer's "of" of that line.
 
-**What it gives.** Of the 103 words kept, each looked at on the page
-rendered at 150 dpi, 62 are printed words of the text, the notes, the
-maps or a page number: the lost lines of pages 9, 11, 15, 52 and 53,
-"FRANÇOIS" (the layer's "FftAigou", page 9), "Égypte" (page 11), "a"
-(page 14), "through" and "paper" (page 21), the scales of the maps of
-pages 29, 33, 36 and 45 ("5 Km."), "27." and "Var." on page 50, and the
-page numbers of pages 10, 11, 12, 18, 21, 28, 37 and 67; 41 are the
-layer's junk over hieroglyphs, Arabic or a map (pages 21, 27, 29, 33,
-38, 40, 41, 44, 45, 46, 50, 51, 52) or specks (pages 15, 47, 55, 63, 66),
-which Tesseract read as junk of its own or not at
-all. Most of the junk lies in an in-page figure's box and goes with its
-figure (`docs/specs/figures.md` §5); the rest stays as text, as the
-layer's junk does under `verify`. Some words the layer has are still
+**What it gives.** The rule keeps 79 words. Without condition 3 it
+kept 103, each looked at on the page rendered at 150 dpi: 62 printed
+words of the text, the notes, the maps or a page number, and 41 of the
+layer's junk; the 24 that condition 3 takes out are 17 of the junk,
+over hieroglyphs and maps, and the 7 words of the scales of the maps of
+pages 29, 33, 36 and 45 ("5 Km."), which lie inside the maps' boxes. Of
+the 79, 55 are printed words: the lost lines of pages 9, 11, 15, 52 and
+53, "FRANÇOIS" (the layer's "FftAigou", page 9), "Égypte" (page 11),
+"a" (page 14), "through" and "paper" (page 21), "27." and "Var." on
+page 50, and the page numbers of pages 10, 11, 12, 18, 21, 28, 37 and
+67; 24 are the layer's junk over hieroglyphs or Arabic outside the
+figures' boxes (pages 21, 27, 33, 38, 41, 44, 45, 46) or specks (pages
+15, 47, 55, 63, 66), which Tesseract read as junk of its own or not at
+all. The junk stays as text, as the layer's junk does under `verify`. Some words the layer has are still
 lost: page 11's "the" before "compilation" has an unclaimed "the" of
 Tesseract's 9 pt below, and page 9's line keeps the layer's misreadings
 ("wu", "eocueiou*" for "was conscious").

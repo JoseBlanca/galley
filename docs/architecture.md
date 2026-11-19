@@ -251,7 +251,7 @@ book). analyze runs no audit and writes
 `ocr_audit` `None`. extract reads each `ocr` page with Tesseract
 (`docs/specs/extract.md` §9), and keeps the layer's words where
 Tesseract read none, a line or a word it skipped, so that no printed
-word is lost (on Kadesh 103 words, 62 of them printed text); the words of an excluded, front-matter or
+word is lost (on Kadesh 79 words, 55 of them printed text); the words of an excluded, front-matter or
 inkless page are the layer's, recorded as removals, as with `verify`.
 layout re-reads nothing. `cli.py` looks for Tesseract before analyze or
 extract starts under `redo` and stops when it is missing (sections 12
