@@ -3978,6 +3978,53 @@ def test_heading_chapter_label_and_its_title_are_one_level_1_heading() -> None:
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+# Structure spec section 34: a line read by Tesseract whose median
+# confidence is below 60 is no heading; the words of Kadesh's junk line of
+# page 32, "KELP IPM DS", had 8 to 25.
+
+
+def _with_confidences(line: Line, *confidences: float | None) -> Line:
+    return replace(
+        line,
+        words=tuple(
+            replace(word, ocr_confidence=confidence)
+            for word, confidence in zip(line.words, confidences, strict=True)
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("confidences", "kind"),
+    [
+        ((8.0, 25.0, 49.0, 30.0), "paragraph"),
+        ((90.0, 90.0, 90.0, 90.0), "heading"),
+        ((None, None, None, None), "heading"),
+        ((90.0, 8.0, 59.0, 70.0), "heading"),
+        ((8.0, 25.0, 49.0, 59.0), "paragraph"),
+        ((8.0, None, 25.0, None), "paragraph"),
+        ((8.0, None, None, None), "heading"),
+    ],
+    ids=[
+        "low",
+        "high",
+        "layer",
+        "median_64_5",
+        "median_37",
+        "half_layer_low",
+        "mostly_layer",
+    ],
+)
+def test_centred_line_in_capitals_is_a_heading_unless_tesseract_read_it_poorly(
+    confidences: tuple[float | None, ...], kind: str
+) -> None:
+    line = _with_confidences(_centred_line("KELP IPM DSRT WORD", 130), *confidences)
+    blocks = make_blocks(_lines_of(_around(line)), _NO_WORDS, workers=1)
+    # The line is in the text either way, in a heading or in a paragraph.
+    assert [
+        block.kind.value for block in blocks.blocks if "KELP" in block_text(block)
+    ] == [kind]
+
+
 def test_heading_of_one_line_has_no_label() -> None:
     blocks = make_blocks(
         _lines_of(_around(_centred_line("INDEX", 130))), _NO_WORDS, workers=1

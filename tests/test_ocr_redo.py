@@ -36,11 +36,6 @@ _EXCERPT = "kadesh_redo"
 _EXCLUDED_PAGE = 8
 _PLATE_PAGE = 10
 
-_TASK_3_2 = pytest.mark.xfail(
-    strict=True,
-    reason="task 3.2 of docs/plans/ocr-redo.md: no heading of low Tesseract confidence",
-)
-
 
 def _expected(page: int) -> dict[str, Any]:
     return json.loads(
@@ -153,7 +148,6 @@ def test_reference_tesseract_read_as_a_sign_is_linked_from_the_layer(
 
 
 @pytest.mark.tesseract
-@_TASK_3_2
 def test_rows_of_hieroglyphs_read_by_tesseract_make_no_heading(
     redo_excerpt_run: Callable[[str], BookFolder],
 ) -> None:
