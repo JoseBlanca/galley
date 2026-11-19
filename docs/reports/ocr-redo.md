@@ -52,7 +52,11 @@ Still wrong:
   small capitals ("Breastep" for Breasted) and some words next to the
   hieroglyphs; lines of junk from the hieroglyph rows stay as
   paragraphs; some note links are missing or wrong (pages 9, 11, 33),
-  and two footnotes are merged on pages 25 and 27. Reading the page
+  footnotes are merged on page 25 (two) and page 27 (three, hung on
+  one reference); and on page 27, where the scan's lines slope by about
+  7 pt, one line's words are out of order ("the (Kadesh).” 1. city"):
+  galley's rows do not follow a slope, and changing that touches every
+  book, so it is left for a later plan. Reading the page
   images with a vision model (the correct stage) would be the next
   step for this book.
 - Stubbs keeps some garble of its own beside the margin notes (page
@@ -278,3 +282,14 @@ layer on main they were a quotation in the text. Task 5.2 looks at it.
   reordered text on Kadesh. A rule that mixes two readings of a page
   needs a fidelity reviewer who reads the whole book's text against the
   images, not only counts.
+
+## The last review
+
+A reviewer read the final fixes (b2b10b3..20b086c) and found no lost,
+duplicated or invented word: on Stubbs exactly 116 more pieces removed,
+20 checked at 300 dpi; on Kadesh exactly 7 words back, all printed.
+Fixed: two guards no test checked (16e3844). Recorded in the layout
+spec, not fixed (6b46c69): on Kadesh page 27 notes 64, 65 and 66 come out
+as one note, and one sloping line's words are out of order. Final
+checks: pytest 3,080 passed in 74 s (115 s with 8 threads); Kadesh's
+whole-book tests 17 passed; the Kadesh EPUB rebuilt, epubcheck clean.
