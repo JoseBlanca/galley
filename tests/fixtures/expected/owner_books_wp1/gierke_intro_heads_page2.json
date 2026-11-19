@@ -1,5 +1,5 @@
 {
-  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules.",
+  "read": "Read from the 300-dpi render by the assistant on 17 November 2026: a subagent read the page image and recorded what is printed (\"printed\"); the expected values were written from that reading and the excerpt's text layer, as the rules of work package 1 of docs/plans/owner-books.md (layout spec section 3, steps 2 to 4; structure spec sections 2 to 4 and 14) should give them. Not yet compared with galley's output, which at a1fc504 does not have those rules. On 19 November 2026 the signature mark of the foot (\"foot\" below) was added to the expected removals, as structure spec section 4, \"A signature mark of letters\", removes it; the OCR reads it \"M. e\".",
   "excerpt": "gierke_intro_heads",
   "page": 2,
   "book_page_index": 70,
@@ -9,6 +9,10 @@
       {
         "reason": "running_head",
         "text": "List of Authorities."
+      },
+      {
+        "reason": "signature_mark",
+        "text": "M. e"
       }
     ],
     "page_numbers": []
