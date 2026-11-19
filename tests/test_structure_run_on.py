@@ -17,7 +17,7 @@ import pytest
 
 from galley.book_folder import BookFolder
 from galley.config import read_config
-from galley.errors import FidelityBoundary, FidelityError
+from galley.errors import FidelityBoundary, FidelityError, GalleyError
 from galley.fidelity import check_stage
 from galley.markdown import render_markdown
 from galley.model import (
@@ -42,6 +42,7 @@ from galley.structure._hyphens import (
     PageLine,
     join_lines,
     join_sign_hyphen,
+    sign_removals,
 )
 
 _HASH = "a" * 64
@@ -311,3 +312,110 @@ def test_sign_ending_a_word_an_earlier_join_made_is_not_joined() -> None:
         if removal.reason is RemovalReason.MISREAD_HYPHEN
     ]
     check_stage(FidelityBoundary.STRUCTURE, chained, blocks)
+
+
+def _retyped_sign_join(first: str) -> tuple[LinesFile, BlocksFile]:
+    """Stubbs' lines and blocks with "aggres*" retyped as `first` in
+    lines.json and in its join, and the joined word and the removed sign
+    retyped to match: a change shaped like a join over a sign."""
+    lines = _stubbs_lines()
+    blocks = make_blocks(lines, _WORD_LIST, workers=1)
+    joined, sign = first[:-1] + "sive", first[-1:]
+
+    def retyped_word(word: Word) -> Word:
+        return replace(word, text=first) if word.text == "aggres*" else word
+
+    retyped_lines = replace(
+        lines,
+        pages=tuple(
+            replace(
+                page,
+                regions=tuple(
+                    replace(
+                        region,
+                        lines=tuple(
+                            replace(line, words=tuple(map(retyped_word, line.words)))
+                            for line in region.lines
+                        ),
+                    )
+                    for region in page.regions
+                ),
+            )
+            for page in lines.pages
+        ),
+    )
+    retyped_blocks = replace(
+        blocks,
+        blocks=tuple(
+            replace(
+                block,
+                spans=tuple(
+                    replace(span, text=span.text.replace("aggressive", joined))
+                    for span in block.spans
+                ),
+            )
+            for block in blocks.blocks
+        ),
+        word_changes=tuple(
+            replace(change, before=(first, "sive"), after=(joined, sign))
+            if change.before == ("aggres*", "sive")
+            else change
+            for change in blocks.word_changes
+        ),
+        removals=tuple(
+            replace(removal, text=sign)
+            if removal.reason is RemovalReason.MISREAD_HYPHEN
+            else removal
+            for removal in blocks.removals
+        ),
+    )
+    return retyped_lines, retyped_blocks
+
+
+def test_retyped_sign_join_of_a_real_sign_passes_the_fidelity_check() -> None:
+    # `_retyped_sign_join` keeps a true sign join true.
+    check_stage(FidelityBoundary.STRUCTURE, *_retyped_sign_join("aggre^"))
+
+
+@pytest.mark.parametrize(
+    "first",
+    [
+        "aggre1*",  # a digit before the sign
+        "aggres.",  # a full stop is no sign of a reference
+        "aggres,",  # nor a comma
+    ],
+)
+def test_join_shaped_like_one_over_a_sign_fails_the_fidelity_check(first: str) -> None:
+    with pytest.raises(FidelityError):
+        check_stage(FidelityBoundary.STRUCTURE, *_retyped_sign_join(first))
+
+
+def _change(first: str) -> WordChange:
+    return WordChange(
+        page_index=24,
+        before=(first, "sive"),
+        after=(first[:-1] + "sive", first[-1:]),
+        reason=ChangeReason.HYPHEN_JOIN,
+    )
+
+
+def test_sign_removal_takes_the_box_of_the_first_line_ending_with_the_word() -> None:
+    page = PageLayout(
+        index=24,
+        regions=(
+            Region(
+                Box(_LEFT_PT, 100.0, _RIGHT_PT, 140.0),
+                (_line(_FULL, 0), _line("here", 1), _line(_FULL, 2)),
+            ),
+        ),
+        figures=(),
+    )
+    lines = LinesFile(source_pdf_sha256=_HASH, pages=(page,), rereads=())
+    (removal,) = sign_removals((_change("aggres*"),), lines)
+    assert removal.box == page.regions[0].lines[0].words[-1].box
+    assert removal.box != page.regions[0].lines[2].words[-1].box
+
+
+def test_sign_removal_of_a_word_that_ends_no_line_stops_structure() -> None:
+    with pytest.raises(GalleyError, match="no line ends with 'regres\\*'"):
+        sign_removals((_change("regres*"),), _stubbs_lines())
