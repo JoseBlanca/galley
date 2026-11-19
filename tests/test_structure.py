@@ -11,7 +11,9 @@ import hashlib
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from enum import StrEnum
 from pathlib import Path
+from typing import assert_never
 
 import pytest
 
@@ -1429,11 +1431,21 @@ def test_signature_mark_limits(
     [
         ((("M.", 37), ("c", 266)), True),
         ((("M.", 37), ("IT", 266)), True),
+        ((("M.", 25), ("c", 25 + 0.9 * 274)), True),
+        ((("M.", 37), ("c", 37 + 0.5 * 274)), True),
         ((("M.", 37), ("c", 173)), False),
         ((("m.", 37), ("c", 266)), False),
         ((("Mr.", 37), ("c", 266)), False),
     ],
-    ids=["M. c", "M. IT", "less than half the column", "lower case", "two letters"],
+    ids=[
+        "M. c",
+        "M. IT",
+        "0.9 of the column",
+        "half the column",
+        "less than half the column",
+        "lower case",
+        "two letters",
+    ],
 )
 def test_signature_mark_without_a_digit_is_a_capital_and_a_word_set_far_apart(
     words: tuple[tuple[str, float], ...], removed: bool
@@ -1448,29 +1460,65 @@ def test_signature_mark_without_a_digit_is_a_capital_and_a_word_set_far_apart(
     )
 
 
-def _page_with_mark_beside(mark_top: float) -> PageLayout:
-    """Domesday's page 428 (spec section 4): a table's column whose last
-    line, "Norfolk", has the mark "26—2" at `mark_top` below it, and
-    another column whose lowest word, "[0", the text layer boxes 5 pt
-    lower than the mark."""
+class _MarkRegion(StrEnum):
+    """Where the mark lies on `_page_with_mark_beside`'s page: below the
+    line before it in the same region, or first in a region of its own."""
+
+    WITH_THE_LINE_BEFORE = "with the line before"
+    OF_ITS_OWN = "of its own"
+
+
+def _page_with_mark_beside(
+    pitches_below_the_line_before: float,
+    lowest_below_the_mark_pt: float,
+    mark_region: _MarkRegion,
+) -> PageLayout:
+    """Domesday's page index 428 (spec section 4): a table's column whose
+    last line, "Norfolk", has the mark "26—2" at the foot, the given
+    pitches below it, and another column whose lowest word, "[0", the text
+    layer boxes `lowest_below_the_mark_pt` lower than the mark (5 pt on
+    that page)."""
     body = _region(*(_column_line(70 + _PITCH_PT * number) for number in range(6)))
-    table = _region(
-        _foot_line(_FOOT_TOP_PT - 3 * _PITCH_PT, ("Norfolk", 252)),
-        _foot_line(mark_top, ("26—2", 252)),
+    before = _foot_line(
+        _FOOT_TOP_PT - pitches_below_the_line_before * _PITCH_PT, ("Norfolk", 252)
     )
-    lower = _region(_foot_line(_FOOT_TOP_PT + 5, ("[0", 40)))
-    return PageLayout(4, (body, table, lower), ())
+    mark = _foot_line(_FOOT_TOP_PT, ("26—2", 252))
+    lower = _region(_foot_line(_FOOT_TOP_PT + lowest_below_the_mark_pt, ("[0", 40)))
+    match mark_region:
+        case _MarkRegion.WITH_THE_LINE_BEFORE:
+            table: tuple[Region, ...] = (_region(before, mark),)
+        case _MarkRegion.OF_ITS_OWN:
+            table = (_region(before), _region(mark))
+        case _:
+            assert_never(mark_region)
+    return PageLayout(4, (body, *table, lower), ())
 
 
 @pytest.mark.parametrize(
-    ("mark_top", "removed"),
-    [(_FOOT_TOP_PT, True), (_FOOT_TOP_PT - 3 * _PITCH_PT + 1.9 * _PITCH_PT, False)],
-    ids=["3 pitches below the line before", "1.9 pitches below"],
+    ("pitches_below", "lowest_below_pt", "mark_region", "removed"),
+    [
+        (3.0, 5.0, _MarkRegion.WITH_THE_LINE_BEFORE, True),
+        (1.9, 5.0, _MarkRegion.WITH_THE_LINE_BEFORE, False),
+        (3.0, _PITCH_PT, _MarkRegion.WITH_THE_LINE_BEFORE, False),
+        (3.0, 5.0, _MarkRegion.OF_ITS_OWN, False),
+    ],
+    ids=[
+        "3 pitches below the line before",
+        "1.9 pitches below the line before",
+        "a pitch above the lowest line",
+        "first in its region",
+    ],
 )
 def test_signature_mark_beside_a_lower_line_is_removed_when_set_apart(
-    mark_top: float, removed: bool
+    pitches_below: float,
+    lowest_below_pt: float,
+    mark_region: _MarkRegion,
+    removed: bool,
 ) -> None:
-    page = _page_with_mark_beside(mark_top)
+    # The mark is removed only when its bottom lies less than a pitch above
+    # the lowest line's and its top 2 pitches or more below the top of the
+    # line before it in its region; each case but the first breaks one.
+    page = _page_with_mark_beside(pitches_below, lowest_below_pt, mark_region)
     blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
     assert [(removal.text, removal.reason) for removal in blocks.removals] == (
         [("26—2", RemovalReason.SIGNATURE_MARK)] if removed else []
