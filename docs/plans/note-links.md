@@ -21,7 +21,7 @@ counts per book of notes moved; the seven books' EPUBs through
 epubcheck.
 
 - [x] 1.1 Spec, code, tests, counts.
-- [ ] Review of work package 1.
+- [x] Review of work package 1.
 
 ## 2. A hyphenated word in the correct stage
 
@@ -48,7 +48,7 @@ rule into the correct spec and build it; otherwise report and stop.
   read from the images and committed; build only if the twelve pages
   together pass the bar.
 - [x] 3.2 The rule and its code, if 3.1 says so.
-- [ ] Review of work packages 2 and 3.
+- [x] Review of work packages 2 and 3.
 
 ## 4. The EPUBs
 

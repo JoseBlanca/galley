@@ -75,3 +75,33 @@ starts.
 
 Open: a link cannot yet be rejected for good (an owner edit cannot
 remove a reference, and the stage proposes it again on its next run).
+
+## Review of work packages 1 to 3
+
+A spec reviewer and a code reviewer read 8c5f8b2..c0cbf68. Every note
+is still written exactly once in Kadesh, Domesday and Gierke. What
+mattered, fixed in 637dbcf to eb843d5:
+
+- **Wrong note links outside the reference pages**: 8 of 27 checked on
+  the page images were wrong (page 31's five links one note too far,
+  page 21 two, page 45 a link after the wrong word). The rules had been
+  tuned on the twelve pages. New rules: the k-th reference the model
+  marks on a page must go to the page's k-th footnote; the numbers must
+  rise and agree with galley's markers; galley's word may differ from
+  the model's by one character at most; the edit keeps the model's
+  number. A new whole-Kadesh run was then checked link by link on the
+  images: with the order rules alone 68 links, 7 wrong; with the k-th
+  rule as well 40 links, all right. Notes with a reference: 41 to 76 of
+  183. A new key, `correct_links`, turns links off; it is on by default
+  with `correct`. The model's answers vary between runs at temperature
+  0, so "0 wrong" is one run's result.
+- The link request went to endnote pages too (93 pages of Gierke,
+  about 76 minutes for nothing): now only pages where a footnote starts.
+- A printed closing quote could become a reference's text and vanish
+  from the EPUB: kept in the word now.
+- "DINDORF- MÜLLER" became "Dindorfmüller": the hyphen of two capital
+  halves now stays ("Dindorf-Müller").
+- Two unguarded rules, an unclear error for a note referenced twice,
+  and spec mistakes.
+
+pytest 3,262 passed.
