@@ -478,13 +478,15 @@ margin note.
   The notes stream at markdown is in the order of blocks.json's notes,
   as at blocks, not in the order of `book.md`. markdown writes a
   referenced footnote after the block that refers to it and an
-  unreferenced one after the last block of its page (structure §19,
-  architecture §9), so on a page with both, `book.md` holds the notes in
-  another order than the print: on Mariéjol's page 20, notes 2 and 3,
-  then the unreferenced note 1. Passes 2 and 3 align in book order, and
-  a note out of the reference's order loses its anchors: taken in
-  `book.md`'s order, 152 of Mariéjol's notes found as notes at blocks
-  were not at markdown, measured on 16 November 2026 at 977b2ed.
+  unreferenced one at the end of its chapter, under a heading "Notes"
+  that gives no word (structure §19 and §36, architecture §9), so
+  `book.md` holds the notes in another order than the print: on
+  Mariéjol's page 20, notes 2 and 3 after their blocks, and the
+  unreferenced note 1 only at the end of the chapter. Passes 2 and 3
+  align in book order, and a note out of the reference's order loses
+  its anchors: taken in `book.md`'s order, 152 of Mariéjol's notes found
+  as notes at blocks were not at markdown, measured on 16 November 2026
+  at 977b2ed, when an unreferenced note still followed its page.
 
 **Book order**, used below, is the order of galley's tokens by page
 index, and within a page by stream, body first, then margin notes, then
