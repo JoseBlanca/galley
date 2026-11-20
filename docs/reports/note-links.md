@@ -1,5 +1,38 @@
 # Report: unlinked notes and note links
 
+## Summary
+
+The plan is done on branch `plan/note-links`, on 20 November 2026, and
+waits for the owner's order to merge. The EPUBs are in
+`runs/note-links/<folder>/` of the main checkout; Kadesh with the vision
+model (correct stage and note links, no second reading) is in
+`runs/note-links/battleofkadeshst00breauoft-correct/`.
+
+- **Unlinked footnotes are out of the text**, at the end of their
+  chapter under "Notes", a heading kept out of the table of contents:
+  Kadesh 142 notes, Domesday 323, the other books 0 to 8. On Kadesh this
+  is far from where they were printed: the book has one real chapter,
+  and a quoted inscription on page 39 taken for a heading collects the
+  notes of pages 8 to 38.
+- **The vision model links notes** (`correct_links`, on with the correct
+  stage): on Kadesh notes with a reference rise from 41 to 76 of 183;
+  every one of the 40 new links was checked on the page images and all
+  are right. A first version, tuned on twelve pages, linked 111 but
+  with about 1 in 3 wrong outside them; rules on the order of the
+  numbers removed those.
+- **"cam- P#@igns" now reads "campaigns"**, and "Dindorf-Müller" keeps
+  its hyphen.
+
+Checked: pytest 3,262 passed (144 s on a busy machine); `pytest -m
+whole_book` 159 passed; the eight EPUBs pass epubcheck; the evaluation
+of Haskins, Stubbs and Domesday did not change.
+
+Still wrong: galley's own links (not the model's) are wrong three times
+on Kadesh pages 9 and 10; Kadesh's page-39 heading; the quick tests take
+over a minute. Not done: Kadesh with the second reading and the check of
+its doubtful edits, which needs the owner's Qwen 27B model free for
+about 40 minutes.
+
 The work report of `docs/plans/note-links.md`, for the owner. Started on
 19 November 2026, at main 8c5f8b2.
 
@@ -105,3 +138,14 @@ mattered, fixed in 637dbcf to eb843d5:
   and spec mistakes.
 
 pytest 3,262 passed.
+
+## Task 4.1: the runs
+
+8dab549 corrects the evaluation spec (an unlinked note goes to its
+chapter's end); galley-eval needed no code change. All checks pass;
+`pytest -m whole_book` 159 passed; the seven books and Kadesh with the
+model pass epubcheck; the evaluation in `runs/note-links-final/` is the
+same as `runs/notes-vision-final/`. Checked by eye: the "Notes" heading
+and the moved notes on Kadesh pages 8 to 13, the model's 4 links there
+right; Domesday's chapter "The Serfs" with its two unlinked notes before
+the next chapter.

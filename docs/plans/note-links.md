@@ -6,7 +6,8 @@ reference in the text is not linked (142 of Kadesh's 183) are shown
 where they were printed. The owner chose, the same day, to move such
 notes to the end of their chapter, and to go on with linking more of
 them from the vision model's reading of the small raised numbers.
-Dated 19 November 2026. State: approved; under way.
+Dated 19 November 2026. State: done on 20 November 2026, but for the run of Kadesh with the
+second reading, which waits for the owner's LM Studio to be free.
 
 ## 1. Unlinked notes at the end of the chapter
 
@@ -52,7 +53,7 @@ rule into the correct spec and build it; otherwise report and stop.
 
 ## 4. The EPUBs
 
-- [ ] 4.1 All checks, `pytest -m whole_book`, the seven EPUBs in
+- [x] 4.1 All checks, `pytest -m whole_book`, the seven EPUBs in
   `runs/note-links/` through epubcheck, Kadesh with `correct = true` and
   the second reading, the doubtful edits checked on the page images as
   before (owner edits), and the pages of each change checked by eye.
