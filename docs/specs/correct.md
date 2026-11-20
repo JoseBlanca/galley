@@ -29,7 +29,7 @@ and markdown refuses any edit.
 The architecture (`docs/architecture.md`) gives the book folder (section
 5), the config (6), the formats (8), the edits (10) and the fidelity check
 (13), the test that no word is lost or invented between a stage's input
-and its output. This spec adds three config keys, a second version of the
+and its output. This spec adds four config keys, a second version of the
 edit's format, the stage `correct` to `book_folder.py`, and the rules by
 which markdown applies an edit; the architecture is revised with it.
 
@@ -48,7 +48,7 @@ For each text page of the book, in parallel:
    two differ enough, propose the model's word in its place. In a note,
    where the model has words that line up with none of galley's, propose
    to put them in. Each proposal is an edit.
-5. On a page where a footnote starts, send the page a second time, with the
+5. When `correct_links` is true (the default), on a page where a footnote starts, send the page a second time, with the
    prompt of section 9b, which asks for the text with each note
    reference marked; where the model marks a reference after a word of
    galley's and names one of the page's notes, propose a link from that
@@ -103,7 +103,7 @@ recommendation", point 3).
 
 ## 3. The config
 
-Three keys, besides `correct` (architecture section 6). Each has a
+Four keys, besides `correct` (architecture section 6). Each has a
 default, so that a book needs none of them; they are checked whatever
 `correct` is, and used only when the stage runs.
 
@@ -111,6 +111,7 @@ default, so that a book needs none of them; they are checked whatever
 |---|---|---|
 | `correct_model` | string, `"qwen/qwen3.6-35b-a3b"` | the model that reads the pages, as LM Studio names it |
 | `correct_server` | string, `"http://localhost:1234"` | LM Studio's address: the scheme `http`, the host `localhost`, `127.0.0.1` or `[::1]`, any port, and no path, query or user. Anything else is a `ConfigError`, because a book's text, which may be under copyright, never leaves the machine (the plan: "a cloud model" is out) |
+| `correct_links` | bool, `true` | whether the stage also proposes note links (section 9b), at the cost of a second request on each page where a footnote starts; on by default since 40 links on whole Kadesh were all right (section 9b, "Measured") |
 | `correct_second_model` | string, none | a second model, which reads each page's footnote band to mark the edits it disagrees with (section 9); none by default, since it marks but does not fix, and costs about 28 s a page |
 
 ## 4. Calling LM Studio
@@ -522,7 +523,7 @@ section 11); on Kadesh 142 of its 183 notes have no link, and some links
 go to the note before or after the right one. The stage asks the model
 where the references are, and links the notes it can place.
 
-**The request.** On each text page where a footnote starts (a note of
+**The request.** When `correct_links` is true, on each text page where a footnote starts (a note of
 kind footnote whose first origin is on the page), a second request, as in section 4 but for
 the prompt:
 
@@ -540,8 +541,9 @@ first, had the model copy the example onto a page that does not print it.
 **What the answer gives.** Line by line:
 
 - a **reference** is `[x]`, `<sup>x</sup>`, or a run of superscript
-  digits, with x 1 to 4 characters and no space, superscript digits read
-  as digits. With it go the words before it in its line, the last three,
+  digits, with x 1 to 3 digits or 1 or 2 of "*", "†", "‡", superscript
+  digits read as digits; the model brackets other things too, "[at]" on
+  page 27, which are none. With it go the words before it in its line, the last three,
   and the word after it, the marks of other references taken out. A
   reference with no word before it in its line gives nothing;
 - a line that gives no reference (a mark with no word before it, as the
@@ -562,8 +564,11 @@ the words before the reference, from the last back, with galley's tokens
 from the candidate back, summed, plus the likeness of the word after the
 reference with galley's first changeable token after the candidate. The
 best candidate is the place when it scores at least 0.5 more than the
-second; else the reference gives no link. A fixed token is never the
-place.
+second, and when its form and the model's word's differ in length by
+one character at most; else the reference gives no link. A misread word
+keeps its length within one; on page 45 the model's "order" (the page
+prints "ordered") was placed on galley's "ordered'”", 0.83 alike (review
+of 19 November 2026). A fixed token is never the place.
 
 An endnote gets no request and no link: Gierke's endnotes start on 93
 pages of its endnote section, where no reference is printed, and its
@@ -574,6 +579,30 @@ first three words, their comparison forms joined, are most alike the
 note line's first three words: at least 0.6 alike, and 0.1 more than any
 other note. Else no link. A reference whose number has no note line
 gives no link.
+
+**The numbers of a page.** The model reads the raised numbers wrong
+often enough that its references and its note lines can agree with each
+other and still be one note off: on the whole-Kadesh run of 19 November
+2026 a reviewer found, among 27 links outside the twelve reference
+pages, all five of page 31's one note too far, and page 21's two, whose
+model numbers were 10 and then 7 for the printed 50 and 51. So the
+links of a page are kept only when they number its footnotes in order:
+
+- the k-th reference the model marked on the page, counted from 0, goes
+  to the k-th footnote that starts on it, where the footnotes before it
+  that galley references and no link of the page goes to count as
+  marked: the model does not bracket the heading's "*" on page 8, whose
+  note galley links. Page 31's first link went to the page's second
+  footnote with nothing before it, and page 21's first to the third;
+- in the order of the model's answer, their notes come in the order of
+  the page's footnotes, no note twice, and their numbers, those that are
+  digits, rise;
+- each footnote of the page takes its link's number, or else galley's
+  marker when that is digits of as many as the links' longest number (a
+  shorter one is a marker the OCR cut, "1" for 61 on page 26), and these
+  numbers rise in the order of the footnotes.
+
+Otherwise no link of the page is proposed, and the page is logged.
 
 **The link.** The galley word that holds the place's token, its
 whitespace word, gets a reference to that note right after it:
@@ -587,17 +616,18 @@ whitespace word, gets a reference to that note right after it:
   (section 6), past as many as the model's word has after its core
   (quotes made straight on both sides, and equal there), are the
   misread reference when they are 1 to 3, each a digit or one of
-  `' " ‘ ’ “ ” * † ‡ ™ ® ^ %`. They leave the word and become the
-  reference's text. Otherwise the word stays whole and the reference's
-  text is the model's x. "advanced.”", where the model has
+  `' " ‘ ’ “ ” * † ‡ ™ ® ^ %`. They leave the word, and are kept only in
+  the edit's `old`. Otherwise the word stays whole. The reference's
+  text is the model's number x, so that the edit shows which number the
+  model read. "advanced.”", where the model has
   `advanced." [4]`, keeps its quote. A quote is taken as part of the
   misread reference only when the reference's number is not in galley's
   word: in "soldiers.”37" against the model's "soldiers." the reference
   is "37" and the quote, which the model left out, stays (review of 19
-  November 2026, finding 3). The reference's text is not shown: markdown
-  writes a footnote's reference as Pandoc's `[^n-p0008-004]`, so a quote
-  taken into it is dropped from `book.md` and the EPUB and kept only in
-  the edit, where the owner sees it.
+  November 2026, finding 3). What is taken out is not shown: it is
+  dropped from `book.md` and the EPUB, where a footnote's reference is
+  Pandoc's `[^n-p0008-004]`, and kept only in the edit's `old`, where
+  the owner sees it.
 
 A link is not proposed, and is logged, when:
 
@@ -620,8 +650,8 @@ the words before it in the same span added one at a time until it
 occurs once, as section 8 says, but only before, so that the reference
 stays at the end of `old`; `new` is `old` less the misread reference,
 followed by the link written as markdown writes a link to a note,
-`[x](#n-p0008-004)`, with the reference's text in the brackets (a `[` or
-`]` in it is left out). `second_reading` is null. The link edits come in
+`[x](#n-p0008-004)`, with the model's number x in the brackets (a `[`
+or `]` in it is left out). `second_reading` is null. The link edits come in
 `edits/correct.jsonl` after all the word edits, in page order and, on a
 page, in the order of the text, so that a word edit applies before the
 link edit beside it splits the span.
@@ -642,7 +672,24 @@ of the owner's running on the same machine. A prompt that asked only
 for each reference's line, with an example line, gave 36 links with 1
 wrong (on page 13 it numbered a note line 22 for the note printed 23).
 On pages 11 and 27 the model marks the references, but no note line of
-its answer matches one of galley's notes, so they get no links.
+its answer matches one of galley's notes, so they get no links. These
+twelve pages were measured before the rules of the numbers of a page,
+the word's length and the reference's text were added.
+
+**Measured on the whole book**, Kadesh, 20 November 2026, every link
+checked on the 300 dpi page images (the 35B model; the stage's answers
+differ between runs at temperature 0, so each run is its own sample):
+
+| run | links | right | wrong |
+|---|---|---|---|
+| before the review's rules | 79 | (8 wrong among 27 a reviewer checked outside the twelve pages) | |
+| with the word's length and the order of numbers | 68 | 61 | 7 (page 21: 2, page 31: 5, each one note too far) |
+| with the k-th reference to the k-th footnote too | 40 | 40 | 0 |
+
+In the last run 14 pages lost their links to the rule of the numbers of
+a page, and the notes linked in the book went from 41 to 76 of 183. The
+stage took 3,705 s for 44 pages against about 474 s without links,
+with another model of the owner's running on the same Mac.
 
 ## 10. How markdown applies the edits
 

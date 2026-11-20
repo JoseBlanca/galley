@@ -255,7 +255,9 @@ def run(
                     reading=reading,
                     cores=token_cores(blocks, reading),
                     band_top=footnote_band_top(blocks, page.index),
-                    notes=footnotes_starting(blocks, page.index),
+                    notes=footnotes_starting(blocks, page.index)
+                    if config.correct_links
+                    else (),
                 )
             )
     results = map_pages(lambda item: _read_page(config, item), work, workers)

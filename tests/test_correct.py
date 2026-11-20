@@ -1044,12 +1044,15 @@ def test_excerpt_edits_are_the_same_with_1_and_2_workers_and_markdown_applies_th
         folder, config = _excerpt_folder(
             tmp_path / str(workers), redo_excerpt_run, server
         )
+        config = dataclasses.replace(config, correct_links=False)
         if workers == 1:
             fake.in_order.extend(_recorded_answers(folder))
         correct.run(folder, config, workers=workers)
         written[workers] = folder.correct_jsonl.read_bytes()
     assert written[1] == written[2]
     assert fake.in_order == []
+    # With correct_links false no page is asked for its links.
+    assert json.dumps(LINKS_PROMPT) not in json.dumps(fake.bodies)
     edits = read_edits(folder.correct_jsonl)
     assert len(edits) == EXCERPT_EDIT_COUNT
     assert {edit.author for edit in edits} == {"correct"}
@@ -1173,7 +1176,7 @@ def _recorded_link_answers(folder: BookFolder) -> list[str]:
 # "Salvolini" to note 4 is refused too, since galley's link from
 # "Lenormant," to note 4 stays.
 EXCERPT_LINKS = (
-    (0, "investigation.\u2019", "investigation.[\u2019](#n-p0000-003)"),
+    (0, "investigation.\u2019", "investigation.[2](#n-p0000-003)"),
     (0, "forces.3", "forces.[3](#n-p0000-004)"),
     (1, "\u201cRecord\u201d", "\u201cRecord\u201d[7](#n-p0001-004)"),
 )

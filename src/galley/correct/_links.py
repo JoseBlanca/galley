@@ -34,6 +34,9 @@ _MARK = re.compile(r"\[([^\]\s]{1,4})\]|<sup>([^<\s]{1,4})</sup>|([⁰¹²³⁴�
 _NOTE_LINE = re.compile(
     r"^\s*(?:NOTE[\s,:|]*)?([0-9⁰¹²³⁴⁵⁶⁷⁸⁹]{1,3}|[*†‡])[\s,.:|]+(\S.*)$"
 )
+# What a reference the model marks reads as: a number or a sign; the
+# model also brackets other things ("[at]" on Kadesh page 27).
+_REFERENCE_TEXT = re.compile(r"[0-9]{1,3}|[*†‡]{1,2}")
 # The words before a reference the model gives, and the words of a note
 # line compared with a note's first words.
 _WORDS_BEFORE = 3
@@ -43,6 +46,9 @@ _LEAST_CANDIDATE = 0.75
 _LEAST_LEAD = 0.5
 _LEAST_NOTE = 0.6
 _LEAST_NOTE_LEAD = 0.1
+# Review of 19 November 2026: the model's "order" placed on galley's
+# "ordered" (Kadesh page 45); a misread word keeps its length within one.
+_MOST_LENGTH_DIFFERENCE = 1
 # A misread reference left in galley's word: 1 to 3 of these characters.
 _MISREAD_LONGEST = 3
 _MISREAD_CHARACTERS = frozenset("0123456789'\"‘’“”*†‡™®^%")
@@ -88,7 +94,11 @@ def link_answer(raw: str) -> LinkAnswer:
             )
             for mark in _MARK.finditer(line)
         ]
-        placed = [mark for mark in marks if mark.before]
+        placed = [
+            mark
+            for mark in marks
+            if mark.before and _REFERENCE_TEXT.fullmatch(mark.text) is not None
+        ]
         if placed:
             references.extend(placed)
             continue
@@ -153,7 +163,12 @@ def reference_place(
     ):
         return None
     best = candidates[0]
-    return best if body[best].place is not None else None
+    if (
+        body[best].place is None
+        or abs(len(forms[best]) - len(wanted[-1])) > _MOST_LENGTH_DIFFERENCE
+    ):
+        return None
+    return best
 
 
 def _first_words(text: str) -> str:
@@ -193,14 +208,16 @@ def note_of(notes: Sequence[Note], first_words: str) -> str | None:
 class Link:
     """A link the model's answer gives on page `page_index`: after the
     galley word that holds `place`, a reference to the note `note_id`;
-    `text` is the reference as the model read it and `model_word` the word
-    the model printed before it."""
+    `text` is the reference as the model read it, `model_word` the word
+    the model printed before it, and `rank` how many references the model
+    marked on the page before it."""
 
     page_index: int
     place: Place
     note_id: str
     text: str
     model_word: str
+    rank: int = 0
 
 
 def page_links(
@@ -218,7 +235,7 @@ def page_links(
         if token.note_id is None and token.block_id is not None
     ]
     links = []
-    for reference in answer.references:
+    for rank, reference in enumerate(answer.references):
         position = reference_place(body, reference)
         first_words = answer.notes.get(reference.text)
         note_id = None if first_words is None else note_of(notes, first_words)
@@ -232,9 +249,65 @@ def page_links(
                 note_id=note_id,
                 text=reference.text.replace("[", "").replace("]", ""),
                 model_word=reference.before[-1],
+                rank=rank,
             )
         )
+    if not numbers_in_order(links, notes):
+        _logger.info(
+            "page %d: the numbers of the references and notes do not run in "
+            "order; no link on it",
+            page_index,
+        )
+        return ()
     return tuple(links)
+
+
+def _number(text: str) -> int | None:
+    digits = text.rstrip(".")
+    return int(digits) if digits.isdigit() else None
+
+
+def numbers_in_order(links: Sequence[Link], notes: Sequence[Note]) -> bool:
+    """Whether a page's links agree with each other and with galley's
+    markers (section 9b): each link's note is the k-th footnote of the page
+    when its reference is the k-th the model marked on it, counted from 0,
+    and the footnotes before it that galley references and no link goes
+    to are counted as marked too (the heading's "*" on Kadesh's page 8,
+    which the model does not bracket);
+    in the order of the model's answer their numbers rise; and, with each note
+    numbered by its link's number or else by galley's marker when that
+    is digits of as many as the links' longest number (a shorter one is a
+    marker the OCR cut, "1" for 61 on Kadesh's page 26), the numbers of
+    the page's notes rise in their order."""
+    order = {note.id: index for index, note in enumerate(notes)}
+    indices = [order[link.note_id] for link in links]
+    linked = {link.note_id for link in links}
+    if any(
+        index
+        != link.rank
+        + sum(1 for note in notes[:index] if note.referenced and note.id not in linked)
+        for index, link in zip(indices, links, strict=True)
+    ):
+        return False
+    numbers = [_number(link.text) for link in links]
+    if indices != sorted(set(indices)) or len(set(indices)) != len(indices):
+        return False
+    known = [number for number in numbers if number is not None]
+    if known != sorted(set(known)) or len(set(known)) != len(known):
+        return False
+    by_note = {link.note_id: _number(link.text) for link in links}
+    digits = max((len(str(number)) for number in known), default=0)
+
+    def marker_number(note: Note) -> int | None:
+        number = _number(note.marker)
+        return number if number is not None and len(str(number)) == digits else None
+
+    numbered = [
+        number
+        for note in notes
+        if (number := by_note.get(note.id) or marker_number(note)) is not None
+    ]
+    return numbered == sorted(set(numbered)) and len(set(numbered)) == len(numbered)
 
 
 # The edits.
@@ -362,8 +435,9 @@ def _link_edit(
         )
         return None
     old = text[words[low].start : word.end]
-    reference = misread or link.text
-    new = old[: len(old) - len(misread)] + f"[{reference}](#{link.note_id})"
+    # The model's number is the reference's text; a misread reference
+    # taken out of galley's word is kept only in `old` (section 9b).
+    new = old[: len(old) - len(misread)] + f"[{link.text}](#{link.note_id})"
     return Edit(
         block_id=block.id,
         block_sha256=block_sha256(block),

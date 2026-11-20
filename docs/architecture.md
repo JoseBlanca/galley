@@ -202,6 +202,7 @@ An unknown key or a wrong type is an error.
 | `correct_model` | string, `"qwen/qwen3.6-35b-a3b"` | the vision model the correct stage asks, as LM Studio names it (`docs/specs/correct.md` §3) |
 | `correct_server` | string, `"http://localhost:1234"` | LM Studio's address; only `http` on `localhost`, `127.0.0.1` or `[::1]`, so that a book's text never leaves the machine |
 | `correct_second_model` | string, none | a second model whose reading of each page's notes marks the correct stage's doubtful edits; none by default |
+| `correct_links` | bool, true | whether the correct stage also links footnotes to their references from the model's reading (`docs/specs/correct.md` §9b) |
 | `exclude_pages` | list of page indices, `[]` | pages left out, as removals |
 | `exclude_regions` | list of `{page, box}`, `[]` | a library stamp, a label |
 | `cover_page` | page index, none | rendered as the EPUB's cover |

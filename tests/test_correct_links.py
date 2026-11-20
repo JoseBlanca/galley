@@ -15,6 +15,7 @@ from galley.correct._links import (
     link_edits,
     misread_reference,
     note_of,
+    numbers_in_order,
     reference_place,
 )
 from galley.correct._merge import Change, ChangeKind
@@ -148,6 +149,14 @@ def test_a_reference_whose_context_cannot_choose_is_not_placed() -> None:
     assert reference_place(BODY, reference) is None
 
 
+def test_a_reference_after_a_longer_word_is_not_placed() -> None:
+    # Kadesh page 45: the model's "order" is galley's "ordered" (the page
+    # prints "ordered"), 0.83 alike but two letters longer.
+    body = (_token("vizier"), _token("was"), _token("ordered"))
+    reference = MarkedReference("107", ("vizier", "was", "order"), ())
+    assert reference_place(body, reference) is None
+
+
 def test_a_reference_after_a_fixed_token_is_not_placed() -> None:
     body = (_token("greece"), _token("1", fixed=True))
     assert reference_place(body, MarkedReference("1", ("1",), ())) is None
@@ -233,7 +242,7 @@ PAGE = _blocks(
 )
 
 
-def test_a_link_edit_takes_the_misread_reference_into_the_link() -> None:
+def test_a_link_edit_drops_the_misread_reference_and_keeps_the_models_number() -> None:
     links = (
         _link(BODY_BLOCK, "investigation", "n-p0008-003", "2", "investigation."),
         _link(BODY_BLOCK, "forces", "n-p0008-004", "3", "forces."),
@@ -242,7 +251,7 @@ def test_a_link_edit_takes_the_misread_reference_into_the_link() -> None:
     assert [(edit.old, edit.new, edit.reason) for edit in edits] == [
         (
             "investigation.’",
-            "investigation.[’](#n-p0008-003)",
+            "investigation.[2](#n-p0008-003)",
             "vision_note_link",
         ),
         ("forces.3", "forces.[3](#n-p0008-004)", "vision_note_link"),
@@ -485,3 +494,78 @@ def test_links_are_asked_for_on_pages_where_a_footnote_starts_only() -> None:
         "n-p0008-004",
     ]
     assert footnotes_starting(_blocks((BODY_BLOCK,), (endnote,)), 8) == ()
+
+
+def _numbered(note_id: str, number: str, rank: int) -> Link:
+    return Link(
+        page_index=31,
+        place=Place("b-p0031-001", 0, 0, 1),
+        note_id=note_id,
+        text=number,
+        model_word="x",
+        rank=rank,
+    )
+
+
+def _page_notes(*markers: str, referenced: tuple[int, ...] = ()) -> tuple[Note, ...]:
+    return tuple(
+        dataclasses.replace(
+            _note(f"n-p0031-{index:03d}", "Text"),
+            marker=marker,
+            referenced=index in referenced,
+        )
+        for index, marker in enumerate(markers, start=1)
+    )
+
+
+@pytest.mark.parametrize(
+    ("links", "markers", "referenced", "in_order"),
+    [
+        ((("n-p0031-001", "76", 0), ("n-p0031-002", "77", 1)), ("", ""), (), True),
+        # Kadesh page 21 in the run of 19 November 2026: 10, then 7.
+        ((("n-p0031-001", "10", 0), ("n-p0031-002", "7", 1)), ("", ""), (), False),
+        ((("n-p0031-002", "76", 0), ("n-p0031-001", "77", 1)), ("", ""), (), False),
+        ((("n-p0031-001", "76", 0), ("n-p0031-001", "76", 1)), ("", ""), (), False),
+        # galley reads note 2's marker 78, after the link's 77 on note 3.
+        ((("n-p0031-003", "77", 2),), ("", "78", ""), (), False),
+        # A marker shorter than the links' numbers is one the OCR cut.
+        ((("n-p0031-002", "77", 1),), ("8", ""), (), True),
+        ((("n-p0031-001", "76", 0),), ("", "77"), (), True),
+        # Kadesh page 31: the model's first reference goes to the second
+        # note, though nothing references the first: one note too far.
+        ((("n-p0031-002", "17", 0), ("n-p0031-003", "18", 1)), ("", "", ""), (), False),
+        # Kadesh page 8: galley links the first note from the heading's
+        # "*", which the model does not bracket.
+        ((("n-p0031-002", "2", 0), ("n-p0031-003", "3", 1)), ("", "", ""), (1,), True),
+    ],
+    ids=[
+        "rising",
+        "falling_numbers",
+        "notes_out_of_order",
+        "one_note_twice",
+        "against_galleys_marker",
+        "cut_marker",
+        "with_galleys_marker",
+        "one_note_too_far",
+        "a_note_galley_links",
+    ],
+)
+def test_the_links_of_a_page_must_number_its_notes_in_order(
+    links: tuple[tuple[str, str, int], ...],
+    markers: tuple[str, ...],
+    referenced: tuple[int, ...],
+    in_order: bool,
+) -> None:
+    # Section 9b, review of 19 November 2026: page 31's five links each one
+    # note too far, page 21's two.
+    found = numbers_in_order(
+        [_numbered(note_id, number, rank) for note_id, number, rank in links],
+        _page_notes(*markers, referenced=referenced),
+    )
+    assert found is in_order
+
+
+def test_a_bracket_that_is_no_number_or_sign_is_no_reference() -> None:
+    # Kadesh page 27: the model brackets "[at]", printed so in the text.
+    answer = link_answer("L. P. H., arrived [at] the city\nthe ford [66] of the\n")
+    assert [reference.text for reference in answer.references] == ["66"]
