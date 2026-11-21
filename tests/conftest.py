@@ -366,13 +366,25 @@ def excerpt_pdf() -> frozendict[str, Path]:
 def excerpt_book_toml(excerpt_pdf: frozendict[str, Path]) -> frozendict[str, str]:
     """The `book.toml` of each excerpt, by excerpt name: the configs of spec
     section 9, with the absolute path of the excerpt's PDF."""
-    # A TOML literal string: no escapes, so any path but one with a quote.
     return frozendict(
         {
-            name: f"pdf = '{excerpt_pdf[name]}'\n{toml}"
+            name: _excerpt_toml(excerpt_pdf, name, toml)
             for name, toml in EXCERPT_CONFIGS.items()
         }
     )
+
+
+def _excerpt_toml(excerpt_pdf: frozendict[str, Path], name: str, toml: str) -> str:
+    """The `book.toml` of the excerpt `name`: `toml` with the absolute path
+    of its PDF; an error that names the PDF when it is not committed."""
+    if name not in excerpt_pdf:
+        msg = (
+            f"the excerpt {name}.pdf is missing from {EXCERPTS_DIR}; "
+            "`uv run python scripts/fetch_samples.py` cuts it"
+        )
+        raise FileNotFoundError(msg)
+    # A TOML literal string: no escapes, so any path but one with a quote.
+    return f"pdf = '{excerpt_pdf[name]}'\n{toml}"
 
 
 # The excerpts' runs and the redo excerpt's run start in the background as
@@ -445,22 +457,24 @@ def _fixture_scopes(item: pytest.Item) -> tuple[tuple[str, str], ...]:
 def _background_runs(
     request: pytest.FixtureRequest,
     tmp_path_factory: pytest.TempPathFactory,
-    excerpt_book_toml: frozendict[str, str],
     excerpt_pdf: frozendict[str, Path],
 ) -> Iterator[_BackgroundRuns]:
     """Starts the excerpts' runs that a test of the session asks for, when
-    their programs are installed, and waits for them at the session's end."""
+    their programs are installed, and waits for them at the session's end.
+    Every test uses this fixture, so it raises nothing itself: a missing
+    excerpt PDF is the error of the runs, which only the tests that read
+    them see."""
     used = {name for item in request.session.items for name in _fixtures(item)}
     pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="excerpt-runs")
     excerpts = None
     if "excerpt_books" in used and _have("pandoc", "tesseract"):
-        folders = {
-            name: BookFolder(tmp_path_factory.mktemp(name))
-            for name in excerpt_book_toml
-        }
-        for name, folder in folders.items():
-            folder.book_toml.write_text(excerpt_book_toml[name], encoding="utf-8")
-        excerpts = pool.submit(_run_excerpts, frozendict(folders))
+        folders = frozendict(
+            {
+                name: BookFolder(tmp_path_factory.mktemp(name))
+                for name in EXCERPT_CONFIGS
+            }
+        )
+        excerpts = pool.submit(_run_excerpts, folders, excerpt_pdf)
     redo = None
     if "redo_excerpt_run" in used and _have("tesseract"):
         redo = frozendict(
@@ -468,9 +482,10 @@ def _background_runs(
                 name: pool.submit(
                     _run_redo_excerpt,
                     BookFolder(tmp_path_factory.mktemp(name)),
-                    f"pdf = '{excerpt_pdf[name]}'\n{toml}",
+                    name,
+                    excerpt_pdf,
                 )
-                for name, toml in REDO_EXCERPT_CONFIGS.items()
+                for name in REDO_EXCERPT_CONFIGS
             }
         )
     yield _BackgroundRuns(excerpts, redo)
@@ -506,7 +521,13 @@ def excerpt_books(_background_runs: _BackgroundRuns) -> frozendict[str, BookFold
     return _background_runs.excerpts.result()
 
 
-def _run_excerpts(folders: frozendict[str, BookFolder]) -> frozendict[str, BookFolder]:
+def _run_excerpts(
+    folders: frozendict[str, BookFolder], excerpt_pdf: frozendict[str, Path]
+) -> frozendict[str, BookFolder]:
+    for name, folder in folders.items():
+        folder.book_toml.write_text(
+            _excerpt_toml(excerpt_pdf, name, EXCERPT_CONFIGS[name]), encoding="utf-8"
+        )
     with ThreadPoolExecutor(max_workers=_EXCERPT_RUNS_AT_ONCE) as pool:
         # list() waits for every run and raises the first run's error.
         list(pool.map(_run_excerpt, folders.values()))
@@ -562,8 +583,12 @@ def redo_excerpt_run(
     return run
 
 
-def _run_redo_excerpt(folder: BookFolder, toml: str) -> BookFolder:
-    folder.book_toml.write_text(toml, encoding="utf-8")
+def _run_redo_excerpt(
+    folder: BookFolder, name: str, excerpt_pdf: frozendict[str, Path]
+) -> BookFolder:
+    folder.book_toml.write_text(
+        _excerpt_toml(excerpt_pdf, name, REDO_EXCERPT_CONFIGS[name]), encoding="utf-8"
+    )
     for stage in ("analyze", "extract", "layout", "structure"):
         _run_stage(stage, folder)
     return folder
