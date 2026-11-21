@@ -958,6 +958,107 @@ wait either way.
    stage off until the stage is measured on a second book. The stage
    stays off by default.
 
+2. **Whether the stage is on for a book whose OCR is good**: measured on
+   Domesday (`domesdaybook00maituoft`) on 21 November 2026, and the
+   recommendation is **off**; the owner decides. Domesday's text layer
+   is good in English and poor in Latin and Old English, which its notes
+   and appendices quote at length. Its tables are not read as tables:
+   structure made the rows of the table on page 426 into footnotes, their
+   cells out of the printed order.
+
+   *What was measured.* Six pages read word by word from the page images,
+   2,485 words as section 6 cuts them, in `tests/fixtures/expected/domesday_reference/pages.json`:
+   pages 100 and 180 (body and Latin footnotes), 250 (body), 316 (an
+   appendix of Latin and Old English charter extracts), 426 (a table of
+   counties) and 470 (body, a small table, four footnotes). The stage ran
+   on these pages alone, as `run` does for each page, with the 35B model,
+   note links and the second reading by Qwen 3.6 27B, on the owner's Mac
+   while another program of the owner's used the 27B model. galley's
+   reading of each page (section 5) was scored against the reference
+   before and after the edits: its words lined up with the reference's
+   by least edits, and the wrong, missing and extra words counted per 100
+   words of the reference, compared in the comparison form of section 6.
+   The side notes, the short headings Domesday prints in the margin, were
+   put in the reference where galley reads them, so that their place is
+   not counted. The table of page 426 is compared without its order,
+   since galley's order of its cells is not the printed one: the count is
+   of the words one side has more times than the other. Whether each edit
+   is right was decided by hand, against the reference and the images:
+   an edit whose new word is right but leaves an extra word beside it is
+   wrong.
+
+   | text | words | wrong before | wrong after |
+   |---|---|---|---|
+   | body, English (pages 100, 180, 250, 470, and the heading of 426) | 1,417 | 6 (0.4 in 100) | 3 (0.2 in 100) |
+   | body, Latin and Old English (page 316) | 469 | 32 (6.8 in 100) | 13 (2.8 in 100) |
+   | footnotes (pages 100, 180, 470) | 371 | 23 (6.2 in 100) | 10 (2.7 in 100) |
+   | small table (page 470) | 27 | 4 | 1 |
+   | side notes | 17 | 0 | 0 |
+   | table of page 426, order left aside | 184 | 13 | 18 |
+
+   *The edits.* 77 word edits, of which 23 are wrong: 17 on the five
+   pages without the table of page 426, 6 on that table.
+
+   - On the five pages without that table, 67 edits, 50 right and 17
+     wrong. 12 of the wrong ones turn a word galley read right into a
+     wrong one ("resolvat" to "resolut" three times, "munitione" to
+     "munitio ne" twice, "affirmative" to "baraffirmative", the side
+     note's "bar-" joined to the body's word, "Aluuinus" to "Aluinus"),
+     and 2 put in a word that galley has already beside it ("team lands"
+     to "team teamlands", "Heraldo... Terra" to "Heraldo...Terra...
+     Terra"), and 3 change a word galley read wrong into another wrong
+     one. 2 are fluent wrong words, wrong words that read as real ones:
+     "oðrum" and "geworce", Old English words printed elsewhere on page
+     316, where the page prints "oþrum" and "gewerce".
+   - On the table of page 426, 10 edits: 4 right (2 put in a letter the
+     table lacked, 2 put back a number another edit took away) and 6 wrong, which put in a word the
+     table already has, in the wrong row (the counties "Surrey",
+     "Berkshire", "Cornwall", and three numbers), all 6 fluent;
+     "Berkshire" takes the place of "Hampshire", which is lost.
+   - The second reading marks 11 edits doubtful, 9 of them wrong: the 6
+     wrong edits in the footnotes of pages 100 and 180, and the 3 county
+     names on the table; the three numbers put in twice it reads as the
+     35B model does, and does not mark. The 11 wrong edits in the body
+     are not marked, since the second reading reads only the footnote
+     band (section 9); 9 of them are on page 316.
+
+   *Links.* 2 links, both right: on page 470 they take the place of two
+   wrong links of galley's. A third was galley's already. Page 180's first
+   note gets none: its first words, "D. B. i. 238 b", are those of its
+   eighth note too, so the note line matches neither (section 9b).
+
+   *Time.* The 35B model took 9 to 14 s a page to read it, 11 s on
+   average, and 7 to 10 s more for the note references; the 27B model 16
+   to 54 s for a footnote band, 30 s on average. For Domesday's 539 text
+   pages, 489 of them with footnotes, that is about 3 hours without the
+   second reading and about 7 hours with it; the 27B model's times may be
+   too high, since another program was using it.
+
+   *Why off.* Outside the table of page 426 the stage takes the wrong
+   words from 65 to 27, but the gain is not in the English text, where
+   it would show on every page. In English, where galley's reading has
+   0.4 wrong words in 100, the stage made 5 edits on the four pages: 3
+   right, 1 wrong ("baraffirmative") and 1 that left a broken word's
+   first half ("team teamlands"); that is 3 wrong words fewer in 1,417.
+   The gain is in the Latin and Old English: the footnotes from 6.2 to
+   2.7 wrong words in 100, and to about 1.3 (5 wrong words in 371) when
+   the doubtful edits are checked and the wrong ones undone, as item 1
+   has it for Kadesh; page 316 from 6.8 to 2.8, with 9 wrong edits the
+   second reading does not mark, since they are not in a footnote; and
+   the table is made worse. Getting the footnotes' gain takes about 7
+   hours for the book and checking against the images some 1,000
+   doubtful edits (6 on the two pages with Latin footnotes, about 2 on
+   each of the book's 489 pages with footnotes), while the body's Latin
+   quotations keep wrong edits nobody is told of. That is why the
+   recommendation is off for a book like Domesday: the English, which is
+   most of what is read, gains nothing a reader would see. The case for
+   turning it on is a book whose quotations in another language matter
+   to the owner more than that cost; it then wants the second reading,
+   the doubtful edits checked, and the edits in quotations printed in
+   the body, as on page 316, checked too. Leaving out the pages whose
+   tables structure turned into notes would remove the table's harm; it
+   is not built.
+
 ## 17. Not in this spec
 
 - `galley2epub edits-from`, by which the owner writes edits from a
@@ -966,4 +1067,5 @@ wait either way.
   measurement found cheaper when the body is already good: not built.
 - Another prompt, resolution or model: one prompt and 300 dpi were
   measured.
-- How the stage does on books other than Kadesh: not measured.
+- How the stage does on books other than Kadesh and Domesday: not
+  measured (section 16, item 2).
