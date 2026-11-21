@@ -3749,6 +3749,16 @@ def test_footnote_without_a_value_takes_none_unless_its_place_fits_two_values(
     assert _footnote_links(values, ('above)."*',)) == links
 
 
+def test_an_opening_quote_takes_a_note_only_where_no_other_candidate_can() -> None:
+    # Spec section 11: "Kings‘" may be a misread closing quote; the later
+    # "*" takes the note. On Kadesh's page 9 "Salvolini‘" is needed for a
+    # third note.
+    assert _footnote_links((None,), ("Kings‘", "spot*")) == ((0, 1),)
+    assert _footnote_links(
+        (None, None, None), ("Salvolini‘", "Lenormant,*", "Chabas*")
+    ) == ((0, 0), (1, 1), (2, 2))
+
+
 def test_referenced_endnotes_are_matched_in_the_order_of_their_values() -> None:
     # Note 2 printed before note 1: in printed order note 2 would take "y2"
     # and note 1 could not take the earlier "x1".
