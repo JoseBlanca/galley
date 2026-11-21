@@ -26,6 +26,7 @@ from galley.config import BookConfig, read_config
 from galley.correct import edits_of, footnote_band_top, page_png, token_cores
 from galley.correct._align import Pair, align, align_free_tail
 from galley.correct._lmstudio import (
+    LINKS_PROMPT,
     PROMPT,
     check_models,
     read_image,
@@ -369,6 +370,58 @@ def test_a_galley_word_glued_from_two_takes_the_models_two_words(
     blocks = _blocks((_block("b-p0001-001", _span(galley)),))
     edits = _changes_and_edits(blocks, f"THE BATTLE OF KADESH 6 {model}")
     assert [(edit.old, edit.new) for edit in edits] == [expected]
+
+
+@pytest.mark.parametrize(
+    ("galley", "model", "expected"),
+    [
+        (
+            "kings in such cam- P#@igns was first",
+            "kings in such cam-\npaigns was first",
+            [("cam- P#@igns", "campaigns")],
+        ),
+        (
+            "see Vol. I, Dirporr- MCiuer, Vol. I",
+            "see Vol. I, DINDORF-\nMÜLLER, Vol. I",
+            [("Dirporr- MCiuer,", "Dindorf-M\u00fcller,")],
+        ),
+        # The first half pairs with a word of the model's: it stays, and
+        # the second half alone is replaced.
+        (
+            "kings in such cam- P#@igns was first",
+            "kings in such cam\ncam-\npaigns was first",
+            [("P#@igns", "campaigns")],
+        ),
+        # The model printed the word whole: galley's hyphen is left alone.
+        (
+            "kings in such cam- P#@igns was first",
+            "kings in such campaigns was first",
+            [],
+        ),
+        # Galley's second half alone is nearer the model's word than the
+        # two halves joined: only the second half is replaced.
+        (
+            "the com- (Newaey. Gram., 7)",
+            "the com- (Neuag. Gram., 7)",
+            [("(Newaey.", "(Neuag.")],
+        ),
+    ],
+    ids=[
+        "second_half_misread",
+        "small_capitals",
+        "first_half_paired",
+        "printed_whole",
+        "not_the_same_word",
+    ],
+)
+def test_a_word_split_at_a_line_end_is_replaced_whole(
+    galley: str, model: str, expected: list[tuple[str, str]]
+) -> None:
+    # Section 7: Kadesh page 8, where the stage replaced "P#@igns" alone and
+    # left "cam- campaigns".
+    blocks = _blocks((_block("b-p0001-001", _span(galley)),))
+    edits = _changes_and_edits(blocks, f"THE BATTLE OF KADESH 6 {model}")
+    assert [(edit.old, edit.new) for edit in edits] == expected
 
 
 def test_the_model_word_a_glued_replacement_takes_is_not_put_in_a_note() -> None:
@@ -743,7 +796,10 @@ class _FakeLmStudio:
     each page from `answers`, by the SHA-256 of the image it is sent, or
     with `status` when that is not 200. An image it has no answer for takes
     the first answer of `in_order`, which is then its answer: the answers
-    of a run with one worker, in the order of its requests."""
+    of a run with one worker, in the order of its requests. A request with
+    the prompt of the note links (section 9b) is answered the same way
+    from `link_answers` and `links_in_order`, and with nothing when they
+    have no answer for it."""
 
     models: tuple[str, ...]
     answers: dict[str, str] = field(default_factory=dict)
@@ -751,6 +807,8 @@ class _FakeLmStudio:
     status: int = 200
     redirect: str | None = None
     in_order: list[str] = field(default_factory=list)
+    link_answers: dict[str, str] = field(default_factory=dict)
+    links_in_order: list[str] = field(default_factory=list)
     bodies: list[dict[str, object]] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
@@ -792,10 +850,13 @@ def _handler(fake: _FakeLmStudio) -> type[BaseHTTPRequestHandler]:
             url = body["messages"][0]["content"][1]["image_url"]["url"]
             png = base64.b64decode(url.removeprefix("data:image/png;base64,"))
             key = _image_key(png)
+            links = body["messages"][0]["content"][0]["text"] == LINKS_PROMPT
+            answers = fake.link_answers if links else fake.answers
+            in_order = fake.links_in_order if links else fake.in_order
             with fake.lock:
-                if key not in fake.answers and fake.in_order:
-                    fake.answers[key] = fake.in_order.pop(0)
-                text = fake.answers.get(key, "")
+                if key not in answers and in_order:
+                    answers[key] = in_order.pop(0)
+                text = answers.get(key, "")
             self._send(
                 200,
                 {
@@ -983,12 +1044,15 @@ def test_excerpt_edits_are_the_same_with_1_and_2_workers_and_markdown_applies_th
         folder, config = _excerpt_folder(
             tmp_path / str(workers), redo_excerpt_run, server
         )
+        config = dataclasses.replace(config, correct_links=False)
         if workers == 1:
             fake.in_order.extend(_recorded_answers(folder))
         correct.run(folder, config, workers=workers)
         written[workers] = folder.correct_jsonl.read_bytes()
     assert written[1] == written[2]
     assert fake.in_order == []
+    # With correct_links false no page is asked for its links.
+    assert json.dumps(LINKS_PROMPT) not in json.dumps(fake.bodies)
     edits = read_edits(folder.correct_jsonl)
     assert len(edits) == EXCERPT_EDIT_COUNT
     assert {edit.author for edit in edits} == {"correct"}
@@ -1085,3 +1149,64 @@ def test_lm_studio_reads_kadesh_page_11_and_its_edits_fix_the_note(
         if span.note_ref is not None
     }
     assert not any(edit.old in references for edit in edits)
+
+
+def _recorded_link_answers(folder: BookFolder) -> list[str]:
+    """The recorded answers to the note links' prompt (section 9b), in the
+    order of the requests of a run with one worker: one for each text page
+    where a note starts, empty where none was recorded."""
+    pages = read_pages(folder.pages_json)
+    blocks = read_blocks(folder.blocks_json)
+    starts = {note.origin[0].page_index for note in blocks.notes if note.origin}
+    folder_of = FIXTURES / "kadesh_redo_links"
+    return [
+        path.read_text(encoding="utf-8")
+        if (path := folder_of / f"p{page.index:03d}.txt").exists()
+        else ""
+        for page in pages.pages
+        if page.kind is PageKind.TEXT and page.index in starts
+    ]
+
+
+# The excerpt's link edits with the recorded answers of its pages 0, 1, 3
+# and 7 (Kadesh's 8, 9, 11 and 15), each checked against the reference
+# tests/fixtures/expected/kadesh_reference/note_references.json.
+# On page 1, "Lenormant," to note 5 is refused, since galley links note 5
+# from "Chabas", for which the model's answer gives no note line; then
+# "Salvolini" to note 4 is refused too, since galley's link from
+# "Lenormant," to note 4 stays.
+EXCERPT_LINKS = (
+    (0, "investigation.\u2019", "investigation.[2](#n-p0000-003)"),
+    (0, "forces.3", "forces.[3](#n-p0000-004)"),
+    (1, "\u201cRecord\u201d", "\u201cRecord\u201d[7](#n-p0001-004)"),
+)
+
+
+# Renders with PDFium.
+@pytest.mark.thread_unsafe
+@pytest.mark.tesseract
+@pytest.mark.pandoc
+def test_excerpt_note_links_are_the_references_the_page_prints(
+    tmp_path: Path,
+    redo_excerpt_run: Callable[[str], BookFolder],
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+) -> None:
+    from galley import markdown
+
+    fake, server = lm_studio()
+    folder, config = _excerpt_folder(tmp_path, redo_excerpt_run, server)
+    fake.in_order.extend(_recorded_answers(folder))
+    fake.links_in_order.extend(_recorded_link_answers(folder))
+    correct.run(folder, config, workers=1)
+    assert fake.in_order == []
+    assert fake.links_in_order == []
+    links = [
+        (edit.page_index, edit.old, edit.new)
+        for edit in read_edits(folder.correct_jsonl)
+        if edit.reason == "vision_note_link"
+    ]
+    assert tuple(links) == EXCERPT_LINKS
+    markdown.run(folder, config)
+    book = folder.book_md.read_text(encoding="utf-8")
+    assert "forces\\.[^n-p0000-004]" in book
+    assert "Record\u201d[^n-p0001-004]" in book

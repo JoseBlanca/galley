@@ -202,6 +202,7 @@ An unknown key or a wrong type is an error.
 | `correct_model` | string, `"qwen/qwen3.6-35b-a3b"` | the vision model the correct stage asks, as LM Studio names it (`docs/specs/correct.md` §3) |
 | `correct_server` | string, `"http://localhost:1234"` | LM Studio's address; only `http` on `localhost`, `127.0.0.1` or `[::1]`, so that a book's text never leaves the machine |
 | `correct_second_model` | string, none | a second model whose reading of each page's notes marks the correct stage's doubtful edits; none by default |
+| `correct_links` | bool, true | whether the correct stage also links footnotes to their references from the model's reading (`docs/specs/correct.md` §9b) |
 | `exclude_pages` | list of page indices, `[]` | pages left out, as removals |
 | `exclude_regions` | list of `{page, box}`, `[]` | a library stamp, a label |
 | `cover_page` | page index, none | rendered as the EPUB's cover |
@@ -753,8 +754,12 @@ every other block as a Pandoc fenced div with its id (`::: {#b-p0012-003}`);
 notes with `referenced` true as Pandoc footnotes, each of their blocks a
 fenced div with its id inside the footnote, which Pandoc puts at the end
 of each chapter and the Kindle shows as pop-ups (section 17);
-footnotes with `referenced` false as ordinary blocks where they were
-printed, the marker first; endnotes, referenced or not, where they were
+footnotes with `referenced` false, each a div with its id and its
+marker first, at the end of their chapter (the blocks up to the next
+heading of level 1 or 2, or the book's end), after a heading "Notes"
+one level below the chapter's, of class `unlisted`, which keeps it out
+of the EPUB's table of contents, and `chapter-notes`
+(`docs/specs/structure.md` §36; owner, 19 November 2026); endnotes, referenced or not, where they were
 printed, as one list in the book's order, each note a div with its id,
 and each reference to one a link to it marked as a note reference
 (`epub:type="noteref"`), which a Kindle can show as a pop-up (Pandoc
@@ -810,7 +815,10 @@ November 2026: patches, usable by agents too).
   text as edited so far, and that occurrence lies inside one span that is
   not a note reference, so that no edit changes a note reference or joins
   two spans (`docs/specs/correct.md` §10). Then `old` becomes `new` in
-  that span. Otherwise markdown stops with an error
+  that span. An edit whose `new` ends with a link to a note,
+  `[x](#n-p0008-004)`, puts a note reference after the new text, or in
+  place of the reference that follows it (`docs/specs/correct.md` §9b
+  and §10). Otherwise markdown stops with an error
   that lists every edit that did not apply, with its file, line and
   reason. Nothing is skipped.
 - When edits stop applying because structure changed, the owner reruns
@@ -971,6 +979,11 @@ lists the words, with the pages they came from where the origins say.
   `source`, in its `epigraph-source` div after the dash markdown writes
   there, which is not compared, and a note's `group`, in the
   `note-group` div before the note (`docs/specs/structure.md` §25).
+  A heading of class `chapter-notes`, the "Notes" markdown writes
+  before a chapter's unlinked footnotes, holds no word of the book:
+  `read_markdown` gives no word for it when its text is exactly
+  "Notes", and raises an error with any other text (§36 of the same
+  spec).
   A list in `book.md` is read item by item, each item's blocks as
   blocks, and holds only the forms markdown writes: an item of one div
   of a list item, or of one div of a contents entry followed by a
@@ -1183,6 +1196,13 @@ for the owner by the plan ocr-redo (`docs/plans/ocr-redo.md`):
 - **Stubbs' letter fragments are removals of their own**,
   `letter_fragment`, in a book where they are common
   (`docs/specs/structure.md` §35).
+
+On 19 November 2026, after reading Kadesh, the owner decided:
+
+- **A footnote with no linked reference goes to the end of its
+  chapter**, under a heading "Notes", in the order printed, with its
+  marker; endnotes and linked footnotes stay as they were
+  (`docs/specs/structure.md` §36).
 
 ## 18. Not in this document
 

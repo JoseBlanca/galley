@@ -881,8 +881,9 @@ def test_endnote_words_stand_near_the_page_of_their_first_reference(
 
 # The order of the notes at markdown (spec section 5): book.md writes a
 # referenced footnote after the block that refers to it and an
-# unreferenced one after the last block of its page, as on Mariéjol's
-# page 20, where the unreferenced note 1 follows notes 2 and 3.
+# unreferenced one at the end of its chapter (structure spec section 36),
+# as on Mariéjol's page 20, where the unreferenced note 1 follows notes 2
+# and 3.
 
 
 def _footnote(
@@ -961,7 +962,8 @@ def test_notes_at_markdown_keep_the_order_of_blocks_json(tmp_path: Path) -> None
 
 
 # galley's markdown stage on a file with every kind of note: its words, as
-# read_markdown reads them, are the tokens at blocks, word for word.
+# read_markdown reads them, are the tokens at blocks, word for word, with
+# the unreferenced footnote moved to the chapter's end under "Notes".
 
 _EVERY_NOTE_LINES = LinesFile(
     source_pdf_sha256=_SHA,
@@ -1051,7 +1053,14 @@ def test_markdown_tokens_of_galleys_book_md_are_the_tokens_at_blocks(
     config = BookConfig(
         pdf=tmp_path / "book.pdf", title="Law", authors=("A",), language=Language.EN
     )
-    markdown = read_markdown(render_markdown(blocks, config))
+    text = render_markdown(blocks, config)
+    # The unreferenced footnote, printed first, is written last, after the
+    # chapter's "Notes" heading.
+    assert text.index("## Notes {#notes-n-p0000-001") < text.index(
+        "{#n-p0000-001 .note}"
+    )
+    assert text.index("{#n-p0010-002 .endnote}") < text.index("## Notes")
+    markdown = read_markdown(text)
     at_blocks = blocks_tokens(blocks, _EVERY_NOTE_LINES)
     at_markdown = markdown_tokens(markdown, blocks, at_blocks)
     assert [(token.text, token.block_id) for token in at_markdown] == [

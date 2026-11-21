@@ -11,7 +11,14 @@ from typing import assert_never
 
 from galley.correct._align import Pair, align
 from galley.correct._reading import GalleyToken, Place
-from galley.correct._tokens import Token, alike, clean_answer, comparison_form, tokens
+from galley.correct._tokens import (
+    LineEndJoin,
+    Token,
+    alike,
+    cleaned_answer,
+    comparison_form,
+    tokens,
+)
 from galley.model import Block, Edit, block_sha256, only_occurrence
 
 _logger = logging.getLogger(__name__)
@@ -58,16 +65,31 @@ class Change:
 
 @dataclass(frozen=True, slots=True)
 class Answer:
-    """A model's answer cut into tokens: `text` as cleaned and its tokens."""
+    """A model's answer cut into tokens: `text` as cleaned and its tokens;
+    `joins` gives, by token position, the line-end join inside the token,
+    for a word the model printed broken at a line end."""
 
     text: str
     tokens: tuple[Token, ...]
+    joins: Mapping[int, LineEndJoin] = frozendict()
 
 
 def answer(raw: str) -> Answer:
     """The model's raw answer as cleaned text and its tokens."""
-    text = clean_answer(raw)
-    return Answer(text, tokens(text))
+    text, joins = cleaned_answer(raw)
+    answer_tokens = tokens(text)
+    return Answer(
+        text,
+        answer_tokens,
+        frozendict(
+            {
+                position: join
+                for join in joins
+                for position, token in enumerate(answer_tokens)
+                if token.start < join.offset < token.end
+            }
+        ),
+    )
 
 
 def _core(reading_answer: Answer, position: int) -> str:
@@ -378,6 +400,49 @@ def _insertions(
     return tuple(changes)
 
 
+def _whole_word(
+    reading: Sequence[GalleyToken],
+    position: int,
+    place: Place,
+    model_form: str,
+    galley_text: Mapping[Place, str],
+    paired: Mapping[int, int],
+) -> tuple[Place, str, Place | None]:
+    """The place a replacement of galley's token at `position`, whose core
+    is at `place`, covers, galley's core there for checks (a) to (c), and
+    the place of the first half when it covers two: the token's own; or
+    both halves of a word split at a line end, their cores joined without
+    the hyphen, when the token is the second half, the first half is the
+    token before, pairs with nothing, and joined with it is more alike the
+    model's form (section 7)."""
+    token = reading[position]
+    head = token.first_half
+    if (
+        head is None
+        or position == 0
+        or reading[position - 1].place != head
+        or position - 1 in paired
+        or alike(reading[position - 1].form + token.form, model_form)
+        <= alike(token.form, model_form)
+    ):
+        return place, galley_text[place], None
+    return (
+        Place(place.block_id, place.span_index, head.start, place.end),
+        galley_text[head][:-1] + galley_text[place],
+        head,
+    )
+
+
+def _halves(
+    model_core: str, join: LineEndJoin, start: int, first: str, second: str
+) -> str:
+    """The model's word broken in capitals at a line end, with its hyphen,
+    each half in the case of galley's half: "DINDORF-MÜLLER" against
+    "Dirporr-" and "MCiuer" is "Dindorf-Müller" (section 7)."""
+    cut = join.offset - start
+    return cased(model_core[:cut], first) + "-" + cased(model_core[cut:], second)
+
+
 def page_changes(
     page_index: int,
     reading: Sequence[GalleyToken],
@@ -407,6 +472,7 @@ def page_changes(
         )
     changes: list[tuple[float, Change]] = []
     consumed: set[int] = set()
+    paired = _paired(pairs)
     for pair in pairs:
         if pair.first is None or pair.second is None:
             continue
@@ -419,12 +485,26 @@ def page_changes(
             or alike(token.form, model_form) < _LEAST_ALIKE
         ):
             continue
-        replacement = _replacement(
-            galley_text[token.place], model_answer, pair.second, unpaired
+        place, galley_core, head = _whole_word(
+            reading, pair.first, token.place, model_form, galley_text, paired
         )
+        join = model_answer.joins.get(pair.second)
+        if head is not None and join is None:
+            # The model printed the word whole: galley's hyphen may be one
+            # the word has; leave it alone (section 7).
+            continue
+        replacement = _replacement(galley_core, model_answer, pair.second, unpaired)
         if replacement is None:
             continue
         new_core, beside = replacement
+        if head is not None and join is not None and join.capitals:
+            new_core = _halves(
+                _core(model_answer, pair.second),
+                join,
+                model_answer.tokens[pair.second].start,
+                galley_text[head][:-1],
+                galley_text[token.place],
+            )
         if beside is not None:
             consumed.add(beside)
         changes.append(
@@ -433,7 +513,7 @@ def page_changes(
                 Change(
                     kind=ChangeKind.REPLACE,
                     page_index=page_index,
-                    place=token.place,
+                    place=place,
                     text=new_core,
                     second_reading=second.replaced(pair.first)
                     if token.note_id is not None
@@ -566,30 +646,28 @@ def block_edits(
     occurs once in the block's text as structure wrote it and as the edits
     before it leave it. A change no such `old` can hold is not proposed,
     and logged."""
-    by_word: dict[tuple[int, int], list[Change]] = {}
     span_words = {index: _words(span.text) for index, span in enumerate(block.spans)}
-    for change in changes:
-        words = span_words[change.place.span_index]
-        position = next(
-            index
-            for index, word in enumerate(words)
-            if word.start <= change.place.start and change.place.end <= word.end
-        )
-        by_word.setdefault((change.place.span_index, position), []).append(change)
+    by_word = _by_word(changes, span_words)
     original = "".join(span.text for span in block.spans)
     spans = [span.text for span in block.spans]
     shift = dict.fromkeys(range(len(spans)), 0)
     edits = []
-    for span_index, position in sorted(by_word):
-        word_changes = by_word[(span_index, position)]
+    for (span_index, first, last), word_changes in sorted(by_word.items()):
         words = span_words[span_index]
         text = block.spans[span_index].text
-        word = words[position]
-        new_word = _changed_word(text[word.start : word.end], word.start, word_changes)
-        if new_word == text[word.start : word.end]:
+        start, end = words[first].start, words[last].end
+        new_word = _changed_word(text[start:end], start, word_changes)
+        if new_word == text[start:end]:
             continue
-        changed = {key[1] for key in by_word if key[0] == span_index}
-        bounds = _context(words, position, changed, text, (original, "".join(spans)))
+        changed = {
+            index
+            for key in by_word
+            if key[0] == span_index
+            for index in range(key[1], key[2] + 1)
+        }
+        bounds = _context(
+            words, (first, last), changed, text, (original, "".join(spans))
+        )
         first_change = word_changes[0]
         if bounds is None:
             _logger.info(
@@ -597,16 +675,12 @@ def block_edits(
                 "not proposed",
                 first_change.page_index,
                 block.id,
-                text[word.start : word.end],
+                text[start:end],
             )
             continue
         low, high = bounds
         old = text[words[low].start : words[high].end]
-        new = (
-            text[words[low].start : word.start]
-            + new_word
-            + text[word.end : words[high].end]
-        )
+        new = text[words[low].start : start] + new_word + text[end : words[high].end]
         reason = (
             EditReason.VISION_WORD
             if any(change.kind is ChangeKind.REPLACE for change in word_changes)
@@ -633,19 +707,50 @@ def block_edits(
     return tuple(edits)
 
 
+def _by_word(
+    changes: Sequence[Change], span_words: Mapping[int, Sequence[_Word]]
+) -> dict[tuple[int, int, int], list[Change]]:
+    """The changes grouped by the whitespace words they touch: by span, and
+    first and last word of the span, one word but for a replacement of
+    both halves of a word split at a line end (section 7). Changes whose
+    words overlap are in one group."""
+    ranges = []
+    for change in changes:
+        words = span_words[change.place.span_index]
+        first = next(
+            index
+            for index, word in enumerate(words)
+            if word.start <= change.place.start < word.end
+        )
+        last = next(
+            index
+            for index in range(first, len(words))
+            if change.place.end <= words[index].end
+        )
+        ranges.append((change.place.span_index, first, last, change))
+    merged: list[tuple[int, int, int, list[Change]]] = []
+    for span_index, first, last, change in sorted(ranges, key=lambda r: r[:3]):
+        if merged and merged[-1][0] == span_index and first <= merged[-1][2]:
+            _, low, high, group = merged[-1]
+            merged[-1] = (span_index, low, max(last, high), [*group, change])
+        else:
+            merged.append((span_index, first, last, [change]))
+    return {(span, low, high): group for span, low, high, group in merged}
+
+
 def _context(
     words: Sequence[_Word],
-    position: int,
+    positions: tuple[int, int],
     changed: set[int],
     text: str,
     texts: tuple[str, str],
 ) -> tuple[int, int] | None:
-    """The first and last word of `old` around the word at `position` of
-    the span `text`, widened alternately after and before, never over a word
-    another change touches, until `old` occurs once in each of `texts`, the
-    block's text as structure wrote it and as edited so far; None when it
-    never does."""
-    low = high = position
+    """The first and last word of `old` around the words `positions`, first
+    and last, of the span `text`, widened alternately after and before,
+    never over a word another change touches, until `old` occurs once in
+    each of `texts`, the block's text as structure wrote it and as edited
+    so far; None when it never does."""
+    low, high = positions
     toward_end = True
     while True:
         old = text[words[low].start : words[high].end]

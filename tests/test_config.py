@@ -66,6 +66,7 @@ def test_config_with_every_key_is_read_into_its_values(
             "correct_model": '"qwen/qwen3.6-27b"',
             "correct_server": '"http://127.0.0.1:5678/"',
             "correct_second_model": '"allenai/olmocr-2-7b"',
+            "correct_links": "false",
         },
     )
 
@@ -89,6 +90,7 @@ def test_config_with_every_key_is_read_into_its_values(
         correct_model="qwen/qwen3.6-27b",
         correct_server="http://127.0.0.1:5678",
         correct_second_model="allenai/olmocr-2-7b",
+        correct_links=False,
     )
 
 
@@ -115,6 +117,7 @@ def test_config_with_only_the_required_keys_has_the_defaults(
         correct_model="qwen/qwen3.6-35b-a3b",
         correct_server="http://localhost:1234",
         correct_second_model=None,
+        correct_links=True,
     )
 
 
@@ -277,6 +280,7 @@ def test_region_without_its_box_is_an_error(
         ("correct_model", '""', "correct_model"),
         ("correct_second_model", "true", "correct_second_model"),
         ("correct_second_model", '""', "correct_second_model"),
+        ("correct_links", '"yes"', "correct_links"),
         ("correct_server", "1234", "correct_server"),
         ("exclude_regions", '"x"', "exclude_regions"),
         ("exclude_regions", "[3]", "exclude_regions[0]"),

@@ -479,6 +479,15 @@ def _unreferenced_note(
     )
 
 
+def _endnote(note_id: str, page_index: int, *blocks: Block) -> Note:
+    """An unreferenced endnote, which is written where it was printed
+    (structure spec section 10, option b): an unlinked footnote goes to the
+    end of its chapter instead (section 36)."""
+    return replace(
+        _unreferenced_note(note_id, page_index, *blocks), kind=NoteKind.ENDNOTE
+    )
+
+
 HEADER = """\
 ---
 title: "Political Theories of the Middle Age"
@@ -525,15 +534,21 @@ First paragraph\\.
 runs over the page\\.
 :::
 
+::: {#b-p0004-001 .margin-note}
+Of kings\\.
+:::
+
+::: {#b-p0005-001}
+Last\\.
+:::
+
+## Notes {#notes-n-p0003-001 .unlisted .chapter-notes}
+
 :::: {#n-p0003-001 .note}
 ::: {#b-p0003-003}
 \\* A note of page three\\.
 :::
 ::::
-
-::: {#b-p0004-001 .margin-note}
-Of kings\\.
-:::
 
 :::: {#n-p0004-001 .note}
 ::: {#b-p0004-002}
@@ -544,15 +559,11 @@ A note\\,
 in two paragraphs\\.
 :::
 ::::
-
-::: {#b-p0005-001}
-Last\\.
-:::
 """
 )
 
 
-def test_render_markdown_writes_margin_notes_where_they_are_and_notes_after_their_page() -> (
+def test_render_markdown_writes_margin_notes_where_they_are_and_unlinked_notes_at_the_end() -> (
     None
 ):
     assert render_markdown(SIDE_TEXT, CONFIG) == SIDE_TEXT_MARKDOWN
@@ -576,12 +587,12 @@ def test_notes_of_a_page_follow_the_side_text_of_the_page_before() -> None:
             _block("b-p0005-001", BlockKind.PARAGRAPH, "Page five.", 5),
         ),
         (
-            _unreferenced_note(
+            _endnote(
                 "n-p0003-001",
                 3,
                 _block("b-p0003-003", BlockKind.PARAGRAPH, "Note three.", 3),
             ),
-            _unreferenced_note(
+            _endnote(
                 "n-p0004-001",
                 4,
                 _block("b-p0004-001", BlockKind.PARAGRAPH, "Note four.", 4),
@@ -612,7 +623,7 @@ def test_a_note_follows_the_last_block_in_blocks_order_that_starts_on_its_page_o
             _block("b-p0002-002", BlockKind.MARGIN_NOTE, "Out of order.", 2),
         ),
         (
-            _unreferenced_note(
+            _endnote(
                 "n-p0004-001",
                 4,
                 _block("b-p0004-001", BlockKind.PARAGRAPH, "Page four.", 4),
@@ -634,7 +645,7 @@ def test_a_note_before_every_page_of_the_blocks_comes_first_of_all() -> None:
     blocks = _blocks_file(
         (_block("b-p0002-001", BlockKind.PARAGRAPH, "Page two.", 2),),
         (
-            _unreferenced_note(
+            _endnote(
                 "n-p0001-001",
                 1,
                 _block("b-p0001-001", BlockKind.PARAGRAPH, "Page one.", 1),
@@ -656,7 +667,7 @@ def test_notes_after_the_same_block_keep_their_order() -> None:
             _block("b-p0002-001", BlockKind.PARAGRAPH, "Page two.", 2),
         ),
         tuple(
-            _unreferenced_note(
+            _endnote(
                 f"n-p0001-00{position}",
                 1,
                 _block(f"b-p0001-00{position + 1}", BlockKind.PARAGRAPH, "A note.", 1),
@@ -1248,6 +1259,8 @@ def test_an_unreferenced_footnote_writes_its_marker_after_its_margin_note() -> N
     assert render_markdown(_blocks_file((), (note,)), CONFIG) == (
         HEADER
         + """
+## Notes {#notes-n-p0003-001 .unlisted .chapter-notes}
+
 :::: {#n-p0003-001 .note}
 ::: {#b-p0003-002 .margin-note}
 Of kings\\.
@@ -1314,8 +1327,9 @@ def test_endnotes_with_a_body_block_between_them_are_two_lists() -> None:
 
 def test_a_footnote_and_an_endnote_at_one_place_are_written_apart() -> None:
     # An unreferenced footnote and an endnote, both printed on page 9, are
-    # written after the page's paragraph; only the endnote is in the
-    # endnotes' list.
+    # written after the page's paragraph, the footnote under "Notes" after
+    # the endnotes' list (structure spec section 36); only the endnote is
+    # in the list.
     blocks = _blocks_file(
         (_block("b-p0009-001", BlockKind.PARAGRAPH, "Text.", 9),),
         (
@@ -1339,10 +1353,12 @@ def test_a_footnote_and_an_endnote_at_one_place_are_written_apart() -> None:
     written = render_markdown(blocks, CONFIG)
 
     assert written.count("::::: {.endnotes}") == 1
-    endnotes = written[written.index("::::: {.endnotes}") :]
+    start = written.index("::::: {.endnotes}")
+    endnotes = written[start : written.index(":::::\n", start + 1)]
     assert "b-p0009-003" in endnotes
     assert "b-p0009-002" not in endnotes
-    assert written.index("b-p0009-002") < written.index("::::: {.endnotes}")
+    assert written.index("::::: {.endnotes}") < written.index("## Notes")
+    assert written.index("## Notes") < written.index("b-p0009-002")
 
 
 @pytest.mark.pandoc

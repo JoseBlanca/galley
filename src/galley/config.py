@@ -64,8 +64,9 @@ class BookConfig:
     footnote band with Tesseract (architecture section 6). `correct_model`
     is the vision model the correct stage asks, as LM Studio names it,
     `correct_server` LM Studio's address on this machine, and
-    `correct_second_model` the model of the second reading, None for none
-    (docs/specs/correct.md, section 3).
+    `correct_second_model` the model of the second reading, None for none,
+    and `correct_links` whether the stage also links notes to their
+    references (docs/specs/correct.md, sections 3 and 9b).
     """
 
     pdf: Path
@@ -84,6 +85,7 @@ class BookConfig:
     correct_model: str = DEFAULT_CORRECT_MODEL
     correct_server: str = DEFAULT_CORRECT_SERVER
     correct_second_model: str | None = None
+    correct_links: bool = True
 
 
 # The hosts LM Studio may be asked on: this machine only, so that a book's
@@ -105,6 +107,7 @@ _OPTIONAL_KEYS = (
     "correct_model",
     "correct_server",
     "correct_second_model",
+    "correct_links",
 )
 _REGION_KEYS = ("page", "box")
 _BOX_COORDINATES = 4
@@ -204,6 +207,7 @@ def _config_from_toml(content: dict[str, object], path: Path) -> BookConfig:
             "correct_second_model",
             path,
         ),
+        correct_links=_bool(content.get("correct_links", True), "correct_links", path),
     )
 
 
