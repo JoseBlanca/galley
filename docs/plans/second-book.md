@@ -4,7 +4,8 @@ The owner read Kadesh (`battleofkadeshst00breauoft`) with the correct
 stage on 21 November 2026, found it "very good", and said to go on.
 The stage is off for books whose OCR is good until it is measured on a
 second book (`docs/specs/correct.md` §16). Dated 21 November 2026.
-State: approved; under way.
+State: done on 21 November 2026, but for the Kadesh EPUB rebuilt with
+the vision model, which waits for LM Studio's memory.
 
 ## 1. The correct stage on Domesday
 
@@ -19,8 +20,8 @@ doubtful edits and how many are wrong, time per page. Then recommend
 whether the stage should be on for a book like Domesday, and write the
 result into `docs/specs/correct.md` §16.
 
-- [ ] 1.1 The reference.
-- [ ] 1.2 The measurement and the recommendation.
+- [x] 1.1 The reference.
+- [x] 1.2 The measurement and the recommendation.
 
 ## 2. Kadesh pages without links
 
@@ -33,7 +34,7 @@ checked on the images against `tests/fixtures/expected/kadesh_reference/`
 where it covers the page, otherwise on the image. Build only with no
 wrong link.
 
-- [ ] 2.1 The cause and, if found, the rule.
+- [x] 2.1 The cause and, if found, the rule.
 
 ## 3. The end
 
