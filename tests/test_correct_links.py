@@ -184,18 +184,28 @@ def test_two_notes_nearly_as_alike_give_no_note() -> None:
 
 
 @pytest.mark.parametrize(
-    ("galley_after", "model_word", "number", "misread"),
+    ("galley_core", "galley_after", "model_word", "number", "misread"),
     [
-        (".3", "forces.", "3", "3"),
-        (";™", "enemy;", "34", "™"),
-        ("“", "Zahi", "64", "“"),
-        (".”", 'advanced."', "74", ""),
-        (".", "forces.", "3", ""),
-        (".abc", "forces.", "3", ""),
-        (".1234", "forces.", "3", ""),
+        ("forces", ".3", "forces.", "3", "3"),
+        ("enemy;™", "", "enemy;", "34", "™"),
+        ("Zahi", "“", "Zahi", "64", "“"),
+        ("advanced", ".”", 'advanced."', "74", ""),
+        ("forces", ".", "forces.", "3", ""),
+        ("forces", ".abc", "forces.", "3", ""),
+        ("forces", ".1234", "forces.", "3", ""),
         # The number is in galley's word: the printed quote before it,
         # which the model left out, stays in the word.
-        (".”37", "soldiers.", "37", "37"),
+        ("soldiers", ".”37", "soldiers.", "37", "37"),
+        # A sign the core keeps: taken out when it is one the OCR gives for
+        # a raised number and the model's word lacks it.
+        ("map®", "", "map", "43", "®"),
+        ("map®", "", "map®", "43", ""),
+        ("50%", "", "50", "3", None),
+        ("50%", "", "50%", "3", ""),
+        ("soldiers;™", "", "soldiers.", "36", None),
+        ("map®", ".abc", "map", "43", None),
+        # A core made only of signs is not cut.
+        ("®", "", "®", "3", ""),
     ],
     ids=[
         "digit",
@@ -206,12 +216,23 @@ def test_two_notes_nearly_as_alike_give_no_note() -> None:
         "letters",
         "too_long",
         "quote_before_the_number",
+        "raised_sign",
+        "raised_sign_the_model_has",
+        "printed_sign",
+        "printed_sign_the_model_has",
+        "other_punctuation",
+        "sign_left_in_the_word",
+        "only_signs",
     ],
 )
 def test_the_misread_reference_is_what_galley_has_past_the_models_punctuation(
-    galley_after: str, model_word: str, number: str, misread: str
+    galley_core: str,
+    galley_after: str,
+    model_word: str,
+    number: str,
+    misread: str | None,
 ) -> None:
-    assert misread_reference(galley_after, model_word, number) == misread
+    assert misread_reference(galley_core, galley_after, model_word, number) == misread
 
 
 # The link edits.
@@ -285,6 +306,21 @@ def test_a_link_takes_the_place_of_a_sign_the_words_core_keeps() -> None:
         ("soldiers;™", "soldiers;[36](#n-p0008-003)"),
         ("map®", "map[43](#n-p0008-004)"),
     ]
+
+
+def test_a_printed_sign_the_core_keeps_and_the_model_lacks_gives_no_link() -> None:
+    # Section 9b: "%" may be printed, so "50%" against the model's "50"
+    # keeps its sign and gets no link.
+    block = _block("b-p0014-002", _span("about 50% of them"))
+    text = block.spans[0].text
+    link = Link(
+        page_index=8,
+        place=Place(block.id, 0, text.index("50%"), text.index("50%") + 3),
+        note_id="n-p0008-003",
+        text="3",
+        model_word="50",
+    )
+    assert link_edits(_blocks((block,), PAGE.notes), (link,), (), (), MODEL) == ()
 
 
 def test_a_word_twice_in_its_block_takes_the_words_before_it() -> None:

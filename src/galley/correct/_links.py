@@ -55,6 +55,10 @@ _MISREAD_LONGEST = 3
 _MISREAD_CHARACTERS = frozenset("0123456789'\"‘’“”*†‡™®^%")
 _QUOTE_CHARACTERS = frozenset("'\"‘’“”")
 _STRAIGHT = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"'})
+# The signs the OCR gives for a raised number that a link may take out of
+# galley's core: every core of the seven books that ends in one is a
+# misread reference or noise (section 9b, 21 November 2026).
+_RAISED_SIGNS = frozenset("™®^")
 # What is no letter or digit at the end of a core: section 6 keeps a sign
 # such as "™" in the core, and the punctuation before it ("soldiers;™").
 _CORE_END = re.compile(r"[\W_]+$")
@@ -368,40 +372,53 @@ def _words(text: str) -> tuple[_Word, ...]:
     )
 
 
-def _bare_end(text: str, start: int, end: int) -> int:
-    """The end of the core `text[start:end]` less what is no letter or
-    digit at its end (section 9b)."""
-    found = _CORE_END.search(text, start, end)
-    return end if found is None or found.start() == start else found.start()
+def _bare_end(core: str) -> int:
+    """The length of `core` less what is no letter or digit at its end
+    (section 9b); the whole core when nothing else is left."""
+    found = _CORE_END.search(core)
+    return len(core) if found is None or found.start() == 0 else found.start()
 
 
-def misread_reference(galley_after: str, model_word: str, number: str) -> str:
-    """The misread reference at the end of a galley word (section 9b):
-    `galley_after` is what follows the word's core cut by `_bare_end`; the
-    characters past
-    those the model's word has after its core, when they are 1 to 3 digits
-    or signs; empty otherwise. When they hold the reference's `number`,
-    the quotes before it are no part of the reference: they stay in the
-    word ("soldiers.”37" has the misread reference "37")."""
+def misread_reference(
+    galley_core: str, galley_after: str, model_word: str, number: str
+) -> str | None:
+    """The misread reference at the end of a galley word, which a link
+    takes the place of (section 9b): `galley_core` is the core of the
+    word's token the link follows and `galley_after` what follows it in
+    the word; `model_word` is the word the model printed before the
+    reference `number`. Both cores are cut of what is no letter or digit
+    at their end; the characters galley has past those the model has
+    there are the misread reference when they are 1 to 3 digits or signs,
+    empty otherwise. When they hold `number`, the quotes before it stay
+    in the word ("soldiers.”37" has the misread reference "37"). None, no
+    link, when galley's core keeps past the model's a character other
+    than "™", "®" or "^", or one that the misread reference leaves in the
+    word ("50%" against the model's "50")."""
     model_tokens = tokens(model_word)
-    model_after = (
-        model_word[
-            _bare_end(model_word, model_tokens[-1].start, model_tokens[-1].end) :
-        ]
-        if model_tokens
-        else ""
-    )
-    if not galley_after.translate(_STRAIGHT).startswith(
-        model_after.translate(_STRAIGHT)
-    ):
-        return ""
-    tail = galley_after[len(model_after) :]
+    model_after = ""
+    if model_tokens:
+        model_core = model_word[model_tokens[-1].start : model_tokens[-1].end]
+        model_after = (
+            model_core[_bare_end(model_core) :] + model_word[model_tokens[-1].end :]
+        )
+    galley_cut = galley_core[_bare_end(galley_core) :]
+    signs = galley_cut[len(model_after) :]
+    if any(c not in _RAISED_SIGNS for c in signs):
+        return None
+    after = galley_cut + galley_after
+    if not after.translate(_STRAIGHT).startswith(model_after.translate(_STRAIGHT)):
+        return None if signs else ""
+    tail = after[len(model_after) :]
+    misread = tail
     if len(tail) > _MISREAD_LONGEST or any(c not in _MISREAD_CHARACTERS for c in tail):
-        return ""
-    found = tail.find(number) if number else -1
-    if found > 0 and all(c in _QUOTE_CHARACTERS for c in tail[:found]):
-        return tail[found:]
-    return tail
+        misread = ""
+    elif (found := tail.find(number) if number else -1) > 0 and all(
+        c in _QUOTE_CHARACTERS for c in tail[:found]
+    ):
+        misread = tail[found:]
+    if signs and not misread.startswith(signs):
+        return None
+    return misread
 
 
 def _changed_offsets(changes: Sequence[Change]) -> dict[tuple[str, int], list[int]]:
@@ -478,10 +495,20 @@ def _link_edit(
     text = block.spans[link.place.span_index].text
     word = words[position]
     misread = misread_reference(
-        text[_bare_end(text, link.place.start, link.place.end) : word.end],
+        text[link.place.start : link.place.end],
+        text[link.place.end : word.end],
         link.model_word,
         link.text,
     )
+    if misread is None:
+        _logger.info(
+            "page %d, block %s: %r ends in a sign that may be printed; no link to %s",
+            link.page_index,
+            block.id,
+            text[word.start : word.end],
+            link.note_id,
+        )
+        return None
     low = _context(text, words, position, changed, texts)
     if low is None:
         _logger.info(
