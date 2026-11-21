@@ -732,7 +732,9 @@ differ between runs at temperature 0, so each run is its own sample):
 | with the k-th reference to the k-th footnote too | 40 | 40 | 0 |
 
 In the last run 14 pages lost their links to the rule of the numbers of
-a page, and the notes linked in the book went from 41 to 76 of 183.
+a page, and the notes linked in the book went from 41 to 76 of 183. The
+stage took 3,705 s for 44 pages against about 474 s without links,
+with another model of the owner's running on the same Mac.
 
 **The pages without links**, measured 21 November 2026 on new answers
 of the 35B model for the 42 pages where a footnote starts (the answers
@@ -753,12 +755,11 @@ page images:
 The rule for a reference with no place, and the end of the comparison
 with galley's markers, link pages 40, 26 and 53: 13 more links, all to
 the right note after the right word, against `kadesh_reference`, which
-covers the three pages. On the 42 pages the stage's links went from 43
-to 56, and no other page changed. A rule that left out of the count a
+covers the three pages. On the 42 pages the stage's link edits went
+from 43 to 56, and no other page changed; the links that equal galley's
+own, page 28's two among them, give no edit and are not counted. A rule that left out of the count a
 reference whose number has no note line was tried and lost 5 right
-links (pages 9 and 20) and gained none. The
-stage took 3,705 s for 44 pages against about 474 s without links,
-with another model of the owner's running on the same Mac.
+links (pages 9 and 20) and gained none.
 
 ## 10. How markdown applies the edits
 
@@ -1087,8 +1088,9 @@ wait either way.
    second reading does not mark, since they are not in a footnote; and
    the table is made worse. Getting the footnotes' gain takes about 7
    hours for the book and checking against the images some 1,000
-   doubtful edits (6 on the two pages with Latin footnotes, about 2 on
-   each of the book's 489 pages with footnotes), while the body's Latin
+   doubtful edits (6 on the three measured pages with footnotes, 100,
+   180 and 470, so about 2 on each of the book's 489 pages with
+   footnotes), while the body's Latin
    quotations keep wrong edits nobody is told of. That is why the
    recommendation is off for a book like Domesday: the English, which is
    most of what is read, gains nothing a reader would see. The case for
