@@ -2097,6 +2097,18 @@ reading order:
   on page 77, to the right note. A sign at the end of a
   word of one letter, "T*", stays a candidate: the rule changed on all
   eight books would also unlink a reference of Kadesh's page 39.
+  An opening single quotation mark, "‘", is a sign of this kind too,
+  but only after a letter and any punctuation, never a word of its own:
+  a word never ends with an opening quotation mark, and Tesseract reads
+  the raised 4 after "Salvolini" on Kadesh's page 9 as
+  "Salvolini‘". Without it the page's two other candidates, "Lenormant,*"
+  and "Chabas*", took notes 4 and 5 instead of 5 and 6, since the page's
+  notes have no value. Measured on 21 November 2026 on every line of the
+  `lines.json` of the seven books' runs of the note-links plan, one word
+  more has this form besides "Salvolini‘": Domesday's "S‘." (page 329),
+  which the rule for "S*." keeps out. Kadesh has 10 words that end
+  with "“" after a letter ("Zahi“", page 27, is reference 64 by the
+  references read by eye, below), which are left as they are until checked.
 
 **The book's reference form.** A first pass of the matching below, over
 every page and with every candidate, counts for each kind of candidate
@@ -2125,6 +2137,32 @@ candidate wins, then the second note, and so on. The scores:
 | the numbers differ in one digit, a pair the OCR confuses (3 and 8, 5 and 6, 1 and 7, 3 and 5, 6 and 8, 1 and 4, 8 and 9, 2 and 8) | 2 |
 | a sign against a note with no value | 2 |
 | a sign against a note with a value (Haskins: "^" for note 1) | 1 |
+
+**A note without a value between two with values.** Before the
+matching, a footnote with no value that lies between two notes of its
+page with values a and b, k places after the first, is matched as a
+note of value a + k when b − a is the number of places from the first
+to the second: their markers were lost, and the numbers between follow.
+A note before the page's first value or after its last keeps none.
+Kadesh's page 10 prints notes 10 to 14, which Tesseract
+reads as "10", "1!", none, "13The" and "1$", so the notes' values are
+10, none, none, 13, none. The "*" after "(see above)." took note 11,
+the first note without a value, which a sign scores 2 against 1 for a
+note with one, and "Kadesh,12" matched no note. With the values 11 and
+12, "Kadesh,12" takes note 12, and the sign note 14, the only note left
+without a value. In a book numbered per page every note has a value but
+a page's first piece that continues an earlier note, so the rule gives
+values only in a book numbered through, as Kadesh is.
+
+Measured on 21 November 2026 on the `lines.json` of the seven books'
+runs of the note-links plan, with the "‘" above: Kadesh's links go from
+41 to 43 and 5 change, each right by the page images of pages 9 and 10:
+"Salvolini‘" takes note 4, "Lenormant," note 5 (was 4), "Chabas" note
+6 (was 5), "Kadesh,12" note 12, and "(see above)." note 14 (was 11).
+Page 9's three agree with the references read by eye in
+`tests/fixtures/expected/kadesh_reference/note_references.json`, and no
+other link of its twelve pages changes. No link of the other six books
+changes.
 
 A pair that none of these rows scores is never matched. A note left
 unmatched has `referenced` false; a candidate left unmatched
