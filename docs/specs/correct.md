@@ -601,16 +601,32 @@ links of a page are kept only when they number its footnotes in order:
   [6], whose note line matches none of galley's notes, gives no link;
   counted both as the model's third reference and as a note galley
   references, it put the model's "Record" [7], its fourth, one note too
-  far, and the page lost that right link (21 November 2026);
+  far, and the page lost that right link (21 November 2026).
+  A reference that has no place among galley's words, and whose note
+  line names a footnote galley references, counts once too, as that note
+  marked: on page 40 galley reads "beaten" as "»aten", so the model's
+  "beaten" [103] has no place, and counted both as the model's fifth
+  reference and as a note galley references, it put the model's "is."
+  [104], its sixth, one note too far, and the page lost three right
+  links (21 November 2026);
 - in the order of the model's answer, their notes come in the order of
   the page's footnotes, no note twice, and their numbers, those that are
-  digits, rise;
-- each footnote of the page takes its link's number, or else galley's
-  marker when that is digits of as many as the links' longest number (a
-  shorter one is a marker the OCR cut, "1" for 61 on page 26), and these
-  numbers rise in the order of the footnotes.
+  digits, rise.
 
 Otherwise no link of the page is proposed, and the page is logged.
+
+The model's numbers are not compared with galley's markers. Until 21
+November 2026 they were: each footnote took its link's number, or else
+galley's marker, and these numbers had to rise. On pages 26 and 53 the
+model misreads the tens of every number, 66 to 68 for the printed 56 to
+58, 120 to 129 for 130 to 139, and galley's markers 59 and 137 then
+refused all ten links of the two pages, though each goes to the right
+note after the right word (`kadesh_reference`). The comparison caught
+none of the seven wrong links of the run of 20 November 2026 below
+(page 31's markers are no digits, page 21's numbers fall); the k-th
+reference rule did. What the model's number gives is the reference's
+text in the edit, which the owner sees; the EPUB numbers its notes
+itself.
 
 **The link.** The galley word that holds the place's token, its
 whitespace word, gets a reference to that note right after it:
@@ -716,7 +732,31 @@ differ between runs at temperature 0, so each run is its own sample):
 | with the k-th reference to the k-th footnote too | 40 | 40 | 0 |
 
 In the last run 14 pages lost their links to the rule of the numbers of
-a page, and the notes linked in the book went from 41 to 76 of 183. The
+a page, and the notes linked in the book went from 41 to 76 of 183.
+
+**The pages without links**, measured 21 November 2026 on new answers
+of the 35B model for the 42 pages where a footnote starts (the answers
+of the run above were not kept, and differ at temperature 0). On the 13
+pages that run left without links, the causes, from the answers and the
+page images:
+
+| cause | pages |
+|---|---|
+| galley split one printed note into several, or made a note of other text, so the k-th reference is not the k-th footnote | 13 (the list of sources, note 22, split in eight), 46 (a line of junk before the first note, note 111 split in two), 63 (note 173 split in two) |
+| galley joined two printed notes, or left one in the body | 29 (72 joined to 71 of page 28), 62 (169 joined to 168), 36 (87 left as a paragraph of the body) |
+| the model's note lines are one number off its references | 31 (it left out note 76's line and numbered the others from 17) |
+| the model left a reference out | 61 (160) |
+| notes whose first words are alike, "LD., II, 149d" or "Op. cit., p.", so a note line matches no note or the wrong one | 14, 28 (where no new link was possible) |
+| galley's word misread, the model's reference has no place | 40 |
+| the model misread the tens of every number | 26, 53 |
+
+The rule for a reference with no place, and the end of the comparison
+with galley's markers, link pages 40, 26 and 53: 13 more links, all to
+the right note after the right word, against `kadesh_reference`, which
+covers the three pages. On the 42 pages the stage's links went from 43
+to 56, and no other page changed. A rule that left out of the count a
+reference whose number has no note line was tried and lost 5 right
+links (pages 9 and 20) and gained none. The
 stage took 3,705 s for 44 pages against about 474 s without links,
 with another model of the owner's running on the same Mac.
 
