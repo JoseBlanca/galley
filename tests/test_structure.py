@@ -89,6 +89,7 @@ from galley.structure._references import (
     NoteToMatch,
     align,
     match_endnotes,
+    match_footnotes,
     pair_score,
     reference_form,
 )
@@ -2946,6 +2947,21 @@ def test_footnote_lines_in_the_body_of_a_book_with_digit_markers_stay() -> None:
         ("t", None),
         ("£2", None),
         ("(1907)", None),
+        # An opening single quotation mark after a letter: Kadesh's page 9
+        # reads the raised 4 after "Salvolini" so.
+        (
+            "Salvolini\u2018",
+            Reference("Salvolini", "\u2018", "", ReferenceForm.SIGN, None),
+        ),
+        (
+            "Salvolini,\u2018",
+            Reference("Salvolini,", "\u2018", "", ReferenceForm.SIGN, None),
+        ),
+        ("\u2018", None),
+        ("\u2018\u2018tandis", None),
+        ("d@\u2018aflirmer", None),
+        ("S\u2018.", None),
+        ("Salvolini\u201c", None),
     ],
 )
 def test_reference_candidate_gives_the_reference_in_a_word(
@@ -3684,6 +3700,53 @@ def test_note_marker_loose_bracket_holds_at_most_two_letters_or_digits(
     word: str, marker: bool
 ) -> None:
     assert (note_marker(word) is not None) is marker
+
+
+def _footnote_links(
+    values: tuple[int | None, ...], words: tuple[str, ...]
+) -> tuple[tuple[int, int], ...]:
+    """The (note, candidate) positions of `match_footnotes` on one page."""
+    notes = tuple(
+        NoteToMatch(position, 10, value) for position, value in enumerate(values)
+    )
+    candidates = tuple(
+        Candidate(0, position, 10, reference)
+        for position, word in enumerate(words)
+        if (reference := reference_candidate(word)) is not None
+    )
+    return tuple(
+        (link.note, link.candidate.word) for link in match_footnotes(notes, candidates)
+    )
+
+
+def test_footnote_without_a_value_between_two_with_values_is_matched_by_its_place() -> (
+    None
+):
+    # Kadesh's page 10: notes 10, 11 and 12 without a marker, 13, and 14
+    # without one; "Kadesh,12" is note 12's reference and the "*" after
+    # "(see above)." note 14's.
+    assert _footnote_links((10, None, None, 13, None), ("Kadesh,12", 'above)."*')) == (
+        (2, 0),
+        (4, 1),
+    )
+
+
+@pytest.mark.parametrize(
+    ("values", "links"),
+    [
+        # Three places from 10 to 14 hold only two notes: no value is given,
+        # and the sign takes the first note with none.
+        ((10, None, None, 14, None), ((1, 0),)),
+        # A note after the page's last value takes none.
+        ((10, None), ((1, 0),)),
+        ((None, 11), ((0, 0),)),
+    ],
+    ids=["numbers_skip", "after_the_last", "before_the_first"],
+)
+def test_footnote_without_a_value_takes_none_unless_its_place_fits_two_values(
+    values: tuple[int | None, ...], links: tuple[tuple[int, int], ...]
+) -> None:
+    assert _footnote_links(values, ('above)."*',)) == links
 
 
 def test_referenced_endnotes_are_matched_in_the_order_of_their_values() -> None:
