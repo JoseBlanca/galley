@@ -11,6 +11,7 @@ from galley.correct import footnotes_starting
 from galley.correct._links import (
     Link,
     MarkedReference,
+    galley_references,
     link_answer,
     link_edits,
     misread_reference,
@@ -668,6 +669,69 @@ def test_a_reference_the_model_marks_where_galley_links_the_note_counts_once() -
     assert [(link.note_id, link.text, link.rank) for link in links] == [
         ("n-p0009-004", "7", 1)
     ]
+
+
+def test_a_link_where_galley_links_another_note_does_not_count_galleys_as_marked() -> (
+    None
+):
+    # Section 9b: galley links "Lenormant" to the page's first note, the
+    # model to the second. galley's note is then no note the model marked,
+    # so it counts before the model's first reference, which goes to the
+    # second note.
+    lenormant = Place("b-p0009-001", 0, 0, 9)
+    reading = (
+        GalleyToken(
+            form="lenormant", place=lenormant, block_id="b-p0009-001", note_id=None
+        ),
+        GalleyToken(
+            form="in",
+            place=Place("b-p0009-001", 2, 1, 3),
+            block_id="b-p0009-001",
+            note_id=None,
+        ),
+    )
+    notes = (
+        dataclasses.replace(
+            _note("n-p0009-001", "Campagne de Rhamses"), referenced=True
+        ),
+        _note("n-p0009-002", "Rev. arch., 1858"),
+    )
+    answer = link_answer("by Lenormant [5] in\nNOTE 5 | Rev. arch., 1858\n")
+    links = page_links(
+        9, reading, notes, answer, frozendict({lenormant: "n-p0009-001"})
+    )
+    assert [(link.note_id, link.text, link.rank) for link in links] == [
+        ("n-p0009-002", "5", 0)
+    ]
+
+
+def test_galleys_reference_after_white_space_is_not_one_right_after_the_word() -> None:
+    # Section 9b: only a reference span right after the word's end counts;
+    # "Chabas " then "*" has white space between.
+    block = _block(
+        "b-p0009-001",
+        _span("by Lenormant"),
+        _span("4", "n-p0009-001"),
+        _span(" exposed by Chabas "),
+        _span("*", "n-p0009-002"),
+    )
+    reading = (
+        GalleyToken(
+            form="lenormant",
+            place=Place(block.id, 0, 3, 12),
+            block_id=block.id,
+            note_id=None,
+        ),
+        GalleyToken(
+            form="chabas",
+            place=Place(block.id, 2, 12, 18),
+            block_id=block.id,
+            note_id=None,
+        ),
+    )
+    assert galley_references(_blocks((block,), ()), reading) == {
+        Place(block.id, 0, 3, 12): "n-p0009-001"
+    }
 
 
 def test_a_bracket_that_is_no_number_or_sign_is_no_reference() -> None:

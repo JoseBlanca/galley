@@ -3749,6 +3749,21 @@ def test_footnote_without_a_value_takes_none_unless_its_place_fits_two_values(
     assert _footnote_links(values, ('above)."*',)) == links
 
 
+def test_footnote_without_a_value_between_two_pages_takes_none() -> None:
+    # Spec section 11: values are given only between two notes of one page;
+    # the note of page 10 after its last value keeps none, so "land11" is no
+    # match for it.
+    notes = (NoteToMatch(0, 10, 10), NoteToMatch(1, 10, None), NoteToMatch(2, 11, 12))
+    candidates = (
+        Candidate(0, 0, 10, _glued("land10")),
+        Candidate(0, 1, 10, _glued("land11")),
+        Candidate(0, 2, 11, _glued("land12")),
+    )
+    assert tuple(
+        (link.note, link.candidate.word) for link in match_footnotes(notes, candidates)
+    ) == ((0, 0), (2, 2))
+
+
 def test_an_opening_quote_takes_a_note_only_where_no_other_candidate_can() -> None:
     # Spec section 11: "Kings‘" may be a misread closing quote; the later
     # "*" takes the note. On Kadesh's page 9 "Salvolini‘" is needed for a
