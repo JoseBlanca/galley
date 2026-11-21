@@ -1173,13 +1173,13 @@ def _recorded_link_answers(folder: BookFolder) -> list[str]:
 # tests/fixtures/expected/kadesh_reference/note_references.json.
 # On page 1 galley itself links "Salvolini", "Lenormant," and "Chabas" to
 # notes 4, 5 and 6 (structure spec section 11). The model's "Chabas" [6]
-# gives no link, its note line matching none of galley's notes, and its
-# "Record" [7], the fourth reference it marked, is then counted after
-# galley's reference to note 6 as well, so the page's numbers do not run
-# in order and the page gets no link (correct spec section 9b).
+# gives no link, its note line matching none of galley's notes, and counts
+# once with galley's reference after it, so its "Record" [7] goes to note 7
+# (correct spec section 9b).
 EXCERPT_LINKS = (
     (0, "investigation.\u2019", "investigation.[2](#n-p0000-003)"),
     (0, "forces.3", "forces.[3](#n-p0000-004)"),
+    (1, "\u201cRecord\u201d", "\u201cRecord\u201d[7](#n-p0001-004)"),
 )
 
 
@@ -1213,3 +1213,4 @@ def test_excerpt_note_links_are_the_references_the_page_prints(
     assert "Salvolini[^n-p0001-001]" in book
     assert "Lenormant\\,[^n-p0001-002]" in book
     assert "Chabas[^n-p0001-003]" in book
+    assert "Record\u201d[^n-p0001-004]" in book
