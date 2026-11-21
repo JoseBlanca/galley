@@ -4027,6 +4027,45 @@ def test_centred_line_in_capitals_is_a_heading_unless_tesseract_read_it_poorly(
     ] == [kind]
 
 
+# Structure spec section 14: a line right below a line Tesseract read
+# poorly takes no heading by the gaps; Kadesh's page 39 prints the
+# translation of a row of hieroglyphs, centred, 3.2 pitches below the row.
+
+
+@pytest.mark.parametrize(
+    ("row_confidences", "kind"),
+    [((8.0, 25.0, 49.0, 30.0), "paragraph"), ((90.0, 90.0, 90.0, 90.0), "heading")],
+    ids=["row_read_poorly", "row_read_well"],
+)
+def test_centred_line_below_a_line_read_poorly_is_no_heading_by_its_gaps(
+    row_confidences: tuple[float, ...], kind: str
+) -> None:
+    # The row has no letter, so it is no heading itself whatever its
+    # confidence; the translation is 2 pitches below it and 1.5 above the
+    # text after it.
+    row = _with_confidences(_centred_line("16. 12 345 6789", 130), *row_confidences)
+    translation = _centred_line("The stand which his majesty made.", 160, width=170)
+    lines = _lines_of(_around(row, translation))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert [
+        block.kind.value
+        for block in blocks.blocks
+        if "stand which" in block_text(block)
+    ] == [kind]
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_centred_line_in_capitals_below_a_line_read_poorly_is_a_heading() -> None:
+    row = _with_confidences(
+        _centred_line("16. 12 345 6789", 130), 8.0, 25.0, 49.0, 30.0
+    )
+    title = _centred_line("THE STAND OF HIS MAJESTY", 160, width=120)
+    blocks = make_blocks(_lines_of(_around(row, title)), _NO_WORDS, workers=1)
+    assert [
+        block.kind.value for block in blocks.blocks if "STAND" in block_text(block)
+    ] == ["heading"]
+
+
 def test_heading_of_one_line_has_no_label() -> None:
     blocks = make_blocks(
         _lines_of(_around(_centred_line("INDEX", 130))), _NO_WORDS, workers=1
