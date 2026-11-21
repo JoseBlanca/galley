@@ -2,7 +2,7 @@
 
 The owner said to go on on 21 November 2026, after merging the
 note-links plan. Its report left three faults. Dated 21 November 2026.
-State: approved; under way.
+State: done on 21 November 2026.
 
 ## 1. A quotation taken for a heading (Kadesh)
 
@@ -48,6 +48,6 @@ Spec first (correct.md §9b), a test that fails first.
 
 ## 4. The end
 
-- [ ] 4.1 Review; all checks; `pytest -m whole_book`; the seven EPUBs in
+- [x] 4.1 Review; all checks; `pytest -m whole_book`; the seven EPUBs in
   `runs/small-fixes/` through epubcheck; the evaluation against
   `runs/note-links-final/`.

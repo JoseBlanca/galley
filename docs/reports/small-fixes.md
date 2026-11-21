@@ -1,5 +1,25 @@
 # Report: three faults left after the note-links plan
 
+## Summary
+
+The plan is done on branch `plan/small-fixes`, on 21 November 2026, and
+waits for the owner's order to merge. The EPUBs are in
+`runs/small-fixes/<folder>/`.
+
+- Kadesh (`battleofkadeshst00breauoft`): the quoted inscription on page
+  39 is no longer a heading, so the unlinked notes no longer gather
+  there; galley's own note links on pages 9 and 10 go to the right notes
+  (43 links, 5 changed, all checked on the images).
+- A note link added by the vision model takes the place of the sign the
+  OCR read for the note's number ("soldiers;™" becomes "soldiers;" with
+  the reference).
+- The quick tests take 61 to 62 s on a quiet machine, from 81 s.
+
+Checked: all tests, the 159 whole-book tests, the seven EPUBs through
+epubcheck; the evaluation unchanged. Two reviewers found no lost word or
+wrong link on the seven books; their findings (guards for other books,
+tests, names) are fixed.
+
 For the owner. Started on 21 November 2026.
 
 ## Tasks 1.1 and 2.1
@@ -31,3 +51,16 @@ run, the correct stage's excerpt tests share one run, two Tesseract
 tests read in parallel; no check dropped). Three timings on a quiet
 machine: 81.2, 80.9, 81.0 s before; 62.0, 63.5, 63.8 s after; with 8
 threads 131 s to 114 s.
+
+## Review and the end
+
+Two reviewers read 0c64405..f977c03. No lost word, invented text or
+wrong link on the seven books; every changed link and heading right on
+the images. Fixed (3fa5b38 to 2079590): a real sign ("50%") could be
+taken for a misread reference, now only ™, ® and ^ are; a "‘" read for a
+closing quote could be replaced by a link, now kept only when it links
+more of the page's notes; five unguarded branches; names; work done
+when links are off; a missing excerpt PDF failing every test. Then:
+pytest 3,290 passed in 61.3, 61.4, 62.5 s; `pytest -m whole_book` 159
+passed; the seven EPUBs in `runs/small-fixes/` pass epubcheck; the
+evaluation in `runs/small-fixes-final/` equals `runs/note-links-final/`.
