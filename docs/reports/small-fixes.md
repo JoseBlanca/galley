@@ -19,3 +19,15 @@ Kadesh run with the correct stage, note links and the second reading at
 the note-links code (`runs/note-links/battleofkadeshst00breauoft-correct2/`):
 1,090 edits, 40 links, all right; 177 doubtful edits checked on the
 images, 61 wrong undone in `edits/owner.jsonl`; epubcheck clean.
+
+## Tasks 3b.1 and 3.1
+
+Merged: 20eb634, 1c5880e (a vision-model link takes the place of a sign
+the OCR read for the note's number, keeping real punctuation:
+"soldiers;™" becomes "soldiers;" with the reference; 4 of Kadesh's 40
+links change, pages 15, 20, 37, 59) and 61eeed7 (the quick tests: the
+excerpt runs start at the beginning of the session while unit tests
+run, the correct stage's excerpt tests share one run, two Tesseract
+tests read in parallel; no check dropped). Three timings on a quiet
+machine: 81.2, 80.9, 81.0 s before; 62.0, 63.5, 63.8 s after; with 8
+threads 131 s to 114 s.

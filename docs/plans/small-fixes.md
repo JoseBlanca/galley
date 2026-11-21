@@ -34,7 +34,7 @@ They take 75 to 105 s. Find where the time goes (`--durations=30`, the
 excerpt fixture, the correct stage's excerpt test, the Tesseract
 excerpts) and cut it without dropping a check.
 
-- [ ] 3.1
+- [x] 3.1
 
 ## 3b. A misread mark left before a vision-model link
 
@@ -44,7 +44,7 @@ correct stage adds leaves the sign in the text: "soldiers;™", "map®",
 The link should take the sign's place, as galley's own references do.
 Spec first (correct.md §9b), a test that fails first.
 
-- [ ] 3b.1
+- [x] 3b.1
 
 ## 4. The end
 
