@@ -2,9 +2,10 @@
 11, "References"): the candidates of each page, the book's reference
 form, and the alignment of a page's notes with its candidates."""
 
+import itertools
 from collections import Counter
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from galley.structure._markers import Reference, ReferenceForm
 
@@ -171,12 +172,39 @@ def reference_form(
     return max(ReferenceForm, key=lambda form: exact[form])
 
 
+def _with_values_between(notes: Sequence[NoteToMatch]) -> tuple[NoteToMatch, ...]:
+    """`notes` with a value given to each note without one that lies between
+    two notes of its page with values `a` and `b`, `k` places after the
+    first, when `b - a` is the number of places from the first to the
+    second: it is matched as a note of value `a + k` (spec section 11,
+    "Matching"; Kadesh's page 10)."""
+    given = list(notes)
+    valued = [
+        (place, note.value)
+        for place, note in enumerate(notes)
+        if note.value is not None
+    ]
+    # The notes are in the book's order, so those between two notes of one
+    # page are on that page.
+    for (first, low), (second, high) in itertools.pairwise(valued):
+        if (
+            notes[first].page_index == notes[second].page_index
+            and high - low == second - first
+        ):
+            for place in range(first + 1, second):
+                given[place] = replace(notes[place], value=low + place - first)
+    return tuple(given)
+
+
 def match_footnotes(
     notes: Sequence[NoteToMatch], candidates: Sequence[Candidate]
 ) -> tuple[Link, ...]:
     """The footnotes linked to the candidates of their page, in page order
-    (spec section 11, "Matching"): only candidates of the book's reference
-    form are kept, and signs too unless that form is the bracketed number."""
+    (spec section 11, "Matching"): a note without a value between two of
+    its page whose values its place fits is matched with the value of its
+    place; only candidates of the book's reference form are kept, and signs
+    too unless that form is the bracketed number."""
+    notes = _with_values_between(notes)
     form = reference_form(notes, candidates)
 
     def keep(candidate: Candidate) -> bool:

@@ -6,6 +6,7 @@ import logging
 import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -225,21 +226,29 @@ def page_links(
     reading: Sequence[GalleyToken],
     notes: Sequence[Note],
     answer: LinkAnswer,
+    galley_references: Mapping[Place, str] = frozendict(),
 ) -> tuple[Link, ...]:
     """The links of one page: each reference of the answer placed after a
     word of galley's body and matched to one of `notes`, the notes that
-    start on the page, through its note line."""
+    start on the page, through its note line. `galley_references` gives,
+    by the place of a token, the note galley's own reference right after
+    its word refers to; a reference the model marks there that gives no
+    link, or one to that note, counts once in the numbers of the page."""
     body = [
         token
         for token in reading
         if token.note_id is None and token.block_id is not None
     ]
     links = []
+    marked: set[str] = set()
     for rank, reference in enumerate(answer.references):
         position = reference_place(body, reference)
         first_words = answer.notes.get(reference.text)
         note_id = None if first_words is None else note_of(notes, first_words)
         place = None if position is None else body[position].place
+        galleys = None if place is None else galley_references.get(place)
+        if galleys is not None and note_id in (None, galleys):
+            marked.add(galleys)
         if place is None or note_id is None:
             continue
         links.append(
@@ -252,7 +261,7 @@ def page_links(
                 rank=rank,
             )
         )
-    if not numbers_in_order(links, notes):
+    if not numbers_in_order(links, notes, frozenset(marked)):
         _logger.info(
             "page %d: the numbers of the references and notes do not run in "
             "order; no link on it",
@@ -262,18 +271,45 @@ def page_links(
     return tuple(links)
 
 
+def galley_references(
+    blocks: BlocksFile, reading: Sequence[GalleyToken]
+) -> frozendict[Place, str]:
+    """By the place of each changeable token of `reading`, the note that
+    galley's reference span right after the token's word refers to: the
+    word ends its span, and the next span is a reference (section 9b)."""
+    spans = {block.id: block.spans for block in every_block(blocks)}
+    found = {}
+    for token in reading:
+        place = token.place
+        if place is None:
+            continue
+        block_spans = spans[place.block_id]
+        rest = block_spans[place.span_index].text[place.end :]
+        if any(c.isspace() for c in rest) or place.span_index + 1 >= len(block_spans):
+            continue
+        note_ref = block_spans[place.span_index + 1].note_ref
+        if note_ref is not None:
+            found[place] = note_ref
+    return frozendict(found)
+
+
 def _number(text: str) -> int | None:
     digits = text.rstrip(".")
     return int(digits) if digits.isdigit() else None
 
 
-def numbers_in_order(links: Sequence[Link], notes: Sequence[Note]) -> bool:
+def numbers_in_order(
+    links: Sequence[Link],
+    notes: Sequence[Note],
+    marked: AbstractSet[str] = frozenset(),
+) -> bool:
     """Whether a page's links agree with each other and with galley's
     markers (section 9b): each link's note is the k-th footnote of the page
     when its reference is the k-th the model marked on it, counted from 0,
     and the footnotes before it that galley references and no link goes
     to are counted as marked too (the heading's "*" on Kadesh's page 8,
-    which the model does not bracket);
+    which the model does not bracket), but for the notes of `marked`,
+    whose galley reference the model marked already;
     in the order of the model's answer their numbers rise; and, with each note
     numbered by its link's number or else by galley's marker when that
     is digits of as many as the links' longest number (a shorter one is a
@@ -285,7 +321,11 @@ def numbers_in_order(links: Sequence[Link], notes: Sequence[Note]) -> bool:
     if any(
         index
         != link.rank
-        + sum(1 for note in notes[:index] if note.referenced and note.id not in linked)
+        + sum(
+            1
+            for note in notes[:index]
+            if note.referenced and note.id not in linked and note.id not in marked
+        )
         for index, link in zip(indices, links, strict=True)
     ):
         return False

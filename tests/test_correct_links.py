@@ -16,6 +16,7 @@ from galley.correct._links import (
     misread_reference,
     note_of,
     numbers_in_order,
+    page_links,
     reference_place,
 )
 from galley.correct._merge import Change, ChangeKind
@@ -563,6 +564,47 @@ def test_the_links_of_a_page_must_number_its_notes_in_order(
         _page_notes(*markers, referenced=referenced),
     )
     assert found is in_order
+
+
+def test_a_reference_the_model_marks_where_galley_links_the_note_counts_once() -> None:
+    # Section 9b, Kadesh's page 9: galley links "Chabas" to note 6; the
+    # model's "Chabas" [6] gives no link, its note line missing, and its
+    # "Record" [7], the second reference it marks, goes to note 7, the
+    # page's second footnote.
+    chabas = Place("b-p0009-001", 0, 0, 6)
+    reading = (
+        GalleyToken(form="chabas", place=chabas, block_id="b-p0009-001", note_id=None),
+        GalleyToken(
+            form="with",
+            place=Place("b-p0009-001", 2, 1, 5),
+            block_id="b-p0009-001",
+            note_id=None,
+        ),
+        GalleyToken(
+            form="record",
+            place=Place("b-p0009-001", 2, 7, 13),
+            block_id="b-p0009-001",
+            note_id=None,
+        ),
+        GalleyToken(
+            form="inscription",
+            place=Place("b-p0009-001", 2, 15, 26),
+            block_id="b-p0009-001",
+            note_id=None,
+        ),
+    )
+    notes = (
+        dataclasses.replace(_note("n-p0009-003", "Rev. arch., 1858"), referenced=True),
+        _note("n-p0009-004", "This and the other documentary sources"),
+    )
+    answer = link_answer(
+        "exposed by Chabas [6] with\nthe Record [7] inscription\n"
+        "NOTE 7 | This and the\n"
+    )
+    links = page_links(9, reading, notes, answer, frozendict({chabas: "n-p0009-003"}))
+    assert [(link.note_id, link.text, link.rank) for link in links] == [
+        ("n-p0009-004", "7", 1)
+    ]
 
 
 def test_a_bracket_that_is_no_number_or_sign_is_no_reference() -> None:

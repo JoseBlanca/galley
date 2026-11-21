@@ -193,10 +193,14 @@ _BRACKETED_REFERENCE = re.compile(
 # before the sign holds one letter alone is none: Domesday's "St.", read
 # "S*." 28 times, made 2 wrong links of those 23 new ones (pages 285 and
 # 333). Without punctuation after, a word of one letter stays a candidate.
+# An opening single quotation mark after a letter, which no word ends with,
+# is a sign too, but never a word of its own: Kadesh's page 9 reads the
+# raised 4 after "Salvolini" as "Salvolini‘" (21 November 2026).
 _SIGN_REFERENCE = re.compile(
-    rf"(?P<before>(?:.*[^\W\d_]{PUNCTUATION}*)?)(?P<reference>[\^*•])"
+    rf"(?P<before>(?:.*[^\W\d_]{PUNCTUATION}*)?)(?P<reference>[\^*•‘])"
     rf"(?P<after>{PUNCTUATION}*)"
 )
+_SIGN_NEVER_ALONE = "‘"
 
 
 def reference_candidate(word: str) -> Reference | None:
@@ -205,7 +209,8 @@ def reference_candidate(word: str) -> Reference | None:
     gives ("land", "3", ".")), unless the word starts with a citation's
     abbreviation and has no other letter ("p.12"); a bracketed number
     ("(i)." gives ("", "(i)", ".") of value 1); or a sign ("rulers.^", and
-    "servus*." gives ("servus", "*", "."))."""
+    "servus*." gives ("servus", "*", "."); "Salvolini‘", an opening single
+    quotation mark after a letter))."""
     bracketed = _BRACKETED_REFERENCE.fullmatch(word)
     if bracketed is not None and is_punctuation(bracketed.group("after")):
         value = read_number(bracketed.group("inner"), in_brackets=True)
@@ -223,7 +228,11 @@ def reference_candidate(word: str) -> Reference | None:
         return glued
     sign = _SIGN_REFERENCE.fullmatch(word)
     if sign is not None and (
-        (not sign.group("before") and not sign.group("after"))
+        (
+            not sign.group("before")
+            and not sign.group("after")
+            and sign.group("reference") != _SIGN_NEVER_ALONE
+        )
         or (
             sign.group("before")
             and (

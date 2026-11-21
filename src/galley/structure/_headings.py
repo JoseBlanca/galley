@@ -204,7 +204,8 @@ def _is_heading_line(
     which the line may also be centred or flush left;
     `kept_head` is the position in `lines` of the page's head line when
     section 3 left it in the text in its band of the head lines, which is
-    not flush left unless it starts with a chapter label word."""
+    not flush left unless it starts with a chapter label word. A line right
+    below a line Tesseract read poorly takes no heading by the gaps."""
     line = lines[number]
     texts = line_texts(line)
     centred = is_centred(line) or (
@@ -228,6 +229,10 @@ def _is_heading_line(
             or (
                 _gap_branch(lines, number, pitch)
                 and not (flush_left and texts[-1].endswith(_FLUSH_LEFT_GAP_ENDS))
+                # Spec section 14: the gap above a line right below a line
+                # Tesseract read poorly is measured from a row of
+                # hieroglyphs (Kadesh's page 39).
+                and not (number > 0 and _read_poorly(lines[number - 1]))
             )
         )
     )

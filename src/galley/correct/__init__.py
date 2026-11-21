@@ -18,7 +18,13 @@ from PIL import Image
 from galley import pdfium
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
-from galley.correct._links import Link, link_answer, link_edits, page_links
+from galley.correct._links import (
+    Link,
+    galley_references,
+    link_answer,
+    link_edits,
+    page_links,
+)
 from galley.correct._lmstudio import LINKS_PROMPT, Reading, check_models, read_image
 from galley.correct._merge import (
     Answer,
@@ -79,13 +85,15 @@ def check_server(config: BookConfig) -> None:
 class _PageWork:
     """What a worker needs for one page: galley's reading of it, the core
     of each changeable token, and the top of its footnote band in points,
-    None when it has no notes."""
+    None when it has no notes; the footnotes that start on it, and the note
+    galley's reference after a token's word refers to, by its place."""
 
     page_index: int
     reading: tuple[GalleyToken, ...]
     cores: Mapping[Place, str]
     band_top: float | None
     notes: tuple[Note, ...]
+    galley_references: Mapping[Place, str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,7 +167,11 @@ def _read_page(config: BookConfig, work: _PageWork) -> _PageResult:
         links_cut_short = marked.cut_short
         if not marked.cut_short:
             links = page_links(
-                work.page_index, work.reading, work.notes, link_answer(marked.text)
+                work.page_index,
+                work.reading,
+                work.notes,
+                link_answer(marked.text),
+                work.galley_references,
             )
     return _PageResult(
         work.page_index,
@@ -258,6 +270,7 @@ def run(
                     notes=footnotes_starting(blocks, page.index)
                     if config.correct_links
                     else (),
+                    galley_references=galley_references(blocks, reading),
                 )
             )
     results = map_pages(lambda item: _read_page(config, item), work, workers)
