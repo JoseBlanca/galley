@@ -2109,6 +2109,15 @@ reading order:
   which the rule for "S*." keeps out. Kadesh has 10 words that end
   with "“" after a letter ("Zahi“", page 27, is reference 64 by the
   references read by eye, below), which are left as they are until checked.
+  A "‘" after a letter may also be a closing quotation mark misread
+  ("Kings‘" for "Kings’"), so a page's "‘" candidates are kept only
+  when the page's matching (below) pairs more of its notes with them
+  than without them: only when a note of the page needs a reference that
+  no other candidate gives. A sign against a note with no value scores
+  2 whichever sign it is, and of two equal alignments the earlier
+  candidate wins, so without this a "Kings‘" before a note's "*" would
+  take the note. On Kadesh's page 9 the matching pairs three notes with
+  "Salvolini‘" and two without it.
 
 **The book's reference form.** A first pass of the matching below, over
 every page and with every candidate, counts for each kind of candidate
