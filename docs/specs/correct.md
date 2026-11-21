@@ -593,7 +593,15 @@ links of a page are kept only when they number its footnotes in order:
   that galley references and no link of the page goes to count as
   marked: the model does not bracket the heading's "*" on page 8, whose
   note galley links. Page 31's first link went to the page's second
-  footnote with nothing before it, and page 21's first to the third;
+  footnote with nothing before it, and page 21's first to the third.
+  A reference the model marks after a galley word that galley's own
+  reference follows directly, in the same span's word, counts once, as
+  that note marked, when it gives no link or a link to the same note:
+  on page 9 galley links "Chabas" to note 6, and the model's "Chabas"
+  [6], whose note line matches none of galley's notes, gives no link;
+  counted both as the model's third reference and as a note galley
+  references, it put the model's "Record" [7], its fourth, one note too
+  far, and the page lost that right link (21 November 2026);
 - in the order of the model's answer, their notes come in the order of
   the page's footnotes, no note twice, and their numbers, those that are
   digits, rise;
@@ -613,11 +621,31 @@ whitespace word, gets a reference to that note right after it:
 - else the link is put in after the word. galley's word may still hold
   the reference as the OCR misread it, after its punctuation: "forces.3",
   "enemy;™", "Zahi“". The characters after the core of galley's word
-  (section 6), past as many as the model's word has after its core
+  (section 6), the core less what is no letter or digit at its end,
+  past as many as the model's word has after its core so cut
   (quotes made straight on both sides, and equal there), are the
   misread reference when they are 1 to 3, each a digit or one of
   `' " ‘ ’ “ ” * † ‡ ™ ® ^ %`. They leave the word, and are kept only in
-  the edit's `old`. Otherwise the word stays whole. The reference's
+  the edit's `old`. Otherwise the word stays whole. The core is cut
+  because section 6 keeps in it a sign that is no ordinary punctuation,
+  and so the punctuation before the sign: "soldiers;™" is one core, and
+  until 21 November 2026 the link went after its "™" ("soldiers;™",
+  "map®", "iter™", "whatever.™" on Kadesh). But a sign the core keeps
+  may be printed ("50%", "40°"), so of the misread reference, the
+  characters that are in galley's core, past those of the model's word,
+  must each be "™", "®" or "^", signs the OCR gives for a raised number,
+  which the model's word then lacks; when one of them is another
+  character, or when they are not all taken as the misread reference,
+  the reference gives no link. "map®", where the model has `map [43]`,
+  becomes "map" with the link; "50%", where the model has `50 [3]`, gets
+  no link; "map®", where the model has `map® [43]`, keeps its "®" and
+  the link follows it. Measured on the seven books (the runs of the
+  note-links plan, 21 November 2026): each of the cores of galley's
+  words that end in "™", "®" or "^" (Kadesh 19, Domesday 40, Gierke 61,
+  Stubbs 11, Haskins 11, Turney 8, Haynes 1) is a misread raised number
+  or OCR noise ("description™", "map®", "undoing.^", "(37)®"), none a
+  printed sign; "%" and "°" also end numbers ("111.1%", "40°" on
+  Kadesh). The reference's
   text is the model's number x, so that the edit shows which number the
   model read. "advanced.”", where the model has
   `advanced." [4]`, keeps its quote. A quote is taken as part of the
@@ -639,10 +667,11 @@ A link is not proposed, and is logged, when:
   galley that no link of the stage takes the place of: a footnote is
   referenced once (markdown refuses two). Refusing a link brings back
   the reference of galley's it would have taken the place of, so this is
-  checked again until no link is refused: on page 9, "Lenormant," to
-  note 5 is refused while galley links note 5 from "Chabas", and then
-  "Salvolini" to note 4 too, since galley's "Lenormant," to note 4
-  stays;
+  checked again until no link is refused: had galley linked
+  "Lenormant," to note 4 and "Chabas" to note 5 on page 9, as it did
+  until 21 November 2026, the model's "Lenormant," to note 5 would be
+  refused while galley links note 5 from "Chabas", and then "Salvolini"
+  to note 4 too, since galley's "Lenormant," to note 4 stays;
 - two links of the book go to the same note: neither is proposed.
 
 **The edit.** `reason` `"vision_note_link"`; `old` galley's word, with

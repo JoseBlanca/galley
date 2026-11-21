@@ -10,6 +10,7 @@ that the 8-thread run does it once.
 import logging
 import shutil
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
@@ -891,16 +892,18 @@ def test_ocr_pages_are_read_by_tesseract_alike_with_1_worker_and_with_6(
             *pages.pages[2:],
         ),
     )
-    folders = []
-    for workers in (1, 6):
+
+    def extract_with(workers: int) -> BookFolder:
         folder = kadesh_folder(
             tmp_path / str(workers), excerpt_pdf[KADESH], TWO_PAGES_OF_REMOVALS
         )
         write_pages(folder.pages_json, pages)
         extract.run(folder, read_config(folder.book_toml), workers=workers)
-        folders.append(folder)
+        return folder
 
-    one, six = folders
+    # The two runs side by side: each waits on Tesseract for its one page.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        one, six = pool.map(extract_with, (1, 6))
     assert one.words_json.read_bytes() == six.words_json.read_bytes()
     words = read_words(one.words_json)
     assert [page.text_source for page in words.pages[:3]] == [

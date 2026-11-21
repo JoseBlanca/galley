@@ -11,11 +11,13 @@ from galley.correct import footnotes_starting
 from galley.correct._links import (
     Link,
     MarkedReference,
+    galley_references,
     link_answer,
     link_edits,
     misread_reference,
     note_of,
     numbers_in_order,
+    page_links,
     reference_place,
 )
 from galley.correct._merge import Change, ChangeKind
@@ -183,18 +185,28 @@ def test_two_notes_nearly_as_alike_give_no_note() -> None:
 
 
 @pytest.mark.parametrize(
-    ("galley_after", "model_word", "number", "misread"),
+    ("galley_core", "galley_after", "model_word", "number", "misread"),
     [
-        (".3", "forces.", "3", "3"),
-        (";™", "enemy;", "34", "™"),
-        ("“", "Zahi", "64", "“"),
-        (".”", 'advanced."', "74", ""),
-        (".", "forces.", "3", ""),
-        (".abc", "forces.", "3", ""),
-        (".1234", "forces.", "3", ""),
+        ("forces", ".3", "forces.", "3", "3"),
+        ("enemy;™", "", "enemy;", "34", "™"),
+        ("Zahi", "“", "Zahi", "64", "“"),
+        ("advanced", ".”", 'advanced."', "74", ""),
+        ("forces", ".", "forces.", "3", ""),
+        ("forces", ".abc", "forces.", "3", ""),
+        ("forces", ".1234", "forces.", "3", ""),
         # The number is in galley's word: the printed quote before it,
         # which the model left out, stays in the word.
-        (".”37", "soldiers.", "37", "37"),
+        ("soldiers", ".”37", "soldiers.", "37", "37"),
+        # A sign the core keeps: taken out when it is one the OCR gives for
+        # a raised number and the model's word lacks it.
+        ("map®", "", "map", "43", "®"),
+        ("map®", "", "map®", "43", ""),
+        ("50%", "", "50", "3", None),
+        ("50%", "", "50%", "3", ""),
+        ("soldiers;™", "", "soldiers.", "36", None),
+        ("map®", ".abc", "map", "43", None),
+        # A core made only of signs is not cut.
+        ("®", "", "®", "3", ""),
     ],
     ids=[
         "digit",
@@ -205,12 +217,23 @@ def test_two_notes_nearly_as_alike_give_no_note() -> None:
         "letters",
         "too_long",
         "quote_before_the_number",
+        "raised_sign",
+        "raised_sign_the_model_has",
+        "printed_sign",
+        "printed_sign_the_model_has",
+        "other_punctuation",
+        "sign_left_in_the_word",
+        "only_signs",
     ],
 )
 def test_the_misread_reference_is_what_galley_has_past_the_models_punctuation(
-    galley_after: str, model_word: str, number: str, misread: str
+    galley_core: str,
+    galley_after: str,
+    model_word: str,
+    number: str,
+    misread: str | None,
 ) -> None:
-    assert misread_reference(galley_after, model_word, number) == misread
+    assert misread_reference(galley_core, galley_after, model_word, number) == misread
 
 
 # The link edits.
@@ -257,6 +280,48 @@ def test_a_link_edit_drops_the_misread_reference_and_keeps_the_models_number() -
         ("forces.3", "forces.[3](#n-p0008-004)", "vision_note_link"),
     ]
     assert {edit.block_sha256 for edit in edits} == {block_sha256(BODY_BLOCK)}
+
+
+def test_a_link_takes_the_place_of_a_sign_the_words_core_keeps() -> None:
+    # Section 6 keeps "™" and "®" in the core, and the ";" before them,
+    # so the place, galley's token, ends after the sign (Kadesh).
+    block = _block("b-p0014-002", _span("the soldiers;™ and Blanckenhorn’s map® then"))
+    text = block.spans[0].text
+    links = tuple(
+        Link(
+            page_index=8,
+            place=Place(block.id, 0, text.index(core), text.index(core) + len(core)),
+            note_id=note_id,
+            text=number,
+            model_word=model_word,
+        )
+        for core, note_id, number, model_word in (
+            ("soldiers;™", "n-p0008-003", "36", "soldiers;"),
+            ("map®", "n-p0008-004", "43", "map"),
+        )
+    )
+    page = _blocks((block,), PAGE.notes)
+    assert [
+        (edit.old, edit.new) for edit in link_edits(page, links, (), (), MODEL)
+    ] == [
+        ("soldiers;™", "soldiers;[36](#n-p0008-003)"),
+        ("map®", "map[43](#n-p0008-004)"),
+    ]
+
+
+def test_a_printed_sign_the_core_keeps_and_the_model_lacks_gives_no_link() -> None:
+    # Section 9b: "%" may be printed, so "50%" against the model's "50"
+    # keeps its sign and gets no link.
+    block = _block("b-p0014-002", _span("about 50% of them"))
+    text = block.spans[0].text
+    link = Link(
+        page_index=8,
+        place=Place(block.id, 0, text.index("50%"), text.index("50%") + 3),
+        note_id="n-p0008-003",
+        text="3",
+        model_word="50",
+    )
+    assert link_edits(_blocks((block,), PAGE.notes), (link,), (), (), MODEL) == ()
 
 
 def test_a_word_twice_in_its_block_takes_the_words_before_it() -> None:
@@ -563,6 +628,110 @@ def test_the_links_of_a_page_must_number_its_notes_in_order(
         _page_notes(*markers, referenced=referenced),
     )
     assert found is in_order
+
+
+def test_a_reference_the_model_marks_where_galley_links_the_note_counts_once() -> None:
+    # Section 9b, Kadesh's page 9: galley links "Chabas" to note 6; the
+    # model's "Chabas" [6] gives no link, its note line missing, and its
+    # "Record" [7], the second reference it marks, goes to note 7, the
+    # page's second footnote.
+    chabas = Place("b-p0009-001", 0, 0, 6)
+    reading = (
+        GalleyToken(form="chabas", place=chabas, block_id="b-p0009-001", note_id=None),
+        GalleyToken(
+            form="with",
+            place=Place("b-p0009-001", 2, 1, 5),
+            block_id="b-p0009-001",
+            note_id=None,
+        ),
+        GalleyToken(
+            form="record",
+            place=Place("b-p0009-001", 2, 7, 13),
+            block_id="b-p0009-001",
+            note_id=None,
+        ),
+        GalleyToken(
+            form="inscription",
+            place=Place("b-p0009-001", 2, 15, 26),
+            block_id="b-p0009-001",
+            note_id=None,
+        ),
+    )
+    notes = (
+        dataclasses.replace(_note("n-p0009-003", "Rev. arch., 1858"), referenced=True),
+        _note("n-p0009-004", "This and the other documentary sources"),
+    )
+    answer = link_answer(
+        "exposed by Chabas [6] with\nthe Record [7] inscription\n"
+        "NOTE 7 | This and the\n"
+    )
+    links = page_links(9, reading, notes, answer, frozendict({chabas: "n-p0009-003"}))
+    assert [(link.note_id, link.text, link.rank) for link in links] == [
+        ("n-p0009-004", "7", 1)
+    ]
+
+
+def test_a_link_where_galley_links_another_note_does_not_count_galleys_as_marked() -> (
+    None
+):
+    # Section 9b: galley links "Lenormant" to the page's first note, the
+    # model to the second. galley's note is then no note the model marked,
+    # so it counts before the model's first reference, which goes to the
+    # second note.
+    lenormant = Place("b-p0009-001", 0, 0, 9)
+    reading = (
+        GalleyToken(
+            form="lenormant", place=lenormant, block_id="b-p0009-001", note_id=None
+        ),
+        GalleyToken(
+            form="in",
+            place=Place("b-p0009-001", 2, 1, 3),
+            block_id="b-p0009-001",
+            note_id=None,
+        ),
+    )
+    notes = (
+        dataclasses.replace(
+            _note("n-p0009-001", "Campagne de Rhamses"), referenced=True
+        ),
+        _note("n-p0009-002", "Rev. arch., 1858"),
+    )
+    answer = link_answer("by Lenormant [5] in\nNOTE 5 | Rev. arch., 1858\n")
+    links = page_links(
+        9, reading, notes, answer, frozendict({lenormant: "n-p0009-001"})
+    )
+    assert [(link.note_id, link.text, link.rank) for link in links] == [
+        ("n-p0009-002", "5", 0)
+    ]
+
+
+def test_galleys_reference_after_white_space_is_not_one_right_after_the_word() -> None:
+    # Section 9b: only a reference span right after the word's end counts;
+    # "Chabas " then "*" has white space between.
+    block = _block(
+        "b-p0009-001",
+        _span("by Lenormant"),
+        _span("4", "n-p0009-001"),
+        _span(" exposed by Chabas "),
+        _span("*", "n-p0009-002"),
+    )
+    reading = (
+        GalleyToken(
+            form="lenormant",
+            place=Place(block.id, 0, 3, 12),
+            block_id=block.id,
+            note_id=None,
+        ),
+        GalleyToken(
+            form="chabas",
+            place=Place(block.id, 2, 12, 18),
+            block_id=block.id,
+            note_id=None,
+        ),
+    )
+    assert galley_references(_blocks((block,), ()), reading) == {
+        Place(block.id, 0, 3, 12): "n-p0009-001"
+    }
 
 
 def test_a_bracket_that_is_no_number_or_sign_is_no_reference() -> None:

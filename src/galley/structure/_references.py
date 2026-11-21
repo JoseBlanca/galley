@@ -2,9 +2,10 @@
 11, "References"): the candidates of each page, the book's reference
 form, and the alignment of a page's notes with its candidates."""
 
+import itertools
 from collections import Counter
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from galley.structure._markers import Reference, ReferenceForm
 
@@ -18,6 +19,9 @@ _SIGN_WITH_VALUE = 1
 _CONFUSED_DIGITS = frozenset(
     frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28")
 )
+# Spec section 11, "References": a candidate that is an opening single
+# quotation mark after a letter ("Salvolini‘").
+_OPENING_QUOTE = "\u2018"
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,13 +133,35 @@ def _matched(
     )
 
 
+def _matched_with_quotes(
+    notes: Sequence[NoteToMatch], candidates: Sequence[Candidate]
+) -> tuple[Link, ...]:
+    """The links of one page's `notes` with its `candidates`, those that are
+    an opening single quotation mark only when they pair more notes than
+    without them (spec section 11, "References": "Kings‘" may be a misread
+    closing quote)."""
+    without = _matched(
+        notes,
+        tuple(
+            candidate
+            for candidate in candidates
+            if candidate.reference.reference != _OPENING_QUOTE
+        ),
+    )
+    with_quotes = _matched(notes, candidates)
+    return with_quotes if len(with_quotes) > len(without) else without
+
+
 def _per_page(
     notes: Sequence[NoteToMatch],
     candidates: Sequence[Candidate],
     keep: Callable[[Candidate], bool],
+    match: Callable[
+        [Sequence[NoteToMatch], Sequence[Candidate]], tuple[Link, ...]
+    ] = _matched,
 ) -> tuple[Link, ...]:
     """The links of each page's notes with the page's candidates that
-    `keep` keeps, page by page."""
+    `keep` keeps, page by page, each page's by `match`."""
     notes_by_page: dict[int, list[NoteToMatch]] = {}
     for note in notes:
         notes_by_page.setdefault(note.page_index, []).append(note)
@@ -146,7 +172,7 @@ def _per_page(
     return tuple(
         link
         for page_index in sorted(notes_by_page)
-        for link in _matched(
+        for link in match(
             notes_by_page[page_index], candidates_by_page.get(page_index, ())
         )
     )
@@ -171,12 +197,40 @@ def reference_form(
     return max(ReferenceForm, key=lambda form: exact[form])
 
 
+def _with_values_between(notes: Sequence[NoteToMatch]) -> tuple[NoteToMatch, ...]:
+    """`notes` with a value given to each note without one that lies between
+    two notes of its page with values `a` and `b`, `k` places after the
+    first, when `b - a` is the number of places from the first to the
+    second: it is matched as a note of value `a + k` (spec section 11,
+    "Matching"; Kadesh's page 10)."""
+    given = list(notes)
+    valued = [
+        (place, note.value)
+        for place, note in enumerate(notes)
+        if note.value is not None
+    ]
+    # The notes are in the book's order, so those between two notes of one
+    # page are on that page.
+    for (first, low), (second, high) in itertools.pairwise(valued):
+        if (
+            notes[first].page_index == notes[second].page_index
+            and high - low == second - first
+        ):
+            for place in range(first + 1, second):
+                given[place] = replace(notes[place], value=low + place - first)
+    return tuple(given)
+
+
 def match_footnotes(
     notes: Sequence[NoteToMatch], candidates: Sequence[Candidate]
 ) -> tuple[Link, ...]:
     """The footnotes linked to the candidates of their page, in page order
-    (spec section 11, "Matching"): only candidates of the book's reference
-    form are kept, and signs too unless that form is the bracketed number."""
+    (spec section 11, "Matching"): a note without a value between two of
+    its page whose values its place fits is matched with the value of its
+    place; only candidates of the book's reference form are kept, and signs
+    too unless that form is the bracketed number; a page's opening single
+    quotation marks only when they pair more of its notes."""
+    notes = _with_values_between(notes)
     form = reference_form(notes, candidates)
 
     def keep(candidate: Candidate) -> bool:
@@ -185,7 +239,7 @@ def match_footnotes(
             candidate_form is ReferenceForm.SIGN and form is not ReferenceForm.BRACKETED
         )
 
-    return _per_page(notes, candidates, keep)
+    return _per_page(notes, candidates, keep, _matched_with_quotes)
 
 
 def match_endnotes(

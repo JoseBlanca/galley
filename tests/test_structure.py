@@ -89,6 +89,7 @@ from galley.structure._references import (
     NoteToMatch,
     align,
     match_endnotes,
+    match_footnotes,
     pair_score,
     reference_form,
 )
@@ -2946,6 +2947,21 @@ def test_footnote_lines_in_the_body_of_a_book_with_digit_markers_stay() -> None:
         ("t", None),
         ("£2", None),
         ("(1907)", None),
+        # An opening single quotation mark after a letter: Kadesh's page 9
+        # reads the raised 4 after "Salvolini" so.
+        (
+            "Salvolini\u2018",
+            Reference("Salvolini", "\u2018", "", ReferenceForm.SIGN, None),
+        ),
+        (
+            "Salvolini,\u2018",
+            Reference("Salvolini,", "\u2018", "", ReferenceForm.SIGN, None),
+        ),
+        ("\u2018", None),
+        ("\u2018\u2018tandis", None),
+        ("d@\u2018aflirmer", None),
+        ("S\u2018.", None),
+        ("Salvolini\u201c", None),
     ],
 )
 def test_reference_candidate_gives_the_reference_in_a_word(
@@ -3686,6 +3702,78 @@ def test_note_marker_loose_bracket_holds_at_most_two_letters_or_digits(
     assert (note_marker(word) is not None) is marker
 
 
+def _footnote_links(
+    values: tuple[int | None, ...], words: tuple[str, ...]
+) -> tuple[tuple[int, int], ...]:
+    """The (note, candidate) positions of `match_footnotes` on one page."""
+    notes = tuple(
+        NoteToMatch(position, 10, value) for position, value in enumerate(values)
+    )
+    candidates = tuple(
+        Candidate(0, position, 10, reference)
+        for position, word in enumerate(words)
+        if (reference := reference_candidate(word)) is not None
+    )
+    return tuple(
+        (link.note, link.candidate.word) for link in match_footnotes(notes, candidates)
+    )
+
+
+def test_footnote_without_a_value_between_two_with_values_is_matched_by_its_place() -> (
+    None
+):
+    # Kadesh's page 10: notes 10, 11 and 12 without a marker, 13, and 14
+    # without one; "Kadesh,12" is note 12's reference and the "*" after
+    # "(see above)." note 14's.
+    assert _footnote_links((10, None, None, 13, None), ("Kadesh,12", 'above)."*')) == (
+        (2, 0),
+        (4, 1),
+    )
+
+
+@pytest.mark.parametrize(
+    ("values", "links"),
+    [
+        # Three places from 10 to 14 hold only two notes: no value is given,
+        # and the sign takes the first note with none.
+        ((10, None, None, 14, None), ((1, 0),)),
+        # A note after the page's last value takes none.
+        ((10, None), ((1, 0),)),
+        ((None, 11), ((0, 0),)),
+    ],
+    ids=["numbers_skip", "after_the_last", "before_the_first"],
+)
+def test_footnote_without_a_value_takes_none_unless_its_place_fits_two_values(
+    values: tuple[int | None, ...], links: tuple[tuple[int, int], ...]
+) -> None:
+    assert _footnote_links(values, ('above)."*',)) == links
+
+
+def test_footnote_without_a_value_between_two_pages_takes_none() -> None:
+    # Spec section 11: values are given only between two notes of one page;
+    # the note of page 10 after its last value keeps none, so "land11" is no
+    # match for it.
+    notes = (NoteToMatch(0, 10, 10), NoteToMatch(1, 10, None), NoteToMatch(2, 11, 12))
+    candidates = (
+        Candidate(0, 0, 10, _glued("land10")),
+        Candidate(0, 1, 10, _glued("land11")),
+        Candidate(0, 2, 11, _glued("land12")),
+    )
+    assert tuple(
+        (link.note, link.candidate.word) for link in match_footnotes(notes, candidates)
+    ) == ((0, 0), (2, 2))
+
+
+def test_an_opening_quote_takes_a_note_only_where_no_other_candidate_can() -> None:
+    # Spec section 11: "Kings‘" may be a misread closing quote; the later
+    # "*" takes the note. On Kadesh's page 9 "Salvolini‘" is needed for a
+    # third note.
+    assert _footnote_links((None,), ("Kings‘", "spot*")) == ((0, 1),)
+    assert _footnote_links(
+        (None, None, None), ("Salvolini‘", "Lenormant,*", "Chabas*")
+    ) == ((0, 0), (1, 1), (2, 2))
+
+
 def test_referenced_endnotes_are_matched_in_the_order_of_their_values() -> None:
     # Note 2 printed before note 1: in printed order note 2 would take "y2"
     # and note 1 could not take the earlier "x1".
@@ -4025,6 +4113,45 @@ def test_centred_line_in_capitals_is_a_heading_unless_tesseract_read_it_poorly(
     assert [
         block.kind.value for block in blocks.blocks if "KELP" in block_text(block)
     ] == [kind]
+
+
+# Structure spec section 14: a line right below a line Tesseract read
+# poorly takes no heading by the gaps; Kadesh's page 39 prints the
+# translation of a row of hieroglyphs, centred, 3.2 pitches below the row.
+
+
+@pytest.mark.parametrize(
+    ("row_confidences", "kind"),
+    [((8.0, 25.0, 49.0, 30.0), "paragraph"), ((90.0, 90.0, 90.0, 90.0), "heading")],
+    ids=["row_read_poorly", "row_read_well"],
+)
+def test_centred_line_below_a_line_read_poorly_is_no_heading_by_its_gaps(
+    row_confidences: tuple[float, ...], kind: str
+) -> None:
+    # The row has no letter, so it is no heading itself whatever its
+    # confidence; the translation is 2 pitches below it and 1.5 above the
+    # text after it.
+    row = _with_confidences(_centred_line("16. 12 345 6789", 130), *row_confidences)
+    translation = _centred_line("The stand which his majesty made.", 160, width=170)
+    lines = _lines_of(_around(row, translation))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert [
+        block.kind.value
+        for block in blocks.blocks
+        if "stand which" in block_text(block)
+    ] == [kind]
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_centred_line_in_capitals_below_a_line_read_poorly_is_a_heading() -> None:
+    row = _with_confidences(
+        _centred_line("16. 12 345 6789", 130), 8.0, 25.0, 49.0, 30.0
+    )
+    title = _centred_line("THE STAND OF HIS MAJESTY", 160, width=120)
+    blocks = make_blocks(_lines_of(_around(row, title)), _NO_WORDS, workers=1)
+    assert [
+        block.kind.value for block in blocks.blocks if "STAND" in block_text(block)
+    ] == ["heading"]
 
 
 def test_heading_of_one_line_has_no_label() -> None:

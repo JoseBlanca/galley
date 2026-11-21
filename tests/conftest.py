@@ -23,9 +23,9 @@ import shutil
 import subprocess
 import sys
 import threading
-from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
+from collections.abc import Callable, Iterator
+from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
@@ -366,40 +366,172 @@ def excerpt_pdf() -> frozendict[str, Path]:
 def excerpt_book_toml(excerpt_pdf: frozendict[str, Path]) -> frozendict[str, str]:
     """The `book.toml` of each excerpt, by excerpt name: the configs of spec
     section 9, with the absolute path of the excerpt's PDF."""
-    # A TOML literal string: no escapes, so any path but one with a quote.
     return frozendict(
         {
-            name: f"pdf = '{excerpt_pdf[name]}'\n{toml}"
+            name: _excerpt_toml(excerpt_pdf, name, toml)
             for name, toml in EXCERPT_CONFIGS.items()
         }
     )
 
 
+def _excerpt_toml(excerpt_pdf: frozendict[str, Path], name: str, toml: str) -> str:
+    """The `book.toml` of the excerpt `name`: `toml` with the absolute path
+    of its PDF; an error that names the PDF when it is not committed."""
+    if name not in excerpt_pdf:
+        msg = (
+            f"the excerpt {name}.pdf is missing from {EXCERPTS_DIR}; "
+            "`uv run python scripts/fetch_samples.py` cuts it"
+        )
+        raise FileNotFoundError(msg)
+    # A TOML literal string: no escapes, so any path but one with a quote.
+    return f"pdf = '{excerpt_pdf[name]}'\n{toml}"
+
+
+# The excerpts' runs and the redo excerpt's run start in the background as
+# the session begins, and the tests that read them run after the others, so
+# that the unit tests run while the excerpts are made. Measured on 21
+# November 2026 on an M5 Pro, `uv run pytest`: 81 s with the runs made when
+# the first test asks for them, 67 and 68 s with this.
+_RUN_FIXTURES = frozenset({"excerpt_books", "redo_excerpt_run"})
+
+
+@dataclass(frozen=True, slots=True)
+class _BackgroundRuns:
+    """The session's runs of the excerpts, started in the background: the
+    folders of `excerpt_books` and of each redo excerpt, None for those no
+    test of the session asks for."""
+
+    excerpts: Future[frozendict[str, BookFolder]] | None
+    redo: frozendict[str, Future[BookFolder]] | None
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Moves the tests that read the excerpts' runs after the others, each
+    group in its order, with the tests that share a module-scoped fixture
+    with one of them, so that no such fixture is made twice."""
+    late = {item for item in items if _RUN_FIXTURES & set(_fixtures(item))}
+    while True:
+        shared = {
+            (item.path, name)
+            for item in late
+            for name, scope in _fixture_scopes(item)
+            if scope == "module"
+        }
+        joined = {
+            item
+            for item in items
+            if item not in late
+            and any(
+                (item.path, name) in shared
+                for name, scope in _fixture_scopes(item)
+                if scope == "module"
+            )
+        }
+        if not joined:
+            break
+        late |= joined
+    items[:] = [item for item in items if item not in late] + [
+        item for item in items if item in late
+    ]
+
+
+def _fixtures(item: pytest.Item) -> tuple[str, ...]:
+    return tuple(str(name) for name in getattr(item, "fixturenames", ()))
+
+
+def _fixture_scopes(item: pytest.Item) -> tuple[tuple[str, str], ...]:
+    """The fixtures of a test with their scopes; pytest has no public way to
+    them but a test's fixture info."""
+    info = getattr(item, "_fixtureinfo", None)
+    if info is None:
+        return ()
+    return tuple(
+        (str(name), str(definitions[-1].scope))
+        for name, definitions in info.name2fixturedefs.items()
+        if definitions
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _background_runs(
+    request: pytest.FixtureRequest,
+    tmp_path_factory: pytest.TempPathFactory,
+    excerpt_pdf: frozendict[str, Path],
+) -> Iterator[_BackgroundRuns]:
+    """Starts the excerpts' runs that a test of the session asks for, when
+    their programs are installed, and waits for them at the session's end.
+    Every test uses this fixture, so it raises nothing itself: a missing
+    excerpt PDF is the error of the runs, which only the tests that read
+    them see."""
+    used = {name for item in request.session.items for name in _fixtures(item)}
+    pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="excerpt-runs")
+    excerpts = None
+    if "excerpt_books" in used and _have("pandoc", "tesseract"):
+        folders = frozendict(
+            {
+                name: BookFolder(tmp_path_factory.mktemp(name))
+                for name in EXCERPT_CONFIGS
+            }
+        )
+        excerpts = pool.submit(_run_excerpts, folders, excerpt_pdf)
+    redo = None
+    if "redo_excerpt_run" in used and _have("tesseract"):
+        redo = frozendict(
+            {
+                name: pool.submit(
+                    _run_redo_excerpt,
+                    BookFolder(tmp_path_factory.mktemp(name)),
+                    name,
+                    excerpt_pdf,
+                )
+                for name in REDO_EXCERPT_CONFIGS
+            }
+        )
+    yield _BackgroundRuns(excerpts, redo)
+    # No run is left running after the session; their errors were the
+    # tests'.
+    pool.shutdown(wait=True)
+
+
+def _have(*programs: str) -> bool:
+    return all(shutil.which(program) is not None for program in programs)
+
+
 @pytest.fixture(scope="session")
-def excerpt_books(
-    tmp_path_factory: pytest.TempPathFactory, excerpt_book_toml: frozendict[str, str]
-) -> frozendict[str, BookFolder]:
+def excerpt_books(_background_runs: _BackgroundRuns) -> frozendict[str, BookFolder]:
     """A book folder for each excerpt, by excerpt name, with its `book.toml`
     (the configs of spec section 9) and the files `galley2epub run` wrote
     in it, book.epub last (spec section 9, "The end-to-end test").
 
     Session-scoped: the stages run once, also under --parallel-threads=8,
-    and the excerpts' runs go side by side, each in a process of its own.
-    A test reads these folders and never writes in them. Skips every test
-    that uses it when Pandoc is missing, which markdown and epub need, or
-    Tesseract, with which layout re-reads small print (docs/specs/reocr.md).
+    started as the session begins, and the excerpts' runs go side by side,
+    each in a process of its own. A test reads these folders and never
+    writes in them. Skips every test that uses it when Pandoc is missing,
+    which markdown and epub need, or Tesseract, with which layout re-reads
+    small print (docs/specs/reocr.md).
     """
     _require_program("pandoc")
     _require_program("tesseract")
-    folders = {
-        name: BookFolder(tmp_path_factory.mktemp(name)) for name in excerpt_book_toml
-    }
+    assert _background_runs.excerpts is not None, (
+        "the excerpts' runs were not started: no collected test names "
+        "excerpt_books among its arguments or fixtures, which is how the "
+        "session finds the runs to start"
+    )
+    return _background_runs.excerpts.result()
+
+
+def _run_excerpts(
+    folders: frozendict[str, BookFolder], excerpt_pdf: frozendict[str, Path]
+) -> frozendict[str, BookFolder]:
     for name, folder in folders.items():
-        folder.book_toml.write_text(excerpt_book_toml[name], encoding="utf-8")
+        folder.book_toml.write_text(
+            _excerpt_toml(excerpt_pdf, name, EXCERPT_CONFIGS[name]), encoding="utf-8"
+        )
     with ThreadPoolExecutor(max_workers=_EXCERPT_RUNS_AT_ONCE) as pool:
         # list() waits for every run and raises the first run's error.
         list(pool.map(_run_excerpt, folders.values()))
-    return frozendict(folders)
+    return folders
 
 
 def _run_excerpt(folder: BookFolder) -> None:
@@ -428,38 +560,38 @@ def _run_excerpt(folder: BookFolder) -> None:
 
 @pytest.fixture(scope="session")
 def redo_excerpt_run(
-    tmp_path_factory: pytest.TempPathFactory, excerpt_pdf: frozendict[str, Path]
+    _background_runs: _BackgroundRuns,
 ) -> Callable[[str], BookFolder]:
     """A function that gives the book folder of an excerpt of
     REDO_EXCERPT_CONFIGS, by name, with the files analyze, extract, layout
-    and structure wrote in it, each stage a process of its own, run the
-    first time a test asks for it and kept for the session. The run is
-    made inside the test, not in the fixture's setup, so that a test of a
-    task not yet done fails as its strict xfail expects instead of
+    and structure wrote in it, each stage a process of its own, started as
+    the session begins. The function waits for the run, so that a test of
+    a task not yet done fails as its strict xfail expects instead of
     erroring. Skips when Tesseract is missing. A test reads the folder and
     never writes in it."""
     _require_program("tesseract")
-    roots = frozendict(
-        {name: tmp_path_factory.mktemp(name) for name in REDO_EXCERPT_CONFIGS}
+    runs = _background_runs.redo
+    assert runs is not None, (
+        "the redo excerpts' runs were not started: no collected test names "
+        "redo_excerpt_run among its arguments or fixtures, which is how the "
+        "session finds the runs to start"
     )
-    locks = frozendict({name: threading.Lock() for name in REDO_EXCERPT_CONFIGS})
 
     def run(name: str) -> BookFolder:
-        with locks[name]:
-            return run_once(name)
-
-    @functools.cache
-    def run_once(name: str) -> BookFolder:
-        folder = BookFolder(roots[name])
-        folder.book_toml.write_text(
-            f"pdf = '{excerpt_pdf[name]}'\n{REDO_EXCERPT_CONFIGS[name]}",
-            encoding="utf-8",
-        )
-        for stage in ("analyze", "extract", "layout", "structure"):
-            _run_stage(stage, folder)
-        return folder
+        return runs[name].result()
 
     return run
+
+
+def _run_redo_excerpt(
+    folder: BookFolder, name: str, excerpt_pdf: frozendict[str, Path]
+) -> BookFolder:
+    folder.book_toml.write_text(
+        _excerpt_toml(excerpt_pdf, name, REDO_EXCERPT_CONFIGS[name]), encoding="utf-8"
+    )
+    for stage in ("analyze", "extract", "layout", "structure"):
+        _run_stage(stage, folder)
+    return folder
 
 
 def _run_stage(stage: str, folder: BookFolder) -> None:

@@ -219,9 +219,10 @@ _KADESH_BOOK = "battleofkadeshst00breauoft"
 # 2026 (34 by the references alone, more with the notes the layer's
 # heights give back).
 _KADESH_LINKED_NOTES_LEAST = 31
-# The layer's 3 headings: the article's title, the caption of the battle
-# plan on page 39 (a false heading with the layer too) and "ADDENDUM".
-_KADESH_HEADING_PAGES = (8, 39, 66)
+# The article's title and "ADDENDUM"; the translation of a row of
+# hieroglyphs on page 39, a heading with the layer, is none below a line
+# Tesseract read poorly (structure spec section 14).
+_KADESH_HEADING_PAGES = (8, 66)
 
 
 @pytest.mark.whole_book

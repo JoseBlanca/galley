@@ -13,6 +13,7 @@ import json
 import math
 from collections import Counter
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
@@ -2937,8 +2938,15 @@ def test_reread_stubbs_excerpt_with_1_worker_and_with_6_writes_the_same_bytes(
     folder = excerpt_books["stubbs_51_56-64"]
     (tmp_path / "one").mkdir()
     (tmp_path / "six").mkdir()
-    one = _layout_again(folder, tmp_path / "one", _unchanged, 1)
-    six = _layout_again(folder, tmp_path / "six", _unchanged, 6)
+    # The two runs side by side, as Tesseract re-reads for both.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        one, six = pool.map(
+            lambda name, workers: _layout_again(
+                folder, tmp_path / name, _unchanged, workers
+            ),
+            ("one", "six"),
+            (1, 6),
+        )
     assert read_lines(one.lines_json).rereads != ()
     assert one.lines_json.read_bytes() == six.lines_json.read_bytes()
 
