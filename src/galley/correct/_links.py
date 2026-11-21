@@ -55,6 +55,9 @@ _MISREAD_LONGEST = 3
 _MISREAD_CHARACTERS = frozenset("0123456789'\"‘’“”*†‡™®^%")
 _QUOTE_CHARACTERS = frozenset("'\"‘’“”")
 _STRAIGHT = str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"'})
+# What is no letter or digit at the end of a core: section 6 keeps a sign
+# such as "™" in the core, and the punctuation before it ("soldiers;™").
+_CORE_END = re.compile(r"[\W_]+$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -365,15 +368,29 @@ def _words(text: str) -> tuple[_Word, ...]:
     )
 
 
+def _bare_end(text: str, start: int, end: int) -> int:
+    """The end of the core `text[start:end]` less what is no letter or
+    digit at its end (section 9b)."""
+    found = _CORE_END.search(text, start, end)
+    return end if found is None or found.start() == start else found.start()
+
+
 def misread_reference(galley_after: str, model_word: str, number: str) -> str:
     """The misread reference at the end of a galley word (section 9b):
-    `galley_after` is what follows the word's core; the characters past
+    `galley_after` is what follows the word's core cut by `_bare_end`; the
+    characters past
     those the model's word has after its core, when they are 1 to 3 digits
     or signs; empty otherwise. When they hold the reference's `number`,
     the quotes before it are no part of the reference: they stay in the
     word ("soldiers.”37" has the misread reference "37")."""
     model_tokens = tokens(model_word)
-    model_after = model_word[model_tokens[-1].end :] if model_tokens else ""
+    model_after = (
+        model_word[
+            _bare_end(model_word, model_tokens[-1].start, model_tokens[-1].end) :
+        ]
+        if model_tokens
+        else ""
+    )
     if not galley_after.translate(_STRAIGHT).startswith(
         model_after.translate(_STRAIGHT)
     ):
@@ -461,7 +478,9 @@ def _link_edit(
     text = block.spans[link.place.span_index].text
     word = words[position]
     misread = misread_reference(
-        text[link.place.end : word.end], link.model_word, link.text
+        text[_bare_end(text, link.place.start, link.place.end) : word.end],
+        link.model_word,
+        link.text,
     )
     low = _context(text, words, position, changed, texts)
     if low is None:
