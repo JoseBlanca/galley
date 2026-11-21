@@ -498,7 +498,11 @@ def excerpt_books(_background_runs: _BackgroundRuns) -> frozendict[str, BookFold
     """
     _require_program("pandoc")
     _require_program("tesseract")
-    assert _background_runs.excerpts is not None, "no test was collected for it"
+    assert _background_runs.excerpts is not None, (
+        "the excerpts' runs were not started: no collected test names "
+        "excerpt_books among its arguments or fixtures, which is how the "
+        "session finds the runs to start"
+    )
     return _background_runs.excerpts.result()
 
 
@@ -546,7 +550,11 @@ def redo_excerpt_run(
     never writes in it."""
     _require_program("tesseract")
     runs = _background_runs.redo
-    assert runs is not None, "no test was collected for it"
+    assert runs is not None, (
+        "the redo excerpts' runs were not started: no collected test names "
+        "redo_excerpt_run among its arguments or fixtures, which is how the "
+        "session finds the runs to start"
+    )
 
     def run(name: str) -> BookFolder:
         return runs[name].result()

@@ -253,9 +253,9 @@ def page_links(
         first_words = answer.notes.get(reference.text)
         note_id = None if first_words is None else note_of(notes, first_words)
         place = None if position is None else body[position].place
-        galleys = None if place is None else galley_references.get(place)
-        if galleys is not None and note_id in (None, galleys):
-            marked.add(galleys)
+        galley_note_id = None if place is None else galley_references.get(place)
+        if galley_note_id is not None and note_id in (None, galley_note_id):
+            marked.add(galley_note_id)
         if place is None or note_id is None:
             continue
         links.append(
