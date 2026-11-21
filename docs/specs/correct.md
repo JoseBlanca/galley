@@ -630,7 +630,22 @@ whitespace word, gets a reference to that note right after it:
   because section 6 keeps in it a sign that is no ordinary punctuation,
   and so the punctuation before the sign: "soldiers;™" is one core, and
   until 21 November 2026 the link went after its "™" ("soldiers;™",
-  "map®", "iter™", "whatever.™" on Kadesh). The reference's
+  "map®", "iter™", "whatever.™" on Kadesh). But a sign the core keeps
+  may be printed ("50%", "40°"), so of the misread reference, the
+  characters that are in galley's core, past those of the model's word,
+  must each be "™", "®" or "^", signs the OCR gives for a raised number,
+  which the model's word then lacks; when one of them is another
+  character, or when they are not all taken as the misread reference,
+  the reference gives no link. "map®", where the model has `map [43]`,
+  becomes "map" with the link; "50%", where the model has `50 [3]`, gets
+  no link; "map®", where the model has `map® [43]`, keeps its "®" and
+  the link follows it. Measured on the seven books (the runs of the
+  note-links plan, 21 November 2026): each of the cores of galley's
+  words that end in "™", "®" or "^" (Kadesh 19, Domesday 40, Gierke 61,
+  Stubbs 11, Haskins 11, Turney 8, Haynes 1) is a misread raised number
+  or OCR noise ("description™", "map®", "undoing.^", "(37)®"), none a
+  printed sign; "%" and "°" also end numbers ("111.1%", "40°" on
+  Kadesh). The reference's
   text is the model's number x, so that the edit shows which number the
   model read. "advanced.”", where the model has
   `advanced." [4]`, keeps its quote. A quote is taken as part of the
