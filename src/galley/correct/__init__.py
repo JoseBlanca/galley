@@ -270,7 +270,9 @@ def run(
                     notes=footnotes_starting(blocks, page.index)
                     if config.correct_links
                     else (),
-                    galley_references=galley_references(blocks, reading),
+                    galley_references=galley_references(blocks, reading)
+                    if config.correct_links
+                    else frozendict(),
                 )
             )
     results = map_pages(lambda item: _read_page(config, item), work, workers)
