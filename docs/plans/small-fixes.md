@@ -13,7 +13,7 @@ rule takes it (structure §14), fix with the narrowest rule, spec first,
 a test that fails first; count the headings that change on the seven
 books and look at each.
 
-- [ ] 1.1
+- [x] 1.1
 
 ## 2. Wrong note links made by galley (Kadesh pages 9, 10)
 
@@ -26,7 +26,7 @@ the seven books and check a sample on the page images (the references
 read by eye in `tests/fixtures/expected/kadesh_reference/` cover pages
 8, 9, 11, 13, 15, 25, 26, 27, 29, 40, 47, 53).
 
-- [ ] 2.1
+- [x] 2.1
 
 ## 3. The quick tests back to about a minute
 
@@ -35,6 +35,16 @@ excerpt fixture, the correct stage's excerpt test, the Tesseract
 excerpts) and cut it without dropping a check.
 
 - [ ] 3.1
+
+## 3b. A misread mark left before a vision-model link
+
+Where the scan's OCR read a note's raised number as a sign, a link the
+correct stage adds leaves the sign in the text: "soldiers;™", "map®",
+"iter™", "whatever.™" on Kadesh (run `runs/note-links/battleofkadeshst00breauoft-correct2/`).
+The link should take the sign's place, as galley's own references do.
+Spec first (correct.md §9b), a test that fails first.
+
+- [ ] 3b.1
 
 ## 4. The end
 
