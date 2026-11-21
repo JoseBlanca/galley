@@ -240,7 +240,8 @@ def page_links(
     start on the page, through its note line. `galley_references` gives,
     by the place of a token, the note galley's own reference right after
     its word refers to; a reference the model marks there that gives no
-    link, or one to that note, counts once in the numbers of the page."""
+    link, or one to that note, counts once in the numbers of the page, and
+    so does a reference with no place whose note galley references."""
     body = [
         token
         for token in reading
@@ -248,6 +249,7 @@ def page_links(
     ]
     links = []
     marked: set[str] = set()
+    referenced = {note.id for note in notes if note.referenced}
     for rank, reference in enumerate(answer.references):
         position = reference_place(body, reference)
         first_words = answer.notes.get(reference.text)
@@ -256,6 +258,8 @@ def page_links(
         galley_note_id = None if place is None else galley_references.get(place)
         if galley_note_id is not None and note_id in (None, galley_note_id):
             marked.add(galley_note_id)
+        if place is None and note_id is not None and note_id in referenced:
+            marked.add(note_id)
         if place is None or note_id is None:
             continue
         links.append(
@@ -310,18 +314,17 @@ def numbers_in_order(
     notes: Sequence[Note],
     marked: AbstractSet[str] = frozenset(),
 ) -> bool:
-    """Whether a page's links agree with each other and with galley's
-    markers (section 9b): each link's note is the k-th footnote of the page
-    when its reference is the k-th the model marked on it, counted from 0,
-    and the footnotes before it that galley references and no link goes
-    to are counted as marked too (the heading's "*" on Kadesh's page 8,
-    which the model does not bracket), but for the notes of `marked`,
-    whose galley reference the model marked already;
-    in the order of the model's answer their numbers rise; and, with each note
-    numbered by its link's number or else by galley's marker when that
-    is digits of as many as the links' longest number (a shorter one is a
-    marker the OCR cut, "1" for 61 on Kadesh's page 26), the numbers of
-    the page's notes rise in their order."""
+    """Whether a page's links agree with each other (section 9b): each
+    link's note is the k-th footnote of the page when its reference is the
+    k-th the model marked on it, counted from 0, and the footnotes before
+    it that galley references and no link goes to are counted as marked
+    too (the heading's "*" on Kadesh's page 8, which the model does not
+    bracket), but for the notes of `marked`, whose galley reference the
+    model marked already; and in the order of the model's answer their
+    notes come in the order of the page's footnotes, no note twice, and
+    their numbers rise. The numbers are not compared with galley's
+    markers: the model misreads the tens of every number on Kadesh's pages
+    26 and 53, and their links are right."""
     order = {note.id: index for index, note in enumerate(notes)}
     indices = [order[link.note_id] for link in links]
     linked = {link.note_id for link in links}
@@ -336,25 +339,10 @@ def numbers_in_order(
         for index, link in zip(indices, links, strict=True)
     ):
         return False
-    numbers = [_number(link.text) for link in links]
     if indices != sorted(set(indices)) or len(set(indices)) != len(indices):
         return False
-    known = [number for number in numbers if number is not None]
-    if known != sorted(set(known)) or len(set(known)) != len(known):
-        return False
-    by_note = {link.note_id: _number(link.text) for link in links}
-    digits = max((len(str(number)) for number in known), default=0)
-
-    def marker_number(note: Note) -> int | None:
-        number = _number(note.marker)
-        return number if number is not None and len(str(number)) == digits else None
-
-    numbered = [
-        number
-        for note in notes
-        if (number := by_note.get(note.id) or marker_number(note)) is not None
-    ]
-    return numbered == sorted(set(numbered)) and len(set(numbered)) == len(numbered)
+    known = [number for link in links if (number := _number(link.text)) is not None]
+    return known == sorted(set(known)) and len(set(known)) == len(known)
 
 
 # The edits.
