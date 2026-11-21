@@ -3,6 +3,7 @@ application of edits (its section 10), with the model's answers recorded:
 no model runs here but in the test marked vision_model."""
 
 import base64
+import contextlib
 import dataclasses
 import hashlib
 import io
@@ -11,7 +12,7 @@ import logging
 import shutil
 import socket
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -869,8 +870,10 @@ def _handler(fake: _FakeLmStudio) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
-@pytest.fixture
-def lm_studio() -> Iterator[Callable[..., tuple[_FakeLmStudio, str]]]:
+@contextlib.contextmanager
+def _fake_servers() -> Generator[Callable[..., tuple[_FakeLmStudio, str]]]:
+    """A function that starts a fake LM Studio and gives it with its URL;
+    every server it started is shut down on leaving."""
     servers: list[ThreadingHTTPServer] = []
 
     def start(
@@ -888,10 +891,18 @@ def lm_studio() -> Iterator[Callable[..., tuple[_FakeLmStudio, str]]]:
         servers.append(server)
         return fake, f"http://127.0.0.1:{server.server_address[1]}"
 
-    yield start
-    for server in servers:
-        server.shutdown()
-        server.server_close()
+    try:
+        yield start
+    finally:
+        for server in servers:
+            server.shutdown()
+            server.server_close()
+
+
+@pytest.fixture
+def lm_studio() -> Iterator[Callable[..., tuple[_FakeLmStudio, str]]]:
+    with _fake_servers() as start:
+        yield start
 
 
 def _closed_port() -> int:
@@ -1027,41 +1038,81 @@ EXCERPT_EDITS = (
 EXCERPT_EDIT_COUNT = 475
 
 
+@dataclass(frozen=True, slots=True)
+class _ExcerptCorrected:
+    """The excerpt corrected with the recorded answers: with 1 worker and
+    the note links, then book.md made from it; and with 2 workers and
+    `correct_links` false, with the bodies of its requests."""
+
+    one: BookFolder
+    two: BookFolder
+    two_bodies: tuple[dict[str, object], ...]
+
+
+@pytest.fixture(scope="module")
+def excerpt_corrected(
+    tmp_path_factory: pytest.TempPathFactory,
+    redo_excerpt_run: Callable[[str], BookFolder],
+) -> _ExcerptCorrected:
+    """The runs that the tests of the excerpt's edits and links read, made
+    once for both: each run renders the ten pages and aligns them, about
+    two seconds (21 November 2026). The run with 2 workers is without the
+    links, so that the two runs also show that the word edits do not depend
+    on them."""
+    from galley import markdown
+
+    with _fake_servers() as lm_studio:
+        fake, server = lm_studio()
+        one, config = _excerpt_folder(
+            tmp_path_factory.mktemp("one"), redo_excerpt_run, server
+        )
+        fake.in_order.extend(_recorded_answers(one))
+        fake.links_in_order.extend(_recorded_link_answers(one))
+        correct.run(one, config, workers=1)
+        assert fake.in_order == []
+        assert fake.links_in_order == []
+        markdown.run(one, config)
+        # The same server answers each page as it did with 1 worker.
+        asked = len(fake.bodies)
+        two, two_config = _excerpt_folder(
+            tmp_path_factory.mktemp("two"), redo_excerpt_run, server
+        )
+        correct.run(
+            two, dataclasses.replace(two_config, correct_links=False), workers=2
+        )
+        two_bodies = tuple(fake.bodies[asked:])
+    return _ExcerptCorrected(one, two, two_bodies)
+
+
 # Renders with PDFium.
 @pytest.mark.thread_unsafe
 @pytest.mark.tesseract
 @pytest.mark.pandoc
 def test_excerpt_edits_are_the_same_with_1_and_2_workers_and_markdown_applies_them(
-    tmp_path: Path,
-    redo_excerpt_run: Callable[[str], BookFolder],
-    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+    excerpt_corrected: _ExcerptCorrected,
 ) -> None:
-    from galley import markdown
-
-    fake, server = lm_studio()
-    written = {}
-    for workers in (1, 2):
-        folder, config = _excerpt_folder(
-            tmp_path / str(workers), redo_excerpt_run, server
-        )
-        config = dataclasses.replace(config, correct_links=False)
-        if workers == 1:
-            fake.in_order.extend(_recorded_answers(folder))
-        correct.run(folder, config, workers=workers)
-        written[workers] = folder.correct_jsonl.read_bytes()
-    assert written[1] == written[2]
-    assert fake.in_order == []
+    one = excerpt_corrected.one.correct_jsonl.read_bytes()
+    two = excerpt_corrected.two.correct_jsonl.read_bytes()
+    # The link edits come after the word edits (section 9b).
+    assert one.startswith(two)
+    assert all(
+        edit.reason == "vision_note_link"
+        for edit in read_edits(excerpt_corrected.one.correct_jsonl)[
+            len(read_edits(excerpt_corrected.two.correct_jsonl)) :
+        ]
+    )
     # With correct_links false no page is asked for its links.
-    assert json.dumps(LINKS_PROMPT) not in json.dumps(fake.bodies)
-    edits = read_edits(folder.correct_jsonl)
+    assert excerpt_corrected.two_bodies != ()
+    assert json.dumps(LINKS_PROMPT) not in json.dumps(excerpt_corrected.two_bodies)
+    edits = read_edits(excerpt_corrected.two.correct_jsonl)
     assert len(edits) == EXCERPT_EDIT_COUNT
     assert {edit.author for edit in edits} == {"correct"}
     pages = [edit.page_index or 0 for edit in edits]
     assert pages == sorted(pages)
     found = {(edit.block_id, edit.page_index, edit.old, edit.new) for edit in edits}
     assert set(EXCERPT_EDITS) <= found
-    markdown.run(folder, config)
-    assert "a poem in rhymed" in folder.book_md.read_text(encoding="utf-8")
+    book = excerpt_corrected.one.book_md.read_text(encoding="utf-8")
+    assert "a poem in rhymed" in book
 
 
 # Renders with PDFium.
@@ -1188,26 +1239,15 @@ EXCERPT_LINKS = (
 @pytest.mark.tesseract
 @pytest.mark.pandoc
 def test_excerpt_note_links_are_the_references_the_page_prints(
-    tmp_path: Path,
-    redo_excerpt_run: Callable[[str], BookFolder],
-    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+    excerpt_corrected: _ExcerptCorrected,
 ) -> None:
-    from galley import markdown
-
-    fake, server = lm_studio()
-    folder, config = _excerpt_folder(tmp_path, redo_excerpt_run, server)
-    fake.in_order.extend(_recorded_answers(folder))
-    fake.links_in_order.extend(_recorded_link_answers(folder))
-    correct.run(folder, config, workers=1)
-    assert fake.in_order == []
-    assert fake.links_in_order == []
+    folder = excerpt_corrected.one
     links = [
         (edit.page_index, edit.old, edit.new)
         for edit in read_edits(folder.correct_jsonl)
         if edit.reason == "vision_note_link"
     ]
     assert tuple(links) == EXCERPT_LINKS
-    markdown.run(folder, config)
     book = folder.book_md.read_text(encoding="utf-8")
     assert "forces\\.[^n-p0000-004]" in book
     assert "Salvolini[^n-p0001-001]" in book

@@ -621,11 +621,16 @@ whitespace word, gets a reference to that note right after it:
 - else the link is put in after the word. galley's word may still hold
   the reference as the OCR misread it, after its punctuation: "forces.3",
   "enemy;™", "Zahi“". The characters after the core of galley's word
-  (section 6), past as many as the model's word has after its core
+  (section 6), the core less what is no letter or digit at its end,
+  past as many as the model's word has after its core so cut
   (quotes made straight on both sides, and equal there), are the
   misread reference when they are 1 to 3, each a digit or one of
   `' " ‘ ’ “ ” * † ‡ ™ ® ^ %`. They leave the word, and are kept only in
-  the edit's `old`. Otherwise the word stays whole. The reference's
+  the edit's `old`. Otherwise the word stays whole. The core is cut
+  because section 6 keeps in it a sign that is no ordinary punctuation,
+  and so the punctuation before the sign: "soldiers;™" is one core, and
+  until 21 November 2026 the link went after its "™" ("soldiers;™",
+  "map®", "iter™", "whatever.™" on Kadesh). The reference's
   text is the model's number x, so that the edit shows which number the
   model read. "advanced.”", where the model has
   `advanced." [4]`, keeps its quote. A quote is taken as part of the

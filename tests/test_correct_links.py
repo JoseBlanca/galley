@@ -260,6 +260,33 @@ def test_a_link_edit_drops_the_misread_reference_and_keeps_the_models_number() -
     assert {edit.block_sha256 for edit in edits} == {block_sha256(BODY_BLOCK)}
 
 
+def test_a_link_takes_the_place_of_a_sign_the_words_core_keeps() -> None:
+    # Section 6 keeps "™" and "®" in the core, and the ";" before them,
+    # so the place, galley's token, ends after the sign (Kadesh).
+    block = _block("b-p0014-002", _span("the soldiers;™ and Blanckenhorn’s map® then"))
+    text = block.spans[0].text
+    links = tuple(
+        Link(
+            page_index=8,
+            place=Place(block.id, 0, text.index(core), text.index(core) + len(core)),
+            note_id=note_id,
+            text=number,
+            model_word=model_word,
+        )
+        for core, note_id, number, model_word in (
+            ("soldiers;™", "n-p0008-003", "36", "soldiers;"),
+            ("map®", "n-p0008-004", "43", "map"),
+        )
+    )
+    page = _blocks((block,), PAGE.notes)
+    assert [
+        (edit.old, edit.new) for edit in link_edits(page, links, (), (), MODEL)
+    ] == [
+        ("soldiers;™", "soldiers;[36](#n-p0008-003)"),
+        ("map®", "map[43](#n-p0008-004)"),
+    ]
+
+
 def test_a_word_twice_in_its_block_takes_the_words_before_it() -> None:
     block = _block("b-p0008-002", _span("of the enemy; but of the enemy; then"))
     start = block.spans[0].text.rindex("enemy")
