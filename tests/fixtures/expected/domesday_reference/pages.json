@@ -1,0 +1,1164 @@
+{
+  "book": "domesdaybook00maituoft",
+  "read": "Transcribed by the assistant on 21 November 2026 from the page images, rendered with pypdfium2 at 300 dpi and read in strips of the full page width, about 140 points high, enlarged about two times. Page means the page index of the PDF, from 0. Each line is a printed line, with its kind: 'body' the text of the page, 'note' a footnote, 'side' a side note in the margin, 'table' a row of a table, 'other' a running head, page number or signature mark, which are not scored. Note markers and note references are left out, as are the raised numbers of a table cell (the '21' of '21³' on page 470, whose '3' refers to a note). A word broken at a line end keeps its hyphen, as printed. The side notes stand where galley's reading of the page (docs/specs/correct.md section 5) puts them, not where they are printed beside the text, so that a word-by-word alignment does not count their place as errors; on page 470 the last two body lines are printed after the table. The rows of the table on page 426 are read left to right, its column heads from the top. No word was unreadable; on page 180 'omni' is printed with a damaged 'o', and on page 316 '(ii. 34);' with a damaged parenthesis. Pages: 100 body, Latin footnotes and a side note; 180 body and eight Latin footnotes; 250 body and a side note; 316 an appendix in small type of Latin and Old English charter extracts; 426 a table of county statistics; 470 body, side notes, a small table and four footnotes.",
+  "pages": [
+    {
+      "page_index": 100,
+      "lines": [
+        {
+          "kind": "other",
+          "text": "The Sokemen. 75"
+        },
+        {
+          "kind": "body",
+          "text": "commended man may be rendered definite by a bargain which"
+        },
+        {
+          "kind": "body",
+          "text": "imposes upon him the payment of rent or the performance of"
+        },
+        {
+          "kind": "body",
+          "text": "some specified services. When this is so, we shall often find"
+        },
+        {
+          "kind": "body",
+          "text": "that the land is moving, if we may so speak, not from the man"
+        },
+        {
+          "kind": "body",
+          "text": "but from the lord. The man is taking land from the lord to"
+        },
+        {
+          "kind": "body",
+          "text": "hold during good behaviour, or for life, or for lives. A form"
+        },
+        {
+          "kind": "body",
+          "text": "of lease or loan (lǽn) which gives the land to the lessee and to"
+        },
+        {
+          "kind": "body",
+          "text": "two or three successive heirs of his, has from of old been"
+        },
+        {
+          "kind": "body",
+          "text": "commonly used by some of the great churches. Also we"
+        },
+        {
+          "kind": "body",
+          "text": "see landowners giving up their land to the churches and"
+        },
+        {
+          "kind": "body",
+          "text": "taking it back again as mere life tenants. During their"
+        },
+        {
+          "kind": "body",
+          "text": "lives the church is to have some ‘service,’ or at least some"
+        },
+        {
+          "kind": "body",
+          "text": "‘recognition’ of its lordship, while after their deaths the church"
+        },
+        {
+          "kind": "body",
+          "text": "will have the land in demesne. This is something different"
+        },
+        {
+          "kind": "body",
+          "text": "from mere commendation. We see here the feuda oblata or"
+        },
+        {
+          "kind": "body",
+          "text": "beneficia oblata which foreign jurists have contrasted with feuda"
+        },
+        {
+          "kind": "body",
+          "text": "or beneficia data. The land is brought into the bargain by the"
+        },
+        {
+          "kind": "body",
+          "text": "man, not by the lord. But often the land comes from the lord,"
+        },
+        {
+          "kind": "body",
+          "text": "and the tenancy is no merely temporary tenancy; it is herit-"
+        },
+        {
+          "kind": "body",
+          "text": "able. The king has provided his thegns with lands; the earls,"
+        },
+        {
+          "kind": "body",
+          "text": "the churches have provided their thegns with lands, and these"
+        },
+        {
+          "kind": "body",
+          "text": "thegns have heritable estates, and already they are conceived"
+        },
+        {
+          "kind": "body",
+          "text": "as holding them of (de) the churches, the earls, the king. But"
+        },
+        {
+          "kind": "body",
+          "text": "we must not as yet be led away into any discussion about the"
+        },
+        {
+          "kind": "body",
+          "text": "architecture of the very highest storeys of the feudal or vassalic"
+        },
+        {
+          "kind": "body",
+          "text": "edifice. It must at present suffice that in humbler quarters"
+        },
+        {
+          "kind": "body",
+          "text": "there has been much letting and hiring of land. The leases, if"
+        },
+        {
+          "kind": "body",
+          "text": "we choose to call them so, the gifts, if we choose to call them so,"
+        },
+        {
+          "kind": "body",
+          "text": "have created heritable rights and perdurable relationships."
+        },
+        {
+          "kind": "body",
+          "text": "There is no kind of service that can not be purchased by a"
+        },
+        {
+          "kind": "body",
+          "text": "grant or lease of land. Godric’s wife had land from the king"
+        },
+        {
+          "kind": "side",
+          "text": "Land-loans and ser-"
+        },
+        {
+          "kind": "side",
+          "text": "vices."
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 45 b: ‘Quidam frater Edrici tenuit tali conventione, quod quamdiu"
+        },
+        {
+          "kind": "note",
+          "text": "bene se haberet erga eum [Edricum] tamdiu terram de eo teneret, et si vendere"
+        },
+        {
+          "kind": "note",
+          "text": "vellet, non alicui nisi ei de quo tenebat vendere vel dare liceret.’"
+        },
+        {
+          "kind": "note",
+          "text": "Cases of life tenancies will be found in D. B. i. 47, Stantune; 67 b, Newetone;"
+        },
+        {
+          "kind": "note",
+          "text": "80, Catesclive; 177 b, Witune; ii. 373, 444 b."
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 46 b, 66 b, 72, 175. We shall return to this when in the next essay"
+        },
+        {
+          "kind": "note",
+          "text": "we speak of loanland."
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 67 b: ‘Hanc terram reddidit sponte sua aecclesiae Hardingus qui in"
+        },
+        {
+          "kind": "note",
+          "text": "vita sua per convent[ionem] debebat tenere.’ See also the case in i. 177 b."
+        },
+        {
+          "kind": "note",
+          "text": "Again, ii. 431: ‘terram quam cepit cum uxore sua...misit in ecclesia concedente"
+        },
+        {
+          "kind": "note",
+          "text": "muliere tali conventione quod non potuit vendere nec dare de aecclesia.’ For a"
+        },
+        {
+          "kind": "note",
+          "text": "‘recognitio’ see i. 175, Persore."
+        }
+      ]
+    },
+    {
+      "page_index": 180,
+      "lines": [
+        {
+          "kind": "other",
+          "text": "The Feudal Superstructure. 155"
+        },
+        {
+          "kind": "body",
+          "text": "his lord. And at least in the eastern counties—so it may well"
+        },
+        {
+          "kind": "body",
+          "text": "have seemed to the Normans—matters sadly needed simplifica-"
+        },
+        {
+          "kind": "body",
+          "text": "tion. Even elsewhere and when a large estate is at stake they"
+        },
+        {
+          "kind": "body",
+          "text": "can not always get an answer to the question ‘Of whom was"
+        },
+        {
+          "kind": "body",
+          "text": "this land holden?’ Still they thought that some of the"
+        },
+        {
+          "kind": "body",
+          "text": "greatest men in the realm had held their lands, or some of"
+        },
+        {
+          "kind": "body",
+          "text": "their lands, of the king or of someone else. The formulas"
+        },
+        {
+          "kind": "body",
+          "text": "which are used throughout the description of Hampshire and"
+        },
+        {
+          "kind": "body",
+          "text": "some other counties seem to assume that every holder of a"
+        },
+        {
+          "kind": "body",
+          "text": "manor, at all events if a layman, had held it of the king, if he"
+        },
+        {
+          "kind": "body",
+          "text": "did not hold it of another lord. Tenure in feudo again they"
+        },
+        {
+          "kind": "body",
+          "text": "regarded as no innovation. They saw the work of subinfeu-"
+        },
+        {
+          "kind": "body",
+          "text": "dation:—Brihtmær held land of Azor and Azor of Harold; we"
+        },
+        {
+          "kind": "body",
+          "text": "may well suppose that Harold held it of the king and that"
+        },
+        {
+          "kind": "body",
+          "text": "some villeins held part of it of Brihtmær, and thus we see"
+        },
+        {
+          "kind": "body",
+          "text": "already a feudal ladder with no less than five rungs. They"
+        },
+        {
+          "kind": "body",
+          "text": "saw that the thegns owed ‘service’ to their lords. They saw"
+        },
+        {
+          "kind": "body",
+          "text": "the heriot; they sometimes called it a relief. We can not be"
+        },
+        {
+          "kind": "body",
+          "text": "sure that this change of names imported any change in the"
+        },
+        {
+          "kind": "body",
+          "text": "law; when a burgess of Hereford died the king took a heriot,"
+        },
+        {
+          "kind": "body",
+          "text": "but if he could not get the heriot he took the dead man’s land."
+        },
+        {
+          "kind": "body",
+          "text": "They saw that in certain cases an heir had to ‘seek’ his"
+        },
+        {
+          "kind": "body",
+          "text": "ancestor’s lord if he wished to enjoy his ancestor’s land. They"
+        },
+        {
+          "kind": "body",
+          "text": "saw that many a free man could not give or sell his land"
+        },
+        {
+          "kind": "body",
+          "text": "without his lord’s consent. They saw that great and powerful"
+        },
+        {
+          "kind": "body",
+          "text": "men could not give or sell their land without the king’s consent."
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 238 b: ‘Reliquas autem 7 hidas et dimidiam tenuit [sic] Britnodus"
+        },
+        {
+          "kind": "note",
+          "text": "et Aluui T. R. E., sed comitatus nescit de quo tenuerint.’"
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 23: ‘Offa tenuit de episcopo in feudo.’ Ib. i. 59 b: ‘Blacheman"
+        },
+        {
+          "kind": "note",
+          "text": "tenuit in feudo T. R. E.’"
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 28 b: ‘Bricmar tenuit de Azor et Azor de Heraldo...Terra est 2"
+        },
+        {
+          "kind": "note",
+          "text": "carucis. In dominio est una et 2 villani et 2 bordarii cum dimidia caruca.’"
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 75 b: ‘De eadem terra ten[ent] 3 taini 3 hidas et reddunt 3 libras"
+        },
+        {
+          "kind": "note",
+          "text": "excepto servicio.’ Ib. 86 b: ‘Huic manerio est addita dimidia hida. Tres"
+        },
+        {
+          "kind": "note",
+          "text": "taini tenebant T. R. E. et serviebant preposito manerii per consuetudinem"
+        },
+        {
+          "kind": "note",
+          "text": "absque omni firma donante.’"
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 1: ‘Quando moritur alodiarius, Rex inde habet relevationem terrae.’"
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 179: ‘Burgensis cum caballo serviens, cum moriebatur, habebat"
+        },
+        {
+          "kind": "note",
+          "text": "Rex equum et arma eius. De eo qui equum non habebat, si moreretur, habebat"
+        },
+        {
+          "kind": "note",
+          "text": "Rex aut 10 solidos aut terram eius cum domibus.’"
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 50 b: ‘Alric tenet dimidiam hidam. Hanc tenuit pater eius de"
+        },
+        {
+          "kind": "note",
+          "text": "Rege E. Sed hic Regem non requisivit post mortem Godric sui avunculi qui"
+        },
+        {
+          "kind": "note",
+          "text": "eam custodiebat.’"
+        },
+        {
+          "kind": "note",
+          "text": "D. B. i. 238 b: ‘Huic aecclesiae dedit Aluuinus vicecomes Cliptone"
+        }
+      ]
+    },
+    {
+      "page_index": 250,
+      "lines": [
+        {
+          "kind": "other",
+          "text": "England before the Conquest. 225"
+        },
+        {
+          "kind": "body",
+          "text": "retrogression takes place, that the best legal ideas of the ninth"
+        },
+        {
+          "kind": "body",
+          "text": "and tenth centuries are not so good, so modern, as those of the"
+        },
+        {
+          "kind": "body",
+          "text": "third and fourth. If, however, we take a narrower view and fix"
+        },
+        {
+          "kind": "body",
+          "text": "our eyes upon the barbarian hordes which invade a Roman"
+        },
+        {
+          "kind": "body",
+          "text": "province, shall we say that their legal thought gradually goes"
+        },
+        {
+          "kind": "body",
+          "text": "to the bad, and loses distinctions which it has once ap-"
+        },
+        {
+          "kind": "body",
+          "text": "prehended? To turn to our own case—Shall we say that"
+        },
+        {
+          "kind": "body",
+          "text": "Englishmen of the eighth century mark the line that divides"
+        },
+        {
+          "kind": "body",
+          "text": "public from private law, while Englishmen of the eleventh"
+        },
+        {
+          "kind": "body",
+          "text": "century can not perceive it?"
+        },
+        {
+          "kind": "side",
+          "text": "The con-"
+        },
+        {
+          "kind": "side",
+          "text": "tact of bar-"
+        },
+        {
+          "kind": "side",
+          "text": "barism and"
+        },
+        {
+          "kind": "side",
+          "text": "civiliza-"
+        },
+        {
+          "kind": "side",
+          "text": "tion."
+        },
+        {
+          "kind": "body",
+          "text": "No one perhaps to such a question would boldly say: Yes."
+        },
+        {
+          "kind": "body",
+          "text": "And yet, when it comes to a treatment of particulars, an"
+        },
+        {
+          "kind": "body",
+          "text": "affirmative answer seems to be implied in much that has"
+        },
+        {
+          "kind": "body",
+          "text": "been written even by modern historians. They begin at the"
+        },
+        {
+          "kind": "body",
+          "text": "beginning and attribute precise ideas and well-defined law to"
+        },
+        {
+          "kind": "body",
+          "text": "the German conquerors of Britain. If they began with the"
+        },
+        {
+          "kind": "body",
+          "text": "eleventh century and thence turned to the earlier time, they"
+        },
+        {
+          "kind": "body",
+          "text": "might come to another opinion, to the opinion that in the"
+        },
+        {
+          "kind": "body",
+          "text": "beginning all was very vague, and that such clearness and pre-"
+        },
+        {
+          "kind": "body",
+          "text": "cision as legal thought has attained in the days of the Norman"
+        },
+        {
+          "kind": "body",
+          "text": "Conquest has been very gradually attained and is chiefly due"
+        },
+        {
+          "kind": "body",
+          "text": "to the influence which the old heathen world working through"
+        },
+        {
+          "kind": "body",
+          "text": "the Roman church has exercised upon the new. The process"
+        },
+        {
+          "kind": "body",
+          "text": "that is started when barbarism is brought into contact with"
+        },
+        {
+          "kind": "body",
+          "text": "civilization is not simple. The hitherto naked savage may at"
+        },
+        {
+          "kind": "body",
+          "text": "once assume some part of the raiment, perhaps the hat, of the"
+        },
+        {
+          "kind": "body",
+          "text": "white man. When after a while he puts these things aside"
+        },
+        {
+          "kind": "body",
+          "text": "and learns to make for himself clothes suitable to the climate"
+        },
+        {
+          "kind": "body",
+          "text": "in which he lives and the pursuits in which he is engaged, we"
+        },
+        {
+          "kind": "body",
+          "text": "see in this an advance, not a relapse; and yet he has abandoned"
+        },
+        {
+          "kind": "body",
+          "text": "some things that belong to the white man. Even so when our"
+        },
+        {
+          "kind": "body",
+          "text": "kings of the eighth century set their hands to documents"
+        },
+        {
+          "kind": "body",
+          "text": "written in Latin and bristling with the technical terms of"
+        },
+        {
+          "kind": "body",
+          "text": "Roman law, to documents which at first sight seem to express"
+        },
+        {
+          "kind": "body",
+          "text": "clear enough ideas of ownership and alienation, we must not at"
+        },
+        {
+          "kind": "body",
+          "text": "once assume that they have grasped these ideas. In course of"
+        },
+        {
+          "kind": "body",
+          "text": "time men will evolve formulas which will aptly fit their thought,"
+        },
+        {
+          "kind": "body",
+          "text": "for example, the ‘feudal’ charter of feoffment with its tenendum"
+        },
+        {
+          "kind": "body",
+          "text": "de me and its reddendo mihi. Externally it will not be so"
+        },
+        {
+          "kind": "body",
+          "text": "Roman or (we may say it) so modern a document as was the"
+        },
+        {
+          "kind": "body",
+          "text": "land-book of the eighth century, and yet in truth there has"
+        },
+        {
+          "kind": "other",
+          "text": "M. 15"
+        }
+      ]
+    },
+    {
+      "page_index": 316,
+      "lines": [
+        {
+          "kind": "other",
+          "text": "The Ángild Clause. 291"
+        },
+        {
+          "kind": "body",
+          "text": "(ii) [Questionable]. A.D. 799. Cenwulf. K. 176 (i. 213); B. i. 411:"
+        },
+        {
+          "kind": "body",
+          "text": "‘de partibus vero et de causis singulare solvere pretium et nihil aliud de"
+        },
+        {
+          "kind": "body",
+          "text": "hac terra.’"
+        },
+        {
+          "kind": "body",
+          "text": "(iii) A.D. 799–802. Pilheard. K. 116 (i. 142); B. i. 284: ‘ut ab"
+        },
+        {
+          "kind": "body",
+          "text": "omnium fiscalium redituum operum onerumque seu etiam popularium"
+        },
+        {
+          "kind": "body",
+          "text": "conciliorum vindictis nisi tantum pretium pro pretio liberae sint in"
+        },
+        {
+          "kind": "body",
+          "text": "perpetuum.’"
+        },
+        {
+          "kind": "body",
+          "text": "(iv) A.D. 814. Cenwulf of Mercia for the church of Worcester. K. 206"
+        },
+        {
+          "kind": "body",
+          "text": "(i. 259); B. i. 489: ‘exceptis his, expeditione et pontis constructione, et"
+        },
+        {
+          "kind": "body",
+          "text": "singulare pretium foras, nihilque ad poenam resolvat.’"
+        },
+        {
+          "kind": "body",
+          "text": "(v) Cenwulf of Mercia for the church of Worcester. K. 215 (i. 271);"
+        },
+        {
+          "kind": "body",
+          "text": "B. i. 507: ‘exceptis his, arcis et pontis constructione et expeditione et"
+        },
+        {
+          "kind": "body",
+          "text": "singulare pretium foras adversum aliud; ad poenam vero neque quadran-"
+        },
+        {
+          "kind": "body",
+          "text": "tem minutam foras resolvat.’"
+        },
+        {
+          "kind": "body",
+          "text": "(vi) A.D. 822. Ceolwulf of Mercia for Archbishop Wilfred. K. 216"
+        },
+        {
+          "kind": "body",
+          "text": "(i. 272); B. i. 508: ‘liberata permaneat in aefum nisi is quattuor causis"
+        },
+        {
+          "kind": "body",
+          "text": "quae nunc nominabo, expeditione contra paganos ostes, et pontes construc-"
+        },
+        {
+          "kind": "body",
+          "text": "tione sui [=seu] arcis munitione vel destructione in eodem gente, et"
+        },
+        {
+          "kind": "body",
+          "text": "singulare pretium foras reddat, secundum ritam gentes illius, et tamen"
+        },
+        {
+          "kind": "body",
+          "text": "nullam penam foras alicui persolvat.’"
+        },
+        {
+          "kind": "body",
+          "text": "(vii) A.D. 831. Wiglaf of Mercia for the archbishop. K. 227 (i. 294);"
+        },
+        {
+          "kind": "body",
+          "text": "B. i. 556: ‘nisi his tantum causis, expeditione et arcis munitione pontisque"
+        },
+        {
+          "kind": "body",
+          "text": "constructione et singulare pretium contra alium.’"
+        },
+        {
+          "kind": "body",
+          "text": "(viii) A.D. 835. Egbert of Wessex for Abingdon. K. 236 (i. 312); B. i."
+        },
+        {
+          "kind": "body",
+          "text": "577: ‘de illa autem tribulatione que witereden nominatur sit libera, nisi"
+        },
+        {
+          "kind": "body",
+          "text": "tamen singuli pretium solverit ut talia accipiant. Fures quoque quos"
+        },
+        {
+          "kind": "body",
+          "text": "appellant weregeldðeofas si foras rapiantur, pretium eius dimidium illi"
+        },
+        {
+          "kind": "body",
+          "text": "aecclesiae, et dimidium regi detur, et si intus rapitur totum reddatur ad"
+        },
+        {
+          "kind": "body",
+          "text": "aecclesiam.’"
+        },
+        {
+          "kind": "body",
+          "text": "(ix) A.D. 849. Berhtwulf of Mercia for his thegn Egbert. K. 262"
+        },
+        {
+          "kind": "body",
+          "text": "(ii. 34); B. ii. 40: ‘Liberabo ab omnibus saecularibus servitutibus...nisi in"
+        },
+        {
+          "kind": "body",
+          "text": "confinio rationem reddant contra alium.’"
+        },
+        {
+          "kind": "body",
+          "text": "(x) A.D. 855. Burhred of Mercia for the church of Worcester. K. 277"
+        },
+        {
+          "kind": "body",
+          "text": "(ii. 58); B. ii. 88: ‘nisi tantum quattuor causis, pontis et arcis, et expe-"
+        },
+        {
+          "kind": "body",
+          "text": "ditione contra hostes, et singulare pretium contra alium, et ad poenam nihil"
+        },
+        {
+          "kind": "body",
+          "text": "foras resolvat."
+        },
+        {
+          "kind": "body",
+          "text": "(xi) A.D. 883. Æthelred of Mercia for Berkeley. K. 313 (ii. 110);"
+        },
+        {
+          "kind": "body",
+          "text": "B. ii. 172: ‘and þæt ic þæt mynster fram æghwelcum gafolum gefreoge þe"
+        },
+        {
+          "kind": "body",
+          "text": "to þiode hlafarde belimpeð, littles oððe micles, cuðes ge uncuðes, butan"
+        },
+        {
+          "kind": "body",
+          "text": "angilde wið oþrum and fæsten gewerce and fyrd socne and brycg ge-"
+        },
+        {
+          "kind": "body",
+          "text": "weorce......æghwelces þinges to freon ge wið cyning, ge wið ealdorman, ge"
+        },
+        {
+          "kind": "body",
+          "text": "wið gerefan æghwelces þeodomes, lytles and micles, butan fyrd socne and"
+        },
+        {
+          "kind": "body",
+          "text": "fæsten geworce and brycg geworce and angylde wið oðrum and noht ut to"
+        },
+        {
+          "kind": "body",
+          "text": "wite.’"
+        },
+        {
+          "kind": "body",
+          "text": "(xii) A.D. 888. Æthelred of Mercia for a thegn. K. 1068 (v. 133);"
+        },
+        {
+          "kind": "body",
+          "text": "B. ii. 194: ‘liberam hanc terram describimus ab omnibus causis nisi"
+        },
+        {
+          "kind": "body",
+          "text": "singulare pretium contra aliud ponat et modum ecclesiae.’ Is the modus"
+        },
+        {
+          "kind": "body",
+          "text": "[or modius] of the church the church-scot?"
+        },
+        {
+          "kind": "other",
+          "text": "19—2"
+        }
+      ]
+    },
+    {
+      "page_index": 426,
+      "lines": [
+        {
+          "kind": "other",
+          "text": "Domesday Statistics. 401"
+        },
+        {
+          "kind": "body",
+          "text": "STATISTICS."
+        },
+        {
+          "kind": "table",
+          "text": "Hides"
+        },
+        {
+          "kind": "table",
+          "text": "Gelding Valet"
+        },
+        {
+          "kind": "table",
+          "text": "T. R. W. Teamlands Teams (Pearson)"
+        },
+        {
+          "kind": "table",
+          "text": "V VI VII VIII"
+        },
+        {
+          "kind": "table",
+          "text": "£ s. d."
+        },
+        {
+          "kind": "table",
+          "text": "3,102 5,140 9 10 Kent"
+        },
+        {
+          "kind": "table",
+          "text": "2,241 3,091 3,255 7 4 Sussex"
+        },
+        {
+          "kind": "table",
+          "text": "706 1,172 1,142 1,524 4 9 Surrey"
+        },
+        {
+          "kind": "table",
+          "text": "1,572 2,847 2,614 Hampshire"
+        },
+        {
+          "kind": "table",
+          "text": "1,338 2,087 1,796 2,383 16 1 Berkshire"
+        },
+        {
+          "kind": "table",
+          "text": "3,457 2,997 Wiltshire"
+        },
+        {
+          "kind": "table",
+          "text": "2,303 1,762 2,656 9 8 Dorset"
+        },
+        {
+          "kind": "table",
+          "text": "[2,332 E] [3,359 12 9 E]"
+        },
+        {
+          "kind": "table",
+          "text": "4,858 3,804 Somerset"
+        },
+        {
+          "kind": "table",
+          "text": "[4,812 E] [4,161 4 7 E]"
+        },
+        {
+          "kind": "table",
+          "text": "7,972 5,542 3,220 14 3 Devon"
+        },
+        {
+          "kind": "table",
+          "text": "399 2,377 1,187 662 1 4 Cornwall"
+        },
+        {
+          "kind": "table",
+          "text": "664 545 754 7 8 Middlesex"
+        },
+        {
+          "kind": "table",
+          "text": "1,716 1,406 1,541 13 11 Hertford"
+        },
+        {
+          "kind": "table",
+          "text": "2,244 1,952 1,813 7 9 Buckingham"
+        },
+        {
+          "kind": "table",
+          "text": "2,639 2,467 3,242 2 11 Oxford"
+        },
+        {
+          "kind": "table",
+          "text": "3,768 2,827 6 8 Gloucester"
+        },
+        {
+          "kind": "table",
+          "text": "1,889 991 0 6 Worcester"
+        },
+        {
+          "kind": "table",
+          "text": "2,479 Hereford"
+        },
+        {
+          "kind": "table",
+          "text": "1,676 1,443 Cambridge"
+        },
+        {
+          "kind": "table",
+          "text": "1,120 967 864 15 4 Huntingdon"
+        },
+        {
+          "kind": "table",
+          "text": "1,557 1,367 1,096 12 2 Bedford"
+        },
+        {
+          "kind": "table",
+          "text": "2,931 2,422 1,843 0 7 Northampton"
+        },
+        {
+          "kind": "table",
+          "text": "1,817 736 3 0 Leicester"
+        },
+        {
+          "kind": "table",
+          "text": "2,276 2,003 1,359 13 8 Warwick"
+        },
+        {
+          "kind": "table",
+          "text": "1,398 951 [516 16 3 E] Stafford"
+        },
+        {
+          "kind": "table",
+          "text": "1,755 Shropshire"
+        },
+        {
+          "kind": "table",
+          "text": "Chester"
+        },
+        {
+          "kind": "table",
+          "text": "762 862 461 4 0 Derby"
+        },
+        {
+          "kind": "table",
+          "text": "1,255 1,991 Nottingham"
+        },
+        {
+          "kind": "table",
+          "text": "Rutland"
+        },
+        {
+          "kind": "table",
+          "text": "York"
+        },
+        {
+          "kind": "table",
+          "text": "5,043 4,712 Lincoln"
+        },
+        {
+          "kind": "table",
+          "text": "3,920 4,784 10 8 Essex"
+        },
+        {
+          "kind": "table",
+          "text": "4,853 4,154 11 7 Norfolk"
+        },
+        {
+          "kind": "table",
+          "text": "Suffolk"
+        },
+        {
+          "kind": "other",
+          "text": "M. 26"
+        }
+      ]
+    },
+    {
+      "page_index": 470,
+      "lines": [
+        {
+          "kind": "other",
+          "text": "Domesday Statistics. 445"
+        },
+        {
+          "kind": "body",
+          "text": "Here we must leave this question to those who are expert"
+        },
+        {
+          "kind": "body",
+          "text": "in the history of agriculture; but if some relief is required, it"
+        },
+        {
+          "kind": "body",
+          "text": "may be plausibly obtained by a reduction in the size of the"
+        },
+        {
+          "kind": "body",
+          "text": "ancient acre. A small piece off the village perches will mean"
+        },
+        {
+          "kind": "body",
+          "text": "a great piece off the 2,600 teamlands of Oxfordshire, and we"
+        },
+        {
+          "kind": "body",
+          "text": "seem to have the best warrant for a recourse to this device"
+        },
+        {
+          "kind": "body",
+          "text": "where it is most needed. The pressure upon our space appears"
+        },
+        {
+          "kind": "body",
+          "text": "to be at its utmost in Oxfordshire, and just for that county we"
+        },
+        {
+          "kind": "body",
+          "text": "have first-rate evidence of some very small acres. On the"
+        },
+        {
+          "kind": "body",
+          "text": "other hand, in Lincolnshire and generally in the north, where"
+        },
+        {
+          "kind": "body",
+          "text": "we read of abnormally large acres, we seem to have room"
+        },
+        {
+          "kind": "body",
+          "text": "enough for them. And here may be a partial explanation of the"
+        },
+        {
+          "kind": "body",
+          "text": "apparent fact that the teamland of Oxfordshire does not support"
+        },
+        {
+          "kind": "body",
+          "text": "three, while that of Lincolnshire supports five recorded men."
+        },
+        {
+          "kind": "side",
+          "text": "Varying size of"
+        },
+        {
+          "kind": "side",
+          "text": "acres."
+        },
+        {
+          "kind": "body",
+          "text": "In these last paragraphs we have been speaking of averages"
+        },
+        {
+          "kind": "body",
+          "text": "struck for large spaces; but if we come to some particular"
+        },
+        {
+          "kind": "body",
+          "text": "districts we shall have the greatest difficulty in allowing 120"
+        },
+        {
+          "kind": "body",
+          "text": "acres to every teamland. This is the case in southern Cam-"
+        },
+        {
+          "kind": "body",
+          "text": "bridgeshire. In that county Domesday’s list of vills is so"
+        },
+        {
+          "kind": "body",
+          "text": "nearly the same as the modern list of parishes that we run no"
+        },
+        {
+          "kind": "body",
+          "text": "great risk in comparing the ancient teamlands with the modern"
+        },
+        {
+          "kind": "body",
+          "text": "acreage vill by vill, if we also compare them hundred by"
+        },
+        {
+          "kind": "body",
+          "text": "hundred. The general result will be to make us unwilling to"
+        },
+        {
+          "kind": "body",
+          "text": "bestow on every teamland a long-hundred of acres. One"
+        },
+        {
+          "kind": "body",
+          "text": "example shall be given. The Whittlesford Hundred contains"
+        },
+        {
+          "kind": "body",
+          "text": "five vills and we can not easily concede to it more land than is"
+        },
+        {
+          "kind": "body",
+          "text": "now within its boundary. In the following table we give for"
+        },
+        {
+          "kind": "body",
+          "text": "each vill its modern acreage, then the number of its teamlands,"
+        },
+        {
+          "kind": "body",
+          "text": "then the result of multiplying that number by 120."
+        },
+        {
+          "kind": "side",
+          "text": "The team-"
+        },
+        {
+          "kind": "side",
+          "text": "land in"
+        },
+        {
+          "kind": "side",
+          "text": "Cambridge-"
+        },
+        {
+          "kind": "side",
+          "text": "shire."
+        },
+        {
+          "kind": "table",
+          "text": "Whittlesford Hundred."
+        },
+        {
+          "kind": "table",
+          "text": "Sawston 1884 10 1200"
+        },
+        {
+          "kind": "table",
+          "text": "Whittlesford 1969 11 1320"
+        },
+        {
+          "kind": "table",
+          "text": "Duxford 3232 21 2520"
+        },
+        {
+          "kind": "table",
+          "text": "Hinxton 1557 16 1920"
+        },
+        {
+          "kind": "table",
+          "text": "Ickleton 2695 24½ 2940"
+        },
+        {
+          "kind": "table",
+          "text": "The Hundred 11337 82½ 9900"
+        },
+        {
+          "kind": "body",
+          "text": "In two cases out of five we have already come upon sheer"
+        },
+        {
+          "kind": "body",
+          "text": "physical impossibility. But let us suppose some rearrangement"
+        },
+        {
+          "kind": "note",
+          "text": "See above, p. 382."
+        },
+        {
+          "kind": "note",
+          "text": "Inq. Com. Cant. 38."
+        },
+        {
+          "kind": "note",
+          "text": "Or a little less."
+        },
+        {
+          "kind": "note",
+          "text": "Perhaps too small. One estate was valued in Essex."
+        }
+      ]
+    }
+  ]
+}
