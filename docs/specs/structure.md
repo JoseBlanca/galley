@@ -2717,6 +2717,22 @@ never a heading line, a chapter label or a continuation, whatever branch
 takes it (section 34): under `ocr = "redo"` Tesseract reads rows of
 hieroglyphs as centred junk.
 
+A line right below such a line in the body stream is not a heading line
+by rule 4's second branch, the gaps: its gap above is measured from a
+row of hieroglyphs, not from text, and Kadesh prints under each row its
+translation. On Kadesh's page 39 (printed 28) the translation of row 16,
+"The stand which his majesty made while he was sitting on the northwest
+of Kadesh." with the reference 97 (read as "”"), is one line set 22 pt
+in from each side of the column, so centred, 3.2 pitches below the top
+of the row and 2.0 above the paragraph after it; the gaps made it a
+level-2 heading, and the unlinked notes of pages 8 to 38 (section 36)
+gathered before it. The line can still be a heading line in capitals,
+a tall line, a chapter label or a continuation. Measured on 21 November
+2026 on the `lines.json` of the seven books' runs of the note-links
+plan (Haynes and Turney among them): the gap branch takes 78 lines, and
+this one alone lies below a line read poorly; the rule takes away that
+heading and changes no other.
+
 Two more kinds of line join a heading:
 
 - a **chapter label** that is centred and whose next line is a heading
@@ -2884,7 +2900,9 @@ headings.
   on one side for the title to be centred.
 - **False**: Domesday's titles of four tables set in capitals
   ("ARMINGFORD HUNDRED.", pages 28, 42, 156, 470), and its printer's
-  imprint (553). Kadesh's centred caption of a battle plan (39) and a
+  imprint (553). Kadesh's translation of a row of hieroglyphs on page
+  39, with the text layer only (under `ocr = "redo"` the rule for a
+  line below a line Tesseract read poorly keeps it out, above), and a
   garbled map label (29). Gierke's "Macrocosm and Microcosm." at the top
   of page 92 (excerpt page 6), a running head that section 3 does not
   remove, taken by the gap branch.
