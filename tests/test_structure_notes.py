@@ -1128,6 +1128,7 @@ def _body_links(
         body,
         notes,
         note_values,
+        frozenset(),
         groups,
         ("Chapter One",),
         len(body),

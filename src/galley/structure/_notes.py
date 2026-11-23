@@ -18,6 +18,7 @@ from galley.structure._lines import (
     first_word,
     hyphen_between,
     is_indented,
+    is_short,
     with_words,
 )
 from galley.structure._markers import (
@@ -26,6 +27,7 @@ from galley.structure._markers import (
     note_marker,
     read_number,
 )
+from galley.structure._references import are_confused
 from galley.wordlist import is_known_word
 
 # Spec section 11, rule 2: a note's first line is indented from the band's
@@ -42,7 +44,23 @@ _LINE_MARKER_MAX_CHARACTERS = 2
 # before a capital is a marker: a note's text starts a sentence.
 _ONE_LETTER_WORDS = frozenset({"A", "I"})
 _LINE_MARKER_GAP_PT = 10.0
+_NEXT_MARKER_GAP_PT = 8.0
+_WIDE_GAP_PT = 20.0
 _ENDS_BEFORE_A_NOTE = (".", "'", "’", ":", ";", ")")
+# Spec section 11, "Its value": the scores of a page's numbering. A
+# marker that reads its note's value scores 1, one a confused digit away
+# 0.5; each number skipped costs 0.5, at most 2 on a page, and each note
+# left out 0.25. Chosen on 23 November 2026 with galley-eval on the whole
+# Domesday: 1,488 notes whose reference is right, against 1,487 with
+# costs of 0.4 and 0.2, which lost 6 notes right before.
+_MATCH_SCORE = 1.0
+_CONFUSED_SCORE = 0.5
+_JUMP_COST = 0.5
+_MAX_JUMPS = 2
+_SKIP_COST = 0.25
+_UNMARKED_SKIP_COST = 0.1
+# Spec section 11, rule 5: the marker and the word after it.
+_MARKER_AND_A_WORD = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,12 +78,14 @@ class PageNote:
 @dataclass(frozen=True, slots=True)
 class Footnote:
     """A note of the book: its lines, over one page or two, in order; its
-    marker, None when it has none; and its value, the number of spec
-    section 11, "Its value", or None."""
+    marker, None when it has none; its value, the number of spec section
+    11, "Its value", or None; and whether its page's numbering counts it,
+    false for a note the numbering leaves out, which takes no reference."""
 
     lines: tuple[PlacedLine, ...]
     marker: NoteMarker | None
     value: int | None
+    counted: bool = True
 
 
 def _column_left(line: PlacedLine, lines: Sequence[PlacedLine]) -> float:
@@ -106,42 +126,101 @@ def _indent_marker(
     return NoteMarker(words[0].text, "", read_number(words[0].text))
 
 
-def _line_marker(before: str, word: str, after: str, gap: float) -> NoteMarker | None:
+def _line_marker(
+    before: str, word: str, after: str, gap: float, next_value: int | None
+) -> NoteMarker | None:
     """The marker of a second note that starts at `word` inside a note
     line, between the words `before` and `after`, `gap` points after
-    `before`; None when no note starts there (spec section 11, "Two notes
-    on one line")."""
+    `before`, where the next note's value would be `next_value`; None when
+    no note starts there (spec section 11, "Two notes on one line")."""
     marker = note_marker(word)
     lone_letter = len(word) == 1 and word.isalpha() and word.islower()
+    if not before.endswith(_ENDS_BEFORE_A_NOTE) or not after:
+        return None
+    if (
+        len(word) == 1
+        and gap >= _WIDE_GAP_PT
+        and (reading := read_number(word)) is not None
+    ):
+        return marker if marker is not None else NoteMarker(word, "", reading)
     if (
         (marker is None and not lone_letter)
         or len(word) > _LINE_MARKER_MAX_CHARACTERS
-        or gap < _LINE_MARKER_GAP_PT
-        or not before.endswith(_ENDS_BEFORE_A_NOTE)
         or not (after[:1].isupper() or after[:1].isdigit())
     ):
+        return None
+    reads_next = (
+        marker is not None and next_value is not None and marker.value == next_value
+    )
+    if gap < (_NEXT_MARKER_GAP_PT if reads_next else _LINE_MARKER_GAP_PT):
         return None
     return marker if marker is not None else NoteMarker(word, "", read_number(word))
 
 
-def _cut_line(line: PlacedLine) -> tuple[tuple[PlacedLine, NoteMarker | None], ...]:
+def _cut_line(
+    line: PlacedLine, value: int | None
+) -> tuple[tuple[PlacedLine, NoteMarker | None], ...]:
     """The parts of a note line, each with the marker of the note it starts,
-    the first part's None: one part when no second note starts in it."""
+    the first part's None: one part when no second note starts in it.
+    `value` is that of the note the first part belongs to, None when not
+    known."""
     words = line.line.words
     parts: list[tuple[int, NoteMarker | None]] = [(0, None)]
     for position in range(1, len(words) - 1):
+        next_value = value + 1 if value is not None else None
         marker = _line_marker(
             words[position - 1].text,
             words[position].text,
             words[position + 1].text,
             words[position].box.x0 - words[position - 1].box.x1,
+            next_value,
         )
         if marker is not None:
             parts.append((position, marker))
+            value = marker.value if marker.value is not None else next_value
     ends = (*(start for start, _ in parts[1:]), len(words))
     return tuple(
         (with_words(line, words[start:end]), marker)
         for (start, marker), end in zip(parts, ends, strict=True)
+    )
+
+
+def _under_a_short_line(
+    region: Sequence[PlacedLine],
+    number: int,
+    marker: NoteMarker | None,
+    expected: int | None,
+) -> bool:
+    """Whether line `number` of `region`, whose first word's marker is
+    `marker`, starts a note by spec section 11's rule 5: a marker of one
+    character before a capital, under a line that ends short and no hyphen;
+    a sign only when the next line's marker reads `expected`, the value
+    the note before should have, plus 2."""
+    line = region[number]
+    words = line.line.words
+    if (
+        marker is None
+        or len(marker.marker) != 1
+        or marker.rest
+        or number == 0
+        or len(words) < _MARKER_AND_A_WORD
+        or not words[1].text[:1].isupper()
+    ):
+        return False
+    before = region[number - 1]
+    if not is_short(before) or hyphen_between(before, line):
+        return False
+    if marker.value is not None:
+        return True
+    following = (
+        note_marker(first_word(region[number + 1]))
+        if number + 1 < len(region)
+        else None
+    )
+    return (
+        expected is not None
+        and following is not None
+        and following.value == expected + 2
     )
 
 
@@ -155,8 +234,11 @@ def page_notes(
 
     A line starts a note when section 6's indent rule starts a block there;
     when its first word has a note marker's form and it is indented 5 to 40
-    pt from the band's left edge; or when its first word has a marker's
-    form that reads one more than the note before's. A word inside a line
+    pt from the band's left edge; when its first word has a marker's form
+    that reads one more than the note before's, or, of one character, one
+    more than the last number the page's markers read plus the notes
+    after it; or when its first word is a marker of one character under a
+    short line (rule 5, `_under_a_short_line`). A word inside a line
     can start a note too ("Two notes on one line"). Any other line, the
     first of a later region too, is part of the note before. The page's
     first line always starts a note, and so does the first line of a later
@@ -174,19 +256,35 @@ def page_notes(
                 is_indented(line, before) and not hyphen_between(before, line)
             )
             last_value = notes[-1].marker.value if notes and notes[-1].marker else None
+            expected = _expected_value(notes)
             starts = (
                 not notes
                 or by_indent
                 or (marker is not None and indented)
                 or (number == 0 and indented)
+                or _under_a_short_line(region, number, marker, expected)
                 or (
                     marker is not None
                     and marker.value is not None
-                    and last_value is not None
-                    and marker.value == last_value + 1
+                    and (
+                        (last_value is not None and marker.value == last_value + 1)
+                        or (
+                            expected is not None
+                            and len(marker.marker) == 1
+                            and marker.value == expected + 1
+                        )
+                    )
                 )
             )
-            parts = _cut_line(line)
+            if starts:
+                value = (
+                    marker.value
+                    if marker is not None and marker.value is not None
+                    else (expected + 1 if expected is not None else None)
+                )
+            else:
+                value = expected
+            parts = _cut_line(line, value)
             first_part, _ = parts[0]
             if starts:
                 if marker is None and (by_indent or indented):
@@ -207,6 +305,16 @@ def page_notes(
                 for part, part_marker in parts[1:]
             )
     return tuple(notes)
+
+
+def _expected_value(notes: Sequence[PageNote]) -> int | None:
+    """The value the last of `notes` should have: what the last marker that
+    reads a number reads, plus the notes after it; None when no marker
+    reads one."""
+    for back, note in enumerate(reversed(notes)):
+        if note.marker is not None and note.marker.value is not None:
+            return note.marker.value + back
+    return None
 
 
 class Numbering(StrEnum):
@@ -278,20 +386,87 @@ def footnotes(
 
 
 def _valued(notes: Sequence[PageNote], numbering: Numbering) -> tuple[Footnote, ...]:
-    """The footnotes that start on one page, with their values. A first
-    note that may continue one of the page before and does not, the end of
-    a note that started elsewhere, is not counted and has no value."""
+    """The footnotes that start on one page, with their values: in a book
+    numbered per page, those of `page_values`, a note it leaves out not
+    counted; otherwise what their markers read. A first note that may
+    continue one of the page before and does not, the end of a note that
+    started elsewhere, is not counted and has no value."""
     leftover = notes[0].may_continue
     counted = notes[1:] if leftover else notes
+    readings = tuple(
+        note.marker.value if note.marker is not None else None for note in counted
+    )
+    values = (
+        page_values(readings, tuple(note.marker is None for note in counted))
+        if numbering is Numbering.PER_PAGE
+        else readings
+    )
     return (
         (Footnote(notes[0].lines, notes[0].marker, None),) if leftover else ()
     ) + tuple(
         Footnote(
             lines=note.lines,
             marker=note.marker,
-            value=place
-            if numbering is Numbering.PER_PAGE
-            else (note.marker.value if note.marker is not None else None),
+            value=value,
+            counted=value is not None or numbering is not Numbering.PER_PAGE,
         )
-        for place, note in enumerate(counted, start=1)
+        for note, value in zip(counted, values, strict=True)
     )
+
+
+def _reading_score(reading: int | None, value: int) -> float:
+    """The score of a note whose marker reads `reading` given `value`."""
+    if reading is None:
+        return 0.0
+    if reading == value:
+        return _MATCH_SCORE
+    return _CONFUSED_SCORE if are_confused(reading, value) else 0.0
+
+
+# A numbering of a page's notes so far: its score, minus the numbers it
+# skipped and the notes it left out, and the values, None for a note left
+# out.
+type _Numbering = tuple[float, int, tuple[int | None, ...]]
+
+
+def page_values(
+    readings: Sequence[int | None], unmarked: Sequence[bool] = ()
+) -> tuple[int | None, ...]:
+    """The values of a page's notes in a book numbered per page, whose
+    markers read `readings`, None for one that reads no number (spec
+    section 11, "Its value"): of the numberings in which each note's value
+    is one more than the last value before it or more, at most 2 numbers
+    skipped on the page, or the note is left out with no value, the one of
+    the highest score, then of the fewest numbers skipped and notes left
+    out. "1 3 4 s" gives 1, 3, 4, 5; "1 2 8" gives 1, 2, 3."""
+    # The best numbering of the notes so far for each last value and number
+    # of values skipped.
+    states: dict[tuple[int, int], _Numbering] = {(0, 0): (0.0, 0, ())}
+    for place, reading in enumerate(readings):
+        skip_cost = (
+            _UNMARKED_SKIP_COST
+            if place < len(unmarked) and unmarked[place]
+            else _SKIP_COST
+        )
+        following: dict[tuple[int, int], _Numbering] = {}
+        for (last, skipped), (score, changes, values) in states.items():
+            left_out: _Numbering = (score - skip_cost, changes - 1, (*values, None))
+            options: list[tuple[tuple[int, int], _Numbering]] = [
+                (
+                    (last + 1 + more, skipped + more),
+                    (
+                        score
+                        + _reading_score(reading, last + 1 + more)
+                        - _JUMP_COST * more,
+                        changes - more,
+                        (*values, last + 1 + more),
+                    ),
+                )
+                for more in range(_MAX_JUMPS - skipped + 1)
+            ]
+            options.append(((last, skipped), left_out))
+            for key, numbering in options:
+                if key not in following or numbering[:2] > following[key][:2]:
+                    following[key] = numbering
+        states = following
+    return max(states.values(), key=lambda numbering: numbering[:2])[2]

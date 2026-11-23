@@ -19,7 +19,7 @@ _CONFUSED = 2
 _SIGN_WITHOUT_VALUE = 2
 _SIGN_WITH_VALUE = 1
 _CONFUSED_DIGITS = frozenset(
-    frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28")
+    frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28", "58")
 )
 # Spec section 11, "References": a candidate that is an opening single
 # quotation mark after a letter ("Salvolini‘").
@@ -368,6 +368,12 @@ def _one_digit_confused(digits: str, number: str) -> bool:
         and len(differing) == 1
         and differing[0] in _CONFUSED_DIGITS
     )
+
+
+def are_confused(one: int, other: int) -> bool:
+    """Whether the numbers `one` and `other` differ in one digit, a pair the
+    OCR confuses (spec section 11, "Matching"): 8 and 3, 6 and 5."""
+    return _one_digit_confused(str(one), str(other))
 
 
 def _gap_reference(

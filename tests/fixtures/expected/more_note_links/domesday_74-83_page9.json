@@ -1,0 +1,6 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 83,
+  "read": "Read by the assistant on 23 November 2026 from the page rendered at 200 dpi. The body prints 'a rent of more than £11¹.'; note 1 reads 'See above p. 56.'. The text layer sets the raised 1 apart as the word '1.'.",
+  "expected": {"references": [["£11", "1", "See above p. 56."]]}
+}

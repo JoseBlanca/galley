@@ -212,7 +212,7 @@ _UNLINKED = {"turney": 30, "haynes": 7}
 # Kept apart from galley's own copy on purpose, so that this test checks
 # the links against the spec independently of the code under test.
 _CONFUSED_DIGITS = frozenset(
-    frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28")
+    frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28", "58")
 )
 
 
