@@ -115,7 +115,7 @@ Deliverables:
 3. The fixture excerpts' outputs unchanged except for new right links.
 
 - [x] 2.1 Glued, dash and abbreviation candidates (cause A, D, E).
-- [ ] 2.2 The gap between linked neighbours (B, C1, C2, F).
+- [x] 2.2 The gap between linked neighbours (B, C1, C2, F).
 
 ## 3. Endnotes run into the note before
 
