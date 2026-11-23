@@ -374,6 +374,12 @@ def _one_digit_confused(digits: str, number: str) -> bool:
     )
 
 
+def are_confused(one: int, other: int) -> bool:
+    """Whether the numbers `one` and `other` differ in one digit, a pair the
+    OCR confuses (spec section 11, "Matching"): 8 and 3, 6 and 5."""
+    return _one_digit_confused(str(one), str(other))
+
+
 def gap_reference(
     word: BodyWord, value: int, signs: frozenset[str]
 ) -> Reference | None:

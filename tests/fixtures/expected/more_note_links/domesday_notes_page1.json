@@ -1,0 +1,11 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 35,
+  "read": "Read by the assistant on 23 November 2026 from the page rendered at 200 dpi. The band prints six notes on four lines, each line at the band's left edge: 1 on the first, 2 on the second, 3, 4 and 5 side by side on the third, 6 on the fourth. The body's references 1 to 6 follow 'it', 'name', 'five', 'hides' (twenty), 'hides' (five) and 'two'.",
+  "expected": {
+    "own_note": "A good many cases will be found in Essex and Suffolk.",
+    "reference_word": "five",
+    "reference": "3",
+    "note_of_reference_starts": "Inq. Com. Cantab. 51, 53."
+  }
+}

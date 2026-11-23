@@ -81,7 +81,7 @@ from galley.structure._linking import body_candidates
 from galley.structure._margins import BesideLine, InParagraph, line_beside
 from galley.structure._markers import MarkerForm, book_marker_form
 from galley.structure._measures import Edges
-from galley.structure._notes import Numbering
+from galley.structure._notes import Numbering, page_values
 from galley.structure._paragraphs import PageParts
 from galley.structure._plates import plate_survey
 from galley.structure._references import (
@@ -2561,6 +2561,82 @@ def test_footnote_marker_reading_one_more_starts_a_note_without_an_indent() -> N
         ("1", "The first note fills its line."),
         ("2", "The second note. 4 is a number in the second note."),
     )
+
+
+def test_footnote_marker_under_a_short_line_starts_a_note() -> None:
+    # Rule 5: no line is indented, and "'" reads no number, so rule 3
+    # starts neither "2" nor "8"; each is one character before a capital
+    # under a short line. "4 furlongs" is before a lower-case word.
+    page = _page_with_band(
+        0,
+        _note_line("' The first note.", 300, 50, 150),
+        _note_line("2 The second note.", 300 + _NOTE_PITCH_PT, 50, 150),
+        _note_line("8 The third note.", 300 + 2 * _NOTE_PITCH_PT, 50, 150),
+        _note_line("4 furlongs in its length.", 300 + 3 * _NOTE_PITCH_PT),
+    )
+    lines = _lines_of(page)
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("'", "The first note."),
+        ("2", "The second note."),
+        ("8", "The third note. 4 furlongs in its length."),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_footnote_sign_starts_a_note_only_between_two_numbers() -> None:
+    # Rule 5 for a sign: "*" stands for 2 between "1" and "3"; the "3"
+    # under the full line starts by rule 3, the last number 1 plus one
+    # note plus 1. The last "*" has no number after it and stays.
+    page = _page_with_band(
+        0,
+        _note_line("1 The first note.", 300, 50, 150),
+        _note_line("* The second note fills its line.", 300 + _NOTE_PITCH_PT),
+        _note_line("3 The third note.", 300 + 2 * _NOTE_PITCH_PT, 50, 150),
+        _note_line("* The fourth note.", 300 + 3 * _NOTE_PITCH_PT, 50, 150),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("1", "The first note."),
+        ("*", "The second note fills its line."),
+        ("3", "The third note. * The fourth note."),
+    )
+
+
+@pytest.mark.parametrize(
+    ("readings", "values"),
+    [
+        # Domesday's page 83, "1 2 8 * 8 e 7 8": the count.
+        ((1, 2, 8, None, 8, None, 7, 8), (1, 2, 3, 4, 5, 6, 7, 8)),
+        # Page 58, "1 3 4 s": note 2 joined to note 1.
+        ((1, 3, 4, 5), (1, 3, 4, 5)),
+        # Page 42: a table's rows cut into five notes before notes 1, 2.
+        ((None, None, 35, None, None, 1, 2), (None, None, None, None, None, 1, 2)),
+        # Page 74, "1 3 3 4 6 « 7": a skip would pay for no more matches.
+        ((1, 3, 3, 4, 6, None, 7), (1, 2, 3, 4, 5, 6, 7)),
+        # Page 97, "1 3 8": "8" is 3 misread, a confused digit.
+        ((1, 3, 8), (1, 2, 3)),
+        ((None, None), (1, 2)),
+        ((), ()),
+    ],
+)
+def test_footnote_values_of_a_page_follow_the_markers_that_read_true(
+    readings: tuple[int | None, ...], values: tuple[int | None, ...]
+) -> None:
+    assert page_values(readings) == values
+
+
+def test_referenced_note_the_numbering_leaves_out_takes_no_reference() -> None:
+    # The markers read 1, 2, 2, 3: one "2" is left out, and takes neither
+    # the digits nor a sign, which a note without a value would.
+    lines = _lines_of(
+        _referenced_page(
+            0, "here1. * there2 * then3.", "1 One.", "2 Two.", "2 Again.", "3 Three."
+        )
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("1", "1"), ("2", "2"), ("3", "3"))
+    assert sum(not note.referenced for note in blocks.notes) == 1
 
 
 def test_footnote_of_two_notes_on_one_line_gives_two_notes() -> None:

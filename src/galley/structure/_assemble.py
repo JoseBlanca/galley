@@ -546,6 +546,7 @@ def _links(
     body: Sequence[Unnumbered],
     notes: Sequence[UnnumberedNote],
     values: Sequence[int | None],
+    uncounted: frozenset[int],
     groups: Sequence[int | None],
     group_headings: Sequence[str | None],
     before_section: int,
@@ -554,7 +555,8 @@ def _links(
     """The references of `body`, the body's blocks but the endnote
     section's, matched to `notes`, whose values are `values` and whose
     note groups are `groups` (spec sections 11 and 12): the footnotes
-    first, then the endnotes, among the candidates of the first
+    first, but those at the positions `uncounted`, which their page's
+    numbering leaves out, then the endnotes, among the candidates of the first
     `before_section` blocks after the last contents page that no footnote
     took; with several note groups, whose headings are `group_headings`,
     each group's endnotes among the candidates of its chapter."""
@@ -563,7 +565,7 @@ def _links(
         tuple(
             NoteToMatch(position, first_page(note.origin), value)
             for position, (note, value) in enumerate(zip(notes, values, strict=True))
-            if note.kind is NoteKind.FOOTNOTE
+            if note.kind is NoteKind.FOOTNOTE and position not in uncounted
         ),
         candidates,
     )
@@ -908,6 +910,11 @@ def assemble(
             kept,
             notes,
             tuple(_value(source) for source in sources),
+            frozenset(
+                position
+                for position, source in enumerate(sources)
+                if isinstance(source, Footnote) and not source.counted
+            ),
             tuple(_group(source) for source in sources),
             group_headings,
             sum(1 for p in kept_positions if p < min(in_section, default=len(entries))),

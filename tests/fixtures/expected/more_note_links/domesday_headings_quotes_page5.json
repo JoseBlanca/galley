@@ -1,0 +1,11 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 42,
+  "read": "Read by the assistant on 23 November 2026 from the page rendered at 200 dpi. The body's references 1 and 2 follow 'than this' and 'the non-servile population'; below the table 'Armingford Hundred' (Abington, Bassingbourn, Clapton, Croydon) the band ends a note of the page before ('-worth, -wick, -thorpe, ...') and prints notes 1 and 2.",
+  "expected": {
+    "references": [
+      ["this", "1", "When more than five-and-twenty team-lands"],
+      ["population", "2", "Inq. Com. Cant. 51 fol."]
+    ]
+  }
+}
