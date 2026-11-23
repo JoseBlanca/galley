@@ -341,9 +341,11 @@ _GLUED_DIGITS = re.compile(
 )
 
 
-# A number's own punctuation before glued digits: "10.35" is a time,
-# "2,718" a number, and neither a reference.
-_NUMBER_PUNCTUATION = re.compile(r".*[0-9][.,:;]*")
+# What before glued digits makes them part of a number, not a reference:
+# a number's own punctuation or a range's hyphen or dash after a digit
+# ("10.35" a time, "2,718" a number, "1914-18" a range), or a currency or
+# section sign with any punctuation after it ("£16", "§.12").
+_NUMBER_PUNCTUATION = re.compile(r".*(?:[0-9][.,:;\-–—]*|[£$§][^\w\s]*)")
 
 
 def foreign_signs(words: Iterable[str]) -> frozenset[str]:

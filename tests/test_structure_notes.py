@@ -997,6 +997,13 @@ def test_gap_glued_digits_of_the_note_are_linked(
         "some 1,547 rivers ran",  # a number
         "the river ran.2 Then",  # not part of 47
         "the river ran.47a Then",  # a letter after
+        "in 1914-47 the river ran",  # a range
+        "see pp.12-47 then",
+        "see pp.12\u201347 then",
+        "it cost \u00a347 then",  # a currency sign
+        "it cost $47. Then",
+        "see \u00a747 then",  # a section sign
+        "see \u00a7.47 then",
     ],
 )
 def test_gap_digits_that_are_no_reference_stay_unlinked(text: str) -> None:
