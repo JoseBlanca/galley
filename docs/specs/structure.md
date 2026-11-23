@@ -2530,8 +2530,13 @@ of the body's paragraphs (blocks of kind `paragraph`, not headings,
 figures or quotes) after the first of those two references and before
 the second, that no footnote and no link took. A link made by this rule
 is never the neighbour of another run: the runs are found once, from
-the matching's links only. The examples below are made up; the owner's
-books are named by page and note only.
+the matching's links only. The matching links a group's notes in the
+reading order of their values, so a run's first reference comes before
+its second; a run whose first reference does not come before its
+second (links out of order, which the matching does not make) takes
+nothing, and a word that one run took, in the order of the runs'
+values, is not in the gap of another. The examples below are made up;
+the owner's books are named by page and note only.
 
 A word of the gap **reads as** a reference to note V when it is:
 
