@@ -22,6 +22,7 @@ from galley_eval.scores import (
     NoteScores,
     Part,
     Placement,
+    _is_paragraph_place,
     block_kinds,
     galley_parts,
     kinds_right,
@@ -839,6 +840,73 @@ def test_note_reference_at_a_block_end_before_a_margin_note_is_before_it() -> No
     # After "fourth" is Gutenberg's gap 4; before "the", past the four
     # tokens of the margin note, would be gap 8.
     assert scores.reference_right == 1
+
+
+def _one_note_score(
+    reference: ReferenceText, galley: tuple[GalleyToken, ...], tokens_before: int
+) -> int:
+    """Whether the reference to note 1 of `reference` is right, galley's
+    at `tokens_before` tokens of its block p1."""
+    return note_scores(
+        reference,
+        align(reference, galley),
+        reference_places(reference),
+        galley,
+        _NOTE_BLOCKS,
+        (
+            GalleyNoteReference(
+                note_id="n-p0000-001", block_id="p1", tokens_before=tokens_before
+            ),
+        ),
+    ).reference_right
+
+
+def test_note_reference_mid_block_before_an_extra_token_is_after_the_one_before() -> (
+    None
+):
+    reference = _reference(
+        _paragraph("one two three four five six seven eight nine ten eleven twelve"),
+        notes=(_note("Footnote_1", "Ibid. page forty"),),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 4)),),
+    )
+    # galley lost "five" to "eight" and reads an extra "zzq" after the
+    # reference: after "four" is Gutenberg's gap 4; before "nine", the
+    # next aligned token, would be gap 8.
+    galley = _tokens("one two three four zzq nine ten eleven twelve", "p1") + _tokens(
+        "Ibid. page forty", "n1", stream=GalleyStream.NOTES
+    )
+    assert _one_note_score(reference, galley, tokens_before=4) == 1
+
+
+def test_note_reference_after_a_margin_notes_tokens_maps_after_the_body_token() -> None:
+    reference = _reference(
+        _paragraph("first second third fourth"),
+        _block(ReferenceKind.MARGIN_NOTE, "Becket exiled from England again"),
+        _paragraph("the king came back"),
+        notes=(_note("Footnote_1", "Ibid. page forty"),),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 4)),),
+    )
+    # The margin note's words sit inside galley's block, before the
+    # reference: they are passed over, and after "fourth" is gap 4; after
+    # "again" would be gap 9.
+    galley = _tokens(
+        "first second third fourth Becket exiled from England again the king",
+        "p1",
+    ) + _tokens("Ibid. page forty", "n1", stream=GalleyStream.NOTES)
+    assert _one_note_score(reference, galley, tokens_before=9) == 1
+
+
+def test_paragraph_place_is_a_body_token_outside_a_margin_note() -> None:
+    reference = _reference(
+        _paragraph("first second"),
+        _block(ReferenceKind.MARGIN_NOTE, "Becket exiled"),
+        _block(ReferenceKind.HEADING, "CHAPTER ONE"),
+        notes=(_note("Footnote_1", "Ibid. page forty"),),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 1)),),
+    )
+    assert tuple(
+        _is_paragraph_place(place) for place in reference_places(reference)
+    ) == (True, True, False, False, True, True, False, False, False)
 
 
 def test_galley_kinds_are_galleys_block_kinds_and_none() -> None:

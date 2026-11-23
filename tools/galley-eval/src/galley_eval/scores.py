@@ -771,18 +771,16 @@ def _note_reference_gap(
     tokens_before: int,
 ) -> int | None:
     """The gap of the reference body that a galley note reference maps
-    onto, after `tokens_before` of its block's tokens, at `positions`.
-    When no token after it in the block is aligned to the body, the gap
-    is after the block's last aligned body token, so that a margin note
-    after the block in the reference is not counted (spec section 6,
-    notes); else, and when no token of the block is aligned, before the
-    next aligned body token."""
-    if _gap_after_aligned(alignment, places, galley, positions[tokens_before:]) is None:
-        before = _gap_after_aligned(
-            alignment, places, galley, positions[:tokens_before]
-        )
-        if before is not None:
-            return before
+    onto, after `tokens_before` of its block's tokens, at `positions`
+    (spec section 6, notes): after the reference token of the last token
+    before it in the block that is aligned to the body outside a margin
+    note, so that neither a margin note after the block in the reference
+    nor tokens after the reference that are extra or aligned elsewhere
+    move it; when no token before it is so aligned, before the next
+    aligned body token."""
+    before = _gap_after_aligned(alignment, places, galley, positions[:tokens_before])
+    if before is not None:
+        return before
     if tokens_before < len(positions):
         return gaps[positions[tokens_before]]
     return gaps[positions[-1] + 1]
