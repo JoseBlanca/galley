@@ -9,6 +9,8 @@ pt high, with one character's width between words. Body lines lie 15 pt
 apart; the notes' lines lie 12 pt apart, Turney's 0.8 pitch.
 """
 
+import pytest
+
 from galley.model import (
     BlockKind,
     BlocksFile,
@@ -23,6 +25,7 @@ from galley.model import (
 )
 from galley.structure import make_blocks, reference_candidate
 from galley.structure._endnotes import group_reaches
+from galley.structure._markers import Reference, ReferenceForm, endnote_candidate
 from galley.structure._references import Candidate, NoteToMatch, match_endnotes
 
 _HASH = "a" * 64
@@ -283,16 +286,20 @@ def _spread(text: str, x0: float, x1: float, top: float) -> Line:
     return Line(_box(tuple(word.box for word in words)), words)
 
 
-def _chapter_page(index: int, title: str) -> PageLayout:
+def _chapter_page(
+    index: int,
+    title: str,
+    ends: tuple[str, ...] = tuple(f"word{n}." for n in range(1, 10)),
+) -> PageLayout:
+    """A chapter's page whose nine full lines end with the words `ends`,
+    "word1." to "word9." unless given."""
     width = _CHAR_PT * len(title)
     lines = (
         _spread(title, 175 - width / 2, 175 + width / 2, 50.0),
         _spread("The chapter opens here and", _LEFT_PT + 20, _RIGHT_PT, 85.0),
         *(
-            _spread(
-                f"a full line goes on to word{n}.", _LEFT_PT, _RIGHT_PT, 85.0 + 15 * n
-            )
-            for n in range(1, 10)
+            _spread(f"a full line goes on to {end}", _LEFT_PT, _RIGHT_PT, 85.0 + 15 * n)
+            for n, end in enumerate(ends, start=1)
         ),
         _spread("and it ends.", _LEFT_PT, 150.0, 235.0),
     )
@@ -785,6 +792,107 @@ def test_endnote_reference_standing_for_a_lost_note_stays_unlinked() -> None:
         ("word17.", 17),
         ("word20.", 20),
     )
+
+
+# Spec section 12, "The candidates of endnotes": three forms of reference
+# that endnotes take and footnotes do not.
+
+
+@pytest.mark.parametrize(
+    ("word", "reference"),
+    [
+        # A glued number without the citation exclusion.
+        ("art.27", ("art.", "27", "")),
+        ("Q.19", ("Q.", "19", "")),
+        # After a year and sentence punctuation.
+        ("1911.34", ("1911.", "34", "")),
+        ("1886,57", ("1886,", "57", "")),
+        ("1871\u2019.42", ("1871\u2019.", "42", "")),
+        # After a closing bracket and any sentence punctuation.
+        ("(61).29", ("(61).", "29", "")),
+        ("[1862]).38", ("[1862]).", "38", "")),
+        ("5)16", ("5)", "16", "")),
+        ("(1936)41", ("(1936)", "41", "")),
+        # Followed by a dash and a word.
+        ("river20\u2014and", ("river", "20", "\u2014and")),
+        ("seas?25\u2014Then", ("seas?", "25", "\u2014Then")),
+        ("(6)3\u2014so", ("(6)", "3", "\u2014so")),
+        ("tide4\u2013and", ("tide", "4", "\u2013and")),
+    ],
+)
+def test_endnote_candidate_of_each_form_splits_off_its_number(
+    word: str, reference: tuple[str, str, str]
+) -> None:
+    before, number, after = reference
+    assert endnote_candidate(word) == Reference(
+        before, number, after, ReferenceForm.GLUED, int(number)
+    )
+    # Footnotes keep the candidates of section 11.
+    assert reference_candidate(word) is None
+
+
+@pytest.mark.parametrize(
+    "word",
+    [
+        "10.35",  # a time
+        "10:35",
+        "14",  # "7 September": a lone number is no candidate
+        "4.6",  # a decimal
+        "14.9.73",  # a date
+        "19731",  # a year with no punctuation before the number
+        "1914-18",  # a range
+        "1914\u201318",
+        "(612-19)",
+        "(71-72)-46",
+        "10,000.5",
+        "word4-but",  # a hyphen is not a dash before a word
+        "word4.\u2014but",  # punctuation between the number and the dash
+    ],
+)
+def test_endnote_candidate_is_none_for_a_number_that_is_no_reference(
+    word: str,
+) -> None:
+    assert endnote_candidate(word) is None
+
+
+def test_endnote_candidate_keeps_a_bracketed_number_as_section_11_reads_it() -> None:
+    candidate = endnote_candidate("(1).")
+    assert candidate == reference_candidate("(1).")
+    assert candidate is not None
+    assert candidate.form is ReferenceForm.BRACKETED
+
+
+def test_endnotes_link_the_references_only_endnotes_take() -> None:
+    # One chapter whose nine lines end with a reference of each form, a
+    # glued one, and a time that would read note 6 but is passed over.
+    ends = (
+        "cap.1",
+        "1911.2",
+        "(61).3",
+        "7)4",
+        "word5\u2014and",
+        "at 11.6",
+        "word6.",
+        "word7.",
+        "1886,8",
+    )
+    first = (*_group_heading(1, _CHAPTERS[0], 50.0), *_dotted_notes(80.0))
+    pages = (
+        _chapter_page(0, _CHAPTERS[0], ends),
+        PageLayout(1, (_region(*first),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    markers = {note.id: note.marker for note in blocks.notes}
+    links = tuple(
+        (span.text, markers[span.note_ref])
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref is not None
+    )
+    assert links == tuple((str(n), f"{n}.") for n in range(1, 9))
+    text = block_text(blocks.blocks[1])
+    assert "at 11.6 " in text
+    assert "word5\u2014and" in text
 
 
 # Review of work package 3: hand-written cases for the rules the mutation

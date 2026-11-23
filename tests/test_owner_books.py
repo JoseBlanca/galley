@@ -201,6 +201,63 @@ def test_no_reference_links_to_a_note_of_another_groups_chapter(
     assert sum(group != chapter for group, chapter in links) == 0
 
 
+# Structure spec section 26, "Whole-book tests": the endnotes without a
+# link, at most (section 12, "The candidates of endnotes"; 65 and 13 on 23
+# November 2026, 83 and 50 before).
+_UNLINKED = {"turney": 70, "haynes": 15}
+# Structure spec section 11, "Matching": the digit pairs the OCR confuses.
+_CONFUSED_DIGITS = frozenset(
+    frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28")
+)
+
+
+@pytest.mark.parametrize("book", ["turney", "haynes"])
+def test_endnotes_without_a_link_number_at_most_the_target(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    endnotes = _endnotes(owner_book_run(book))
+    assert sum(not note.referenced for note in endnotes) <= _UNLINKED[book]
+
+
+def _misread(reference: str, number: str) -> bool:
+    """Whether `reference` differs from `number` in one digit the OCR
+    confuses."""
+    differing = tuple(
+        frozenset(pair)
+        for pair in zip(reference, number, strict=False)
+        if len(set(pair)) > 1
+    )
+    return (
+        len(reference) == len(number)
+        and len(differing) == 1
+        and differing[0] in _CONFUSED_DIGITS
+    )
+
+
+@pytest.mark.parametrize("book", ["turney", "haynes"])
+def test_every_endnote_link_reads_its_notes_number(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    # The note's number is its marker's digits; a marker the OCR read with
+    # no digit ("x") gives none to compare, and a reference misread by one
+    # confused digit (Turney's "3" for a printed 5) is its note's.
+    blocks = owner_book_run(book)
+    numbers = {note.id: note.marker.rstrip(".") for note in _endnotes(blocks)}
+    links = tuple(
+        (span.text, numbers[span.note_ref])
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref in numbers
+    )
+    assert links
+    wrong = tuple(
+        (reference, number)
+        for reference, number in links
+        if number.isdigit() and reference != number and not _misread(reference, number)
+    )
+    assert wrong == ()
+
+
 # Structure spec section 26, "Whole-book tests": the epigraphs (section 22).
 _EPIGRAPHS = {"turney": (13, 0), "haynes": (21, 8)}
 _SOURCE_DASHES = {"turney": 0, "haynes": 21}

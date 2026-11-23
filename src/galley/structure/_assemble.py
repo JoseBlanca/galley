@@ -56,7 +56,12 @@ from galley.structure._margins import (
     placing_order,
     split_beside_margin_notes,
 )
-from galley.structure._markers import MarkerForm, NoteMarker, book_marker_form
+from galley.structure._markers import (
+    MarkerForm,
+    NoteMarker,
+    book_marker_form,
+    endnote_candidate,
+)
 from galley.structure._measures import letters
 from galley.structure._notes import (
     Footnote,
@@ -557,13 +562,17 @@ def _links(
         ),
         candidates,
     )
-    footnoted = frozenset(link.candidate for link in footnote_links)
+    footnoted = frozenset(
+        (link.candidate.block, link.candidate.word) for link in footnote_links
+    )
+    # Endnotes take more forms of reference than footnotes (spec section 12,
+    # "The candidates of endnotes").
     free = tuple(
         candidate
-        for candidate in candidates
+        for candidate in body_candidates(body, endnote_candidate)
         if candidate.block < before_section
         and candidate.page_index > last_contents_page
-        and candidate not in footnoted
+        and (candidate.block, candidate.word) not in footnoted
     )
     reaches = group_reaches(
         tuple(
