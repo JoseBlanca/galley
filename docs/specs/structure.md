@@ -1877,8 +1877,8 @@ a note when any of these holds:
    indented 12 pt against its column, a note whose marker the OCR glued
    to its first word;
 5. its first word is a note marker of one character, a digit or a
-   letter that reads as one ("s"), the word after it starts with a
-   capital, and the line before it in its region ends more than 3 pt
+   sign (a letter has no marker's form, above), the word after it starts
+   with a capital, and the line before it in its region ends more than 3 pt
    short of the region's right edge, as section 6, rule 1 asks of the
    line before an indent, and does not end with a hyphen that joins it
    to this line. A one-character sign starts a note by this rule only
