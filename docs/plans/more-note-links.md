@@ -149,8 +149,8 @@ Deliverables:
 2. galley-eval on the whole Domesday: notes whose reference is right at
    least 150 more than after 1; no other book's count falls.
 
-- [ ] 4.1 Joined notes and values from markers.
-- [ ] 4.2 The reference candidates.
+- [x] 4.1 Joined notes and values from markers.
+- [x] 4.2 The reference candidates.
 
 ## 5. Kadesh's footnotes
 

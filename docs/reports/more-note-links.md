@@ -92,3 +92,34 @@ are fixed (77c019b to 69d36d9):
 
 Counts after the fixes: Turney 29 unlinked of 618 endnotes, Haynes 3 of
 691; Gierke 311 endnotes, 228 with a link (208 before the plan).
+
+## Work package 4: Domesday's footnotes
+
+Tasks 4.1 and 4.2 done on a stream branch (08a6e99, 47b32d9, 7ced95a,
+0602c96, 93b160a; merged with the review fixes in 18e550e). A footnote
+starts at a one-character marker followed by a capital after a short
+line, at a number after a 20 pt gap, or at the next note's marker after
+an 8 pt gap; a sign starts a note only when the number after confirms
+it. A note's value follows a scored numbering of the page's markers,
+not only its place; a note the numbering leaves out takes no reference.
+New footnote references: a lone backslash before a capital, a star
+glued after a number, the last digits glued after a year or amount
+(footnotes only), a lone 1–2 digit number after a word ending in a
+letter when no other word of the gap ends in the note's digits, and 5
+for 8 among the confused digits.
+
+**Domesday misses the bar**: notes whose reference is right 1,432 →
+1,557 of 1,729 (+125; the plan asked +150). Haskins 66 → 68 of 72.
+Links more than 3 words from their reference: 114 → 49. Wrong links
+found on the way (a "*" note taking the next note's reference, table
+rows and "9 furlongs" cut into notes, a left-out note taking a stray
+sign on Gierke p31, lone numbers matching "(Poem, 1. 17)" and "thus:
+8." on Kadesh) were removed by narrowing the rules. One stays: Domesday
+page 106, "justice*" links to a signature mark that layout puts in the
+notes band; before, that mark took note 5's reference, also wrongly.
+
+Not done: a trailing "V" for a printed reference (about 11 notes, the
+likeliest way to the bar) — the fidelity check refuses a letter as a
+reference outside round brackets (architecture §13), so it is the
+owner's decision. Gierke 228 → 230 linked endnotes (5 for 8, both right
+on the images); Turney 29 → 27 unlinked.
