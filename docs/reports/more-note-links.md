@@ -123,3 +123,36 @@ likeliest way to the bar) — the fidelity check refuses a letter as a
 reference outside round brackets (architecture §13), so it is the
 owner's decision. Gierke 228 → 230 linked endnotes (5 for 8, both right
 on the images); Turney 29 → 27 unlinked.
+
+Review of work package 4 (two reviewers: spec and fidelity; tests and
+conventions). No lost word, no new wrong link; about 50 changed links
+checked on the images. Fixed (e800015 to b3def51): five narrowing rules
+that no test caught now each have a test, and the whole-book bounds are
+tight (Domesday unreferenced ≤ 295, now 290; Turney ≤ 28, Haynes ≤ 4
+unlinked, now 27 and 3); the spec no longer names a letter marker the
+code never reads; stale docstrings, the source of three constants, two
+defaults made required; and a reference linked by the lone-number rule
+now sits against its word ("child[1]." instead of "child [1].").
+Counts unchanged.
+
+## Work package 5: Kadesh's footnotes
+
+Task 5.1, structure half (a9527c4 spec, 7786d52 code): on a band's
+first line, a 1–3 digit marker after a 20 pt gap and before a capital
+starts a note; a page whose first line is a row of notes gives its first
+note the signs glued to its first word as marker. Kadesh footnotes 183
+→ 187 (notes 72, 83, 176, 178 cut from the note before), 4 of the 13
+column joins; linked without the vision model 43 → 45 (one from work
+package 4, one here, both right on the images). The other books are
+byte-identical. Not fixed: p62 (169 read "16°"), the lost or non-digit
+markers of p21, 25–28, 55, the splits on p13 and p63, note 87 in the
+body on p36. On p32 the second line of the row, holding the ends of
+notes 82 and 83, all goes to 83. The tests are unit tests modelled on
+pages 29, 32 and 66 and one excerpt test on `kadesh_redo` page 9: the
+other Kadesh excerpts are cut from the text layer, which reads these
+markers otherwise.
+
+Waiting for LM Studio: the page-order fallback of the correct stage
+(rest of 5.1) and the narrower order check (5.2) need the model's
+answers on 18 Kadesh pages recorded once as fixtures, about 15 minutes;
+the correct stage keeps no copy of its answers.
