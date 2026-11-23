@@ -601,16 +601,32 @@ links of a page are kept only when they number its footnotes in order:
   [6], whose note line matches none of galley's notes, gives no link;
   counted both as the model's third reference and as a note galley
   references, it put the model's "Record" [7], its fourth, one note too
-  far, and the page lost that right link (21 November 2026);
+  far, and the page lost that right link (21 November 2026).
+  A reference that has no place among galley's words, and whose note
+  line names a footnote galley references, counts once too, as that note
+  marked: on page 40 galley reads "beaten" as "»aten", so the model's
+  "beaten" [103] has no place, and counted both as the model's fifth
+  reference and as a note galley references, it put the model's "is."
+  [104], its sixth, one note too far, and the page lost three right
+  links (21 November 2026);
 - in the order of the model's answer, their notes come in the order of
   the page's footnotes, no note twice, and their numbers, those that are
-  digits, rise;
-- each footnote of the page takes its link's number, or else galley's
-  marker when that is digits of as many as the links' longest number (a
-  shorter one is a marker the OCR cut, "1" for 61 on page 26), and these
-  numbers rise in the order of the footnotes.
+  digits, rise.
 
 Otherwise no link of the page is proposed, and the page is logged.
+
+The model's numbers are not compared with galley's markers. Until 21
+November 2026 they were: each footnote took its link's number, or else
+galley's marker, and these numbers had to rise. On pages 26 and 53 the
+model misreads the tens of every number, 66 to 68 for the printed 56 to
+58, 120 to 129 for 130 to 139, and galley's markers 59 and 137 then
+refused all ten links of the two pages, though each goes to the right
+note after the right word (`kadesh_reference`). The comparison caught
+none of the seven wrong links of the run of 20 November 2026 below
+(page 31's markers are no digits, page 21's numbers fall); the k-th
+reference rule did. What the model's number gives is the reference's
+text in the edit, which the owner sees; the EPUB numbers its notes
+itself.
 
 **The link.** The galley word that holds the place's token, its
 whitespace word, gets a reference to that note right after it:
@@ -719,6 +735,31 @@ In the last run 14 pages lost their links to the rule of the numbers of
 a page, and the notes linked in the book went from 41 to 76 of 183. The
 stage took 3,705 s for 44 pages against about 474 s without links,
 with another model of the owner's running on the same Mac.
+
+**The pages without links**, measured 21 November 2026 on new answers
+of the 35B model for the 42 pages where a footnote starts (the answers
+of the run above were not kept, and differ at temperature 0). On the 13
+pages that run left without links, the causes, from the answers and the
+page images:
+
+| cause | pages |
+|---|---|
+| galley split one printed note into several, or made a note of other text, so the k-th reference is not the k-th footnote | 13 (the list of sources, note 22, split in eight), 46 (a line of junk before the first note, note 111 split in two), 63 (note 173 split in two) |
+| galley joined two printed notes, or left one in the body | 29 (72 joined to 71 of page 28), 62 (169 joined to 168), 36 (87 left as a paragraph of the body) |
+| the model's note lines are one number off its references | 31 (it left out note 76's line and numbered the others from 17) |
+| the model left a reference out | 61 (160) |
+| notes whose first words are alike, "LD., II, 149d" or "Op. cit., p.", so a note line matches no note or the wrong one | 14, 28 (where no new link was possible) |
+| galley's word misread, the model's reference has no place | 40 |
+| the model misread the tens of every number | 26, 53 |
+
+The rule for a reference with no place, and the end of the comparison
+with galley's markers, link pages 40, 26 and 53: 13 more links, all to
+the right note after the right word, against `kadesh_reference`, which
+covers the three pages. On the 42 pages the stage's link edits went
+from 43 to 56, and no other page changed; the links that equal galley's
+own, page 28's two among them, give no edit and are not counted. A rule that left out of the count a
+reference whose number has no note line was tried and lost 5 right
+links (pages 9 and 20) and gained none.
 
 ## 10. How markdown applies the edits
 
@@ -958,6 +999,108 @@ wait either way.
    stage off until the stage is measured on a second book. The stage
    stays off by default.
 
+2. **Whether the stage is on for a book whose OCR is good**: measured on
+   Domesday (`domesdaybook00maituoft`) on 21 November 2026, and the
+   recommendation is **off**; the owner decides. Domesday's text layer
+   is good in English and poor in Latin and Old English, which its notes
+   and appendices quote at length. Its tables are not read as tables:
+   structure made the rows of the table on page 426 into footnotes, their
+   cells out of the printed order.
+
+   *What was measured.* Six pages read word by word from the page images,
+   2,485 words as section 6 cuts them, in `tests/fixtures/expected/domesday_reference/pages.json`:
+   pages 100 and 180 (body and Latin footnotes), 250 (body), 316 (an
+   appendix of Latin and Old English charter extracts), 426 (a table of
+   counties) and 470 (body, a small table, four footnotes). The stage ran
+   on these pages alone, as `run` does for each page, with the 35B model,
+   note links and the second reading by Qwen 3.6 27B, on the owner's Mac
+   while another program of the owner's used the 27B model. galley's
+   reading of each page (section 5) was scored against the reference
+   before and after the edits: its words lined up with the reference's
+   by least edits, and the wrong, missing and extra words counted per 100
+   words of the reference, compared in the comparison form of section 6.
+   The side notes, the short headings Domesday prints in the margin, were
+   put in the reference where galley reads them, so that their place is
+   not counted. The table of page 426 is compared without its order,
+   since galley's order of its cells is not the printed one: the count is
+   of the words one side has more times than the other. Whether each edit
+   is right was decided by hand, against the reference and the images:
+   an edit whose new word is right but leaves an extra word beside it is
+   wrong.
+
+   | text | words | wrong before | wrong after |
+   |---|---|---|---|
+   | body, English (pages 100, 180, 250, 470, and the heading of 426) | 1,417 | 6 (0.4 in 100) | 3 (0.2 in 100) |
+   | body, Latin and Old English (page 316) | 469 | 32 (6.8 in 100) | 13 (2.8 in 100) |
+   | footnotes (pages 100, 180, 470) | 371 | 23 (6.2 in 100) | 10 (2.7 in 100) |
+   | small table (page 470) | 27 | 4 | 1 |
+   | side notes | 17 | 0 | 0 |
+   | table of page 426, order left aside | 184 | 13 | 18 |
+
+   *The edits.* 77 word edits, of which 23 are wrong: 17 on the five
+   pages without the table of page 426, 6 on that table.
+
+   - On the five pages without that table, 67 edits, 50 right and 17
+     wrong. 12 of the wrong ones turn a word galley read right into a
+     wrong one ("resolvat" to "resolut" three times, "munitione" to
+     "munitio ne" twice, "affirmative" to "baraffirmative", the side
+     note's "bar-" joined to the body's word, "Aluuinus" to "Aluinus"),
+     and 2 put in a word that galley has already beside it ("team lands"
+     to "team teamlands", "Heraldo... Terra" to "Heraldo...Terra...
+     Terra"), and 3 change a word galley read wrong into another wrong
+     one. 2 are fluent wrong words, wrong words that read as real ones:
+     "oðrum" and "geworce", Old English words printed elsewhere on page
+     316, where the page prints "oþrum" and "gewerce".
+   - On the table of page 426, 10 edits: 4 right (2 put in a letter the
+     table lacked, 2 put back a number another edit took away) and 6 wrong, which put in a word the
+     table already has, in the wrong row (the counties "Surrey",
+     "Berkshire", "Cornwall", and three numbers), all 6 fluent;
+     "Berkshire" takes the place of "Hampshire", which is lost.
+   - The second reading marks 11 edits doubtful, 9 of them wrong: the 6
+     wrong edits in the footnotes of pages 100 and 180, and the 3 county
+     names on the table; the three numbers put in twice it reads as the
+     35B model does, and does not mark. The 11 wrong edits in the body
+     are not marked, since the second reading reads only the footnote
+     band (section 9); 9 of them are on page 316.
+
+   *Links.* 2 links, both right: on page 470 they take the place of two
+   wrong links of galley's. A third was galley's already. Page 180's first
+   note gets none: its first words, "D. B. i. 238 b", are those of its
+   eighth note too, so the note line matches neither (section 9b).
+
+   *Time.* The 35B model took 9 to 14 s a page to read it, 11 s on
+   average, and 7 to 10 s more for the note references; the 27B model 16
+   to 54 s for a footnote band, 30 s on average. For Domesday's 539 text
+   pages, 489 of them with footnotes, that is about 3 hours without the
+   second reading and about 7 hours with it; the 27B model's times may be
+   too high, since another program was using it.
+
+   *Why off.* Outside the table of page 426 the stage takes the wrong
+   words from 65 to 27, but the gain is not in the English text, where
+   it would show on every page. In English, where galley's reading has
+   0.4 wrong words in 100, the stage made 5 edits on the four pages: 3
+   right, 1 wrong ("baraffirmative") and 1 that left a broken word's
+   first half ("team teamlands"); that is 3 wrong words fewer in 1,417.
+   The gain is in the Latin and Old English: the footnotes from 6.2 to
+   2.7 wrong words in 100, and to about 1.3 (5 wrong words in 371) when
+   the doubtful edits are checked and the wrong ones undone, as item 1
+   has it for Kadesh; page 316 from 6.8 to 2.8, with 9 wrong edits the
+   second reading does not mark, since they are not in a footnote; and
+   the table is made worse. Getting the footnotes' gain takes about 7
+   hours for the book and checking against the images some 1,000
+   doubtful edits (6 on the three measured pages with footnotes, 100,
+   180 and 470, so about 2 on each of the book's 489 pages with
+   footnotes), while the body's Latin
+   quotations keep wrong edits nobody is told of. That is why the
+   recommendation is off for a book like Domesday: the English, which is
+   most of what is read, gains nothing a reader would see. The case for
+   turning it on is a book whose quotations in another language matter
+   to the owner more than that cost; it then wants the second reading,
+   the doubtful edits checked, and the edits in quotations printed in
+   the body, as on page 316, checked too. Leaving out the pages whose
+   tables structure turned into notes would remove the table's harm; it
+   is not built.
+
 ## 17. Not in this spec
 
 - `galley2epub edits-from`, by which the owner writes edits from a
@@ -966,4 +1109,5 @@ wait either way.
   measurement found cheaper when the body is already good: not built.
 - Another prompt, resolution or model: one prompt and 300 dpi were
   measured.
-- How the stage does on books other than Kadesh: not measured.
+- How the stage does on books other than Kadesh and Domesday: not
+  measured (section 16, item 2).

@@ -591,9 +591,34 @@ def _page_notes(*markers: str, referenced: tuple[int, ...] = ()) -> tuple[Note, 
         ((("n-p0031-001", "10", 0), ("n-p0031-002", "7", 1)), ("", ""), (), False),
         ((("n-p0031-002", "76", 0), ("n-p0031-001", "77", 1)), ("", ""), (), False),
         ((("n-p0031-001", "76", 0), ("n-p0031-001", "76", 1)), ("", ""), (), False),
-        # galley reads note 2's marker 78, after the link's 77 on note 3.
-        ((("n-p0031-003", "77", 2),), ("", "78", ""), (), False),
-        # A marker shorter than the links' numbers is one the OCR cut.
+        # galley reads note 2's marker 78, after the link's 77 on note 3:
+        # the model's numbers are not compared with galley's markers.
+        ((("n-p0031-003", "77", 2),), ("", "78", ""), (), True),
+        # Kadesh page 26, 21 November 2026: the model reads 66 to 68 for the
+        # printed 56 to 58, and galley's markers are 59, 62 and 63.
+        (
+            (
+                ("n-p0031-001", "66", 0),
+                ("n-p0031-002", "67", 1),
+                ("n-p0031-003", "68", 2),
+            ),
+            ("8", "", "", "59", "1", "62", "63"),
+            (4, 6),
+            True,
+        ),
+        # Kadesh page 53: 120 to 129 for 130 to 139, galley's marker 137.
+        (
+            (
+                ("n-p0031-001", "120", 0),
+                ("n-p0031-002", "121", 1),
+                ("n-p0031-009", "128", 8),
+                ("n-p0031-010", "129", 9),
+            ),
+            ("", "11", "13", "12", "", "", "36", "137", "188", ""),
+            (),
+            True,
+        ),
+        # galley's markers, cut by the OCR or not, are not compared.
         ((("n-p0031-002", "77", 1),), ("8", ""), (), True),
         ((("n-p0031-001", "76", 0),), ("", "77"), (), True),
         # Kadesh page 31: the model's first reference goes to the second
@@ -609,6 +634,8 @@ def _page_notes(*markers: str, referenced: tuple[int, ...] = ()) -> tuple[Note, 
         "notes_out_of_order",
         "one_note_twice",
         "against_galleys_marker",
+        "tens_misread_page_26",
+        "tens_misread_page_53",
         "cut_marker",
         "with_galleys_marker",
         "one_note_too_far",
@@ -738,3 +765,65 @@ def test_a_bracket_that_is_no_number_or_sign_is_no_reference() -> None:
     # Kadesh page 27: the model brackets "[at]", printed so in the text.
     answer = link_answer("L. P. H., arrived [at] the city\nthe ford [66] of the\n")
     assert [reference.text for reference in answer.references] == ["66"]
+
+
+def test_a_reference_with_no_place_to_a_note_galley_references_counts_once() -> None:
+    # Section 9b, Kadesh's page 40 on 21 November 2026: galley reads
+    # "beaten" as "»aten" and links it to note 103, so the model's "beaten"
+    # [103] has no place among galley's words. Counted both as the model's
+    # fifth reference and as a note galley references, it put "is." [104]
+    # one note too far, and the page lost its three right links.
+    block = "b-p0040-001"
+    words = ("was", "(B’wy).", "camp", "away.", "»aten", "of", "Kheta", "is.")
+    starts = [0]
+    for word in words[:-1]:
+        starts.append(starts[-1] + len(word) + 1)
+    places = {
+        word: Place(block, 0, start, start + len(word.strip("().")))
+        for word, start in zip(words, starts, strict=True)
+    }
+    reading = tuple(
+        GalleyToken(form=form, place=places[word], block_id=block, note_id=None)
+        for word, form in zip(
+            words,
+            ("was", "b'wy", "camp", "away", "aten", "of", "kheta", "is"),
+            strict=True,
+        )
+    )
+    notes = (
+        _note("n-p0040-001", "This clause shows that"),
+        _note("n-p0040-002", "Abu Simbel: Champ., Mon., 32"),
+        _note("n-p0040-003", "This is a march", referenced=True),
+        _note("n-p0040-004", "Maspero's statement (Struggle", referenced=True),
+        _note("n-p0040-005", "Literally, one is beating", referenced=True),
+        _note("n-p0040-006", "Inscription by the scene"),
+    )
+    references = frozendict(
+        {
+            places["camp"]: "n-p0040-003",
+            places["away."]: "n-p0040-004",
+            places["»aten"]: "n-p0040-005",
+        }
+    )
+    answer = link_answer(
+        "L. P. H., was⁹⁹ had not finished\n"
+        "forest of Baul (B’wy).¹⁰⁰\n"
+        "and gone into camp¹⁰¹ while\n"
+        "evidently too far away.¹⁰² They\n"
+        "They are being beaten.¹⁰³\n"
+        "the vanquished of Kheta is.¹⁰⁴\n"
+        "NOTE 99 | This clause shows\n"
+        "NOTE 100 | Abu Simbel: CHAMP.,\n"
+        "NOTE 101 | This is a\n"
+        "NOTE 102 | MASPERO’s statement (Struggle,\n"
+        "NOTE 103 | Literally, “one is\n"
+        "NOTE 104 | Inscription by the\n"
+    )
+    links = page_links(40, reading, notes, answer, references)
+    assert [(link.note_id, link.text) for link in links] == [
+        ("n-p0040-001", "99"),
+        ("n-p0040-002", "100"),
+        ("n-p0040-003", "101"),
+        ("n-p0040-004", "102"),
+        ("n-p0040-006", "104"),
+    ]
