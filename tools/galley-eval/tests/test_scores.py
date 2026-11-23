@@ -814,8 +814,63 @@ def test_note_reference_at_the_end_of_its_block_is_after_its_last_token() -> Non
     assert scores.reference_right == 1
 
 
+def test_note_reference_at_a_block_end_before_a_margin_note_is_before_it() -> None:
+    reference = _reference(
+        _paragraph("first second third fourth"),
+        _block(ReferenceKind.MARGIN_NOTE, "Becket exiled from England"),
+        _paragraph("the king came back"),
+        notes=(_note("Footnote_1", "Ibid. page forty"),),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 4)),),
+    )
+    galley = (
+        _tokens("first second third fourth", "p1")
+        + _tokens("Becket exiled from England", "m1", stream=GalleyStream.MARGIN_NOTES)
+        + _tokens("the king came back", "p2")
+        + _tokens("Ibid. page forty", "n1", stream=GalleyStream.NOTES)
+    )
+    scores = note_scores(
+        reference,
+        align(reference, galley),
+        reference_places(reference),
+        galley,
+        _NOTE_BLOCKS,
+        (GalleyNoteReference(note_id="n-p0000-001", block_id="p1", tokens_before=4),),
+    )
+    # After "fourth" is Gutenberg's gap 4; before "the", past the four
+    # tokens of the margin note, would be gap 8.
+    assert scores.reference_right == 1
+
+
 def test_galley_kinds_are_galleys_block_kinds_and_none() -> None:
     # A galley block's kind is read into a GalleyKind by its value.
     assert {kind.value for kind in GalleyKind} == {kind.value for kind in BlockKind} | {
         "none"
     }
+
+
+def test_note_reference_before_an_extra_last_token_is_before_a_margin_note() -> None:
+    reference = _reference(
+        _paragraph("first second third fourth"),
+        _block(ReferenceKind.MARGIN_NOTE, "Becket exiled from England"),
+        _paragraph("the king came back"),
+        notes=(_note("Footnote_1", "Ibid. page forty"),),
+        note_references=(NoteReference("Footnote_1", Gap(Stream.BODY, 4)),),
+    )
+    # The block ends in "*", which the reference does not have.
+    galley = (
+        _tokens("first second third fourth *", "p1")
+        + _tokens("Becket exiled from England", "m1", stream=GalleyStream.MARGIN_NOTES)
+        + _tokens("the king came back", "p2")
+        + _tokens("Ibid. page forty", "n1", stream=GalleyStream.NOTES)
+    )
+    scores = note_scores(
+        reference,
+        align(reference, galley),
+        reference_places(reference),
+        galley,
+        _NOTE_BLOCKS,
+        (GalleyNoteReference(note_id="n-p0000-001", block_id="p1", tokens_before=4),),
+    )
+    # Before "*" no token of the block is aligned: after "fourth" is gap 4;
+    # before "the" would be gap 8.
+    assert scores.reference_right == 1

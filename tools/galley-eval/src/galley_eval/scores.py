@@ -742,6 +742,52 @@ def _found_where(
     return _Found.MISSING, None
 
 
+def _gap_after_aligned(
+    alignment: Alignment,
+    places: tuple[ReferencePlace, ...],
+    galley: tuple[GalleyToken, ...],
+    positions: tuple[int, ...],
+) -> int | None:
+    """The gap of the reference body after the reference token of the last
+    galley token at `positions` that is aligned to the body; None when
+    none is."""
+    for index in reversed(positions):
+        if galley[index].stream is not GalleyStream.BODY:
+            continue  # only body tokens map onto the body's gaps
+        pairing = alignment.pairings[alignment.galley_pairing[index]]
+        if pairing.state in _ALIGNED and _is_paragraph_place(
+            places[pairing.reference_indices[0]]
+        ):
+            return max(pairing.reference_indices) + 1
+    return None
+
+
+def _note_reference_gap(
+    alignment: Alignment,
+    places: tuple[ReferencePlace, ...],
+    galley: tuple[GalleyToken, ...],
+    gaps: tuple[int | None, ...],
+    positions: tuple[int, ...],
+    tokens_before: int,
+) -> int | None:
+    """The gap of the reference body that a galley note reference maps
+    onto, after `tokens_before` of its block's tokens, at `positions`.
+    When no token after it in the block is aligned to the body, the gap
+    is after the block's last aligned body token, so that a margin note
+    after the block in the reference is not counted (spec section 6,
+    notes); else, and when no token of the block is aligned, before the
+    next aligned body token."""
+    if _gap_after_aligned(alignment, places, galley, positions[tokens_before:]) is None:
+        before = _gap_after_aligned(
+            alignment, places, galley, positions[:tokens_before]
+        )
+        if before is not None:
+            return before
+    if tokens_before < len(positions):
+        return gaps[positions[tokens_before]]
+    return gaps[positions[-1] + 1]
+
+
 def note_scores(
     reference: ReferenceText,
     alignment: Alignment,
@@ -770,12 +816,9 @@ def note_scores(
         positions = block_positions.get(note_reference.block_id, ())
         if not positions:
             continue  # a block with no token at this output has no place
-        at = (
-            positions[note_reference.tokens_before]
-            if note_reference.tokens_before < len(positions)
-            else positions[-1] + 1
+        gap = _note_reference_gap(
+            alignment, places, galley, gaps, positions, note_reference.tokens_before
         )
-        gap = gaps[at]
         if gap is not None:
             galley_gaps.setdefault(note_reference.note_id, []).append(gap)
     gutenberg_gaps: dict[str, list[int]] = {}
