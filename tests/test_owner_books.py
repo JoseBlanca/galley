@@ -206,8 +206,9 @@ def test_no_reference_links_to_a_note_of_another_groups_chapter(
 # Structure spec section 26, "Whole-book tests": the endnotes without a
 # link, at most (section 12, "The candidates of endnotes" and "The gap
 # between linked neighbours"; 29 and 3 on 23 November 2026, 83 and 50
-# before both).
-_UNLINKED = {"turney": 30, "haynes": 7}
+# before both; 27 and 3 after work package 4 of the plan more-note-links,
+# which counts 5 and 8 among the confused digits).
+_UNLINKED = {"turney": 28, "haynes": 4}
 # Structure spec section 11, "Matching": the digit pairs the OCR confuses.
 # Kept apart from galley's own copy on purpose, so that this test checks
 # the links against the spec independently of the code under test.

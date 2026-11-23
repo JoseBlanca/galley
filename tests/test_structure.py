@@ -2616,6 +2616,8 @@ def test_footnote_sign_starts_a_note_only_between_two_numbers() -> None:
         ((1, 3, 3, 4, 6, None, 7), (1, 2, 3, 4, 5, 6, 7)),
         # Page 97, "1 3 8": "8" is 3 misread, a confused digit.
         ((1, 3, 8), (1, 2, 3)),
+        # Three numbers skipped are more than a page's 2: by place.
+        ((1, 5, 6, 7), (1, 2, 3, 4)),
         ((None, None), (1, 2)),
         ((), ()),
     ],
@@ -2687,6 +2689,41 @@ def test_footnote_next_marker_after_a_gap_of_9_pt_starts_a_note() -> None:
     assert _markers_and_texts(blocks) == (
         ("4", "D. Poiwic."),
         ("5", "D. Gretford. 7 Ibid."),
+    )
+
+
+def test_footnote_markers_reading_on_after_a_cut_at_9_pt_each_start_a_note() -> None:
+    # After the cut at "5" the next note should read 6, so "6" 9 pt after
+    # "Gretford." is cut too.
+    line = _placed_line(
+        300,
+        ("4", 50, 55),
+        ("D.", 60, 70),
+        ("Poiwic.", 75, 105),
+        ("5", 114, 119),
+        ("D.", 124, 134),
+        ("Gretford.", 139, 179),
+        ("6", 188, 193),
+        ("Ibid.", 198, 218),
+    )
+    blocks = make_blocks(_lines_of(_page_with_band(0, line)), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("4", "D. Poiwic."),
+        ("5", "D. Gretford."),
+        ("6", "Ibid."),
+    )
+
+
+def test_footnote_marker_of_two_digits_under_a_short_line_starts_no_note() -> None:
+    # Rule 5 asks for a marker of one character: "12" stays in the note.
+    page = _page_with_band(
+        0,
+        _note_line("' The first note.", 300, 50, 150),
+        _note_line("12 The next line runs to the edge", 300 + _NOTE_PITCH_PT),
+    )
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("'", "The first note. 12 The next line runs to the edge"),
     )
 
 
@@ -3255,6 +3292,12 @@ def test_referenced_8_for_5_is_a_confused_digit() -> None:
         ("here1. (Poem, 2. 17)", (("1", "1"),)),
         ("here1. exceeds 42. will touch 2. We", (("1", "1"),)),
         ("here1. Wilton 1400 \\ 1200", (("1", "1"),)),
+        # A backslash glued after a letter and punctuation; a lone number
+        # after a sentence's end and a closing quotation mark; a lone
+        # number with no punctuation before an opening bracket.
+        ("here1. the burh'\\ Then", (("1", "1"), ("\\", "2"))),
+        ('here1. for all time." 2 Then', (("1", "1"), ("2", "2"))),
+        ("here1. the manor 2 (iv) three", (("1", "1"), ("2", "2"))),
     ],
 )
 def test_referenced_lone_number_links_the_note_after_the_last_linked(
