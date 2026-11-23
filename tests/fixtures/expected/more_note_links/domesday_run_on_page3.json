@@ -1,0 +1,6 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 468,
+  "read": "Read by the assistant on 23 November 2026 from the page rendered at 200 dpi. The body prints 'not 7,000 acres of meadow in 1086⁴.'; note 4 reads 'Eyton, Dorset, 146.'.",
+  "expected": {"references": [["1086", "4", "Eyton, Dorset, 146."]]}
+}

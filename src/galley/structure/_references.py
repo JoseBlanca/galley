@@ -19,7 +19,7 @@ _CONFUSED = 2
 _SIGN_WITHOUT_VALUE = 2
 _SIGN_WITH_VALUE = 1
 _CONFUSED_DIGITS = frozenset(
-    frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28")
+    frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28", "58")
 )
 # Spec section 11, "References": a candidate that is an opening single
 # quotation mark after a letter ("Salvolini‘").

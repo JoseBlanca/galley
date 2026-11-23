@@ -210,7 +210,7 @@ def test_no_reference_links_to_a_note_of_another_groups_chapter(
 _UNLINKED = {"turney": 30, "haynes": 7}
 # Structure spec section 11, "Matching": the digit pairs the OCR confuses.
 _CONFUSED_DIGITS = frozenset(
-    frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28")
+    frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28", "58")
 )
 
 

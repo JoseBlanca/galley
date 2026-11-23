@@ -36,8 +36,8 @@ def _page_notes(blocks: BlocksFile, page: int) -> tuple[str, ...]:
 
 
 def _linked(blocks: BlocksFile, page: int) -> tuple[tuple[str, str, str], ...]:
-    """Each reference of the page in reading order: the text of the span
-    before it, its own text and its note's text."""
+    """Each reference of the blocks printed on the page, in reading order:
+    the text of the span before it, its own text and its note's text."""
     notes = {note.id: note for note in blocks.notes}
     return tuple(
         (
@@ -46,7 +46,7 @@ def _linked(blocks: BlocksFile, page: int) -> tuple[tuple[str, str, str], ...]:
             _note_text(notes[span.note_ref]),
         )
         for block in blocks.blocks
-        if block.origin[0].page_index == page
+        if any(origin.page_index == page for origin in block.origin)
         for number, span in enumerate(block.spans)
         if span.note_ref is not None
     )
@@ -105,4 +105,28 @@ def test_notes_reading_1_and_2_after_a_table_cut_into_notes_take_1_and_2(
     ]:
         linked = _links_to(blocks, 5, word, reference)
         assert len(linked) == 1
+        assert linked[0].startswith(note_starts)
+
+
+@pytest.mark.pandoc
+@pytest.mark.tesseract
+@pytest.mark.parametrize(
+    ("excerpt", "page"),
+    [
+        # A number glued after an amount or a year ("£16,0002", "10864.").
+        ("domesday_notes", 0),
+        ("domesday_run_on", 3),
+        # 8 read for a raised 5 ("centuries8").
+        ("domesday_run_on", 4),
+        # A lone number after an amount ("£11 1.").
+        ("domesday_74-83", 9),
+    ],
+)
+def test_reference_the_ocr_glued_misread_or_set_apart_links_its_note(
+    excerpt_books: frozendict[str, BookFolder], excerpt: str, page: int
+) -> None:
+    blocks = read_blocks(excerpt_books[excerpt].blocks_json)
+    for word, reference, note_starts in _expected(excerpt, page)["references"]:
+        linked = _links_to(blocks, page, word, reference)
+        assert len(linked) == 1, (word, reference)
         assert linked[0].startswith(note_starts)

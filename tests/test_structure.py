@@ -2626,6 +2626,20 @@ def test_footnote_values_of_a_page_follow_the_markers_that_read_true(
     assert page_values(readings) == values
 
 
+def test_footnote_values_leave_out_notes_without_a_marker_more_readily() -> None:
+    # Domesday's page 418: thirteen rows of a table without a marker before
+    # notes 1 to 3. Left out at 0.25 each they would cost more than the
+    # three markers that read true give.
+    readings = (*([None] * 13), 1, 2, 3)
+    assert page_values(readings, (*([True] * 13), False, False, False)) == (
+        *([None] * 13),
+        1,
+        2,
+        3,
+    )
+    assert page_values(readings)[-3:] == (14, 15, 16)
+
+
 def test_referenced_note_the_numbering_leaves_out_takes_no_reference() -> None:
     # The markers read 1, 2, 2, 3: one "2" is left out, and takes neither
     # the digits nor a sign, which a note without a value would.
@@ -2637,6 +2651,43 @@ def test_referenced_note_the_numbering_leaves_out_takes_no_reference() -> None:
     blocks = make_blocks(lines, _NO_WORDS, workers=1)
     assert _references(blocks) == (("1", "1"), ("2", "2"), ("3", "3"))
     assert sum(not note.referenced for note in blocks.notes) == 1
+
+
+def test_footnote_number_after_a_wide_gap_starts_a_note_whatever_follows() -> None:
+    # "6" 25 pt after "b." starts a note though "gee" (for "See") is in
+    # lower case; Domesday's page 114.
+    line = _placed_line(
+        300,
+        ("5", 50, 55),
+        ("D.", 60, 70),
+        ("b.", 75, 85),
+        ("6", 110, 115),
+        ("gee", 120, 135),
+        ("e.g.", 140, 160),
+    )
+    blocks = make_blocks(_lines_of(_page_with_band(0, line)), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (("5", "D. b."), ("6", "gee e.g."))
+
+
+def test_footnote_next_marker_after_a_gap_of_9_pt_starts_a_note() -> None:
+    # "5" reads the value after "4", 9 pt after "Poiwic." (page 134); "7",
+    # which does not, stays at 9 pt.
+    line = _placed_line(
+        300,
+        ("4", 50, 55),
+        ("D.", 60, 70),
+        ("Poiwic.", 75, 105),
+        ("5", 114, 119),
+        ("D.", 124, 134),
+        ("Gretford.", 139, 179),
+        ("7", 188, 193),
+        ("Ibid.", 198, 218),
+    )
+    blocks = make_blocks(_lines_of(_page_with_band(0, line)), _NO_WORDS, workers=1)
+    assert _markers_and_texts(blocks) == (
+        ("4", "D. Poiwic."),
+        ("5", "D. Gretford. 7 Ibid."),
+    )
 
 
 def test_footnote_of_two_notes_on_one_line_gives_two_notes() -> None:
@@ -3038,6 +3089,15 @@ def test_footnote_lines_in_the_body_of_a_book_with_digit_markers_stay() -> None:
         ("d@\u2018aflirmer", None),
         ("S\u2018.", None),
         ("Salvolini\u201c", None),
+        # A last digit glued after an amount or a year (Domesday's pages 24
+        # and 468); an amount without its commas is none.
+        ("£16,0002", Reference("£16,000", "2", "", ReferenceForm.GLUED, 2)),
+        ("£24,0003,", Reference("£24,000", "3", ",", ReferenceForm.GLUED, 3)),
+        ("10864.", Reference("1086", "4", ".", ReferenceForm.GLUED, 4)),
+        ("£16,000", None),
+        ("£123.", None),
+        ("10860.", None),
+        ("20864.", None),
     ],
 )
 def test_reference_candidate_gives_the_reference_in_a_word(
@@ -3174,6 +3234,45 @@ def test_referenced_page_s_leftover_note_end_is_not_counted() -> None:
     blocks = make_blocks(_lines_of(first, body_only, page), _NO_WORDS, workers=1)
     assert _references(blocks) == (("1", "1"), ("1", "1"), ("2", "2"))
     assert tuple(note.referenced for note in blocks.notes) == (True, False, True, True)
+
+
+def test_referenced_8_for_5_is_a_confused_digit() -> None:
+    # Spec section 11, "Matching": Domesday's "centuries8" for note 5.
+    assert pair_score(Reference("centuries", "8", "", ReferenceForm.GLUED, 8), 5) == 2
+
+
+@pytest.mark.parametrize(
+    ("body_words", "references"),
+    [
+        # A lone number for the note after the last one linked.
+        ("here1. the child 2. Then", (("1", "1"), ("2", "2"))),
+        ("here1. more than £11 2. At", (("1", "1"), ("2", "2"))),
+        # A backslash before a capital, a star glued after a number.
+        ("here1. the hides \\ Moreover", (("1", "1"), ("\\", "2"))),
+        ("here1. nearly £700*. The", (("1", "1"), ("*", "2"))),
+        # A line of a poem, a number glued before it, a backslash before a
+        # number: no reference.
+        ("here1. (Poem, 2. 17)", (("1", "1"),)),
+        ("here1. exceeds 42. will touch 2. We", (("1", "1"),)),
+        ("here1. Wilton 1400 \\ 1200", (("1", "1"),)),
+    ],
+)
+def test_referenced_lone_number_links_the_note_after_the_last_linked(
+    body_words: str, references: tuple[tuple[str, str], ...]
+) -> None:
+    lines = _lines_of(_referenced_page(0, body_words, "1 One.", "2 Two."))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == references
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_referenced_lone_number_of_a_note_after_an_unlinked_one_stays() -> None:
+    # Note 2 has no reference, so the "3." is not taken for note 3.
+    lines = _lines_of(
+        _referenced_page(0, "here1. the child 3. Then", "1 One.", "2 Two.", "3 Three.")
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == (("1", "1"),)
 
 
 def test_referenced_note_is_never_linked_to_an_earlier_candidate() -> None:

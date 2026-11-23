@@ -44,6 +44,8 @@ _LINE_MARKER_MAX_CHARACTERS = 2
 # before a capital is a marker: a note's text starts a sentence.
 _ONE_LETTER_WORDS = frozenset({"A", "I"})
 _LINE_MARKER_GAP_PT = 10.0
+_NEXT_MARKER_GAP_PT = 8.0
+_WIDE_GAP_PT = 20.0
 _ENDS_BEFORE_A_NOTE = (".", "'", "’", ":", ";", ")")
 # Spec section 11, "Its value": the scores of a page's numbering. A
 # marker that reads its note's value scores 1, one a confused digit away
@@ -56,6 +58,7 @@ _CONFUSED_SCORE = 0.5
 _JUMP_COST = 0.5
 _MAX_JUMPS = 2
 _SKIP_COST = 0.25
+_UNMARKED_SKIP_COST = 0.1
 # Spec section 11, rule 5: the marker and the word after it.
 _MARKER_AND_A_WORD = 2
 
@@ -123,38 +126,58 @@ def _indent_marker(
     return NoteMarker(words[0].text, "", read_number(words[0].text))
 
 
-def _line_marker(before: str, word: str, after: str, gap: float) -> NoteMarker | None:
+def _line_marker(
+    before: str, word: str, after: str, gap: float, next_value: int | None
+) -> NoteMarker | None:
     """The marker of a second note that starts at `word` inside a note
     line, between the words `before` and `after`, `gap` points after
-    `before`; None when no note starts there (spec section 11, "Two notes
-    on one line")."""
+    `before`, where the next note's value would be `next_value`; None when
+    no note starts there (spec section 11, "Two notes on one line")."""
     marker = note_marker(word)
     lone_letter = len(word) == 1 and word.isalpha() and word.islower()
+    if not before.endswith(_ENDS_BEFORE_A_NOTE) or not after:
+        return None
+    if (
+        len(word) == 1
+        and gap >= _WIDE_GAP_PT
+        and (reading := read_number(word)) is not None
+    ):
+        return marker if marker is not None else NoteMarker(word, "", reading)
     if (
         (marker is None and not lone_letter)
         or len(word) > _LINE_MARKER_MAX_CHARACTERS
-        or gap < _LINE_MARKER_GAP_PT
-        or not before.endswith(_ENDS_BEFORE_A_NOTE)
         or not (after[:1].isupper() or after[:1].isdigit())
     ):
+        return None
+    reads_next = (
+        marker is not None and next_value is not None and marker.value == next_value
+    )
+    if gap < (_NEXT_MARKER_GAP_PT if reads_next else _LINE_MARKER_GAP_PT):
         return None
     return marker if marker is not None else NoteMarker(word, "", read_number(word))
 
 
-def _cut_line(line: PlacedLine) -> tuple[tuple[PlacedLine, NoteMarker | None], ...]:
+def _cut_line(
+    line: PlacedLine, value: int | None
+) -> tuple[tuple[PlacedLine, NoteMarker | None], ...]:
     """The parts of a note line, each with the marker of the note it starts,
-    the first part's None: one part when no second note starts in it."""
+    the first part's None: one part when no second note starts in it.
+    `value` is that of the note the first part belongs to, None when not
+    known."""
     words = line.line.words
     parts: list[tuple[int, NoteMarker | None]] = [(0, None)]
     for position in range(1, len(words) - 1):
+        next_value = value + 1 if value is not None else None
         marker = _line_marker(
             words[position - 1].text,
             words[position].text,
             words[position + 1].text,
             words[position].box.x0 - words[position - 1].box.x1,
+            next_value,
         )
         if marker is not None:
             parts.append((position, marker))
+            value = marker.value if marker.value is not None else next_value
     ends = (*(start for start, _ in parts[1:]), len(words))
     return tuple(
         (with_words(line, words[start:end]), marker)
@@ -253,7 +276,15 @@ def page_notes(
                     )
                 )
             )
-            parts = _cut_line(line)
+            if starts:
+                value = (
+                    marker.value
+                    if marker is not None and marker.value is not None
+                    else (expected + 1 if expected is not None else None)
+                )
+            else:
+                value = expected
+            parts = _cut_line(line, value)
             first_part, _ = parts[0]
             if starts:
                 if marker is None and (by_indent or indented):
@@ -365,7 +396,11 @@ def _valued(notes: Sequence[PageNote], numbering: Numbering) -> tuple[Footnote, 
     readings = tuple(
         note.marker.value if note.marker is not None else None for note in counted
     )
-    values = page_values(readings) if numbering is Numbering.PER_PAGE else readings
+    values = (
+        page_values(readings, tuple(note.marker is None for note in counted))
+        if numbering is Numbering.PER_PAGE
+        else readings
+    )
     return (
         (Footnote(notes[0].lines, notes[0].marker, None),) if leftover else ()
     ) + tuple(
@@ -394,7 +429,9 @@ def _reading_score(reading: int | None, value: int) -> float:
 type _Numbering = tuple[float, int, tuple[int | None, ...]]
 
 
-def page_values(readings: Sequence[int | None]) -> tuple[int | None, ...]:
+def page_values(
+    readings: Sequence[int | None], unmarked: Sequence[bool] = ()
+) -> tuple[int | None, ...]:
     """The values of a page's notes in a book numbered per page, whose
     markers read `readings`, None for one that reads no number (spec
     section 11, "Its value"): of the numberings in which each note's value
@@ -405,10 +442,15 @@ def page_values(readings: Sequence[int | None]) -> tuple[int | None, ...]:
     # The best numbering of the notes so far for each last value and number
     # of values skipped.
     states: dict[tuple[int, int], _Numbering] = {(0, 0): (0.0, 0, ())}
-    for reading in readings:
+    for place, reading in enumerate(readings):
+        skip_cost = (
+            _UNMARKED_SKIP_COST
+            if place < len(unmarked) and unmarked[place]
+            else _SKIP_COST
+        )
         following: dict[tuple[int, int], _Numbering] = {}
         for (last, skipped), (score, changes, values) in states.items():
-            left_out: _Numbering = (score - _SKIP_COST, changes - 1, (*values, None))
+            left_out: _Numbering = (score - skip_cost, changes - 1, (*values, None))
             options: list[tuple[tuple[int, int], _Numbering]] = [
                 (
                     (last + 1 + more, skipped + more),

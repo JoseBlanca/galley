@@ -45,6 +45,7 @@ from galley.structure._index_entries import with_index_breaks, with_index_entrie
 from galley.structure._lines import Piece, PlacedLine, first_word
 from galley.structure._linking import body_candidates, linked
 from galley.structure._lists import StreamPage, list_items
+from galley.structure._lone_references import lone_links
 from galley.structure._margins import (
     BesideLine,
     InNote,
@@ -561,13 +562,34 @@ def _links(
     took; with several note groups, whose headings are `group_headings`,
     each group's endnotes among the candidates of its chapter."""
     candidates = body_candidates(body)
-    footnote_links = match_footnotes(
+    footnote_notes = tuple(
+        NoteToMatch(position, first_page(note.origin), value)
+        for position, (note, value) in enumerate(zip(notes, values, strict=True))
+        if note.kind is NoteKind.FOOTNOTE and position not in uncounted
+    )
+    footnote_links = match_footnotes(footnote_notes, candidates)
+    # Spec section 11, "A lone number": a footnote's reference set apart as
+    # a word of its own.
+    taken_by_footnotes = frozenset(
+        (link.candidate.block, link.candidate.word) for link in footnote_links
+    )
+    footnote_links += lone_links(
+        footnote_notes,
         tuple(
-            NoteToMatch(position, first_page(note.origin), value)
-            for position, (note, value) in enumerate(zip(notes, values, strict=True))
-            if note.kind is NoteKind.FOOTNOTE and position not in uncounted
+            BodyWord(
+                position,
+                place,
+                block.word_pages[place],
+                word,
+                block.words[place - 1] if place > 0 else "",
+                block.words[place + 1] if place + 1 < len(block.words) else "",
+            )
+            for position, block in enumerate(body)
+            if block.kind is BlockKind.PARAGRAPH
+            for place, word in enumerate(block.words)
+            if (position, place) not in taken_by_footnotes
         ),
-        candidates,
+        footnote_links,
     )
     footnoted = frozenset(
         (link.candidate.block, link.candidate.word) for link in footnote_links
