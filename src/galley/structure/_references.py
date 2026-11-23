@@ -65,14 +65,8 @@ def pair_score(reference: Reference, note_value: int | None) -> int:
         return 0
     if reference.value == note_value:
         return _EXACT
-    candidate, note = str(reference.value), str(note_value)
-    differing = tuple(
-        frozenset((one, other))
-        for one, other in zip(candidate, note, strict=False)
-        if one != other
-    )
-    if len(candidate) == len(note) and len(differing) == 1:
-        return _CONFUSED if differing[0] in _CONFUSED_DIGITS else 0
+    if _one_digit_confused(str(reference.value), str(note_value)):
+        return _CONFUSED
     return 0
 
 
