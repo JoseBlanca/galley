@@ -2392,6 +2392,55 @@ enter the EPUB's table of contents. Not in the EPUB's table of contents
 either is a group heading, which markdown writes before its note
 (section 25; **Open 2**).
 
+**Endnotes run into the note before.** Where a note starts on a line
+of its own but no paragraph rule starts a paragraph there, its marker is
+a word inside the paragraph of the note before: Haynes sets the first
+line of a note indented, and when the note before ends with a full line
+nothing tells the paragraphs apart; Turney's OCR reads the full stop
+that ends a note after a page number as a hyphen, "p. 487-", and the
+hyphen joins that line to the next note's. Such a note is cut off the
+paragraph before it, once the section and its group headings are found,
+at a line of the section's paragraph, not its first, when:
+
+- the line's first word is the marker of the next value: the value of
+  the paragraph's note plus one, plus one more for each note already cut
+  off this paragraph, in the section's form (digits then "." or "-" in
+  a section of "N." markers, "57." or "57-"; bare digits in a section
+  whose markers are mostly bare numbers, "57");
+- the line before ends a note: its last word ends with a full stop,
+  with only closing brackets and quotation marks after it ("river.",
+  "1987).", "p. 61.", "river.\""), or is a number and a hyphen
+  ("487-");
+- the section's next marker after this paragraph does not read that
+  value, so that a note whose own paragraph follows is never made
+  twice.
+
+A number that is not the next value stays text: a line that starts
+"12." inside note 7 ("see note 12." broken before its number) is no
+note, nor is "8." in note 7 when the next paragraph starts with "8.".
+The marker must start a line: of the run-on markers found inside the
+notes of Haynes (searched for a word that reads the next value after a
+note whose next marker skips it), 51 of 53 start a line, and the 2 that
+do not have no full stop before them.
+
+Measured on 23 November 2026, structure run on copies of the runs of
+`runs/more-note-links-endnotes/`: Haynes' endnotes go from 632 to 691,
+59 cut off; the line before ended with a bracket and a full stop 17
+times, a letter and a full stop 17, a number and a full stop 16, a
+number and a hyphen 7, and a full stop and a closing quotation mark once
+(58 measured before the "N-" form was added, which added 1). Turney's
+go from 613 to 618, 5 cut off, each after a number and a hyphen.
+Gierke's go from 299 to 311, 12 cut off, each checked on the page
+images as a note that starts its own indented line. The body gains
+61 links in Haynes (2 to notes that were there before), 3 in Turney
+and 10 in Gierke, by the matching or the gap rule, each checked on the
+page images in Gierke; no link of before moves, and the four footnote
+books do not change. Where the numbers of a group still skip, the
+missing number is not in the note before as a word that starts a line:
+Haynes' 11 (between 10 and 12) and Turney's 41 and 42 (between 40 and
+43). Haynes' "37." between "56." and "58." is the misread marker of
+note 57 (the gap rule's order, above).
+
 **References.** Endnotes are numbered through the book, or through each
 group, so they are matched as in section 11, but once over the whole
 book, or once over each group, not per page: the endnotes of a group in
@@ -4335,10 +4384,11 @@ when the PDF is absent. They assert counts only, never text:
 | `running_head` removals whose first word is a chapter label word | 0 | 0 |
 | `page_number` removals at the foot | at least 14 of the 15 opening pages | (none printed) |
 | `margin_note` blocks that are a number of 1 to 3 digits | 0 | 0 |
-| endnotes, and note groups (notes with a `group`) | at least 580, 11 | at least 620, 18 |
+| endnotes, and note groups (notes with a `group`) | at least 615, 11 | at least 685, 18 |
 | endnotes linked | at least 450 | at least 550 |
 | links from a reference to a note of another group's chapter | 0 | 0 |
 | endnotes without a link (section 12, "The candidates of endnotes" and "The gap between linked neighbours") | at most 30 | at most 7 |
+| endnotes of a group whose marker's number is not the one before plus one (section 12, "Endnotes run into the note before") | at most 2 | at most 5 |
 | links whose digits are not their note's marker's number, nor the start or end of it, nor one confused digit from it (section 11, "Matching"); a marker that reads no number and a sign are not counted | 0 | 0 |
 | links of a note group whose notes' numbers, in the reading order of the links, do not rise | 0 | 0 |
 | `epigraph` blocks, and those with line feeds | 13, 0 | 21, 8 |
