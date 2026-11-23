@@ -48,8 +48,10 @@ _OPENINGS = {
     ),
 }
 # Structure spec section 26, "Whole-book tests": the endnotes, the note
-# groups (notes with a group), and the endnotes linked, at least.
-_ENDNOTES = {"turney": 580, "haynes": 620}
+# groups (notes with a group), and the endnotes linked, at least; the
+# endnotes, 618 and 691 on 23 November 2026, once the notes run into the
+# note before are cut off it (section 12).
+_ENDNOTES = {"turney": 615, "haynes": 685}
 _NOTE_GROUPS = {"turney": 11, "haynes": 18}
 _LINKED = {"turney": 450, "haynes": 550}
 # Structure spec sections 3 and 14: the words that start a chapter label.
@@ -292,6 +294,31 @@ def test_endnote_links_of_a_group_rise_in_reading_order(
         if before[0] == after[0] and after[1] <= before[1]
     )
     assert falling == ()
+
+
+# Structure spec section 26, "Whole-book tests": the endnotes whose
+# number is not the one before plus one, at most (section 12, "Endnotes run
+# into the note before"; 1 and 3 on 23 November 2026, 6 and 58 before).
+_NUMBER_SKIPS = {"turney": 2, "haynes": 5}
+
+
+@pytest.mark.parametrize("book", ["turney", "haynes"])
+def test_endnotes_whose_number_skips_number_at_most_the_target(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    numbers = tuple(
+        int(digits) if (digits := note.marker.rstrip(".-")).isdigit() else None
+        for note in _endnotes(owner_book_run(book))
+    )
+    skips = sum(
+        1
+        for before, after in itertools.pairwise(numbers)
+        if before is not None
+        and after is not None
+        and after != 1
+        and after != before + 1
+    )
+    assert skips <= _NUMBER_SKIPS[book]
 
 
 # Structure spec section 26, "Whole-book tests": the epigraphs (section 22).

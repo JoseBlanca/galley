@@ -1070,6 +1070,120 @@ def test_endnote_linked_in_the_gap_by_make_blocks() -> None:
     assert links == tuple((str(n), f"{n}.") for n in range(1, 10))
 
 
+# Spec section 12, "Endnotes run into the note before". Made-up notes in
+# Haynes' form, one group: each note's first line indented
+# 20 pt, its other lines full, its last line short; a run-on note's first
+# line is flush left after a full last line, where no paragraph starts.
+
+_FULL = "the note goes on over a full line"
+
+
+def _run_on_page(notes: tuple[tuple[str, bool], ...]) -> PageLayout:
+    """A page of notes, each (its first line's text,
+    whether it is run into the note before): a note run in has its first
+    line flush left, and the note before it ends with a full line ending
+    "here."; any other ends with a short line."""
+    lines: list[Line] = []
+    top = 50.0
+    for number, (first, run_on) in enumerate(notes):
+        following_runs_on = number + 1 < len(notes) and notes[number + 1][1]
+        lines.append(
+            _spread(first, _LEFT_PT if run_on else _LEFT_PT + 20, _RIGHT_PT, top)
+        )
+        lines.append(_spread(_FULL, _LEFT_PT, _RIGHT_PT, top + 15))
+        lines.append(
+            _spread(f"{_FULL} here.", _LEFT_PT, _RIGHT_PT, top + 30)
+            if following_runs_on
+            else _spread("line and ends.", _LEFT_PT, 150.0, top + 30)
+        )
+        top += 45
+    return PageLayout(1, (_region(*lines),), ())
+
+
+def _run_on_markers(notes: tuple[tuple[str, bool], ...]) -> tuple[str, ...]:
+    pages = (_chapter_page(0, _CHAPTERS[0]), _run_on_page(notes))
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    return tuple(marker for marker, _ in _endnotes(blocks))
+
+
+def _notes_with(run_on: dict[int, str]) -> tuple[tuple[str, bool], ...]:
+    """Notes "1." to "12.", the first line of note n replaced by
+    `run_on[n]` and run into the note before."""
+    return tuple(
+        (run_on.get(n, f"{n}. The note of its"), n in run_on) for n in range(1, 13)
+    )
+
+
+def test_note_run_into_the_note_before_is_cut_off_it() -> None:
+    notes = _notes_with({4: "4. The note of its", 5: "5. The note of its"})
+    assert _run_on_markers(notes) == tuple(f"{n}." for n in range(1, 13))
+
+
+def test_note_run_in_with_a_hyphen_marker_is_cut_off_it() -> None:
+    notes = _notes_with({4: "4- The note of its"})
+    assert _run_on_markers(notes)[:5] == ("1.", "2.", "3.", "4-", "5.")
+
+
+def test_number_that_is_not_the_next_value_stays_text_of_its_note() -> None:
+    # "40." starts a line inside note 3, where note 4 is next: it stays
+    # text of note 3, and note 4 is missing.
+    markers = _run_on_markers(_notes_with({4: "40. The note of its"}))
+    assert markers == ("1.", "2.", "3.", *(f"{n}." for n in range(5, 13)))
+
+
+def test_next_value_whose_own_paragraph_follows_stays_text() -> None:
+    # Note 3 holds a line "4." run in, and note 4 has its own paragraph
+    # after it: the line is not a second note 4.
+    notes = (
+        *_notes_with({})[:3],
+        ("4. The note of its", True),
+        *_notes_with({})[3:],
+    )
+    assert _run_on_markers(notes).count("4.") == 1
+
+
+def test_next_value_after_a_line_that_ends_no_note_stays_text() -> None:
+    # The line before "4." ends "see" with no full stop: not a note's end.
+    notes = _notes_with({4: "4. The note of its"})
+    page = _run_on_page(notes)
+    region = page.regions[0]
+    lines = list(region.lines)
+    end = next(
+        number for number, line in enumerate(lines) if line.words[0].text == "4."
+    )
+    before = lines[end - 1]
+    lines[end - 1] = _spread(
+        " ".join(word.text for word in before.words[:-1]) + " see",
+        _LEFT_PT,
+        _RIGHT_PT,
+        before.box.top,
+    )
+    pages = (
+        _chapter_page(0, _CHAPTERS[0]),
+        PageLayout(1, (_region(*lines),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert "4." not in tuple(marker for marker, _ in _endnotes(blocks))
+
+
+def test_bare_number_run_into_a_note_after_a_number_and_hyphen_is_cut_off() -> None:
+    # Turney's form: notes hung as bare numbers; note 5's number starts the
+    # line after one that ends "p. 487-", the OCR's full stop, and is not
+    # hung, so no paragraph starts there.
+    numbers = ("1", "2", "3", "4", "5", "6", "7", "8", "9")
+    lines = list(_hung_notes(numbers))
+    four = next(n for n, line in enumerate(lines) if line.words[0].text == "4")
+    five = next(n for n, line in enumerate(lines) if line.words[0].text == "5")
+    lines[five - 1] = _line("see p. 487-", _TEXT_EDGE_PT, lines[five - 1].box.top)
+    lines[five] = _line(
+        "5 Compare the note which runs", _TEXT_EDGE_PT, lines[five].box.top
+    )
+    assert four < five
+    page = PageLayout(0, (_region(*lines),), ())
+    blocks = make_blocks(_lines_of(page), _NO_WORDS, workers=1)
+    assert tuple(marker for marker, _ in _endnotes(blocks)) == numbers
+
+
 # Review of work package 3: hand-written cases for the rules the mutation
 # of the suite left alive.
 

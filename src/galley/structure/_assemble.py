@@ -37,6 +37,7 @@ from galley.structure._endnotes import (
     group_reaches,
     note_groups,
     with_group_headings_cut,
+    with_run_on_endnotes_split,
 )
 from galley.structure._figure_blocks import with_figures, with_in_page_figures
 from galley.structure._ids import numbered
@@ -838,6 +839,9 @@ def assemble(
     section = endnote_section(entries, contents_pages, body_line_pitch)
     if section is not None:
         entries = with_group_headings_cut(entries, section, body_line_pitch)
+        section = endnote_section(entries, contents_pages, body_line_pitch)
+    if section is not None:
+        entries = with_run_on_endnotes_split(entries, section)
         section = endnote_section(entries, contents_pages, body_line_pitch)
     section_pieces = frozenset(
         entries[position].piece for position in (section.paragraphs if section else ())
