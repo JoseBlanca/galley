@@ -47,6 +47,7 @@ from galley.model import (
     replaced_layer_words,
     take_out_once,
 )
+from galley.note_references import is_punctuation
 
 
 @dataclass(frozen=True, slots=True)
@@ -712,15 +713,19 @@ def _reference_problem(
 def _split_off_words(blocks: BlocksFile) -> Counter[str]:
     """The words that note_marker word changes split off the words they
     were glued to, as a multiset: every word of a change's `after` but its
-    first, and a "V" only when the part before it ends with two lower-case
-    letters ("adquesierit", "V")."""
+    first, and a "V" only off the end of a word: the part before it ends
+    with two lower-case letters and every part after it is punctuation
+    ("adquesierit", "V", ".")."""
     return Counter(
         word
         for change in blocks.word_changes
         if change.reason is ChangeReason.NOTE_MARKER
         for place, word in enumerate(change.after[1:], start=1)
         if word != _TRAILING_V
-        or _BEFORE_A_TRAILING_V.fullmatch(change.after[place - 1]) is not None
+        or (
+            _BEFORE_A_TRAILING_V.fullmatch(change.after[place - 1]) is not None
+            and all(is_punctuation(rest) for rest in change.after[place + 1 :])
+        )
     )
 
 

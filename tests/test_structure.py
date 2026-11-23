@@ -3489,9 +3489,16 @@ def test_referenced_trailing_v_stays_glued_to_its_word() -> None:
         ("here1. the fendulmV+ Then there3.", _ONE_TWO_THREE),
         # Two words for a run of one note.
         ("here1. a fendulmV b corvallV there3.", _ONE_TWO_THREE),
-        # One word for a run of two notes: a link the rule made is no
-        # neighbour, so note 2's "V" does not leave note 3 a run of one.
+        # One word for a run of two notes, at the page's end.
         ("here1. a fendulmV b", _ONE_TWO_THREE),
+        # One word for a run of two notes between notes 1 and 4. A rule that
+        # went note by note and took each link it made as the next note's
+        # neighbour would link note 2 here, the one "V" between notes 1
+        # and 4, and leave note 3; the run of two takes nothing.
+        (
+            "here1. a fendulmV b there4.",
+            ("1 One.", "2 Two.", "3 Three.", "4 Four."),
+        ),
         # The word lies before the reference of the note before the run,
         # or after that of the note after it.
         ("the fendulmV here1. there3.", _ONE_TWO_THREE),

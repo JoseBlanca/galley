@@ -743,12 +743,13 @@ def test_structure_reference_span_with_a_letter_that_was_a_whole_word_fails(
 
 
 def _trailing_letter_blocks(
-    word: str, letter: str, kind: NoteKind = NoteKind.FOOTNOTE
+    word: str, letter: str, kind: NoteKind = NoteKind.FOOTNOTE, rest: str = ""
 ) -> tuple[LinesFile, BlocksFile]:
-    """The lines "as in {word}{letter}" and the blocks whose reference span
-    is `letter`, split off the word by a note_marker change, to a note of
-    `kind` (architecture section 13: a trailing "V" to a footnote)."""
-    lines = _lines_file(((f"as in {word}{letter}", "1 A note."),))
+    """The lines "as in {word}{letter}{rest}" and the blocks whose reference
+    span is `letter`, split off the word by a note_marker change, to a note
+    of `kind` (architecture section 13: a trailing "V" to a footnote)."""
+    lines = _lines_file(((f"as in {word}{letter}{rest}", "1 A note."),))
+    rest_spans = (_span(rest),) if rest else ()
     blocks = _greece_blocks("1", referenced=True)
     return lines, replace(
         blocks,
@@ -756,42 +757,51 @@ def _trailing_letter_blocks(
             _block(
                 "b-p0000-001",
                 (0,),
-                (_span(f"as in {word}"), _span(letter, "n-p0000-001")),
+                (
+                    _span(f"as in {word}"),
+                    _span(letter, "n-p0000-001"),
+                    *rest_spans,
+                ),
             ),
         ),
         notes=(replace(blocks.notes[0], kind=kind),),
         word_changes=(
             WordChange(
                 page_index=0,
-                before=(f"{word}{letter}",),
-                after=(word, letter),
+                before=(f"{word}{letter}{rest}",),
+                after=(word, letter, *((rest,) if rest else ())),
                 reason=ChangeReason.NOTE_MARKER,
             ),
         ),
     )
 
 
-def test_structure_trailing_v_split_off_a_word_to_a_footnote_passes() -> None:
-    lines, blocks = _trailing_letter_blocks("fendulm", "V")
+@pytest.mark.parametrize("rest", ["", "."])
+def test_structure_trailing_v_split_off_a_word_to_a_footnote_passes(
+    rest: str,
+) -> None:
+    lines, blocks = _trailing_letter_blocks("fendulm", "V", rest=rest)
 
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
 @pytest.mark.parametrize(
-    ("word", "letter", "kind", "problem"),
+    ("word", "letter", "kind", "rest", "problem"),
     [
         # To an endnote; another letter; a "V" after a capital word or a
-        # word of one letter, as "XV" or "IV" would be.
-        ("fendulm", "V", NoteKind.ENDNOTE, "does not have a marker's shape"),
-        ("fendulm", "W", NoteKind.FOOTNOTE, "does not have a marker's shape"),
-        ("QX", "V", NoteKind.FOOTNOTE, "was not split off a word"),
-        ("d", "V", NoteKind.FOOTNOTE, "was not split off a word"),
+        # word of one letter, as "XV" or "IV" would be; a "V" from the
+        # middle of a word, with letters after it.
+        ("fendulm", "V", NoteKind.ENDNOTE, "", "does not have a marker's shape"),
+        ("fendulm", "W", NoteKind.FOOTNOTE, "", "does not have a marker's shape"),
+        ("QX", "V", NoteKind.FOOTNOTE, "", "was not split off a word"),
+        ("d", "V", NoteKind.FOOTNOTE, "", "was not split off a word"),
+        ("fendulm", "V", NoteKind.FOOTNOTE, "ille", "was not split off a word"),
     ],
 )
 def test_structure_trailing_letter_outside_the_exception_fails(
-    word: str, letter: str, kind: NoteKind, problem: str
+    word: str, letter: str, kind: NoteKind, rest: str, problem: str
 ) -> None:
-    lines, blocks = _trailing_letter_blocks(word, letter, kind)
+    lines, blocks = _trailing_letter_blocks(word, letter, kind, rest)
 
     with pytest.raises(FidelityError) as raised:
         check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
