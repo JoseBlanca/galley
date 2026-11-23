@@ -1946,6 +1946,24 @@ the "«" glued to the note before it stays, so the cut note would take
 the value of the glued one and its reference; and on page 500 a "." after
 a wide gap would take note 5's value.
 
+A row of notes set in columns is cut too (added on 23 November 2026,
+plan more-note-links, task 5.1). Kadesh sets its notes in two or three
+columns, and layout reads a row across them as one line, so a note that
+tops the second or third column starts inside the first line of a band
+region. On that line, the top of the region's columns, a word with a
+note marker's form whose marker is 1 to 3 digits ("83", "176"), after a
+gap of at least 20 pt from the word before, the gap between columns,
+and before a word that starts with a capital, starts a note, whatever
+the word before ends with: on Kadesh's page 32 "83" tops the right
+column 23 pt after "It", the last word of the left column's first line,
+and on page 66 "176" and "178" have three digits. Kadesh's footnotes go
+from 183 to 186, and "vizier83" on page 32 now links to its note 83, as
+the page image shows; the other seven whole books' `blocks.json` are
+unchanged. Each later line of such a row stays in the note its first
+word belongs to, columns and all: page 32's second line, "will be
+discussed later. … original has", the ends of notes 82 and 83, is all in
+note 83, where before both notes were one.
+
 A band block whose first line starts no note is part of the note before
 it on the same page (the rest of a note in the second column, whose
 first line is not indented, or a table that the centring rule of
@@ -1983,7 +2001,17 @@ III.'s day" on Kadesh page 8 and "3 See e.g. D. B." on Domesday page
 taken for a word once the text layer read "I n" as "In", a known word.
 A note takes as its marker the signs too, when the word is 1 or 2 of the
 signs above glued to a word that starts with a capital ("'There" on Kadesh page 8: the
-marker is "'" and the text starts with "There"). Otherwise the note has
+marker is "'" and the text starts with "There"). So does the page's first
+note when its first line is a row of notes, a second note starting in
+it ("Two notes on one line"), indented or not, so that it continues no
+note of the page before (below, "A note that runs over a page break"):
+Kadesh's page 29 is one row of three notes, and its first, 72, reads
+'"Ip. ett. p. 168.' for "Op. cit., p. 168."; it was joined to page 28's
+note 71, and is now a note of its own, one of Kadesh's 187 (added on 23
+November 2026, plan more-note-links, task 5.1). Of the pages of the
+eight whole books whose first note could continue one of the page
+before, it is the only one whose first word has that form. A first note
+of one line, alone, keeps a quotation mark that starts it in its text. Otherwise the note has
 no marker: `marker` is empty and every word stays in its text.
 
 The marker is taken out of the note's first block into `marker`, as the
