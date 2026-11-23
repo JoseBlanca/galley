@@ -493,7 +493,8 @@ def gap_links(
     words of `words` between those two references that `gap_reference`
     reads as a reference to one of the run's notes, when there are exactly
     k of them and the i-th reads as the i-th note's. `words` are the
-    group's chapter's words in reading order, none of them linked; a link
+    group's chapter's words in reading order, which may hold the words
+    `links` took: those lie at the ends of the gaps, never inside; a link
     made here is never a neighbour of another. `links` are expected in the
     reading order of their notes' values, as the matching makes them; a
     run whose first reference does not come before its second takes

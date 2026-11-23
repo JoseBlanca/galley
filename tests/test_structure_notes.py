@@ -20,12 +20,14 @@ from galley.model import (
     Line,
     LinesFile,
     NoteKind,
+    Origin,
     PageLayout,
     Region,
     Word,
     block_text,
 )
 from galley.structure import make_blocks, reference_candidate
+from galley.structure._assemble import _links
 from galley.structure._endnotes import group_reaches
 from galley.structure._markers import Reference, ReferenceForm, endnote_candidate
 from galley.structure._references import (
@@ -38,6 +40,7 @@ from galley.structure._references import (
     match_endnotes,
     with_values_in_order,
 )
+from galley.structure._unnumbered import Unnumbered, UnnumberedNote
 
 _HASH = "a" * 64
 _NO_WORDS: frozenset[str] = frozenset()
@@ -824,6 +827,7 @@ def test_endnote_reference_standing_for_a_lost_note_stays_unlinked() -> None:
         ("[1862]).38", ("[1862]).", "38", "")),
         ("5)16", ("5)", "16", "")),
         ("(1936)41", ("(1936)", "41", "")),
+        ("[1862]38", ("[1862]", "38", "")),
         # Followed by a dash and a word.
         ("river20\u2014and", ("river", "20", "\u2014and")),
         ("rivers?25\u2014Then", ("rivers?", "25", "\u2014Then")),
@@ -851,6 +855,8 @@ def test_endnote_candidate_of_each_form_splits_off_its_number(
         "4.6",  # a decimal
         "14.9.73",  # a date
         "19731",  # a year with no punctuation before the number
+        "12345.6",  # five digits are no year
+        "river20\u20141914",  # a dash and a number, not a word
         "1914-18",  # a range
         "1914\u201318",
         "(612-19)",
@@ -930,16 +936,15 @@ def _gap_words(text: str) -> tuple[BodyWord, ...]:
     )
 
 
-def _gap_linked(
+def _gap_made(
     text: str,
     values: tuple[int, ...] = (6, 7, 8),
     linked: tuple[int, ...] = (6, 8),
     signs: frozenset[str] = _CURLY_BOOK,
-) -> tuple[tuple[str, int], ...]:
-    """Each link made in the gap: the linked word's text and the note's
-    value, for notes of `values` of which those of `linked` are linked, the
-    first in block 0 and the others in block 2, around the words of
-    `text`."""
+) -> tuple[Link, ...]:
+    """The links made in the gap, for notes of `values` of which those of
+    `linked` are linked, the first in block 0 and the others in block 2,
+    around the words of `text`."""
     notes = tuple(
         NoteToMatch(position, 9, value) for position, value in enumerate(values)
     )
@@ -953,10 +958,21 @@ def _gap_linked(
             if value in linked
         )
     )
+    return gap_links(notes, _gap_words(text), links, signs)
+
+
+def _gap_linked(
+    text: str,
+    values: tuple[int, ...] = (6, 7, 8),
+    linked: tuple[int, ...] = (6, 8),
+    signs: frozenset[str] = _CURLY_BOOK,
+) -> tuple[tuple[str, int], ...]:
+    """Each link `_gap_made` makes: the linked word's text and the note's
+    value."""
     words = _gap_words(text)
     return tuple(
         (words[link.candidate.word].text, values[link.note])
-        for link in gap_links(notes, words, links, signs)
+        for link in _gap_made(text, values, linked, signs)
     )
 
 
@@ -1043,6 +1059,116 @@ def test_gap_needs_both_neighbours_linked_by_the_matching() -> None:
     assert _gap_linked("the river 7 then ran", (6, 7, 8, 9), (6,)) == ()
 
 
+def test_gap_run_whose_words_read_out_of_order_stays_unlinked() -> None:
+    # Two words for notes 6 and 7, but the first reads only as 7.
+    values, linked = (5, 6, 7, 8), (5, 8)
+    assert _gap_linked('the river ran.7 Then it ran." So', values, linked) == ()
+
+
+def test_gap_digits_of_another_length_never_read_as_one_confused_digit() -> None:
+    # "18" against 137: 8 and 3 are confused, but the lengths differ.
+    assert _gap_linked("the river ran.18 Then", (136, 137, 138), (136, 138)) == ()
+
+
+def test_gap_sign_read_is_the_last_of_the_word() -> None:
+    made = _gap_made("the river ran.\"' Then")
+    assert tuple(link.candidate.reference.reference for link in made) == ("'",)
+
+
+def test_gap_sign_with_a_symbol_after_it_is_no_reading() -> None:
+    assert _gap_linked('the river ran."\u00a3 Then') == ()
+
+
+# Spec section 12, "The gap between linked neighbours": which words of the
+# body the gap rule looks at, through the links of the body's blocks.
+
+
+def _block(
+    kind: BlockKind, text: str, page: int = 5, level: int | None = None
+) -> Unnumbered:
+    words = tuple(text.split(" "))
+    return Unnumbered(
+        kind=kind,
+        words=words,
+        word_pages=(page,) * len(words),
+        origin=(Origin(page, Box(50.0, 50.0, 300.0, 60.0)),),
+        changes=(),
+        level=level,
+    )
+
+
+def _note(kind: NoteKind, marker: str, page: int = 9) -> UnnumberedNote:
+    return UnnumberedNote(
+        kind, marker, (), (Origin(page, Box(50.0, 50.0, 300.0, 60.0)),), False
+    )
+
+
+def _body_links(
+    gap: Unnumbered,
+    values: tuple[int, ...] = (6, 7, 8),
+    footnote: bool = False,
+    last_contents_page: int = -1,
+) -> tuple[tuple[str, str], ...]:
+    """The links of a chapter whose paragraphs end with references to
+    endnotes 6 and 8 around `gap`, as (the linked word, the note's
+    marker); with `footnote`, a footnote of value 7 on the gap's page."""
+    body = (
+        _block(BlockKind.HEADING, "Chapter One", level=1),
+        _block(BlockKind.PARAGRAPH, "the river ran word6. and on"),
+        gap,
+        _block(BlockKind.PARAGRAPH, "the river ran word8. and on"),
+    )
+    notes = tuple(_note(NoteKind.ENDNOTE, f"{value}.") for value in values)
+    note_values: tuple[int | None, ...] = values
+    groups: tuple[int | None, ...] = (0,) * len(values)
+    if footnote:
+        notes = (*notes, _note(NoteKind.FOOTNOTE, "7", gap.word_pages[0]))
+        note_values, groups = (*values, 7), (*groups, None)
+    links = _links(
+        body,
+        notes,
+        note_values,
+        groups,
+        ("Chapter One",),
+        len(body),
+        last_contents_page,
+    )
+    return tuple(
+        (body[link.candidate.block].words[link.candidate.word], notes[link.note].marker)
+        for link in links
+    )
+
+
+def test_gap_rule_links_a_lone_number_of_a_paragraph() -> None:
+    gap = _block(BlockKind.PARAGRAPH, "the river 7 then ran")
+    assert ("7", "7.") in _body_links(gap)
+
+
+@pytest.mark.parametrize(
+    ("kind", "level"), [(BlockKind.HEADING, 2), (BlockKind.QUOTE, None)]
+)
+def test_gap_rule_does_not_look_in_a_heading_or_a_quote(
+    kind: BlockKind, level: int | None
+) -> None:
+    gap = _block(kind, "the river 7 then ran", level=level)
+    assert ("7", "7.") not in _body_links(gap)
+
+
+def test_gap_rule_does_not_look_on_a_contents_page() -> None:
+    gap = _block(BlockKind.PARAGRAPH, "the river 7 then ran", page=3)
+    assert ("7", "7.") not in _body_links(gap, last_contents_page=4)
+
+
+def test_gap_rule_does_not_take_a_footnotes_reference() -> None:
+    gap = _block(BlockKind.PARAGRAPH, "the river ran7. then")
+    assert _body_links(gap, footnote=True).count(("ran7.", "7.")) == 0
+
+
+def test_gap_rule_matches_a_note_out_of_order_by_its_place() -> None:
+    gap = _block(BlockKind.PARAGRAPH, "the river ran word7. then")
+    assert ("word7.", "37.") in _body_links(gap, values=(6, 37, 8))
+
+
 def _out_of_order_links(places: dict[int, int]) -> tuple[Link, ...]:
     """Links of the notes of values 11 to 16 (positions 0 to 5) by value,
     each at a word of block 1 by place."""
@@ -1124,11 +1250,13 @@ def test_endnote_linked_in_the_gap_by_make_blocks() -> None:
 _FULL = "the note goes on over a full line"
 
 
-def _run_on_page(notes: tuple[tuple[str, bool], ...]) -> PageLayout:
+def _run_on_page(
+    notes: tuple[tuple[str, bool], ...], ending: str = "here."
+) -> PageLayout:
     """A page of notes, each (its first line's text,
     whether it is run into the note before): a note run in has its first
     line flush left, and the note before it ends with a full line ending
-    "here."; any other ends with a short line."""
+    with the word `ending`; any other ends with a short line."""
     lines: list[Line] = []
     top = 50.0
     for number, (first, run_on) in enumerate(notes):
@@ -1138,7 +1266,7 @@ def _run_on_page(notes: tuple[tuple[str, bool], ...]) -> PageLayout:
         )
         lines.append(_spread(_FULL, _LEFT_PT, _RIGHT_PT, top + 15))
         lines.append(
-            _spread(f"{_FULL} here.", _LEFT_PT, _RIGHT_PT, top + 30)
+            _spread(f"{_FULL} {ending}", _LEFT_PT, _RIGHT_PT, top + 30)
             if following_runs_on
             else _spread("line and ends.", _LEFT_PT, 150.0, top + 30)
         )
@@ -1146,8 +1274,10 @@ def _run_on_page(notes: tuple[tuple[str, bool], ...]) -> PageLayout:
     return PageLayout(1, (_region(*lines),), ())
 
 
-def _run_on_markers(notes: tuple[tuple[str, bool], ...]) -> tuple[str, ...]:
-    pages = (_chapter_page(0, _CHAPTERS[0]), _run_on_page(notes))
+def _run_on_markers(
+    notes: tuple[tuple[str, bool], ...], ending: str = "here."
+) -> tuple[str, ...]:
+    pages = (_chapter_page(0, _CHAPTERS[0]), _run_on_page(notes, ending))
     blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     return tuple(marker for marker, _ in _endnotes(blocks))
 
@@ -1210,6 +1340,65 @@ def test_next_value_after_a_line_that_ends_no_note_stays_text() -> None:
     )
     blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
     assert "4." not in tuple(marker for marker, _ in _endnotes(blocks))
+
+
+def test_note_run_in_after_a_full_stop_and_a_closing_quote_is_cut_off() -> None:
+    notes = _notes_with({4: "4. The note of its"})
+    assert "4." in _run_on_markers(notes, ending='here."')
+
+
+def test_note_run_in_after_a_word_broken_by_a_hyphen_stays_text() -> None:
+    notes = _notes_with({4: "4. The note of its"})
+    assert "4." not in _run_on_markers(notes, ending="con-")
+
+
+def test_bare_number_run_into_a_section_of_dotted_markers_stays_text() -> None:
+    # Not cut off: note 3 stays one paragraph, the bare "4" inside it.
+    notes = _notes_with({4: "4 The note of its"})
+    pages = (_chapter_page(0, _CHAPTERS[0]), _run_on_page(notes))
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    third = next(text for marker, text in _endnotes(blocks) if marker == "3.")
+    assert " / " not in third
+    assert " 4 The note of its " in third
+
+
+def test_note_run_into_a_later_paragraph_takes_the_value_after_a_cut() -> None:
+    # Note 3, then "4." run into it, then a paragraph of note 4 without a
+    # marker (indented) into which "5." runs: 5 is the next value there.
+    lines: list[Line] = []
+    top = 50.0
+    for number in (1, 2):
+        lines += [
+            _spread(f"{number}. The note of its", _LEFT_PT + 20, _RIGHT_PT, top),
+            _spread("line and ends.", _LEFT_PT, 150.0, top + 15),
+        ]
+        top += 30
+    # Note 4's paragraph ends with a short line, so that the indented line
+    # after it starts a paragraph of its own.
+    for first, indent, full in (
+        ("3. The note of its", 20, True),
+        ("4. The note of its", 0, False),
+        ("And it goes on", 20, True),
+        ("5. The note of its", 0, False),
+    ):
+        lines += [
+            _spread(first, _LEFT_PT + indent, _RIGHT_PT, top),
+            _spread(f"{_FULL} here.", _LEFT_PT, _RIGHT_PT, top + 15)
+            if full
+            else _spread("line and ends.", _LEFT_PT, 150.0, top + 15),
+        ]
+        top += 30
+    for number in range(6, 13):
+        lines += [
+            _spread(f"{number}. The note of its", _LEFT_PT + 20, _RIGHT_PT, top),
+            _spread("line and ends.", _LEFT_PT, 150.0, top + 15),
+        ]
+        top += 30
+    pages = (_chapter_page(0, _CHAPTERS[0]), PageLayout(1, (_region(*lines),), ()))
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    assert tuple(marker for marker, _ in _endnotes(blocks)) == tuple(
+        f"{n}." for n in range(1, 13)
+    )
 
 
 def test_bare_number_run_into_a_note_after_a_number_and_hyphen_is_cut_off() -> None:
