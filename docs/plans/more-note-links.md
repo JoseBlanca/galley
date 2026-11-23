@@ -91,7 +91,7 @@ Deliverables:
    reference is right rise from 1,307 by about 107–126, the other books'
    counts do not fall.
 
-- [ ] 1.1 The fix, its test and the remeasure.
+- [x] 1.1 The fix, its test and the remeasure.
 
 ## 2. Endnote references in the owner's books
 
