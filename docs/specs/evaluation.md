@@ -879,18 +879,24 @@ These are scored at blocks and markdown.
   For a note found `as_note`, its reference is right when one of
   galley's note references to that note, mapped onto the gaps between the reference's
   tokens through the alignment, is within 3 tokens of the gap where
-  Gutenberg's reference is. A galley reference with no token after it
-  in its block that is aligned to the body, at the block's end or before
-  a closing "." the alignment counts as extra, maps onto the gap after
-  the reference token of the block's last aligned body token, not
-  before the next aligned token: a margin note that follows the block
-  in the reference would otherwise lie between the two. On Domesday's
-  output of 23 November 2026 this made 103 more references right, 102
-  of the 107 that an earlier count found past a margin note; 18 right
-  references in tables and quoted lists, where the alignment of the
-  block's own tokens is off, are still scored wrong. When no token of
-  the block is aligned to the body, the reference maps before the next
-  aligned body token.
+  Gutenberg's reference is. A galley reference maps onto the gap after
+  the reference token of the last token before it in its block that is
+  aligned to a token of the reference's body that is not in a margin
+  note (nor in a note, outside the body); only when no token before it in
+  its block is so aligned does it map before the next aligned body
+  token. The word a reference follows is the one it belongs to: mapped
+  before the next aligned token, a reference at a block's end lies past
+  a margin note that follows the block in the reference, and one inside
+  a block lies past any tokens after it that the alignment counts as
+  extra or puts elsewhere. On Domesday's output of 23 November 2026 the
+  first form of this rule, which looked back only when no token after
+  the reference was aligned, made 103 more references right, 102 of the
+  107 that an earlier count found past a margin note; looking back
+  always made 22 more right (1,432 against 1,410), and lost none. At
+  each of the 22 the gap it gives is Gutenberg's own, and on 6 of them
+  checked on the page images (pages 66, 87, 105, 256, 387, 449) galley's
+  link is on the word that carries the printed reference. Haskins' 66
+  right references do not change.
 - **Margin notes.** Each reference margin note is `as_margin_note`,
   `in_body` or `missing`, by the same rule. Its position is right when
   galley's margin note comes just before the block that holds the first
