@@ -45,6 +45,9 @@ _LINE_MARKER_MAX_CHARACTERS = 2
 _ONE_LETTER_WORDS = frozenset({"A", "I"})
 _LINE_MARKER_GAP_PT = 10.0
 _NEXT_MARKER_GAP_PT = 8.0
+# Spec section 11, "Two notes on one line": also the gap between the
+# columns of a row of notes, 23 to 37 pt before the markers that top
+# Kadesh's columns on its pages 32 and 66.
 _WIDE_GAP_PT = 20.0
 _ENDS_BEFORE_A_NOTE = (".", "'", "’", ":", ";", ")")
 # Spec section 11, "Its value": the scores of a page's numbering. A
@@ -88,6 +91,13 @@ class Footnote:
     counted: bool = True
 
 
+class _LinePlace(StrEnum):
+    """Where a note line is in its band region."""
+
+    TOP = "the region's first line"
+    BELOW_THE_TOP = "a later line"
+
+
 def _column_left(line: PlacedLine, lines: Sequence[PlacedLine]) -> float:
     """The band's left edge for `line` (spec section 11, rule 2)."""
     return min(
@@ -127,13 +137,29 @@ def _indent_marker(
 
 
 def _line_marker(
-    before: str, word: str, after: str, gap: float, next_value: int | None
+    before: str,
+    word: str,
+    after: str,
+    gap: float,
+    next_value: int | None,
+    place: _LinePlace,
 ) -> NoteMarker | None:
     """The marker of a second note that starts at `word` inside a note
     line, between the words `before` and `after`, `gap` points after
     `before`, where the next note's value would be `next_value`; None when
-    no note starts there (spec section 11, "Two notes on one line")."""
+    no note starts there (spec section 11, "Two notes on one line"). On
+    the first line of a band region, `place` `TOP`, a number after a
+    column's gap starts a note whatever `before` ends with."""
     marker = note_marker(word)
+    if (
+        place is _LinePlace.TOP
+        and gap >= _WIDE_GAP_PT
+        and marker is not None
+        and marker.value is not None
+        and marker.marker.rstrip(".").isdigit()
+        and after[:1].isupper()
+    ):
+        return marker
     lone_letter = len(word) == 1 and word.isalpha() and word.islower()
     if not before.endswith(_ENDS_BEFORE_A_NOTE) or not after:
         return None
@@ -158,12 +184,12 @@ def _line_marker(
 
 
 def _cut_line(
-    line: PlacedLine, value: int | None
+    line: PlacedLine, value: int | None, place: _LinePlace
 ) -> tuple[tuple[PlacedLine, NoteMarker | None], ...]:
     """The parts of a note line, each with the marker of the note it starts,
     the first part's None: one part when no second note starts in it.
     `value` is that of the note the first part belongs to, None when not
-    known."""
+    known; `place` says whether the line is the first of its region."""
     words = line.line.words
     parts: list[tuple[int, NoteMarker | None]] = [(0, None)]
     for position in range(1, len(words) - 1):
@@ -174,6 +200,7 @@ def _cut_line(
             words[position + 1].text,
             words[position].box.x0 - words[position - 1].box.x1,
             next_value,
+            place,
         )
         if marker is not None:
             parts.append((position, marker))
@@ -239,7 +266,11 @@ def page_notes(
     more than the last number the page's markers read plus the notes
     after it; or when its first word is a marker of one character under a
     short line (rule 5, `_under_a_short_line`). A word inside a line
-    can start a note too ("Two notes on one line"). Any other line, the
+    can start a note too ("Two notes on one line"), on a region's first
+    line a number after the gap between columns whatever comes before it.
+    The page's first note, when its first line is a row of notes, takes
+    signs glued to its first word as its marker ("The marker of a note"),
+    and so continues no note of the page before. Any other line, the
     first of a later region too, is part of the note before. The page's
     first line always starts a note, and so does the first line of a later
     region indented 5 to 40 pt against its column (rule 4)."""
@@ -284,11 +315,17 @@ def page_notes(
                 )
             else:
                 value = expected
-            parts = _cut_line(line, value)
+            parts = _cut_line(
+                line,
+                value,
+                _LinePlace.TOP if number == 0 else _LinePlace.BELOW_THE_TOP,
+            )
             first_part, _ = parts[0]
             if starts:
                 if marker is None and (by_indent or indented):
                     marker = _indent_marker(line, lower_case_words)
+                if marker is None and not notes and len(parts) > 1:
+                    marker = glued_sign_marker(word)
                 notes.append(
                     PageNote(
                         (first_part,),

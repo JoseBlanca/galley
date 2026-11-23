@@ -2669,6 +2669,104 @@ def test_footnote_number_after_a_wide_gap_starts_a_note_whatever_follows() -> No
     assert _markers_and_texts(blocks) == (("5", "D. b."), ("6", "gee e.g."))
 
 
+def test_footnote_number_at_the_top_of_a_column_starts_a_note() -> None:
+    # Kadesh's page 66: the band's first line runs over three columns,
+    # "176" 27 pt after "394." and "178", of three digits, 37 pt after
+    # "395."; the second line's "177" opens no column and its line's
+    # "Eg." ends no sentence, so its "city" stays in note 177.
+    first = _placed_line(
+        300,
+        ("175", 60, 70),
+        ("Maspero,", 72, 110),
+        ("p.", 112, 118),
+        ("394.", 120, 152),
+        ("176", 180, 190),
+        ("Ibid.,", 192, 215),
+        ("395.", 217, 227),
+        ("178", 264, 274),
+        ("In", 276, 284),
+        ("accordance", 286, 330),
+    )
+    second = _placed_line(
+        300 + _NOTE_PITCH_PT,
+        ("177", 60, 70),
+        ("Around", 72, 100),
+        ("Eg.", 230, 245),
+        ("city", 268, 285),
+        ("on", 287, 297),
+    )
+    third = _placed_line(300 + 2 * _NOTE_PITCH_PT, ("Inscr.,", 48, 70))
+    blocks = make_blocks(
+        _lines_of(_page_with_band(0, first, second, third)), _NO_WORDS, workers=1
+    )
+    assert _markers_and_texts(blocks) == (
+        ("175", "Maspero, p. 394."),
+        ("176", "Ibid., 395."),
+        ("178", "In accordance"),
+        ("177", "Around Eg. city on Inscr.,"),
+    )
+
+
+@pytest.mark.parametrize(
+    ("line_number", "gap", "after", "notes"),
+    [
+        (0, 23.0, "Read", 2),
+        (0, 19.0, "Read", 1),
+        (0, 23.0, "read", 1),
+        (1, 23.0, "Read", 1),
+    ],
+)
+def test_footnote_number_after_no_full_stop_needs_a_column_top(
+    line_number: int, gap: float, after: str, notes: int
+) -> None:
+    # Kadesh's page 32: "83" tops the right column 23 pt after "It", which
+    # ends no sentence; on a later line, after a narrower gap or before a
+    # word in lower case it starts no note.
+    lines = [
+        _placed_line(300, ("82", 60, 70), ("The", 72, 90), ("variant", 92, 130)),
+        _placed_line(300 + _NOTE_PITCH_PT, ("is", 60, 70), ("It", 72, 80)),
+    ]
+    words = lines[line_number].words
+    end = words[-1].box.x1
+    lines[line_number] = _placed_line(
+        300 + line_number * _NOTE_PITCH_PT,
+        *((word.text, word.box.x0, word.box.x1) for word in words),
+        ("83", end + gap, end + gap + 10),
+        (after, end + gap + 12, end + gap + 30),
+    )
+    blocks = make_blocks(_lines_of(_page_with_band(0, *lines)), _NO_WORDS, workers=1)
+    assert len(blocks.notes) == notes
+
+
+def test_footnote_page_first_note_with_a_glued_sign_continues_no_note() -> None:
+    # Kadesh's page 29: the band is one row of three notes, the first's
+    # "72" read as a quotation mark glued to "Ip." ("Op."); it is a note of
+    # its own, not the end of page 28's note 71.
+    before = _page_with_band(
+        0,
+        _note_line("70 Op. cit., p. 540.", 300, 62, 160),
+        _note_line("71 Op. cit., p. 161.", 300 + _NOTE_PITCH_PT, 62, 160),
+    )
+    row = _placed_line(
+        300,
+        ('"Ip.', 69, 80),
+        ("ett.", 82, 95),
+        ("p.", 97, 103),
+        ("168.", 105, 121),
+        ("73", 184, 192),
+        ("Op.", 194, 205),
+    )
+    blocks = make_blocks(
+        _lines_of(before, _page_with_band(1, row)), _NO_WORDS, workers=1
+    )
+    assert _markers_and_texts(blocks) == (
+        ("70", "Op. cit., p. 540."),
+        ("71", "Op. cit., p. 161."),
+        ('"', "Ip. ett. p. 168."),
+        ("73", "Op."),
+    )
+
+
 def test_footnote_next_marker_after_a_gap_of_9_pt_starts_a_note() -> None:
     # "5" reads the value after "4", 9 pt after "Poiwic." (page 134); "7",
     # which does not, stays at 9 pt.

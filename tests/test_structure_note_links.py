@@ -8,6 +8,8 @@ its file in tests/fixtures/expected/more_note_links/, read from the page
 rendered at 200 dpi."""
 
 import json
+from collections.abc import Callable, Sequence
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -130,3 +132,36 @@ def test_reference_the_ocr_glued_misread_or_set_apart_links_its_note(
         linked = _links_to(blocks, page, word, reference)
         assert len(linked) == 1, (word, reference)
         assert linked[0].startswith(note_starts)
+
+
+@pytest.mark.tesseract
+def test_note_at_the_top_of_a_column_after_no_full_stop_is_a_note_of_its_own(
+    redo_excerpt_run: Callable[[str], BookFolder],
+) -> None:
+    # Kadesh's page 32, kadesh_redo's page 9 (work package 5): "83" tops
+    # the band's right column 23 pt after "It", which ends no sentence.
+    blocks = read_blocks(redo_excerpt_run("kadesh_redo").blocks_json)
+    printed = _expected("kadesh_redo", 9)["notes"]
+    texts = tuple(note["text"] for note in printed)
+    found = tuple(
+        printed[_most_alike(text, texts)]["number"] for text in _page_notes(blocks, 9)
+    )
+    assert found == ("82", "83")
+
+
+# The characters of a note's start compared: "Read the above is a" for
+# "Read t't; the above is a".
+_START_CHARACTERS = 20
+
+
+def _most_alike(text: str, printed: Sequence[str]) -> int:
+    """The position in `printed` of the note whose start is most alike that
+    of `text`."""
+    return max(
+        range(len(printed)),
+        key=lambda place: SequenceMatcher(
+            None,
+            text[:_START_CHARACTERS].lower(),
+            printed[place][:_START_CHARACTERS].lower(),
+        ).ratio(),
+    )
