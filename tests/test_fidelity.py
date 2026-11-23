@@ -647,7 +647,8 @@ def test_structure_reference_span_land_fails_as_no_marker_shape() -> None:
     assert raised.value.detail == (
         "block b-p0000-001: the note reference span 'land' does not have a "
         "marker's shape (1 to 4 characters, at most 3 letters or digits, no "
-        "white space, '&' or dash, and a letter only beside a round bracket)"
+        "white space, '&' or dash, and a letter only beside a round bracket, "
+        "or a trailing 'V' to a footnote)"
     )
 
 
@@ -739,6 +740,75 @@ def test_structure_reference_span_with_a_letter_that_was_a_whole_word_fails(
         f"block b-p0000-001: the note reference span {reference!r} holds a "
         "letter but was not split off a word by a note_marker word change"
     )
+
+
+def _trailing_letter_blocks(
+    word: str, letter: str, kind: NoteKind = NoteKind.FOOTNOTE
+) -> tuple[LinesFile, BlocksFile]:
+    """The lines "as in {word}{letter}" and the blocks whose reference span
+    is `letter`, split off the word by a note_marker change, to a note of
+    `kind` (architecture section 13: a trailing "V" to a footnote)."""
+    lines = _lines_file(((f"as in {word}{letter}", "1 A note."),))
+    blocks = _greece_blocks("1", referenced=True)
+    return lines, replace(
+        blocks,
+        blocks=(
+            _block(
+                "b-p0000-001",
+                (0,),
+                (_span(f"as in {word}"), _span(letter, "n-p0000-001")),
+            ),
+        ),
+        notes=(replace(blocks.notes[0], kind=kind),),
+        word_changes=(
+            WordChange(
+                page_index=0,
+                before=(f"{word}{letter}",),
+                after=(word, letter),
+                reason=ChangeReason.NOTE_MARKER,
+            ),
+        ),
+    )
+
+
+def test_structure_trailing_v_split_off_a_word_to_a_footnote_passes() -> None:
+    lines, blocks = _trailing_letter_blocks("fendulm", "V")
+
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+@pytest.mark.parametrize(
+    ("word", "letter", "kind", "problem"),
+    [
+        # To an endnote; another letter; a "V" after a capital word or a
+        # word of one letter, as "XV" or "IV" would be.
+        ("fendulm", "V", NoteKind.ENDNOTE, "does not have a marker's shape"),
+        ("fendulm", "W", NoteKind.FOOTNOTE, "does not have a marker's shape"),
+        ("QX", "V", NoteKind.FOOTNOTE, "was not split off a word"),
+        ("d", "V", NoteKind.FOOTNOTE, "was not split off a word"),
+    ],
+)
+def test_structure_trailing_letter_outside_the_exception_fails(
+    word: str, letter: str, kind: NoteKind, problem: str
+) -> None:
+    lines, blocks = _trailing_letter_blocks(word, letter, kind)
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert f"span {letter!r} " in raised.value.detail
+    assert problem in raised.value.detail
+
+
+def test_structure_trailing_v_that_was_a_whole_word_fails() -> None:
+    lines = _lines_file((("as in fendulm V", "1 A note."),))
+    _, blocks = _trailing_letter_blocks("fendulm", "V")
+    blocks = replace(blocks, word_changes=())
+
+    with pytest.raises(FidelityError) as raised:
+        check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+    assert "span 'V' holds a letter but was not split off" in raised.value.detail
 
 
 def test_structure_two_spans_with_a_letter_and_one_split_off_fails() -> None:

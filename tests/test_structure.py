@@ -3427,6 +3427,90 @@ def test_referenced_lone_reference_is_written_against_the_word_before(
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+# Spec section 11, "A trailing V": the notes and body words of a page, made
+# up, and the references they give.
+_ONE_TWO_THREE = ("1 One.", "2 Two.", "3 Three.")
+
+
+@pytest.mark.parametrize(
+    ("body_words", "notes", "references"),
+    [
+        # Between two linked notes, before the page's end, after its start.
+        (
+            "here1. the fendulmV. Then there3.",
+            _ONE_TWO_THREE,
+            (("1", "1"), ("V", "2"), ("3", "3")),
+        ),
+        ("here1. the fendulmV Then", ("1 One.", "2 Two."), (("1", "1"), ("V", "2"))),
+        ("the fendulmV then there2.", ("1 One.", "2 Two."), (("V", "1"), ("2", "2"))),
+        # A run of two notes, two words.
+        (
+            "here1. a fendulmV b corvallV, c there4.",
+            ("1 One.", "2 Two.", "3 Three.", "4 Four."),
+            (("1", "1"), ("V", "2"), ("V", "3"), ("4", "4")),
+        ),
+    ],
+)
+def test_referenced_trailing_v_between_linked_neighbours_is_linked(
+    body_words: str, notes: tuple[str, ...], references: tuple[tuple[str, str], ...]
+) -> None:
+    lines = _lines_of(_referenced_page(0, body_words, *notes))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert _references(blocks) == references
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_referenced_trailing_v_stays_glued_to_its_word() -> None:
+    lines = _lines_of(
+        _referenced_page(0, "here1. the fendulmV. Then there3.", *_ONE_TWO_THREE)
+    )
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    spans = tuple(span.text for span in blocks.blocks[0].spans)
+    place = spans.index("V")
+    assert spans[place - 1].endswith(". the fendulm")
+    assert spans[place + 1] == ". Then there"
+    assert (
+        WordChange(
+            page_index=0,
+            before=("fendulmV.",),
+            after=("fendulm", "V", "."),
+            reason=ChangeReason.NOTE_MARKER,
+        )
+        in blocks.word_changes
+    )
+
+
+@pytest.mark.parametrize(
+    ("body_words", "notes"),
+    [
+        # A capital word, a word of one letter, a sign after the "V".
+        ("here1. the QXV Then there3.", _ONE_TWO_THREE),
+        ("here1. the dV Then there3.", _ONE_TWO_THREE),
+        ("here1. the fendulmV+ Then there3.", _ONE_TWO_THREE),
+        # Two words for a run of one note.
+        ("here1. a fendulmV b corvallV there3.", _ONE_TWO_THREE),
+        # One word for a run of two notes: a link the rule made is no
+        # neighbour, so note 2's "V" does not leave note 3 a run of one.
+        ("here1. a fendulmV b", _ONE_TWO_THREE),
+        # The word lies before the reference of the note before the run,
+        # or after that of the note after it.
+        ("the fendulmV here1. there3.", _ONE_TWO_THREE),
+        ("here1. there3. the fendulmV", _ONE_TWO_THREE),
+        # No linked note on the page: the page's start and end are no pair
+        # of neighbours.
+        ("a fendulmV b corvallV", ("1 One.", "2 Two.")),
+        # The values do not follow on from the note before.
+        ("here1. the fendulmV Then", ("1 One.", "3 Three.")),
+    ],
+)
+def test_referenced_trailing_v_outside_the_rule_stays_unlinked(
+    body_words: str, notes: tuple[str, ...]
+) -> None:
+    lines = _lines_of(_referenced_page(0, body_words, *notes))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert all(reference != "V" for reference, _ in _references(blocks))
+
+
 def test_referenced_lone_number_of_a_note_after_an_unlinked_one_stays() -> None:
     # Note 2 has no reference, so the "3." is not taken for note 3.
     lines = _lines_of(

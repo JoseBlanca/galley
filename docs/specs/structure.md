@@ -2416,7 +2416,9 @@ image (pages 53, 89, 289, 326, 356, 537, each the reference to the note
 the rule gives it); "oxenV" on page 167 lies before a run of two notes
 and stays unlinked. The other four public-domain books and the owner's
 two give the same `blocks.json` byte for byte (Haskins' "gV" and
-"XXvV," and Stubbs' "sV" are not of the form).
+"XXvV," and Stubbs' "sV" are not of the form). galley-eval on Domesday:
+notes whose reference is right 1,557 → 1,563 of 1,729; Haskins stays at
+68 of 72.
 
 A "V" that is a word of its own ("pleas V", page 127) stays unlinked,
 and so do "-." ("victus-.", page 262) and a straight double quotation

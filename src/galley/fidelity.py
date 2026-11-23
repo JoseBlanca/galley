@@ -646,6 +646,14 @@ _MARKER_MAX_LETTERS_OR_DIGITS = 3
 _MARKER_MAX_LETTERS = 1
 _MARKER_BRACKETS = frozenset("()")
 _NOT_IN_A_MARKER = frozenset("&")
+# The one letter a footnote reference may be without a round bracket:
+# Domesday's OCR reads a raised number glued to its word as a capital "V"
+# ("adquesieritV", page 53), which structure links only between two linked
+# neighbours (architecture section 13; owner, 23 November 2026). The part
+# of the word before it ends with two lower-case letters, so that a roman
+# numeral ("IV", "XV") or a capital word keeps its "V".
+_TRAILING_V = "V"
+_BEFORE_A_TRAILING_V = re.compile(r".*[a-z]{2}")
 
 
 def _has_marker_shape(text: str) -> bool:
@@ -675,21 +683,28 @@ def _has_marker_shape(text: str) -> bool:
 
 
 def _reference_problem(
-    block: Block, span_text: str, note_ref: str, note_ids: frozenset[str]
+    block: Block,
+    span_text: str,
+    note_ref: str,
+    footnote_ids: frozenset[str],
+    endnote_ids: frozenset[str],
 ) -> str | None:
     """Why a note reference span is wrong, or None when it names a note of
-    the file and has a marker's shape."""
-    if note_ref not in note_ids:
+    the file and has a marker's shape, or is a trailing "V" that names a
+    footnote."""
+    if note_ref not in footnote_ids | endnote_ids:
         return (
             f"block {block.id}: the note reference span {span_text!r} names "
             f"{note_ref}, which is no note"
         )
+    if span_text == _TRAILING_V and note_ref in footnote_ids:
+        return None
     if not _has_marker_shape(span_text):
         return (
             f"block {block.id}: the note reference span {span_text!r} does not "
             "have a marker's shape (1 to 4 characters, at most 3 letters or "
             "digits, no white space, '&' or dash, and a letter only beside a "
-            "round bracket)"
+            "round bracket, or a trailing 'V' to a footnote)"
         )
     return None
 
@@ -697,12 +712,15 @@ def _reference_problem(
 def _split_off_words(blocks: BlocksFile) -> Counter[str]:
     """The words that note_marker word changes split off the words they
     were glued to, as a multiset: every word of a change's `after` but its
-    first."""
+    first, and a "V" only when the part before it ends with two lower-case
+    letters ("adquesierit", "V")."""
     return Counter(
         word
         for change in blocks.word_changes
         if change.reason is ChangeReason.NOTE_MARKER
-        for word in change.after[1:]
+        for place, word in enumerate(change.after[1:], start=1)
+        if word != _TRAILING_V
+        or _BEFORE_A_TRAILING_V.fullmatch(change.after[place - 1]) is not None
     )
 
 
@@ -738,9 +756,14 @@ def _reference_problems(blocks: BlocksFile) -> tuple[str, ...]:
     lost unseen at the markdown boundary, where a span to a footnote becomes
     Pandoc's note. The span need not read as its note's marker: the OCR
     reads the two sides of a superscript differently."""
-    note_ids = frozenset(note.id for note in blocks.notes)
+    footnote_ids = frozenset(
+        note.id for note in blocks.notes if note.kind is NoteKind.FOOTNOTE
+    )
+    endnote_ids = frozenset(
+        note.id for note in blocks.notes if note.kind is not NoteKind.FOOTNOTE
+    )
     problems = (
-        _reference_problem(block, span.text, span.note_ref, note_ids)
+        _reference_problem(block, span.text, span.note_ref, footnote_ids, endnote_ids)
         for block in _all_blocks(blocks)
         for span in block.spans
         if span.note_ref is not None
@@ -1063,8 +1086,10 @@ def check_stage(
     boundaries it also raises, with no word, when a note reference span
     names no note, does not have a marker's shape (1 to 4 characters, at
     most 3 letters or digits, no white space, "&" or dash, a letter only
-    beside a round bracket), or holds a letter without a note_marker word
-    change that split it off a word, or when a block that is not an
+    beside a round bracket) and is not a "V" to a footnote, or holds a
+    letter without a note_marker word change that split it off a word (a
+    "V" off a word whose part before it ends with two lower-case letters),
+    or when a block that is not an
     epigraph has a source; at the markdown boundary when a contents link
     targets anything but "#" and the id of a heading block, or a heading
     other than its entry's heading_ref; and at the

@@ -1,7 +1,10 @@
 """A footnote's reference that the OCR set apart as a word of its own (spec
 section 11, "A lone number"): "child 3." for "child³.", linked only to
-the note after the last one its page linked."""
+the note after the last one its page linked; and one it read as a "V"
+glued to its word (section 11, "A trailing V"), linked only between two
+linked neighbours."""
 
+import itertools
 import re
 from collections.abc import Sequence
 
@@ -152,4 +155,94 @@ def lone_links(
                 )
             )
             start = (word.block, word.word)
+    return tuple(made)
+
+
+# Spec section 11, "A trailing V": Domesday's OCR reads a raised number
+# glued to its word as a capital "V" ("adquesieritV", page 53). The word
+# before it ends with two lower-case letters, so that a roman numeral
+# ("IV", "XV", Haskins' "XXvV,") and a capital word keep their "V".
+_TRAILING_V = re.compile(r"(?P<before>.*[a-z]{2})V(?P<after>[^\w\s]*)")
+
+
+def trailing_v(word: BodyWord) -> Reference | None:
+    """The reference that a "V" glued to the end of `word` is, or None: the
+    word ends with two lower-case letters, a capital "V" and then only
+    punctuation ("adquesieritV", "villV.")."""
+    match = _TRAILING_V.fullmatch(word.text)
+    if match is None or not is_punctuation(match.group("after")):
+        return None
+    return Reference(
+        match.group("before"), "V", match.group("after"), ReferenceForm.SIGN, None
+    )
+
+
+def _follows_on(
+    run: Sequence[NoteToMatch], before: NoteToMatch | None, after: NoteToMatch | None
+) -> bool:
+    """Whether the values of `run` follow one another and on from the note
+    `before` it and to the note `after` it, where there is one."""
+    values = [note.value for note in run]
+    if before is not None:
+        values.insert(0, before.value)
+    if after is not None:
+        values.append(after.value)
+    return all(
+        first is not None and second is not None and second == first + 1
+        for first, second in itertools.pairwise(values)
+    )
+
+
+def trailing_v_links(
+    notes: Sequence[NoteToMatch], words: Sequence[BodyWord], links: Sequence[Link]
+) -> tuple[Link, ...]:
+    """The footnotes that `links` left unlinked, linked to a trailing "V"
+    (spec section 11, "A trailing V"): on each page, a run of k unlinked
+    notes between two linked neighbours, a linked note of the page or the
+    page's start or end but not both ends, whose values follow on from the
+    one neighbour to the other, is linked when exactly k of `words`, the
+    body's paragraph words that no link took, between the neighbours'
+    references, are a `trailing_v`, the i-th to the i-th note. A link made
+    here is never the neighbour of another run."""
+    linked = {link.note: (link.candidate.block, link.candidate.word) for link in links}
+    by_page: dict[int, list[NoteToMatch]] = {}
+    for note in notes:
+        by_page.setdefault(note.page_index, []).append(note)
+    words_by_page: dict[int, list[BodyWord]] = {}
+    for word in words:
+        words_by_page.setdefault(word.page_index, []).append(word)
+    made: list[Link] = []
+    for page_index, page_notes in sorted(by_page.items()):
+        # -1 and len(page_notes) stand for the page's start and end.
+        places = (
+            [-1]
+            + [place for place, note in enumerate(page_notes) if note.note in linked]
+            + [len(page_notes)]
+        )
+        for first, second in itertools.pairwise(places):
+            run = page_notes[first + 1 : second]
+            before = page_notes[first] if first >= 0 else None
+            after = page_notes[second] if second < len(page_notes) else None
+            if not run or (before is None and after is None):
+                continue
+            start = linked[before.note] if before is not None else None
+            end = linked[after.note] if after is not None else None
+            if not _follows_on(run, before, after):
+                continue
+            found = tuple(
+                (word, reading)
+                for word in words_by_page.get(page_index, ())
+                if (start is None or start < (word.block, word.word))
+                and (end is None or (word.block, word.word) < end)
+                and (reading := trailing_v(word)) is not None
+            )
+            if len(found) != len(run):
+                continue
+            made.extend(
+                Link(
+                    Candidate(word.block, word.word, word.page_index, reading),
+                    note.note,
+                )
+                for note, (word, reading) in zip(run, found, strict=True)
+            )
     return tuple(made)
