@@ -18,6 +18,7 @@ __all__ = [
     "Reference",
     "ReferenceForm",
     "after_last_letter",
+    "endnote_reference",
     "glued_reference",
     "is_punctuation",
 ]
@@ -93,6 +94,21 @@ _CITATION_ABBREVIATIONS = frozenset(
     ]
 )
 _CITATION = re.compile(rf"{PUNCTUATION}*(?P<letters>[^\W\d_]+){PUNCTUATION}*")
+# Structure spec section 12, "The candidates of endnotes": 1 to 3 digits
+# glued after a number of 4 digits, a year ("1911.34"), or after a closing
+# bracket ("(61).29", "5)16"), with only the punctuation that ends a
+# sentence, a clause or a quotation between them; a dash is none of it, so
+# "1914-18" and "(612-19)" are no candidates, and a time "10.35" has 2
+# digits before.
+_SENTENCE_PUNCTUATION = "[.,;:!?)\\]'\"\u2019\u201d]"
+_GLUED_AFTER_A_NUMBER = re.compile(
+    rf"(?P<before>(?:(?:.*[^0-9])?[0-9]{{4}}{_SENTENCE_PUNCTUATION}+|.*[)\]]"
+    rf"{_SENTENCE_PUNCTUATION}*))(?P<reference>[0-9]{{1,3}})"
+    rf"(?P<after>{PUNCTUATION}*)"
+)
+# For endnotes only: a reference followed straight by a dash and a word,
+# "river20—and"; the dash is an em or en dash, a hyphen is none.
+_DASH_AND_WORD = re.compile(r"(?P<head>.*?[0-9])(?P<tail>[\u2014\u2013][^\W\d_].*)")
 
 
 def is_punctuation(text: str) -> bool:
@@ -115,6 +131,50 @@ def glued_reference(word: str) -> Reference | None:
     citation's abbreviation and has no other letter ("p.12"); or
     punctuation, 1 to 3 digits and only punctuation, with no letter
     (";13")."""
+    return _glued(word, citations=True)
+
+
+def endnote_reference(word: str) -> Reference | None:
+    """The number glued to `word` as a reference to an endnote, by
+    structure spec section 12, "The candidates of endnotes", or None: a
+    glued reference without the citation exclusion ("art.27"); a number of
+    4 digits or a closing bracket, then sentence punctuation, then 1 to 3
+    digits and only punctuation ("1911.34" gives ("1911.", "34", ""),
+    "(61).29" gives ("(61).", "29", "")), so that a time "10.35" is none;
+    and either of these followed by a dash and a word ("river20—and" gives
+    ("river", "20", "—and"))."""
+    dashed = _DASH_AND_WORD.fullmatch(word)
+    if dashed is not None:
+        head = _endnote_glued(dashed.group("head"))
+        return (
+            None
+            if head is None
+            else head._replace(after=head.after + dashed.group("tail"))
+        )
+    return _endnote_glued(word)
+
+
+def _endnote_glued(word: str) -> Reference | None:
+    """A glued reference of `word` with no citation exclusion, or one after
+    a number of 4 digits or a closing bracket and sentence punctuation."""
+    glued = _glued(word, citations=False)
+    if glued is not None:
+        return glued
+    match = _GLUED_AFTER_A_NUMBER.fullmatch(word)
+    if match is None or not is_punctuation(match.group("after")):
+        return None
+    return Reference(
+        match.group("before"),
+        match.group("reference"),
+        match.group("after"),
+        ReferenceForm.GLUED,
+        int(match.group("reference")),
+    )
+
+
+def _glued(word: str, *, citations: bool) -> Reference | None:
+    """The glued reference of `word` by `glued_reference`, with the citation
+    exclusion only when `citations` is true."""
     after_letter = _GLUED_AFTER_A_LETTER.fullmatch(word)
     if after_letter is not None and not (
         is_punctuation(after_last_letter(after_letter.group("before")))
@@ -124,7 +184,8 @@ def glued_reference(word: str) -> Reference | None:
     if after_letter is not None:
         citation = _CITATION.fullmatch(after_letter.group("before"))
         if (
-            citation is not None
+            citations
+            and citation is not None
             and citation.group("letters").lower() in _CITATION_ABBREVIATIONS
         ):
             return None

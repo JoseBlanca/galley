@@ -2,7 +2,7 @@
 "References" and "What is changed"): the candidates of the body's
 paragraphs, and each matched one split off its word."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 
 from galley.model import BlockKind, ChangeReason, WordChange
@@ -26,11 +26,15 @@ _NOT_SEARCHED = frozenset(
 )
 
 
-def body_candidates(body: Sequence[Unnumbered]) -> tuple[Candidate, ...]:
+def body_candidates(
+    body: Sequence[Unnumbered],
+    read: Callable[[str], Reference | None] = reference_candidate,
+) -> tuple[Candidate, ...]:
     """The candidate references of the body's blocks other than margin notes,
     index entries (spec section 17, rule 4) and contents entries (section
     30, rule 10), in reading order: a
-    heading holds them too (Kadesh's title, "STRATEGY*")."""
+    heading holds them too (Kadesh's title, "STRATEGY*"). `read` gives a
+    word's candidate, `reference_candidate` unless given."""
     return tuple(
         Candidate(block_position, word_position, page_index, reference)
         for block_position, block in enumerate(body)
@@ -38,7 +42,7 @@ def body_candidates(body: Sequence[Unnumbered]) -> tuple[Candidate, ...]:
         for word_position, (word, page_index) in enumerate(
             zip(block.words, block.word_pages, strict=True)
         )
-        if (reference := reference_candidate(word)) is not None and _linkable(reference)
+        if (reference := read(word)) is not None and _linkable(reference)
     )
 
 

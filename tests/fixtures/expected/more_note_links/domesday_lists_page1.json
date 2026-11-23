@@ -1,0 +1,15 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 141,
+  "read": "Read by the assistant on 23 November 2026 from the page rendered at 200 dpi. Six numbered paragraphs (i) to (vi), each opening 'A Somersetshire manor' or 'A Devonshire manor' with references 1 to 6; the band prints notes 1 to 6, one to a line.",
+  "expected": {
+    "notes": [
+      "D. B. iv. 397; i. 93 b, Ichetoca.",
+      "D. B. iv. 411; i. 94 b, Tocheswilla.",
+      "D. B. iv. 398; i. 93 b, Pilloc.",
+      "D. B. iv. 341; i. 96, Sordemanneford.",
+      "D. B. iv. 355; i. 116 b, Labera.",
+      "D. B. iv. 367; i. 112 b, Oplomia."
+    ]
+  }
+}

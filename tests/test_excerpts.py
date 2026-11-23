@@ -551,7 +551,9 @@ def test_referenced_domesday_83_links_shillings_and_pence_references(
     words = tuple(word for word, _ in _references_on(blocks, 8))
     assert "12s.2" in words
     assert "30d8" in words
-    assert not any(word.startswith("£") for word in words)
+    # "£2" and "£8." are no candidates; the one word with a "£" is "£11"
+    # with its lone "1." written against it (section 11, "A lone number").
+    assert [word for word in words if word.startswith("£")] == ["£111."]
 
 
 def test_referenced_haskins_132_and_133_link_signs(

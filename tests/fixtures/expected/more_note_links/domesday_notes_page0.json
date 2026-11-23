@@ -1,0 +1,14 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 24,
+  "read": "Read by the assistant on 23 November 2026 from the page rendered at 200 dpi. The body prints the references 2 to 6 raised after amounts and a year: '£16,000²', '£24,000³,', '£30,000⁴,', '£3,000⁵;' and '1014⁶;'; the band prints notes 1 to 9, notes 2 to 6 'Ibid. 132-3.', 'Ibid. 137.', 'Ibid. 141.', 'Ibid. 142.', 'Ibid. 151.'.",
+  "expected": {
+    "references": [
+      ["£16,000", "2", "Ibid. 132-3."],
+      ["£24,000", "3", "Ibid. 137."],
+      ["£30,000", "4", "Ibid. 141."],
+      ["£3,000", "5", "Ibid. 142."],
+      ["1014", "6", "Ibid. 151."]
+    ]
+  }
+}

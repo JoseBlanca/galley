@@ -3,6 +3,7 @@ start with endnote markers ("1." to "345." in Gierke, or bare numbers
 from 1, as Turney marks its notes) in rising order, which become notes of
 kind endnote."""
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -576,6 +577,109 @@ def with_group_headings_cut(
         for position, entry in enumerate(entries)
         for part in (
             _split(entry, cuts[position])
+            if position in cuts and isinstance(entry, BodyBlock)
+            else (entry,)
+        )
+    )
+
+
+# Spec section 12, "Endnotes run into the note before": the marker of a
+# note that starts a line inside the paragraph of the note before, "57."
+# in a book of "N." markers or "57" in one of bare numbers, and the end of
+# the line before it: a full stop, with closing brackets and quotation
+# marks after it ("1987).", "p. 61.", "here.\""), or digits and a hyphen, a
+# full stop the OCR read as one after a page number ("p. 487-").
+_RUN_ON_DOTTED = re.compile(r"[0-9]{1,3}[.-]")
+_CLOSING = ")]'\"’”"
+_NUMBER_AND_HYPHEN = re.compile(r".*[0-9]-")
+
+
+def _ends_a_note(word: str) -> bool:
+    """Whether `word`, the last of a line, ends a note: a full stop, then
+    only closing brackets and quotation marks, or digits and a hyphen."""
+    return (
+        word.rstrip(_CLOSING).endswith(".")
+        or _NUMBER_AND_HYPHEN.fullmatch(word) is not None
+    )
+
+
+def _run_on_value(word: str, *, bare: bool) -> int | None:
+    """The number `word` reads as the marker of a note run into the one
+    before: bare digits in a book of bare markers, digits and "." in the
+    others; None when it is neither."""
+    if bare:
+        return int(word) if is_bare_number(word) else None
+    return int(word[:-1]) if _RUN_ON_DOTTED.fullmatch(word) else None
+
+
+def _run_on_starts(
+    piece: Piece, value: int, following: int | None, *, bare: bool
+) -> tuple[int, ...]:
+    """The positions of the lines of `piece`, the paragraph of a note of
+    `value` and the ones run into it, that start the notes run into it:
+    a line but the first whose first word reads the next value and whose
+    line before ends a note, when the next marker of the section,
+    `following`, is not that value (None when there is none)."""
+    starts: list[int] = []
+    expected = value + 1
+    for number in range(1, len(piece.lines)):
+        line, before = piece.lines[number], piece.lines[number - 1]
+        if (
+            expected != following
+            and before.line.words
+            and _run_on_value(first_word(line), bare=bare) == expected
+            and _ends_a_note(before.line.words[-1].text)
+        ):
+            starts.append(number)
+            expected += 1
+    return tuple(starts)
+
+
+def _split_at(entry: BodyBlock, starts: Sequence[int]) -> tuple[BodyBlock, ...]:
+    """`entry` cut before each of its lines at `starts`, in rising order."""
+    if not starts:
+        return (entry,)
+    head, tail = _split(entry, starts[-1])
+    return (*_split_at(head, starts[:-1]), tail)
+
+
+def with_run_on_endnotes_split(
+    entries: Sequence[Entry], section: EndnoteSection
+) -> tuple[Entry, ...]:
+    """`entries` with each endnote run into the paragraph of the note before
+    cut off it into a paragraph of its own (spec section 12, "Endnotes run
+    into the note before"): at a line, not the paragraph's first, whose
+    first word is the marker of the next value after the note's (and of the
+    notes already cut off it), in the section's form, when the line before
+    ends a note and the section's next marker does not read that value. A
+    section whose markers are bare numbers takes bare numbers; the others
+    take "57."."""
+    marked = sorted(section.markers)
+    bare = sum(
+        is_bare_number(section.markers[position].marker) for position in marked
+    ) * 2 > len(marked)
+    cuts: dict[int, tuple[int, ...]] = {}
+    value: int | None = None
+    for position in section.paragraphs:
+        marker = section.markers.get(position)
+        if marker is not None:
+            value = marker.value
+        entry = entries[position]
+        if value is None or not isinstance(entry, BodyBlock):
+            continue
+        following = next(
+            (section.markers[later].value for later in marked if later > position),
+            None,
+        )
+        starts = _run_on_starts(entry.piece, value, following, bare=bare)
+        if starts:
+            cuts[position] = starts
+            value += len(starts)
+    return tuple(
+        part
+        for position, entry in enumerate(entries)
+        for part in (
+            _split_at(entry, cuts[position])
             if position in cuts and isinstance(entry, BodyBlock)
             else (entry,)
         )

@@ -70,8 +70,11 @@ def test_sign_followed_by_punctuation_is_linked_to_its_note(
 # not linked. 343 on the starting commit of the plan (a0a1675, 18 November
 # 2026); 322 with the sign followed by punctuation, which links 21 more,
 # each checked on the page image.
-# The plan asks for a fall of at least 15: at most 328.
-_DOMESDAY_UNREFERENCED_NOTES_AT_MOST = 328
+# The plan asks for a fall of at least 15: at most 328. 290 after the
+# plan more-note-links (23 November 2026), work package 4; 284 with the
+# trailing "V" of the same day, whose 6 links were each checked on the
+# page image; at most 286.
+_DOMESDAY_UNREFERENCED_NOTES_AT_MOST = 286
 
 
 @pytest.mark.whole_book

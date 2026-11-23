@@ -904,6 +904,17 @@ lists the words, with the pages they came from where the origins say.
   own stays one (decided in the review of the plan structure-second, 16
   November 2026: Mariéjol has 18,247 block words of the earlier shape
   with a letter).
+  One letter is accepted outside round brackets: a span "V" that names a
+  footnote and that a `note_marker` word change split off the end of a
+  word whose part before it ends with two lower-case letters
+  ("adquesieritV" to "adquesierit" and "V"). Domesday's OCR reads a
+  raised number glued to its word so, and structure links it only
+  between two linked neighbours where the page's numbering expects the
+  reference (`docs/specs/structure.md` §11, "A trailing V"; owner, 23
+  November 2026). A roman numeral, "IV" or "XV", and a capital word keep
+  their "V": the part before it does not end with two lower-case
+  letters. A "V" to an endnote, a "V" that was a word of its own, and
+  any other letter are refused as before.
   Structure links no candidate without this shape (its bracketed form
   allows two letters read as digits, "(li)" for 11, which then stays in
   its word). The span need not read as its note's `marker`: the OCR

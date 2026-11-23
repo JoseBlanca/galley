@@ -1,0 +1,6 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 469,
+  "read": "Read by the assistant on 23 November 2026 from the page rendered at 200 dpi. The body prints 'thirteenth centuries⁵ suggests'; note 5 reads 'Rogers, Hist. Agric. i. 226, 342.'. The text layer reads the raised 5 as '8'.",
+  "expected": {"references": [["centuries", "8", "Rogers, Hist. Agric. i. 226, 342."]]}
+}

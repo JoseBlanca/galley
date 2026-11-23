@@ -170,15 +170,18 @@ def misread_marker_lines(lines: Sequence[PlacedLine]) -> frozenset[int]:
     )
 
 
+def is_short(line: PlacedLine) -> bool:
+    """Spec section 6, rule 1: `line` ends more than 3 pt short of its
+    region's right edge."""
+    return line.line.box.x1 < line.edges.right - _SHORT_LINE_PT
+
+
 def is_indented(line: PlacedLine, before: PlacedLine) -> bool:
     """Spec section 6, rule 1: `line` starts 5 to 40 pt right of its
     region's left edge, and `before` ends more than 3 pt short of its
     region's right edge."""
     indent = line.line.box.x0 - line.edges.left
-    return (
-        INDENT_MIN_PT <= indent <= INDENT_MAX_PT
-        and before.line.box.x1 < before.edges.right - _SHORT_LINE_PT
-    )
+    return INDENT_MIN_PT <= indent <= INDENT_MAX_PT and is_short(before)
 
 
 def is_centred(line: PlacedLine) -> bool:

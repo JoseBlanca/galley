@@ -13,6 +13,7 @@ from galley.note_references import (
     Reference,
     ReferenceForm,
     after_last_letter,
+    endnote_reference,
     glued_reference,
     is_punctuation,
 )
@@ -203,9 +204,20 @@ _SIGN_REFERENCE = re.compile(
 _SIGN_NEVER_ALONE = "‘"
 
 
-def reference_candidate(word: str) -> Reference | None:
-    """The candidate note reference in a word of the body, by the forms of
-    spec section 11, "References", or None: a glued number ("land3."
+# Structure spec section 11, "References": a last digit glued after a
+# well-formed amount, its thousands set off by commas ("£16,0002", Domesday
+# page 24), or after a year of four digits ("10864."), with only
+# punctuation after.
+_GLUED_AFTER_AN_AMOUNT = re.compile(
+    rf"(?P<before>£?[0-9]{{1,3}}(?:,[0-9]{{3}})+|1[0-9]{{3}})(?P<reference>[1-9])"
+    rf"(?P<after>{PUNCTUATION}*)"
+)
+
+
+def _common_candidate(word: str) -> Reference | None:
+    """The candidate reference to a footnote or an endnote in a word of the
+    body, by the forms of spec section 11, "References", or None: a glued
+    number ("land3."
     gives ("land", "3", ".")), unless the word starts with a citation's
     abbreviation and has no other letter ("p.12"); a bracketed number
     ("(i)." gives ("", "(i)", ".") of value 1); or a sign ("rulers.^", and
@@ -251,3 +263,36 @@ def reference_candidate(word: str) -> Reference | None:
             None,
         )
     return None
+
+
+def reference_candidate(word: str) -> Reference | None:
+    """The candidate footnote reference in a word of the body (spec section
+    11, "References"): a glued number ("land3." gives ("land", "3", ".")),
+    unless the word starts with a citation's abbreviation and has no other
+    letter ("p.12"); a bracketed number ("(i)." gives ("", "(i)", ".") of
+    value 1); a sign ("rulers.^", "servus*.", "Salvolini‘"); or the last
+    digit glued after an amount or a year ("£16,0002" gives ("£16,000",
+    "2", ""))."""
+    candidate = _common_candidate(word)
+    if candidate is not None:
+        return candidate
+    amount = _GLUED_AFTER_AN_AMOUNT.fullmatch(word)
+    if amount is None or not is_punctuation(amount.group("after")):
+        return None
+    return Reference(
+        amount.group("before"),
+        amount.group("reference"),
+        amount.group("after"),
+        ReferenceForm.GLUED,
+        int(amount.group("reference")),
+    )
+
+
+def endnote_candidate(word: str) -> Reference | None:
+    """The candidate reference to an endnote in a word of the body (spec
+    section 12, "The candidates of endnotes"): the candidate of
+    `reference_candidate` but a number after an amount, or when there is
+    none, a number that only endnotes take ("1911.34", "art.27",
+    "river20—and")."""
+    candidate = _common_candidate(word)
+    return candidate if candidate is not None else endnote_reference(word)
