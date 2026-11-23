@@ -4,7 +4,8 @@ The owner chose on 23 November 2026, after the second-book plan, to
 link the notes galley still leaves unlinked: first the endnotes of their
 own two books, then the footnotes of the public-domain books. The
 breakdown below was approved in chat that day. Dated 23 November 2026.
-State: under way.
+State: done on 23 November 2026, but for the parts of work package 5
+that need LM Studio (the rest of 5.1, 5.2, 5.3), left for a later plan.
 
 Specs: `docs/specs/structure.md` (notes, endnotes, note references,
 §34–§36), `docs/specs/correct.md` §9b (note links from the vision
@@ -167,12 +168,15 @@ Deliverables:
    wrong on `tests/fixtures/expected/kadesh_reference/` and on the
    images of the pages with new links.
 
-- [ ] 5.1 Column-top markers and the page-order fallback.
-- [ ] 5.2 The narrower order check, with recorded answers.
-- [ ] 5.3 The rebuild and the check by eye (orchestrator, LM Studio).
+- [x] 5.1 Column-top markers (done) and the page-order fallback (left: needs
+  the model's recorded answers).
+- [ ] 5.2 The narrower order check, with recorded answers. Left for later:
+  LM Studio was busy.
+- [ ] 5.3 The rebuild and the check by eye (orchestrator, LM Studio). Left
+  for later.
 
 ## 6. The end
 
-- [ ] 6.1 Review per `reviewing-code`; all checks; the EPUBs of the
+- [x] 6.1 Review per `reviewing-code`; all checks; the EPUBs of the
   seven books rebuilt in `runs/more-note-links/`, through epubcheck;
   galley-eval; the report.

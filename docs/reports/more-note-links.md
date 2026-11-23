@@ -3,6 +3,39 @@
 For the owner. Started on 23 November 2026, at main f69b847. The plan is
 `docs/plans/more-note-links.md`.
 
+## Summary
+
+Done on branch `plan/more-note-links`, 23 November 2026, but for the
+parts of work package 5 that need LM Studio. No reviewer found a wrong
+link or a lost word; every new link checked on the page images was
+right but one on Domesday page 106, which was wrong before too.
+
+| book (folder) | measure | before | after |
+|---|---|---|---|
+| Turney (`turney`) | endnotes with no link | 83 of 613 | 27 of 618 |
+| Haynes (`haynes`) | endnotes with no link | 50 of 632 | 3 of 691 |
+| Gierke (`politicaltheorie00gieruoft`) | endnotes with a link | 208 of 299 | 230 of 311 |
+| Domesday (`domesdaybook00maituoft`) | notes whose reference is right (galley-eval) | 1,432 of 1,729 | 1,563 |
+| Haskins (`normansineuropea00hask`) | the same | 66 of 72 | 68 |
+| Kadesh (`battleofkadeshst00breauoft`) | footnotes linked without the vision model | 43 | 45 |
+
+Domesday's "before" is with the corrected evaluation (work package 1);
+with the old one it was 1,307. Domesday falls short of the plan's +150
+(+131). Turney's endnotes rise to 618 because 5 notes run into the note
+before are cut off; Haynes' by 59 for the same reason.
+
+The owner decided on 23 November 2026 that a "V" glued to a word may be
+a footnote link's text where the numbering expects a reference (6
+Domesday links); see the last section.
+
+The EPUBs of the seven books are in `runs/more-note-links/<folder>/`,
+all through epubcheck with no error or warning.
+
+Left open: the Kadesh work that needs the vision model (the page-order
+fallback for garbled first words, the narrower order check, the rebuild
+with the model); recording the model's answers on 18 pages takes about
+15 minutes, the rebuild about 35.
+
 ## Work package 1: the evaluation's note count
 
 Done (a538264, 8bea196). galley-eval maps a note reference with no
@@ -156,3 +189,31 @@ Waiting for LM Studio: the page-order fallback of the correct stage
 (rest of 5.1) and the narrower order check (5.2) need the model's
 answers on 18 Kadesh pages recorded once as fixtures, about 15 minutes;
 the correct stage keeps no copy of its answers.
+
+## The trailing "V" (the owner's decision of 23 November 2026)
+
+3831117, fad574e, 7e6c9fc. A "V" glued to the end of a word whose part
+before ends in two lower-case letters, followed only by punctuation,
+becomes a footnote reference where the page's numbering expects one
+between neighbours; a neighbour is a linked note or the page's start or
+end (at least one of the two a note), because the owner's own example,
+"adquesieritV" on page 53, refers to the page's last note. The fidelity
+check accepts exactly this case. Six new Domesday links (pages 53, 89,
+289, 326, 356, 537), all right on the images; 1,557 → 1,563. "oxenV"
+(page 167) stays unlinked: it lies before a run of two missing notes.
+The other six books are byte-identical. A review found the check's
+exception would also take a "V" from inside a word, and a test that
+could not fail for its stated reason; both fixed.
+
+## For whoever next revises a skill or writes a plan
+
+- Agents took short examples from the owner's books into the spec, code
+  and tests twice, although the brief forbade it; the conventions
+  reviewer found the second time. The coding skill's rule on samples
+  should say that an example is made up even when it is one word or a
+  number form, and that each example is checked against the books'
+  blocks.json. The branch history was rewritten before the merge.
+- Targets given as counts in a plan were estimates from an
+  investigation; two were missed by a few notes (Turney 27 against 25,
+  Domesday +131 against +150) once each rule was narrowed to make no
+  wrong link.
