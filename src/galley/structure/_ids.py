@@ -6,10 +6,23 @@ from collections import Counter
 from collections.abc import Sequence
 
 from galley.model import Block, BlockKind, Emphasis, Note, Span, note_places
+from galley.structure._markers import Reference, ReferenceForm
 from galley.structure._unnumbered import Unnumbered, UnnumberedNote, first_page
 
 # Spec section 23: the space before a spaced sign in a French book.
 _NO_BREAK_SPACE = "\u00a0"
+# Spec section 11, "What is changed": a backslash of its own, Domesday's
+# reading of a raised number, is written against the word before it.
+_BACKSLASH = "\\"
+
+
+def _against_the_word_before(reference: Reference) -> bool:
+    """Whether a reference that is a word of its own is written against the
+    word before it (spec section 11, "What is changed"): a number, or a
+    backslash; not a bracketed number nor a sign "^", "*" or "•"."""
+    return not reference.before and (
+        reference.form is ReferenceForm.GLUED or reference.reference == _BACKSLASH
+    )
 
 
 def _spans(unnumbered: Unnumbered, note_ids: Sequence[str]) -> tuple[Span, ...]:
@@ -17,7 +30,9 @@ def _spans(unnumbered: Unnumbered, note_ids: Sequence[str]) -> tuple[Span, ...]:
     before the words of its `no_break` (section 23), or in a verse block and
     a verse epigraph by a line feed where a printed line starts, each note reference a span
     of its own with the id of its note; the spaces stay with the spans
-    around it (spec section 11, "What is changed"). A figure block without
+    around it, but the one before a reference that is a number or a
+    backslash of its own, which is written against the word before it
+    (spec section 11, "What is changed"). A figure block without
     a caption has no span (section 18)."""
     if unnumbered.kind is BlockKind.FIGURE and not unnumbered.words:
         return ()
@@ -39,7 +54,9 @@ def _spans(unnumbered: Unnumbered, note_ids: Sequence[str]) -> tuple[Span, ...]:
             text += space + word
             continue
         reference, note = link
-        text += space + reference.before
+        if not _against_the_word_before(reference):
+            text += space
+        text += reference.before
         if text:
             spans.append(Span(text, Emphasis.NONE, None))
         spans.append(Span(reference.reference, Emphasis.NONE, note_ids[note]))

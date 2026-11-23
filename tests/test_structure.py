@@ -3310,6 +3310,25 @@ def test_referenced_lone_number_links_the_note_after_the_last_linked(
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+@pytest.mark.parametrize(
+    ("body_words", "before", "reference", "after"),
+    [
+        ("here1. the child 2. Then", "the child", "2", ". Then"),
+        ("here1. the hides \\ Moreover", "the hides", "\\", " Moreover"),
+    ],
+)
+def test_referenced_lone_reference_is_written_against_the_word_before(
+    body_words: str, before: str, reference: str, after: str
+) -> None:
+    lines = _lines_of(_referenced_page(0, body_words, "1 One.", "2 Two."))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    spans = tuple(span.text for span in blocks.blocks[0].spans)
+    place = spans.index(reference)
+    assert spans[place - 1].endswith(before)
+    assert spans[place + 1] == after
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
 def test_referenced_lone_number_of_a_note_after_an_unlinked_one_stays() -> None:
     # Note 2 has no reference, so the "3." is not taken for note 3.
     lines = _lines_of(
