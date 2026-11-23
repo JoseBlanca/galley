@@ -17,3 +17,14 @@ of this plan. Two galley-eval tests, each failing without its half of
 the change. Results in `runs/more-note-links-eval1/`.
 
 From now on the plan's Domesday counts start from 1,410.
+
+## Work package 2: endnote references in the owner's books
+
+Task 2.1 (73e03c2 spec, cd84541 code, on the stream branch): endnotes
+take a number after a year or a closing bracket with sentence
+punctuation between, a glued number with no citation-abbreviation
+exclusion, and either before a dash and a word. Unlinked endnotes: Turney
+83 → 65 of 613, Haynes 50 → 13 of 632; all links of both books checked
+for number and chapter, none wrong. Footnote matching is unchanged; the
+five public-domain books give byte-identical `blocks.json`. 23 unit
+tests on made-up words, 4 whole_book tests that only count.
