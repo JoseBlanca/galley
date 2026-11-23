@@ -2547,8 +2547,11 @@ A word of the gap **reads as** a reference to note V when it is:
   end of V's digits ("river!’'9" for 19, "river/0" for 30), or V with
   one digit changed by a pair the OCR confuses (section 11,
   "Matching"). The digits are none after a digit, or after a digit and
-  only `. , : ;`: a time "10.35" and a number "2,718" stay text, while
-  "(71-72)-46" has a bracket between;
+  only `. , : ;` or a hyphen or dash (`-` `–` `—`): a time "10.35", a
+  number "2,718" and a range "1914-18" or "pp.12-14" stay text, while
+  "(71-72)-46" has a bracket between; nor are they after a currency or
+  section sign (`£` `$` `§`), with or without punctuation between:
+  "£16", "§12";
 - **a sign the book does not print**: "^" or "~" in any book, and a
   straight quotation mark (`'` or `"`) in a book whose body holds more
   of the curly forms of that mark (‘ ’ or “ ”) than of it, Turney but
