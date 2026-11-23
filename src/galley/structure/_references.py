@@ -370,7 +370,7 @@ def _one_digit_confused(digits: str, number: str) -> bool:
     )
 
 
-def gap_reference(
+def _gap_reference(
     word: BodyWord, value: int, signs: frozenset[str]
 ) -> Reference | None:
     """The reference to note `value` that `word` may be when it lies in the
@@ -484,7 +484,7 @@ def gap_links(
     the gap between linked neighbours (spec section 12, "The gap between
     linked neighbours"): for a run of k notes of consecutive values none
     of which is linked, whose value before and value after are linked, the
-    words of `words` between those two references that `gap_reference`
+    words of `words` between those two references that `_gap_reference`
     reads as a reference to one of the run's notes, when there are exactly
     k of them and the i-th reads as the i-th note's. `words` are the
     group's chapter's words in reading order, which may hold the words
@@ -511,7 +511,7 @@ def gap_links(
             word
             for word in gap
             if any(
-                gap_reference(word, note.value, signs) is not None
+                _gap_reference(word, note.value, signs) is not None
                 for note in run
                 if note.value is not None
             )
@@ -519,7 +519,7 @@ def gap_links(
         if len(found) != len(run):
             continue
         readings = tuple(
-            gap_reference(word, note.value, signs) if note.value is not None else None
+            _gap_reference(word, note.value, signs) if note.value is not None else None
             for word, note in zip(found, run, strict=True)
         )
         if any(reading is None for reading in readings):
