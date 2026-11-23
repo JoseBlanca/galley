@@ -2468,9 +2468,85 @@ after a bracket, 4 after a year, 3 after an abbreviation and 4 before a
 dash. Each new link reads its note's number and lies in its note
 group's chapter, no link of before moves or goes, and on the five
 public-domain books of that run, Gierke's endnotes among them,
-`blocks.json` is the same byte for byte. The rest of the endnotes
-without a link are left to the plan's next task. The targets of
-section 26 lie a few notes above these counts.
+`blocks.json` is the same byte for byte. The rest are taken by the
+gap rule below.
+
+**The gap between linked neighbours.** After the matching above, a
+reference the candidates missed is looked for where it must lie: between
+the references of the notes before and after it. In one note group, a
+**run** is a set of notes of consecutive values N to N + k − 1, none of
+them linked, such that the note of value N − 1 and the note of value
+N + k are both linked by the matching above; its **gap** is the words
+of the body's paragraphs (blocks of kind `paragraph`, not headings,
+figures or quotes) after the first of those two references and before
+the second, that no footnote and no link took. A link made by this rule
+is never the neighbour of another run: the runs are found once, from
+the matching's links only. The examples below are made up; the owner's
+books are named by page and note only.
+
+A word of the gap **reads as** a reference to note V when it is:
+
+- **a lone number**: 1 to 3 digits alone, equal to V ("river 23" for a
+  printed "river.²³" whose full stop was lost, or whose number the text
+  layer put a word early); or the start or the end of V's digits when
+  the word before ends with punctuation after a letter ("river. 9" for
+  79). Either is none when the word before or after is the name of a
+  month or its abbreviation, in English: Turney prints a date with the
+  day 14 where note 14 is sought (page 81);
+- **glued digits**: a word with a letter or punctuation, then 1 to 3
+  digits, then no letter or digit, whose digits are V, the start or
+  end of V's digits ("river!’'9" for 19, "river/0" for 30), or V with
+  one digit changed by a pair the OCR confuses (section 11,
+  "Matching"). The digits are none after a digit, or after a digit and
+  only `. , : ;`: a time "10.35" and a number "2,718" stay text, while
+  "(71-72)-46" has a bracket between;
+- **a sign the book does not print**: "^" or "~" in any book, and a
+  straight quotation mark (`'` or `"`) in a book whose body holds more
+  of the curly forms of that mark (‘ ’ or “ ”) than of it, Turney but
+  not Haynes; alone after a word that ends with punctuation after a
+  letter ("river. '"), or glued after a letter and then punctuation
+  ("river.\""), with only punctuation after. A sign glued straight after
+  a letter is none: on Turney's page 227 such a sign is the curly
+  closing quotation mark read straight, and the reference, read as a
+  letter, comes after it.
+
+The k notes of a run are linked when exactly k words of its gap read as
+a reference to one of the run's notes, and the i-th of them, in reading
+order, reads as a reference to the i-th note: a run of one note with
+one such word links that word; with none or with two, the run stays
+unlinked. A lone number or glued digits are linked as their digits, a
+glued word split as section 11 says ("river!’'" and "9"); a sign as the
+sign.
+
+Before the matching, an endnote whose value is not N but which lies,
+in the book's order, between a note of value N − 1 and one of value
+N + 1 is matched as N: Haynes' note "37." between "56." and "58." (page
+351) is note 57, whose reference reads 57 on page 103. Its marker stays
+as printed.
+
+What the gap rule does not take, measured on the notes left: a letter
+read for a reference (Haynes' note 11 on page 67, Turney's 29 on page
+227), since a reference span holds no letter (architecture section 13);
+digits with a letter after them (Turney's 40, page 91); digits confused
+outside the pairs of section 11 (0 for 9, Turney's 39; 8 for 5, its
+59); a sign straight after a letter (Turney's 66, page 75, though right
+there); and runs whose gap holds fewer words that read as their notes
+than the run has notes (Turney's 36 to 39, with two).
+
+Measured on 23 November 2026, structure run on copies of the runs of
+the rule above, `runs/more-note-links-endnotes/`: Turney's endnotes
+without a link go from 65 to 27 of 613, by 38 links: 4 lone numbers
+equal to the note, 3 lone numbers that are part of it, 23 glued
+digits, 8 signs. Haynes' go from 13 to 5 of 632, by 8 links: 6 lone
+numbers, 1 glued number and note 57, by its order, to a lone number. Gierke, on the small-fixes run,
+gains 11 links by glued digits (page 97, "supreme12.^)" for 12; page
+168, "bestow2*5'" for 285); the four footnote books do not change.
+Every new link was checked on the page images: each lies on the printed
+reference, or, for a lone number the text layer put a word early
+(Turney's pages 83 and 123), on the reference's digits one word before.
+Two lone "^" that the rule took in Gierke before it asked for the word
+before to end a phrase (pages 107 and 169, in lines beside a margin
+note) were wrong; the rule above does not take them.
 
 **The chapter of a group** is a level-1 heading block of the body,
 after the config's `contents_pages` and before the endnote section,
@@ -4262,8 +4338,9 @@ when the PDF is absent. They assert counts only, never text:
 | endnotes, and note groups (notes with a `group`) | at least 580, 11 | at least 620, 18 |
 | endnotes linked | at least 450 | at least 550 |
 | links from a reference to a note of another group's chapter | 0 | 0 |
-| endnotes without a link (section 12, "The candidates of endnotes") | at most 70 | at most 15 |
-| links whose number is not their note's marker's, but for one digit the OCR confuses (section 11, "Matching") or a marker that reads no number ("x") | 0 | 0 |
+| endnotes without a link (section 12, "The candidates of endnotes" and "The gap between linked neighbours") | at most 30 | at most 7 |
+| links whose digits are not their note's marker's number, nor the start or end of it, nor one confused digit from it (section 11, "Matching"); a marker that reads no number and a sign are not counted | 0 | 0 |
+| links of a note group whose notes' numbers, in the reading order of the links, do not rise | 0 | 0 |
 | `epigraph` blocks, and those with line feeds | 13, 0 | 21, 8 |
 | `source_dash` changes | 0 | 21 |
 
