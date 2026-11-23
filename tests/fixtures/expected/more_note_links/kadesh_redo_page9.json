@@ -1,0 +1,13 @@
+{
+  "book": "battleofkadeshst00breauoft",
+  "page_index": 32,
+  "excerpt": "kadesh_redo, page 9",
+  "read": "Read by the assistant on 23 November 2026 from the band rendered at 200 dpi. The band prints three notes in two columns of two lines: 82 in the left column; 83 at the top of the right column, its second line ending 'original has t't.'; and 84 after it on that second line.",
+  "expected": {
+    "notes": [
+      {"number": "82", "text": "The variant is of no importance for this point. It will be discussed later. For the context see Extract No. 9."},
+      {"number": "83", "text": "Read t't; the above is a typographical error; the original has t't."},
+      {"number": "84", "text": "Op. cit., p. 557."}
+    ]
+  }
+}
