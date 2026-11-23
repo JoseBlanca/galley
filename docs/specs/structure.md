@@ -2147,9 +2147,11 @@ reading order:
   "£" before or not, or after a year of 4 digits from 1000 to 1999, then
   only punctuation ("£16,0002" gives "£16,000" and "2", "10864." gives
   "1086", "4" and ".", Domesday's pages 24 and 468). Added on 23
-  November 2026 (plan more-note-links, task 4.2). Such words on every
-  line of the seven books' `lines.json`: Domesday 14, Stubbs, Kadesh and
-  Gierke 1 each, Haynes 1, Haskins and Turney none; an amount without
+  November 2026 (plan more-note-links, task 4.2), for footnotes only:
+  endnotes keep section 12's rule, under which a year with a digit glued
+  ("19731") is no reference. Such words on every line of the seven books'
+  `lines.json`: Domesday 14, Stubbs, Kadesh and Gierke 1 each, Haynes 1,
+  Haskins and Turney none; an amount without
   its commas ("£123.", "1121.") is no candidate, since the reference
   cannot be told from the number's last digit;
 - a **bracketed number**: an opening bracket, 1 or 2 digits or letters
