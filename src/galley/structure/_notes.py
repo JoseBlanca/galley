@@ -44,15 +44,24 @@ _LINE_MARKER_MAX_CHARACTERS = 2
 # before a capital is a marker: a note's text starts a sentence.
 _ONE_LETTER_WORDS = frozenset({"A", "I"})
 _LINE_MARKER_GAP_PT = 10.0
+# Spec section 11, "Two notes on one line", the cuts of 23 November 2026:
+# a marker that reads the next note's value is cut after a gap of 8 pt
+# (Domesday's page 134 sets "5" 9.9 pt and "6" 9.3 pt after the note
+# before); a word of one character that reads a number, after 20 pt,
+# whatever follows (page 114, 41.9 pt; the other gaps of note lines reach
+# 14.0 pt at the 99th percentile). Guessed between those, not varied.
 _NEXT_MARKER_GAP_PT = 8.0
 _WIDE_GAP_PT = 20.0
 _ENDS_BEFORE_A_NOTE = (".", "'", "’", ":", ";", ")")
 # Spec section 11, "Its value": the scores of a page's numbering. A
 # marker that reads its note's value scores 1, one a confused digit away
 # 0.5; each number skipped costs 0.5, at most 2 on a page, and each note
-# left out 0.25. Chosen on 23 November 2026 with galley-eval on the whole
-# Domesday: 1,488 notes whose reference is right, against 1,487 with
-# costs of 0.4 and 0.2, which lost 6 notes right before.
+# left out 0.25, or 0.1 for a note with no marker. Chosen on 23 November
+# 2026 with galley-eval on the whole Domesday: 1,488 notes whose reference
+# is right, against 1,487 with costs of 0.4 and 0.2, which lost 6 notes
+# right before. The 0.1 lets the 13 unmarked rows of a table on page 418
+# be left out before notes 1 to 3 (3 notes gained, none lost); guessed,
+# below 3 matches over 13 rows, not varied further.
 _MATCH_SCORE = 1.0
 _CONFUSED_SCORE = 0.5
 _JUMP_COST = 0.5
