@@ -2625,13 +2625,14 @@ def test_footnote_sign_starts_a_note_only_between_two_numbers() -> None:
 def test_footnote_values_of_a_page_follow_the_markers_that_read_true(
     readings: tuple[int | None, ...], values: tuple[int | None, ...]
 ) -> None:
-    assert page_values(readings) == values
+    # Every note has a marker, a sign where it reads no number.
+    assert page_values(readings, (False,) * len(readings)) == values
 
 
 def test_footnote_values_leave_out_notes_without_a_marker_more_readily() -> None:
     # Domesday's page 418: thirteen rows of a table without a marker before
-    # notes 1 to 3. Left out at 0.25 each they would cost more than the
-    # three markers that read true give.
+    # notes 1 to 3. Left out at 0.25 each, as rows with a sign would be,
+    # they would cost more than the three markers that read true give.
     readings = (*([None] * 13), 1, 2, 3)
     assert page_values(readings, (*([True] * 13), False, False, False)) == (
         *([None] * 13),
@@ -2639,7 +2640,7 @@ def test_footnote_values_leave_out_notes_without_a_marker_more_readily() -> None
         2,
         3,
     )
-    assert page_values(readings)[-3:] == (14, 15, 16)
+    assert page_values(readings, (False,) * 16)[-3:] == (14, 15, 16)
 
 
 def test_referenced_note_the_numbering_leaves_out_takes_no_reference() -> None:

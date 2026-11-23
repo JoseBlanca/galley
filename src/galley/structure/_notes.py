@@ -94,7 +94,7 @@ class Footnote:
     lines: tuple[PlacedLine, ...]
     marker: NoteMarker | None
     value: int | None
-    counted: bool = True
+    counted: bool
 
 
 def _column_left(line: PlacedLine, lines: Sequence[PlacedLine]) -> float:
@@ -411,7 +411,9 @@ def _valued(notes: Sequence[PageNote], numbering: Numbering) -> tuple[Footnote, 
         else readings
     )
     return (
-        (Footnote(notes[0].lines, notes[0].marker, None),) if leftover else ()
+        (Footnote(notes[0].lines, notes[0].marker, None, counted=True),)
+        if leftover
+        else ()
     ) + tuple(
         Footnote(
             lines=note.lines,
@@ -439,10 +441,11 @@ type _Numbering = tuple[float, int, tuple[int | None, ...]]
 
 
 def page_values(
-    readings: Sequence[int | None], unmarked: Sequence[bool] = ()
+    readings: Sequence[int | None], unmarked: Sequence[bool]
 ) -> tuple[int | None, ...]:
     """The values of a page's notes in a book numbered per page, whose
-    markers read `readings`, None for one that reads no number (spec
+    markers read `readings`, None for one that reads no number, and of
+    which those `unmarked` have no marker at all (spec
     section 11, "Its value"): of the numberings in which each note's value
     is one more than the last value before it or more, at most 2 numbers
     skipped on the page, or the note is left out with no value, the one of
@@ -451,12 +454,8 @@ def page_values(
     # The best numbering of the notes so far for each last value and number
     # of values skipped.
     states: dict[tuple[int, int], _Numbering] = {(0, 0): (0.0, 0, ())}
-    for place, reading in enumerate(readings):
-        skip_cost = (
-            _UNMARKED_SKIP_COST
-            if place < len(unmarked) and unmarked[place]
-            else _SKIP_COST
-        )
+    for reading, no_marker in zip(readings, unmarked, strict=True):
+        skip_cost = _UNMARKED_SKIP_COST if no_marker else _SKIP_COST
         following: dict[tuple[int, int], _Numbering] = {}
         for (last, skipped), (score, changes, values) in states.items():
             left_out: _Numbering = (score - skip_cost, changes - 1, (*values, None))
