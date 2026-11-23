@@ -26,7 +26,16 @@ from galley.model import (
 from galley.structure import make_blocks, reference_candidate
 from galley.structure._endnotes import group_reaches
 from galley.structure._markers import Reference, ReferenceForm, endnote_candidate
-from galley.structure._references import Candidate, NoteToMatch, match_endnotes
+from galley.structure._references import (
+    BodyWord,
+    Candidate,
+    Link,
+    NoteToMatch,
+    foreign_signs,
+    gap_links,
+    match_endnotes,
+    with_values_in_order,
+)
 
 _HASH = "a" * 64
 _NO_WORDS: frozenset[str] = frozenset()
@@ -815,7 +824,7 @@ def test_endnote_reference_standing_for_a_lost_note_stays_unlinked() -> None:
         ("(1936)41", ("(1936)", "41", "")),
         # Followed by a dash and a word.
         ("river20\u2014and", ("river", "20", "\u2014and")),
-        ("seas?25\u2014Then", ("seas?", "25", "\u2014Then")),
+        ("rivers?25\u2014Then", ("rivers?", "25", "\u2014Then")),
         ("(6)3\u2014so", ("(6)", "3", "\u2014so")),
         ("tide4\u2013and", ("tide", "4", "\u2013and")),
     ],
@@ -893,6 +902,172 @@ def test_endnotes_link_the_references_only_endnotes_take() -> None:
     text = block_text(blocks.blocks[1])
     assert "at 11.6 " in text
     assert "word5\u2014and" in text
+
+
+# Spec section 12, "The gap between linked neighbours". Made-up words: a
+# gap's paragraph is block 1; notes are given by value, the note at
+# position i of `values`; links of the matching sit in block 0 (before)
+# and block 2 (after).
+
+_CURLY_BOOK = frozenset("^~'\"")
+_STRAIGHT_BOOK = frozenset("^~")
+
+
+def _gap_words(text: str) -> tuple[BodyWord, ...]:
+    words = text.split(" ")
+    return tuple(
+        BodyWord(
+            1,
+            place,
+            5,
+            word,
+            words[place - 1] if place > 0 else "",
+            words[place + 1] if place + 1 < len(words) else "",
+        )
+        for place, word in enumerate(words)
+    )
+
+
+def _gap_linked(
+    text: str,
+    values: tuple[int, ...] = (6, 7, 8),
+    linked: tuple[int, ...] = (6, 8),
+    signs: frozenset[str] = _CURLY_BOOK,
+) -> tuple[tuple[str, int], ...]:
+    """Each link made in the gap: the linked word's text and the note's
+    value, for notes of `values` of which those of `linked` are linked, the
+    first in block 0 and the others in block 2, around the words of
+    `text`."""
+    notes = tuple(
+        NoteToMatch(position, 9, value) for position, value in enumerate(values)
+    )
+    reference = reference_candidate("word1.")
+    assert reference is not None
+    links = tuple(
+        Link(Candidate(0 if order == 0 else 2, order, 5, reference), position)
+        for order, (position, value) in enumerate(
+            (position, value)
+            for position, value in enumerate(values)
+            if value in linked
+        )
+    )
+    words = _gap_words(text)
+    return tuple(
+        (words[link.candidate.word].text, values[link.note])
+        for link in gap_links(notes, words, links, signs)
+    )
+
+
+def test_gap_lone_number_equal_to_the_note_is_linked() -> None:
+    assert _gap_linked("the river 7 then ran on") == (("7", 7),)
+
+
+def test_gap_lone_number_beside_a_month_stays_unlinked() -> None:
+    assert _gap_linked("on 7 September the river ran") == ()
+    assert _gap_linked("in June 7 the river ran") == ()
+
+
+def test_gap_lone_number_that_ends_the_note_is_linked_after_a_phrase_end() -> None:
+    values, linked = (78, 79, 80), (78, 80)
+    assert _gap_linked("the river ran. 9 Then it", values, linked) == (("9", 79),)
+    assert _gap_linked("the river ran 9 then it", values, linked) == ()
+
+
+@pytest.mark.parametrize(
+    ("text", "values", "linked", "word"),
+    [
+        ("the river ran!\u2019'9 Then", (18, 19, 20), (18, 20), "ran!\u2019'9"),
+        ("the river ran/0 Then", (29, 30, 31), (29, 31), "ran/0"),
+        ("the river ran.4 Then", (44, 45, 46), (44, 46), "ran.4"),
+        # 3 for 8, a pair the OCR confuses.
+        ("the river ran.13 Then", (17, 18, 19), (17, 19), "ran.13"),
+        ("the hills (12-13)-18 Then", (17, 18, 19), (17, 19), "(12-13)-18"),
+    ],
+)
+def test_gap_glued_digits_of_the_note_are_linked(
+    text: str, values: tuple[int, ...], linked: tuple[int, ...], word: str
+) -> None:
+    assert _gap_linked(text, values, linked) == ((word, values[1]),)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "at 10.35 the river ran",  # a time
+        "some 1,547 rivers ran",  # a number
+        "the river ran.2 Then",  # not part of 47
+        "the river ran.47a Then",  # a letter after
+    ],
+)
+def test_gap_digits_that_are_no_reference_stay_unlinked(text: str) -> None:
+    assert _gap_linked(text, (46, 47, 48), (46, 48)) == ()
+
+
+def test_gap_sign_the_book_does_not_print_is_linked() -> None:
+    assert _gap_linked('the river ran." Then') == (('ran."', 7),)
+    assert _gap_linked("the river ran. ' Then") == (("'", 7),)
+    assert _gap_linked("the river ran.^ Then", signs=_STRAIGHT_BOOK) == (("ran.^", 7),)
+
+
+def test_gap_sign_the_book_prints_or_straight_after_a_letter_stays_unlinked() -> None:
+    assert _gap_linked('the river ran." Then', signs=_STRAIGHT_BOOK) == ()
+    assert _gap_linked("the river Ran' Then") == ()
+    assert _gap_linked("the river a ^ then") == ()
+
+
+def test_gap_with_two_words_that_read_as_the_note_stays_unlinked() -> None:
+    assert _gap_linked("the river 7 ran.7 Then") == ()
+
+
+def test_gap_run_of_two_notes_links_two_words_in_order() -> None:
+    values, linked = (5, 6, 7, 8), (5, 8)
+    assert _gap_linked('the river ran.6 Then it ran." So', values, linked) == (
+        ("ran.6", 6),
+        ('ran."', 7),
+    )
+    # One word for two notes: neither is linked.
+    assert _gap_linked("the river ran.6 Then it ran", values, linked) == ()
+
+
+def test_gap_needs_both_neighbours_linked_by_the_matching() -> None:
+    # Note 8 is not linked: the gap of 7 has no end, and no run is linked.
+    assert _gap_linked("the river 7 then ran", (6, 7, 8, 9), (6,)) == ()
+
+
+def test_endnote_out_of_order_between_its_neighbours_takes_their_middle_value() -> None:
+    notes = tuple(
+        NoteToMatch(position, 9, value)
+        for position, value in enumerate((55, 56, 37, 58, 59, 7, 62))
+    )
+    assert tuple(note.value for note in with_values_in_order(notes)) == (
+        *(55, 56, 57, 58, 59, 7, 62),
+    )
+
+
+def test_straight_quotation_mark_is_a_sign_in_a_book_of_curly_ones() -> None:
+    assert foreign_signs(("\u2018river\u2019", "ran'")) == frozenset("^~'")
+    assert foreign_signs(("'river'", "\u2019")) == frozenset("^~")
+
+
+def test_endnote_linked_in_the_gap_by_make_blocks() -> None:
+    # Line 5 ends with a lone "5" where "word5." would be: note 5 is
+    # linked to it, between the references of notes 4 and 6.
+    ends = tuple(f"word{n}." for n in range(1, 10))
+    ends = (*ends[:4], "river 5", *ends[5:])
+    first = (*_group_heading(1, _CHAPTERS[0], 50.0), *_dotted_notes(80.0))
+    pages = (
+        _chapter_page(0, _CHAPTERS[0], ends),
+        PageLayout(1, (_region(*first),), ()),
+    )
+    blocks = make_blocks(_lines_of(*pages), _NO_WORDS, workers=1)
+    markers = {note.id: note.marker for note in blocks.notes}
+    links = tuple(
+        (span.text, markers[span.note_ref])
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref is not None
+    )
+    assert links == tuple((str(n), f"{n}.") for n in range(1, 10))
 
 
 # Review of work package 3: hand-written cases for the rules the mutation
