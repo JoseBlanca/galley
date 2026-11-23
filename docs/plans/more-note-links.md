@@ -130,7 +130,7 @@ Deliverables:
    690, Turney's 613 → about 621, still no wrong link; references to
    the new notes linked.
 
-- [ ] 3.1 The split, its tests and the count.
+- [x] 3.1 The split, its tests and the count.
 
 ## 4. Domesday's footnotes
 

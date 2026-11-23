@@ -51,3 +51,19 @@ number and the word after its dash) had gone into the spec, a
 docstring and a test of 2.1. They were replaced with made-up words
 and the stream branch's history rewritten before any merge
 (`git filter-branch`), so no commit holds them.
+
+## Work package 3: endnotes run into the note before
+
+Done (4294a46 spec, 0fb14b3 code). A line inside an endnote, not its
+first, starts a new note when its first word is the next number in the
+section's marker form ("N." or "N-" in Haynes and Gierke, a bare "N" in
+Turney), the line before ends a note (a full stop, or a number and a
+hyphen: Turney's OCR reads a closing "p. 487." as "487-"), and the
+section's next marker is not that number. 63 of the 67 run-on endnotes
+found by the investigation are cut: Haynes 632 → 691 endnotes, Turney
+613 → 618; 61 and 3 new links, none wrong. Unlinked: Haynes 5 → 3,
+Turney 27 → 29 (two new notes whose references the body lacks or
+garbles). Gierke 299 → 311 endnotes, 10 new links; the 12 new starts
+and 5 links checked on the images. The four other public-domain books
+are byte-identical. Not caught: Haynes 11, Turney 41 and 42, whose
+number does not start a line.
