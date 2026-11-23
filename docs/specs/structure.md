@@ -2308,7 +2308,9 @@ differently, and of the pairs matched in the second research the
 reference read exactly as the marker in only 21 of Haskins' 60, 1,202 of
 Domesday's 1,440 and 182 of Mariéjol's 676. The fidelity check asks
 only that a reference have a marker's shape (architecture §13); every
-reference these rules split off has it.
+reference these rules split off has it, and so does every reference of
+the rules below but the trailing "V", which the check accepts on its
+own terms.
 
 **What is changed.** A matched glued candidate, a number or a sign at
 the end of a word, is split by a `note_marker` word change, ("land3.",)
@@ -2374,12 +2376,51 @@ November 2026 (plan more-note-links, task 4.2): Domesday gains 21
 links, Haskins 2 (pages 116 and 156, each right by the page image),
 Kadesh, Gierke, Stubbs and the owner's two books none.
 
-A trailing "V", Domesday's other reading of a raised number ("villV",
-page 89; "pleas V", page 127; 22 notes of the investigation of 23
-November 2026), stays unlinked: a reference span with a letter that no
-round bracket holds has no marker's shape (architecture §13). Linking it
-is the owner's decision. So are "-." ("victus-.", page 262) and a
-straight double quotation mark ('Adderbury".', page 117).
+**A trailing "V".** Domesday's OCR also reads a raised number glued to
+its word as a capital "V" ("adquesieritV" for "adquesierit²", page 53).
+After the lone numbers, a "V" glued to the end of a body paragraph's
+word that no link took is linked to a footnote, as the owner decided on
+23 November 2026, only where the page's numbering expects the
+reference:
+
+- the word ends with two lower-case letters, a capital "V", then only
+  punctuation ("villV", "MerchammeV."), so that a roman numeral ("IV",
+  "XV", Haskins' "XXvV,"), a word of capitals and a word of one letter
+  before the "V" ("sV") keep it;
+- on a page, a **run** is k notes in a row that no link took, the
+  matching's or a lone number's, between two **neighbours**: the linked
+  note before the run on the page, or the page's start when the run
+  starts with the page's first note, and the linked note after it, or the
+  page's end when it ends with the page's last note. At least one
+  neighbour is a note: a page with no linked note takes nothing. The
+  values of the notes, the neighbours' with the run's, follow one
+  another by one, each run note having a value; the run's gap is the
+  words of the body's paragraphs on that page after the reference of the
+  neighbour before (or from the page's start) and before that of the
+  neighbour after (or to the page's end);
+- the run's k notes are linked when exactly k words of its gap end with
+  such a "V", the i-th word to the i-th note; with fewer or more, none
+  is. A link made by this rule is never a neighbour of another run.
+
+The word is split by a `note_marker` word change, ("adquesieritV",) to
+("adquesierit", "V"), and the "V" is the reference span, glued to its
+word as the printed number is. The fidelity check accepts a "V" so
+split off a word whose part before it ends with two lower-case letters,
+and only as the reference to a footnote (architecture §13); it accepts
+no other letter outside round brackets.
+
+Measured on 23 November 2026, structure run on copies of the runs of
+work package 4 of the plan more-note-links: Domesday's body paragraphs
+hold 7 words of this form, and 6 are linked, each right by the page
+image (pages 53, 89, 289, 326, 356, 537, each the reference to the note
+the rule gives it); "oxenV" on page 167 lies before a run of two notes
+and stays unlinked. The other four public-domain books and the owner's
+two give the same `blocks.json` byte for byte (Haskins' "gV" and
+"XXvV," and Stubbs' "sV" are not of the form).
+
+A "V" that is a word of its own ("pleas V", page 127) stays unlinked,
+and so do "-." ("victus-.", page 262) and a straight double quotation
+mark ('Adderbury".', page 117).
 
 **What they give, 23 November 2026.** With galley-eval on the whole
 Domesday (plan more-note-links, work package 4), with every rule of
