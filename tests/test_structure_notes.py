@@ -9,6 +9,8 @@ pt high, with one character's width between words. Body lines lie 15 pt
 apart; the notes' lines lie 12 pt apart, Turney's 0.8 pitch.
 """
 
+from dataclasses import replace
+
 import pytest
 
 from galley.model import (
@@ -1039,6 +1041,43 @@ def test_gap_run_of_two_notes_links_two_words_in_order() -> None:
 def test_gap_needs_both_neighbours_linked_by_the_matching() -> None:
     # Note 8 is not linked: the gap of 7 has no end, and no run is linked.
     assert _gap_linked("the river 7 then ran", (6, 7, 8, 9), (6,)) == ()
+
+
+def _out_of_order_links(places: dict[int, int]) -> tuple[Link, ...]:
+    """Links of the notes of values 11 to 16 (positions 0 to 5) by value,
+    each at a word of block 1 by place."""
+    reference = reference_candidate("word1.")
+    assert reference is not None
+    return tuple(
+        Link(Candidate(1, place, 5, reference), value - 11)
+        for value, place in places.items()
+    )
+
+
+def test_gap_word_is_taken_by_one_run_only() -> None:
+    # Notes 11, 13, 14 and 16 linked at places 10, 50, 20 and 60, out of
+    # order: the gaps of 12 (10 to 50) and of 15 (20 to 60) both hold the
+    # sign at place 30, which goes to note 12 alone.
+    notes = tuple(NoteToMatch(value - 11, 9, value) for value in range(11, 17))
+    texts = ["the"] * 70
+    texts[29], texts[30] = "river.", "^"
+    words = tuple(
+        BodyWord(1, place, 5, text, texts[place - 1] if place else "", "")
+        for place, text in enumerate(texts)
+    )
+    links = _out_of_order_links({11: 10, 13: 50, 14: 20, 16: 60})
+    made = gap_links(notes, words, links, _CURLY_BOOK)
+    assert tuple((link.candidate.word, link.note + 11) for link in made) == ((30, 12),)
+
+
+def test_gap_run_whose_first_reference_comes_after_its_second_takes_nothing() -> None:
+    notes = tuple(NoteToMatch(value - 11, 9, value) for value in range(11, 14))
+    words = _gap_words("the river 12 ran on and on")
+    links = tuple(
+        replace(link, candidate=replace(link.candidate, block=block))
+        for link, block in zip(_out_of_order_links({11: 0, 13: 0}), (2, 0), strict=True)
+    )
+    assert gap_links(notes, words, links, _CURLY_BOOK) == ()
 
 
 def test_endnote_out_of_order_between_its_neighbours_takes_their_middle_value() -> None:

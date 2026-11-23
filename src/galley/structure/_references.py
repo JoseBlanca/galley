@@ -494,12 +494,24 @@ def gap_links(
     reads as a reference to one of the run's notes, when there are exactly
     k of them and the i-th reads as the i-th note's. `words` are the
     group's chapter's words in reading order, none of them linked; a link
-    made here is never a neighbour of another."""
+    made here is never a neighbour of another. `links` are expected in the
+    reading order of their notes' values, as the matching makes them; a
+    run whose first reference does not come before its second takes
+    nothing, and a word taken by one run, in the order of the runs'
+    values, is in no other run's gap."""
     valued = tuple(note for note in notes if note.value is not None)
     linked = {link.note: (link.candidate.block, link.candidate.word) for link in links}
     made: list[Link] = []
+    taken: set[tuple[int, int]] = set()
     for run, start, end in _unlinked_runs(valued, linked):
-        gap = tuple(word for word in words if start < (word.block, word.word) < end)
+        if not start < end:
+            continue
+        gap = tuple(
+            word
+            for word in words
+            if start < (word.block, word.word) < end
+            and (word.block, word.word) not in taken
+        )
         found = tuple(
             word
             for word in gap
@@ -522,4 +534,5 @@ def gap_links(
             for word, note, reading in zip(found, run, readings, strict=True)
             if reading is not None
         )
+        taken.update((word.block, word.word) for word in found)
     return tuple(made)
