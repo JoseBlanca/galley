@@ -361,9 +361,9 @@ def footnotes(
     when it may (`PageNote.may_continue`) and the last page before it with
     notes is the page before, pages with neither notes nor a body stream
     (blank, plate and excluded pages) aside. In a book numbered per page,
-    the k-th note that starts on a page has the value k, a first note that
-    may continue and does not being left uncounted; otherwise its value is
-    what its marker reads."""
+    the notes that start on a page take the values of `page_values`, a
+    first note that may continue and does not being left uncounted;
+    otherwise a note's value is what its marker reads."""
     joined: list[list[PageNote]] = []
     last_page_with_notes: int | None = None
     for page_number, notes in enumerate(pages):

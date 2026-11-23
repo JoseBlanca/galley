@@ -83,8 +83,7 @@ def lone_reference(word: BodyWord, value: int) -> Reference | None:
 
 def _reads(word: BodyWord, value: int) -> bool:
     """Whether `word` ends with the digits of `value` and then only
-    punctuation ("2.", "42."): another place the reference may be, unless
-    it is the word just before the lone number ("£11 1.")."""
+    punctuation ("2.", "42."): another place the reference may be."""
     return re.fullmatch(rf".*{value}[^\w\s]*", word.text) is not None
 
 
@@ -97,7 +96,9 @@ def lone_links(
     exactly one of `words`, the body's paragraph words in reading order
     that no link took, between the reference of the note before (or the
     page's start) and that of the next linked note of the page (or the
-    page's end), is `lone_reference` to its value."""
+    page's end), is `lone_reference` to its value, and no other word
+    there but the one just before it ("£11" before "1.") `_reads` its
+    value."""
     linked = {link.note: (link.candidate.block, link.candidate.word) for link in links}
     by_page: dict[int, list[NoteToMatch]] = {}
     for note in notes:
