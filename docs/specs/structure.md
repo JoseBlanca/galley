@@ -2301,6 +2301,18 @@ out first, 521 when it is matched first, since a matched "(i)" takes the
 place of a later "(1)" (pages 279 and 334). The note's `referenced`
 becomes true.
 
+A number that is a word of its own, or a backslash, linked as a
+reference (by "A lone number" below, or by section 12's gap between
+linked neighbours) is written against the word before it: the span
+before the reference loses its last space, so that the mark sits on its
+word, "child[^n]." and not "child [^n].", as the printed superscript
+does (decided in the review of the plan more-note-links, 23 November
+2026). Every character but that space is kept, and the words stay those
+of the lines: the fidelity check splits each span apart. A bracketed
+number and a sign "^", "*" or "•" of their own keep the space: Mariéjol
+prints its "(1)" at full size after a space, and Haskins' raised signs
+stand apart from their word.
+
 **A lone number.** After the matching, a footnote of a page that is
 still unlinked is linked to a word of the body's paragraphs that no link
 took when the note is the page's first or the note before it on the
