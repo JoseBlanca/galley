@@ -1860,7 +1860,11 @@ a note when any of these holds:
    note before;
 3. its first word has a note marker's form, and what the marker reads
    as a number (below, "Its value", the reading of digit-like letters)
-   is what the marker of the note before it reads plus 1; this uses what
+   is what the marker of the note before it reads plus 1, or, for a
+   marker of one character, what the last marker of the page that reads
+   a number reads plus the notes after it plus 1 (Domesday's page 141,
+   "3", "*", "5": the "5" starts a note though the note before it has
+   the sign); this uses what
    the marker reads, even in a book numbered per page, where a note's
    value is otherwise its place, since by place every marker-shaped
    line, a table's row too, would pass. On a page whose notes are each
@@ -1871,7 +1875,31 @@ a note when any of these holds:
    note of the next column (owner, 16 November 2026). On Kadesh's page 8
    (excerpt page 0) the right column starts "'There is, however…",
    indented 12 pt against its column, a note whose marker the OCR glued
-   to its first word.
+   to its first word;
+5. its first word is a note marker of one character, a digit or a
+   letter that reads as one ("s"), the word after it starts with a
+   capital, and the line before it in its region ends more than 3 pt
+   short of the region's right edge, as section 6, rule 1 asks of the
+   line before an indent, and does not end with a hyphen that joins it
+   to this line. A one-character sign starts a note by this rule only
+   when the next line of the region starts with a marker that reads
+   what rule 3's last marker plus the notes after it reads plus 2: the
+   sign stands for the number between (Domesday's page 141, "*" for 4
+   between "3" and "5"). Domesday sets a short note on a line of its
+   own at the band's left edge, under a short line, so that neither
+   indent rule sees it (page 35: "2 A good many cases…" under "1 D. B.
+   i. 41…"). Added on 23 November 2026 (plan more-note-links, task 4.1):
+   with rules 3 and 5, Domesday's footnotes go from 1,847 to 1,868, and
+   of the 66 notes the investigation of that day found joined to the
+   note before, 30 are cut off. Without the capital, the one character
+   and the lookahead for a sign, the rule cut 109 notes, most of them
+   rows of tables (pages 200, 426, 428, 460, 499: "7 3E] Northampton",
+   "120 acres"), lines that start with a number in a note's text ("9
+   furlongs", page 396) and quotations ("' Consuetudo…", page 181); a
+   sign at the end of a page's notes, "* Maitland" on page 35, stands
+   for 6 there and would take note 5's reference. Haskins gains one
+   note, its page 116's "2 Origin of the English Constitution", which
+   the page image shows as a note of its own.
 
 A line is indented only against other note lines: on a page with one
 note line, the band's left edge is that line's own left side, so the
@@ -1947,10 +1975,45 @@ OCR read it. A glued marker is split off by a `note_marker` word change
 on the note's page: ("13The",) becomes ("13", "The"), the marker is "13"
 and the text starts with "The".
 
-**Its value.** In a book whose notes are numbered per page, the k-th
-note that starts on a page has the value k, whatever its marker reads:
-the markers are too damaged to count on (Domesday's page 83 reads "1 2 8
-* 8 e 7 8" for notes 1 to 8). A page's first note that has no marker
+**Its value.** In a book whose notes are numbered per page, the notes
+that start on a page are numbered 1, 2, 3 and on, in order, and their
+markers decide only where the count skips a number or leaves a note
+out. The markers are too damaged to be taken as they read (Domesday's
+page 83 reads "1 2 8 * 8 e 7 8" for notes 1 to 8), but a marker that
+reads a number the count misses tells of a note joined to the one
+before it (page 58 reads "1 3 4 s": note 2 is joined to note 1, so the
+notes are 1, 3, 4 and 5), and one that reads a number the count has
+passed tells of a note that is not one (page 42 cuts a table's rows
+into five notes before its notes 1 and 2). Of all the numberings of a
+page's notes, each note's value one more than the last value before it
+or more, or the note left out, the one with the highest score is taken:
+
+| for | score |
+|---|---|
+| each note whose marker reads its value | +1 |
+| each note whose marker reads a number one confused digit away from its value (the pairs of "Matching", below: 8 for 3) | +0.5 |
+| each number skipped, at most 2 on a page | −0.5 |
+| each note left out | −0.25 |
+
+Of two numberings with the same score, the one with fewer numbers
+skipped and notes left out wins, and with no marker that reads a
+number, the k-th note has the value k. A skip costs half a match, so
+that two markers that read true pay for one skip and a confused digit
+does not: on page 74, "1 3 3 4 6 « 7" is numbered 1 to 7, not 1, 3, 4,
+… A note left out has no value and takes no reference (below,
+"Matching"), not even a sign. Measured on 23 November 2026 (plan
+more-note-links, task 4.1) with galley-eval on the whole Domesday,
+with rule 5 above: the notes whose reference is right go from 1,410 to
+1,488 (78 gained, 1 lost, page 121's note 3, which galley joins to
+note 2, so that its reference now links to no note); the galley
+references that lie farther than 3 words from a reference to their
+note go from 114 to 52, and one is new, page 106's "justice*", a
+misread quotation mark that takes the signature mark "M." the band
+holds as a last note, whose value took the "5" of note 5 before.
+Numbering by place but with rule 5 gave 1,426; skips and left-out
+notes cost 0.4 and 0.2 gave 1,487 and lost 6 notes right before.
+Haskins stays at 66. On Gierke's page 31, "Law³" moves to its note
+3 from note 2, as the page image shows it should. A page's first note that has no marker
 and is not indented, and that does not continue a note of the page
 before (below, "A note that runs over a page break"), is the end of a
 note that started elsewhere, and is not counted and has no value: on
@@ -2173,7 +2236,8 @@ Page 9's three agree with the references read by eye in
 other link of its twelve pages changes. No link of the other six books
 changes.
 
-A pair that none of these rows scores is never matched. A note left
+A pair that none of these rows scores is never matched, and a note that
+its page's numbering leaves out ("Its value") is in no pair. A note left
 unmatched has `referenced` false; a candidate left unmatched
 stays as it is. A matched pair is linked whether or not the reference
 reads as the note's marker, and the reference keeps what the OCR read
