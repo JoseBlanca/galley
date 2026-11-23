@@ -48,8 +48,10 @@ _OPENINGS = {
     ),
 }
 # Structure spec section 26, "Whole-book tests": the endnotes, the note
-# groups (notes with a group), and the endnotes linked, at least.
-_ENDNOTES = {"turney": 580, "haynes": 620}
+# groups (notes with a group), and the endnotes linked, at least; the
+# endnotes, 618 and 691 on 23 November 2026, once the notes run into the
+# note before are cut off it (section 12).
+_ENDNOTES = {"turney": 615, "haynes": 685}
 _NOTE_GROUPS = {"turney": 11, "haynes": 18}
 _LINKED = {"turney": 450, "haynes": 550}
 # Structure spec sections 3 and 14: the words that start a chapter label.
@@ -199,6 +201,124 @@ def test_no_reference_links_to_a_note_of_another_groups_chapter(
     )
     assert links
     assert sum(group != chapter for group, chapter in links) == 0
+
+
+# Structure spec section 26, "Whole-book tests": the endnotes without a
+# link, at most (section 12, "The candidates of endnotes" and "The gap
+# between linked neighbours"; 27 and 5 on 23 November 2026, 83 and 50
+# before both).
+_UNLINKED = {"turney": 30, "haynes": 7}
+# Structure spec section 11, "Matching": the digit pairs the OCR confuses.
+_CONFUSED_DIGITS = frozenset(
+    frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28")
+)
+
+
+@pytest.mark.parametrize("book", ["turney", "haynes"])
+def test_endnotes_without_a_link_number_at_most_the_target(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    endnotes = _endnotes(owner_book_run(book))
+    assert sum(not note.referenced for note in endnotes) <= _UNLINKED[book]
+
+
+def _reads_as(reference: str, number: str) -> bool:
+    """Whether the digits of a link, `reference`, may stand for a note of
+    `number`: equal to it, its start or end (section 12, "The gap between
+    linked neighbours"), or one digit the OCR confuses away."""
+    differing = tuple(
+        frozenset(pair)
+        for pair in zip(reference, number, strict=False)
+        if len(set(pair)) > 1
+    )
+    return (
+        number.startswith(reference)
+        or number.endswith(reference)
+        or (
+            len(reference) == len(number)
+            and len(differing) == 1
+            and differing[0] in _CONFUSED_DIGITS
+        )
+    )
+
+
+def _endnote_links(blocks: BlocksFile) -> tuple[tuple[str, Note], ...]:
+    """Each link to an endnote, in reading order: its text and its note."""
+    endnotes = {note.id: note for note in _endnotes(blocks)}
+    return tuple(
+        (span.text, endnotes[span.note_ref])
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref in endnotes
+    )
+
+
+@pytest.mark.parametrize("book", ["turney", "haynes"])
+def test_every_endnote_link_reads_its_notes_number(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    # The note's number is its marker's digits; a marker the OCR read with
+    # no digit gives none to compare, and a sign has no digits.
+    links = _endnote_links(owner_book_run(book))
+    assert links
+    wrong = tuple(
+        (reference, note.marker)
+        for reference, note in links
+        if reference.isdigit()
+        and (number := note.marker.rstrip(".")).isdigit()
+        and not _reads_as(reference, number)
+    )
+    assert wrong == ()
+
+
+@pytest.mark.parametrize("book", ["turney", "haynes"])
+def test_endnote_links_of_a_group_rise_in_reading_order(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    # The notes of one group are numbered from 1 in the order of their
+    # references: a link to a note before the one linked just before it is
+    # in the wrong place. Positions in the notes stand for the numbers, so
+    # that a misread marker counts too.
+    blocks = owner_book_run(book)
+    endnotes = _endnotes(blocks)
+    starts = (*_group_starts(endnotes), len(endnotes))
+    place = {
+        note.id: (group, position)
+        for group, (start, end) in enumerate(itertools.pairwise(starts))
+        for position, note in enumerate(endnotes[start:end])
+    }
+    linked = tuple(place[note.id] for _, note in _endnote_links(blocks))
+    falling = tuple(
+        (before, after)
+        for before, after in itertools.pairwise(linked)
+        if before[0] == after[0] and after[1] <= before[1]
+    )
+    assert falling == ()
+
+
+# Structure spec section 26, "Whole-book tests": the endnotes whose
+# number is not the one before plus one, at most (section 12, "Endnotes run
+# into the note before"; 1 and 3 on 23 November 2026, 6 and 58 before).
+_NUMBER_SKIPS = {"turney": 2, "haynes": 5}
+
+
+@pytest.mark.parametrize("book", ["turney", "haynes"])
+def test_endnotes_whose_number_skips_number_at_most_the_target(
+    owner_book_run: Callable[[str], BlocksFile], book: str
+) -> None:
+    numbers = tuple(
+        int(digits) if (digits := note.marker.rstrip(".-")).isdigit() else None
+        for note in _endnotes(owner_book_run(book))
+    )
+    skips = sum(
+        1
+        for before, after in itertools.pairwise(numbers)
+        if before is not None
+        and after is not None
+        and after != 1
+        and after != before + 1
+    )
+    assert skips <= _NUMBER_SKIPS[book]
 
 
 # Structure spec section 26, "Whole-book tests": the epigraphs (section 22).

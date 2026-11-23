@@ -37,6 +37,7 @@ from galley.structure._endnotes import (
     group_reaches,
     note_groups,
     with_group_headings_cut,
+    with_run_on_endnotes_split,
 )
 from galley.structure._figure_blocks import with_figures, with_in_page_figures
 from galley.structure._ids import numbered
@@ -56,7 +57,12 @@ from galley.structure._margins import (
     placing_order,
     split_beside_margin_notes,
 )
-from galley.structure._markers import MarkerForm, NoteMarker, book_marker_form
+from galley.structure._markers import (
+    MarkerForm,
+    NoteMarker,
+    book_marker_form,
+    endnote_candidate,
+)
 from galley.structure._measures import letters
 from galley.structure._notes import (
     Footnote,
@@ -77,10 +83,14 @@ from galley.structure._paragraphs import (
 )
 from galley.structure._quotes import book_density, with_quotes
 from galley.structure._references import (
+    BodyWord,
     Link,
     NoteToMatch,
+    foreign_signs,
+    gap_links,
     match_endnotes,
     match_footnotes,
+    with_values_in_order,
 )
 from galley.structure._runs import EpigraphParts, LabelLine, QuotationForm
 from galley.structure._spaced import with_spaced_signs
@@ -557,13 +567,17 @@ def _links(
         ),
         candidates,
     )
-    footnoted = frozenset(link.candidate for link in footnote_links)
+    footnoted = frozenset(
+        (link.candidate.block, link.candidate.word) for link in footnote_links
+    )
+    # Endnotes take more forms of reference than footnotes (spec section 12,
+    # "The candidates of endnotes").
     free = tuple(
         candidate
-        for candidate in candidates
+        for candidate in body_candidates(body, endnote_candidate)
         if candidate.block < before_section
         and candidate.page_index > last_contents_page
-        and candidate not in footnoted
+        and (candidate.block, candidate.word) not in footnoted
     )
     reaches = group_reaches(
         tuple(
@@ -576,19 +590,60 @@ def _links(
         group_headings,
         before_section,
     )
-    return footnote_links + tuple(
-        link
-        for group, (start, end) in enumerate(reaches)
-        for link in match_endnotes(
+    # Spec section 12, "The gap between linked neighbours": the words of
+    # the body's paragraphs where a reference the candidates missed may
+    # lie, and the signs that stand for a raised number in this book.
+    signs = foreign_signs(
+        word for block in body[:before_section] for word in block.words
+    )
+    words = tuple(
+        BodyWord(
+            position,
+            place,
+            block.word_pages[place],
+            word,
+            block.words[place - 1] if place > 0 else "",
+            block.words[place + 1] if place + 1 < len(block.words) else "",
+        )
+        for position, block in enumerate(body[:before_section])
+        if block.kind is BlockKind.PARAGRAPH
+        for place, word in enumerate(block.words)
+        if block.word_pages[place] > last_contents_page
+        and (position, place) not in footnoted
+    )
+
+    def group_links(group: int, start: int, end: int) -> tuple[Link, ...]:
+        group_notes = with_values_in_order(
             tuple(
                 NoteToMatch(position, first_page(note.origin), value)
                 for position, (note, value, note_group) in enumerate(
                     zip(notes, values, groups, strict=True)
                 )
                 if note.kind is NoteKind.ENDNOTE and note_group == group
-            ),
+            )
+        )
+        matched = match_endnotes(
+            group_notes,
             tuple(candidate for candidate in free if start <= candidate.block < end),
         )
+        taken = frozenset(
+            (link.candidate.block, link.candidate.word) for link in matched
+        )
+        return matched + gap_links(
+            group_notes,
+            tuple(
+                word
+                for word in words
+                if start <= word.block < end and (word.block, word.word) not in taken
+            ),
+            matched,
+            signs,
+        )
+
+    return footnote_links + tuple(
+        link
+        for group, (start, end) in enumerate(reaches)
+        for link in group_links(group, start, end)
     )
 
 
@@ -784,6 +839,9 @@ def assemble(
     section = endnote_section(entries, contents_pages, body_line_pitch)
     if section is not None:
         entries = with_group_headings_cut(entries, section, body_line_pitch)
+        section = endnote_section(entries, contents_pages, body_line_pitch)
+    if section is not None:
+        entries = with_run_on_endnotes_split(entries, section)
         section = endnote_section(entries, contents_pages, body_line_pitch)
     section_pieces = frozenset(
         entries[position].piece for position in (section.paragraphs if section else ())
