@@ -2425,6 +2425,53 @@ an earlier build). Maitland's
 introduction (pages 0 to 85) has notes of its own, printed on pages 62
 to 64; they were not studied, and stay where they are now.
 
+**The candidates of endnotes.** Endnotes take three forms of glued
+number that footnotes do not, besides the candidates of section 11:
+
+- the glued number of section 11 without its exclusion of the
+  abbreviations of citations: "art.27", "Q.19" (a word such as
+  "Smart.27" is a candidate under section 11 already);
+- 1 to 3 digits after a number of exactly 4 digits, a year, or after a
+  closing bracket, with between them only the punctuation that ends a
+  sentence, a clause or a quotation (`. , ; : ! ? ) ] ' " ’ ”`): at
+  least one such mark after a year, so that "19731" is no candidate,
+  and none or more after a bracket. Only punctuation may follow the
+  digits: "1911.34",
+  "1886,57", "(61).29", "[1862]).38", "5)16", "(1936)41". A dash or a
+  hyphen is not such punctuation, so a range, "1914-18" or "(612-19)",
+  is no candidate; nor is a number after 1 to 3 digits, so a time
+  "10.35", a decimal "4.6" or a date "14.9.73" stays text;
+- either of these, or a glued number of section 11, whose digits are
+  followed straight by an em or en dash and a word, with no punctuation
+  between the digits and the dash: "river20—and" reads "river", the
+  reference "20", and "—and", which stays text after the link; a hyphen
+  is not such a dash.
+
+A word that section 11 reads as a candidate keeps that reading, so
+"(1)." stays a bracketed number, which endnotes do not take; "(61).29"
+is no candidate of section 11, since a bracketed number has only
+punctuation after its bracket, so it is read by the second form. These
+forms are matched like the others (**References** above): the notes of
+a group in the order of their values against the candidates of its
+chapter in reading order, so a candidate is linked to note N only when
+it comes after the one linked to the note before N. Footnotes keep section 11's
+candidates: the footnotes of the public-domain books are matched page
+by page, where a year with a glued number has not been measured, and
+the plan `more-note-links` changes Domesday's footnote candidates on
+measurements of its own.
+
+Measured on 23 November 2026, structure run on copies of the runs of the
+small-fixes plan (`runs/small-fixes/`): Turney's endnotes without a
+link go from 83 to 65 of 613, by 18 new links, 17 after a year and 1
+after a bracket; Haynes' from 50 to 13 of 632, by 37 new links, 26
+after a bracket, 4 after a year, 3 after an abbreviation and 4 before a
+dash. Each new link reads its note's number and lies in its note
+group's chapter, no link of before moves or goes, and on the five
+public-domain books of that run, Gierke's endnotes among them,
+`blocks.json` is the same byte for byte. The rest of the endnotes
+without a link are left to the plan's next task. The targets of
+section 26 lie a few notes above these counts.
+
 **The chapter of a group** is a level-1 heading block of the body,
 after the config's `contents_pages` and before the endnote section,
 found from the group heading: the heading whose spans' letters, in
@@ -4215,6 +4262,8 @@ when the PDF is absent. They assert counts only, never text:
 | endnotes, and note groups (notes with a `group`) | at least 580, 11 | at least 620, 18 |
 | endnotes linked | at least 450 | at least 550 |
 | links from a reference to a note of another group's chapter | 0 | 0 |
+| endnotes without a link (section 12, "The candidates of endnotes") | at most 70 | at most 15 |
+| links whose number is not their note's marker's, but for one digit the OCR confuses (section 11, "Matching") or a marker that reads no number ("x") | 0 | 0 |
 | `epigraph` blocks, and those with line feeds | 13, 0 | 21, 8 |
 | `source_dash` changes | 0 | 21 |
 
