@@ -205,10 +205,12 @@ def test_no_reference_links_to_a_note_of_another_groups_chapter(
 
 # Structure spec section 26, "Whole-book tests": the endnotes without a
 # link, at most (section 12, "The candidates of endnotes" and "The gap
-# between linked neighbours"; 27 and 5 on 23 November 2026, 83 and 50
+# between linked neighbours"; 29 and 3 on 23 November 2026, 83 and 50
 # before both).
 _UNLINKED = {"turney": 30, "haynes": 7}
 # Structure spec section 11, "Matching": the digit pairs the OCR confuses.
+# Kept apart from galley's own copy on purpose, so that this test checks
+# the links against the spec independently of the code under test.
 _CONFUSED_DIGITS = frozenset(
     frozenset(pair) for pair in ("38", "56", "17", "35", "68", "14", "89", "28", "58")
 )

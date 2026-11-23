@@ -65,14 +65,8 @@ def pair_score(reference: Reference, note_value: int | None) -> int:
         return 0
     if reference.value == note_value:
         return _EXACT
-    candidate, note = str(reference.value), str(note_value)
-    differing = tuple(
-        frozenset((one, other))
-        for one, other in zip(candidate, note, strict=False)
-        if one != other
-    )
-    if len(candidate) == len(note) and len(differing) == 1:
-        return _CONFUSED if differing[0] in _CONFUSED_DIGITS else 0
+    if _one_digit_confused(str(reference.value), str(note_value)):
+        return _CONFUSED
     return 0
 
 
@@ -341,9 +335,11 @@ _GLUED_DIGITS = re.compile(
 )
 
 
-# A number's own punctuation before glued digits: "10.35" is a time,
-# "2,718" a number, and neither a reference.
-_NUMBER_PUNCTUATION = re.compile(r".*[0-9][.,:;]*")
+# What before glued digits makes them part of a number, not a reference:
+# a number's own punctuation or a range's hyphen or dash after a digit
+# ("10.35" a time, "2,718" a number, "1914-18" a range), or a currency or
+# section sign with any punctuation after it ("£16", "§.12").
+_NUMBER_PUNCTUATION = re.compile(r".*(?:[0-9][.,:;\-–—]*|[£$§][^\w\s]*)")
 
 
 def foreign_signs(words: Iterable[str]) -> frozenset[str]:
@@ -380,7 +376,7 @@ def are_confused(one: int, other: int) -> bool:
     return _one_digit_confused(str(one), str(other))
 
 
-def gap_reference(
+def _gap_reference(
     word: BodyWord, value: int, signs: frozenset[str]
 ) -> Reference | None:
     """The reference to note `value` that `word` may be when it lies in the
@@ -494,21 +490,34 @@ def gap_links(
     the gap between linked neighbours (spec section 12, "The gap between
     linked neighbours"): for a run of k notes of consecutive values none
     of which is linked, whose value before and value after are linked, the
-    words of `words` between those two references that `gap_reference`
+    words of `words` between those two references that `_gap_reference`
     reads as a reference to one of the run's notes, when there are exactly
     k of them and the i-th reads as the i-th note's. `words` are the
-    group's chapter's words in reading order, none of them linked; a link
-    made here is never a neighbour of another."""
+    group's chapter's words in reading order, which may hold the words
+    `links` took: those lie at the ends of the gaps, never inside; a link
+    made here is never a neighbour of another. `links` are expected in the
+    reading order of their notes' values, as the matching makes them; a
+    run whose first reference does not come before its second takes
+    nothing, and a word taken by one run, in the order of the runs'
+    values, is in no other run's gap."""
     valued = tuple(note for note in notes if note.value is not None)
     linked = {link.note: (link.candidate.block, link.candidate.word) for link in links}
     made: list[Link] = []
+    taken: set[tuple[int, int]] = set()
     for run, start, end in _unlinked_runs(valued, linked):
-        gap = tuple(word for word in words if start < (word.block, word.word) < end)
+        if not start < end:
+            continue
+        gap = tuple(
+            word
+            for word in words
+            if start < (word.block, word.word) < end
+            and (word.block, word.word) not in taken
+        )
         found = tuple(
             word
             for word in gap
             if any(
-                gap_reference(word, note.value, signs) is not None
+                _gap_reference(word, note.value, signs) is not None
                 for note in run
                 if note.value is not None
             )
@@ -516,7 +525,7 @@ def gap_links(
         if len(found) != len(run):
             continue
         readings = tuple(
-            gap_reference(word, note.value, signs) if note.value is not None else None
+            _gap_reference(word, note.value, signs) if note.value is not None else None
             for word, note in zip(found, run, strict=True)
         )
         if any(reading is None for reading in readings):
@@ -526,4 +535,5 @@ def gap_links(
             for word, note, reading in zip(found, run, readings, strict=True)
             if reading is not None
         )
+        taken.update((word.block, word.word) for word in found)
     return tuple(made)

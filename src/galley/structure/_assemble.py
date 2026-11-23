@@ -650,16 +650,11 @@ def _links(
             group_notes,
             tuple(candidate for candidate in free if start <= candidate.block < end),
         )
-        taken = frozenset(
-            (link.candidate.block, link.candidate.word) for link in matched
-        )
+        # The matching links in the order of the notes' values, so none of
+        # its words lies inside a gap: they are passed as they are.
         return matched + gap_links(
             group_notes,
-            tuple(
-                word
-                for word in words
-                if start <= word.block < end and (word.block, word.word) not in taken
-            ),
+            tuple(word for word in words if start <= word.block < end),
             matched,
             signs,
         )

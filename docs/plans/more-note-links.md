@@ -43,11 +43,10 @@ Two read-only investigations, on the EPUBs of `runs/small-fixes/`:
   pages where galley split or joined notes); notes of two columns
   joined (13); a garbled first word defeating `note_of` (43).
 
-The investigations' per-note files, while the scratchpad lasts:
-`/private/tmp/claude-501/-Users-jose-devel-book-parser/1ee0a54b-9041-40e0-8eea-a6a998ac4e20/scratchpad/footnotes/`
-(Domesday per-note results and causes, Kadesh true notes per page) and
-`.../scratchpad/endnotes/` (scripts only for the owner's books). The
-counts above are what the plan's checks start from.
+The investigations' per-note files (Domesday per-note results and
+causes, Kadesh true notes per page, scripts for the owner's books) were
+kept only in a session's temporary folder. The counts above are what the
+plan's checks start from.
 
 ## In and out
 

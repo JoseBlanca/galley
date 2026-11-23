@@ -292,6 +292,7 @@ def endnote_candidate(word: str) -> Reference | None:
     """The candidate reference to an endnote in a word of the body (spec
     section 12, "The candidates of endnotes"): the candidate of
     `reference_candidate` but a number after an amount, or when there is
-    none, a number that only endnotes take ("1911.34", "art.27", "river20—and")."""
+    none, a number that only endnotes take ("1911.34", "art.27",
+    "river20—and")."""
     candidate = _common_candidate(word)
     return candidate if candidate is not None else endnote_reference(word)

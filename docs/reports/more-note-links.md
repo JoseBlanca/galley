@@ -67,3 +67,28 @@ garbles). Gierke 299 → 311 endnotes, 10 new links; the 12 new starts
 and 5 links checked on the images. The four other public-domain books
 are byte-identical. Not caught: Haynes 11, Turney 41 and 42, whose
 number does not start a line.
+
+## Review of work packages 1–3
+
+Four reviewers (spec, tests, fidelity, conventions) at 7500c30. None
+found a wrong link or a lost word in the outputs. All findings held and
+are fixed (77c019b to 69d36d9):
+
+- Examples in the spec, code, tests, plan and report were copied from
+  the owner's books (mostly reference forms such as a year and a glued
+  number, a few with a word); all replaced with made-up forms of the
+  same shape, none of which occurs in either book. The branch history
+  is rewritten before the merge so that no commit holds them.
+- The gap rule read digits after a range's dash or a currency sign
+  ("1914-18", "£5"); it no longer does. Gierke loses one right link
+  (note 322, read "elaborated3-2.").
+- A gap word can be taken by one run only, so that out-of-order links
+  could never link one word to two notes.
+- About 15 checks had no test that failed without them; each has one
+  now. One filter could not be reached and was removed.
+- galley-eval: a reference now maps after the last token before it
+  aligned to the body outside a margin note. Domesday 1,410 → 1,432;
+  the 22 more are right on the reference text, 6 checked on the images.
+
+Counts after the fixes: Turney 29 unlinked of 618 endnotes, Haynes 3 of
+691; Gierke 311 endnotes, 228 with a link (208 before the plan).

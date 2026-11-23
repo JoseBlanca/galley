@@ -2319,8 +2319,7 @@ the page's start) and the reference of the next linked note of the page
   word that starts with a capital ("80 \\ Moreover", Domesday page 483),
   or after a letter and punctuation, then only punctuation ("burh'\\",
   page 215): Domesday's OCR reads a raised number so;
-- a star glued after a digit, then punctuation ("15*.", "£700*.", pages
-  139 and 191).
+- a star glued after a digit, then punctuation ("15*.", page 139).
 
 No other word of that stretch may end with the note's digits and then
 only punctuation, but the word just before the found one ("£11" before
@@ -2675,8 +2674,13 @@ of the body's paragraphs (blocks of kind `paragraph`, not headings,
 figures or quotes) after the first of those two references and before
 the second, that no footnote and no link took. A link made by this rule
 is never the neighbour of another run: the runs are found once, from
-the matching's links only. The examples below are made up; the owner's
-books are named by page and note only.
+the matching's links only. The matching links a group's notes in the
+reading order of their values, so a run's first reference comes before
+its second; a run whose first reference does not come before its
+second (links out of order, which the matching does not make) takes
+nothing, and a word that one run took, in the order of the runs'
+values, is not in the gap of another. The examples below are made up;
+the owner's books are named by page and note only.
 
 A word of the gap **reads as** a reference to note V when it is:
 
@@ -2692,8 +2696,11 @@ A word of the gap **reads as** a reference to note V when it is:
   end of V's digits ("river!’'9" for 19, "river/0" for 30), or V with
   one digit changed by a pair the OCR confuses (section 11,
   "Matching"). The digits are none after a digit, or after a digit and
-  only `. , : ;`: a time "10.35" and a number "2,718" stay text, while
-  "(71-72)-46" has a bracket between;
+  only `. , : ;` or a hyphen or dash (`-` `–` `—`): a time "10.35", a
+  number "2,718" and a range "1914-18" or "pp.12-14" stay text, while
+  "(71-72)-46" has a bracket between; nor are they after a currency or
+  section sign (`£` `$` `§`), with or without punctuation between:
+  "£16", "§12";
 - **a sign the book does not print**: "^" or "~" in any book, and a
   straight quotation mark (`'` or `"`) in a book whose body holds more
   of the curly forms of that mark (‘ ’ or “ ”) than of it, Turney but
