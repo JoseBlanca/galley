@@ -1135,11 +1135,33 @@ def _body_links(
         len(body),
         last_contents_page,
         Numbering.BY_MARKER,
+        frozenset(),
     )
     return tuple(
         (body[link.candidate.block].words[link.candidate.word], notes[link.note].marker)
         for link in links
     )
+
+
+def test_lone_number_to_an_unmarked_note_after_a_skip_is_undone() -> None:
+    # Spec section 11, "Sure links", applied again after the lone numbers:
+    # the note with no marker has the value 3 after note 1, so a lone "3."
+    # is not the reference the order expects (it would read 2).
+    body = (_block(BlockKind.PARAGRAPH, "the land1. and the king 3. Then on", page=9),)
+    notes = (_note(NoteKind.FOOTNOTE, "1"), _note(NoteKind.FOOTNOTE, ""))
+    links = _links(
+        body,
+        notes,
+        (1, 3),
+        frozenset(),
+        (None, None),
+        (),
+        len(body),
+        -1,
+        Numbering.PER_PAGE,
+        frozenset(),
+    )
+    assert tuple(notes[link.note].marker for link in links) == ("1",)
 
 
 @pytest.mark.parametrize(
@@ -1172,6 +1194,7 @@ def test_unmarked_footnote_after_an_unlinked_note_is_linked_only_by_marker(
         len(body),
         -1,
         numbering,
+        frozenset(),
     )
     assert (
         tuple(

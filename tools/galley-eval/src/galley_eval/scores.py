@@ -52,8 +52,8 @@ How the spec is read here, where it leaves a choice:
   heading is right when it holds a reference heading, in the range or
   not.
 - A note's reference is right when any galley reference to the galley
-  note that holds the note is within 3 tokens of any of Gutenberg's
-  references to it.
+  note that holds the note is within NOTE_REFERENCE_TOKENS tokens of any
+  of Gutenberg's references to it.
 - A margin note's position is right when, in galley's order of blocks at
   that output, the first block after the galley margin note that holds it
   and is not a margin note is the block that holds the first aligned
@@ -404,12 +404,6 @@ def _text_scores(counter: Counter[str], *, with_repaired: bool) -> TextScores:
 def aligned_galley_index(alignment: Alignment, index: int) -> int | None:
     """The index of the first galley token of the pairing of the reference
     token at `index`, None when it is not aligned."""
-    return _first_galley(alignment, index)
-
-
-def _first_galley(alignment: Alignment, index: int) -> int | None:
-    """The first galley token of a reference token's pairing, None when it
-    is not aligned."""
     pairing = alignment.pairings[_pairing_of(alignment, index)]
     if pairing.state not in _ALIGNED:
         return None
@@ -569,7 +563,7 @@ def _label_share(
     held = tuple(
         galley[galley_index]
         for index in indices
-        if (galley_index := _first_galley(alignment, index)) is not None
+        if (galley_index := aligned_galley_index(alignment, index)) is not None
         and galley[galley_index].block_id == holder
     )
     return sum(token.in_label for token in held) / len(held) if held else 0.0
@@ -632,7 +626,7 @@ def _holder(
     holders = Counter(
         block_id
         for index in indices
-        if (galley_index := _first_galley(alignment, index)) is not None
+        if (galley_index := aligned_galley_index(alignment, index)) is not None
         and (block_id := galley[galley_index].block_id) is not None
     )
     return holders.most_common(1)[0][0] if holders else None
@@ -736,7 +730,7 @@ def _found_where(
     tokens = tuple(
         galley[galley_index]
         for index in indices
-        if (galley_index := _first_galley(alignment, index)) is not None
+        if (galley_index := aligned_galley_index(alignment, index)) is not None
     )
     if not tokens:
         return _Found.MISSING, None
@@ -834,7 +828,7 @@ def note_scores(
 ) -> NoteScores:
     """Each reference note found as a galley note, in the body or not at
     all, and whether galley's reference to a note found as a note is
-    within 3 tokens of Gutenberg's."""
+    within NOTE_REFERENCE_TOKENS tokens of Gutenberg's."""
 
     def note_of(token: GalleyToken) -> str | None:
         if token.stream is not GalleyStream.NOTES or token.block_id is None:
@@ -1009,7 +1003,7 @@ def _first_aligned_block(
     alignment: Alignment, indices: list[int], galley: tuple[GalleyToken, ...]
 ) -> str | None:
     for index in indices:
-        galley_index = _first_galley(alignment, index)
+        galley_index = aligned_galley_index(alignment, index)
         if galley_index is not None:
             return galley[galley_index].block_id
     return None

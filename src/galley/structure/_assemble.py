@@ -64,7 +64,6 @@ from galley.structure._markers import (
     book_marker_form,
     endnote_candidate,
     marker_form,
-    note_marker,
 )
 from galley.structure._measures import letters
 from galley.structure._notes import (
@@ -100,7 +99,6 @@ from galley.structure._references import (
     sure_links,
     sure_through,
     through_score,
-    with_own_numbers,
     with_values_in_order,
     without_one_digit_values,
 )
@@ -563,15 +561,6 @@ def _mark(marker: str) -> NoteMark:
     return NoteMark.NUMBER
 
 
-def _digits_reading(marker: str) -> int | None:
-    """What a note's marker of digits reads ("6", "12."), None for any
-    other marker."""
-    reading = note_marker(marker)
-    if reading is None or not reading.marker.rstrip(".").isdigit():
-        return None
-    return reading.value
-
-
 def _links(
     body: Sequence[Unnumbered],
     notes: Sequence[UnnumberedNote],
@@ -582,7 +571,7 @@ def _links(
     before_section: int,
     last_contents_page: int,
     numbering: Numbering,
-    guessed: frozenset[int] = frozenset(),
+    guessed: frozenset[int],
 ) -> tuple[Link, ...]:
     """The references of `body`, the body's blocks but the endnote
     section's, matched to `notes`, whose values are `values` and whose
@@ -594,21 +583,14 @@ def _links(
     each group's endnotes among the candidates of its chapter. In a book
     whose notes are numbered per page, `numbering`, the footnotes keep only
     their sure links, `guessed` being the positions of the footnotes a
-    stand-in or a row of notes started."""
+    row of notes started (spec section 11, rule 6)."""
     candidates = body_candidates(body)
     footnote_notes = tuple(
         NoteToMatch(position, first_page(note.origin), value, _mark(note.marker))
         for position, (note, value) in enumerate(zip(notes, values, strict=True))
         if note.kind is NoteKind.FOOTNOTE and position not in uncounted
     )
-    if numbering is Numbering.PER_PAGE:
-        # Spec section 11, "A marker's own number".
-        footnote_notes = with_own_numbers(
-            footnote_notes,
-            tuple(_digits_reading(notes[note.note].marker) for note in footnote_notes),
-            candidates,
-        )
-    else:
+    if numbering is not Numbering.PER_PAGE:
         # Spec section 11, "A value out of order".
         footnote_notes = in_page_order(without_one_digit_values(footnote_notes))
     # Spec section 11, "Sure links": in a book numbered per page, a note

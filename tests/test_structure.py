@@ -2404,6 +2404,56 @@ def test_band_of_two_columns_is_found_when_its_lines_outnumber_the_body() -> Non
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
+def _note_words(*parts: tuple[str, float], top: float) -> Line:
+    """A note line 7 pt high of the words of each part's text, each part
+    starting at its x0, 4 pt a character and 3 pt between words."""
+    words: list[Word] = []
+    for text, x0 in parts:
+        left = x0
+        for word in text.split(" "):
+            right = left + 4.0 * len(word)
+            words.append(Word(word, Box(left, top, right, top + 7.0), None))
+            left = right + 3.0
+    return Line(_box(tuple(word.box for word in words)), tuple(words))
+
+
+def test_sign_to_the_note_before_one_under_a_row_is_unlinked_alone() -> None:
+    # Structure spec section 11, "Sure links", made up in the form of
+    # Haskins' page 56: notes 1 and 2 on a row, note 3 under it (rule 6);
+    # the page's two signs refer to notes 1 and 3, the reference to 2
+    # lost; the second sign would take note 2 in order.
+    body = _region(
+        _full("the fame of the sea and Eric's war-faring.^ went far", 70),
+        *(
+            _full(f"more words {n} of the page and so on", 70 + _PITCH_PT * n)
+            for n in range(1, 4)
+        ),
+        _full("but I am quoting Gummere ^ as weapon-dead men", 130),
+        *(
+            _full(f"other words {n} of the page and so on", 130 + _PITCH_PT * n)
+            for n in range(1, 5)
+        ),
+    )
+    band = _region(
+        _note_words(
+            ("1 Corpus Poeticum Boreale, i.", 50.0),
+            ("^ Ibid., p. 281.", 200.0),
+            top=280,
+        ),
+        _note_words(("^ Germanic Origins, p. 305.", 50.0), top=289),
+    )
+    lines = _lines_of(PageLayout(0, (body, band), ()))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert tuple(note.marker for note in blocks.notes) == ("1", "^", "^")
+    linked = tuple(
+        span.note_ref
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref is not None
+    )
+    assert linked == (blocks.notes[0].id,)
+
+
 def test_band_of_five_lines_with_short_last_lines_gives_a_note_each() -> None:
     # The band's commonest edges would be 60 and 140 pt, those of its
     # indented first lines and short last lines; its box, 50 to 300 pt,
@@ -4218,7 +4268,7 @@ def _sure_kept(
         Link(Candidate(0, word, 10, _glued(text)), note)
         for word, (note, text) in enumerate(linked)
     )
-    return tuple(link.note for link in sure_links(notes, links, unmarked))
+    return tuple(link.note for link in sure_links(notes, links, unmarked, frozenset()))
 
 
 def test_unmarked_table_row_under_the_last_note_loses_its_link() -> None:

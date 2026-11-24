@@ -1,13 +1,11 @@
-"""Tests of the plan wrong-links, work package 3: footnotes the OCR read as
-one (docs/specs/structure.md, section 11, "Where a note starts", "Two
-notes on one line", "A marker's own number" and "Sure links").
+"""Tests of the plan wrong-links, work package 3, and of its review:
+footnotes the OCR read as one (docs/specs/structure.md, section 11,
+"Where a note starts", "Two notes on one line" and "Sure links").
 
 The unit tests write a page's note lines by hand, made up in the form of
 Domesday's notes. The excerpt tests run on domesday_joined_notes; the
 expected notes and references of each page are those of its file in
-tests/fixtures/expected/wrong_links/, read from the page image. Page 8 of
-the excerpt (Domesday's page index 504), whose "6" the OCR reads "8" less
-than 10 pt after the note before, stays one note and is not tested.
+tests/fixtures/expected/wrong_links/, read from the page image.
 """
 
 import json
@@ -29,7 +27,6 @@ from galley.structure._references import (
     Link,
     NoteToMatch,
     sure_links,
-    with_own_numbers,
 )
 
 _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "wrong_links"
@@ -42,12 +39,14 @@ _LEFT_PT = 30.0
 _FULL = 300.0
 
 
-def _line(text: str, top: float, x1: float | None = None) -> PlacedLine:
+def _line(
+    text: str, top: float, x1: float | None = None, x0: float = _LEFT_PT
+) -> PlacedLine:
     """A note line of `text` from the band's left edge; "|NN|" between two
     words sets a gap of NN pt there. It ends at `x1` when given, its last
     word moved there."""
     words: list[Word] = []
-    left = _LEFT_PT
+    left = x0
     gap = 0.0
     for part in text.split(" "):
         if part.startswith("|") and part.endswith("|"):
@@ -63,7 +62,7 @@ def _line(text: str, top: float, x1: float | None = None) -> PlacedLine:
         last = words[-1]
         width = last.box.x1 - last.box.x0
         words[-1] = Word(last.text, Box(x1 - width, top, x1, top + 8.0), None)
-    box = Box(_LEFT_PT, top, words[-1].box.x1, top + 8.0)
+    box = Box(x0, top, words[-1].box.x1, top + 8.0)
     return PlacedLine(0, Line(box, tuple(words)), _EDGES, _EDGES)
 
 
@@ -170,54 +169,160 @@ def test_number_starting_a_line_after_a_sentence_end_starts_a_note() -> None:
     )
 
 
-def _candidate(value: int, page: int = 0) -> Candidate:
-    return Candidate(
-        0, value, page, Reference("oxen", str(value), "", ReferenceForm.GLUED, value)
+def _notes_of(*regions: tuple[PlacedLine, ...]) -> tuple[str, ...]:
+    """The texts of the notes `page_notes` cuts from the band regions."""
+    return tuple(
+        " ".join(word.text for line in note.lines for word in line.line.words)
+        for note in page_notes(regions, frozenset())
     )
 
 
-def _values(notes: Sequence[NoteToMatch]) -> tuple[int | None, ...]:
-    return tuple(note.value for note in notes)
+def test_marker_one_confused_digit_from_the_next_value_starts_a_note() -> None:
+    # Domesday's page 504: notes 5 and 6 side by side, the 6 read "8" 9.9
+    # pt after the note before.
+    assert _notes(
+        _line("5 D. B. iv. 3-4, 9, 15 (Chinbrige). |9.9| 8 D. B. iv. 61-2-3.", 10.0)
+    ) == ("5 D. B. iv. 3-4, 9, 15 (Chinbrige).", "8 D. B. iv. 61-2-3.")
 
 
-_PAGE_NOTES = tuple(NoteToMatch(place, 0, place + 1) for place in range(5))
-# The page's numbering gave the note marked "6" the value 5.
-_READINGS = (1, 2, 3, 4, 6)
+def test_marker_two_values_past_the_next_after_8_pt_starts_no_note() -> None:
+    assert _notes(
+        _line("5 D. B. iv. 3-4, 9, 15 (Chinbrige). |9.9| 9 D. B. iv. 61-2-3.", 10.0)
+    ) == ("5 D. B. iv. 3-4, 9, 15 (Chinbrige). 9 D. B. iv. 61-2-3.",)
 
 
-def test_note_takes_its_own_number_when_a_reference_on_its_page_reads_it() -> None:
-    candidates = tuple(_candidate(value) for value in range(1, 7))
-    assert _values(with_own_numbers(_PAGE_NOTES, _READINGS, candidates)) == (
-        1,
-        2,
-        3,
-        4,
-        6,
+def test_line_under_a_row_after_no_sentence_end_starts_no_note() -> None:
+    assert _notes(
+        _line("1 D. B. i. 41. |19| 2 Stat. of Westminster, c. 3, and of", 10.0, _FULL),
+        _line("3 Edward I. c. 4.", 20.0),
+    ) == (
+        "1 D. B. i. 41.",
+        "2 Stat. of Westminster, c. 3, and of 3 Edward I. c. 4.",
     )
 
 
-def test_note_keeps_its_page_value_when_no_reference_reads_its_own_number() -> None:
-    candidates = (*(_candidate(value) for value in range(1, 6)), _candidate(6, 1))
-    assert _values(with_own_numbers(_PAGE_NOTES, _READINGS, candidates)) == (
-        1,
-        2,
-        3,
-        4,
-        5,
+_ROW = "1 D. B. i. 41. |19| 2 Ibid. 42."
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A marker of two characters.
+        "12 Edward I. c. 4.",
+        # A marker glued to its word.
+        "5Edward I. c. 4.",
+        # A marker before a word in lower case.
+        "5 hidae et 4 car.",
+    ],
+    ids=["two_characters", "glued", "lower_case"],
+)
+def test_line_under_a_row_without_a_lone_marker_before_a_capital_starts_no_note(
+    text: str,
+) -> None:
+    assert _notes(_line(_ROW, 10.0), _line(text, 20.0)) == (
+        "1 D. B. i. 41.",
+        f"2 Ibid. 42. {text}",
     )
 
 
-def test_note_keeps_its_page_value_when_another_note_has_its_own_number() -> None:
-    notes = (*_PAGE_NOTES, NoteToMatch(5, 0, 6))
-    candidates = tuple(_candidate(value) for value in range(1, 7))
-    assert _values(with_own_numbers(notes, (*_READINGS, 6), candidates)) == (
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
+def test_sign_under_a_short_line_looks_ahead_in_its_own_line() -> None:
+    # Domesday's page 169: "*" for 4 under a short line, and 5 and 6 on
+    # its own line, the page's last.
+    assert _notes(
+        _line("3 D. B. ii. 404 b.", 10.0),
+        _line("* D. B. ii. 291 b. |23| 5 D. B. ii. 24 b. |22| 6 D. B. ii. 438.", 20.0),
+    ) == (
+        "3 D. B. ii. 404 b.",
+        "* D. B. ii. 291 b.",
+        "5 D. B. ii. 24 b.",
+        "6 D. B. ii. 438.",
     )
+
+
+def test_stand_in_looks_ahead_to_the_next_band_region() -> None:
+    # The note after the stand-in tops the next column, a region of its own.
+    assert _notes_of(
+        (_line("4 D. B. i. 339, Agetorne. |19| & D. B. i. 174.", 10.0),),
+        (_line("6 D. B. i. 163, Bercbelai.", 10.0, x0=200.0),),
+    ) == ("4 D. B. i. 339, Agetorne.", "& D. B. i. 174.", "6 D. B. i. 163, Bercbelai.")
+
+
+def test_stand_in_before_a_marker_starts_no_note() -> None:
+    # Domesday's page 500: the "." 70 pt after note 4 stands for 5, but no
+    # text follows it before note 6.
+    assert _notes(
+        _line("4 D. B. i. 364 (Lincoln). |70| . |16| 6 See above.", 10.0)
+    ) == (
+        "4 D. B. i. 364 (Lincoln). .",
+        "6 See above.",
+    )
+
+
+def test_last_stand_in_after_a_note_whose_value_is_its_place_starts_no_note() -> None:
+    # Domesday's page 240: the "»" note's value is its place, and the
+    # spaced "«" would take the value of the glued one.
+    assert _notes(
+        _line("8 See above, p. 183.", 10.0),
+        _line("» D. B. 38 b, 44. |19| «D. B. C4b. |20| « D. B. 66.", 20.0, x0=42.0),
+    ) == ("8 See above, p. 183.", "» D. B. 38 b, 44. «D. B. C4b. « D. B. 66.")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # The word "A", not a stand-in, before a note 6.
+        "4 D. B. i. 339. |19| A Treatise, p. 3. |19| 6 Ibid. 4.",
+        # A stand-in after a word that ends no sentence.
+        "4 D. B. i. 339, Agetorne |19| & D. B. i. 174. |19| 6 Ibid. 4.",
+        # A word of two letters.
+        "4 This we can not find. |19| If Kent were. |19| 6 Ibid. 4.",
+    ],
+    ids=["word_a", "no_sentence_end", "two_letters"],
+)
+def test_word_that_is_no_stand_in_between_two_notes_starts_no_note(
+    text: str,
+) -> None:
+    notes = _notes(_line(text, 10.0))
+    assert len(notes) == 2
+    assert notes[1] == "6 Ibid. 4."
+
+
+def test_last_stand_in_before_a_word_in_lower_case_starts_no_note() -> None:
+    assert _notes(_line("1 D. B. i. 154. |30| - and so on.", 10.0)) == (
+        "1 D. B. i. 154. - and so on.",
+    )
+
+
+def _sign_links(linked: tuple[int, ...], guessed: frozenset[int]) -> tuple[int, ...]:
+    """The notes whose sign link `sure_links` keeps, of one page's three
+    notes 1 to 3, the notes `linked` each linked to a sign "^", those at
+    `guessed` started by a row of notes."""
+    notes = tuple(NoteToMatch(place, 0, place + 1) for place in range(3))
+    links = tuple(
+        Link(
+            Candidate(
+                0, word, 0, Reference("Gummere", "^", "", ReferenceForm.SIGN, None)
+            ),
+            note,
+        )
+        for word, note in enumerate(linked)
+    )
+    return tuple(link.note for link in sure_links(notes, links, frozenset(), guessed))
+
+
+def test_sign_to_the_note_before_a_note_under_a_row_is_unlinked_alone() -> None:
+    # Haskins' page 56: notes 1 and 2 on a row, 3 under it (rule 6); the
+    # reference to 2 is lost, and the sign that refers to 3 took 2.
+    assert _sign_links((0, 1), frozenset({2})) == (0,)
+
+
+def test_signs_to_both_notes_of_a_cut_keep_their_links() -> None:
+    # Haskins' page 29: the same row, each note with its sign.
+    assert _sign_links((0, 1, 2), frozenset({2})) == (0, 1, 2)
+
+
+def test_sign_with_no_note_started_by_a_row_keeps_its_link() -> None:
+    assert _sign_links((0, 1), frozenset()) == (0, 1)
 
 
 # Excerpt tests.
@@ -263,7 +368,7 @@ def _page_numbers(blocks: BlocksFile, page: int) -> tuple[str, ...]:
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.parametrize("page", [0, 1, 2, 3, 4, 5, 6, 7, 9])
+@pytest.mark.parametrize("page", [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 def test_each_printed_note_is_a_note_of_its_own(
     excerpt_books: frozendict[str, BookFolder], page: int
 ) -> None:
@@ -274,7 +379,7 @@ def test_each_printed_note_is_a_note_of_its_own(
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.parametrize("page", [6, 7, 9])
+@pytest.mark.parametrize("page", [6, 7, 8, 9])
 def test_reference_links_the_note_of_its_number(
     excerpt_books: frozendict[str, BookFolder], page: int
 ) -> None:
@@ -295,35 +400,3 @@ def test_reference_links_the_note_of_its_number(
             if before.endswith(reference["word"]) and text == reference["reference"]
         )
         assert found == (reference["note"],), reference
-
-
-def _sign_links(linked: tuple[int, ...], guessed: frozenset[int]) -> tuple[int, ...]:
-    """The notes whose sign link `sure_links` keeps, of one page's three
-    notes 1 to 3, the notes `linked` each linked to a sign "^", those at
-    `guessed` started by a stand-in or a row of notes."""
-    notes = tuple(NoteToMatch(place, 0, place + 1) for place in range(3))
-    links = tuple(
-        Link(
-            Candidate(
-                0, word, 0, Reference("Gummere", "^", "", ReferenceForm.SIGN, None)
-            ),
-            note,
-        )
-        for word, note in enumerate(linked)
-    )
-    return tuple(link.note for link in sure_links(notes, links, frozenset(), guessed))
-
-
-def test_sign_to_the_note_before_a_note_under_a_row_is_unlinked_alone() -> None:
-    # Haskins' page 56: notes 1 and 2 on a row, 3 under it (rule 6); the
-    # reference to 2 is lost, and the sign that refers to 3 took 2.
-    assert _sign_links((0, 1), frozenset({2})) == (0,)
-
-
-def test_signs_to_both_notes_of_a_cut_keep_their_links() -> None:
-    # Haskins' page 29: the same row, each note with its sign.
-    assert _sign_links((0, 1, 2), frozenset({2})) == (0, 1, 2)
-
-
-def test_sign_with_no_note_started_by_a_guess_keeps_its_link() -> None:
-    assert _sign_links((0, 1), frozenset()) == (0, 1)

@@ -39,7 +39,7 @@ from galley_eval.errors import EvaluationError
 from galley_eval.evaluate import Difference, Evaluation, OutputScores, Scorecard
 from galley_eval.note_links import NoteLinks
 from galley_eval.page_table import PageRow
-from galley_eval.scores import Part, TextScores
+from galley_eval.scores import NOTE_REFERENCE_TOKENS, Part, TextScores
 from galley_eval.stages import StageOutput
 
 __all__ = [
@@ -426,12 +426,15 @@ def _apart_rows(evaluation: Evaluation) -> list[str]:
 
 
 def _note_link_rows(links: NoteLinks) -> list[str]:
+    """The lines of `summary.md` that list the wrong note links and the
+    joined notes, each list under its heading with its count."""
     rows = [
         f"### Wrong note links: {len(links.wrong_links)}",
         "",
         (
             "At markdown, the note links whose note begins as none of the "
-            "notes the reference text references within 3 tokens: "
+            "notes the reference text references within "
+            f"{NOTE_REFERENCE_TOKENS} tokens: "
             "`other_note` when it references one there, `no_reference` when "
             "it references none."
         ),
