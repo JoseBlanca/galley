@@ -13,6 +13,7 @@ from galley_eval.align import State, Subkind
 from galley_eval.books import EvaluationBook
 from galley_eval.errors import EvaluationError
 from galley_eval.evaluate import Apart, Difference, Evaluation
+from galley_eval.note_links import JoinedNote, LinkFault, NoteLinks, WrongLink
 from galley_eval.output import (
     BookResult,
     RunInfo,
@@ -199,6 +200,62 @@ def test_book_summary_lists_the_running_head_under_structure(
     assert extract.startswith("1 tokens")
     assert "`work` → `werk`" in extract
     assert "### Unplaced tokens: 0" in summary
+
+
+_NOTE_LINKS = NoteLinks(
+    wrong_links=(
+        WrongLink(
+            page_index=106,
+            note_id="n-p0106-006",
+            block_id="b-p0106-002",
+            fault=LinkFault.NO_REFERENCE,
+            reference_notes=(),
+        ),
+        WrongLink(
+            page_index=440,
+            note_id="n-p0440-005",
+            block_id="b-p0440-001",
+            fault=LinkFault.OTHER_NOTE,
+            reference_notes=("Footnote_1379",),
+        ),
+    ),
+    joined_notes=(
+        JoinedNote(
+            page_index=52,
+            note_id="n-p0052-003",
+            reference_note="Footnote_65",
+            next_reference_note="Footnote_66",
+        ),
+    ),
+)
+
+
+def test_book_summary_lists_the_wrong_note_links_and_joined_notes(
+    small_evaluation: SmallEvaluation,
+) -> None:
+    evaluation = dataclasses.replace(small_evaluation(None), note_links=_NOTE_LINKS)
+    summary = book_summary(evaluation, _RUN)
+    assert "### Wrong note links: 2" in summary
+    assert (
+        "- page 106: n-p0106-006 from b-p0106-002, no_reference "
+        "(Gutenberg's: none)" in summary
+    )
+    assert (
+        "- page 440: n-p0440-005 from b-p0440-001, other_note "
+        "(Gutenberg's: Footnote_1379)" in summary
+    )
+    assert "### Joined notes: 1" in summary
+    assert "- page 52: n-p0052-003 holds Footnote_65 and Footnote_66" in summary
+
+
+def test_scorecard_json_holds_the_counts_of_wrong_links_and_joined_notes(
+    small_evaluation: SmallEvaluation,
+) -> None:
+    scorecard = dataclasses.replace(
+        small_evaluation(None).scorecard, wrong_note_links=2, joined_notes=1
+    )
+    content = json.loads(scorecard_json(scorecard, _RUN))
+    assert (content["wrong_note_links"], content["joined_notes"]) == (2, 1)
 
 
 def test_write_evaluation_writes_the_four_files(

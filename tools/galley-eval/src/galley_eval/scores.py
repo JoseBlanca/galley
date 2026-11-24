@@ -81,6 +81,7 @@ from galley_eval.galley_side import GalleyBlock, GalleyNoteReference
 from galley_eval.reader import ReferenceKind, ReferenceText, Stream
 
 __all__ = [
+    "NOTE_REFERENCE_TOKENS",
     "BoundaryScores",
     "GalleyKind",
     "HeadingScores",
@@ -90,12 +91,14 @@ __all__ = [
     "Part",
     "Placement",
     "TextScores",
+    "aligned_galley_index",
     "block_kinds",
     "endnote_notes",
     "galley_parts",
     "heading_scores",
     "kinds_right",
     "margin_note_scores",
+    "note_reference_gaps",
     "note_scores",
     "notes_found_as_notes",
     "page_parts",
@@ -396,6 +399,12 @@ def _text_scores(counter: Counter[str], *, with_repaired: bool) -> TextScores:
 
 
 # Where a reference token's galley token is
+
+
+def aligned_galley_index(alignment: Alignment, index: int) -> int | None:
+    """The index of the first galley token of the pairing of the reference
+    token at `index`, None when it is not aligned."""
+    return _first_galley(alignment, index)
 
 
 def _first_galley(alignment: Alignment, index: int) -> int | None:
@@ -786,6 +795,35 @@ def _note_reference_gap(
     return gaps[positions[-1] + 1]
 
 
+def note_reference_gaps(
+    alignment: Alignment,
+    places: tuple[ReferencePlace, ...],
+    galley: tuple[GalleyToken, ...],
+    galley_note_references: tuple[GalleyNoteReference, ...],
+) -> tuple[int | None, ...]:
+    """For each galley note reference, the gap of the reference body it
+    maps onto (spec section 6, notes); None when its block has no token
+    at this output or no body token of the output is aligned."""
+    gaps = _reference_gaps(alignment, places, galley)
+    block_positions = _block_positions(galley)
+    found: list[int | None] = []
+    for note_reference in galley_note_references:
+        positions = block_positions.get(note_reference.block_id, ())
+        found.append(
+            _note_reference_gap(
+                alignment,
+                places,
+                galley,
+                gaps,
+                positions,
+                note_reference.tokens_before,
+            )
+            if positions
+            else None  # a block with no token at this output has no place
+        )
+    return tuple(found)
+
+
 def note_scores(
     reference: ReferenceText,
     alignment: Alignment,
@@ -807,16 +845,12 @@ def note_scores(
     for index, place in enumerate(places):
         if place.note_index is not None:
             by_note.setdefault(place.note_index, []).append(index)
-    gaps = _reference_gaps(alignment, places, galley)
-    block_positions = _block_positions(galley)
     galley_gaps: dict[str, list[int]] = {}
-    for note_reference in galley_note_references:
-        positions = block_positions.get(note_reference.block_id, ())
-        if not positions:
-            continue  # a block with no token at this output has no place
-        gap = _note_reference_gap(
-            alignment, places, galley, gaps, positions, note_reference.tokens_before
-        )
+    for note_reference, gap in zip(
+        galley_note_references,
+        note_reference_gaps(alignment, places, galley, galley_note_references),
+        strict=True,
+    ):
         if gap is not None:
             galley_gaps.setdefault(note_reference.note_id, []).append(gap)
     gutenberg_gaps: dict[str, list[int]] = {}
@@ -833,7 +867,7 @@ def note_scores(
         )
         found[where] += 1
         if galley_note is not None and any(
-            abs(galley_gap - gutenberg_gap) <= _NOTE_REFERENCE_TOKENS
+            abs(galley_gap - gutenberg_gap) <= NOTE_REFERENCE_TOKENS
             for galley_gap in galley_gaps.get(galley_note, ())
             for gutenberg_gap in gutenberg_gaps.get(note.note_id, ())
         ):
@@ -897,7 +931,7 @@ def endnote_notes(
 
 
 # A guess, to be set again once structure finds notes (spec section 6).
-_NOTE_REFERENCE_TOKENS = 3
+NOTE_REFERENCE_TOKENS = 3
 
 
 def _block_positions(

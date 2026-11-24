@@ -103,8 +103,9 @@ __all__ = [
 class GalleyBlock:
     """A block of `blocks.json`: its kind, its stream, the id of the note
     it is in, None in the body, and the kind of that note; whether it is a
-    heading with a label; and the page index of its first origin, None
-    for a block without one."""
+    heading with a label; the page index of its first origin, None for a
+    block without one; and how many of its first tokens are its note's
+    marker, 0 when its note prints none there."""
 
     kind: BlockKind
     stream: GalleyStream
@@ -112,6 +113,7 @@ class GalleyBlock:
     note_kind: NoteKind | None = None
     has_label: bool = False
     first_page: int | None = None
+    marker_tokens: int = 0
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -283,6 +285,11 @@ def galley_blocks(blocks: BlocksFile) -> frozendict[str, GalleyBlock]:
         )
         for block in blocks.blocks
     }
+    markers = {
+        block.id: len(marker.split())
+        for block, marker, in_note in _blocks_with_markers(blocks)
+        if in_note
+    }
     notes = {
         block.id: GalleyBlock(
             kind=block.kind,
@@ -291,6 +298,7 @@ def galley_blocks(blocks: BlocksFile) -> frozendict[str, GalleyBlock]:
             note_kind=note.kind,
             has_label=block.label is not None,
             first_page=_first_page(block),
+            marker_tokens=markers[block.id],
         )
         for note in blocks.notes
         for block in note.blocks
