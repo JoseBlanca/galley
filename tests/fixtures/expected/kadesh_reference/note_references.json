@@ -1,6 +1,6 @@
 {
   "book": "battleofkadeshst00breauoft",
-  "read": "Transcribed by the assistant on 19 November 2026 from the page images, rendered with pypdfium2 at 300 dpi, whole pages and crops enlarged about two times. The raised numbers of the references are blurred on pages 9, 11, 15 and 27; each was read with the help of the sequence, since Kadesh numbers its notes through the article, and checked against the notes' own markers at the foot of the page, which are clearer. 'after' is the word printed just before the reference, with its punctuation, and 'context' the words before it on the same page, as many as make it occur once there; 'starts' the first words of the note after its marker. Page 8's '*' follows the heading's last word. Page 11's note 19 holds the numbered paragraphs 1. to 3. Pages 13, 25, 26, 40, 47 and 53 were added the same day, read the same way; page 40's 'beaten' is printed damaged. Pages 14, 32, 37, 59, 60, 61, 62, 63 and 66 were added on 24 November 2026, read the same way from the page images at 200 dpi, to check the links of the correct stage on the vision model's recorded answers (correct spec, section 9b); on page 66 the notes are printed in two columns, 175 to 177 in the left and 178 in the right.",
+  "read": "Transcribed by the assistant on 19 November 2026 from the page images, rendered with pypdfium2 at 300 dpi, whole pages and crops enlarged about two times. The raised numbers of the references are blurred on pages 9, 11, 15 and 27; each was read with the help of the sequence, since Kadesh numbers its notes through the article, and checked against the notes' own markers at the foot of the page, which are clearer. 'after' is the word printed just before the reference, with its punctuation, and 'context' the words before it on the same page, as many as make it occur once there; 'starts' the first words of the note after its marker. Page 8's '*' follows the heading's last word. Page 11's note 19 holds the numbered paragraphs 1. to 3. Pages 13, 25, 26, 40, 47 and 53 were added the same day, read the same way; page 40's 'beaten' is printed damaged. Pages 14, 32, 37, 59, 60, 61, 62, 63 and 66 were added on 24 November 2026, read from the page images rendered with pypdfium2 at 200 dpi, each page in two halves and not enlarged, to check the links of the correct stage on the vision model's recorded answers (correct spec, section 9b); on page 66 the notes are printed in two columns, 175 to 177 in the left and 178 in the right.",
   "pages": [
     {
       "page_index": 8,
@@ -249,11 +249,11 @@
       "notes": [
         {
           "marker": "24",
-          "starts": "LD., II, 149d"
+          "starts": "LD., II, 149d = Gol., Ham., XII:"
         },
         {
           "marker": "25",
-          "starts": "LD., II, 149d"
+          "starts": "LD., II, 149d = Gol., Ham., XI."
         },
         {
           "marker": "26",
