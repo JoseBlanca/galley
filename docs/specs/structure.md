@@ -2379,8 +2379,11 @@ candidate wins, then the second note, and so on. The scores:
 |---|---|
 | the candidate's number is the note's value | 3 |
 | the numbers differ in one digit, a pair the OCR confuses (3 and 8, 5 and 6, 1 and 7, 3 and 5, 6 and 8, 1 and 4, 8 and 9, 2 and 8, 5 and 8) | 2 |
-| a sign against a note with no value | 2 |
-| a sign against a note with a value (Haskins: "^" for note 1) | 1 |
+| a sign against a note with no value whose marker is a sign, or that has none ("What a sign pairs with", below) | 2 |
+| a sign against any other note (Haskins: "^" for note 1) | 1 |
+
+In a book numbered through, the second row has one exception ("One
+number off", below).
 
 **A note without a value between two with values.** Before the
 matching, a footnote with no value that lies between two notes of its
@@ -2407,6 +2410,69 @@ Page 9's three agree with the references read by eye in
 `tests/fixtures/expected/kadesh_reference/note_references.json`, and no
 other link of its twelve pages changes. No link of the other six books
 changes.
+
+**A value out of order.** In a book numbered through, before "A note
+without a value between two with values", a footnote loses the value its marker reads when another note
+that starts on its page reads the same number, or when two notes of its
+page whose values are in order with each other are each out of order
+with it. Two values of one page are in order when the later note's is
+the larger. The OCR reads part of a raised number, "1" for 31 or 159,
+and such a value takes a reference that reads the same part, or keeps
+"A note without a value between two with values" from giving the notes
+around it their values. Kadesh
+(`battleofkadeshst00breauoft`, page indices) reads the markers of its
+page 14's notes 27 to 33 as "27", "28", "29", "%", "1", "32" and "33".
+The "1" is out of order with "29" and "32", which are in order with each
+other, so it has no value, as "%" has none; "A note without a value
+between two with values" then gives both notes, 30 and 31, their values, "gendarmes.80" and "Sinai.31" take them, and the signs
+after "5,000.”" and "people,”" take notes 32 and 33, where before they
+took notes 29 and 30. Page 61 reads its notes 158 to 164 "18", "1", "1",
+"141", "2", "43" and "4": only "43" keeps a value, and "Luxor1"", the
+reference to note 163, no longer takes note 159. Two values out of
+order only with each other both stay: page 32 reads its notes 82 and 83
+"88" and "83", and each is linked right. Asking instead that the later
+value be larger by at least the places between the notes drops right
+values wherever the cut makes a false note: the excerpt
+`kadesh_redo`, whose layout cuts page 14's note 32 into three notes,
+then dropped "27" to "29" and "33". A book numbered per page needs no
+such rule: its numbering gives each page's values in order.
+
+**What a sign pairs with.** A note's marker may be a number the OCR
+could not read as one: Kadesh's notes 25, 26, 30 and 34 are marked "%",
+its note 76 "™" and its note 80 "©". Such a note, and a note whose
+marker is digits or bracketed but that has no value (above), is marked
+with a number, and a sign scores 1 against it, as against a note with a
+value; only against a note with no value whose marker is a sign of the
+note marker's form ("*", "'", "»") or that has no marker does a sign
+score 2. Kadesh's page 15 lost the reference to its note 34, marked
+"%", which the OCR read "enemy;™", no candidate; the sign after "2,052",
+the reference to note 35, took note 34, and now takes note 35, which
+has no marker. The rule holds in every book; in a book numbered per
+page every note but a first piece that continues a note has a value, so
+it changes nothing there.
+
+**One number off.** In a book numbered through, a candidate whose number
+is one more or one less than a note's value is never paired with it as
+a confused digit (5 and 6, 8 and 9): the notes of a page are numbered
+one after the other, so that number is the note's before or after it,
+read right. Kadesh's page 60 linked "bottom155" to note 156, its marker
+read right, while note 155's marker reads "18"; it is now unlinked.
+Pairs of a confused digit further off stay: "»aten108" takes note 103
+(page 40) and "Aranami82" note 82, marked "88" (page 32), each right by
+the page image. The rule is not applied in a book numbered per page,
+where it was not measured.
+
+These three rules were added on 24 November 2026 (plan wrong-links,
+task 4.1). Kadesh rebuilt that day without the vision model, every link
+checked against the references read by eye in
+`tests/fixtures/expected/kadesh_reference/note_references.json` or the
+page image: before, 30 of its 45 links were right and 15 wrong (page
+indices 14 twice, 15, 21, 27, 31, 37, 41, 47, 53, 54, 55, 60, 61, 63);
+after, 35 of 45 are right and 10 wrong. Right links gained: page 14's
+notes 30 and 31, unlinked before; page 14's references 32 and 33 and
+page 15's 35, which went to the wrong notes before and now go to their
+own. Wrong links removed without a new link: pages 60 and 61. Domesday, Haskins, Gierke, Stubbs and the owner's two books give
+the same `blocks.json` byte for byte.
 
 A pair that none of these rows scores is never matched, and a note that
 its page's numbering leaves out ("Its value") is in no pair. The pair 5
@@ -2660,6 +2726,26 @@ some of them.
   numbered per page, a page whose reference to note 2 the OCR lost links
   note 2 to the next candidate that reads 2 or a digit confusable with
   it.
+- **Kadesh's wrong links, 24 November 2026**: 10 of the 45 links of
+  the book built without the vision model go to a note other than their
+  reference's, by page index:
+  - a sign takes the page's first note, or its first without a value,
+    while the references before it were lost or read as no candidate:
+    37 (note 90's "iter" has no mark), 47 (112 to 114 lost), 53 (130 to
+    133 lost), 55 (145 read as the word "'*", which has no letter before
+    the sign); and 54, where "I'*" (144) takes note 141, the first of
+    the page's notes that no glued number took;
+  - the notes are joined, so a sign takes the record that holds its note
+    and others: 21 (notes 48 to 50: the OCR read note 49's marker "©"
+    after a full line, and merged note 50's first line with the line
+    before it), 27 (64 to 66, marked "“", which is no marker's form, and
+    the short line "Phœnicia." that ends note 64 lost);
+  - both the reference and the note's marker read the same first digit
+    of different numbers: 31 ("river,"7*", 79, and note 78 marked "7"),
+    41 ("city.1*", 106, and note 105 marked "1"), 63 ("Luxor."1", 172,
+    and note 173 marked "1"). Dropping a one-digit value after note 9
+    would also drop page 18's "Kadesh4"" to note 40, marked "4", and
+    page 26's "sledges."5*" to note 56, marked "8", both right.
 - **Kadesh's notes on pages 9, 11 and 13 to 15** are too damaged to cut
   ("*Oampagne de Kkamitf"): 94 of its band blocks after another note
   have no marker. They stay notes with no marker, unreferenced, in
