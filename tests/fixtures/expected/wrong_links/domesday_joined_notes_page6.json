@@ -1,0 +1,56 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 440,
+  "excerpt": "domesday_joined_notes, page 6",
+  "read": "Read by the assistant on 24 November 2026 from the band rendered at 150 dpi. Below the end of a note of the page before, six notes: 1; 2 and 3 side by side; 4 and 5 side by side, the OCR reading the 5 as '&'; 6. The body's references 2 to 6 follow 'oxen' (2, 3, 4, 5) and 'teams' (6).",
+  "expected": {
+    "notes": [
+      {
+        "number": "1",
+        "text": "D. B. i. 222, Codestoche, Lidintone."
+      },
+      {
+        "number": "2",
+        "text": "D. B. i. 289; 339 b, Bechelinge."
+      },
+      {
+        "number": "3",
+        "text": "D. B. i. 342 b, Toresbi."
+      },
+      {
+        "number": "4",
+        "text": "D. B. i. 339, Agetorne."
+      },
+      {
+        "number": "5",
+        "text": "D. B. i. 174, Lappewrte."
+      },
+      {
+        "number": "6",
+        "text": "D. B. i. 163, Berchelai."
+      }
+    ],
+    "references": [
+      {
+        "word": "oxen",
+        "reference": "3",
+        "note": "3"
+      },
+      {
+        "word": "oxen",
+        "reference": "4",
+        "note": "4"
+      },
+      {
+        "word": "oxen",
+        "reference": "5",
+        "note": "5"
+      },
+      {
+        "word": "teams",
+        "reference": "6",
+        "note": "6"
+      }
+    ]
+  }
+}

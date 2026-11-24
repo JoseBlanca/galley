@@ -223,6 +223,11 @@ EXCERPT_CONFIGS = frozendict(
             'authors = ["Frederic William Maitland"]\n'
             'language = "en"\n'
         ),
+        "domesday_joined_notes": (
+            'title = "Domesday Book and Beyond"\n'
+            'authors = ["Frederic William Maitland"]\n'
+            'language = "en"\n'
+        ),
         "gierke_notes_heads": (
             'title = "Political Theories of the Middle Age"\n'
             'authors = ["O. Gierke", "F. W. Maitland"]\n'

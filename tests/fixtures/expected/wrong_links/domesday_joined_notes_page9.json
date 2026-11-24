@@ -1,0 +1,51 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 517,
+  "excerpt": "domesday_joined_notes, page 9",
+  "read": "Read by the assistant on 24 November 2026 from the band rendered at 150 dpi. Six notes: 1 and 2 side by side; 3; 4 and 5 side by side, the OCR reading the 4 as '*' and the 5 as '6'; 6. The body's references 4 to 6 follow 'day', 'Confessor' and 'record'.",
+  "expected": {
+    "notes": [
+      {
+        "number": "1",
+        "text": "D. B. i. 32 b."
+      },
+      {
+        "number": "2",
+        "text": "K. 812 (iv. 151)."
+      },
+      {
+        "number": "3",
+        "text": "K. 986-988 (v. 14-21); B. i. 55-9, 64."
+      },
+      {
+        "number": "4",
+        "text": "Plummer, Bede, ii. 217."
+      },
+      {
+        "number": "5",
+        "text": "K. 917 (iv. 165)."
+      },
+      {
+        "number": "6",
+        "text": "D. B. i. 66 b, 67."
+      }
+    ],
+    "references": [
+      {
+        "word": "day",
+        "reference": "4",
+        "note": "4"
+      },
+      {
+        "word": "Confessor",
+        "reference": "5",
+        "note": "5"
+      },
+      {
+        "word": "record",
+        "reference": "6",
+        "note": "6"
+      }
+    ]
+  }
+}

@@ -518,6 +518,20 @@ EVALUATION_EXCERPTS = frozendict(
                     "ink (481)"
                 ),
             ),
+            Excerpt(
+                name="domesday_joined_notes",
+                page_indices=(177, 187, 207, 213, 225, 335, 440, 445, 504, 517),
+                covers=(
+                    "footnotes the OCR read as one (docs/plans/wrong-links.md, "
+                    "work package 3): a note that starts inside a line after "
+                    "a quotation's end (\"Rege.' 3 But\", page index 177; "
+                    "187, 335), a marker read as a sign or a dash between "
+                    'two numbers ("- D. B.", 207, 225; "&", 440) or as the '
+                    'page\'s last ("- D. B.", 213), a 6 read 8 (504), a '
+                    '4 read "*" before a 5 read 6 (517), and a number that '
+                    'starts a line inside a note ("2 carucae", 445)'
+                ),
+            ),
         ),
     }
 )

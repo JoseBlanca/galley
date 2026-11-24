@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
+from galley.model import Word
 from galley.structure._lines import (
     INDENT_MAX_PT,
     INDENT_MIN_PT,
@@ -56,6 +57,16 @@ _NEXT_MARKER_GAP_PT = 8.0
 # Kadesh's columns on its pages 32 and 66.
 _WIDE_GAP_PT = 20.0
 _ENDS_BEFORE_A_NOTE = (".", "'", "’", ":", ";", ")")
+# Spec section 11, "Two notes on one line": the end of a quotation, a full
+# stop, "?" or "!" and a closing quotation mark ("Rege.'"), after which a
+# marker that reads the next value starts a note whatever the gap.
+_QUOTATION_ENDS = tuple(
+    stop + quote for stop in ".?!" for quote in ("'", "’", '"', "”")
+)
+# Spec section 11, "Two notes on one line": a word that stands for a
+# marker the OCR misread ("«", "-", "&", ":<", "B"), of at most 2
+# characters, none a digit.
+_STAND_IN_MAX_CHARACTERS = 2
 # Spec section 11, "Its value": the scores of a page's numbering. A
 # marker that reads its note's value scores 1, one a confused digit away
 # 0.5; each number skipped costs 0.5, at most 2 on a page, and each note
@@ -105,6 +116,15 @@ class _LinePlace(StrEnum):
 
     TOP = "the region's first line"
     BELOW_THE_TOP = "a later line"
+
+
+class _ValueSource(StrEnum):
+    """Where the value of the note a line's first words belong to comes
+    from: what its marker reads, or its place after a note whose marker
+    reads one."""
+
+    MARKER = "its marker"
+    PLACE = "its place"
 
 
 def _column_left(line: PlacedLine, lines: Sequence[PlacedLine]) -> float:
@@ -172,6 +192,16 @@ def _line_marker(
     lone_letter = len(word) == 1 and word.isalpha() and word.islower()
     if not before.endswith(_ENDS_BEFORE_A_NOTE) or not after:
         return None
+    reads_next = (
+        marker is not None
+        and marker.marker.rstrip(".").isdigit()
+        and next_value is not None
+        and marker.value == next_value
+    )
+    if reads_next and before.endswith(_QUOTATION_ENDS) and after[:1].isupper():
+        return marker
+    if reads_next and gap >= _NEXT_MARKER_GAP_PT and not after[:1].islower():
+        return marker
     if (
         len(word) == 1
         and gap >= _WIDE_GAP_PT
@@ -192,28 +222,129 @@ def _line_marker(
     return marker if marker is not None else NoteMarker(word, "", read_number(word))
 
 
+def _reading_in_line(words: Sequence[Word], start: int) -> int | None:
+    """What the first marker of a note inside a line reads, among `words`
+    from position `start` on: a word of 1 to 3 digits after a word that
+    ends as before a note and a gap of at least 8 pt, before a word that
+    starts with a capital; None when there is none."""
+    for position in range(max(start, 1), len(words) - 1):
+        marker = note_marker(words[position].text)
+        if (
+            marker is not None
+            and marker.value is not None
+            and marker.marker.rstrip(".").isdigit()
+            and words[position - 1].text.endswith(_ENDS_BEFORE_A_NOTE)
+            and words[position].box.x0 - words[position - 1].box.x1
+            >= _NEXT_MARKER_GAP_PT
+            and words[position + 1].text[:1].isupper()
+        ):
+            return marker.value
+    return None
+
+
+def _reads_after_next(following: int | None, next_value: int) -> bool:
+    """Whether `following`, what a later marker reads, is the number after
+    `next_value`, or more than `next_value` and one confused digit away
+    from that number (a 5 read 6 after a 4): the number between is a
+    marker the OCR misread (spec section 11, rule 5 and "Two notes on one
+    line")."""
+    return following is not None and (
+        following == next_value + 1
+        or (following > next_value and are_confused(following, next_value + 1))
+    )
+
+
+def _is_stand_in(word: str) -> bool:
+    """Whether `word` may stand for a marker the OCR misread: 1 or 2
+    characters, no digit, reading no number, and of 2 characters only
+    when neither is a letter ("«", "&", ":<", "B")."""
+    return (
+        0 < len(word) <= _STAND_IN_MAX_CHARACTERS
+        and not any(character.isdigit() for character in word)
+        and read_number(word) is None
+        and (len(word) == 1 or not any(character.isalpha() for character in word))
+    )
+
+
+def _stand_in_marker(
+    before: str,
+    word: str,
+    after: str,
+    gap: float,
+    next_value: int,
+    following: int | None,
+    source: _ValueSource,
+) -> NoteMarker | None:
+    """The marker of a second note that starts at `word`, a word that
+    stands for a misread marker, inside a note line between `before` and
+    `after`, `gap` points after `before`, where the next note's value would
+    be `next_value` and `following` is what the next marker of the page
+    after `word` reads, None when none reads a number; None when no note
+    starts there (spec section 11, "Two notes on one line"). `source` says
+    whether the value of the note the line's words so far belong to is its
+    marker's reading."""
+    if (
+        not _is_stand_in(word)
+        or word in _ONE_LETTER_WORDS
+        or not before.endswith(_ENDS_BEFORE_A_NOTE)
+        or gap < _LINE_MARKER_GAP_PT
+        or note_marker(after) is not None
+    ):
+        return None
+    between = _reads_after_next(following, next_value)
+    last = (
+        following is None
+        and gap >= _WIDE_GAP_PT
+        and source is _ValueSource.MARKER
+        and after[:1].isupper()
+        and not word.islower()
+    )
+    return NoteMarker(word, "", None) if between or last else None
+
+
 def _cut_line(
-    line: PlacedLine, value: int | None, place: _LinePlace
+    line: PlacedLine,
+    value: int | None,
+    place: _LinePlace,
+    source: _ValueSource,
+    following: int | None,
 ) -> tuple[tuple[PlacedLine, NoteMarker | None], ...]:
     """The parts of a note line, each with the marker of the note it starts,
     the first part's None: one part when no second note starts in it.
     `value` is that of the note the first part belongs to, None when not
-    known; `place` says whether the line is the first of its region."""
+    known, and `source` where it comes from; `place` says whether the line
+    is the first of its region; `following` is what the first marker of the
+    page's later note lines reads, None when none reads a number."""
     words = line.line.words
     parts: list[tuple[int, NoteMarker | None]] = [(0, None)]
     for position in range(1, len(words) - 1):
         next_value = value + 1 if value is not None else None
+        gap = words[position].box.x0 - words[position - 1].box.x1
         marker = _line_marker(
             words[position - 1].text,
             words[position].text,
             words[position + 1].text,
-            words[position].box.x0 - words[position - 1].box.x1,
+            gap,
             next_value,
             place,
         )
+        if marker is None and next_value is not None:
+            in_line = _reading_in_line(words, position + 1)
+            marker = _stand_in_marker(
+                words[position - 1].text,
+                words[position].text,
+                words[position + 1].text,
+                gap,
+                next_value,
+                in_line if in_line is not None else following,
+                source,
+            )
         if marker is not None:
             parts.append((position, marker))
             value = marker.value if marker.value is not None else next_value
+            source = (
+                _ValueSource.MARKER if marker.value is not None else _ValueSource.PLACE
+            )
     ends = (*(start for start, _ in parts[1:]), len(words))
     return tuple(
         (with_words(line, words[start:end]), marker)
@@ -248,16 +379,18 @@ def _under_a_short_line(
         return False
     if marker.value is not None:
         return True
-    following = (
+    in_line = _reading_in_line(words, 2)
+    next_line = (
         note_marker(first_word(region[number + 1]))
         if number + 1 < len(region)
         else None
     )
-    return (
-        expected is not None
-        and following is not None
-        and following.value == expected + 2
+    following = (
+        in_line
+        if in_line is not None
+        else (next_line.value if next_line is not None else None)
     )
+    return expected is not None and _reads_after_next(following, expected + 1)
 
 
 def page_notes(
@@ -284,9 +417,20 @@ def page_notes(
     first line always starts a note, and so does the first line of a later
     region indented 5 to 40 pt against its column (rule 4)."""
     page_lines = tuple(line for region in regions for line in region)
+    readings = tuple(
+        marker.value if (marker := note_marker(first_word(line))) else None
+        for line in page_lines
+    )
     notes: list[PageNote] = []
+    line_count = 0
     for region in regions:
+        parts_before = 1
         for number, line in enumerate(region):
+            line_count += 1
+            following = next(
+                (reading for reading in readings[line_count:] if reading is not None),
+                None,
+            )
             word = first_word(line)
             marker = note_marker(word)
             indent = _indent(line, page_lines)
@@ -303,6 +447,7 @@ def page_notes(
                 or (marker is not None and indented)
                 or (number == 0 and indented)
                 or _under_a_short_line(region, number, marker, expected)
+                or _under_a_row(line, marker, parts_before)
                 or (
                     marker is not None
                     and marker.value is not None
@@ -316,19 +461,26 @@ def page_notes(
                     )
                 )
             )
-            if starts:
-                value = (
-                    marker.value
-                    if marker is not None and marker.value is not None
-                    else (expected + 1 if expected is not None else None)
-                )
+            if starts and marker is not None and marker.value is not None:
+                value, source = marker.value, _ValueSource.MARKER
+            elif starts:
+                value = expected + 1 if expected is not None else None
+                source = _ValueSource.PLACE
             else:
                 value = expected
+                source = (
+                    _ValueSource.MARKER
+                    if notes and notes[-1].marker and notes[-1].marker.value is not None
+                    else _ValueSource.PLACE
+                )
             parts = _cut_line(
                 line,
                 value,
                 _LinePlace.TOP if number == 0 else _LinePlace.BELOW_THE_TOP,
+                source,
+                following,
             )
+            parts_before = len(parts)
             first_part, _ = parts[0]
             if starts:
                 if marker is None and (by_indent or indented):
@@ -351,6 +503,24 @@ def page_notes(
                 for part, part_marker in parts[1:]
             )
     return tuple(notes)
+
+
+def _under_a_row(
+    line: PlacedLine, marker: NoteMarker | None, parts_before: int
+) -> bool:
+    """Whether `line`, whose first word's marker is `marker`, starts a note
+    under a row of notes, the line before it in its region having been cut
+    into `parts_before` notes (spec section 11, rule 6): a marker of one
+    character before a capital, under a line of two notes or more."""
+    words = line.line.words
+    return (
+        parts_before > 1
+        and marker is not None
+        and len(marker.marker) == 1
+        and not marker.rest
+        and len(words) >= _MARKER_AND_A_WORD
+        and words[1].text[:1].isupper()
+    )
 
 
 def _expected_value(notes: Sequence[PageNote]) -> int | None:
