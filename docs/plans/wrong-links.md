@@ -146,7 +146,7 @@ Deliverables:
 2. Kadesh rebuilt without the vision model: wrong structure links 8 → at
    most 2, right links not fewer than before (by the page images).
 
-- [ ] 4.1 The causes and the rules.
+- [x] 4.1 The causes and the rules.
 
 ## 5. The end
 
