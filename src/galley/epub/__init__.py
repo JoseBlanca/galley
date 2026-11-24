@@ -4,8 +4,9 @@ sheet and, when the config has a `cover_page`, the cover extract rendered.
 The style sheet is `style.css`, a file of this package, which styles each
 kind of block by the class the markdown stage gives it. `back_links.lua`,
 another, is a Pandoc Lua filter that starts each footnote with its number
-as a link back to its reference (architecture section 9, "Back links"). The stage does not
-run epubcheck, which only the tests use (architecture section 16).
+as a link back to its reference (architecture section 9, "Back links").
+The stage does not run epubcheck, which only the tests use (architecture
+section 16).
 """
 
 import logging
@@ -29,6 +30,11 @@ _logger = logging.getLogger(__name__)
 _PANDOC_TIMEOUT_S = 120
 _STYLE_SHEET = "style.css"
 _BACK_LINKS_FILTER = "back_links.lua"
+# The heading level at which Pandoc starts a chapter file, its default,
+# given so that a change of default cannot part it from SPLIT_LEVEL in
+# back_links.lua, which counts the footnotes of each file from 1 as
+# Pandoc numbers them: the two must be equal.
+_SPLIT_LEVEL = "1"
 # Spec section 8: the format fidelity.read_markdown reads book.md with, so
 # that the EPUB is made from the reading the word check passed.
 _INPUT_FORMAT = "markdown-smart-auto_identifiers"
@@ -40,10 +46,12 @@ def pandoc_arguments(
     """The arguments Pandoc runs with, after the program's name: book.md
     read as Markdown with smart quotes and automatic heading ids off,
     written as EPUB 3 to book.epub with `style_sheet` in place of Pandoc's
-    own, through the Lua filter `back_links`, the figures' images found from the book folder, failing on any
-    warning (an image not found among them), and with images/cover.png as
-    the cover when the config has a `cover_page`. The paths are written as
-    given; run gives absolute ones.
+    own, through the Lua filter `back_links`, a chapter file started at
+    each heading of level 1, the figures' images found from the book
+    folder, failing on any warning (an image not found among them), and
+    with images/cover.png as the cover when the config has a
+    `cover_page`. The paths are written as given; run gives absolute
+    ones.
     """
     cover = (
         ("--epub-cover-image", str(folder.cover_png))
@@ -62,6 +70,8 @@ def pandoc_arguments(
         str(style_sheet),
         "--lua-filter",
         str(back_links),
+        "--split-level",
+        _SPLIT_LEVEL,
         "--resource-path",
         str(folder.root),
         "--fail-if-warnings",

@@ -5339,10 +5339,10 @@ kinds, as on any page.
    the piece does not lie at least 5 pt right of the left side of the
    entry's first line: an entry runs on to a second line only when the
    printer indented it, as Turney's titles of two lines, whose second
-   line starts under the first's title (42 pt) and Stubbs' topics (13 pt). Without the second
-   condition Haynes' closing chapter's entry, whose page number the OCR
-   read "3x3", ran into "Notes 317". A line with no letter or digit joins the
-   entry before it.
+   line starts under the first's title (42 pt), and Stubbs' topics (13
+   pt). Without the second condition Haynes' closing chapter's entry,
+   whose page number the OCR read "3x3", ran into "Notes 317". A line
+   with no letter or digit joins the entry before it.
 5. **A lone label joins the entry after it** as its label: Stubbs',
    Domesday's and Mariéjol's labels over their titles. A lone label
    never has a page number ("CHAPITRE 11", the OCR's "II"). At the end
@@ -5496,8 +5496,8 @@ kinds, as on any page.
     keeps its title whole, but for one case: an entry whose label rule
     12 inferred loses, as junk at the start, the longest piece (at most
     5 characters, as above) that holds a junk sign and a digit or one
-    of the letters I, V, X, L and C, and ends at a space: the mark read together with the lost
-    number. In the `haskins_front` excerpt, whose chapter headings are
+    of the letters I, V, X, L and C, and ends at a space: the mark read
+    together with the lost number. In the `haskins_front` excerpt, whose chapter headings are
     not in its pages (section 32), the three entries of chapters I to
     III lose "-^1.", "_ II," and `"HI.` so, and show "I.", "II." and
     "III." without them; until 24 November 2026 they showed both.
@@ -5519,9 +5519,9 @@ kinds, as on any page.
     digits with ".", "7.", or a well-formed roman numeral in capitals
     with ".", "IV." (rule 7 reads no roman label in lower case, and the
     OCR's "l" or "1" for "I" is not taken as one); two are of the same
-    **style** when both are digits or both roman numerals. In a contents run, labels are inferred for entries without a
-    label in two places, when the count fits exactly and the depths
-    agree:
+    **style** when both are digits or both roman numerals. In a
+    contents run, labels are inferred for entries without a label in
+    two places, when the count fits exactly and the depths agree:
     - between two entries whose number labels are of the same style,
       M and N, at the same depth (rule 8), with exactly N−M−1 entries
       between them, all at that depth and none of them with a label:
@@ -5788,9 +5788,10 @@ would not give back, "5." after "3." or a "1." with no "2." after it,
 are not admitted (revised on 24 November 2026: until then any number
 label that followed its neighbours in any block was admitted, read or
 not). The check applies the same two functions as structure, the runs
-and rule 12, so that the two cannot read the rule apart. It verifies a `list_marker` change: one word before,
-two after, the first after a dash, "—" or "–", and the two joined equal
-to the word before; and it reads `leader_dots` removals as any removal.
+and rule 12, so that the two cannot read the rule apart. It verifies a
+`list_marker` change: one word before, two after, the first after a
+dash, "—" or "–", and the two joined equal to the word before; and it
+reads `leader_dots` removals as any removal.
 
 ## 32. How lists and contents are verified
 

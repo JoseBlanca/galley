@@ -11,14 +11,16 @@ doc-backlink, in the note's first paragraph that is not inside a margin
 note's div.
 
 Pandoc 3.14 numbers the footnotes of each chapter file from 1, and starts a
-file at each heading of level 1 (its default --split-level), so the filter
+file at each heading of level 1 (--split-level 1, which the epub stage
+passes), so the filter
 counts the notes in the order of the text and starts again at each such
 heading. The ids are Pandoc's, not galley's: the epub stage's tests check
 that each back link points to its own note's reference, and epubcheck
 reports a link to an id no file holds.
 ]]
 
--- The heading level at which Pandoc starts a chapter file.
+-- The heading level at which Pandoc starts a chapter file: the epub
+-- stage passes it as --split-level (_SPLIT_LEVEL in __init__.py).
 local SPLIT_LEVEL = 1
 -- The class of the div of a margin note, which keeps its own line.
 local MARGIN_NOTE_CLASS = "margin-note"

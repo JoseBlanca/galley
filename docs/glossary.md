@@ -275,10 +275,10 @@ note reference.
 epub. A subpackage of `src/galley/`.
 
 **stray mark**: a line with no letter or digit above the running head
-or above the title of a printed contents, a speck of the scan that the OCR read as text (";", "^"); also a
-reader's pen mark or a speck read as text before a contents entry's
-label or at the start or end of its title. Removed by structure, with a
-record.
+or above the title of a printed contents, a speck of the scan that the
+OCR read as text (";", "^"); also a reader's pen mark or a speck read
+as text before a contents entry's label or at the start or end of its
+title (see contents junk). Removed by structure, with a record.
 
 **text layer**: the invisible words an OCR program placed over the page
 image of a scanned PDF. Its characters come in **the PDF's order**, the

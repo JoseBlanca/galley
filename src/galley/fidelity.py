@@ -1959,8 +1959,8 @@ def read_markdown(markdown: str) -> MarkdownWords:
     markdown-smart-auto_identifiers --to json --fail-if-warnings`), each with
     the id of the innermost div or heading with an id it is in, the number
     of notes, the number of links marked `epub:type="noteref"`, the number
-    of back links (links with the role `doc-backlink`), the number of items of the lists of list items, and the links of the contents
-    entries.
+    of back links (links with the role `doc-backlink`), the number of items
+    of the lists of list items, and the links of the contents entries.
 
     Words are split at spaces and line breaks, and at the start and end of
     every block, note, link marked as a note reference and back link, whose
