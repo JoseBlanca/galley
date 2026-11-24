@@ -109,7 +109,7 @@ Deliverables:
    count not lower than 1,563 (Domesday) and 68 (Haskins) less the
    links removed as wrong.
 
-- [ ] 2.1 The rule, its tests and the remeasure.
+- [x] 2.1 The rule, its tests and the remeasure.
 
 ## 3. Notes joined on one line, and continuation lines
 
