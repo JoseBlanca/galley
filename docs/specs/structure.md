@@ -1923,10 +1923,13 @@ a note when any of these holds:
 6. its first word is a note marker of one character, a digit or a sign,
    the word after it starts with a capital, and the line before it in
    its region holds two notes or more, cut by "Two notes on one line"
-   (below): a line under a **row of notes** starts a note whatever the
-   line before ends with, since the row's last note ends where it ends
-   and not at the band's right edge (added on 24 November 2026, plan
-   wrong-links, task 3.1). Domesday's page 517 prints "4 Plummer, Bede,
+   (below), and ends as a word before a note does, as rule 3 asks: a
+   line under a **row of notes** starts a note whether or not the line
+   before reaches the band's right edge, since the row's last note ends
+   where it ends (added on 24 November 2026, plan wrong-links, task 3.1;
+   the line before's end asked from the review of that day, so that "2
+   Stat. of Westminster, c. 3, and of" over "3 Edward I. c. 4." stays one
+   note; it changes no note of the seven books). Domesday's page 517 prints "4 Plummer, Bede,
    ii. 217." and "5 K. 917 (iv. 165)." side by side, then "6 D. B. i. 66
    b, 67." on a line of its own; the row reaches the band's right edge,
    so rule 5 did not start note 6. The rule starts 4 notes of Domesday
@@ -1989,7 +1992,15 @@ then a closing quotation mark, before a word that starts with a capital
 two printed lines, the gap a word's); and after a gap of at least 8 pt
 the word after such a marker need only not start with a lower-case
 letter ("4 ^thelb. 26." for "Æthelb.", page 52). After any other word a
-gap is still needed: "D. B. i. 2 D. B." is a citation. Second, a
+gap is still needed: "D. B. i. 2 D. B." is a citation. A marker of 1 to
+3 digits that reads a number one confused digit away from that value
+(the pairs of "Matching", below), after a gap of at least 8 pt, before
+a word that starts with a capital, starts a note too: Domesday's page
+504 prints notes 5 and 6 side by side, read "5 D. B. iv. 3-4, 9, 15
+(Chinbrige). 8 D. B. iv. 61-2-3.", the 6 read "8" 9.9 pt after the full
+stop, and "farthing⁶" took the joined note 5 (added from the review of
+24 November 2026; it adds that note alone to the seven books, and the
+link of "farthing⁶" moves to it, right by the page image). Second, a
 **stand-in**, a word of 1 or 2 characters with no digit that reads no
 number, and of 2 characters only when neither is a letter ("«", "-",
 "&", ":<", "B", "a"), but "A" and "I", after a word that ends as above
@@ -1998,14 +2009,16 @@ starts a note, with the stand-in as its marker and no value of its own
 (the numbering gives it one, "Its value"), when
 - the next marker of the page, the first number cut off later in its
   line (rule 5's next marker) or else the first word of a later note
-  line of the page that reads a number, reads the next value plus 1,
+  line of the page that reads a number, in any band region of the page
+  (the next column too), reads the next value plus 1,
   or a larger number one confused digit away from it: the stand-in is
   the number between ("4 D. B. i. 339, Agetorne. & D. B. i. 174…" over
   "6 D. B. i. 163", page 440; "1 Rot. Hund. ii. 361. - D. B. i. 189."
   over "3 Rental…", page 207; "« D. B. i. 307 b…" before a 5 read "6",
   page 135);
-- or no later note line of the page starts with a number, the gap is at
-  least 20 pt, the word after starts with a capital, the stand-in is no
+- or no number is cut off later in its line and no later note line of
+  the page, in any of its band regions, starts with a number, the gap
+  is at least 20 pt, the word after starts with a capital, the stand-in is no
   lower-case letter, and the note it is cut from has a value its own
   marker reads, not one given by its place: the page's last note ("1 D.
   B. i. 154. - D. B. i. 262 b.", page 213; "8 Ibid. 20 § b. « Ibid.
@@ -2026,6 +2039,9 @@ more-note-links: Domesday's footnotes go from 1,873 to 1,901 and its
 links from 1,585 to 1,613; galley-eval's notes whose reference is right
 from 1,563 to 1,591 of 1,729, and its notes that hold the start of the
 next (galley-eval, "Wrong note links and joined notes") from 36 to 10.
+With the rules of task 3.2 and the confused digit above (review of 24
+November 2026), Domesday has 1,901 footnotes, 1,594 notes whose
+reference is right and 9 joined notes.
 The cuts, each checked on the page image: a number after a quotation's
 end on pages 81, 114, 177, 187, 258, 307 and 335, after a wide gap on
 52; a stand-in between on 58, 78, 135, 139, 207, 225, 235 and 440, last
@@ -2168,24 +2184,13 @@ Otherwise a note's value is what its marker reads, once "i", "l", "I",
 "z" and "Z" as 2, and, inside brackets, "a" as 2 and "t" as 1. A sign
 has no value.
 
-**A marker's own number.** In a book numbered per page, a footnote whose
-marker is 1 to 3 digits that read a number other than the value its
-page's numbering gave it keeps the number its marker reads, as an
-endnote does (section 12, "References"), when a candidate reference of
-its page (below, "Candidates") reads that number, no other note of the
-page has it as its value, and it lies above the values of the page's
-notes before it and below those of the notes after it. The numbering
-moves a value down when a note before is joined to the one before it:
-Domesday's page 440 prints notes 4 and 5 side by side and the OCR reads
-5 as "&", so before the cuts of "Two notes on one line" of 24 November
-2026 the notes read "4" and "6" and were numbered 4 and 5, and
-reference 5 opened note 6. The rule is applied before the matching
-(added on 24 November 2026, plan wrong-links, task 3.2). Measured that
-day, structure run on the `lines.json` of the plan more-note-links:
-with the cuts, no link of the seven books changes; without them,
-Domesday's page 440 takes reference 6 for note 6 and leaves 5
-unlinked, and page 517's note "6", which then held notes 5 and 6, takes
-reference 6 instead of 4.
+A rule that gave a footnote the number its marker reads, instead of its
+page's numbering, when a candidate reference of its page reads that
+number, as an endnote keeps its own (section 12, "References"), was
+added on 24 November 2026 (plan wrong-links, task 3.2) and dropped in
+the review of the same day: once the cuts of "Two notes on one line"
+are made it changes no link of the seven books, and without them it
+moved page 517's reference 6 to a note that held notes 5 and 6.
 
 ### Notes left in the body
 
@@ -2438,17 +2443,20 @@ notes before it:
 - a footnote with no marker, `marker` empty, keeps its link when it is
   the page's only note, or when the note before it on the page is
   linked and its reference reads one more than that note's value;
-- any other footnote whose reference is a sign (`*`, `^`, `•`, and the
-  backslash and star of "A lone number" below) keeps its link when it
-  is the page's first note or the note before it on the page is linked.
+- any other footnote whose reference is a sign (`*`, `^`, `•`, the
+  backslash and star of "A lone number" and the trailing "V" below)
+  keeps its link when it is the page's first note or the note before
+  it on the page is linked.
 
-A note that a stand-in or a row of notes started ("Two notes on one
-line", rule 6) and the note before it on the page were read as one note
-before 24 November 2026; the cut tells that two notes are there, not
-which of them a sign refers to. So a footnote whose reference is a sign,
-when it is such a note or the note before one, keeps its link only when
-the other of the two has a link too (added on 24 November 2026, plan
-wrong-links, task 3.2). Haskins' (`normansineuropea00hask`) page 56
+A note that a row of notes started ("Where a note starts", rule 6) and
+the note before it on the page were read as one note before 24 November
+2026; the cut tells that two notes are there, not which of them a sign
+refers to. So a footnote whose reference is a sign and that the page's
+next note is such a note keeps its link only when that note has a link
+too; a sign on the note rule 6 started needs the note before linked
+already (above). Added on 24 November 2026 (plan wrong-links, task
+3.2); the same rule for a note a stand-in started was dropped in the
+review of that day, since it changed no link of the seven books. Haskins' (`normansineuropea00hask`) page 56
 prints notes 1 and 2 side by side and 3 below them, which rule 6 starts;
 the OCR lost note 2's reference ("target.²"), and "Gummere ^", the
 reference to note 3, took note 2 in order. It is now unlinked. Page 29,
