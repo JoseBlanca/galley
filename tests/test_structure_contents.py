@@ -27,6 +27,7 @@ from galley.model import (
     Origin,
     PageLayout,
     Region,
+    Removal,
     RemovalReason,
     Span,
     Word,
@@ -1075,6 +1076,54 @@ def test_whole_book_contents_entries_linked_to_headings(
     )
     assert len(refs) == _LINKED[book]
     assert all(ref in headings for ref in refs)
+
+
+# Spec section 30, rules 7 and 11, on the whole books: the marks and
+# misread page numbers removed from inside the contents entries, each
+# checked against its page image on 24 November 2026; the other removals
+# of the contents pages are running heads and page numbers. Haskins' "^"
+# is rule 7's, before the label "VI."; the rest are rule 11's.
+_ENTRY_REMOVALS = {
+    "normansineuropea00hask": (
+        (14, "^", RemovalReason.STRAY_MARK),
+        (14, "-^1.", RemovalReason.STRAY_MARK),
+        (14, "_ II,", RemovalReason.STRAY_MARK),
+        (14, '"HI.', RemovalReason.STRAY_MARK),
+    ),
+    "domesdaybook00maituoft": (
+        (14, "*.", RemovalReason.STRAY_MARK),
+        (17, "290.", RemovalReason.PAGE_NUMBER),
+        (20, "pp,", RemovalReason.PAGE_NUMBER),
+    ),
+}
+
+
+def _inside_origin(removal: Removal, block: Block) -> bool:
+    return any(
+        part.page_index == removal.page_index
+        and part.box.x0 <= removal.box.x0
+        and removal.box.x1 <= part.box.x1
+        and part.box.top <= removal.box.top
+        and removal.box.bottom <= part.box.bottom
+        for part in block.origin
+    )
+
+
+@pytest.mark.whole_book
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize("book", list(_ENTRY_REMOVALS))
+def test_whole_book_contents_entries_lose_only_their_marks_and_misread_numbers(
+    whole_book_run: Callable[[str], BookFolder], book: str
+) -> None:
+    blocks = read_blocks(whole_book_run(book).blocks_json)
+    entries = tuple(b for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY)
+    removed = tuple(
+        (removal.page_index, removal.text, removal.reason)
+        for removal in blocks.removals
+        if removal.reason is not RemovalReason.LEADER_DOTS
+        and any(_inside_origin(removal, entry) for entry in entries)
+    )
+    assert removed == _ENTRY_REMOVALS[book]
 
 
 # The excerpts (spec section 32, "Excerpt tests").
