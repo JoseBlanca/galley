@@ -1,0 +1,23 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 225,
+  "excerpt": "domesday_joined_notes, page 4",
+  "read": "Read by the assistant on 24 November 2026 from the band rendered at 150 dpi. Three notes: 1 and 2 side by side, the OCR reading the 2 as '-', and 3 below.",
+  "expected": {
+    "notes": [
+      {
+        "number": "1",
+        "text": "D. B. i. 280."
+      },
+      {
+        "number": "2",
+        "text": "D. B. i. 336 b."
+      },
+      {
+        "number": "3",
+        "text": "D. B. ii. 117."
+      }
+    ],
+    "references": []
+  }
+}

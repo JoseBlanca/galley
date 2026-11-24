@@ -7,6 +7,7 @@ import re
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from enum import StrEnum
 
 from galley.note_references import after_last_letter, is_punctuation
 from galley.structure._markers import Reference, ReferenceForm
@@ -38,14 +39,26 @@ class Candidate:
     reference: Reference
 
 
+class NoteMark(StrEnum):
+    """What a footnote's marker tells of its reference (spec section 11,
+    "Matching"): a sign or no marker at all, against which a sign scores
+    as a note's own mark; or a number, read or not."""
+
+    SIGN = "sign"
+    NUMBER = "number"
+
+
 @dataclass(frozen=True, slots=True)
 class NoteToMatch:
-    """A note to match: its position among the notes, its first page index
-    and its value."""
+    """A note to match: its position among the notes, its first page index,
+    its value, and what its marker is: a number (digits, bracketed, or any
+    other character the OCR read for one, "%", "©") or else a sign or
+    nothing."""
 
     note: int
     page_index: int
     value: int | None
+    mark: NoteMark
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,11 +69,17 @@ class Link:
     note: int
 
 
-def pair_score(reference: Reference, note_value: int | None) -> int:
-    """The score of pairing a candidate with a note of `note_value`, 0 when
-    they are never paired (spec section 11, "Matching")."""
+def pair_score(reference: Reference, note_value: int | None, mark: NoteMark) -> int:
+    """The score of pairing a candidate with a note of `note_value` whose
+    marker is `mark`, 0 when they are never paired (spec section 11,
+    "Matching"): a sign scores more against a note with no value whose
+    marker is a sign or none than against any other."""
     if reference.form is ReferenceForm.SIGN:
-        return _SIGN_WITHOUT_VALUE if note_value is None else _SIGN_WITH_VALUE
+        return (
+            _SIGN_WITHOUT_VALUE
+            if note_value is None and mark is NoteMark.SIGN
+            else _SIGN_WITH_VALUE
+        )
     if reference.value is None or note_value is None:
         return 0
     if reference.value == note_value:
@@ -70,23 +89,18 @@ def pair_score(reference: Reference, note_value: int | None) -> int:
     return 0
 
 
-def align(
-    values: Sequence[int | None],
-    references: Sequence[Reference],
-    score: Callable[[Reference, int | None], int] = pair_score,
-) -> tuple[tuple[int, int], ...]:
+def _best_pairs(scores: Sequence[Sequence[int]]) -> tuple[tuple[int, int], ...]:
     """The pairs (note position, candidate position) of the alignment of
-    notes of `values` with `references`, both in reading order, whose total
-    score is highest: each note with at most one candidate and each
-    candidate with at most one note, a later note never with an earlier
-    candidate. Of two alignments with the same total, the one that pairs
-    the first note with the earlier candidate wins, then the second note,
-    and so on; a note left alone counts as paired after every candidate.
-    `score` gives each pair's score, `pair_score` unless given."""
-    note_count, candidate_count = len(values), len(references)
-    scores = tuple(
-        tuple(score(reference, value) for reference in references) for value in values
-    )
+    notes with candidates, both in reading order, whose total score is
+    highest, from the score of each note (row) with each candidate
+    (column), 0 for a pair never made: each note with at most one
+    candidate and each candidate with at most one note, a later note never
+    with an earlier candidate. Of two alignments with the same total, the
+    one that pairs the first note with the earlier candidate wins, then
+    the second note, and so on; a note left alone counts as paired after
+    every candidate."""
+    note_count = len(scores)
+    candidate_count = len(scores[0]) if scores else 0
     # best[i][j]: the highest total of the notes from i and the candidates
     # from j.
     best = [[0] * (candidate_count + 1) for _ in range(note_count + 1)]
@@ -113,29 +127,37 @@ def align(
     return tuple(pairs)
 
 
+def note_score(reference: Reference, note: NoteToMatch) -> int:
+    """`pair_score` of `reference` against `note`."""
+    return pair_score(reference, note.value, note.mark)
+
+
 def _matched(
     notes: Sequence[NoteToMatch],
     candidates: Sequence[Candidate],
-    score: Callable[[Reference, int | None], int] = pair_score,
+    score: Callable[[Reference, NoteToMatch], int],
 ) -> tuple[Link, ...]:
     """The links of an alignment of `notes` with `candidates`, by `score`."""
     return tuple(
         Link(candidates[candidate], notes[note].note)
-        for note, candidate in align(
-            tuple(note.value for note in notes),
-            tuple(candidate.reference for candidate in candidates),
-            score,
+        for note, candidate in _best_pairs(
+            tuple(
+                tuple(score(candidate.reference, note) for candidate in candidates)
+                for note in notes
+            )
         )
     )
 
 
 def _matched_with_quotes(
-    notes: Sequence[NoteToMatch], candidates: Sequence[Candidate]
+    notes: Sequence[NoteToMatch],
+    candidates: Sequence[Candidate],
+    score: Callable[[Reference, NoteToMatch], int],
 ) -> tuple[Link, ...]:
-    """The links of one page's `notes` with its `candidates`, those that are
-    an opening single quotation mark only when they pair more notes than
-    without them (spec section 11, "References": "Kings‘" may be a misread
-    closing quote)."""
+    """The links of one page's `notes` with its `candidates` by `score`,
+    those that are an opening single quotation mark only when they pair
+    more notes than without them (spec section 11, "References": "Kings‘"
+    may be a misread closing quote)."""
     without = _matched(
         notes,
         tuple(
@@ -143,24 +165,30 @@ def _matched_with_quotes(
             for candidate in candidates
             if candidate.reference.reference != _OPENING_QUOTE
         ),
+        score,
     )
-    with_quotes = _matched(notes, candidates)
+    with_quotes = _matched(notes, candidates, score)
     return with_quotes if len(with_quotes) > len(without) else without
+
+
+def _by_page(notes: Sequence[NoteToMatch]) -> dict[int, list[NoteToMatch]]:
+    """`notes` grouped by the page they start on, each page's in their
+    order."""
+    by_page: dict[int, list[NoteToMatch]] = {}
+    for note in notes:
+        by_page.setdefault(note.page_index, []).append(note)
+    return by_page
 
 
 def _per_page(
     notes: Sequence[NoteToMatch],
     candidates: Sequence[Candidate],
     keep: Callable[[Candidate], bool],
-    match: Callable[
-        [Sequence[NoteToMatch], Sequence[Candidate]], tuple[Link, ...]
-    ] = _matched,
+    match: Callable[[Sequence[NoteToMatch], Sequence[Candidate]], tuple[Link, ...]],
 ) -> tuple[Link, ...]:
     """The links of each page's notes with the page's candidates that
     `keep` keeps, page by page, each page's by `match`."""
-    notes_by_page: dict[int, list[NoteToMatch]] = {}
-    for note in notes:
-        notes_by_page.setdefault(note.page_index, []).append(note)
+    notes_by_page = _by_page(notes)
     candidates_by_page: dict[int, list[Candidate]] = {}
     for candidate in candidates:
         if keep(candidate):
@@ -184,7 +212,14 @@ def reference_form(
     values = {note.note: note.value for note in notes}
     exact = Counter(
         link.candidate.reference.form
-        for link in _per_page(notes, candidates, lambda _: True)
+        for link in _per_page(
+            notes,
+            candidates,
+            lambda _: True,
+            lambda page_notes, page_candidates: _matched(
+                page_notes, page_candidates, note_score
+            ),
+        )
         if link.candidate.reference.value is not None
         and link.candidate.reference.value == values[link.note]
     )
@@ -217,15 +252,32 @@ def _with_values_between(notes: Sequence[NoteToMatch]) -> tuple[NoteToMatch, ...
     return tuple(given)
 
 
+def through_score(reference: Reference, note: NoteToMatch) -> int:
+    """The score of `reference` against `note` in a book whose notes are
+    numbered through (spec section 11, "Matching"): `pair_score`, but a
+    number one more or one less than the note's value is never a confused
+    reading of it: the next or the previous note has that number."""
+    if (
+        reference.value is not None
+        and note.value is not None
+        and abs(reference.value - note.value) == 1
+    ):
+        return 0
+    return note_score(reference, note)
+
+
 def match_footnotes(
-    notes: Sequence[NoteToMatch], candidates: Sequence[Candidate]
+    notes: Sequence[NoteToMatch],
+    candidates: Sequence[Candidate],
+    score: Callable[[Reference, NoteToMatch], int],
 ) -> tuple[Link, ...]:
-    """The footnotes linked to the candidates of their page, in page order
-    (spec section 11, "Matching"): a note without a value between two of
-    its page whose values its place fits is matched with the value of its
-    place; only candidates of the book's reference form are kept, and signs
-    too unless that form is the bracketed number; a page's opening single
-    quotation marks only when they pair more of its notes."""
+    """The footnotes linked to the candidates of their page, in page order,
+    each pair scored by `score` (spec section 11, "Matching"): a note
+    without a value between two of its page whose values its place fits is
+    matched with the value of its place; only candidates of the book's
+    reference form are kept, and signs too unless that form is the
+    bracketed number; a page's opening single quotation marks only when
+    they pair more of its notes."""
     notes = _with_values_between(notes)
     form = reference_form(notes, candidates)
 
@@ -235,7 +287,89 @@ def match_footnotes(
             candidate_form is ReferenceForm.SIGN and form is not ReferenceForm.BRACKETED
         )
 
-    return _per_page(notes, candidates, keep, _matched_with_quotes)
+    def match(
+        page_notes: Sequence[NoteToMatch], page_candidates: Sequence[Candidate]
+    ) -> tuple[Link, ...]:
+        return _matched_with_quotes(page_notes, page_candidates, score)
+
+    return _per_page(notes, candidates, keep, match)
+
+
+# Spec section 11, "A one-digit value": the share of a book's values of two
+# digits or more that its rise must hold for the book to rise through.
+# Kadesh's rise holds 45 of its 73 such values (24 November 2026); a book
+# of three chapters numbered 1 to 30 each holds a third. Guessed between.
+_RISE_SHARE = 0.5
+# The smallest value of two digits.
+_TWO_DIGITS = 10
+
+
+def _rise_start(values: Sequence[int]) -> tuple[int, int]:
+    """The length of a longest run of `values`, not necessarily next to one
+    another, each larger than the one before, and the place of the first
+    value that starts such a run (0 and 0 for no values)."""
+    longest_from = [1] * len(values)
+    for place in range(len(values) - 1, -1, -1):
+        for later in range(place + 1, len(values)):
+            if values[later] > values[place]:
+                longest_from[place] = max(longest_from[place], longest_from[later] + 1)
+    longest = max(longest_from, default=0)
+    return longest, next(
+        (place for place, length in enumerate(longest_from) if length == longest), 0
+    )
+
+
+def without_one_digit_values(
+    notes: Sequence[NoteToMatch],
+) -> tuple[NoteToMatch, ...]:
+    """The footnotes of a book numbered through, `notes` in the book's
+    order, each without a value of one digit when it comes after the
+    first note of the book's rise (spec section 11, "A one-digit value"):
+    past note 9 the OCR read only the first digit of the marker
+    ("7" for 78). The rise is a longest run of the values of two digits or
+    more, in the book's order, each larger than the one before; the book
+    rises through when it holds at least half of those values. A book
+    whose notes start again at 1 in each chapter does not, and a value
+    misread early ("17" for 3) is out of its rise."""
+    large = [
+        place
+        for place, note in enumerate(notes)
+        if note.value is not None and note.value >= _TWO_DIGITS
+    ]
+    longest, start = _rise_start(
+        [value for place in large if (value := notes[place].value) is not None]
+    )
+    if not longest or _RISE_SHARE * len(large) > longest:
+        return tuple(notes)
+    first = large[start]
+    return tuple(
+        replace(note, value=None)
+        if place > first and note.value is not None and note.value < _TWO_DIGITS
+        else note
+        for place, note in enumerate(notes)
+    )
+
+
+def sure_through(
+    notes: Sequence[NoteToMatch], links: Sequence[Link]
+) -> tuple[Link, ...]:
+    """`links` to the footnotes of a book numbered through, but a sign
+    linked to its page's first note when the page has another note and its
+    second note is not linked (spec section 11, "A sign at the head of a
+    page"): the references before the sign may have been lost. `notes` are
+    the book's footnotes in order; the links kept are in the order of
+    `links`."""
+    by_note = {link.note: link for link in links}
+    notes_by_page = _by_page(notes)
+    unsure = {
+        page_notes[0].note
+        for page_notes in notes_by_page.values()
+        if page_notes[0].note in by_note
+        and by_note[page_notes[0].note].candidate.reference.form is ReferenceForm.SIGN
+        and len(page_notes) > 1
+        and page_notes[1].note not in by_note
+    }
+    return tuple(link for link in links if link.note not in unsure)
 
 
 def with_values_in_order(notes: Sequence[NoteToMatch]) -> tuple[NoteToMatch, ...]:
@@ -281,10 +415,10 @@ def match_endnotes(
     values = frozenset(note.value for note in valued if note.value is not None)
     lowest, highest = min(values, default=0), max(values, default=0)
 
-    def score(reference: Reference, note_value: int | None) -> int:
+    def score(reference: Reference, note: NoteToMatch) -> int:
         # A candidate reading another number never takes a note whose own
         # number another candidate reads, nor stands for a missing note.
-        value = reference.value
+        value, note_value = reference.value, note.value
         if value != note_value and (
             read[note_value] > 0
             or (
@@ -292,7 +426,10 @@ def match_endnotes(
             )
         ):
             return 0
-        return pair_score(reference, note_value)
+        # An endnote's marker is its number: a sign is never its reference
+        # (match_endnotes keeps glued candidates only), so its mark does not
+        # count.
+        return pair_score(reference, note_value, NoteMark.SIGN)
 
     return _matched(valued, glued, score)
 
@@ -537,3 +674,50 @@ def gap_links(
         )
         taken.update((word.block, word.word) for word in found)
     return tuple(made)
+
+
+def sure_links(
+    notes: Sequence[NoteToMatch],
+    links: Sequence[Link],
+    unmarked: frozenset[int],
+    guessed: frozenset[int],
+) -> tuple[Link, ...]:
+    """`links` to footnotes, but those that are not sure (spec section 11,
+    "Sure links"): a link to a note of `unmarked`, the positions of the
+    notes with no marker of their own, is kept only when the note is its
+    page's only note, or when the note before it on the page is linked
+    and the reference reads one more than that note's value; a link whose
+    reference is a sign is kept only when its note is its page's first or
+    the note before it on the page is linked, and, when the note after it
+    on the page is one of `guessed`, the positions of the notes a row of
+    notes started, only when that note has a link too. `notes` are the
+    book's footnotes in order; the links kept are in the order of
+    `links`."""
+    by_note = {link.note: link for link in links}
+    notes_by_page = _by_page(notes)
+    kept: set[int] = set()
+    for page_notes in notes_by_page.values():
+        for place, note in enumerate(page_notes):
+            link = by_note.get(note.note)
+            if link is None:
+                continue
+            before = page_notes[place - 1] if place > 0 else None
+            before_linked = before is not None and before.note in kept
+            reference = link.candidate.reference
+            if note.note in unmarked:
+                sure = len(page_notes) == 1 or (
+                    before_linked
+                    and before is not None
+                    and before.value is not None
+                    and reference.value == before.value + 1
+                )
+            elif reference.form is ReferenceForm.SIGN:
+                after = page_notes[place + 1] if place + 1 < len(page_notes) else None
+                sure = (before is None or before_linked) and (
+                    after is None or after.note not in guessed or after.note in by_note
+                )
+            else:
+                sure = True
+            if sure:
+                kept.add(note.note)
+    return tuple(link for link in links if link.note in kept)

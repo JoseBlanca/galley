@@ -1869,7 +1869,19 @@ a note when any of these holds:
    value is otherwise its place, since by place every marker-shaped
    line, a table's row too, would pass. On a page whose notes are each
    one line long no line is indented against another (Mariéjol's pages
-   221, 310 and 409);
+   221, 310 and 409). A number that starts a line after the region's
+   first starts a note by this rule only when the line before it ends
+   as a word before a second note on a line does (".", "'", "’", ":",
+   ";" or ")", "Two notes on one line"): a number inside a note's
+   sentence that the line break puts first is no marker (added on 24
+   November 2026, plan wrong-links, task 3.2). Domesday's page 445 prints
+   note 1 as "Thus, D. B. ii. 39: 'Tunc 4 carucae in dominio, post et
+   modo 2...et" over "2 carucae possunt restaurari.' To use our
+   symbols…"; the "2" made a second note 2, which took reference 2 while
+   the printed note 2 stayed unlinked. Kadesh's page 63 loses its false
+   note "2 Si thuentawen occurred…" ("such a thing occurred"), under a
+   line ending "To suppose that such". No other note of the seven
+   books' builds changes;
 4. it is the first line of a band region after the page's first, and is
    indented 5 to 40 pt from the band's left edge of rule 2: the first
    note of the next column (owner, 16 November 2026). On Kadesh's page 8
@@ -1882,10 +1894,18 @@ a note when any of these holds:
    short of the region's right edge, as section 6, rule 1 asks of the
    line before an indent, and does not end with a hyphen that joins it
    to this line. A one-character sign starts a note by this rule only
-   when the next line of the region starts with a marker that reads
-   what rule 3's last marker plus the notes after it reads plus 2: the
-   sign stands for the number between (Domesday's page 141, "*" for 4
-   between "3" and "5"). Domesday sets a short note on a line of its
+   when the **next marker** reads what rule 3's last marker plus the
+   notes after it reads plus 2, or a larger number one confused digit
+   away from that (the pairs of "Matching", below): the sign stands for
+   the number between (Domesday's page 141, "*" for 4 between "3" and
+   "5"; page 517, "*" for 4 before a 5 read "6"). The next marker is the
+   first number that "Two notes on one line" (below) would cut off later
+   in the sign's own line, 1 to 3 digits after a word that ends as that
+   section says and a gap of at least 8 pt, before a capital (page 169,
+   "* D. B. ii. 291 b. 5 D. B. ii. 24 b."), or else the first word of
+   the region's next line (the lookahead in its own line and the
+   confused digit were added on 24 November 2026, plan wrong-links,
+   task 3.1). Domesday sets a short note on a line of its
    own at the band's left edge, under a short line, so that neither
    indent rule sees it (page 35: "2 A good many cases…" under "1 D. B.
    i. 41…"). Added on 23 November 2026 (plan more-note-links, task 4.1):
@@ -1899,7 +1919,23 @@ a note when any of these holds:
    sign at the end of a page's notes, "* Maitland" on page 35, stands
    for 6 there and would take note 5's reference. Haskins gains one
    note, its page 116's "2 Origin of the English Constitution", which
-   the page image shows as a note of its own.
+   the page image shows as a note of its own;
+6. its first word is a note marker of one character, a digit or a sign,
+   the word after it starts with a capital, and the line before it in
+   its region holds two notes or more, cut by "Two notes on one line"
+   (below), and ends as a word before a note does, as rule 3 asks: a
+   line under a **row of notes** starts a note whether or not the line
+   before reaches the band's right edge, since the row's last note ends
+   where it ends (added on 24 November 2026, plan wrong-links, task 3.1;
+   the line before's end asked from the review of that day, so that "2
+   Stat. of Westminster, c. 3, and of" over "3 Edward I. c. 4." stays one
+   note; it changes no note of the seven books). Domesday's page 517
+   prints "4 Plummer, Bede,
+   ii. 217." and "5 K. 917 (iv. 165)." side by side, then "6 D. B. i. 66
+   b, 67." on a line of its own; the row reaches the band's right edge,
+   so rule 5 did not start note 6. The rule starts 4 notes of Domesday
+   (pages 35, 167, 430, 517) and 2 of Haskins (29, 56), each a note of
+   its own on the page image.
 
 A line is indented only against other note lines: on a page with one
 note line, the band's left edge is that line's own left side, so the
@@ -1941,10 +1977,90 @@ gap of at least 8 pt, before a capital or a digit (page 134, "4 D. B. i.
 174 b, Poiwic.", 9.9 pt, "5 D. B. i. 268"). Domesday's footnotes go from
 1,868 to 1,873, every new note checked against its page's list of
 markers. A sign or a dash after a wide gap ("« Hist.", page 78; "- D.
-B.", page 207) is no cut: on page 240, "« D. B. 66." would be cut while
+B.", page 207) is no cut by these two rules, only by the stand-in rule
+below, with its conditions: on page 240, "« D. B. 66." would be cut while
 the "«" glued to the note before it stays, so the cut note would take
 the value of the glued one and its reference; and on page 500 a "." after
 a wide gap would take note 5's value.
+
+Two more cuts were added on 24 November 2026 (plan wrong-links, task
+3.1), where a note set on a line of its own was read by the OCR into the
+line before it, or its marker was misread. First, a marker of 1 to 3
+digits that reads the value the next note should have (as above) starts
+a note at any gap after a word that ends a quotation, a ".", "?" or "!"
+then a closing quotation mark, before a word that starts with a capital
+("…tenuit de Rege.' 3 But, as…", Domesday's page 177, one OCR line for
+two printed lines, the gap a word's); and after a gap of at least 8 pt
+the word after such a marker need only not start with a lower-case
+letter ("4 ^thelb. 26." for "Æthelb.", page 52). After any other word a
+gap is still needed: "D. B. i. 2 D. B." is a citation. A marker of 1 to
+3 digits that reads a number one confused digit away from that value
+(the pairs of "Matching", below), after a gap of at least 8 pt, before
+a word that starts with a capital, starts a note too: Domesday's page
+504 prints notes 5 and 6 side by side, read "5 D. B. iv. 3-4, 9, 15
+(Chinbrige). 8 D. B. iv. 61-2-3.", the 6 read "8" 9.9 pt after the full
+stop, and "farthing⁶" took the joined note 5 (added from the review of
+24 November 2026; it adds that note alone to the seven books, and the
+link of "farthing⁶" moves to it, right by the page image). Second, a
+**stand-in**, a word of 1 or 2 characters with no digit that reads no
+number, and of 2 characters only when neither is a letter ("«", "-",
+"&", ":<", "B", "a"), but "A" and "I", after a word that ends as above
+and a gap of at least 10 pt, before a word that has no marker's form,
+starts a note, with the stand-in as its marker and no value of its own
+(the numbering gives it one, "Its value"), when
+- the next marker of the page, the first number cut off later in its
+  line (rule 5's next marker) or else the first word of a later note
+  line of the page that reads a number, in any band region of the page
+  (the next column too), reads the next value plus 1,
+  or a larger number one confused digit away from it: the stand-in is
+  the number between ("4 D. B. i. 339, Agetorne. & D. B. i. 174…" over
+  "6 D. B. i. 163", page 440; "1 Rot. Hund. ii. 361. - D. B. i. 189."
+  over "3 Rental…", page 207; "« D. B. i. 307 b…" before a 5 read "6",
+  page 135);
+- or no number is cut off later in its line and no later note line of
+  the page, in any of its band regions, starts with a number, the gap
+  is at least 20 pt, the word after starts with a capital, and the note
+  it is cut from has a value its own
+  marker reads, not one given by its place: the page's last note ("1 D.
+  B. i. 154. - D. B. i. 262 b.", page 213; "8 Ibid. 20 § b. « Ibid.
+  24.", page 111).
+
+(A lower-case letter there is cut by the rule for one lower-case letter
+above, as a marker with no value, which its place numbers.) The last
+condition keeps page 240's "» D. B. 38 b, 44. «D. B. C4b. « D.
+B. 66." whole: its "»" is a sign whose value is its place, and the
+spaced "«" would take the value of the glued one. Page 500's "4 D. B. i.
+364 (Lincoln). . 6 See above" stays whole too, since the word after
+the "." is a marker. Without "more than the next value", a quotation
+mark before a citation ("97): ' ...Meuanias", page 533, over a line that
+starts "1 ...regnum") and the word "A" (page 239, before "5 For
+Taunton") were cut, both wrong.
+
+Measured on 24 November 2026 with these cuts and rules 5 and 6 as
+changed that day, structure run on the `lines.json` of the plan
+more-note-links: Domesday's footnotes go from 1,873 to 1,901 and its
+links from 1,585 to 1,613; galley-eval's notes whose reference is right
+from 1,563 to 1,591 of 1,729, and its notes that hold the start of the
+next (galley-eval, "Wrong note links and joined notes") from 36 to 10.
+With the rules of task 3.2 and the confused digit above (review of 24
+November 2026), Domesday has 1,901 footnotes, 1,594 notes whose
+reference is right and 9 joined notes.
+The cuts, each checked on the page image: a number after a quotation's
+end on pages 81, 114, 177, 187, 258, 307 and 335, after a wide gap on
+52; a stand-in between on 58, 78, 135, 139, 207, 225, 235 and 440, last
+on 35, 111, 145, 213 and 376; rule 5 on 169 and 517; rule 6 on 35, 167,
+430 and 517. The wrong links of pages 440 (reference 5 to the note "6")
+and 517 (reference 4 to the note "6", which held notes 5 and 6) are now
+right. Haskins' footnotes go from 70 to 72 (rule 6 on pages 29 and 56)
+and its joined notes from 1 to 0; its right links stay 68: page 29's
+second reference now takes its own note, and page 56's "Gummere ^", the
+reference to note 3, which took the joined notes 2 and 3, took note 2,
+since the OCR lost note 2's reference ("target.²") and the page's two
+signs pair with notes 1 and 2 in order; "Sure links" (below) unlinks it. Gierke's footnotes
+go from 384 to 385: page 42's "1 Bracton, f. 171 b. - Calvin's Case…"
+over "8 Windscheid…" (3 read 8) is cut, and "laws²" moves from note 3
+to note 2, "Calvin's Case", as the page image shows. Kadesh, Stubbs and
+the owner's two books give the same `blocks.json` byte for byte.
 
 A row of notes set in columns is cut too (added on 23 November 2026,
 plan more-note-links, task 5.1). Kadesh sets its notes in two or three
@@ -2070,6 +2186,14 @@ Otherwise a note's value is what its marker reads, once "i", "l", "I",
 "|", "!" and "J" are read as 1, "o" and "O" as 0, "s" and "S" as 5 and
 "z" and "Z" as 2, and, inside brackets, "a" as 2 and "t" as 1. A sign
 has no value.
+
+A rule that gave a footnote the number its marker reads, instead of its
+page's numbering, when a candidate reference of its page reads that
+number, as an endnote keeps its own (section 12, "References"), was
+added on 24 November 2026 (plan wrong-links, task 3.2) and dropped in
+the review of the same day: once the cuts of "Two notes on one line"
+are made it changes no link of the seven books, and without them it
+moved page 517's reference 6 to a note that held notes 5 and 6.
 
 ### Notes left in the body
 
@@ -2263,8 +2387,11 @@ candidate wins, then the second note, and so on. The scores:
 |---|---|
 | the candidate's number is the note's value | 3 |
 | the numbers differ in one digit, a pair the OCR confuses (3 and 8, 5 and 6, 1 and 7, 3 and 5, 6 and 8, 1 and 4, 8 and 9, 2 and 8, 5 and 8) | 2 |
-| a sign against a note with no value | 2 |
-| a sign against a note with a value (Haskins: "^" for note 1) | 1 |
+| a sign against a note with no value whose marker is a sign, or that has none ("What a sign pairs with", below) | 2 |
+| a sign against any other note (Haskins: "^" for note 1) | 1 |
+
+In a book numbered through, the second row has one exception ("One
+number off", below).
 
 **A note without a value between two with values.** Before the
 matching, a footnote with no value that lies between two notes of its
@@ -2292,6 +2419,107 @@ Page 9's three agree with the references read by eye in
 other link of its twelve pages changes. No link of the other six books
 changes.
 
+**What a sign pairs with.** A note's marker may be a number the OCR
+could not read as one: Kadesh's notes 25, 26, 30 and 34 are marked "%",
+its note 76 "™" and its note 80 "©". Such a note, and a note whose
+marker is digits or bracketed but that has no value ("A one-digit
+value", below), is marked
+with a number, and a sign scores 1 against it, as against a note with a
+value; only against a note with no value whose marker is a sign of the
+note marker's form ("*", "'", "»") or that has no marker does a sign
+score 2. Kadesh's page 15 lost the reference to its note 34, marked "%",
+which the OCR read "enemy;™", no candidate; the sign after "2,052", the
+reference to note 35, took note 34, and now takes note 35, which has no
+marker. The rule holds in every book; in a book numbered per page every
+note but a first piece that continues a note has a value, so it changes
+nothing there.
+
+**One number off.** In a book numbered through, a candidate whose number
+is one more or one less than a note's value is never paired with it as a
+confused digit (5 and 6, 8 and 9): the notes of a page are numbered one
+after the other, so that number is the note's before or after it, read
+right. Kadesh's page 60 linked "bottom155" to note 156, its marker read
+right, while note 155's marker reads "18"; it is now unlinked. Pairs of
+a confused digit further off stay: "»aten108" takes note 103 (page 40)
+and "Aranami82" note 82, marked "88" (page 32), each right by the page
+image. The rule is not applied in a book numbered per page, where it was
+not measured.
+
+**A one-digit value.** In a book numbered through, before "A note
+without a value between two with values", a footnote that comes after
+the first note of the book's rise has no value of one digit: past note 9 the OCR reads only the first digit of a raised
+number, "1" for 31 or 159, and the reference it is matched with is cut
+short the same way. The **rise** is a longest run of the book's values
+of two digits or more, in the book's order, each larger than the one
+before (not necessarily next to one another; of several, one that
+starts at the earliest note). The rule is applied only when the rise holds at
+least half of those values: the book's numbers then rise through it.
+A book whose notes start again at 1 in each chapter has a rise of one
+chapter's values, and keeps its one-digit values; a value misread
+early ("17" for note 3) is out of the rise, which starts at the first
+note read 10 or more in order. Kadesh's rise holds 45 of its 73 values
+of two digits or more and starts at its page 10, "10"; the excerpt
+`kadesh_59-68` holds 10 of 18, and its page 61 loses the same values
+as the whole book (measured on 24 November 2026).
+
+In Kadesh (`battleofkadeshst00breauoft`, page indices) the rule takes
+these values away. Page 14 reads the markers of its notes 27 to 33 as
+"27", "28", "29", "%", "1", "32" and "33": with the "1" gone, "A note
+without a value between two with values" gives notes 30 and 31 their
+values, "gendarmes.80" and "Sinai.31" take them, and the signs after
+"5,000.”" and "people,”" take notes 32 and 33, where they took notes 29
+and 30. Page 61 reads its notes 158 to 164 "18", "1", "1", "141", "2",
+"43" and "4", and "Luxor1"", the reference to note 163, took note 159;
+it is now unlinked. The rule also unlinks "river,"7*", the reference to
+note 79, from note 78, marked "7" (page 31); "city.1*" (106) from note
+105, marked "1" (page 41); and "Luxor."1" (172) from note 173, marked
+"1" (page 63). It unlinks two links that were right by chance,
+"Kadesh4"" to note 40, marked "4" (page 18), and "sledges."5*" to note
+56, marked "8" (page 26): the owner's rule is that a link not sure
+stays unlinked (24 November 2026), and no reading tells these two from
+the three wrong ones.
+
+A rule that took a value away when another note of its page read the
+same, or when two values of its page in order with each other were out
+of order with it ("A value out of order", 24 November 2026), was
+dropped in the review of that day: once the rule above runs first, it
+changes no link of the seven books.
+
+**A sign at the head of a page.** In a book numbered through, after the
+matching, a sign linked to its page's first note is unlinked when the
+page has another note and the second is not linked: the references
+before the sign may have been lost by the OCR, and then the sign is a
+later note's. Kadesh's pages 37, 47, 53 and 55 lost the references to
+their first notes (90, 112, 130, 145) and the sign of a later note (91,
+115, 134, 146) took the first; pages 21 and 27 joined their first notes
+(48 to 50, 64 to 66) into one, which the sign took. Each is now
+unlinked. The second note linked confirms the first: page 9's three
+signs and page 39's two keep their links, and so does page 8's "*" on
+the article's title, whose second note "Greece,1" takes. One right link
+is lost: page 52's "him'*", the reference to its first note, 125, whose
+second note's reference is lost. The rule removes 6 wrong links for that
+1. Asking that the references to notes N − 1 and N + 1 be read as digits
+around a sign's note N would also unlink the right signs of pages 9, 14,
+15, 39 and 61. The rule runs again after "A lone number" and "A trailing
+V", as
+"Sure links" does; a note whose sign it unlinked may take a lone number
+that reads its value, since that link rests on the number read, not on
+the sign.
+
+These rules were added on 24 November 2026 (plan wrong-links, task
+4.1). Kadesh rebuilt that day without the vision model, every link
+checked against the references read by eye in
+`tests/fixtures/expected/kadesh_reference/note_references.json` or the
+page image: before, 30 of its 45 links were right and 15 wrong (page
+indices 14 twice, 15, 21, 27, 31, 37, 41, 47, 53, 54, 55, 60, 61, 63);
+after, 32 of 33 are right and 1 is wrong (page 54). Right links gained:
+page 14's notes 30 and 31, unlinked before, and page 14's references
+32 and 33 and page 15's 35, which went to the wrong notes before. Wrong
+links removed: pages 14 (two, now right), 15 (now right), 21, 27, 31,
+37, 41, 47, 53, 55, 60, 61 and 63. Right links lost: pages 18, 26 and
+52. Domesday, Haskins, Gierke, Stubbs and the owner's two books give
+the same `blocks.json` byte for byte.
+
 A pair that none of these rows scores is never matched, and a note that
 its page's numbering leaves out ("Its value") is in no pair. The pair 5
 and 8 was added on 23 November 2026 (plan more-note-links, task 4.2):
@@ -2311,6 +2539,83 @@ only that a reference have a marker's shape (architecture §13); every
 reference these rules split off has it, and so does every reference of
 the rules below but the trailing "V", which the check accepts on its
 own terms.
+
+**Sure links.** In a book numbered per page, a footnote with no marker
+of its own and a reference that is a sign are linked only where the
+order of the page's notes expects them. The page's notes here are the
+footnotes that start on the page and that its numbering counts ("Its
+value"); each is judged in their order, against the links kept for the
+notes before it:
+
+- a footnote with no marker, `marker` empty, keeps its link when it is
+  the page's only note, or when the note before it on the page is
+  linked and its reference reads one more than that note's value;
+- any other footnote whose reference is a sign (`*`, `^`, `•`, the
+  backslash and star of "A lone number" and the trailing "V" below)
+  keeps its link when it is the page's first note or the note before
+  it on the page is linked.
+
+A note that a row of notes started ("Where a note starts", rule 6) and
+the note before it on the page were read as one note before 24 November
+2026; the cut tells that two notes are there, not which of them a sign
+refers to. So a footnote whose reference is a sign and that the page's
+next note is such a note keeps its link only when that note has a link
+too; a sign on the note rule 6 started needs the note before linked
+already (above). Added on 24 November 2026 (plan wrong-links, task
+3.2); the same rule for a note a stand-in started was dropped in the
+review of that day, since it changed no link of the seven books.
+Haskins' (`normansineuropea00hask`) page 56
+prints notes 1 and 2 side by side and 3 below them, which rule 6 starts;
+the OCR lost note 2's reference ("target.²"), and "Gummere ^", the
+reference to note 3, took note 2 in order. It is now unlinked. Page 29,
+the same row of two notes and a third below, keeps both its sign links,
+each right by the page image. No other link of the seven books changes.
+
+A link that does not hold is undone, and its note stays unreferenced.
+The matching is not run again for the candidate it frees. The rule is
+applied after the matching, before the lone numbers below, and again
+after the trailing "V"s, to the links those rules made.
+
+The page's numbering gives every note a value by its place, a table's
+row or the printer's signature mark that the band holds as well as a
+note, and a sign scores against any note, so the matching links such
+notes to the reference that reads their place or to any sign. In
+Domesday (`domesdaybook00maituoft`, page indices) a row "22 2*
+Huntingdon …" of a table in the band, given value 3, took "Chichester3"
+on page 200, while the page's note 3, marked "3", stayed unlinked; on
+page 499 two rows of a table, "Sussex Surrey …" and
+"Hampshire 206 148 120", took a "3" that is no reference and "Anjou1",
+note 1's; on page 106 the signature mark "M." became note 6 and took a
+closing quotation mark read as "*" ("'low justice*"). A note with no
+marker after a linked note whose reference reads the next number is a
+note whose marker the OCR lost: the reference to Domesday's note 10 on
+page 134 reads "10", and the note's first line has no marker.
+
+A book numbered through (Kadesh) keeps every link: there a note with no
+marker is a note whose marker the OCR lost or glued into a word, which
+has a value only from its place between two notes with values, and a
+sign is the most common reading of its references. Applied to Kadesh
+built without the vision model, the rule unlinked 15 of its 45 links,
+among them "Lenormant,*", "Chabas*" and "Kadesh,12" on pages 9 and 10,
+right by the page images (above).
+
+Measured on 24 November 2026 (plan wrong-links, task 2.1), structure
+run on the `lines.json` of the runs of the plan more-note-links:
+Domesday's links go from 1,589 to 1,585, the four above, each wrong on
+the page image; its notes whose reference is right stay 1,563 by
+galley-eval, among them its 10 notes with no marker that were linked
+right (pages 117, 133, 134 twice, 164, 233, 238, 343, 417 and 493).
+Haskins, Stubbs, Gierke, Kadesh and the owner's two books give the same
+`blocks.json` byte for byte; Haskins' 2 notes with no marker are their
+page's only note (pages 124 and 249). Three wrong links to a sign stay,
+since each is a sign the order expects while the page's reference was
+not read as the matching's candidate: Domesday's page 154, where note 2,
+after linked note 1, takes a "^" in a table while its reference is read
+"example-."; page 498, where note 2 takes a "•" before its reference,
+"£56 2.", which the lone number rule would take; and Haskins'
+(`normansineuropea00hask`) page 204, its only note, whose reference
+"Adams,^" comes after the sign "*" read in "made * Norman", and the
+earlier of two equal candidates wins.
 
 **What is changed.** A matched glued candidate, a number or a sign at
 the end of a word, is split by a `note_marker` word change, ("land3.",)
@@ -2471,6 +2776,12 @@ some of them.
   numbered per page, a page whose reference to note 2 the OCR lost links
   note 2 to the next candidate that reads 2 or a digit confusable with
   it.
+- **Kadesh's wrong link, 24 November 2026**: 1 of the 33 links of the
+  book built without the vision model goes to a note other than its
+  reference's: page 54's "I'*" (144) takes note 141, the first of the
+  page's notes that no glued number took, since the references to
+  notes 141 to 143 were read as no candidate or as "sixth"3". The
+  references the rules above unlink stay in their words.
 - **Kadesh's notes on pages 9, 11 and 13 to 15** are too damaged to cut
   ("*Oampagne de Kkamitf"): 94 of its band blocks after another note
   have no marker. They stay notes with no marker, unreferenced, in

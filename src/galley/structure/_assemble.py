@@ -63,10 +63,12 @@ from galley.structure._markers import (
     NoteMarker,
     book_marker_form,
     endnote_candidate,
+    marker_form,
 )
 from galley.structure._measures import letters
 from galley.structure._notes import (
     Footnote,
+    NoteStart,
     Numbering,
     PageNote,
     book_numbering,
@@ -86,12 +88,18 @@ from galley.structure._quotes import book_density, with_quotes
 from galley.structure._references import (
     BodyWord,
     Link,
+    NoteMark,
     NoteToMatch,
     foreign_signs,
     gap_links,
     match_endnotes,
     match_footnotes,
+    note_score,
+    sure_links,
+    sure_through,
+    through_score,
     with_values_in_order,
+    without_one_digit_values,
 )
 from galley.structure._runs import EpigraphParts, LabelLine, QuotationForm
 from galley.structure._spaced import with_spaced_signs
@@ -543,6 +551,15 @@ def _with_margin_notes_placed(
     )
 
 
+def _mark(marker: str) -> NoteMark:
+    """What a footnote's `marker` tells of its reference (spec section 11,
+    "Matching"): a sign, or no marker, or else a number, read or not ("12",
+    "(3)", or "%" for a number the OCR could not read)."""
+    if not marker or marker_form(marker) is MarkerForm.SIGN:
+        return NoteMark.SIGN
+    return NoteMark.NUMBER
+
+
 def _links(
     body: Sequence[Unnumbered],
     notes: Sequence[UnnumberedNote],
@@ -552,6 +569,8 @@ def _links(
     group_headings: Sequence[str | None],
     before_section: int,
     last_contents_page: int,
+    numbering: Numbering,
+    guessed: frozenset[int],
 ) -> tuple[Link, ...]:
     """The references of `body`, the body's blocks but the endnote
     section's, matched to `notes`, whose values are `values` and whose
@@ -560,14 +579,39 @@ def _links(
     numbering leaves out, then the endnotes, among the candidates of the first
     `before_section` blocks after the last contents page that no footnote
     took; with several note groups, whose headings are `group_headings`,
-    each group's endnotes among the candidates of its chapter."""
+    each group's endnotes among the candidates of its chapter. In a book
+    whose notes are numbered per page, `numbering`, the footnotes keep only
+    their sure links, `guessed` being the positions of the footnotes a
+    row of notes started (spec section 11, rule 6)."""
     candidates = body_candidates(body)
     footnote_notes = tuple(
-        NoteToMatch(position, first_page(note.origin), value)
+        NoteToMatch(position, first_page(note.origin), value, _mark(note.marker))
         for position, (note, value) in enumerate(zip(notes, values, strict=True))
         if note.kind is NoteKind.FOOTNOTE and position not in uncounted
     )
-    footnote_links = match_footnotes(footnote_notes, candidates)
+    per_page = numbering is Numbering.PER_PAGE
+    if not per_page:
+        # Spec section 11, "A one-digit value".
+        footnote_notes = without_one_digit_values(footnote_notes)
+    # Spec section 11, "Sure links": in a book numbered per page, a note
+    # with no marker of its own, and a sign, are linked only where the
+    # page's order expects the reference.
+    unmarked = frozenset(
+        position for position, note in enumerate(notes) if not note.marker
+    )
+
+    def sure(links: tuple[Link, ...]) -> tuple[Link, ...]:
+        if per_page:
+            return sure_links(footnote_notes, links, unmarked, guessed)
+        return sure_through(footnote_notes, links)
+
+    footnote_links = sure(
+        match_footnotes(
+            footnote_notes,
+            candidates,
+            note_score if per_page else through_score,
+        )
+    )
     # Spec section 11, "A lone number": a footnote's reference set apart as
     # a word of its own.
     taken_by_footnotes = frozenset(
@@ -591,7 +635,10 @@ def _links(
     # Spec section 11, "A trailing V": a "V" glued to a word, only between
     # two linked neighbours.
     # A lone number is never such a word, so the words are those above.
-    footnote_links += trailing_v_links(footnote_notes, paragraph_words, footnote_links)
+    footnote_links = sure(
+        footnote_links
+        + trailing_v_links(footnote_notes, paragraph_words, footnote_links)
+    )
     footnoted = frozenset(
         (link.candidate.block, link.candidate.word) for link in footnote_links
     )
@@ -640,7 +687,13 @@ def _links(
     def group_links(group: int, start: int, end: int) -> tuple[Link, ...]:
         group_notes = with_values_in_order(
             tuple(
-                NoteToMatch(position, first_page(note.origin), value)
+                NoteToMatch(
+                    position,
+                    first_page(note.origin),
+                    value,
+                    # An endnote's marker is its number (section 12).
+                    NoteMark.SIGN,
+                )
                 for position, (note, value, note_group) in enumerate(
                     zip(notes, values, groups, strict=True)
                 )
@@ -937,6 +990,12 @@ def assemble(
             group_headings,
             sum(1 for p in kept_positions if p < min(in_section, default=len(entries))),
             max(contents_pages, default=-1),
+            numbering,
+            frozenset(
+                position
+                for position, source in enumerate(sources)
+                if isinstance(source, Footnote) and source.start is NoteStart.GUESSED
+            ),
         ),
     )
     places = margin_note_places(

@@ -1,0 +1,27 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 335,
+  "excerpt": "domesday_joined_notes, page 5",
+  "read": "Read by the assistant on 24 November 2026 from the band rendered at 150 dpi. Four notes, each starting on a line of its own, indented; the OCR's lines join 'poterint.'' and '3 K. 637'.",
+  "expected": {
+    "notes": [
+      {
+        "number": "1",
+        "text": "Heming, i. 259: 'Ac primo videndum quae terrae trium heredum tem-"
+      },
+      {
+        "number": "2",
+        "text": "Lamprecht, op. cit. p. 61, says that it was quite uncommon for the"
+      },
+      {
+        "number": "3",
+        "text": "K. 637 (iii. 194): 'si in viduitate manere decreverit, vel magis nubere"
+      },
+      {
+        "number": "4",
+        "text": "D. B. i. 173: 'Hanc terram tenuit Sirof de episcopo T. R. E., quo mortuo"
+      }
+    ],
+    "references": []
+  }
+}

@@ -86,12 +86,16 @@ from galley.structure._paragraphs import PageParts
 from galley.structure._plates import plate_survey
 from galley.structure._references import (
     Candidate,
+    Link,
+    NoteMark,
     NoteToMatch,
-    align,
+    _best_pairs,
     match_endnotes,
     match_footnotes,
+    note_score,
     pair_score,
     reference_form,
+    sure_links,
 )
 from galley.structure._regions import region_kinds
 from galley.structure._unnumbered import Unnumbered, without_marker
@@ -2379,13 +2383,13 @@ def test_band_of_two_columns_is_found_when_its_lines_outnumber_the_body() -> Non
     body = _region(*_five_full_lines(70, "first"), *_five_full_lines(145, "more")[:4])
     left = _region(
         *(
-            _spread(f"{n} A note on the left", 50, 170, 220 + 9 * n, height=7.0)
+            _spread(f"{n} A note on the left.", 50, 170, 220 + 9 * n, height=7.0)
             for n in range(8)
         )
     )
     right = _region(
         *(
-            _spread(f"{n} A note on the right", 180, 300, 220 + 9 * n, height=7.0)
+            _spread(f"{n} A note on the right.", 180, 300, 220 + 9 * n, height=7.0)
             for n in range(8)
         )
     )
@@ -2400,6 +2404,56 @@ def test_band_of_two_columns_is_found_when_its_lines_outnumber_the_body() -> Non
     )
     assert all(block.kind is BlockKind.PARAGRAPH for block in blocks.blocks)
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def _note_words(*parts: tuple[str, float], top: float) -> Line:
+    """A note line 7 pt high of the words of each part's text, each part
+    starting at its x0, 4 pt a character and 3 pt between words."""
+    words: list[Word] = []
+    for text, x0 in parts:
+        left = x0
+        for word in text.split(" "):
+            right = left + 4.0 * len(word)
+            words.append(Word(word, Box(left, top, right, top + 7.0), None))
+            left = right + 3.0
+    return Line(_box(tuple(word.box for word in words)), tuple(words))
+
+
+def test_sign_to_the_note_before_one_under_a_row_is_unlinked_alone() -> None:
+    # Structure spec section 11, "Sure links", made up in the form of
+    # Haskins' page 56: notes 1 and 2 on a row, note 3 under it (rule 6);
+    # the page's two signs refer to notes 1 and 3, the reference to 2
+    # lost; the second sign would take note 2 in order.
+    body = _region(
+        _full("the fame of the sea and Eric's war-faring.^ went far", 70),
+        *(
+            _full(f"more words {n} of the page and so on", 70 + _PITCH_PT * n)
+            for n in range(1, 4)
+        ),
+        _full("but I am quoting Gummere ^ as weapon-dead men", 130),
+        *(
+            _full(f"other words {n} of the page and so on", 130 + _PITCH_PT * n)
+            for n in range(1, 5)
+        ),
+    )
+    band = _region(
+        _note_words(
+            ("1 Corpus Poeticum Boreale, i.", 50.0),
+            ("^ Ibid., p. 281.", 200.0),
+            top=280,
+        ),
+        _note_words(("^ Germanic Origins, p. 305.", 50.0), top=289),
+    )
+    lines = _lines_of(PageLayout(0, (body, band), ()))
+    blocks = make_blocks(lines, _NO_WORDS, workers=1)
+    assert tuple(note.marker for note in blocks.notes) == ("1", "^", "^")
+    linked = tuple(
+        span.note_ref
+        for block in blocks.blocks
+        for span in block.spans
+        if span.note_ref is not None
+    )
+    assert linked == (blocks.notes[0].id,)
 
 
 def test_band_of_five_lines_with_short_last_lines_gives_a_note_each() -> None:
@@ -3374,7 +3428,12 @@ def test_referenced_page_s_leftover_note_end_is_not_counted() -> None:
 
 def test_referenced_8_for_5_is_a_confused_digit() -> None:
     # Spec section 11, "Matching": Domesday's "centuries8" for note 5.
-    assert pair_score(Reference("centuries", "8", "", ReferenceForm.GLUED, 8), 5) == 2
+    assert (
+        pair_score(
+            Reference("centuries", "8", "", ReferenceForm.GLUED, 8), 5, NoteMark.SIGN
+        )
+        == 2
+    )
 
 
 @pytest.mark.parametrize(
@@ -3556,7 +3615,12 @@ def test_referenced_alignment_pairs_the_highest_total_in_order(
 ) -> None:
     candidates = tuple(reference_candidate(word) for word in references)
     assert all(candidate is not None for candidate in candidates)
-    assert align(values, tuple(c for c in candidates if c is not None)) == pairs
+    found = tuple(c for c in candidates if c is not None)
+    scores = tuple(
+        tuple(pair_score(reference, value, NoteMark.SIGN) for reference in found)
+        for value in values
+    )
+    assert _best_pairs(scores) == pairs
 
 
 def _endnote_pages(
@@ -4104,7 +4168,7 @@ def test_referenced_pair_score_by_the_digits_the_ocr_confuses(
     word: str, value: int | None, score: int
 ) -> None:
     # "x81" against 3: one digit differs only if the lengths are equal.
-    assert pair_score(_glued(word), value) == score
+    assert pair_score(_glued(word), value, NoteMark.SIGN) == score
 
 
 def _candidate(word: str, position: int) -> Candidate:
@@ -4112,7 +4176,7 @@ def _candidate(word: str, position: int) -> Candidate:
 
 
 def test_referenced_book_form_on_a_tie_is_the_glued_number() -> None:
-    notes = (NoteToMatch(0, 0, 1), NoteToMatch(1, 0, 2))
+    notes = (NoteToMatch(0, 0, 1, NoteMark.SIGN), NoteToMatch(1, 0, 2, NoteMark.SIGN))
     candidates = (_candidate("x1", 0), _candidate("(2)", 1))
     assert reference_form(notes, candidates) is ReferenceForm.GLUED
 
@@ -4134,7 +4198,8 @@ def _footnote_links(
 ) -> tuple[tuple[int, int], ...]:
     """The (note, candidate) positions of `match_footnotes` on one page."""
     notes = tuple(
-        NoteToMatch(position, 10, value) for position, value in enumerate(values)
+        NoteToMatch(position, 10, value, NoteMark.SIGN)
+        for position, value in enumerate(values)
     )
     candidates = tuple(
         Candidate(0, position, 10, reference)
@@ -4142,7 +4207,8 @@ def _footnote_links(
         if (reference := reference_candidate(word)) is not None
     )
     return tuple(
-        (link.note, link.candidate.word) for link in match_footnotes(notes, candidates)
+        (link.note, link.candidate.word)
+        for link in match_footnotes(notes, candidates, note_score)
     )
 
 
@@ -4180,14 +4246,19 @@ def test_footnote_without_a_value_between_two_pages_takes_none() -> None:
     # Spec section 11: values are given only between two notes of one page;
     # the note of page 10 after its last value keeps none, so "land11" is no
     # match for it.
-    notes = (NoteToMatch(0, 10, 10), NoteToMatch(1, 10, None), NoteToMatch(2, 11, 12))
+    notes = (
+        NoteToMatch(0, 10, 10, NoteMark.SIGN),
+        NoteToMatch(1, 10, None, NoteMark.SIGN),
+        NoteToMatch(2, 11, 12, NoteMark.SIGN),
+    )
     candidates = (
         Candidate(0, 0, 10, _glued("land10")),
         Candidate(0, 1, 10, _glued("land11")),
         Candidate(0, 2, 11, _glued("land12")),
     )
     assert tuple(
-        (link.note, link.candidate.word) for link in match_footnotes(notes, candidates)
+        (link.note, link.candidate.word)
+        for link in match_footnotes(notes, candidates, note_score)
     ) == ((0, 0), (2, 2))
 
 
@@ -4201,10 +4272,74 @@ def test_an_opening_quote_takes_a_note_only_where_no_other_candidate_can() -> No
     ) == ((0, 0), (1, 1), (2, 2))
 
 
+def _sure_kept(
+    values: tuple[int | None, ...],
+    unmarked: frozenset[int],
+    linked: tuple[tuple[int, str], ...],
+) -> tuple[int, ...]:
+    """The notes whose link `sure_links` keeps, of one page's notes of
+    `values`, those at the positions `unmarked` having no marker, linked
+    as `linked` says, each (note position, the reference's word)."""
+    notes = tuple(
+        NoteToMatch(position, 10, value, NoteMark.SIGN)
+        for position, value in enumerate(values)
+    )
+    links = tuple(
+        Link(Candidate(0, word, 10, _glued(text)), note)
+        for word, (note, text) in enumerate(linked)
+    )
+    return tuple(link.note for link in sure_links(notes, links, unmarked, frozenset()))
+
+
+def test_unmarked_table_row_under_the_last_note_loses_its_link() -> None:
+    # Spec section 11, "Sure links": Domesday's page 200, a table's row in
+    # the band after notes 1 and 2, given the value 3, takes "Chichester3"
+    # while note 2 is unlinked.
+    assert _sure_kept(
+        (1, 2, 3), frozenset({2}), ((0, "land1"), (2, "Chichester3"))
+    ) == (0,)
+
+
+def test_unmarked_rows_are_judged_against_the_links_kept_before_them() -> None:
+    # Page 499: two rows take "x2" and "y3" after an unlinked note 1; the
+    # second row's note before it is linked only until that link is undone.
+    assert _sure_kept((1, 2, 3), frozenset({1, 2}), ((1, "x2"), (2, "y3"))) == ()
+
+
+@pytest.mark.parametrize(
+    ("reference", "kept"),
+    [("hall2", (0, 1)), ("hall3", (0,)), ("justice*", (0,))],
+    ids=["next_number", "another_number", "sign"],
+)
+def test_unmarked_note_after_a_linked_note_keeps_only_the_next_number(
+    reference: str, kept: tuple[int, ...]
+) -> None:
+    # Domesday's page 134, note 10 without a marker after linked note 9;
+    # page 106, the signature mark "M." taken for note 6 takes a sign.
+    assert _sure_kept((1, 2), frozenset({1}), ((0, "land1"), (1, reference))) == kept
+
+
+@pytest.mark.parametrize("reference", ["spot*", "land1"])
+def test_unmarked_note_alone_on_its_page_keeps_its_link(reference: str) -> None:
+    # Haskins' pages 124 and 249: the page's only note, without a marker,
+    # linked to a sign.
+    assert _sure_kept((1,), frozenset({0}), ((0, reference),)) == (0,)
+
+
+def test_sign_paired_with_a_note_that_is_not_next_loses_its_link() -> None:
+    # Note 2's reference was lost, and a sign later on the page took note 3.
+    assert _sure_kept((1, 2, 3), frozenset(), ((0, "land1"), (2, "spot*"))) == (0,)
+
+
+def test_sign_on_the_page_first_note_or_after_a_linked_note_keeps_its_link() -> None:
+    # Haskins' page 29: "^" for both of its notes.
+    assert _sure_kept((1, 2), frozenset(), ((0, "spot^"), (1, "land^"))) == (0, 1)
+
+
 def test_referenced_endnotes_are_matched_in_the_order_of_their_values() -> None:
     # Note 2 printed before note 1: in printed order note 2 would take "y2"
     # and note 1 could not take the earlier "x1".
-    notes = (NoteToMatch(0, 5, 2), NoteToMatch(1, 5, 1))
+    notes = (NoteToMatch(0, 5, 2, NoteMark.SIGN), NoteToMatch(1, 5, 1, NoteMark.SIGN))
     candidates = (_candidate("x1", 0), _candidate("y2", 1))
     assert tuple(
         (link.note, link.candidate.word) for link in match_endnotes(notes, candidates)

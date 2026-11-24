@@ -1,0 +1,27 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 177,
+  "excerpt": "domesday_joined_notes, page 0",
+  "read": "Read by the assistant on 24 November 2026 from the band rendered at 150 dpi. Four notes, each starting on a line of its own, indented; the OCR's lines join 'Rege.'' and '3 But' into one.",
+  "expected": {
+    "notes": [
+      {
+        "number": "1",
+        "text": "D. B. i. 4 b: 'De terra huius manerii tenet Godefridus in feuo dimid. solin.'"
+      },
+      {
+        "number": "2",
+        "text": "D. B. i. 129 b: 'Postea Willelmus Camerarius tenuit de Regina in feudo'"
+      },
+      {
+        "number": "3",
+        "text": "But, as in general a farmer would have no heritable rights, holding in fee"
+      },
+      {
+        "number": "4",
+        "text": "D. B. i. 158: Robert de Ouilly holds forty-two houses in Oxford, some"
+      }
+    ],
+    "references": []
+  }
+}

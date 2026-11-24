@@ -36,7 +36,10 @@ excluded last pages begin (`reference_ends_at`, section 3); revised
 on 19 November 2026 to drop Mariéjol from the evaluation set (section
 3): `evaluation/books.toml` has no entry for it. "The four books" in
 sections 1 to 9, and the rules and examples that name Mariéjol, are the
-set as it was measured before then, Mariéjol included. It builds
+set as it was measured before then, Mariéjol included. Revised on 24
+November 2026 to list the wrong note links and the notes that hold the
+next note's start (section 6, "Wrong note links and joined notes").
+It builds
 on `docs/architecture.md` and `docs/glossary.md`; "architecture §8" is
 a section of that document, "section 6" a section of this spec. No
 code of the tool exists. galley exists as the walking skeleton
@@ -897,6 +900,51 @@ These are scored at blocks and markdown.
   checked on the page images (pages 66, 87, 105, 256, 387, 449) galley's
   link is on the word that carries the printed reference. Haskins' 66
   right references do not change.
+- **Wrong note links and joined notes.** At markdown, two lists, each
+  item with its page index, for a person to check on the page image:
+  the note links that go to a note other than the reference text's, and
+  the galley notes that also hold the start of the next note. They
+  compare how the texts of the notes begin, not where the alignment put
+  their tokens. On Domesday's output of 23 November 2026 the alignment
+  names, as the galley note that holds a reference note, a note other
+  than the one a link should go to at 15 links found right by eye: the
+  short notes of that book, such as "D. B. i. 336 b." and "D. B. i.
+  298." on page 236, align to each other's galley notes, and a note that
+  galley cut in two leaves most of its tokens in the second part, while
+  the link goes to the first.
+
+  A galley note *begins as* a reference note when their texts start
+  alike: each text is the alignment keys of its tokens written one after
+  the other, a galley note's without the tokens of its marker; both are
+  cut to the length of the shorter, at most 30 characters; and
+  `difflib.SequenceMatcher`, with `autojunk` off, gives the two a ratio
+  of 0.6 or more. An empty text begins as nothing. "D. B. i. 27,
+  Percinges." and "D. B. i. 284 b, Ættune." do not begin alike (ratio 0.5); "Hist. Eng. Law, ii. 457."
+  and its OCR reading "jjist. Eng. Law, ii. 457." do (0.87).
+
+  - **Wrong note link**: a galley note reference, mapped onto a gap as
+    above, whose note begins as none of the reference notes that
+    Gutenberg references at a gap no more than 3 gaps before or after
+    that gap, the window of `reference_right`. It is `other_note`
+    when Gutenberg has a reference there, and `no_reference` when it has
+    none: a sign that is no reference, or a table row, linked to a note.
+    Its page is that of the token it precedes in its block, or of the
+    block's last token when it ends the block.
+  - **Joined note**: a galley note that also holds the start of the next
+    reference note. The reference note it begins as is, of those with
+    a token aligned to one of its tokens, the one with the highest ratio,
+    the first in the reference's order on a tie, if that ratio is 0.6 or
+    more. The galley note is joined when the rest of its text, past as
+    many characters as that note's whole text has, holds 4 characters or
+    more and begins as the text of the next note in the reference's
+    order. Its page is that of its first token.
+
+  A link that goes to the right note from a place more than 3 tokens
+  from Gutenberg's reference is listed as `no_reference`: on Domesday
+  page 104, where the printed page repeats the reference "3" in two
+  sentences and Gutenberg keeps the second, and in a table that
+  Gutenberg's tokens give in another order (page 156). A person checking
+  the list sees them on the page image.
 - **Margin notes.** Each reference margin note is `as_margin_note`,
   `in_body` or `missing`, by the same rule. Its position is right when
   galley's margin note comes just before the block that holds the first
@@ -904,7 +952,12 @@ These are scored at blocks and markdown.
   scored in a book with `margin_notes_moved`.
 
 The half and the 3 tokens are guesses, to be set again once structure
-finds notes.
+finds notes. The 30 characters, the ratio of 0.6 and the 4 characters
+of a joined note are guesses too, checked on 24 November 2026 against
+Domesday's and Haskins' links of 23 November 2026, read one by one
+against the reference text and the page images: they list the 10 and 1
+wrong links found by eye and, besides them, only the three links of
+pages 104 and 156 above.
 
 ## 7. What the tool writes
 
@@ -918,7 +971,8 @@ evaluation/
   scorecard.json             the scores of section 6, per stage output and part
   differences.jsonl          one difference per line
   pages.tsv                  the table of section 8
-  summary.md                 the scorecard, and the commonest differences by stage and kind
+  summary.md                 the scorecard, the commonest differences by stage and kind,
+                             and the wrong note links and joined notes
 ```
 
 `runs/evaluation/summary.md` puts the books side by side, one row per
@@ -927,7 +981,10 @@ not with its earlier scores. Its scores include, at markdown, those
 structure's targets are set on (`docs/specs/structure.md` §9): the notes
 whose reference is right, the margin notes as margin notes, the
 reference headings and those in heading blocks on the body range, and
-the index's paragraph precision and recall. Each `scorecard.json` holds
+the index's paragraph precision and recall; and the counts of wrong note
+links and joined notes (section 6), which the book's `summary.md` lists
+one by one with their page index, galley's note id and the reference
+text's. Each `scorecard.json` holds
 the commit of galley that made the book's files, which `run` records in
 the book folder and `compare` reads from there, the commit of the comparison,
 the date, the reference's ebook number and the tool's version. A book's
@@ -1086,6 +1143,14 @@ them is a separate function.
   - the attribution to stages on tokens whose states are given at the
     four outputs, including the two examples of section 5;
   - the boundary, note and margin-note scores on hand-made blocks;
+  - the wrong note links and joined notes on made-up notes: a link to
+    the note before Gutenberg's, `other_note`; a link where Gutenberg
+    has no reference, `no_reference`; a link to a note galley cut in two,
+    and to one of two notes that begin alike and that the alignment
+    crosses, both right; a galley note that holds two reference notes,
+    joined, and one with a few characters more than its reference note,
+    not joined; a galley note whose marker is a token, its marker left
+    out;
   - the kinds of `blocks.json` version 2, on hand-made files, since
     galley's structure does not make them all yet: a heading whose
     `label` "CHAPTER III." gives the block's first two tokens at blocks

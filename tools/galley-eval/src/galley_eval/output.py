@@ -37,8 +37,9 @@ from galley.book_folder import BookFolder
 from galley_eval.align import State
 from galley_eval.errors import EvaluationError
 from galley_eval.evaluate import Difference, Evaluation, OutputScores, Scorecard
+from galley_eval.note_links import NoteLinks
 from galley_eval.page_table import PageRow
-from galley_eval.scores import Part, TextScores
+from galley_eval.scores import NOTE_REFERENCE_TOKENS, Part, TextScores
 from galley_eval.stages import StageOutput
 
 __all__ = [
@@ -164,6 +165,8 @@ def scorecard_json(scorecard: Scorecard, run: RunInfo) -> str:
         "anchor_mismatches": scorecard.anchor_mismatches,
         "unplaced": scorecard.unplaced,
         "front_matter_not_scored": scorecard.front_matter_not_scored,
+        "wrong_note_links": scorecard.wrong_note_links,
+        "joined_notes": scorecard.joined_notes,
         "outputs": {
             scores.output.value: {
                 key: item for key, item in _items(scores) if key != "output"
@@ -422,6 +425,48 @@ def _apart_rows(evaluation: Evaluation) -> list[str]:
     return rows
 
 
+def _note_link_rows(links: NoteLinks) -> list[str]:
+    """The lines of `summary.md` that list the wrong note links and the
+    joined notes, each list under its heading with its count."""
+    rows = [
+        f"### Wrong note links: {len(links.wrong_links)}",
+        "",
+        (
+            "At markdown, the note links whose note begins as none of the "
+            "notes the reference text references within "
+            f"{NOTE_REFERENCE_TOKENS} tokens: "
+            "`other_note` when it references one there, `no_reference` when "
+            "it references none."
+        ),
+        "",
+    ]
+    rows.extend(
+        f"- page {link.page_index}: {link.note_id} from {link.block_id}, "
+        f"{link.fault.value} (Gutenberg's: "
+        f"{', '.join(link.reference_notes) or 'none'})"
+        for link in links.wrong_links
+    )
+    rows.extend(
+        (
+            "",
+            f"### Joined notes: {len(links.joined_notes)}",
+            "",
+            (
+                "At markdown, the galley notes that also hold the start of the "
+                "next note of the reference text."
+            ),
+            "",
+        )
+    )
+    rows.extend(
+        f"- page {joined.page_index}: {joined.note_id} holds "
+        f"{joined.reference_note} and {joined.next_reference_note}"
+        for joined in links.joined_notes
+    )
+    rows.append("")
+    return rows
+
+
 def book_summary(evaluation: Evaluation, run: RunInfo) -> str:
     """The text of a book's summary.md."""
     scorecard = evaluation.scorecard
@@ -443,6 +488,7 @@ def book_summary(evaluation: Evaluation, run: RunInfo) -> str:
         "## Structure",
         "",
         *_structure_rows(scorecard),
+        *_note_link_rows(evaluation.note_links),
         "## Differences by the work they call for",
         "",
         (
@@ -564,6 +610,8 @@ _SUMMARY_COLUMNS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "notes whose reference is right",
         ("outputs", "markdown", "notes", "reference_right"),
     ),
+    ("wrong note links, markdown", ("wrong_note_links",)),
+    ("joined notes, markdown", ("joined_notes",)),
     ("notes in body", ("outputs", "markdown", "notes", "in_body")),
     ("notes missing", ("outputs", "markdown", "notes", "missing")),
     (

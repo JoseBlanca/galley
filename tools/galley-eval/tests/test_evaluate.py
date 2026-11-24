@@ -30,6 +30,7 @@ from galley_eval.evaluate import (
     evaluation_of,
 )
 from galley_eval.galley_side import GalleyBlock, GalleyNoteReference, GalleySide
+from galley_eval.note_links import LinkFault, NoteLinks
 from galley_eval.reader import (
     Gap,
     NoteReference,
@@ -908,6 +909,18 @@ def test_endnote_linked_ten_pages_from_its_reference_is_missing_with_its_cause()
         for difference in evaluation.differences
         if difference.cause is not None
     } == set(missing + extra_in_endnote)
+
+
+def test_link_far_from_gutenbergs_reference_is_listed_and_counted_as_wrong() -> None:
+    wrong = _endnote_evaluation(reference_on_page=20)
+    assert [
+        (link.page_index, link.note_id, link.fault)
+        for link in wrong.note_links.wrong_links
+    ] == [(20, "n-p0010-001", LinkFault.NO_REFERENCE)]
+    assert (wrong.scorecard.wrong_note_links, wrong.scorecard.joined_notes) == (1, 0)
+    right = _endnote_evaluation(reference_on_page=0)
+    assert right.note_links == NoteLinks(wrong_links=(), joined_notes=())
+    assert right.scorecard.wrong_note_links == 0
 
 
 def test_endnote_linked_one_page_from_its_reference_is_found_with_no_cause() -> None:

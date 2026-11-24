@@ -489,6 +489,12 @@ def test_marker_of_a_referenced_note_is_not_a_token() -> None:
     assert tuple(token.text for token in tokens) == ("cate", "it")
 
 
+def test_block_counts_the_marker_tokens_it_starts_with() -> None:
+    unreferenced = galley_blocks(_note_blocks(referenced=False))["b-p0001-002"]
+    referenced = galley_blocks(_note_blocks(referenced=True))["b-p0001-002"]
+    assert (unreferenced.marker_tokens, referenced.marker_tokens) == (1, 0)
+
+
 def test_note_reference_span_separates_the_words_around_it() -> None:
     # "cate" + reference + "it" would be "cateit" if the span gave no space.
     blocks = _note_blocks(referenced=True)

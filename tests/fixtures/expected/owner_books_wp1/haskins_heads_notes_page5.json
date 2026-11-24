@@ -33,11 +33,15 @@
       },
       {
         "marker": "*",
-        "text": "Gesta Regutn (Rolls Series), p. 306. ' Ed. LePrevost, iii, p. 474; cf. p. 230,"
+        "text": "Gesta Regutn (Rolls Series), p. 306."
+      },
+      {
+        "marker": "'",
+        "text": "Ed. LePrevost, iii, p. 474; cf. p. 230,"
       }
     ]
   },
-  "known": "The third note's marker, printed 3, is read \"'\" by the text layer, and the note runs on in the second, as now.",
+  "known": "The third note's marker, printed 3, is read \"'\" by the text layer; since 24 November 2026 (plan wrong-links, task 3.1, structure spec section 11, rule 6) the note under the row of notes 1 and 2 is a note of its own.",
   "printed": {
     "book_page_index": 29,
     "running_head": {

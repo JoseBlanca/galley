@@ -73,8 +73,10 @@ def test_sign_followed_by_punctuation_is_linked_to_its_note(
 # The plan asks for a fall of at least 15: at most 328. 290 after the
 # plan more-note-links (23 November 2026), work package 4; 284 with the
 # trailing "V" of the same day, whose 6 links were each checked on the
-# page image; at most 286.
-_DOMESDAY_UNREFERENCED_NOTES_AT_MOST = 286
+# page image; at most 286. 288 after the plan wrong-links, work package 2
+# (24 November 2026), which undid 4 wrong links; 287 after its work
+# package 3, whose cuts add 27 notes and 28 links; at most 287.
+_DOMESDAY_UNREFERENCED_NOTES_AT_MOST = 287
 
 
 @pytest.mark.whole_book

@@ -332,13 +332,19 @@ def main(argv: Sequence[str] | None = None) -> None:
     repository = _repository()
     books = read_books(repository.root / "evaluation" / "books.toml")
     runs_dir = repository.root / "runs" / "evaluation"
-    runs_dir.mkdir(parents=True, exist_ok=True)
     subcommand = Subcommand(arguments.command)
+    # The books are checked before runs/evaluation/ is made, so that an
+    # unknown book leaves no folder behind.
+    selected = (
+        _selected(books, arguments.names, parser)
+        if subcommand is not Subcommand.SUMMARY
+        else ()
+    )
+    runs_dir.mkdir(parents=True, exist_ok=True)
     match subcommand:
         case Subcommand.SUMMARY:
             failed: tuple[str, ...] = ()
         case Subcommand.RUN | Subcommand.COMPARE:
-            selected = _selected(books, arguments.names, parser)
             failed = compare_books(
                 selected,
                 runs_dir=runs_dir,
