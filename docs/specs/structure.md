@@ -1869,7 +1869,19 @@ a note when any of these holds:
    value is otherwise its place, since by place every marker-shaped
    line, a table's row too, would pass. On a page whose notes are each
    one line long no line is indented against another (Mariéjol's pages
-   221, 310 and 409);
+   221, 310 and 409). A number that starts a line after the region's
+   first starts a note by this rule only when the line before it ends
+   as a word before a second note on a line does (".", "'", "’", ":",
+   ";" or ")", "Two notes on one line"): a number inside a note's
+   sentence that the line break puts first is no marker (added on 24
+   November 2026, plan wrong-links, task 3.2). Domesday's page 445 prints
+   note 1 as "Thus, D. B. ii. 39: 'Tunc 4 carucae in dominio, post et
+   modo 2...et" over "2 carucae possunt restaurari.' To use our
+   symbols…"; the "2" made a second note 2, which took reference 2 while
+   the printed note 2 stayed unlinked. Kadesh's page 63 loses its false
+   note "2 Si thuentawen occurred…" ("such a thing occurred"), under a
+   line ending "To suppose that such". No other note of the seven
+   books' builds changes;
 4. it is the first line of a band region after the page's first, and is
    indented 5 to 40 pt from the band's left edge of rule 2: the first
    note of the next column (owner, 16 November 2026). On Kadesh's page 8
@@ -1882,10 +1894,18 @@ a note when any of these holds:
    short of the region's right edge, as section 6, rule 1 asks of the
    line before an indent, and does not end with a hyphen that joins it
    to this line. A one-character sign starts a note by this rule only
-   when the next line of the region starts with a marker that reads
-   what rule 3's last marker plus the notes after it reads plus 2: the
-   sign stands for the number between (Domesday's page 141, "*" for 4
-   between "3" and "5"). Domesday sets a short note on a line of its
+   when the **next marker** reads what rule 3's last marker plus the
+   notes after it reads plus 2, or a larger number one confused digit
+   away from that (the pairs of "Matching", below): the sign stands for
+   the number between (Domesday's page 141, "*" for 4 between "3" and
+   "5"; page 517, "*" for 4 before a 5 read "6"). The next marker is the
+   first number that "Two notes on one line" (below) would cut off later
+   in the sign's own line, 1 to 3 digits after a word that ends as that
+   section says and a gap of at least 8 pt, before a capital (page 169,
+   "* D. B. ii. 291 b. 5 D. B. ii. 24 b."), or else the first word of
+   the region's next line (the lookahead in its own line and the
+   confused digit were added on 24 November 2026, plan wrong-links,
+   task 3.1). Domesday sets a short note on a line of its
    own at the band's left edge, under a short line, so that neither
    indent rule sees it (page 35: "2 A good many cases…" under "1 D. B.
    i. 41…"). Added on 23 November 2026 (plan more-note-links, task 4.1):
@@ -1899,7 +1919,19 @@ a note when any of these holds:
    sign at the end of a page's notes, "* Maitland" on page 35, stands
    for 6 there and would take note 5's reference. Haskins gains one
    note, its page 116's "2 Origin of the English Constitution", which
-   the page image shows as a note of its own.
+   the page image shows as a note of its own;
+6. its first word is a note marker of one character, a digit or a sign,
+   the word after it starts with a capital, and the line before it in
+   its region holds two notes or more, cut by "Two notes on one line"
+   (below): a line under a **row of notes** starts a note whatever the
+   line before ends with, since the row's last note ends where it ends
+   and not at the band's right edge (added on 24 November 2026, plan
+   wrong-links, task 3.1). Domesday's page 517 prints "4 Plummer, Bede,
+   ii. 217." and "5 K. 917 (iv. 165)." side by side, then "6 D. B. i. 66
+   b, 67." on a line of its own; the row reaches the band's right edge,
+   so rule 5 did not start note 6. The rule starts 4 notes of Domesday
+   (pages 35, 167, 430, 517) and 2 of Haskins (29, 56), each a note of
+   its own on the page image.
 
 A line is indented only against other note lines: on a page with one
 note line, the band's left edge is that line's own left side, so the
@@ -1941,10 +1973,75 @@ gap of at least 8 pt, before a capital or a digit (page 134, "4 D. B. i.
 174 b, Poiwic.", 9.9 pt, "5 D. B. i. 268"). Domesday's footnotes go from
 1,868 to 1,873, every new note checked against its page's list of
 markers. A sign or a dash after a wide gap ("« Hist.", page 78; "- D.
-B.", page 207) is no cut: on page 240, "« D. B. 66." would be cut while
+B.", page 207) is no cut by these two rules, only by the stand-in rule
+below, with its conditions: on page 240, "« D. B. 66." would be cut while
 the "«" glued to the note before it stays, so the cut note would take
 the value of the glued one and its reference; and on page 500 a "." after
 a wide gap would take note 5's value.
+
+Two more cuts were added on 24 November 2026 (plan wrong-links, task
+3.1), where a note set on a line of its own was read by the OCR into the
+line before it, or its marker was misread. First, a marker of 1 to 3
+digits that reads the value the next note should have (as above) starts
+a note at any gap after a word that ends a quotation, a ".", "?" or "!"
+then a closing quotation mark, before a word that starts with a capital
+("…tenuit de Rege.' 3 But, as…", Domesday's page 177, one OCR line for
+two printed lines, the gap a word's); and after a gap of at least 8 pt
+the word after such a marker need only not start with a lower-case
+letter ("4 ^thelb. 26." for "Æthelb.", page 52). After any other word a
+gap is still needed: "D. B. i. 2 D. B." is a citation. Second, a
+**stand-in**, a word of 1 or 2 characters with no digit that reads no
+number, and of 2 characters only when neither is a letter ("«", "-",
+"&", ":<", "B", "a"), but "A" and "I", after a word that ends as above
+and a gap of at least 10 pt, before a word that has no marker's form,
+starts a note, with the stand-in as its marker and no value of its own
+(the numbering gives it one, "Its value"), when
+- the next marker of the page, the first number cut off later in its
+  line (rule 5's next marker) or else the first word of a later note
+  line of the page that reads a number, reads the next value plus 1,
+  or a larger number one confused digit away from it: the stand-in is
+  the number between ("4 D. B. i. 339, Agetorne. & D. B. i. 174…" over
+  "6 D. B. i. 163", page 440; "1 Rot. Hund. ii. 361. - D. B. i. 189."
+  over "3 Rental…", page 207; "« D. B. i. 307 b…" before a 5 read "6",
+  page 135);
+- or no later note line of the page starts with a number, the gap is at
+  least 20 pt, the word after starts with a capital, the stand-in is no
+  lower-case letter, and the note it is cut from has a value its own
+  marker reads, not one given by its place: the page's last note ("1 D.
+  B. i. 154. - D. B. i. 262 b.", page 213; "8 Ibid. 20 § b. « Ibid.
+  24.", page 111).
+
+The last condition keeps page 240's "» D. B. 38 b, 44. «D. B. C4b. « D.
+B. 66." whole: its "»" is a sign whose value is its place, and the
+spaced "«" would take the value of the glued one. Page 500's "4 D. B. i.
+364 (Lincoln). . 6 See above" stays whole too, since the word after
+the "." is a marker. Without "more than the next value", a quotation
+mark before a citation ("97): ' ...Meuanias", page 533, over a line that
+starts "1 ...regnum") and the word "A" (page 239, before "5 For
+Taunton") were cut, both wrong.
+
+Measured on 24 November 2026 with these cuts and rules 5 and 6 as
+changed that day, structure run on the `lines.json` of the plan
+more-note-links: Domesday's footnotes go from 1,873 to 1,901 and its
+links from 1,585 to 1,613; galley-eval's notes whose reference is right
+from 1,563 to 1,591 of 1,729, and its notes that hold the start of the
+next (galley-eval, "Wrong note links and joined notes") from 36 to 10.
+The cuts, each checked on the page image: a number after a quotation's
+end on pages 81, 114, 177, 187, 258, 307 and 335, after a wide gap on
+52; a stand-in between on 58, 78, 135, 139, 207, 225, 235 and 440, last
+on 35, 111, 145, 213 and 376; rule 5 on 169 and 517; rule 6 on 35, 167,
+430 and 517. The wrong links of pages 440 (reference 5 to the note "6")
+and 517 (reference 4 to the note "6", which held notes 5 and 6) are now
+right. Haskins' footnotes go from 70 to 72 (rule 6 on pages 29 and 56)
+and its joined notes from 1 to 0; its right links stay 68: page 29's
+second reference now takes its own note, and page 56's "Gummere ^", the
+reference to note 3, which took the joined notes 2 and 3, took note 2,
+since the OCR lost note 2's reference ("target.²") and the page's two
+signs pair with notes 1 and 2 in order; "Sure links" (below) unlinks it. Gierke's footnotes
+go from 384 to 385: page 42's "1 Bracton, f. 171 b. - Calvin's Case…"
+over "8 Windscheid…" (3 read 8) is cut, and "laws²" moves from note 3
+to note 2, "Calvin's Case", as the page image shows. Kadesh, Stubbs and
+the owner's two books give the same `blocks.json` byte for byte.
 
 A row of notes set in columns is cut too (added on 23 November 2026,
 plan more-note-links, task 5.1). Kadesh sets its notes in two or three
@@ -2070,6 +2167,25 @@ Otherwise a note's value is what its marker reads, once "i", "l", "I",
 "|", "!" and "J" are read as 1, "o" and "O" as 0, "s" and "S" as 5 and
 "z" and "Z" as 2, and, inside brackets, "a" as 2 and "t" as 1. A sign
 has no value.
+
+**A marker's own number.** In a book numbered per page, a footnote whose
+marker is 1 to 3 digits that read a number other than the value its
+page's numbering gave it keeps the number its marker reads, as an
+endnote does (section 12, "References"), when a candidate reference of
+its page (below, "Candidates") reads that number, no other note of the
+page has it as its value, and it lies above the values of the page's
+notes before it and below those of the notes after it. The numbering
+moves a value down when a note before is joined to the one before it:
+Domesday's page 440 prints notes 4 and 5 side by side and the OCR reads
+5 as "&", so before the cuts of "Two notes on one line" of 24 November
+2026 the notes read "4" and "6" and were numbered 4 and 5, and
+reference 5 opened note 6. The rule is applied before the matching
+(added on 24 November 2026, plan wrong-links, task 3.2). Measured that
+day, structure run on the `lines.json` of the plan more-note-links:
+with the cuts, no link of the seven books changes; without them,
+Domesday's page 440 takes reference 6 for note 6 and leaves 5
+unlinked, and page 517's note "6", which then held notes 5 and 6, takes
+reference 6 instead of 4.
 
 ### Notes left in the body
 
@@ -2325,6 +2441,19 @@ notes before it:
 - any other footnote whose reference is a sign (`*`, `^`, `•`, and the
   backslash and star of "A lone number" below) keeps its link when it
   is the page's first note or the note before it on the page is linked.
+
+A note that a stand-in or a row of notes started ("Two notes on one
+line", rule 6) and the note before it on the page were read as one note
+before 24 November 2026; the cut tells that two notes are there, not
+which of them a sign refers to. So a footnote whose reference is a sign,
+when it is such a note or the note before one, keeps its link only when
+the other of the two has a link too (added on 24 November 2026, plan
+wrong-links, task 3.2). Haskins' (`normansineuropea00hask`) page 56
+prints notes 1 and 2 side by side and 3 below them, which rule 6 starts;
+the OCR lost note 2's reference ("target.²"), and "Gummere ^", the
+reference to note 3, took note 2 in order. It is now unlinked. Page 29,
+the same row of two notes and a third below, keeps both its sign links,
+each right by the page image. No other link of the seven books changes.
 
 A link that does not hold is undone, and its note stays unreferenced.
 The matching is not run again for the candidate it frees. The rule is

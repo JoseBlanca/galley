@@ -1,0 +1,30 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 445,
+  "excerpt": "domesday_joined_notes, page 7",
+  "read": "Read by the assistant on 24 November 2026 from the band rendered at 150 dpi. Two notes; note 1's second line starts with '2 carucae', a number inside the note. The body's references follow 'restored' (1) and 'two' (2).",
+  "expected": {
+    "notes": [
+      {
+        "number": "1",
+        "text": "Thus, D. B. ii. 39: 'Tunc 4 carucae in dominio, post et modo 2...et"
+      },
+      {
+        "number": "2",
+        "text": "Thus, D. B. i. 231: 'Rad. tenet de episcopo 4 car. terrae in Partenei."
+      }
+    ],
+    "references": [
+      {
+        "word": "restored",
+        "reference": "1",
+        "note": "1"
+      },
+      {
+        "word": "two",
+        "reference": "2",
+        "note": "2"
+      }
+    ]
+  }
+}

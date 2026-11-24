@@ -1,0 +1,31 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 207,
+  "excerpt": "domesday_joined_notes, page 2",
+  "read": "Read by the assistant on 24 November 2026 from the band rendered at 150 dpi. Five notes: 1 and 2 side by side on the first line, the OCR reading the 2 as '-'; 3, 4 and 5 below.",
+  "expected": {
+    "notes": [
+      {
+        "number": "1",
+        "text": "Rot. Hund. ii. 361."
+      },
+      {
+        "number": "2",
+        "text": "D. B. i. 189."
+      },
+      {
+        "number": "3",
+        "text": "Rental of Gloucester, ed. W. H. Stevenson: Gloucester, 1890, p. x."
+      },
+      {
+        "number": "4",
+        "text": "There are many examples in Kemble's Codex."
+      },
+      {
+        "number": "5",
+        "text": "Pipe Roll, 31 Hen. I. p. 41: 'Vicecomes reddit compotum de £80 de"
+      }
+    ],
+    "references": []
+  }
+}

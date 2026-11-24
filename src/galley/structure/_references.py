@@ -217,6 +217,54 @@ def _with_values_between(notes: Sequence[NoteToMatch]) -> tuple[NoteToMatch, ...
     return tuple(given)
 
 
+def with_own_numbers(
+    notes: Sequence[NoteToMatch],
+    readings: Sequence[int | None],
+    candidates: Sequence[Candidate],
+) -> tuple[NoteToMatch, ...]:
+    """The footnotes of a book numbered per page, `notes` in page order,
+    each given the number its marker reads, `readings`, None for a marker
+    of no digits, instead of the value its page's numbering gave it, when
+    a candidate of its page reads that number, no other note of the page
+    has it as its value, and it lies between the values of the notes
+    before and after it on the page (spec section 11, "A marker's own
+    number"): the numbering took a note joined to the one before for none
+    and moved the note's value down ("4 … & …", "6": the "6" took 5)."""
+    read_on_page: dict[int, set[int]] = {}
+    for candidate in candidates:
+        if candidate.reference.value is not None:
+            read_on_page.setdefault(candidate.page_index, set()).add(
+                candidate.reference.value
+            )
+    given = list(notes)
+    for place, (note, reading) in enumerate(zip(notes, readings, strict=True)):
+        if note.value is None or reading is None or reading == note.value:
+            continue
+        page = [
+            other
+            for other in notes
+            if other.page_index == note.page_index and other.note != note.note
+        ]
+        before = [
+            other.value
+            for other in page
+            if other.note < note.note and other.value is not None
+        ]
+        after = [
+            other.value
+            for other in page
+            if other.note > note.note and other.value is not None
+        ]
+        if (
+            reading in read_on_page.get(note.page_index, set())
+            and all(other.value != reading for other in page)
+            and (not before or max(before) < reading)
+            and (not after or reading < min(after))
+        ):
+            given[place] = replace(note, value=reading)
+    return tuple(given)
+
+
 def match_footnotes(
     notes: Sequence[NoteToMatch], candidates: Sequence[Candidate]
 ) -> tuple[Link, ...]:
@@ -540,7 +588,10 @@ def gap_links(
 
 
 def sure_links(
-    notes: Sequence[NoteToMatch], links: Sequence[Link], unmarked: frozenset[int]
+    notes: Sequence[NoteToMatch],
+    links: Sequence[Link],
+    unmarked: frozenset[int],
+    guessed: frozenset[int] = frozenset(),
 ) -> tuple[Link, ...]:
     """`links` to footnotes, but those that are not sure (spec section 11,
     "Sure links"): a link to a note of `unmarked`, the positions of the
@@ -548,8 +599,11 @@ def sure_links(
     page's only note, or when the note before it on the page is linked
     and the reference reads one more than that note's value; a link whose
     reference is a sign is kept only when its note is its page's first or
-    the note before it on the page is linked. `notes` are the book's
-    footnotes in order; the links kept are in the order of `links`."""
+    the note before it on the page is linked, and, when the note or the
+    note after it on the page is one of `guessed`, the positions of the
+    notes a stand-in or a row of notes started, only when the other of the
+    two has a link too. `notes` are the book's footnotes in order; the
+    links kept are in the order of `links`."""
     by_note = {link.note: link for link in links}
     notes_by_page: dict[int, list[NoteToMatch]] = {}
     for note in notes:
@@ -571,7 +625,17 @@ def sure_links(
                     and reference.value == before.value + 1
                 )
             elif reference.form is ReferenceForm.SIGN:
-                sure = before is None or before_linked
+                after = page_notes[place + 1] if place + 1 < len(page_notes) else None
+                partner = (
+                    before
+                    if note.note in guessed
+                    else after
+                    if after is not None and after.note in guessed
+                    else None
+                )
+                sure = (before is None or before_linked) and (
+                    partner is None or partner.note in by_note
+                )
             else:
                 sure = True
             if sure:

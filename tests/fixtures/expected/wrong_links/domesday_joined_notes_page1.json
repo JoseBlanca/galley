@@ -1,0 +1,35 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 187,
+  "excerpt": "domesday_joined_notes, page 1",
+  "read": "Read by the assistant on 24 November 2026 from the band rendered at 150 dpi. Six notes, each starting on a line of its own, indented; the OCR's lines join 'quolibet.'' and '4 D. B. i. 91'.",
+  "expected": {
+    "notes": [
+      {
+        "number": "1",
+        "text": "D. B. i. 152 b: 'duo teigni homines Alrici filii Goding.'"
+      },
+      {
+        "number": "2",
+        "text": "D. B. i. 84 b: at the end of a list of royal thegns"
+      },
+      {
+        "number": "3",
+        "text": "D. B. i. 41: 'Tres taini tenuerunt de episcopo et non potuerunt ire quolibet.'"
+      },
+      {
+        "number": "4",
+        "text": "D. B. i. 91: 'Hae terrae erant tainland in Glastingberie T. R. E. nec"
+      },
+      {
+        "number": "5",
+        "text": "Hamilton, Inquisitio, pp. xviii. xix."
+      },
+      {
+        "number": "6",
+        "text": "D. B. i. 66 b: 'De hac eadem terra 3 hidas vendiderat abbas cuidam taino"
+      }
+    ],
+    "references": []
+  }
+}
