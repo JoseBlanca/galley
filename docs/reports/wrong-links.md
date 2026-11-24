@@ -5,58 +5,60 @@ For the owner. Started on 24 November 2026, at main a908204. The plan is
 
 ## Summary
 
-Done on branch `plan/wrong-links`, 24 November 2026, but for task 5.2
-(Kadesh rebuilt with the vision model), which waits for LM Studio. The
-seven books are rebuilt in `runs/wrong-links/<folder>/`, all through
-epubcheck with no error or warning. Every link that changed against the
-builds before the plan was checked on the page images: none of the
-changed links is wrong; 3 right links were given up, all in Kadesh.
+The plan is done on branch `plan/wrong-links`, 24 November 2026, but for
+one task: Kadesh rebuilt with the vision model (task 5.2 of the plan),
+which needs about 26 minutes of LM Studio. Asked of the owner: the order
+to merge, which I recommend now, since 5.2 changes no code and can be
+run after; and whether LM Studio is free for 5.2.
+
+A **link** here is a footnote reference in the text that leads to its
+note; a **wrong link** leads to another note. Pages are given as page
+indices of the PDF, counted from 0, not printed page numbers. The seven
+books are rebuilt in `runs/wrong-links/<folder>/`, and each EPUB passes
+epubcheck (the EPUB validator) with no error or warning. Every link that
+changed against the builds before the plan was checked on the page
+images: none of the changed links is wrong; 3 right links were given up,
+all in Kadesh.
 
 | book (folder) | links | wrong before | wrong after | right links lost |
 |---|---|---|---|---|
 | Domesday (`domesdaybook00maituoft`) | 1,589 → 1,614 | 10 | 3 | 0 |
 | Haskins (`normansineuropea00hask`) | 69 → 69 | 1 | 1 | 0 |
-| Gierke (`politicaltheorie00gieruoft`) | 296 → 296 | 1 (page 42) | 0 | 0 |
+| Gierke (`politicaltheorie00gieruoft`) | 296 → 296 | 1 | 0 | 0 |
 | Kadesh (`battleofkadeshst00breauoft`), without the model | 45 → 33 | 15 | 1 | 3 |
-| Stubbs, Turney, Haynes | unchanged | — | — | — |
+| Stubbs, Turney, Haynes | unchanged | 0 found | 0 found | 0 |
 
-In Haskins one wrong link (page 56, a record holding notes 2 and 3)
-became a link to the right note's neighbour and was then unlinked; the
-other (204) is left. Notes that held the next note's text: Domesday
-36 → 9, Haskins 1 → 0. Domesday's notes with the right reference
-(galley-eval): 1,563 → 1,594.
+Domesday: 4 wrong links removed, 3 made right, and 29 new links to notes
+that galley had read as part of the note before, all right. A note that
+held the next note's text: Domesday 36 → 9, Haskins 1 → 0. In Haskins
+the cut of page 29's note added one right link, and page 56's note
+briefly took a wrong one, removed before the end.
 
-Wrong links left: Domesday 154 and 498 (a sign read where nothing is
-printed, at the place the next reference is expected), Domesday 333 (a
-"2" read as 3), Haskins 204 (a "*" with nothing printed, on the page's
-only note), Kadesh 54 (the reference to 144 read "I'*").
+Wrong links left:
 
-The right links given up, by the owner's rule of no wrong link: Kadesh
-pages 18, 26 and 52.
+- Domesday 154 and 498: a stray mark read where nothing is printed, at
+  the place the next reference is expected, so it takes that note.
+- Domesday 333: a printed "2" read as "3".
+- Haskins 204: a "*" read where nothing is printed, on the page's only
+  note.
+- Kadesh 54: the reference to note 144 read as "I'*".
 
-Left open: Kadesh with the vision model (task 5.2, about 26 minutes of
-LM Studio; the earlier build with the model had 105 links, 95 right);
-the wrong links above; a link the model places one word off.
+The right links given up, by the owner's rule that no link is better
+than a wrong one: Kadesh pages 18, 26 and 52; each rule that removed
+them removed more wrong links (3 and 6) than right ones.
 
-## Work package 2: unmarked notes and signs
+Counts of Domesday's right links come from galley-eval, the project's
+tool that scores a build against a published transcription of the book:
+1,563 → 1,594. galley-eval also lists 3 links it cannot judge (pages 104
+and 156), which are right on the page images; they are left out of the
+table. Stubbs has no links; Turney and Haynes were checked on samples of
+the page images before the plan (no wrong link found) and their output
+did not change.
 
-Done (99848e6 spec, 9682a3b code). In books numbered per page, a
-footnote with no marker, or a sign (`*`, `^`, `•`), is linked only
-where the page expects it: the page's first note, or the note before it
-linked. Domesday's wrong links on page indices 106, 200 and 499 (two)
-are gone, each checked on the page image; Domesday links 1,589 → 1,585,
-galley-eval's right count unchanged at 1,563; Haskins 68 right,
-unchanged. Gierke, Kadesh (without the model), Stubbs, Turney and
-Haynes: blocks.json byte-identical.
-
-Still wrong: Domesday 154 and 498 (the sign sits where the order
-expects a reference; the real one was read as a word or an amount),
-Haskins 204 (the page's only note, two candidates, the earlier wins).
-
-Changed from the plan: the rule is not applied to books numbered
-through (Kadesh), where it unlinked 15 of 45 links, three of them right
-by the spec's own record; and a sign may link the page's first note,
-not only its only note, which keeps 6 right Haskins links.
+Left open: Kadesh with the vision model (the earlier build with the
+model had 105 links, 95 right, and its 10 wrong ones were mostly the
+structure stage's, now fixed); the wrong links above; a link the model
+places one word off.
 
 ## Work package 1: the measure
 
