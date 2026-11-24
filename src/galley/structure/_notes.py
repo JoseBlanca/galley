@@ -87,14 +87,12 @@ _MARKER_AND_A_WORD = 2
 
 
 class NoteStart(StrEnum):
-    """What started a footnote (spec section 11, "Sure links"): a marker it
-    reads, its indent, a short line above it or the start of the band; or
-    a stand-in marker or a row of notes above it ("Two notes on one line",
-    rule 6), which tell that a note starts but not which reference is
-    its."""
+    """What started a footnote (spec section 11, "Sure links"): any rule
+    but rule 6, or a row of notes above it (rule 6), which tells that a
+    note starts but not which of the two a sign refers to."""
 
-    SURE = "a marker, an indent or a short line"
-    GUESSED = "a stand-in or a row of notes"
+    SURE = "a rule other than rule 6"
+    GUESSED = "a row of notes above it"
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +106,7 @@ class PageNote:
     lines: tuple[PlacedLine, ...]
     marker: NoteMarker | None
     may_continue: bool
-    start: NoteStart = NoteStart.SURE
+    start: NoteStart
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,7 +121,7 @@ class Footnote:
     marker: NoteMarker | None
     value: int | None
     counted: bool
-    start: NoteStart = NoteStart.SURE
+    start: NoteStart
 
 
 class _LinePlace(StrEnum):
@@ -200,7 +198,7 @@ def _line_marker(
         and gap >= _WIDE_GAP_PT
         and marker is not None
         and marker.value is not None
-        and marker.marker.rstrip(".").isdigit()
+        and _is_digits(marker)
         and after[:1].isupper()
     ):
         return marker
@@ -209,13 +207,23 @@ def _line_marker(
         return None
     reads_next = (
         marker is not None
-        and marker.marker.rstrip(".").isdigit()
+        and _is_digits(marker)
         and next_value is not None
         and marker.value == next_value
     )
     if reads_next and before.endswith(_QUOTATION_ENDS) and after[:1].isupper():
         return marker
     if reads_next and gap >= _NEXT_MARKER_GAP_PT and not after[:1].islower():
+        return marker
+    if (
+        marker is not None
+        and _is_digits(marker)
+        and next_value is not None
+        and marker.value is not None
+        and are_confused(marker.value, next_value)
+        and gap >= _NEXT_MARKER_GAP_PT
+        and after[:1].isupper()
+    ):
         return marker
     if (
         len(word) == 1
@@ -237,6 +245,12 @@ def _line_marker(
     return marker if marker is not None else NoteMarker(word, "", read_number(word))
 
 
+def _is_digits(marker: NoteMarker) -> bool:
+    """Whether `marker` is 1 to 3 digits, with or without a "." after them
+    ("8", "291."), not a sign or a letter read as a digit."""
+    return marker.marker.rstrip(".").isdigit()
+
+
 def _reading_in_line(words: Sequence[Word], start: int) -> int | None:
     """What the first marker of a note inside a line reads, among `words`
     from position `start` on: a word of 1 to 3 digits after a word that
@@ -247,7 +261,7 @@ def _reading_in_line(words: Sequence[Word], start: int) -> int | None:
         if (
             marker is not None
             and marker.value is not None
-            and marker.marker.rstrip(".").isdigit()
+            and _is_digits(marker)
             and words[position - 1].text.endswith(_ENDS_BEFORE_A_NOTE)
             and words[position].box.x0 - words[position - 1].box.x1
             >= _NEXT_MARKER_GAP_PT
@@ -312,7 +326,6 @@ def _stand_in_marker(
         and gap >= _WIDE_GAP_PT
         and source is _ValueSource.MARKER
         and after[:1].isupper()
-        and not word.islower()
     )
     return NoteMarker(word, "", None) if between or last else None
 
@@ -323,19 +336,17 @@ def _cut_line(
     place: _LinePlace,
     source: _ValueSource,
     following: int | None,
-) -> tuple[tuple[PlacedLine, NoteMarker | None, NoteStart], ...]:
+) -> tuple[tuple[PlacedLine, NoteMarker | None], ...]:
     """The parts of a note line, each with the marker of the note it starts,
-    the first part's None, and what started it: one part when no second
-    note starts in it.
+    the first part's None: one part when no second note starts in it.
     `value` is that of the note the first part belongs to, None when not
     known, and `source` where it comes from; `place` says whether the line
     is the first of its region; `following` is what the first marker of the
     page's later note lines reads, None when none reads a number."""
     words = line.line.words
-    parts: list[tuple[int, NoteMarker | None, NoteStart]] = [(0, None, NoteStart.SURE)]
+    parts: list[tuple[int, NoteMarker | None]] = [(0, None)]
     for position in range(1, len(words) - 1):
         next_value = value + 1 if value is not None else None
-        start = NoteStart.SURE
         gap = words[position].box.x0 - words[position - 1].box.x1
         marker = _line_marker(
             words[position - 1].text,
@@ -356,17 +367,16 @@ def _cut_line(
                 in_line if in_line is not None else following,
                 source,
             )
-            start = NoteStart.GUESSED
         if marker is not None:
-            parts.append((position, marker, start))
+            parts.append((position, marker))
             value = marker.value if marker.value is not None else next_value
             source = (
                 _ValueSource.MARKER if marker.value is not None else _ValueSource.PLACE
             )
-    ends = (*(begin for begin, _, _ in parts[1:]), len(words))
+    ends = (*(begin for begin, _ in parts[1:]), len(words))
     return tuple(
-        (with_words(line, words[begin:end]), marker, start)
-        for (begin, marker, start), end in zip(parts, ends, strict=True)
+        (with_words(line, words[begin:end]), marker)
+        for (begin, marker), end in zip(parts, ends, strict=True)
     )
 
 
@@ -459,7 +469,7 @@ def page_notes(
             )
             last_value = notes[-1].marker.value if notes and notes[-1].marker else None
             expected = _expected_value(notes)
-            under_a_row = _under_a_row(line, marker, parts_before)
+            under_a_row = _under_a_row(line, before, marker, parts_before)
             sure_start = (
                 not notes
                 or by_indent
@@ -469,7 +479,7 @@ def page_notes(
                 or (
                     marker is not None
                     and marker.value is not None
-                    and (before is None or _ends_a_sentence(before))
+                    and (before is None or _ends_before_a_note(before))
                     and (
                         (last_value is not None and marker.value == last_value + 1)
                         or (
@@ -501,7 +511,7 @@ def page_notes(
                 following,
             )
             parts_before = len(parts)
-            first_part, _, _ = parts[0]
+            first_part, _ = parts[0]
             if starts:
                 if marker is None and (by_indent or indented):
                     marker = _indent_marker(line, lower_case_words)
@@ -520,13 +530,13 @@ def page_notes(
             else:
                 notes[-1] = replace(notes[-1], lines=(*notes[-1].lines, first_part))
             notes.extend(
-                PageNote((part,), part_marker, may_continue=False, start=start)
-                for part, part_marker, start in parts[1:]
+                PageNote((part,), part_marker, may_continue=False, start=NoteStart.SURE)
+                for part, part_marker in parts[1:]
             )
     return tuple(notes)
 
 
-def _ends_a_sentence(line: PlacedLine) -> bool:
+def _ends_before_a_note(line: PlacedLine) -> bool:
     """Whether the last word of `line` ends as a word before a note does
     (spec section 11, rule 3)."""
     words = line.line.words
@@ -534,15 +544,21 @@ def _ends_a_sentence(line: PlacedLine) -> bool:
 
 
 def _under_a_row(
-    line: PlacedLine, marker: NoteMarker | None, parts_before: int
+    line: PlacedLine,
+    before: PlacedLine | None,
+    marker: NoteMarker | None,
+    parts_before: int,
 ) -> bool:
     """Whether `line`, whose first word's marker is `marker`, starts a note
-    under a row of notes, the line before it in its region having been cut
-    into `parts_before` notes (spec section 11, rule 6): a marker of one
-    character before a capital, under a line of two notes or more."""
+    under a row of notes, the line `before` it in its region having been
+    cut into `parts_before` notes (spec section 11, rule 6): a marker of
+    one character before a capital, under a line of two notes or more
+    that ends as a word before a note does."""
     words = line.line.words
     return (
         parts_before > 1
+        and before is not None
+        and _ends_before_a_note(before)
         and marker is not None
         and len(marker.marker) == 1
         and not marker.rest

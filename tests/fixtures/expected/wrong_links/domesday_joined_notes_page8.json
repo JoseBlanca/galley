@@ -1,0 +1,46 @@
+{
+  "book": "domesdaybook00maituoft",
+  "page_index": 504,
+  "excerpt": "domesday_joined_notes, page 8",
+  "read": "Read by the assistant on 24 November 2026 from the page rendered at 150 dpi. Six notes in three rows of two: 1 and 2, 3 and 4, 5 and 6; the OCR reads the 6 as '8'. The body's references 5 and 6 follow '10d.' (read 'Wd.', its 5 read '6') and 'farthing'.",
+  "expected": {
+    "notes": [
+      {
+        "number": "1",
+        "text": "D. B. iv. 4, 9, 16."
+      },
+      {
+        "number": "2",
+        "text": "D. B. iv. 22."
+      },
+      {
+        "number": "3",
+        "text": "D. B. iv. 1, 6, 13."
+      },
+      {
+        "number": "4",
+        "text": "D. B. iv. 3, 8, 15 (Melchesham)."
+      },
+      {
+        "number": "5",
+        "text": "D. B. iv. 3-4, 9, 15 (Chinbrige)."
+      },
+      {
+        "number": "6",
+        "text": "D. B. iv. 61-2-3."
+      }
+    ],
+    "references": [
+      {
+        "word": "Wd.",
+        "reference": "6",
+        "note": "5"
+      },
+      {
+        "word": "farthing",
+        "reference": "6",
+        "note": "6"
+      }
+    ]
+  }
+}
