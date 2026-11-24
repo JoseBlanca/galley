@@ -31,12 +31,15 @@ def test_owner_book_list_items_labels_and_list_marker_changes(
     owner_book_run: Callable[[str], BlocksFile], book: str
 ) -> None:
     blocks = owner_book_run(book)
+    # Counts made first, so that a failure prints no text of the owner's
+    # books (pytest shows the arguments of a call in an assert).
     items = tuple(b for b in blocks.blocks if b.kind is BlockKind.LIST_ITEM)
-    assert (
+    counts = (
         len(items),
         sum(item.label == "—" for item in items),
         sum(c.reason is ChangeReason.LIST_MARKER for c in blocks.word_changes),
-    ) == _LIST_ITEMS[book]
+    )
+    assert counts == _LIST_ITEMS[book]
 
 
 @pytest.mark.parametrize("book", ["turney", "haynes"])
@@ -51,12 +54,14 @@ def test_owner_book_contents_entries_of_depth_1_with_page_numbers_and_links(
     )
     entries = tuple(b for b in on_page if b.kind is BlockKind.CONTENTS_ENTRY)
     headings = frozenset(b.id for b in blocks.blocks if b.kind is BlockKind.HEADING)
-    assert (
+    counts = (
         len(entries),
         sum(entry.page_number is not None for entry in entries),
         sum(entry.heading_ref in headings for entry in entries),
-    ) == _CONTENTS[book]
-    assert {entry.level for entry in entries} == {1}
+    )
+    levels = frozenset(entry.level for entry in entries)
+    assert counts == _CONTENTS[book]
+    assert levels == {1}
 
 
 @pytest.mark.parametrize("book", ["turney", "haynes"])
@@ -104,19 +109,21 @@ def test_owner_book_chapter_entries_have_labels_and_their_headings_words(
         for block in blocks.blocks
         if block.kind is BlockKind.CONTENTS_ENTRY and block.heading_ref is not None
     )
-    chapters = tuple(
+    chapter_entries = tuple(
         entry
         for entry, heading in linked
         if heading.label is not None and heading.label.casefold().startswith("chapter")
     )
-    differing = tuple(
-        entry
+    chapter_count = len(chapter_entries)
+    unlabelled_count = sum(1 for entry in chapter_entries if entry.label is None)
+    differing_count = sum(
+        1
         for entry, heading in linked
         for title, words in ((block_text(entry).split(), block_text(heading).split()),)
         if len(title) != len(words)
         or not _agree(title[0], words[0])
         or not _agree(title[-1], words[-1])
     )
-    assert len(chapters) == _CHAPTERS[book]
-    assert sum(entry.label is None for entry in chapters) == 0
-    assert len(differing) == 0
+    assert chapter_count == _CHAPTERS[book]
+    assert unlabelled_count == 0
+    assert differing_count == 0
