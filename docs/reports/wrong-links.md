@@ -5,11 +5,8 @@ For the owner. Started on 24 November 2026, at main a908204. The plan is
 
 ## Summary
 
-The plan is done on branch `plan/wrong-links`, 24 November 2026, but for
-one task: Kadesh rebuilt with the vision model (task 5.2 of the plan),
-which needs about 26 minutes of LM Studio. Asked of the owner: the order
-to merge, which I recommend now, since 5.2 changes no code and can be
-run after; and whether LM Studio is free for 5.2.
+The plan is done, 24 November 2026, and merged into main (16ee387).
+Kadesh rebuilt with the vision model (task 5.2) is at the end.
 
 A **link** here is a footnote reference in the text that leads to its
 note; a **wrong link** leads to another note. Pages are given as page
@@ -55,10 +52,8 @@ table. Stubbs has no links; Turney and Haynes were checked on samples of
 the page images before the plan (no wrong link found) and their output
 did not change.
 
-Left open: Kadesh with the vision model (the earlier build with the
-model had 105 links, 95 right, and its 10 wrong ones were mostly the
-structure stage's, now fixed); the wrong links above; a link the model
-places one word off.
+Left open: the wrong links above; Kadesh page 21 with the model (below);
+a link the model places one word off.
 
 ## Work package 1: the measure
 
@@ -200,3 +195,27 @@ stream's). No word lost, no new wrong link. Fixed (976ffde, db72cb0):
 All seven books' blocks.json byte-identical to before these fixes.
 Default pytest: 74.2 s, against 74.8 s on main a908204 measured the
 same way; the plan does not slow the tests.
+
+## Kadesh with the vision model (task 5.2)
+
+Built after the merge, at main 16ee387, into
+`runs/wrong-links/battleofkadeshst00breauoft-model/` (29 minutes, the
+35B model loaded and unloaded by the session, the owner's 27B as second
+reader). Every link checked on the page images or the reference
+transcriptions:
+
+| Kadesh with the model | links | right | wrong: structure | wrong: model |
+|---|---|---|---|---|
+| more-note-links plan | 105 | 95 | 8 | 2 |
+| this plan | 106 | 103 | 0 | 3 |
+
+6 links are new, all right; 5 are gone, 4 of them wrong before and 1
+right (page 51, note 125). The 3 wrong links are the model's, all on
+page 21: in this build's reading the structure stage joins notes 48–50
+into one record, and the model pairs the references to 49, 50 and 51
+with the next notes in order. Of the owner's 63 corrections one no
+longer applied (page 21, "Coelesyria", which the model had changed) and
+was remade; all 63 apply, and the EPUB passes epubcheck with no error
+or warning. The model also changed three things in that page's note
+that the page does not print ("Antient" to "Ancient", among others);
+they are not corrected.

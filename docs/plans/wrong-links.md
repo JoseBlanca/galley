@@ -3,7 +3,7 @@
 The owner chose on 24 November 2026, after counting the wrong links of
 every book, to remove the wrong links galley's structure stage makes and
 to cut apart notes read as one. The breakdown below was approved in chat
-that day ("option 1"). Dated 24 November 2026. State: done on 24 November 2026, but for 5.2 (LM Studio).
+that day ("option 1"). Dated 24 November 2026. State: done on 24 November 2026.
 
 Specs: `docs/specs/structure.md` §11 (notes and their references, where
 a note starts, the marker of a note, references), §12 (endnotes, for the
@@ -154,6 +154,6 @@ Deliverables:
   seven books rebuilt in `runs/wrong-links/`, through epubcheck;
   galley-eval; every changed link checked on the page images; the
   report.
-- [ ] 5.2 Kadesh with the vision model, if the owner says LM Studio is
+- [x] 5.2 Kadesh with the vision model, if the owner says LM Studio is
   free (about 26 minutes; the 35B loaded by the orchestrator, the
   owner's 27B never touched).
