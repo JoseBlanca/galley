@@ -6,8 +6,10 @@ import difflib
 import json
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -731,7 +733,8 @@ def test_a_page_read_with_one_number_misread_keeps_no_wrong_link() -> None:
     # Review of 24 November 2026: a page printing 76 to 81, the model
     # reading the references after the words of 76 to 80 as 76, 78, 79, 80,
     # 81 and its note lines, with the same numbers, naming the notes 76 and
-    # 78 to 81. Only 76 is right, and only it is kept.
+    # 78 to 81. Only 76 is right; it comes before a skip (76, 78) and the
+    # others go one note past the k-th, so none is kept.
     words = ("one", "two", "three", "four", "five", "six")
     answer = link_answer(
         "one [76] x\n"
@@ -760,7 +763,7 @@ def test_a_page_read_with_one_number_misread_keeps_no_wrong_link() -> None:
         )
     )
     links = page_links(31, _line_page(*words), notes, answer)
-    assert [(link.text, link.note_id) for link in links] == [("76", "n-p0031-001")]
+    assert links == ()
 
 
 def test_a_number_marked_twice_gives_no_link() -> None:
@@ -772,39 +775,21 @@ def test_a_number_marked_twice_gives_no_link() -> None:
         )
     )
     links = page_links(11, _line_page(*PAGE_11_WORDS), _page_11_notes(), answer)
-    assert [link.text for link in links] == ["15", "18"]
+    assert [link.text for link in links] == ["15"]
 
 
 def test_a_reference_with_no_note_makes_galleys_count_unknown() -> None:
-    # Section 9b, Kadesh page 31 with 18 read as 19: galley links "river,"
-    # to the third note, where the page prints the fourth's reference; the
-    # model's two 19s give no note, so whether they include the reference
-    # to galley's note is not known, and 20 and 21 are dropped.
-    words = ("one", "two", "three", "four", "five")
-    reading = _line_page(*words)
-    answer = link_answer(
-        "one [17] x\n"
-        "two [19] x\n"
-        "three [19] x\n"
-        "four [20] x\n"
-        "five [21] x\n"
-        "NOTE 17 | Alpha first note\n"
-        "NOTE 19 | Gamma third note\n"
-        "NOTE 20 | Delta fourth note\n"
-        "NOTE 21 | Epsilon fifth note\n"
+    # Section 9b: galley references the third note from a word the model
+    # does not mark, and the model's 18 and 19 give no note. Whether one
+    # of them is the reference to galley's note is not known, so its 20 to
+    # the fifth note, the k-th only when galley's note counts, is dropped.
+    lines = (
+        "w0 [17] x\nw1 [18] x\nw2 [19] x\nw3 [20] x\n"
+        "NOTE 17 | Alpha note 1\nNOTE 18 | Omega\nNOTE 19 | Omega\n"
+        "NOTE 20 | Epsilon note 5\n"
     )
-    notes = (
-        _note("n-p0031-001", "Alpha first note"),
-        _note("n-p0031-002", "Beta second note"),
-        _note("n-p0031-003", "Gamma third note", referenced=True),
-        _note("n-p0031-004", "Delta fourth note"),
-        _note("n-p0031-005", "Epsilon fifth note"),
-    )
-    river = reading[3].place
-    assert river is not None
-    references = frozendict({river: "n-p0031-003"})
-    links = page_links(31, reading, notes, answer, references)
-    assert [link.text for link in links] == ["17"]
+    found = _by_order(lines, _greek_notes(5, referenced=(3,)), {5: "n-p0031-003"})
+    assert found == [("17", "n-p0031-001")]
 
 
 def _line_page(*words: str) -> tuple[GalleyToken, ...]:
@@ -874,16 +859,20 @@ def test_no_note_is_placed_without_a_link_after_it() -> None:
 
 
 def test_no_note_is_placed_when_its_neighbours_numbers_skip_a_note() -> None:
-    # The model marks 15, 17 and 18, and 18 goes to the page's third
-    # footnote, its third reference: 15 and 18 are three numbers apart and
-    # their notes two places, so whether 17 is the second footnote is not
-    # known, and it is not placed.
-    answer = link_answer(PAGE_11_ANSWER.replace("Poem [16] by", "Poem by"))
-    notes = tuple(note for note in _page_11_notes() if note.id != "n-p0011-002")
-    links = page_links(11, _line_page(*PAGE_11_WORDS), notes, answer)
-    assert [(link.text, link.note_id) for link in links] == [
-        ("15", "n-p0011-001"),
-        ("18", "n-p0011-004"),
+    # Kadesh page 62 with 168 left out (review of 24 November 2026): galley
+    # joins 169 to 168, so 170 and 171 keep the k-th count, and 169, whose
+    # note line names no note, would go by order to the joined note 168.
+    # Between 166 and 170 lie four numbers and three notes: not placed.
+    lines = (
+        "w0 [166] x\nw1 [167] x\nw2 [169] x\nw3 [170] x\nw4 [171] x\n"
+        "NOTE 166 | Alpha note 1\nNOTE 167 | Beta note 2\n"
+        "NOTE 169 | Publication has\nNOTE 170 | Delta note 4\n"
+        "NOTE 171 | Epsilon note 5\n"
+    )
+    assert _by_order(lines, _greek_notes(5)) == [
+        ("166", "n-p0031-001"),
+        ("170", "n-p0031-004"),
+        ("171", "n-p0031-005"),
     ]
 
 
@@ -918,6 +907,46 @@ def _by_order(
     return [(link.text, link.note_id) for link in links]
 
 
+def test_no_link_follows_the_first_mark_of_a_number_marked_twice() -> None:
+    # Section 9b, Kadesh page 31 with "[17]" doubled: the model's note
+    # lines, one note off there, come back in line with its references.
+    lines = (
+        "w0 [17] x\nw1 [17] x\nw2 [18] x\nw3 [19] x\nw4 [20] x\n"
+        "NOTE 17 | Beta note 2\nNOTE 18 | Gamma note 3\n"
+        "NOTE 19 | Delta note 4\nNOTE 20 | Epsilon note 5\n"
+    )
+    assert _by_order(lines, _greek_notes(6)) == []
+
+
+def test_a_mark_at_galleys_reference_counts_galleys_note_as_marked() -> None:
+    # Section 9b, Kadesh page 61 with 159 read as 160: galley links note
+    # 2 from the fifth word, where the page prints 163; the model marks
+    # that word too, so note 2 is no reference it left out, and its 160,
+    # its second reference, is not linked to note 3.
+    lines = (
+        "w0 [158] x\nw1 [160] x\nw2 [161] x\nw3 [162] x\nw4 [163] x\n"
+        "NOTE 158 | Alpha note 1\nNOTE 160 | Gamma note 3\n"
+        "NOTE 161 | Delta note 4\nNOTE 162 | Epsilon note 5\n"
+        "NOTE 163 | Zeta note 6\n"
+    )
+    found = _by_order(lines, _greek_notes(6, referenced=(2,)), {4: "n-p0031-002"})
+    assert found == []
+
+
+def test_a_number_the_next_skips_past_gives_no_link() -> None:
+    # Section 9b, Kadesh page 61 with 161 read as 160: in 158, 159, 160,
+    # 162 the model may have left out 160 and misread 161.
+    lines = (
+        "w0 [158] x\nw1 [159] x\nw2 [160] x\nw3 [162] x\n"
+        "NOTE 158 | Alpha note 1\nNOTE 159 | Beta note 2\n"
+        "NOTE 160 | Gamma note 3\nNOTE 162 | Epsilon note 5\n"
+    )
+    assert _by_order(lines, _greek_notes(5)) == [
+        ("158", "n-p0031-001"),
+        ("159", "n-p0031-002"),
+    ]
+
+
 def test_a_number_far_below_the_next_links_finds_no_note() -> None:
     # The fallback's note would lie before the page's first footnote.
     lines = "w0 [3] x\nw1 [15] x\nNOTE 15 | Beta note 2\n"
@@ -946,17 +975,14 @@ def test_no_note_a_dropped_link_names_is_found_by_order() -> None:
 
 
 def test_a_note_found_by_order_must_be_the_k_th() -> None:
-    # "3" is the model's second reference, but by the numbers its note is
-    # the third: the model marked a reference that is none ("9"), or
-    # misread a number.
+    # By the numbers, "1" and "2" go to the second and third notes, one
+    # and two before 3's; but the model marked something more ("*") among
+    # them, so they are its first and second references, not the k-th.
     lines = (
-        "w0 [1] x\nw1 [3] x\nw2 [9] x\nw3 [4] x\n"
-        "NOTE 1 | Alpha note 1\nNOTE 4 | Delta note 4\n"
+        "w0 [1] x\nw1 [2] x\nw2 [*] x\nw3 [3] x\n"
+        "NOTE 1 | Omega\nNOTE 2 | Omega\nNOTE 3 | Delta note 4\n"
     )
-    assert _by_order(lines, _greek_notes(4)) == [
-        ("1", "n-p0031-001"),
-        ("4", "n-p0031-004"),
-    ]
+    assert _by_order(lines, _greek_notes(4)) == [("3", "n-p0031-004")]
 
 
 def test_a_reference_at_galleys_reference_is_not_found_by_order() -> None:
@@ -1022,13 +1048,12 @@ def test_a_reference_the_model_marks_where_galley_links_the_note_counts_once() -
     ]
 
 
-def test_a_link_where_galley_links_another_note_does_not_count_galleys_as_marked() -> (
-    None
-):
-    # Section 9b: galley links "Lenormant" to the page's first note, the
-    # model to the second. galley's note is then no note the model marked,
-    # so it counts before the model's first reference, which goes to the
-    # second note.
+def test_a_reference_where_galley_links_another_note_counts_galleys_as_marked() -> None:
+    # Section 9b, review of 24 November 2026: galley links "Lenormant" to
+    # the page's first note, the model to the second. The model marked
+    # galley's reference, perhaps misreading its number, so galley's note
+    # counts as marked, and the model's first reference going to the
+    # second note is one note past the k-th: no link.
     lenormant = Place("b-p0009-001", 0, 0, 9)
     reading = (
         GalleyToken(
@@ -1051,9 +1076,7 @@ def test_a_link_where_galley_links_another_note_does_not_count_galleys_as_marked
     links = page_links(
         9, reading, notes, answer, frozendict({lenormant: "n-p0009-001"})
     )
-    assert [(link.note_id, link.text, link.rank) for link in links] == [
-        ("n-p0009-002", "5", 0)
-    ]
+    assert links == ()
 
 
 def test_galleys_reference_after_white_space_is_not_one_right_after_the_word() -> None:
@@ -1413,14 +1436,6 @@ RECORDED_LINKS = (
         "Struggle of the Nations, p. 93.",
     ),
     (
-        61,
-        "159",
-        "159",
-        "says:",
-        "Ramesseum reliefs Diodorus says",
-        "Vol. I, p. @; ad. Voorn, Vol. I.",
-    ),
-    (
         62,
         "166",
         "166",
@@ -1489,13 +1504,24 @@ def _alike(first: str, second: str) -> float:
     return difflib.SequenceMatcher(None, first, second).ratio()
 
 
-def _recorded_rows(
-    folders: frozendict[str, BookFolder], answers: Mapping[int, str]
-) -> list[tuple[int, str, str, str, str]]:
-    """The links of `answers`, by page index in the whole book, on the
-    excerpts' structures, as RECORDED_LINKS gives them less the printed
-    number."""
-    found = []
+@dataclass(frozen=True, slots=True)
+class _LinkPage:
+    """What page_links needs of one page of an excerpt, and what a row of
+    RECORDED_LINKS shows of a link on it."""
+
+    page_index: int
+    reading: tuple[GalleyToken, ...]
+    notes: tuple[Note, ...]
+    galley_references: frozendict[Place, str]
+    blocks: frozendict[str, Block]
+    note_texts: frozendict[str, str]
+
+
+def _link_pages(folders: Mapping[str, BookFolder]) -> frozendict[int, _LinkPage]:
+    """Each page of the excerpts that has a recorded answer, by its page
+    index in the whole book."""
+    pages = {}
+    recorded = {int(path.stem[1:]) for path in RECORDED.glob("k*.txt")}
     for name, first, last in LINK_EXCERPTS:
         blocks = read_blocks(folders[name].blocks_json)
         words = read_words(folders[name].words_json)
@@ -1504,41 +1530,69 @@ def _recorded_rows(
             for block in every_block(blocks)
             if len(block.origin) > 1
         }
-        by_id = {block.id: block for block in every_block(blocks)}
-        for book_page, raw in sorted(answers.items()):
+        by_id = frozendict({block.id: block for block in every_block(blocks)})
+        for book_page in sorted(recorded):
             if not first <= book_page <= last:
                 continue
-            page = book_page - first
-            reading = page_reading(blocks, page, splits)
-            notes = footnotes_starting(blocks, page)
-            texts = {
-                note.id: " ".join(
-                    span.text for block in note.blocks for span in block.spans
+            reading = page_reading(blocks, book_page - first, splits)
+            notes = footnotes_starting(blocks, book_page - first)
+            pages[book_page] = _LinkPage(
+                page_index=book_page - first,
+                reading=reading,
+                notes=notes,
+                galley_references=galley_references(blocks, reading),
+                blocks=by_id,
+                note_texts=frozendict(
+                    {
+                        note.id: " ".join(
+                            span.text for block in note.blocks for span in block.spans
+                        )
+                        for note in notes
+                    }
+                ),
+            )
+    return frozendict(pages)
+
+
+def _recorded_rows(
+    pages: Mapping[int, _LinkPage], answers: Mapping[int, str]
+) -> list[tuple[int, str, str, str, str]]:
+    """The links of `answers`, by page index in the whole book, on the
+    excerpts' structures, as RECORDED_LINKS gives them less the printed
+    number."""
+    found = []
+    for book_page, raw in sorted(answers.items()):
+        page = pages[book_page]
+        for link in page_links(
+            page.page_index,
+            page.reading,
+            page.notes,
+            link_answer(raw),
+            page.galley_references,
+        ):
+            spans = page.blocks[link.place.block_id].spans
+            before = (
+                "".join(span.text for span in spans[: link.place.span_index])
+                + spans[link.place.span_index].text[: link.place.end]
+            )
+            found.append(
+                (
+                    book_page,
+                    link.text,
+                    link.model_word,
+                    " ".join(before.split()[-4:]),
+                    page.note_texts[link.note_id][:32],
                 )
-                for note in notes
-            }
-            for link in page_links(
-                page,
-                reading,
-                notes,
-                link_answer(raw),
-                galley_references(blocks, reading),
-            ):
-                spans = by_id[link.place.block_id].spans
-                before = (
-                    "".join(span.text for span in spans[: link.place.span_index])
-                    + spans[link.place.span_index].text[: link.place.end]
-                )
-                found.append(
-                    (
-                        book_page,
-                        link.text,
-                        link.model_word,
-                        " ".join(before.split()[-4:]),
-                        texts[link.note_id][:32],
-                    )
-                )
+            )
     return found
+
+
+@pytest.fixture(scope="module")
+def kadesh_link_pages(
+    kadesh_link_excerpts: frozendict[str, BookFolder],
+) -> frozendict[int, _LinkPage]:
+    """The pages of the recorded answers, read once for the module."""
+    return _link_pages(kadesh_link_excerpts)
 
 
 def _recorded_answers() -> dict[int, str]:
@@ -1551,9 +1605,9 @@ def _recorded_answers() -> dict[int, str]:
 # Reads the excerpts' runs, which Tesseract made.
 @pytest.mark.tesseract
 def test_the_recorded_answers_link_the_notes_the_pages_print(
-    kadesh_link_excerpts: frozendict[str, BookFolder],
+    kadesh_link_pages: frozendict[int, _LinkPage],
 ) -> None:
-    found = _recorded_rows(kadesh_link_excerpts, _recorded_answers())
+    found = _recorded_rows(kadesh_link_pages, _recorded_answers())
     assert found == [row[:1] + row[2:] for row in RECORDED_LINKS]
 
 
@@ -1561,10 +1615,11 @@ def test_the_recorded_answers_link_the_notes_the_pages_print(
 @pytest.mark.parametrize(
     ("page", "old", "new", "links"),
     [
-        # 8 read as 9: the 9 after "poem" repeats it; 4, 5 and 7 stay.
-        (9, "[8]", "[9]", ("4", "5", "7")),
-        # 25 read as 26: no link takes note 26's place.
-        (14, "[25]", "[26]", ("27", "28", "29")),
+        # 8 read as 9: the 9 after "poem" repeats it, so nothing from the
+        # first 9 on is linked, and 7, before the skip to 9, neither.
+        (9, "[8]", "[9]", ("4", "5")),
+        # 25 read as 26: 24 comes before a skip, and 26 is marked twice.
+        (14, "[25]", "[26]", ()),
         # 18 left out, or read as 19: the model's numbers are one note
         # off on this page already, and nothing is linked.
         (31, "[18]", "", ()),
@@ -1578,7 +1633,7 @@ def test_the_recorded_answers_link_the_notes_the_pages_print(
     ],
 )
 def test_a_misread_or_missing_number_makes_no_wrong_link(
-    kadesh_link_excerpts: frozendict[str, BookFolder],
+    kadesh_link_pages: frozendict[int, _LinkPage],
     page: int,
     old: str,
     new: str,
@@ -1588,48 +1643,112 @@ def test_a_misread_or_missing_number_makes_no_wrong_link(
     # made 1 to 3 wrong links on each of these pages.
     raw = (RECORDED / f"k{page:03d}.txt").read_text(encoding="utf-8")
     assert old in raw
-    found = _recorded_rows(kadesh_link_excerpts, {page: raw.replace(old, new, 1)})
+    found = _recorded_rows(kadesh_link_pages, {page: raw.replace(old, new, 1)})
     assert tuple(row[1] for row in found) == links
     right = {(row[0], row[2]): row[4] for row in RECORDED_LINKS}
     assert all(right[row[0], row[1]] == row[3] for row in found)
 
 
-def test_every_recorded_link_is_where_the_page_prints_it_and_to_its_note() -> None:
+def _reference_pages() -> dict[int, dict[str, Any]]:
     reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
-    pages = {page["page_index"]: page for page in reference["pages"]}
+    return {page["page_index"]: page for page in reference["pages"]}
+
+
+def _printed_numbers(
+    page: Mapping[str, Any], galley_before: str, note_start: str
+) -> tuple[str, str]:
+    """The printed number of the reference whose words before it are most
+    alike galley's before a link, and that of the note whose opening is
+    most alike galley's note's, on a page of REFERENCE."""
+    alike_context = {
+        item["number"]: _alike(
+            _alphanumeric(
+                " ".join(galley_before.split()[-len(item["context"].split()) :])
+            ),
+            _alphanumeric(item["context"]),
+        )
+        for item in page["references"]
+    }
+    alike_note = {
+        note["marker"]: _alike(
+            *_cut(_alphanumeric(note_start), _alphanumeric(note["starts"]))
+        )
+        for note in page["notes"]
+    }
+    return (
+        max(alike_context, key=alike_context.__getitem__),
+        max(alike_note, key=alike_note.__getitem__),
+    )
+
+
+def test_every_recorded_link_is_where_the_page_prints_it_and_to_its_note() -> None:
+    pages = _reference_pages()
     for book_page, printed, _, word, galley_before, note_start in RECORDED_LINKS:
         item = next(
             item for item in pages[book_page]["references"] if item["number"] == printed
         )
         assert _alphanumeric(item["after"]) == _alphanumeric(word)
+        context = " ".join(galley_before.split()[-len(item["context"].split()) :])
+        assert (
+            _alike(_alphanumeric(context), _alphanumeric(item["context"]))
+            >= _LEAST_ALIKE
+        )
         # galley's words before the place are most alike the words before
         # this reference, of all the page's: a link after the wrong "men"
         # on page 14 is caught.
-        alike_context = {
-            other["number"]: _alike(
-                _alphanumeric(
-                    " ".join(galley_before.split()[-len(other["context"].split()) :])
-                ),
-                _alphanumeric(other["context"]),
-            )
-            for other in pages[book_page]["references"]
-        }
-        assert alike_context[printed] >= _LEAST_ALIKE
-        assert max(alike_context, key=alike_context.__getitem__) == printed, (
-            book_page,
+        assert _printed_numbers(pages[book_page], galley_before, note_start) == (
             printed,
-            galley_before,
-            alike_context,
-        )
-        likeness = {
-            note["marker"]: _alike(
-                *_cut(_alphanumeric(note_start), _alphanumeric(note["starts"]))
-            )
-            for note in pages[book_page]["notes"]
-        }
-        assert max(likeness, key=likeness.__getitem__) == printed, (
-            book_page,
             printed,
-            note_start,
-            likeness,
-        )
+        ), (book_page, printed, galley_before, note_start)
+
+
+_MARK = re.compile(r"\[([0-9]{1,3})\]")
+_NOTE_SEPARATOR = "[\\s,.:|]"
+
+
+def _mutations(raw: str) -> Iterator[tuple[str, str]]:
+    """Each mark of a number in a recorded answer changed one way: read
+    one more or one less (in the text only, or in its note line too),
+    left out, or marked twice. Adapted from the second review of 24
+    November 2026; moving a mark to the next word is left out, since the
+    link follows the model's word."""
+    for mark in _MARK.finditer(raw):
+        number = mark.group(1)
+        start, end = mark.span()
+        for step in (1, -1):
+            new = str(int(number) + step)
+            in_text = raw[:start] + f"[{new}]" + raw[end:]
+            yield f"[{number}] as [{new}]", in_text
+            in_both = re.sub(
+                f"(?m)^(NOTE{_NOTE_SEPARATOR}*){number}(?={_NOTE_SEPARATOR})",
+                lambda line, new=new: line.group(1) + new,
+                in_text,
+            )
+            if in_both != in_text:
+                yield f"[{number}] as [{new}] with its note line", in_both
+        yield f"[{number}] left out", raw[:start].rstrip(" ") + raw[end:]
+        yield f"[{number}] twice", raw[:end] + f" [{number}]" + raw[end:]
+
+
+@pytest.mark.tesseract
+def test_no_misread_left_out_or_doubled_mark_gives_a_wrong_link(
+    kadesh_link_pages: frozendict[int, _LinkPage],
+) -> None:
+    # Section 9b, second review of 24 November 2026: every mark of the
+    # recorded answers misread, left out or doubled; each link given is to
+    # the note of the reference printed where it is put.
+    reference = _reference_pages()
+    answers = _recorded_answers()
+    wrong = []
+    for book_page in sorted(answers):
+        for label, mutated in _mutations(answers[book_page]):
+            for row in _recorded_rows(kadesh_link_pages, {book_page: mutated}):
+                if book_page not in reference:
+                    wrong.append((book_page, label, row, "page not in REFERENCE"))
+                    continue
+                by_place, by_note = _printed_numbers(
+                    reference[book_page], row[3], row[4]
+                )
+                if by_place != by_note:
+                    wrong.append((book_page, label, row, by_place, by_note))
+    assert wrong == []

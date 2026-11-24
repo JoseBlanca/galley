@@ -2,6 +2,7 @@
 section 9b): the references it marks and its note lines, the galley word
 and note each goes to, and the link edits they become."""
 
+import itertools
 import logging
 import re
 from collections import Counter
@@ -253,21 +254,30 @@ def page_links(
     notes that start on the page, through its note line, less the links
     that break the order of the page's notes; then the references whose
     note line names no note, or a note another reference names too, placed
-    by that order between two links. A reference whose number the model
-    marks twice on the page gives no link. `galley_references` gives, by the
-    place of a token, the note galley's own reference right after its word
-    refers to; a reference the model marks there that gives no link, or
-    one to that note, counts once in the numbers of the page, and so does
-    a reference with no place whose note galley references."""
+    by that order between two links. No reference gives a link from the
+    first mark of a number the model marks twice on, nor one whose number
+    the next number skips past. `galley_references` gives, by the place of
+    a token, the note galley's own reference right after its word refers
+    to; a reference the model marks there, whatever note it names, counts
+    once in the numbers of the page, and so does a reference with no place
+    whose note galley references."""
     body = [
         token
         for token in reading
         if token.note_id is None and token.block_id is not None
     ]
     repeated = _repeated(answer.references)
+    before_skip = _before_skip(answer.references)
     placed = []
     marked: set[str] = set()
     unresolved = set()
+    # From the first mark of a number marked twice on, the count of the
+    # model's references is not known.
+    unknown = [
+        rank
+        for rank, reference in enumerate(answer.references)
+        if reference.text in repeated
+    ]
     for rank, reference in enumerate(answer.references):
         position = reference_place(body, reference)
         first_words = answer.notes.get(reference.text)
@@ -280,13 +290,20 @@ def page_links(
         )
         place = None if position is None else body[position].place
         galley_note_id = None if place is None else galley_references.get(place)
-        if galley_note_id is not None and note_id in (None, galley_note_id):
+        if galley_note_id is not None:
+            # The model marks galley's reference, whatever note it names:
+            # galley's note counts as marked, not as a reference the model
+            # left out.
             marked.add(galley_note_id)
         elif place is None and note_id is not None:
             marked.add(note_id)
         elif place is None or note_id is None:
             unresolved.add(rank)
-        if place is not None and reference.text not in repeated:
+        if (
+            place is not None
+            and reference.text not in repeated
+            and rank not in before_skip
+        ):
             placed.append(
                 _Placed(
                     rank=rank,
@@ -296,17 +313,20 @@ def page_links(
                     at_galley_reference=galley_note_id is not None,
                 )
             )
+    if unknown:
+        cutoff = min(unknown)
+        _logger.info(
+            "page %d: the model marks %s twice; from its first mark on, the "
+            "count of its references is not known and no link is proposed",
+            page_index,
+            answer.references[cutoff].text,
+        )
+        placed = [item for item in placed if item.rank < cutoff]
     links = tuple(
         _link(page_index, item, item.note_id)
         for item in placed
         if item.note_id is not None
     )
-    if repeated:
-        _logger.info(
-            "page %d: the model marks %s more than once; no link from them",
-            page_index,
-            ", ".join(sorted(repeated)),
-        )
     kept = links_in_order(links, notes, frozenset(marked), frozenset(unresolved))
     for link in links:
         if link not in kept:
@@ -343,6 +363,22 @@ def _link(page_index: int, item: _Placed, note_id: str) -> Link:
         text=item.reference.text.replace("[", "").replace("]", ""),
         model_word=item.reference.before[-1],
         rank=item.rank,
+    )
+
+
+def _before_skip(references: Sequence[MarkedReference]) -> frozenset[int]:
+    """The ranks of the references whose number the next number the model
+    marks skips past: 160 in 158, 159, 160, 162. The model may have left
+    out 160 and read 161 as 160 (section 9b)."""
+    numbered = [
+        (rank, number)
+        for rank, reference in enumerate(references)
+        if (number := _number(reference.text)) is not None
+    ]
+    return frozenset(
+        rank
+        for (rank, number), (_, following) in itertools.pairwise(numbered)
+        if following > number + 1
     )
 
 
