@@ -92,7 +92,6 @@ from galley.structure._references import (
     NoteToMatch,
     foreign_signs,
     gap_links,
-    in_page_order,
     match_endnotes,
     match_footnotes,
     note_score,
@@ -590,9 +589,10 @@ def _links(
         for position, (note, value) in enumerate(zip(notes, values, strict=True))
         if note.kind is NoteKind.FOOTNOTE and position not in uncounted
     )
-    if numbering is not Numbering.PER_PAGE:
-        # Spec section 11, "A value out of order".
-        footnote_notes = in_page_order(without_one_digit_values(footnote_notes))
+    per_page = numbering is Numbering.PER_PAGE
+    if not per_page:
+        # Spec section 11, "A one-digit value".
+        footnote_notes = without_one_digit_values(footnote_notes)
     # Spec section 11, "Sure links": in a book numbered per page, a note
     # with no marker of its own, and a sign, are linked only where the
     # page's order expects the reference.
@@ -601,7 +601,7 @@ def _links(
     )
 
     def sure(links: tuple[Link, ...]) -> tuple[Link, ...]:
-        if numbering is Numbering.PER_PAGE:
+        if per_page:
             return sure_links(footnote_notes, links, unmarked, guessed)
         return sure_through(footnote_notes, links)
 
@@ -609,7 +609,7 @@ def _links(
         match_footnotes(
             footnote_notes,
             candidates,
-            through_score if numbering is Numbering.BY_MARKER else note_score,
+            note_score if per_page else through_score,
         )
     )
     # Spec section 11, "A lone number": a footnote's reference set apart as
@@ -687,7 +687,13 @@ def _links(
     def group_links(group: int, start: int, end: int) -> tuple[Link, ...]:
         group_notes = with_values_in_order(
             tuple(
-                NoteToMatch(position, first_page(note.origin), value)
+                NoteToMatch(
+                    position,
+                    first_page(note.origin),
+                    value,
+                    # An endnote's marker is its number (section 12).
+                    NoteMark.SIGN,
+                )
                 for position, (note, value, note_group) in enumerate(
                     zip(notes, values, groups, strict=True)
                 )
