@@ -2035,9 +2035,9 @@ and 517 (reference 4 to the note "6", which held notes 5 and 6) are now
 right. Haskins' footnotes go from 70 to 72 (rule 6 on pages 29 and 56)
 and its joined notes from 1 to 0; its right links stay 68: page 29's
 second reference now takes its own note, and page 56's "Gummere ^", the
-reference to note 3, which took the joined notes 2 and 3, now takes
-note 2, since the OCR lost note 2's reference ("target.²") and the
-page's two signs pair with notes 1 and 2 in order. Gierke's footnotes
+reference to note 3, which took the joined notes 2 and 3, took note 2,
+since the OCR lost note 2's reference ("target.²") and the page's two
+signs pair with notes 1 and 2 in order; "Sure links" (below) unlinks it. Gierke's footnotes
 go from 384 to 385: page 42's "1 Bracton, f. 171 b. - Calvin's Case…"
 over "8 Windscheid…" (3 read 8) is cut, and "laws²" moves from note 3
 to note 2, "Calvin's Case", as the page image shows. Kadesh, Stubbs and
@@ -2441,6 +2441,19 @@ notes before it:
 - any other footnote whose reference is a sign (`*`, `^`, `•`, and the
   backslash and star of "A lone number" below) keeps its link when it
   is the page's first note or the note before it on the page is linked.
+
+A note that a stand-in or a row of notes started ("Two notes on one
+line", rule 6) and the note before it on the page were read as one note
+before 24 November 2026; the cut tells that two notes are there, not
+which of them a sign refers to. So a footnote whose reference is a sign,
+when it is such a note or the note before one, keeps its link only when
+the other of the two has a link too (added on 24 November 2026, plan
+wrong-links, task 3.2). Haskins' (`normansineuropea00hask`) page 56
+prints notes 1 and 2 side by side and 3 below them, which rule 6 starts;
+the OCR lost note 2's reference ("target.²"), and "Gummere ^", the
+reference to note 3, took note 2 in order. It is now unlinked. Page 29,
+the same row of two notes and a third below, keeps both its sign links,
+each right by the page image. No other link of the seven books changes.
 
 A link that does not hold is undone, and its note stays unreferenced.
 The matching is not run again for the candidate it frees. The rule is
