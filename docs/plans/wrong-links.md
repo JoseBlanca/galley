@@ -88,7 +88,7 @@ Deliverables:
    evaluation's own misalignments are checked by eye, joined notes 24
    and 1. The command and its counts go into the report as the baseline.
 
-- [ ] 1.1 The two reports, their tests and the baseline.
+- [x] 1.1 The two reports, their tests and the baseline.
 
 ## 2. Unmarked notes and signs
 
@@ -125,7 +125,8 @@ Deliverables:
 1. Tests on the Domesday excerpts for the pages they hold, and a new
    excerpt (`scripts/fetch_samples.py`, about ten pages) for pages 440,
    445 and 517 and some of the joined ones, failing before.
-2. Domesday whole book: the joined notes 24 → at most 8; the wrong
+2. Domesday whole book: the joined notes 36 (galley-eval's count,
+   work package 1; the investigation had found 24) → at most 12; the wrong
    links on 440 and 445 gone, 517 linked right or unlinked; no new wrong
    link. Haskins page 29 cut.
 

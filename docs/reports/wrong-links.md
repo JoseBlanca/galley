@@ -22,3 +22,23 @@ Changed from the plan: the rule is not applied to books numbered
 through (Kadesh), where it unlinked 15 of 45 links, three of them right
 by the spec's own record; and a sign may link the page's first note,
 not only its only note, which keeps 6 right Haskins links.
+
+## Work package 1: the measure
+
+Done (d2e8d3a spec, daf32ac code). `uv run galley-eval compare domesday
+haskins`, on copies of the more-note-links builds in
+`runs/evaluation/`, writes in each `evaluation/summary.md` the links to
+a note other than the transcription's and the notes holding the next
+note's text, by page index. A link is right when its note begins like a
+note the transcription references within 3 tokens.
+
+Baseline (the builds of 23 November 2026, before this plan):
+
+- Domesday: 13 wrong links, the plan's 10 and 3 the evaluation cannot
+  tell from wrong (104, where the transcription keeps only one of two
+  printed "3"; 156 twice, a table it orders differently); 36 joined
+  notes, the investigation's 24 and 12 it missed.
+- Haskins: wrong link 204, joined note 29, as the plan says.
+
+Changed in the plan: the target of work package 3 is restated on 36
+joined notes, at most 12 left.
