@@ -98,9 +98,11 @@ from galley.structure._references import (
     match_footnotes,
     note_score,
     sure_links,
+    sure_through,
     through_score,
     with_own_numbers,
     with_values_in_order,
+    without_one_digit_values,
 )
 from galley.structure._runs import EpigraphParts, LabelLine, QuotationForm
 from galley.structure._spaced import with_spaced_signs
@@ -608,7 +610,7 @@ def _links(
         )
     else:
         # Spec section 11, "A value out of order".
-        footnote_notes = in_page_order(footnote_notes)
+        footnote_notes = in_page_order(without_one_digit_values(footnote_notes))
     # Spec section 11, "Sure links": in a book numbered per page, a note
     # with no marker of its own, and a sign, are linked only where the
     # page's order expects the reference.
@@ -619,7 +621,7 @@ def _links(
     def sure(links: tuple[Link, ...]) -> tuple[Link, ...]:
         if numbering is Numbering.PER_PAGE:
             return sure_links(footnote_notes, links, unmarked, guessed)
-        return links
+        return sure_through(footnote_notes, links)
 
     footnote_links = sure(
         match_footnotes(

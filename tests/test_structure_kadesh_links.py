@@ -23,13 +23,16 @@ from galley.model import every_block, read_blocks
 from galley.structure._markers import Reference, ReferenceForm
 from galley.structure._references import (
     Candidate,
+    Link,
     NoteMark,
     NoteToMatch,
     in_page_order,
     match_footnotes,
     note_score,
     pair_score,
+    sure_through,
     through_score,
+    without_one_digit_values,
 )
 
 _REFERENCE = (
@@ -135,6 +138,48 @@ def test_through_a_book_a_reference_one_off_is_left_unlinked() -> None:
     )
     candidates = _candidates((_glued("bottom", "155"),))
     assert match_footnotes(notes, candidates, through_score) == ()
+
+
+def test_past_note_9_a_one_digit_value_is_dropped() -> None:
+    # Made up after Kadesh: "1" and "2" on its first page of notes, "13"
+    # on its third, then "7" for note 78 and "79" on a later page.
+    notes = (
+        NoteToMatch(0, 8, 1),
+        NoteToMatch(1, 8, 2),
+        NoteToMatch(2, 10, 13),
+        NoteToMatch(3, 10, 4),
+        NoteToMatch(4, 31, 7),
+        NoteToMatch(5, 31, 79),
+    )
+    assert tuple(note.value for note in without_one_digit_values(notes)) == (
+        1,
+        2,
+        13,
+        4,
+        None,
+        79,
+    )
+
+
+def _link(note: int, reference: Reference) -> Link:
+    return Link(Candidate(0, note, 37, reference), note)
+
+
+def test_a_sign_at_a_page_head_needs_the_second_note_linked() -> None:
+    # Made up after Kadesh's page 37: the reference to note 90 is lost,
+    # and the sign of note 91 took note 90.
+    notes = tuple(NoteToMatch(place, 37, None) for place in range(3))
+    assert sure_through(notes, (_link(0, _sign("Amon?);")),)) == ()
+    # Page 9: the signs of notes 4 and 5 confirm each other.
+    both = (_link(0, _sign("Salvolini")), _link(1, _sign("Lenormant,")))
+    assert sure_through(notes, both) == both
+    # A page's only note keeps its sign; a glued number at the head stays.
+    only = (NoteToMatch(0, 25, None),)
+    assert sure_through(only, (_link(0, _sign("made.")),)) == (
+        _link(0, _sign("made.")),
+    )
+    glued = (_link(0, _glued("Kadesh,", "12")),)
+    assert sure_through(notes, glued) == glued
 
 
 def _alphanumeric(text: str) -> str:
@@ -245,8 +290,26 @@ def _links_on(
         # Notes 159 and 160 both read "1", and "Luxor1"" (163) went to
         # note 159.
         (61, [("165", "165")]),
+        # Notes 4 to 6 by their signs, each confirmed by the next.
+        (9, [("4", "4"), ("5", "5"), ("6", "6")]),
+        # "river,"7*" (79) went to note 78, marked "7".
+        (31, []),
+        # The sign of note 91 went to note 90, whose reference "iter" is
+        # lost.
+        (37, []),
+        # "Luxor."1" (172) went to note 173, marked "1".
+        (63, []),
     ],
-    ids=["page_14", "page_15", "page_60", "page_61"],
+    ids=[
+        "page_14",
+        "page_15",
+        "page_60",
+        "page_61",
+        "page_9",
+        "page_31",
+        "page_37",
+        "page_63",
+    ],
 )
 def test_kadesh_links_go_to_the_notes_their_references_print(
     kadesh_link_excerpts: frozendict[str, BookFolder],

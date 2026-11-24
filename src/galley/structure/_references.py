@@ -382,6 +382,62 @@ def in_page_order(notes: Sequence[NoteToMatch]) -> tuple[NoteToMatch, ...]:
     return tuple(given)
 
 
+# Spec section 11, "A one-digit value": the values a marker of one digit
+# reads.
+_ONE_DIGIT = range(10)
+
+
+def without_one_digit_values(
+    notes: Sequence[NoteToMatch],
+) -> tuple[NoteToMatch, ...]:
+    """The footnotes of a book numbered through, `notes` in the book's
+    order, each without a value of one digit when it starts on a page after
+    the first page where a note's value has two digits or more (spec
+    section 11, "A one-digit value"): past note 9 the OCR read only the
+    first digit of the marker ("7" for 78)."""
+    first = next(
+        (
+            note.page_index
+            for note in notes
+            if note.value is not None and note.value not in _ONE_DIGIT
+        ),
+        None,
+    )
+    return tuple(
+        replace(note, value=None)
+        if first is not None
+        and note.page_index > first
+        and note.value is not None
+        and note.value in _ONE_DIGIT
+        else note
+        for note in notes
+    )
+
+
+def sure_through(
+    notes: Sequence[NoteToMatch], links: Sequence[Link]
+) -> tuple[Link, ...]:
+    """`links` to the footnotes of a book numbered through, but a sign
+    linked to its page's first note when the page has another note and its
+    second note is not linked (spec section 11, "A sign at the head of a
+    page"): the references before the sign may have been lost. `notes` are
+    the book's footnotes in order; the links kept are in the order of
+    `links`."""
+    by_note = {link.note: link for link in links}
+    notes_by_page: dict[int, list[NoteToMatch]] = {}
+    for note in notes:
+        notes_by_page.setdefault(note.page_index, []).append(note)
+    unsure = {
+        page_notes[0].note
+        for page_notes in notes_by_page.values()
+        if page_notes[0].note in by_note
+        and by_note[page_notes[0].note].candidate.reference.form is ReferenceForm.SIGN
+        and len(page_notes) > 1
+        and page_notes[1].note not in by_note
+    }
+    return tuple(link for link in links if link.note not in unsure)
+
+
 def with_values_in_order(notes: Sequence[NoteToMatch]) -> tuple[NoteToMatch, ...]:
     """The endnotes of one note group, in the book's order, with the value
     N given to a note whose value is not N but which lies between a note of
