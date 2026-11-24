@@ -827,9 +827,12 @@ epubcheck accepts. The two kinds of note get it in two places:
   --lua-filter`) kept in the package, `src/galley/epub/back_links.lua`,
   that
   puts at the start of each such note the number Pandoc shows at its
-  reference, as a link to the reference with the role
+  reference, as a link to the reference of class `footnote-back`, the
+  class Pandoc gives its own back links in HTML, which tells Pandoc's
+  number from an endnote's printed marker, and with the role
   `doc-backlink`: `<aside epub:type="footnote" id="fn3"><p><a
-  href="#fnref3" role="doc-backlink">3</a> Called by…`. The link
+  href="#fnref3" class="footnote-back" role="doc-backlink">3</a> Called
+  by…`. The link
   goes first into the note's first paragraph that is not in a margin
   note's div. Pandoc 3.14 numbers the footnotes of each chapter file
   from 1 and gives the reference to note *n* of a file the id `fnref`
