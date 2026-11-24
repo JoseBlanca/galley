@@ -2312,6 +2312,66 @@ reference these rules split off has it, and so does every reference of
 the rules below but the trailing "V", which the check accepts on its
 own terms.
 
+**Sure links.** In a book numbered per page, a footnote with no marker
+of its own and a reference that is a sign are linked only where the
+order of the page's notes expects them. The page's notes here are the
+footnotes that start on the page and that its numbering counts ("Its
+value"); each is judged in their order, against the links kept for the
+notes before it:
+
+- a footnote with no marker, `marker` empty, keeps its link when it is
+  the page's only note, or when the note before it on the page is
+  linked and its reference reads one more than that note's value;
+- any other footnote whose reference is a sign (`*`, `^`, `•`, and the
+  backslash and star of "A lone number" below) keeps its link when it
+  is the page's first note or the note before it on the page is linked.
+
+A link that does not hold is undone, and its note stays unreferenced.
+The matching is not run again for the candidate it frees. The rule is
+applied after the matching, before the lone numbers below, and again
+after the trailing "V"s, to the links those rules made.
+
+The page's numbering gives every note a value by its place, a table's
+row or the printer's signature mark that the band holds as well as a
+note, and a sign scores against any note, so the matching links such
+notes to the reference that reads their place or to any sign. In
+Domesday (`domesdaybook00maituoft`, page indices) a row "22 2*
+Huntingdon …" of a table in the band, given value 3, took "Chichester3"
+on page 200, while the page's note 3, marked "3", stayed unlinked; on
+page 499 two rows of a table, "Sussex Surrey …" and
+"Hampshire 206 148 120", took a "3" that is no reference and "Anjou1",
+note 1's; on page 106 the signature mark "M." became note 6 and took a
+closing quotation mark read as "*" ("'low justice*"). A note with no
+marker after a linked note whose reference reads the next number is a
+note whose marker the OCR lost: the reference to Domesday's note 10 on
+page 134 reads "10", and the note's first line has no marker.
+
+A book numbered through (Kadesh) keeps every link: there a note with no
+marker is a note whose marker the OCR lost or glued into a word, which
+has a value only from its place between two notes with values, and a
+sign is the most common reading of its references. Applied to Kadesh
+built without the vision model, the rule unlinked 15 of its 45 links,
+among them "Lenormant,*", "Chabas*" and "Kadesh,12" on pages 9 and 10,
+right by the page images (above).
+
+Measured on 24 November 2026 (plan wrong-links, task 2.1), structure
+run on the `lines.json` of the runs of the plan more-note-links:
+Domesday's links go from 1,589 to 1,585, the four above, each wrong on
+the page image; its notes whose reference is right stay 1,563 by
+galley-eval, among them its 10 notes with no marker that were linked
+right (pages 117, 133, 134 twice, 164, 233, 238, 343, 417 and 493).
+Haskins, Stubbs, Gierke, Kadesh and the owner's two books give the same
+`blocks.json` byte for byte; Haskins' 2 notes with no marker are their
+page's only note (pages 124 and 249). Three wrong links to a sign stay,
+since each is a sign the order expects while the page's reference was
+not read as the matching's candidate: Domesday's page 154, where note 2,
+after linked note 1, takes a "^" in a table while its reference is read
+"example-."; page 498, where note 2 takes a "•" before its reference,
+"£56 2.", which the lone number rule would take; and Haskins'
+(`normansineuropea00hask`) page 204, its only note, whose reference
+"Adams,^" comes after the sign "*" read in "made * Norman", and the
+earlier of two equal candidates wins.
+
 **What is changed.** A matched glued candidate, a number or a sign at
 the end of a word, is split by a `note_marker` word change, ("land3.",)
 to ("land", "3", "."), ("rulers.^",) to ("rulers.", "^"), ("servus*.",)
