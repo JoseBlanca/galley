@@ -1869,7 +1869,19 @@ a note when any of these holds:
    value is otherwise its place, since by place every marker-shaped
    line, a table's row too, would pass. On a page whose notes are each
    one line long no line is indented against another (Mariéjol's pages
-   221, 310 and 409);
+   221, 310 and 409). A number that starts a line after the region's
+   first starts a note by this rule only when the line before it ends
+   as a word before a second note on a line does (".", "'", "’", ":",
+   ";" or ")", "Two notes on one line"): a number inside a note's
+   sentence that the line break puts first is no marker (added on 24
+   November 2026, plan wrong-links, task 3.2). Domesday's page 445 prints
+   note 1 as "Thus, D. B. ii. 39: 'Tunc 4 carucae in dominio, post et
+   modo 2...et" over "2 carucae possunt restaurari.' To use our
+   symbols…"; the "2" made a second note 2, which took reference 2 while
+   the printed note 2 stayed unlinked. Kadesh's page 63 loses its false
+   note "2 Si thuentawen occurred…" ("such a thing occurred"), under a
+   line ending "To suppose that such". No other note of the seven
+   books' builds changes;
 4. it is the first line of a band region after the page's first, and is
    indented 5 to 40 pt from the band's left edge of rule 2: the first
    note of the next column (owner, 16 November 2026). On Kadesh's page 8
@@ -2155,6 +2167,25 @@ Otherwise a note's value is what its marker reads, once "i", "l", "I",
 "|", "!" and "J" are read as 1, "o" and "O" as 0, "s" and "S" as 5 and
 "z" and "Z" as 2, and, inside brackets, "a" as 2 and "t" as 1. A sign
 has no value.
+
+**A marker's own number.** In a book numbered per page, a footnote whose
+marker is 1 to 3 digits that read a number other than the value its
+page's numbering gave it keeps the number its marker reads, as an
+endnote does (section 12, "References"), when a candidate reference of
+its page (below, "Candidates") reads that number, no other note of the
+page has it as its value, and it lies above the values of the page's
+notes before it and below those of the notes after it. The numbering
+moves a value down when a note before is joined to the one before it:
+Domesday's page 440 prints notes 4 and 5 side by side and the OCR reads
+5 as "&", so before the cuts of "Two notes on one line" of 24 November
+2026 the notes read "4" and "6" and were numbered 4 and 5, and
+reference 5 opened note 6. The rule is applied before the matching
+(added on 24 November 2026, plan wrong-links, task 3.2). Measured that
+day, structure run on the `lines.json` of the plan more-note-links:
+with the cuts, no link of the seven books changes; without them,
+Domesday's page 440 takes reference 6 for note 6 and leaves 5
+unlinked, and page 517's note "6", which then held notes 5 and 6, takes
+reference 6 instead of 4.
 
 ### Notes left in the body
 
