@@ -586,23 +586,28 @@ often enough that its references and its note lines can agree with each
 other and still be one note off: on the whole-Kadesh run of 19 November
 2026 a reviewer found, among 27 links outside the twelve reference
 pages, all five of page 31's one note too far, and page 21's two, whose
-model numbers were 10 and then 7 for the printed 50 and 51. So a link
-is kept only when it keeps the order of the page's footnotes, checked in
-three steps, each on the links the step before kept:
+model numbers were 10 and then 7 for the printed 50 and 51. A number
+the model marks twice on a page names no note: neither reference gives a
+link, by its note line or by the order below, since which of the two the
+note line belongs to is not known. A misread number often repeats the
+next one: on page 9, the model's 8 read as 9 would put "thoroughness."
+before note 9, and the 9 it marks after "poem" shows the repeat (review
+of 24 November 2026). Then a link is kept only when it keeps the order
+of the page's footnotes, checked in three steps, each on the links the
+step before kept:
 
 - no other link of the page goes to its note: two references whose note
   lines name one note both lose that link. On page 14 the model gives
   references 24 and 25 the same note line, "LD., II, 149d", as the page
   prints the two notes' first words;
 - its reference is the k-th the model marked on the page, counted from
-  0, and its note the k-th footnote that starts on it; or the same holds
-  when the numbers the model's references skip before it are counted as
-  references marked. On page 61 the model leaves out reference 160, and
-  its references 158, 159, 161 go to the page's first, second and fourth
-  footnotes: 161 is the model's third reference, and its fourth counted
-  with the skipped 160. A number skips those between it and the last
-  number before it, when it is the greater; a number that falls skips
-  none. In this count the footnotes before the link's note
+  0, and its note the k-th footnote that starts on it. A number the
+  model's references skip is not counted as a reference: a reference
+  left out and a number misread one too high look alike, and counting
+  the skip made wrong links on pages 9, 14 and 31 when one of their
+  numbers was changed so (review of 24 November 2026). So on page 61,
+  where the model leaves out 160, its 161 to 165 go one note past the
+  k-th and are dropped. In this count the footnotes before the link's note
   that galley references and no link of the page goes to count as
   marked: the model does not bracket the heading's "*" on page 8, whose
   note galley links. Page 31's first link went to the page's second
@@ -621,7 +626,15 @@ three steps, each on the links the step before kept:
   "beaten" [103] has no place, and counted both as the model's fifth
   reference and as a note galley references, it put the model's "is."
   [104], its sixth, one note too far, and the page lost three right
-  links (21 November 2026);
+  links (21 November 2026).
+  Such a count is not known when a reference before the link gives no
+  note (no place, no note line, a note line that names no footnote, or a
+  number marked twice) and a footnote before the link's counts as marked
+  by galley's reference: that reference may be the one to galley's note.
+  The link is then dropped. On page 31 galley links "river," to note 78,
+  where the page prints 79; had the model's 18 been read 19, its 18 and
+  19 would give no note, note 78 would count as marked, and 20 and 21
+  would each go one note too far;
 - no other link comes before it in the model's answer with its note at
   or after the link's note, nor after it with its note at or before the
   link's; and, when both links' numbers are digits, none comes before
@@ -658,8 +671,8 @@ footnote, or whose note line names a footnote another reference's names
 too, is linked by the order of the page's notes when its neighbours fix
 the note:
 
-- its number x is digits, and galley has no reference right after its
-  word (that counts as marked, above);
+- its number x is digits, marked once on the page, and galley has no
+  reference right after its word (that counts as marked, above);
 - the next link kept on the page in the model's answer (after the three
   steps above) has a number b above x, and goes to the j-th footnote of
   the page, counted from 0; the note found is the footnote b − x places
@@ -669,7 +682,7 @@ the note:
   many notes between the two links as numbers. The note found then lies
   between theirs;
 - the note found is the k-th footnote for the reference as the second
-  step above counts it, galley references none of it, and no link of
+  step above counts it, the count known, galley references none of it, and no link of
   the page goes to it; a link two references share, which the first
   step drops, does not count here;
 - no other reference of the page finds the same note.
@@ -694,14 +707,17 @@ footnote: 2 and 3 go to the first and the second.
 footnote starts (pages 8 to 15, 29 to 33, 36 to 38, 59 to 63 and 66), on
 the answers of the 35B model recorded on 24 November 2026
 (`tests/fixtures/correct/kadesh_links/`), against galley's whole-book
-structure: the links went from 24 to 48, 41 of them kept by the three
-steps and 7 found by order. All 48 are right, checked against
+structure: the links went from 24 to 43, 36 of them kept by the three
+steps and 7 found by order. All 43 are right, checked against
 `tests/fixtures/expected/kadesh_reference/note_references.json`, the
 references read from the page images, which now covers the 14 pages
 with links. The links lost are on pages 13, 31, 36
 and 38 (galley's split, the note lines one note off, galley's note left
-in the body, note lines of one word), and those after a split or a join
-on pages 11, 14, 62, 63 and 66.
+in the body, note lines of one word), those after a split or a join on
+pages 11, 14, 62, 63 and 66, and 161 to 165 on page 61, after the
+reference the model leaves out. Counting the skipped number as a
+reference gave those 5 too, all right, but made wrong links when a
+number was misread.
 
 **The link.** The galley word that holds the place's token, its
 whitespace word, gets a reference to that note right after it:
