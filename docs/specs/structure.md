@@ -5406,10 +5406,11 @@ kinds, as on any page.
     heading's text, the heading's spans without its label. A **piece**
     is a stretch of text at the start of the title that:
     - is at most 5 characters long, spaces not counted;
-    - holds a character that is neither a letter nor at the piece's end
-      (a mark or a digit inside it: "(Tj", "-^1.", "_ II,", "*."), so
-      that a word of letters with a sign after it, "Dr.", "Note:", is
-      no piece, and is not made only of quotation marks (`"`, `'`, `“`,
+    - is made only of signs ("^", "*."), or holds a character other than
+      a letter once the signs at its end are taken off ("(Tj", "-^1.",
+      "_ II,", "290."), so that a word of letters with a sign after it,
+      "Dr.", "Note:", is no piece; and is not made only of quotation
+      marks (`"`, `'`, `“`,
       `”`, `‘`, `’`, `«`, `»`);
     - ends at a space, or inside a word whose rest starts with a
       capital ("(QzWord", invented, gives the piece "(Qz" before
