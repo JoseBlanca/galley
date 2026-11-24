@@ -77,6 +77,7 @@ from galley_eval.align import (
 from galley_eval.books import EvaluationBook
 from galley_eval.errors import AlignmentError, BooksFileError
 from galley_eval.galley_side import GalleySide, read_galley_side
+from galley_eval.note_links import NoteLinks, note_links
 from galley_eval.page_table import PageRow, page_rows
 from galley_eval.pages import AnchorPage, reference_pages
 from galley_eval.reader import PageAnchor, ReferenceText, Stream, read_reference_file
@@ -203,7 +204,8 @@ class OutputScores:
 class Scorecard:
     """The scores of a book at the four outputs, and the counts that say
     how far the alignment can be trusted, and the reference tokens left
-    unscored as front matter galley dropped. galley's commit and the date
+    unscored as front matter galley dropped; and, at markdown, the counts
+    of wrong note links and joined notes. galley's commit and the date
     are added when it is written."""
 
     book: str
@@ -212,6 +214,8 @@ class Scorecard:
     anchor_mismatches: int
     unplaced: int
     front_matter_not_scored: int
+    wrong_note_links: int
+    joined_notes: int
     outputs: tuple[OutputScores, ...]
 
 
@@ -227,13 +231,14 @@ class UnplacedRun:
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Evaluation:
     """What the comparison of one book found: the scorecard, the
-    differences, the table of pages, and what `summary.md` lists apart:
-    the anchor mismatches, the unplaced tokens and the page anchors among
-    the notes."""
+    differences, the table of pages, the wrong note links and joined notes
+    at markdown, and what `summary.md` lists apart: the anchor mismatches,
+    the unplaced tokens and the page anchors among the notes."""
 
     scorecard: Scorecard
     differences: tuple[Difference, ...]
     pages: tuple[PageRow, ...]
+    note_links: NoteLinks
     anchor_mismatches: tuple[AnchorPage, ...]
     unplaced: tuple[UnplacedRun, ...]
     anchors_in_notes: tuple[PageAnchor, ...]
@@ -394,6 +399,14 @@ def evaluation_of(
         apart_pages=apart_pages,
     )
     mismatches = tuple(anchor for anchor in pages.anchors if anchor.anchor_mismatch)
+    links = note_links(
+        reference,
+        by_output[StageOutput.MARKDOWN],
+        places,
+        side.markdown,
+        side.galley_blocks,
+        side.note_references,
+    )
     unplaced = _unplaced_runs(places, pages.page_indices)
     return Evaluation(
         scorecard=Scorecard(
@@ -403,9 +416,12 @@ def evaluation_of(
             anchor_mismatches=len(mismatches),
             unplaced=sum(len(run.tokens) for run in unplaced),
             front_matter_not_scored=len(front_matter),
+            wrong_note_links=len(links.wrong_links),
+            joined_notes=len(links.joined_notes),
             outputs=output_scores,
         ),
         differences=differences,
+        note_links=links,
         pages=page_rows(
             side.words_file,
             side.words,
