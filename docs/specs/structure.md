@@ -2462,7 +2462,38 @@ Pairs of a confused digit further off stay: "»aten108" takes note 103
 the page image. The rule is not applied in a book numbered per page,
 where it was not measured.
 
-These three rules were added on 24 November 2026 (plan wrong-links,
+**A one-digit value.** In a book numbered through, a footnote that
+starts on a page after the first page where a note's value has two
+digits or more has no value of one digit: past note 9 a one-digit
+marker is the first digit of a longer number the OCR cut short, and
+the reference it is matched with is cut short the same way. This is
+applied before "A value out of order". Kadesh linked "river,"7*", the
+reference to note 79, to note 78, marked "7" (page 31); "city.1*" (106)
+to note 105, marked "1" (page 41); and "Luxor."1" (172) to note 173,
+marked "1" (page 63). It also unlinks two links that were right by
+chance, "Kadesh4"" to note 40, marked "4" (page 18), and "sledges."5*"
+to note 56, marked "8" (page 26): the owner's rule is that a link not
+sure stays unlinked (24 November 2026), and no reading tells these two
+from the three wrong ones.
+
+**A sign at the head of a page.** In a book numbered through, after the
+matching, a sign linked to its page's first note is unlinked when the
+page has another note and the second is not linked: the references
+before the sign may have been lost by the OCR, and then the sign is a
+later note's. Kadesh's pages 37, 47, 53 and 55 lost the references to
+their first notes (90, 112, 130, 145) and the sign of a later note
+(91, 115, 134, 146) took the first; pages 21 and 27 joined their first
+notes (48 to 50, 64 to 66) into one, which the sign took. Each is now
+unlinked. The second note linked confirms the first: page 9's three
+signs and page 39's two keep their links, and so does page 8's "*" on
+the article's title, whose second note "Greece,1" takes. One right
+link is lost: page 52's "him'*", the reference to its first note, 125,
+whose second note's reference is lost. The rule removes 6 wrong links
+for that 1. Asking that the references to notes N − 1 and N + 1 be
+read as digits around a sign's note N would also unlink the right
+signs of pages 9, 14, 15, 39 and 61.
+
+The first three of these rules were added on 24 November 2026 (plan wrong-links,
 task 4.1). Kadesh rebuilt that day without the vision model, every link
 checked against the references read by eye in
 `tests/fixtures/expected/kadesh_reference/note_references.json` or the
@@ -2471,7 +2502,10 @@ indices 14 twice, 15, 21, 27, 31, 37, 41, 47, 53, 54, 55, 60, 61, 63);
 after, 35 of 45 are right and 10 wrong. Right links gained: page 14's
 notes 30 and 31, unlinked before; page 14's references 32 and 33 and
 page 15's 35, which went to the wrong notes before and now go to their
-own. Wrong links removed without a new link: pages 60 and 61. Domesday, Haskins, Gierke, Stubbs and the owner's two books give
+own. Wrong links removed without a new link: pages 60 and 61. The last two rules, added
+the same day (task 4.1, at the owner's rule above), unlink 12 more: 9
+wrong (pages 21, 27, 31, 37, 41, 47, 53, 55, 63) and 3 right (18, 26,
+52). Kadesh then has 33 links, 32 right and 1 wrong (page 54). Domesday, Haskins, Gierke, Stubbs and the owner's two books give
 the same `blocks.json` byte for byte.
 
 A pair that none of these rows scores is never matched, and a note that
@@ -2726,26 +2760,12 @@ some of them.
   numbered per page, a page whose reference to note 2 the OCR lost links
   note 2 to the next candidate that reads 2 or a digit confusable with
   it.
-- **Kadesh's wrong links, 24 November 2026**: 10 of the 45 links of
-  the book built without the vision model go to a note other than their
-  reference's, by page index:
-  - a sign takes the page's first note, or its first without a value,
-    while the references before it were lost or read as no candidate:
-    37 (note 90's "iter" has no mark), 47 (112 to 114 lost), 53 (130 to
-    133 lost), 55 (145 read as the word "'*", which has no letter before
-    the sign); and 54, where "I'*" (144) takes note 141, the first of
-    the page's notes that no glued number took;
-  - the notes are joined, so a sign takes the record that holds its note
-    and others: 21 (notes 48 to 50: the OCR read note 49's marker "©"
-    after a full line, and merged note 50's first line with the line
-    before it), 27 (64 to 66, marked "“", which is no marker's form, and
-    the short line "Phœnicia." that ends note 64 lost);
-  - both the reference and the note's marker read the same first digit
-    of different numbers: 31 ("river,"7*", 79, and note 78 marked "7"),
-    41 ("city.1*", 106, and note 105 marked "1"), 63 ("Luxor."1", 172,
-    and note 173 marked "1"). Dropping a one-digit value after note 9
-    would also drop page 18's "Kadesh4"" to note 40, marked "4", and
-    page 26's "sledges."5*" to note 56, marked "8", both right.
+- **Kadesh's wrong link, 24 November 2026**: 1 of the 33 links of the
+  book built without the vision model goes to a note other than its
+  reference's: page 54's "I'*" (144) takes note 141, the first of the
+  page's notes that no glued number took, since the references to
+  notes 141 to 143 were read as no candidate or as "sixth"3". The
+  references the rules above unlink stay in their words.
 - **Kadesh's notes on pages 9, 11 and 13 to 15** are too damaged to cut
   ("*Oampagne de Kkamitf"): 94 of its band blocks after another note
   have no marker. They stay notes with no marker, unreferenced, in
