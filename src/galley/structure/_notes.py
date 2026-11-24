@@ -86,16 +86,29 @@ _UNMARKED_SKIP_COST = 0.1
 _MARKER_AND_A_WORD = 2
 
 
+class NoteStart(StrEnum):
+    """What started a footnote (spec section 11, "Sure links"): a marker it
+    reads, its indent, a short line above it or the start of the band; or
+    a stand-in marker or a row of notes above it ("Two notes on one line",
+    rule 6), which tell that a note starts but not which reference is
+    its."""
+
+    SURE = "a marker, an indent or a short line"
+    GUESSED = "a stand-in or a row of notes"
+
+
 @dataclass(frozen=True, slots=True)
 class PageNote:
     """A note cut from one page's note lines: its lines, the last possibly
     cut before a second note on the same line; its marker, the first word's
     or None; and whether it may continue the last note of the page before
-    (the page's first note, without a marker and not indented)."""
+    (the page's first note, without a marker and not indented); and what
+    started it."""
 
     lines: tuple[PlacedLine, ...]
     marker: NoteMarker | None
     may_continue: bool
+    start: NoteStart = NoteStart.SURE
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,12 +116,14 @@ class Footnote:
     """A note of the book: its lines, over one page or two, in order; its
     marker, None when it has none; its value, the number of spec section
     11, "Its value", or None; and whether its page's numbering counts it,
-    false for a note the numbering leaves out, which takes no reference."""
+    false for a note the numbering leaves out, which takes no reference;
+    and what started it."""
 
     lines: tuple[PlacedLine, ...]
     marker: NoteMarker | None
     value: int | None
     counted: bool
+    start: NoteStart = NoteStart.SURE
 
 
 class _LinePlace(StrEnum):
@@ -308,17 +323,19 @@ def _cut_line(
     place: _LinePlace,
     source: _ValueSource,
     following: int | None,
-) -> tuple[tuple[PlacedLine, NoteMarker | None], ...]:
+) -> tuple[tuple[PlacedLine, NoteMarker | None, NoteStart], ...]:
     """The parts of a note line, each with the marker of the note it starts,
-    the first part's None: one part when no second note starts in it.
+    the first part's None, and what started it: one part when no second
+    note starts in it.
     `value` is that of the note the first part belongs to, None when not
     known, and `source` where it comes from; `place` says whether the line
     is the first of its region; `following` is what the first marker of the
     page's later note lines reads, None when none reads a number."""
     words = line.line.words
-    parts: list[tuple[int, NoteMarker | None]] = [(0, None)]
+    parts: list[tuple[int, NoteMarker | None, NoteStart]] = [(0, None, NoteStart.SURE)]
     for position in range(1, len(words) - 1):
         next_value = value + 1 if value is not None else None
+        start = NoteStart.SURE
         gap = words[position].box.x0 - words[position - 1].box.x1
         marker = _line_marker(
             words[position - 1].text,
@@ -339,16 +356,17 @@ def _cut_line(
                 in_line if in_line is not None else following,
                 source,
             )
+            start = NoteStart.GUESSED
         if marker is not None:
-            parts.append((position, marker))
+            parts.append((position, marker, start))
             value = marker.value if marker.value is not None else next_value
             source = (
                 _ValueSource.MARKER if marker.value is not None else _ValueSource.PLACE
             )
-    ends = (*(start for start, _ in parts[1:]), len(words))
+    ends = (*(begin for begin, _, _ in parts[1:]), len(words))
     return tuple(
-        (with_words(line, words[start:end]), marker)
-        for (start, marker), end in zip(parts, ends, strict=True)
+        (with_words(line, words[begin:end]), marker, start)
+        for (begin, marker, start), end in zip(parts, ends, strict=True)
     )
 
 
@@ -441,13 +459,13 @@ def page_notes(
             )
             last_value = notes[-1].marker.value if notes and notes[-1].marker else None
             expected = _expected_value(notes)
-            starts = (
+            under_a_row = _under_a_row(line, marker, parts_before)
+            sure_start = (
                 not notes
                 or by_indent
                 or (marker is not None and indented)
                 or (number == 0 and indented)
                 or _under_a_short_line(region, number, marker, expected)
-                or _under_a_row(line, marker, parts_before)
                 or (
                     marker is not None
                     and marker.value is not None
@@ -462,6 +480,7 @@ def page_notes(
                     )
                 )
             )
+            starts = sure_start or under_a_row
             if starts and marker is not None and marker.value is not None:
                 value, source = marker.value, _ValueSource.MARKER
             elif starts:
@@ -482,7 +501,7 @@ def page_notes(
                 following,
             )
             parts_before = len(parts)
-            first_part, _ = parts[0]
+            first_part, _, _ = parts[0]
             if starts:
                 if marker is None and (by_indent or indented):
                     marker = _indent_marker(line, lower_case_words)
@@ -495,13 +514,14 @@ def page_notes(
                         may_continue=not notes
                         and marker is None
                         and indent < INDENT_MIN_PT,
+                        start=NoteStart.SURE if sure_start else NoteStart.GUESSED,
                     )
                 )
             else:
                 notes[-1] = replace(notes[-1], lines=(*notes[-1].lines, first_part))
             notes.extend(
-                PageNote((part,), part_marker, may_continue=False)
-                for part, part_marker in parts[1:]
+                PageNote((part,), part_marker, may_continue=False, start=start)
+                for part, part_marker, start in parts[1:]
             )
     return tuple(notes)
 
@@ -626,7 +646,15 @@ def _valued(notes: Sequence[PageNote], numbering: Numbering) -> tuple[Footnote, 
         else readings
     )
     return (
-        (Footnote(notes[0].lines, notes[0].marker, None, counted=True),)
+        (
+            Footnote(
+                notes[0].lines,
+                notes[0].marker,
+                None,
+                counted=True,
+                start=notes[0].start,
+            ),
+        )
         if leftover
         else ()
     ) + tuple(
@@ -635,6 +663,7 @@ def _valued(notes: Sequence[PageNote], numbering: Numbering) -> tuple[Footnote, 
             marker=note.marker,
             value=value,
             counted=value is not None or numbering is not Numbering.PER_PAGE,
+            start=note.start,
         )
         for note, value in zip(counted, values, strict=True)
     )

@@ -1,6 +1,6 @@
 """Tests of the plan wrong-links, work package 3: footnotes the OCR read as
 one (docs/specs/structure.md, section 11, "Where a note starts", "Two
-notes on one line" and "A marker's own number").
+notes on one line", "A marker's own number" and "Sure links").
 
 The unit tests write a page's note lines by hand, made up in the form of
 Domesday's notes. The excerpt tests run on domesday_joined_notes; the
@@ -24,7 +24,13 @@ from galley.structure._lines import PlacedLine
 from galley.structure._markers import Reference, ReferenceForm
 from galley.structure._measures import Edges
 from galley.structure._notes import page_notes
-from galley.structure._references import Candidate, NoteToMatch, with_own_numbers
+from galley.structure._references import (
+    Candidate,
+    Link,
+    NoteToMatch,
+    sure_links,
+    with_own_numbers,
+)
 
 _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "wrong_links"
 
@@ -289,3 +295,35 @@ def test_reference_links_the_note_of_its_number(
             if before.endswith(reference["word"]) and text == reference["reference"]
         )
         assert found == (reference["note"],), reference
+
+
+def _sign_links(linked: tuple[int, ...], guessed: frozenset[int]) -> tuple[int, ...]:
+    """The notes whose sign link `sure_links` keeps, of one page's three
+    notes 1 to 3, the notes `linked` each linked to a sign "^", those at
+    `guessed` started by a stand-in or a row of notes."""
+    notes = tuple(NoteToMatch(place, 0, place + 1) for place in range(3))
+    links = tuple(
+        Link(
+            Candidate(
+                0, word, 0, Reference("Gummere", "^", "", ReferenceForm.SIGN, None)
+            ),
+            note,
+        )
+        for word, note in enumerate(linked)
+    )
+    return tuple(link.note for link in sure_links(notes, links, frozenset(), guessed))
+
+
+def test_sign_to_the_note_before_a_note_under_a_row_is_unlinked_alone() -> None:
+    # Haskins' page 56: notes 1 and 2 on a row, 3 under it (rule 6); the
+    # reference to 2 is lost, and the sign that refers to 3 took 2.
+    assert _sign_links((0, 1), frozenset({2})) == (0,)
+
+
+def test_signs_to_both_notes_of_a_cut_keep_their_links() -> None:
+    # Haskins' page 29: the same row, each note with its sign.
+    assert _sign_links((0, 1, 2), frozenset({2})) == (0, 1, 2)
+
+
+def test_sign_with_no_note_started_by_a_guess_keeps_its_link() -> None:
+    assert _sign_links((0, 1), frozenset()) == (0, 1)

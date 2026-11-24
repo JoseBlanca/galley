@@ -588,7 +588,10 @@ def gap_links(
 
 
 def sure_links(
-    notes: Sequence[NoteToMatch], links: Sequence[Link], unmarked: frozenset[int]
+    notes: Sequence[NoteToMatch],
+    links: Sequence[Link],
+    unmarked: frozenset[int],
+    guessed: frozenset[int] = frozenset(),
 ) -> tuple[Link, ...]:
     """`links` to footnotes, but those that are not sure (spec section 11,
     "Sure links"): a link to a note of `unmarked`, the positions of the
@@ -596,8 +599,11 @@ def sure_links(
     page's only note, or when the note before it on the page is linked
     and the reference reads one more than that note's value; a link whose
     reference is a sign is kept only when its note is its page's first or
-    the note before it on the page is linked. `notes` are the book's
-    footnotes in order; the links kept are in the order of `links`."""
+    the note before it on the page is linked, and, when the note or the
+    note after it on the page is one of `guessed`, the positions of the
+    notes a stand-in or a row of notes started, only when the other of the
+    two has a link too. `notes` are the book's footnotes in order; the
+    links kept are in the order of `links`."""
     by_note = {link.note: link for link in links}
     notes_by_page: dict[int, list[NoteToMatch]] = {}
     for note in notes:
@@ -619,7 +625,17 @@ def sure_links(
                     and reference.value == before.value + 1
                 )
             elif reference.form is ReferenceForm.SIGN:
-                sure = before is None or before_linked
+                after = page_notes[place + 1] if place + 1 < len(page_notes) else None
+                partner = (
+                    before
+                    if note.note in guessed
+                    else after
+                    if after is not None and after.note in guessed
+                    else None
+                )
+                sure = (before is None or before_linked) and (
+                    partner is None or partner.note in by_note
+                )
             else:
                 sure = True
             if sure:

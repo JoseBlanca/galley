@@ -68,6 +68,7 @@ from galley.structure._markers import (
 from galley.structure._measures import letters
 from galley.structure._notes import (
     Footnote,
+    NoteStart,
     Numbering,
     PageNote,
     book_numbering,
@@ -565,6 +566,7 @@ def _links(
     before_section: int,
     last_contents_page: int,
     numbering: Numbering,
+    guessed: frozenset[int] = frozenset(),
 ) -> tuple[Link, ...]:
     """The references of `body`, the body's blocks but the endnote
     section's, matched to `notes`, whose values are `values` and whose
@@ -575,7 +577,8 @@ def _links(
     took; with several note groups, whose headings are `group_headings`,
     each group's endnotes among the candidates of its chapter. In a book
     whose notes are numbered per page, `numbering`, the footnotes keep only
-    their sure links."""
+    their sure links, `guessed` being the positions of the footnotes a
+    stand-in or a row of notes started."""
     candidates = body_candidates(body)
     footnote_notes = tuple(
         NoteToMatch(position, first_page(note.origin), value)
@@ -598,7 +601,7 @@ def _links(
 
     def sure(links: tuple[Link, ...]) -> tuple[Link, ...]:
         if numbering is Numbering.PER_PAGE:
-            return sure_links(footnote_notes, links, unmarked)
+            return sure_links(footnote_notes, links, unmarked, guessed)
         return links
 
     footnote_links = sure(match_footnotes(footnote_notes, candidates))
@@ -975,6 +978,11 @@ def assemble(
             sum(1 for p in kept_positions if p < min(in_section, default=len(entries))),
             max(contents_pages, default=-1),
             numbering,
+            frozenset(
+                position
+                for position, source in enumerate(sources)
+                if isinstance(source, Footnote) and source.start is NoteStart.GUESSED
+            ),
         ),
     )
     places = margin_note_places(
