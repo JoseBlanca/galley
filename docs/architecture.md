@@ -600,7 +600,9 @@ page_numbers)`:
   ("subjection", ";") becomes ("subjection;",), a spaced sign attached
   in a book not in French. `case_split`: ("theAvre",) becomes ("the",
   "Avre"), a word the OCR glued at a case change
-  (`docs/specs/structure.md` §22 to §24). `list_marker`: ("—The",)
+  (`docs/specs/structure.md` §22 to §24); also a contents entry's
+  junk glued to a word that starts with a capital, split off and
+  removed (§30, rule 11). `list_marker`: ("—The",)
   becomes ("—", "The"), a list item's dash split off its first word,
   the dash going to the item's `label` (§29 of the same spec). A spec
   adds a reason when it needs one.
@@ -618,9 +620,14 @@ one by one),
 `inkless_page` (a word of an inkless page, which the OCR read in what
 shows through the paper or in an endpaper's pattern; a reason apart
 from `excluded_page` because analyze's rule, not the owner, chose the
-page), `running_head`, `page_number`, `signature_mark`, `plate_text`,
+page), `running_head`, `page_number` (a page's own number, or a
+contents entry's page number that its title kept, misread or at an
+ordinary space, structure §30 rule 11), `signature_mark`, `plate_text`,
 `stray_mark` (a line with no letter or digit above a running head or
-above the title of a printed contents, a speck of the scan),
+above the title of a printed contents, a speck of the scan; and a
+reader's pen mark or a speck read as text before a contents entry's
+label, at the start of its title with any number read together with
+it, or at its end, structure §30 rules 7 and 11),
 `guide_words` (the first letters of the first and last entries that
 Stubbs prints under the running head of an index page, "BUR CON"),
 `leader_dots` (the dots printed between a contents entry's title and
@@ -969,7 +976,8 @@ lists the words, with the pages they came from where the origins say.
   lines.json against blocks.json (the text of every body and note block,
   with a note's `marker` and `group`, a block's `label`, an epigraph's
   `source` and a contents entry's `page_number` counted as words of
-  it); markdown, blocks.json
+  it; a contents entry's label that structure §30 rule 12 inferred, a
+  number between two in sequence, is admitted, §31 of that spec); markdown, blocks.json
   with the edits applied against `book.md` as Pandoc reads it (`pandoc -f
   markdown-smart -t json`): a reference to a footnote is matched to
   Pandoc's note element and its marker is not compared as a word, because
