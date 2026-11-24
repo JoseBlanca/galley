@@ -821,7 +821,10 @@ epubcheck accepts. The two kinds of note get it in two places:
   note, is a link to that id with the role `doc-backlink`:
   `[6](#ref-n-p0190-001){role="doc-backlink"}`. Pandoc points both links
   into the right chapter file, as it does the reference. An endnote
-  with an empty marker has no number to link and gets none. markdown
+  whose marker holds no character other than white space has no
+  number to link and gets none; one predicate, `gets_a_back_link` of
+  `fidelity.py`, says which endnotes get one, for markdown and the
+  fidelity check. markdown
   refuses a blocks.json in which a `ref-` id would equal another id, or
   the id of a note it is made from is not one Pandoc and XML read as
   written: a letter, then letters, digits, `-`, `_` and `.`.
@@ -944,7 +947,7 @@ A stage imports these and nothing else of galley.
 | `list_markers.py` | the readings of a list marker (`docs/specs/structure.md` §29, "Terms"): `marker_readings(word)`, its kind, form and value, a roman numeral before a letter; `starts_a_list`, `follows` and `is_bulleted`; and `DASHES`, which structure's list rules, markdown's lists and the fidelity check share, so that the three read a marker alike |
 | `caption_labels.py` | the caption labels of `docs/specs/figures.md` §1: `LABEL_NAMES` ("figure", "fig.", "fig", "plate", "map"), `is_numeral(text)`, a numeral as the OCR reads one, and `is_well_formed_numeral(text)`, one as printed (1 to 3 digits or a well-formed roman numeral in capitals). Moved from `structure/_figures.py` on 19 November 2026, so that structure's caption labels and extract's caption numbers under `redo` (`docs/specs/extract.md` §9) read a numeral alike |
 | `note_references.py` | `glued_reference(word) -> Reference \| None`: the glued number of `docs/specs/structure.md` §11, "Candidates", both its forms, a letter, any punctuation or none, 1 to 3 digits and only punctuation, not after a citation's abbreviation ("land3.", "Kadesh,12"; not "p.12"), and punctuation, 1 to 3 digits and only punctuation (";13"), with its parts; `Reference` and `ReferenceForm`, the values it gives; and the helpers structure's other reference forms share with it, `PUNCTUATION`, `is_punctuation` and `after_last_letter`. Moved whole from `structure/_markers.py` on 19 November 2026 (its private `_glued` and the two values), and structure's `reference_candidate` calls it, so that extract puts back under `redo` exactly the references structure looks for (`docs/specs/extract.md` §9) |
-| `contents_labels.py` | the number labels of a printed contents (`docs/specs/structure.md` §30, rule 12): `number_label(label)`, the style (digits or a roman numeral in capitals) and value of a label "7." or "IV.", None for any other, and `label_text(style, value)`, the label of a value in a style, which structure's inferred labels and the fidelity check's admission of them share |
+| `contents_labels.py` | the number labels and the runs of a printed contents (`docs/specs/structure.md` §30, rule 12, and §31): `number_label(label)`, the style (digits or a roman numeral in capitals) and value of a label "7." or "IV.", None for any other; `label_text(style, value)`, the label of a value in a style; `contents_runs(pages)`, the contents runs of the contents pages; and `inferred_labels(labels, levels)`, rule 12's labels for a run's entries. structure infers labels with them and the fidelity check admits an inferred label with them, so that the two read the rule alike |
 | `hyphens.py` | `LINE_END_HYPHENS`, "-" and "¬", the hyphens that end a printed line in the OCR's text, which layout's reading score, structure's hyphen joins and the fidelity check share (`docs/specs/structure.md` §5) |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
 | `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc; Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`, and analyze and extract when it is `redo`) and stops naming any that is missing; and, when the command runs correct, LM Studio's server and its models (`correct.check_server`) |
@@ -956,7 +959,9 @@ the module. galley needs the lock off to run pages in parallel.
 ## 13. The fidelity check
 
 galley's first goal is that no word of the book is lost or invented. The
-fidelity check, `fidelity.check_stage(stage, before, after)`, makes that
+fidelity check, `fidelity.check_stage(stage, before, after)` (at the
+structure boundary also with the config's `contents_pages`, by which it
+admits a contents label structure inferred), makes that
 testable at each stage boundary. It works on the whole book: the words of
 a stage's input must equal, as a multiset, the words of its output plus
 the removals that stage made, once the stage's word changes are applied

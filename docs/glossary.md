@@ -5,6 +5,13 @@ document, spec and module calls the same thing by the same name. Started
 on 14 November 2026 with `docs/architecture.md`; a term a spec needs and
 this list lacks is added here.
 
+**back link**: a link from a note back to its reference in the text,
+for a reader who followed the reference to the note. markdown makes
+the printed marker of a referenced endnote one (`role="doc-backlink"`),
+when the marker holds a character other than white space; the epub
+stage gives each referenced footnote one, Pandoc's number at the
+start of the note (architecture section 9, "Back links").
+
 **block**: a unit of the book's text after structure: a heading, a
 paragraph, a quote, verse, a chapter summary, an epigraph, a figure, a
 margin note, an index entry, a list item or a contents entry. Its kind says what the text is, never how it looks. It
@@ -52,6 +59,15 @@ linked to the heading of the chapter it names when its title matches
 one. Its page number is set apart from the title by space or by
 **leader dots**, the dots that lead the eye from one to the other,
 which structure removes with a record.
+
+**contents junk**: text at the start or end of a contents entry's
+title that is not the printer's: a reader's pen mark or a speck read as
+text, alone or with the number it was read together with ("-^1.",
+"(Tj"), or a page number the OCR misread into the title ("3x3").
+structure takes it off by comparing the title with the heading the
+entry is linked to, and removes it with a record (structure spec
+section 30, rule 11). Printed text, a number, a year, "&c.", is never
+junk.
 
 **contents pages**: the pages of a book's printed table of contents,
 named in its config (`contents_pages`). structure makes their entries

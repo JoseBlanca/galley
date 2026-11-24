@@ -5356,7 +5356,11 @@ kinds, as on any page.
    14's form with "." ("IV."), an English number word "One" to "Twenty"
    in any case, a chapter label word together with the word after it
    ("CHAPTER II."), or "§" together with the word after it ("§ 1."), and
-   at least one word follows it. The words before it with no letter or
+   at least one word follows it; or a number of 1 or 2 digits alone
+   ("12"), or such a number or one letter in round brackets ("(a)",
+   "(12)"), when the word after it starts with a letter ("12 The Old
+   Order", "(a) Introduction"; added on 24 November 2026, so that rule
+   11 does not take such a number for junk). The words before it with no letter or
    digit, but a "§" that is part of the label, are marks a reader or
    the scan left, not the printer: each is removed with the reason
    `stray_mark`, one removal for the marks of each line, and the label
@@ -5403,18 +5407,34 @@ kinds, as on any page.
 
 11. **Text that is not the heading's.** Once an entry is linked (rule
     9), the start and the end of its title are compared with its
-    heading's text, the heading's spans without its label. A **piece**
+    heading's text, the heading's spans without its label. A **junk
+    sign** is a sign no printer sets in a title or its label: one of
+    `^ _ * ~ | \ < > { } = + # @ $ %` and the backquote; or, at the
+    start of the title, a "(" or "[" or a `"`, `“` or `«` that nothing
+    after it in the title closes; at its end, a ")" or "]" or a `"`,
+    `”` or `»` that nothing before it in the title opens. A **piece**
     is a stretch of text at the start of the title that:
     - is at most 5 characters long, spaces not counted;
-    - is made only of signs ("^", "*."), or holds a character other than
-      a letter once the signs at its end are taken off ("(Tj", "-^1.",
-      "_ II,", "290."), so that a word of letters with a sign after it,
-      "Dr.", "Note:", is no piece; and is not made only of quotation
-      marks (`"`, `'`, `“`,
-      `”`, `‘`, `’`, `«`, `»`);
+    - holds a junk sign ("(Tj", "-^1.", "_ II,", `"HI.`, "*."), or is
+      made only of signs none of which is a bracket or a quotation mark
+      ("—", ".,"), so that a word with a sign after it, "Dr.",
+      "Note:", "&c.", "A-B", "1st", is no piece, nor is a bracket the
+      title closes, the "[" of "[Introduction]" or the "(" of "(The
+      Church)";
+    - is not, whole, a number, alone or in round brackets, nor one
+      letter in round brackets, with or without a "." or "," after it
+      ("1", "1066", "(1)", "(a)"), which may be a label or a year
+      ("-^1." holds a number and is a piece);
     - ends at a space, or inside a word whose rest starts with a
       capital ("(QzWord", invented, gives the piece "(Qz" before
       "Word").
+
+    Until 24 November 2026 a piece needed no junk sign, only a
+    character other than a letter once the signs at its end were taken
+    off, and printed text matching the heading was taken with it: the
+    "1" of "1 Introduction", the "1066" of "1066 The Conquest", the
+    "1272" of "Edward I. 1272", the "&c." of "Kings &c." (review of the
+    branch reading-fixes).
 
     Two words **agree** as much as `difflib.SequenceMatcher(None, a, b,
     autojunk=False).ratio()` of their **cores**, each word case-folded
@@ -5435,7 +5455,11 @@ kinds, as on any page.
     itself starts with a capital, and the word before it agrees best
     with the heading's last word. A piece at the end may also be "p"
     or "pp" with one sign after it ("pp,"), the start of a page
-    reference the OCR misread. Agreement, not equality, so that an OCR
+    reference the OCR misread, or a **misread page number**: a stretch
+    that holds a digit and no junk sign, when the entry has no page
+    number (rule 6 took none) and the stretch is not a year (4 digits,
+    "1272"), a number in round brackets ("(1)") or an ordinal ("1st",
+    "2nd"): "3x3", "290.". Agreement, not equality, so that an OCR
     misreading in the heading ("AMD" for "AND", "EVTL" for "EVIL") does
     not make a word of the title junk.
 
@@ -5443,9 +5467,9 @@ kinds, as on any page.
     or a speck, alone or with the number it was read together with: it
     is removed with the reason `stray_mark`. Junk at the end sits where
     a page number would: it is removed with the reason `page_number`
-    when it holds a digit or is "p" or "pp" with a sign (a page number
-    misread, or one at an ordinary space that rule 6 left in the
-    title), and as `stray_mark` otherwise. Junk glued to a word, as
+    when it is a misread page number (or one at an ordinary space that
+    rule 6 left in the title) or "p" or "pp" with a sign, and as
+    `stray_mark` otherwise. Junk glued to a word, as
     "(Qz" is to "Word", is half of one word of the text layer, and the
     fidelity check compares words: the word is first split in two by a
     word change of the reason `case_split`, ("(QzWord",) to ("(Qz",
@@ -5461,7 +5485,22 @@ kinds, as on any page.
     a word, as a `misread_hyphen` removal does (section 5). Junk at the
     start is on the page of the title's first line, junk at the end on
     that of its last. The block's spans lose the junk and the space
-    after or before it.
+    after or before it. Junk is not taken, and stays in the title,
+    when the title's words at that end are not the junk's (a hyphen
+    joined across the title's lines), when it does not lie whole in
+    the block's first span, or last, or when it would leave that span
+    empty: the record would then name words or a box that are not the
+    junk's.
+
+    An entry that is not linked has no heading to compare with, and
+    keeps its title whole, but for one case: an entry whose label rule
+    12 inferred loses, as junk at the start, the longest piece (at most
+    5 characters, as above) that holds a junk sign and a digit or one
+    of the letters I, V, X, L and C, and ends at a space: the mark read together with the lost
+    number. In the `haskins_front` excerpt, whose chapter headings are
+    not in its pages (section 32), the three entries of chapters I to
+    III lose "-^1.", "_ II," and `"HI.` so, and show "I.", "II." and
+    "III." without them; until 24 November 2026 they showed both.
 
     Haynes' entries of chapters 1 and 6 lose the characters glued to
     their first word, 3 for chapter 1 and 2 for chapter 6, and its
@@ -5481,13 +5520,22 @@ kinds, as on any page.
     with ".", "IV." (rule 7 reads no roman label in lower case, and the
     OCR's "l" or "1" for "I" is not taken as one); two are of the same
     **style** when both are digits or both roman numerals. In a contents run, labels are inferred for entries without a
-    label in two places, when the count fits exactly:
+    label in two places, when the count fits exactly and the depths
+    agree:
     - between two entries whose number labels are of the same style,
-      M and N, with exactly N−M−1 entries between them and none of them
-      with a label: they get M+1 to N−1;
+      M and N, at the same depth (rule 8), with exactly N−M−1 entries
+      between them, all at that depth and none of them with a label:
+      they get M+1 to N−1;
     - before the run's first number label N, when the N−1 entries just
-      before it have no label: they get 1 to N−1. Entries before those
-      keep none.
+      before it have no label and are at its depth: they get 1 to N−1.
+      Entries before those keep none.
+
+    An entry with any label, a number word or "CHAPTER TWO", keeps it,
+    and no label is inferred across it. The depths keep a chapter's
+    sections, of depth 2, from taking the numbers of the chapters
+    around them: the labels "I." and "IV." at depth 1 with two entries
+    of depth 2 between them infer nothing (review of
+    the branch reading-fixes, 24 November 2026).
 
     Each inferred label is written in the style of its neighbours,
     digits or a roman numeral in capitals, with ".". Haynes' run
@@ -5505,8 +5553,9 @@ kinds, as on any page.
     number, tells it from a read one, and the fidelity check admits it
     by this rule (section 31). It is applied with the entries, in step
     3.1, and rule 11 then takes off the junk that the lost number left.
-    In the `haskins_front` excerpt the three entries are not linked
-    (section 32), so they get their labels and keep their junk.
+    The runs and this rule are one function each, in
+    `src/galley/contents_labels.py`, which structure and the fidelity
+    check share.
 
 The entries and their page numbers are made in step 3.1, where the
 body stream is walked over page breaks, and the links in step 3.4,
@@ -5514,8 +5563,8 @@ with the index entries, once every heading is known; rule 11 runs in
 step 3.4 after the links, on the blocks and the words of their
 entries.
 
-**The thresholds.** Rule 11's 5 characters hold a label of 2 digits
-in a pen circle, "(12)", and a page number of 3 digits with a sign,
+**The thresholds.** Rule 11's 5 characters hold a mark read with a
+roman numeral, "_ II,", and a page number of 3 digits with a sign,
 "290."; a word's agreement of 0.7 is rule 9's ratio for a title. Both
 were chosen, not measured: in the seven books every junk that rule 11
 takes is 2 to 5 characters and its next word agrees at 1.0 (24 November
@@ -5618,7 +5667,8 @@ depth 2 and 29 of depth 3. These stay wrong:
   together with one is lost with it; rule 12 gives it back only when
   the count of entries fits, as for Haskins' chapters I to III. A mark
   glued to a title word that starts in lower case, or at the start of
-  an entry that is not linked, stays.
+  an entry that is not linked and whose label was read, stays, and so
+  does a mark that holds no junk sign (rule 11).
 - **Column headings**, Domesday's "PAGE" (page 14) and Gierke's
   "PA'.R" (page 10), are entries of their own.
 - **Gierke's pages 52 to 67**: on pages 52 to 60, a topics line indented
@@ -5723,18 +5773,22 @@ other link stays an error.
 
 **At the structure boundary**, the check counts a block's `label` as
 words of the block whatever its kind, and a `contents_entry`'s
-`page_number` too, but for a label that section 30's rule 12 inferred:
-a word that the blocks hold more often than the lines, and that is the
-number label of value N (rule 12) of a contents entry whose next
-neighbour among the consecutive `contents_entry` blocks (the check does
-not know the runs; in the seven books a run's entries are consecutive
-blocks) has the label N+1 of the same style, and whose neighbour before
-has N−1 of that style or, when N is 1, none of the entries before it
-has a number label, is admitted, as many times as such entries hold it
-(24 November 2026). The
-check reads only `blocks.json`, so it cannot tell an inferred label
-from a read one; what it admits is a number that the rule could have
-inferred, never another word; it verifies a `list_marker` change: one word before,
+`page_number` too, but for a label that section 30's rule 12 inferred.
+The check is given the config's `contents_pages` and cuts them into
+runs as structure does; a run's entries are its `contents_entry`
+blocks whose first origin lies on its pages, in order. A block's label
+is **unread** when the block holds it more often than the words of
+`lines.json` inside the block's origin (a word inside when the centre
+of its box lies in the box of the origin on its page). The unread
+labels of a run are set to none, rule 12 is applied to the run's
+labels and depths, and each unread label that the rule gives back to
+its own block is admitted, as many times as its block lacks it. A
+number in any other block, a label that was read, and a label the rule
+would not give back, "5." after "3." or a "1." with no "2." after it,
+are not admitted (revised on 24 November 2026: until then any number
+label that followed its neighbours in any block was admitted, read or
+not). The check applies the same two functions as structure, the runs
+and rule 12, so that the two cannot read the rule apart. It verifies a `list_marker` change: one word before,
 two after, the first after a dash, "—" or "–", and the two joined equal
 to the word before; and it reads `leader_dots` removals as any removal.
 
