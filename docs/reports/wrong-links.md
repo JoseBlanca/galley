@@ -42,3 +42,42 @@ Baseline (the builds of 23 November 2026, before this plan):
 
 Changed in the plan: the target of work package 3 is restated on 36
 joined notes, at most 12 left.
+
+## Work package 3: notes joined on one line, and continuation lines
+
+Done (71ef75f, c793b00, 2763161, 5029320, bcc4299, a91b64e, e3bf3d8).
+A footnote is cut where a later marker reads the next number, or, when
+the marker is misread ("«", "-", "&", "B"), where a later one reads the
+number after it, or at the page's last note after a 20 pt gap, or at a
+line under a row of notes. A number starting a line inside a note is a
+marker only when it is the next number after a sentence's end. New
+excerpt `domesday_joined_notes` (page indices 177, 187, 207, 213, 225,
+335, 440, 445, 504, 517).
+
+| book | joined notes | right links | wrong links |
+|---|---|---|---|
+| Domesday | 36 → 10 | 1,563 → 1,593 | 9 → 6 (3 of them the transcription's quirks) |
+| Haskins | 1 → 0 | 68 → 68 | 1 → 1 (204) |
+
+Joined notes left in Domesday: 123, 136, 157, 166, 240, 269, 291, 311,
+449, 504. Domesday 440, 445, 517 now linked right; every cut checked on
+the page images. Gierke: page 42's reference 2 moved to its right note
+(page image), notes 384 → 385. Kadesh without the model: a false note on
+page 63 removed, links unchanged; page 21's notes were already separate
+in this build, page 27's markers are read as quotes and no rule reaches
+them. Stubbs, Turney, Haynes byte-identical.
+
+A cut on Haskins page 56 first made a new wrong link: the OCR lost the
+first note's reference, and the second note's sign took the first note.
+Fixed by a rule: a sign link to a note started by a guessed cut, or to
+the note just before it, is kept only when the other of the two is also
+linked. Page 56's sign is now unlinked.
+
+The whole-book bound on Domesday's unreferenced notes
+(`test_whole_book_domesday_signs_followed_by_punctuation_link_their_notes`)
+rose from 286 to 287: work package 2's removal of 4 wrong links took
+the count from 284 to 288, unseen because that test is in the slow set;
+work package 3 brings it to 287.
+
+The marker's own number, kept when a reference reads it, changes no
+link once the cuts exist.

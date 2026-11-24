@@ -130,8 +130,8 @@ Deliverables:
    links on 440 and 445 gone, 517 linked right or unlinked; no new wrong
    link. Haskins page 29 cut.
 
-- [ ] 3.1 The new excerpt and the cut on one line.
-- [ ] 3.2 The marker's own number, continuation lines, remeasure.
+- [x] 3.1 The new excerpt and the cut on one line.
+- [x] 3.2 The marker's own number, continuation lines, remeasure.
 
 ## 4. Kadesh's wrong structure links
 
