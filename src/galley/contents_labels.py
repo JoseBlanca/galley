@@ -4,7 +4,9 @@ numeral in capitals with ".", "IV.". structure infers a lost label by
 them and the fidelity check admits an inferred one by them, so the two
 read a label alike."""
 
+import itertools
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import assert_never
@@ -89,3 +91,86 @@ def number_label(label: str | None) -> NumberLabel | None:
     if _ROMAN.fullmatch(label):
         return NumberLabel(LabelStyle.ROMAN, _roman_value(label[:-1]))
     return None
+
+
+def contents_runs(pages: Iterable[int]) -> tuple[tuple[int, ...], ...]:
+    """The contents runs of the contents pages `pages`, page indices from
+    0: each run its consecutive pages, in order (structure spec section
+    30, "Terms")."""
+    runs: list[tuple[int, ...]] = []
+    for page_index in sorted(frozenset(pages)):
+        if runs and runs[-1][-1] == page_index - 1:
+            runs[-1] = (*runs[-1], page_index)
+        else:
+            runs.append((page_index,))
+    return tuple(runs)
+
+
+def _gap_labels(
+    labels: Sequence[str | None],
+    levels: Sequence[int],
+    gap: range,
+    level: int,
+    first: NumberLabel,
+) -> tuple[tuple[int, str], ...]:
+    """The labels of the entries of `gap`, from `first` up, when each of
+    them has no label and is at `level`; none otherwise."""
+    if not all(
+        labels[position] is None and levels[position] == level for position in gap
+    ):
+        return ()
+    return tuple(
+        (position, label_text(first.style, value))
+        for value, position in enumerate(gap, start=first.value)
+    )
+
+
+def _leading_labels(
+    labels: Sequence[str | None],
+    levels: Sequence[int],
+    first_labelled: tuple[int, NumberLabel],
+) -> tuple[tuple[int, str], ...]:
+    """The labels of the N−1 entries just before the run's first number
+    label N, `first_labelled` with its position, when they fit."""
+    position, first = first_labelled
+    if position < first.value - 1:
+        return ()
+    return _gap_labels(
+        labels,
+        levels,
+        range(position - (first.value - 1), position),
+        levels[position],
+        NumberLabel(first.style, 1),
+    )
+
+
+def inferred_labels(
+    labels: Sequence[str | None], levels: Sequence[int]
+) -> frozendict[int, str]:
+    """The labels rule 12 of structure spec section 30 infers for the
+    entries of one contents run, whose labels (None for none) and depths
+    are `labels` and `levels`, by position: the N−M−1 entries without a
+    label between number labels M and N of one style at one depth, all at
+    that depth, get M+1 to N−1; the N−1 entries without a label just
+    before the run's first number label N, at its depth, get 1 to N−1."""
+    labelled = tuple(
+        (position, number)
+        for position, label in enumerate(labels)
+        if (number := number_label(label)) is not None
+    )
+    leading = _leading_labels(labels, levels, labelled[0]) if labelled else ()
+    between = tuple(
+        label
+        for (before, low), (after, high) in itertools.pairwise(labelled)
+        if low.style is high.style
+        and levels[before] == levels[after]
+        and high.value - low.value == after - before
+        for label in _gap_labels(
+            labels,
+            levels,
+            range(before + 1, after),
+            levels[before],
+            NumberLabel(low.style, low.value + 1),
+        )
+    )
+    return frozendict(leading + between)

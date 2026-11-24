@@ -4,14 +4,13 @@ with its label, title, page number, leader dots and depth.
 
 Positions are PDF points, origin at the top left of the page."""
 
-import itertools
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 from fractions import Fraction
 
-from galley.contents_labels import LabelStyle, label_text, number_label
+from galley.contents_labels import inferred_labels
 from galley.model import (
     Block,
     ChangeReason,
@@ -255,8 +254,9 @@ class ContentsEntry:
     `leader_dots` the removals of the leader dots before its page number,
     one per line; `stray_marks` the removals of the marks before its
     label, one per line (rule 7); `topics` whether it is a topics entry
-    (rule 8), which is never linked to a heading (rule 9). A label may be
-    inferred, not read (rule 12)."""
+    (rule 8), which is never linked to a heading (rule 9); and
+    `label_inferred` whether its label was inferred, not read (rule
+    12)."""
 
     lines: tuple[PlacedLine, ...]
     title: tuple[PlacedLine, ...]
@@ -266,6 +266,7 @@ class ContentsEntry:
     leader_dots: tuple[Removal, ...]
     stray_marks: tuple[Removal, ...]
     topics: bool
+    label_inferred: bool = False
 
 
 def _pieces(lines: Sequence[PlacedLine]) -> tuple[tuple[PlacedLine, ...], ...]:
@@ -542,32 +543,15 @@ def contents_entries(lines: Sequence[PlacedLine]) -> tuple[ContentsEntry, ...]:
 def _with_labels_inferred(
     entries: Sequence[ContentsEntry],
 ) -> tuple[ContentsEntry, ...]:
-    """`entries`, a contents run's, with labels inferred where the count
-    fits exactly (spec section 30, rule 12): the N−M−1 entries without a
-    label between number labels M and N of one style get M+1 to N−1, and
-    the N−1 entries without a label just before the run's first number
-    label N get 1 to N−1, each in that style."""
-    labelled = tuple(
-        (position, number)
-        for position, entry in enumerate(entries)
-        if (number := number_label(entry.label)) is not None
+    """`entries`, a contents run's, with the labels rule 12 of spec
+    section 30 infers by their labels and depths, marked inferred."""
+    inferred = inferred_labels(
+        tuple(entry.label for entry in entries), tuple(entry.level for entry in entries)
     )
-    inferred: dict[int, str] = {}
-
-    def fill(gap: range, style: LabelStyle, first_value: int) -> None:
-        if all(entries[position].label is None for position in gap):
-            for value, position in enumerate(gap, start=first_value):
-                inferred[position] = label_text(style, value)
-
-    if labelled:
-        first, start = labelled[0]
-        if first >= start.value - 1:
-            fill(range(first - (start.value - 1), first), start.style, 1)
-    for (before, low), (after, high) in itertools.pairwise(labelled):
-        if low.style is high.style and high.value - low.value - 1 == after - before - 1:
-            fill(range(before + 1, after), low.style, low.value + 1)
     return tuple(
-        replace(entry, label=inferred[position]) if position in inferred else entry
+        replace(entry, label=inferred[position], label_inferred=True)
+        if position in inferred
+        else entry
         for position, entry in enumerate(entries)
     )
 

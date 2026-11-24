@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from typing import assert_never
 
 from galley.config import Language
+from galley.contents_labels import contents_runs
 from galley.model import (
     Block,
     BlockKind,
@@ -722,18 +723,6 @@ def _links(
     )
 
 
-def _contents_runs(contents_pages: frozenset[int]) -> tuple[tuple[int, ...], ...]:
-    """The contents runs of `contents_pages`, each its consecutive page
-    indices (spec section 30, "Terms")."""
-    runs: list[list[int]] = []
-    for page_index in sorted(contents_pages):
-        if runs and runs[-1][-1] == page_index - 1:
-            runs[-1].append(page_index)
-        else:
-            runs.append([page_index])
-    return tuple(tuple(run) for run in runs)
-
-
 def _run_lines(page: PageParts) -> frozenset[int]:
     """The positions in the page's body stream of the lines of its runs of
     section 2, step 2.3."""
@@ -749,7 +738,7 @@ def _contents_entries(
     section 30): each run's body stream but its title."""
     return tuple(
         entry
-        for run in _contents_runs(contents_pages)
+        for run in contents_runs(contents_pages)
         for entry in contents_entries(
             tuple(
                 line
@@ -824,7 +813,7 @@ def _with_contents_links(
     )
     headings = tuple(block_text(blocks[position]) for position in heading_positions)
     refs: dict[int, str] = {}
-    for run in _contents_runs(contents_pages):
+    for run in contents_runs(contents_pages):
         candidates = tuple(
             position
             for position, entry in zip(entry_positions, entries, strict=True)
