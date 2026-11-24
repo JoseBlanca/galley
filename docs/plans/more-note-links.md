@@ -5,7 +5,10 @@ link the notes galley still leaves unlinked: first the endnotes of their
 own two books, then the footnotes of the public-domain books. The
 breakdown below was approved in chat that day. Dated 23 November 2026.
 State: done on 23 November 2026, but for the parts of work package 5
-that need LM Studio (the rest of 5.1, 5.2, 5.3), left for a later plan.
+that need LM Studio (the rest of 5.1, 5.2, 5.3), done on 24 November
+2026 on branch `plan/kadesh-links`. Deliverable 5.3 is missed: 105
+links, not 122, and 10 wrong, 8 of them made by the structure stage
+before this plan (the report, work package 5).
 
 Specs: `docs/specs/structure.md` (notes, endnotes, note references,
 §34–§36), `docs/specs/correct.md` §9b (note links from the vision
@@ -168,12 +171,12 @@ Deliverables:
    wrong on `tests/fixtures/expected/kadesh_reference/` and on the
    images of the pages with new links.
 
-- [x] 5.1 Column-top markers (done) and the page-order fallback (left: needs
-  the model's recorded answers).
-- [ ] 5.2 The narrower order check, with recorded answers. Left for later:
-  LM Studio was busy.
-- [ ] 5.3 The rebuild and the check by eye (orchestrator, LM Studio). Left
-  for later.
+- [x] 5.1 Column-top markers and the page-order fallback (the fallback
+  on 24 November 2026).
+- [x] 5.2 The narrower order check, with recorded answers (24 November
+  2026).
+- [x] 5.3 The rebuild and the check by eye (24 November 2026): 105
+  links, 95 right; the target of 122 with none wrong is missed.
 
 ## 6. The end
 

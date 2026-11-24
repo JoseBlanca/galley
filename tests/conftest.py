@@ -249,7 +249,12 @@ EXCERPT_CONFIGS = frozendict(
 # 0 holds the journal's page number 81 where Tesseract boxes it, 634.8 to
 # 641.8 pt from the top, and nothing else (checked on the page at 300 dpi
 # on 19 November 2026); kadesh_8-17's region is 12 pt higher, where the
-# text layer misplaces it.
+# text layer misplaces it. kadesh_29-38 and kadesh_59-68 are read with
+# `ocr = "redo"` too, as the whole book is, for the tests of the correct
+# stage's note links on the vision model's recorded answers (correct spec
+# section 9b): their notes are those of the whole book's structure on
+# pages 29 to 38 and 59 to 68 (compared on 24 November 2026). Those two
+# run only when a test asks for `kadesh_link_excerpts`.
 REDO_EXCERPT_CONFIGS = frozendict(
     {
         "kadesh_redo": (
@@ -259,6 +264,18 @@ REDO_EXCERPT_CONFIGS = frozendict(
             'ocr = "redo"\n'
             "exclude_regions = [{page = 0, box = [240, 632, 252, 644]}]\n"
             "exclude_pages = [8]\n"
+        ),
+        "kadesh_29-38": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["James Henry Breasted"]\n'
+            'language = "en"\n'
+            'ocr = "redo"\n'
+        ),
+        "kadesh_59-68": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["James Henry Breasted"]\n'
+            'language = "en"\n'
+            'ocr = "redo"\n'
         ),
     }
 )
@@ -392,7 +409,11 @@ def _excerpt_toml(excerpt_pdf: frozendict[str, Path], name: str, toml: str) -> s
 # that the unit tests run while the excerpts are made. Measured on 21
 # November 2026 on an M5 Pro, `uv run pytest`: 81 s with the runs made when
 # the first test asks for them, 67 and 68 s with this.
-_RUN_FIXTURES = frozenset({"excerpt_books", "redo_excerpt_run"})
+_RUN_FIXTURES = frozenset({"excerpt_books", "redo_excerpt_run", "kadesh_link_excerpts"})
+# The redo excerpts that `kadesh_link_excerpts` gives, and those that
+# `redo_excerpt_run` alone starts.
+_KADESH_LINK_EXCERPTS = ("kadesh_redo", "kadesh_29-38", "kadesh_59-68")
+_REDO_RUN_EXCERPTS = ("kadesh_redo",)
 
 
 @dataclass(frozen=True, slots=True)
@@ -465,7 +486,13 @@ def _background_runs(
     excerpt PDF is the error of the runs, which only the tests that read
     them see."""
     used = {name for item in request.session.items for name in _fixtures(item)}
-    pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="excerpt-runs")
+    # One worker for the excerpts' runs and one for each redo excerpt, so
+    # that a redo excerpt never waits behind another: queued on 2 workers,
+    # the third waited about 20 s, and a test waiting on it in its body ran
+    # past pytest-timeout's 30 s under load (review of 24 November 2026).
+    pool = ThreadPoolExecutor(
+        max_workers=1 + len(REDO_EXCERPT_CONFIGS), thread_name_prefix="excerpt-runs"
+    )
     excerpts = None
     if "excerpt_books" in used and _have("pandoc", "tesseract"):
         folders = frozendict(
@@ -476,7 +503,10 @@ def _background_runs(
         )
         excerpts = pool.submit(_run_excerpts, folders, excerpt_pdf)
     redo = None
-    if "redo_excerpt_run" in used and _have("tesseract"):
+    names = (_REDO_RUN_EXCERPTS if "redo_excerpt_run" in used else ()) + (
+        _KADESH_LINK_EXCERPTS if "kadesh_link_excerpts" in used else ()
+    )
+    if names and _have("tesseract"):
         redo = frozendict(
             {
                 name: pool.submit(
@@ -485,7 +515,7 @@ def _background_runs(
                     name,
                     excerpt_pdf,
                 )
-                for name in REDO_EXCERPT_CONFIGS
+                for name in dict.fromkeys(names)
             }
         )
     yield _BackgroundRuns(excerpts, redo)
@@ -581,6 +611,25 @@ def redo_excerpt_run(
         return runs[name].result()
 
     return run
+
+
+@pytest.fixture(scope="session")
+def kadesh_link_excerpts(
+    _background_runs: _BackgroundRuns,
+) -> frozendict[str, BookFolder]:
+    """The book folders of kadesh_redo, kadesh_29-38 and kadesh_59-68 read
+    with `ocr = "redo"`, by name, analyze to structure, for the tests of
+    the note links on the vision model's recorded answers. It waits for the
+    runs itself, so that the wait is the fixture's and not under the
+    test's timeout (`timeout_func_only`). Skips when Tesseract is missing.
+    A test reads the folders and never writes in them."""
+    _require_program("tesseract")
+    runs = _background_runs.redo
+    assert runs is not None, (
+        "the redo excerpts' runs were not started: no collected test names "
+        "kadesh_link_excerpts among its arguments or fixtures"
+    )
+    return frozendict({name: runs[name].result() for name in _KADESH_LINK_EXCERPTS})
 
 
 def _run_redo_excerpt(
