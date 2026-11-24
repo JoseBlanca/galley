@@ -31,10 +31,18 @@ Domesday links); see the last section.
 The EPUBs of the seven books are in `runs/more-note-links/<folder>/`,
 all through epubcheck with no error or warning.
 
-Left open: the Kadesh work that needs the vision model (the page-order
-fallback for garbled first words, the narrower order check, the rebuild
-with the model); recording the model's answers on 18 pages takes about
-15 minutes, the rebuild about 35.
+The Kadesh work that needs the vision model was done on 24 November
+2026 on branch `plan/kadesh-links` (work package 5, last part). Kadesh
+rebuilt with the model links 105 footnote references, 95 right and 10
+wrong, against 92 links, 81 right and 11 wrong, in the build of the
+second-book plan. Of the 10 wrong links, 8 are made by the structure
+stage without the model and were in the earlier build too; the other 2,
+on page 21, were too. The plan's target, 122 links with none wrong, is
+missed. The EPUB is `runs/kadesh-links/battleofkadeshst00breauoft-final/`.
+
+Left open: the wrong links the structure stage makes on Kadesh pages
+where it splits or joins notes (pages 14, 15, 21, 27, 31, 55, 61); a
+model link placed one word off follows the model's word.
 
 ## Work package 1: the evaluation's note count
 
@@ -189,6 +197,69 @@ Waiting for LM Studio: the page-order fallback of the correct stage
 (rest of 5.1) and the narrower order check (5.2) need the model's
 answers on 18 Kadesh pages recorded once as fixtures, about 15 minutes;
 the correct stage keeps no copy of its answers.
+
+### The part that needed LM Studio (24 November 2026)
+
+Branch `plan/kadesh-links`, from main da15030. The vision model
+(qwen/qwen3.6-35b-a3b, on localhost) answered the note-link prompt on
+the 22 pages of the three Kadesh excerpts where a footnote starts; the
+answers are fixtures in `tests/fixtures/correct/kadesh_links/`
+(b81378f), recorded by `scripts/record_kadesh_link_answers.py`, so the
+tests run without LM Studio.
+
+What the correct stage does now (spec `docs/specs/correct.md` §9b):
+
+- The order check drops only the links that break the page's order,
+  not the whole page's links.
+- A note whose first words are too garbled to match is found by its
+  place in the page's order, between two kept links.
+- A number the model marks twice gives no link from its first mark on;
+  a number the next one skips past gives no link; two links after one
+  word are both refused.
+
+On the 22 recorded pages the links go from 24 to 42, all right against
+the reference transcriptions (`tests/fixtures/expected/kadesh_reference/`,
+which now also cover pages 14, 31, 32, 36, 37, 59–63 and 66, read from
+the page images).
+
+The review mattered. The first version also counted a number the model
+left out (page 61 gained 5 links), and the reviewers showed that a
+number misread one too high looks the same and gives wrong links (pages
+9, 14, 31 with one mark changed). That rule was removed; no source
+other than the model's numbering tells the two apart. A second review
+changed every mark of every recorded answer six ways (572 answers) and
+found two more ways to a wrong link, a doubled mark and a misread at
+galley's own reference; both are fixed, and the sweep is now a test of
+2.6 s that finds no wrong link for a mark read one higher or lower, left
+out or doubled. A mark the model puts one word off still gives a link
+after that word (8 of the 572); fixing it needs galley's own reading of
+the marker, outside this plan.
+
+The rebuild with the model (`runs/kadesh-links/battleofkadeshst00breauoft-final/`,
+26 minutes, the second reader qwen/qwen3.6-27b as before), every link
+checked on the page images:
+
+| build | links | right | wrong: structure stage | wrong: model |
+|---|---|---|---|---|
+| second-book plan | 92 | 81 | 9 | 2 |
+| this plan | 105 | 95 | 8 | 2 |
+
+17 links are new, all right; 4 right links of the earlier build are
+lost (notes 18, 58, 145, 147); the model now corrects two wrong
+structure links (pages 41, 63) and no longer corrects one (page 55,
+"action."). The 8 wrong structure links point to an earlier note on
+pages where galley joins notes (21: 48–50 in one record; 27: 64–66) or
+reads a marker wrong (14, 15, 31, 55, 61). The 2 wrong model links are
+on page 21: the model read 50 and 51 as 48 and 49, and the joined
+record makes the k-th record not the k-th note.
+
+The 9 of the owner's 63 corrections whose text the new reading changed
+were remade from the page images; all 63 apply, and the EPUB passes
+epubcheck with no error or warning.
+
+Checks at 00da392: uv lock, ruff format and check, ty pass; pytest 3478
+passed, 168 deselected, 6 xfailed in 70 s, and the same with 8 threads
+in 128 s.
 
 ## The trailing "V" (the owner's decision of 23 November 2026)
 
