@@ -1475,6 +1475,17 @@ RECORDED_LINKS = (
         "Record or the reliefs",
         "M seprge's reference (Struggle. ",
     ),
+    # Added on 24 November 2026 (plan wrong-links, task 3.2): page 63's
+    # false note "2 Si thuentawen…" is gone, so the model's 174 finds its
+    # note, as the page image shows.
+    (
+        63,
+        "174",
+        "174",
+        "doubtful.",
+        "but this is doubtful",
+        "MOLLER ( Asien, p. 216, n.1) wou",
+    ),
     (
         66,
         "175",

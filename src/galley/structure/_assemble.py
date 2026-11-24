@@ -63,6 +63,7 @@ from galley.structure._markers import (
     NoteMarker,
     book_marker_form,
     endnote_candidate,
+    note_marker,
 )
 from galley.structure._measures import letters
 from galley.structure._notes import (
@@ -92,6 +93,7 @@ from galley.structure._references import (
     match_endnotes,
     match_footnotes,
     sure_links,
+    with_own_numbers,
     with_values_in_order,
 )
 from galley.structure._runs import EpigraphParts, LabelLine, QuotationForm
@@ -544,6 +546,15 @@ def _with_margin_notes_placed(
     )
 
 
+def _digits_reading(marker: str) -> int | None:
+    """What a note's marker of digits reads ("6", "12."), None for any
+    other marker."""
+    reading = note_marker(marker)
+    if reading is None or not reading.marker.rstrip(".").isdigit():
+        return None
+    return reading.value
+
+
 def _links(
     body: Sequence[Unnumbered],
     notes: Sequence[UnnumberedNote],
@@ -571,6 +582,13 @@ def _links(
         for position, (note, value) in enumerate(zip(notes, values, strict=True))
         if note.kind is NoteKind.FOOTNOTE and position not in uncounted
     )
+    if numbering is Numbering.PER_PAGE:
+        # Spec section 11, "A marker's own number".
+        footnote_notes = with_own_numbers(
+            footnote_notes,
+            tuple(_digits_reading(notes[note.note].marker) for note in footnote_notes),
+            candidates,
+        )
     # Spec section 11, "Sure links": in a book numbered per page, a note
     # with no marker of its own, and a sign, are linked only where the
     # page's order expects the reference.

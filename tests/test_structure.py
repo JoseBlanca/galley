@@ -2381,13 +2381,13 @@ def test_band_of_two_columns_is_found_when_its_lines_outnumber_the_body() -> Non
     body = _region(*_five_full_lines(70, "first"), *_five_full_lines(145, "more")[:4])
     left = _region(
         *(
-            _spread(f"{n} A note on the left", 50, 170, 220 + 9 * n, height=7.0)
+            _spread(f"{n} A note on the left.", 50, 170, 220 + 9 * n, height=7.0)
             for n in range(8)
         )
     )
     right = _region(
         *(
-            _spread(f"{n} A note on the right", 180, 300, 220 + 9 * n, height=7.0)
+            _spread(f"{n} A note on the right.", 180, 300, 220 + 9 * n, height=7.0)
             for n in range(8)
         )
     )

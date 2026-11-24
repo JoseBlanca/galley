@@ -451,6 +451,7 @@ def page_notes(
                 or (
                     marker is not None
                     and marker.value is not None
+                    and (before is None or _ends_a_sentence(before))
                     and (
                         (last_value is not None and marker.value == last_value + 1)
                         or (
@@ -503,6 +504,13 @@ def page_notes(
                 for part, part_marker in parts[1:]
             )
     return tuple(notes)
+
+
+def _ends_a_sentence(line: PlacedLine) -> bool:
+    """Whether the last word of `line` ends as a word before a note does
+    (spec section 11, rule 3)."""
+    words = line.line.words
+    return bool(words) and words[-1].text.endswith(_ENDS_BEFORE_A_NOTE)
 
 
 def _under_a_row(

@@ -217,6 +217,54 @@ def _with_values_between(notes: Sequence[NoteToMatch]) -> tuple[NoteToMatch, ...
     return tuple(given)
 
 
+def with_own_numbers(
+    notes: Sequence[NoteToMatch],
+    readings: Sequence[int | None],
+    candidates: Sequence[Candidate],
+) -> tuple[NoteToMatch, ...]:
+    """The footnotes of a book numbered per page, `notes` in page order,
+    each given the number its marker reads, `readings`, None for a marker
+    of no digits, instead of the value its page's numbering gave it, when
+    a candidate of its page reads that number, no other note of the page
+    has it as its value, and it lies between the values of the notes
+    before and after it on the page (spec section 11, "A marker's own
+    number"): the numbering took a note joined to the one before for none
+    and moved the note's value down ("4 … & …", "6": the "6" took 5)."""
+    read_on_page: dict[int, set[int]] = {}
+    for candidate in candidates:
+        if candidate.reference.value is not None:
+            read_on_page.setdefault(candidate.page_index, set()).add(
+                candidate.reference.value
+            )
+    given = list(notes)
+    for place, (note, reading) in enumerate(zip(notes, readings, strict=True)):
+        if note.value is None or reading is None or reading == note.value:
+            continue
+        page = [
+            other
+            for other in notes
+            if other.page_index == note.page_index and other.note != note.note
+        ]
+        before = [
+            other.value
+            for other in page
+            if other.note < note.note and other.value is not None
+        ]
+        after = [
+            other.value
+            for other in page
+            if other.note > note.note and other.value is not None
+        ]
+        if (
+            reading in read_on_page.get(note.page_index, set())
+            and all(other.value != reading for other in page)
+            and (not before or max(before) < reading)
+            and (not after or reading < min(after))
+        ):
+            given[place] = replace(note, value=reading)
+    return tuple(given)
+
+
 def match_footnotes(
     notes: Sequence[NoteToMatch], candidates: Sequence[Candidate]
 ) -> tuple[Link, ...]:

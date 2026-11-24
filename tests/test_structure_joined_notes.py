@@ -1,14 +1,13 @@
 """Tests of the plan wrong-links, work package 3: footnotes the OCR read as
-one (docs/specs/structure.md, section 11, "Where a note starts" and
-"Two notes on one line").
+one (docs/specs/structure.md, section 11, "Where a note starts", "Two
+notes on one line" and "A marker's own number").
 
 The unit tests write a page's note lines by hand, made up in the form of
 Domesday's notes. The excerpt tests run on domesday_joined_notes; the
 expected notes and references of each page are those of its file in
 tests/fixtures/expected/wrong_links/, read from the page image. Page 8 of
 the excerpt (Domesday's page index 504), whose "6" the OCR reads "8" less
-than 10 pt after the note before, stays one note, and page 7 (445) is
-for the next task; neither is tested here.
+than 10 pt after the note before, stays one note and is not tested.
 """
 
 import json
@@ -22,8 +21,10 @@ import pytest
 from galley.book_folder import BookFolder
 from galley.model import BlocksFile, Box, Line, Note, Word, block_text, read_blocks
 from galley.structure._lines import PlacedLine
+from galley.structure._markers import Reference, ReferenceForm
 from galley.structure._measures import Edges
 from galley.structure._notes import page_notes
+from galley.structure._references import Candidate, NoteToMatch, with_own_numbers
 
 _EXPECTED = Path(__file__).parent / "fixtures" / "expected" / "wrong_links"
 
@@ -140,6 +141,79 @@ def test_sign_under_a_short_line_and_notes_on_a_row_start_their_notes() -> None:
     )
 
 
+def test_number_starting_a_line_after_no_sentence_end_starts_no_note() -> None:
+    # Domesday's page 445: "…post et modo 2...et" / "2 carucae possunt…".
+    assert _notes(
+        _line("1 Thus, D. B. ii. 39: 'Tunc 4 carucae post et modo 2...et", 10.0, _FULL),
+        _line("2 carucae possunt restaurari.' To use our symbols", 20.0),
+    ) == (
+        (
+            "1 Thus, D. B. ii. 39: 'Tunc 4 carucae post et modo 2...et "
+            "2 carucae possunt restaurari.' To use our symbols"
+        ),
+    )
+
+
+def test_number_starting_a_line_after_a_sentence_end_starts_a_note() -> None:
+    assert _notes(
+        _line("1 Thus, D. B. ii. 39: 'Tunc 4 carucae post et modo.'", 10.0, _FULL),
+        _line("2 carucae possunt restaurari.' To use our symbols", 20.0),
+    ) == (
+        "1 Thus, D. B. ii. 39: 'Tunc 4 carucae post et modo.'",
+        "2 carucae possunt restaurari.' To use our symbols",
+    )
+
+
+def _candidate(value: int, page: int = 0) -> Candidate:
+    return Candidate(
+        0, value, page, Reference("oxen", str(value), "", ReferenceForm.GLUED, value)
+    )
+
+
+def _values(notes: Sequence[NoteToMatch]) -> tuple[int | None, ...]:
+    return tuple(note.value for note in notes)
+
+
+_PAGE_NOTES = tuple(NoteToMatch(place, 0, place + 1) for place in range(5))
+# The page's numbering gave the note marked "6" the value 5.
+_READINGS = (1, 2, 3, 4, 6)
+
+
+def test_note_takes_its_own_number_when_a_reference_on_its_page_reads_it() -> None:
+    candidates = tuple(_candidate(value) for value in range(1, 7))
+    assert _values(with_own_numbers(_PAGE_NOTES, _READINGS, candidates)) == (
+        1,
+        2,
+        3,
+        4,
+        6,
+    )
+
+
+def test_note_keeps_its_page_value_when_no_reference_reads_its_own_number() -> None:
+    candidates = (*(_candidate(value) for value in range(1, 6)), _candidate(6, 1))
+    assert _values(with_own_numbers(_PAGE_NOTES, _READINGS, candidates)) == (
+        1,
+        2,
+        3,
+        4,
+        5,
+    )
+
+
+def test_note_keeps_its_page_value_when_another_note_has_its_own_number() -> None:
+    notes = (*_PAGE_NOTES, NoteToMatch(5, 0, 6))
+    candidates = tuple(_candidate(value) for value in range(1, 7))
+    assert _values(with_own_numbers(notes, (*_READINGS, 6), candidates)) == (
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+    )
+
+
 # Excerpt tests.
 
 _EXCERPT = "domesday_joined_notes"
@@ -183,7 +257,7 @@ def _page_numbers(blocks: BlocksFile, page: int) -> tuple[str, ...]:
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.parametrize("page", [0, 1, 2, 3, 4, 5, 6, 9])
+@pytest.mark.parametrize("page", [0, 1, 2, 3, 4, 5, 6, 7, 9])
 def test_each_printed_note_is_a_note_of_its_own(
     excerpt_books: frozendict[str, BookFolder], page: int
 ) -> None:
@@ -194,7 +268,7 @@ def test_each_printed_note_is_a_note_of_its_own(
 
 @pytest.mark.pandoc
 @pytest.mark.tesseract
-@pytest.mark.parametrize("page", [6, 9])
+@pytest.mark.parametrize("page", [6, 7, 9])
 def test_reference_links_the_note_of_its_number(
     excerpt_books: frozendict[str, BookFolder], page: int
 ) -> None:
