@@ -538,3 +538,41 @@ def test_the_epubs_of_a_hand_written_book_md_of_every_kind_and_of_lists_pass_epu
         two_chapters.book_epub,
         lists_book_epub.book_epub,
     )
+
+
+@pytest.mark.pandoc
+def test_footnote_of_margin_notes_only_gets_its_number_before_them(
+    tmp_path: Path,
+) -> None:
+    # The Lua filter's last case: no paragraph outside a margin note's div,
+    # so the number goes first in the note, a line of its own.
+    blocks = replace(
+        EVERY_KIND,
+        blocks=(
+            _block("b-p0000-001", BlockKind.HEADING, "ONE", level=1),
+            _block(
+                "b-p0000-002", BlockKind.PARAGRAPH, "Of Greece", ("*", "n-p0000-001")
+            ),
+        ),
+        notes=(
+            _note(
+                "n-p0000-001",
+                NoteKind.FOOTNOTE,
+                "*",
+                _block("b-p0000-003", BlockKind.MARGIN_NOTE, "Plato."),
+                referenced=True,
+            ),
+        ),
+    )
+    folder, config = _book_of(tmp_path, blocks)
+
+    markdown.run(folder, config)
+    epub.run(folder, config)
+
+    chapters = "".join(_chapter_files(folder.book_epub).values())
+    assert re.search(
+        r'<aside epub:type="footnote"[^>]*>\s*<a href="#fnref1" '
+        r'class="footnote-back" role="doc-backlink">1</a>\s*'
+        r'<div id="b-p0000-003" class="margin-note">',
+        chapters,
+    ), chapters

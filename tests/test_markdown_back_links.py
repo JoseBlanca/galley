@@ -10,7 +10,7 @@ import pytest
 
 from galley.config import BookConfig, Language
 from galley.errors import FidelityBoundary, FidelityError, InputFileError
-from galley.fidelity import check_stage, read_markdown
+from galley.fidelity import check_stage, gets_a_back_link, read_markdown
 from galley.markdown import render_markdown
 from galley.model import (
     Block,
@@ -227,3 +227,43 @@ def test_a_back_link_lost_is_found_by_its_count() -> None:
         "referenced endnotes with a marker in blocks.json: 2; back links in the "
         "Markdown: 1"
     )
+
+
+@pytest.mark.parametrize(
+    ("note", "gets_one"),
+    [
+        (_endnote("n-p0009-001", "6.", "Digest, 1.", referenced=True), True),
+        (_endnote("n-p0009-001", "6.", "Digest, 1.", referenced=False), False),
+        (_endnote("n-p0009-001", "", "Digest, 1.", referenced=True), False),
+        (_endnote("n-p0009-001", " ", "Digest, 1.", referenced=True), False),
+        (_endnote("n-p0009-001", "\xa0", "Digest, 1.", referenced=True), False),
+        (
+            replace(
+                _endnote("n-p0009-001", "6.", "Digest, 1.", referenced=True),
+                kind=NoteKind.FOOTNOTE,
+            ),
+            False,
+        ),
+    ],
+)
+def test_only_a_referenced_endnote_with_a_marker_of_some_word_gets_a_back_link(
+    note: Note, gets_one: bool
+) -> None:
+    assert gets_a_back_link(note) is gets_one
+
+
+@pytest.mark.pandoc
+@pytest.mark.parametrize("marker", [" ", "\xa0"])
+def test_an_endnote_whose_marker_is_white_space_gets_no_back_link(
+    marker: str,
+) -> None:
+    blocks = _blocks_file(
+        (_paragraph("b-p0001-001", "The Law", ("*", "n-p0009-001")),),
+        (_endnote("n-p0009-001", marker, "Digest, 1.", referenced=True),),
+    )
+
+    written = render_markdown(blocks, CONFIG)
+
+    assert "doc-backlink" not in written
+    assert "#ref-n-p0009-001" not in written
+    check_stage(FidelityBoundary.MARKDOWN, blocks, read_markdown(written))

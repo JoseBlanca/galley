@@ -36,6 +36,7 @@ from galley.model import (
     Box,
     ChangeReason,
     LinesFile,
+    Note,
     NoteKind,
     Origin,
     RemovalReason,
@@ -472,15 +473,21 @@ def _note_count_detail(blocks: BlocksFile, markdown: MarkdownWords) -> str:
     )
 
 
+def gets_a_back_link(note: Note) -> bool:
+    """Whether a note's marker is written as a link back to its first
+    reference (architecture section 9, "Back links"): an endnote with
+    `referenced` true whose marker holds a word, a character other than
+    white space. markdown writes the links by it and the check counts
+    them by it."""
+    return (
+        note.kind is NoteKind.ENDNOTE and note.referenced and bool(note.marker.split())
+    )
+
+
 def _back_link_count_detail(blocks: BlocksFile, markdown: MarkdownWords) -> str:
     """Empty when the links with the role `doc-backlink` are as many as the
-    endnotes with `referenced` true and a marker (architecture section 9,
-    "Back links"); otherwise both numbers."""
-    back_linked = sum(
-        1
-        for note in blocks.notes
-        if note.kind is NoteKind.ENDNOTE and note.referenced and note.marker.strip()
-    )
+    notes that get a back link; otherwise both numbers."""
+    back_linked = sum(1 for note in blocks.notes if gets_a_back_link(note))
     if back_linked == markdown.back_link_count:
         return ""
     return (

@@ -153,7 +153,7 @@ from typing import assert_never
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
 from galley.errors import FidelityBoundary, InputFileError
-from galley.fidelity import check_stage, read_markdown
+from galley.fidelity import check_stage, gets_a_back_link, read_markdown
 from galley.list_markers import ListMarker, follows, is_bulleted, marker_readings
 from galley.markdown._edits import FiledEdit, apply_edits, read_edits_files
 from galley.model import (
@@ -258,22 +258,11 @@ _REFERENCE_ID_PREFIX = "ref-"
 _VALID_ID = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*")
 
 
-def _gets_a_back_link(note: Note) -> bool:
-    """Whether a note's marker is written as a link back to its first
-    reference: an endnote with `referenced` true and a marker that is not
-    empty once escaped."""
-    return (
-        note.kind is NoteKind.ENDNOTE
-        and note.referenced
-        and bool(escape_markdown(note.marker))
-    )
-
-
 def _first_references(blocks: BlocksFile) -> frozendict[str, tuple[str, int]]:
     """For each note that gets a back link, the block id and span index of
     its first reference, in the order of the body's blocks, then the notes'
     blocks."""
-    back_linked = frozenset(note.id for note in blocks.notes if _gets_a_back_link(note))
+    back_linked = frozenset(note.id for note in blocks.notes if gets_a_back_link(note))
     first: dict[str, tuple[str, int]] = {}
     for block in _every_block(blocks):
         for index, span in enumerate(block.spans):
@@ -502,7 +491,7 @@ def _check_well_formed(blocks: BlocksFile) -> None:
     entry without a depth from 1, a list item without a label, a contents
     entry whose heading reference names no heading block, or references
     that do not agree with the notes (_reference_problems)."""
-    back_linked = tuple(note for note in blocks.notes if _gets_a_back_link(note))
+    back_linked = tuple(note for note in blocks.notes if gets_a_back_link(note))
     id_counts = Counter(
         (
             *(block.id for block in blocks.blocks),
