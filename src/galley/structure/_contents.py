@@ -4,12 +4,14 @@ with its label, title, page number, leader dots and depth.
 
 Positions are PDF points, origin at the top left of the page."""
 
+import itertools
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 from fractions import Fraction
 
+from galley.contents_labels import LabelStyle, label_text, number_label
 from galley.model import (
     Block,
     ChangeReason,
@@ -537,38 +539,37 @@ def contents_entries(lines: Sequence[PlacedLine]) -> tuple[ContentsEntry, ...]:
     return _with_labels_inferred(entries)
 
 
-def _number(label: str | None) -> int | None:
-    """The number of a label "N." of 1 or 2 digits; None for any other."""
-    if label is None or _NUMBER_LABEL.fullmatch(label) is None:
-        return None
-    return int(label[:-1])
-
-
-# Spec section 30, rule 12: the label after which an entry with none is
-# the run's first, "1.".
-_SECOND_NUMBER = 2
-
-
 def _with_labels_inferred(
     entries: Sequence[ContentsEntry],
 ) -> tuple[ContentsEntry, ...]:
-    """`entries`, a contents run's, with a label inferred for each entry
-    without one whose entries before and after have the labels "N−1." and
-    "N+1.", and for one just before "2." when no entry before it has a
-    number label (spec section 30, rule 12)."""
-    numbers = tuple(_number(entry.label) for entry in entries)
-    inferred: list[ContentsEntry] = []
-    for position, entry in enumerate(entries):
-        after = numbers[position + 1] if position + 1 < len(entries) else None
-        before = numbers[position - 1] if position > 0 else None
-        if entry.label is None and after is not None:
-            first = after == _SECOND_NUMBER and all(
-                number is None for number in numbers[:position]
-            )
-            if first or (before is not None and after == before + 2):
-                entry = replace(entry, label=f"{after - 1}.")
-        inferred.append(entry)
-    return tuple(inferred)
+    """`entries`, a contents run's, with labels inferred where the count
+    fits exactly (spec section 30, rule 12): the N−M−1 entries without a
+    label between number labels M and N of one style get M+1 to N−1, and
+    the N−1 entries without a label just before the run's first number
+    label N get 1 to N−1, each in that style."""
+    labelled = tuple(
+        (position, number)
+        for position, entry in enumerate(entries)
+        if (number := number_label(entry.label)) is not None
+    )
+    inferred: dict[int, str] = {}
+
+    def fill(gap: range, style: LabelStyle, first_value: int) -> None:
+        if all(entries[position].label is None for position in gap):
+            for value, position in enumerate(gap, start=first_value):
+                inferred[position] = label_text(style, value)
+
+    if labelled:
+        first, start = labelled[0]
+        if first >= start.value - 1:
+            fill(range(first - (start.value - 1), first), start.style, 1)
+    for (before, low), (after, high) in itertools.pairwise(labelled):
+        if low.style is high.style and high.value - low.value - 1 == after - before - 1:
+            fill(range(before + 1, after), low.style, low.value + 1)
+    return tuple(
+        replace(entry, label=inferred[position]) if position in inferred else entry
+        for position, entry in enumerate(entries)
+    )
 
 
 # Spec section 30, rule 9: a candidate's title holds at least 4 letters; two

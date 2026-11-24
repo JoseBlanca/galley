@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, assert_never, overload
 
+from galley.contents_labels import NumberLabel, label_text, number_label
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
 from galley.hyphens import LINE_END_HYPHENS
 from galley.list_markers import (
@@ -608,25 +609,13 @@ def _places(words: Iterable[_PlacedWord], text: str) -> str:
     return ", ".join(places) if places else "none"
 
 
-# Structure spec section 30, rule 12: an inferred label is "N." of 1 or 2
-# digits, and the first of a run is "1." before "2.". Written here, as the
-# fidelity check reads no stage's code.
-_NUMBER_LABEL = re.compile(r"[0-9]{1,2}\.")
-_SECOND_NUMBER = 2
-
-
-def _label_number(label: str | None) -> int | None:
-    if label is None or _NUMBER_LABEL.fullmatch(label) is None:
-        return None
-    return int(label[:-1])
-
-
-def _inferable_labels(blocks: BlocksFile) -> Counter[str]:
+def inferable_contents_labels(blocks: BlocksFile) -> Counter[str]:
     """The labels of the contents entries that structure may have inferred
-    (structure spec sections 30, rule 12, and 31): "N." whose neighbours
-    among the consecutive contents entry blocks are "N−1." and "N+1.", or
-    "1." before "2." with no number label among the entries before it;
-    each counted as often as such entries hold it."""
+    (structure spec sections 30, rule 12, and 31): a number label of value
+    N whose next neighbour among the consecutive contents entry blocks has
+    N+1 in its style, and whose neighbour before has N−1 in that style or,
+    for N = 1, none before it has a number label; each counted as often
+    as such entries hold it."""
     runs: list[list[Block]] = [[]]
     for block in blocks.blocks:
         if block.kind is BlockKind.CONTENTS_ENTRY:
@@ -635,19 +624,18 @@ def _inferable_labels(blocks: BlocksFile) -> Counter[str]:
             runs.append([])
     labels: Counter[str] = Counter()
     for run in runs:
-        numbers = tuple(_label_number(block.label) for block in run)
+        numbers = tuple(number_label(block.label) for block in run)
         for position, number in enumerate(numbers):
             if number is None:
                 continue
             before = numbers[position - 1] if position > 0 else None
             after = numbers[position + 1] if position + 1 < len(numbers) else None
-            first = (
-                number == 1
-                and after == _SECOND_NUMBER
+            follows = before == NumberLabel(number.style, number.value - 1) or (
+                number.value == 1
                 and all(earlier is None for earlier in numbers[:position])
             )
-            if first or (before == number - 1 and after == number + 1):
-                labels[f"{number}."] += 1
+            if follows and after == NumberLabel(number.style, number.value + 1):
+                labels[label_text(number.style, number.value)] += 1
     return labels
 
 
@@ -1185,7 +1173,7 @@ def check_stage(
                 + _words_before_changes(after),
                 _words_after_changes(after),
                 "",
-                _inferable_labels(after),
+                inferable_contents_labels(after),
             )
         case FidelityBoundary.MARKDOWN:
             if not (

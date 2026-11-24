@@ -380,6 +380,64 @@ def test_entry_without_a_label_out_of_sequence_gets_none() -> None:
     )
 
 
+def test_entries_without_a_label_before_iv_get_i_to_iii() -> None:
+    # Haskins' page 14: chapters I to III lost their numerals to pencil
+    # strokes; the run's first label is "IV.".
+    lines = _lines(
+        ("The First Title 1", 100, None),
+        ("The Second Title 26", 100, None),
+        ("The Third Title 52", 100, None),
+        ("IV. The Fourth Title 85", 92, None),
+        ("Index 251", 100, None),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == (
+        "I.",
+        "II.",
+        "III.",
+        "IV.",
+        None,
+    )
+
+
+def test_gap_of_two_between_roman_numerals_gets_roman_numerals() -> None:
+    lines = _lines(
+        ("II. A Title 1", 92, None),
+        ("Another Title 9", 100, None),
+        ("A Third Title 19", 100, None),
+        ("V. A Last Title 29", 92, None),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == (
+        "II.",
+        "III.",
+        "IV.",
+        "V.",
+    )
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        ("IV.", None, "6."),
+        ("2.", None, "5."),
+        ("1.", None, "2."),
+        ("III.", None, None, "IV."),
+    ],
+)
+def test_gap_whose_count_does_not_fit_keeps_no_label(
+    labels: tuple[str | None, ...],
+) -> None:
+    lines = _lines(
+        *(
+            (f"{label} A Title {n}" if label is not None else f"A Title {n}", 92, None)
+            for n, label in enumerate(labels, start=10)
+        ),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == labels
+
+
 # Spec section 30, rule 11: text that is not the heading's.
 
 
@@ -496,6 +554,31 @@ def test_contents_junk_is_removed_and_lost_labels_inferred() -> None:
         (0, ("(QzMoths",), ("(Qz", "Moths"), ChangeReason.CASE_SPLIT),
         (0, ("(^Winter",), ("(^", "Winter"), ChangeReason.CASE_SPLIT),
     )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_inferred_roman_labels_pass_the_fidelity_check() -> None:
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("_ Moths and Lanterns 9", 92, 100, apart=12.0),
+                _line("The Silent Harbour 23", 92, 114, apart=12.0),
+                _line("III. Winter Roads 40", 85, 128, apart=12.0),
+            ),
+        ),
+        (),
+    )
+    lines = LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(contents, _text_page(1, "WINTER ROADS")),
+    )
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    assert tuple(
+        b.label for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY
+    ) == ("I.", "II.", "III.")
     check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
 
 
@@ -728,9 +811,9 @@ def test_haskins_front_contents_title_and_nine_entries(
     # heading holds the half-title in the excerpt (spec section 32).
     assert _contents_of(excerpt_books, "haskins_front", 7) == (
         ("heading", 1, None, "CONTENTS", None, None),
-        _entry(1, None, "-^1. NORMANDY AND ITS PLACE IN HISTORY", "i"),
-        _entry(1, None, "_ II, THE COMING OF THE NORTHMEN", "26"),
-        _entry(1, None, '"HI. NORMANDY AND ENGLAND', "52"),
+        _entry(1, "I.", "-^1. NORMANDY AND ITS PLACE IN HISTORY", "i"),
+        _entry(1, "II.", "_ II, THE COMING OF THE NORTHMEN", "26"),
+        _entry(1, "III.", '"HI. NORMANDY AND ENGLAND', "52"),
         _entry(1, "IV.", "THE NORMAN EMPIRE", "85"),
         _entry(1, "V.", "NORMANDY AND FRANCE", "116"),
         _entry(1, "VI.", "NORMAN LIFE AND CULTURE", "148"),
