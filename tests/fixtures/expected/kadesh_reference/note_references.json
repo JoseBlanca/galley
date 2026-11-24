@@ -1,6 +1,6 @@
 {
   "book": "battleofkadeshst00breauoft",
-  "read": "Transcribed by the assistant on 19 November 2026 from the page images, rendered with pypdfium2 at 300 dpi, whole pages and crops enlarged about two times. The raised numbers of the references are blurred on pages 9, 11, 15 and 27; each was read with the help of the sequence, since Kadesh numbers its notes through the article, and checked against the notes' own markers at the foot of the page, which are clearer. 'after' is the word printed just before the reference, with its punctuation, and 'context' the words before it on the same page, as many as make it occur once there; 'starts' the first words of the note after its marker. Page 8's '*' follows the heading's last word. Page 11's note 19 holds the numbered paragraphs 1. to 3. Pages 13, 25, 26, 40, 47 and 53 were added the same day, read the same way; page 40's 'beaten' is printed damaged.",
+  "read": "Transcribed by the assistant on 19 November 2026 from the page images, rendered with pypdfium2 at 300 dpi, whole pages and crops enlarged about two times. The raised numbers of the references are blurred on pages 9, 11, 15 and 27; each was read with the help of the sequence, since Kadesh numbers its notes through the article, and checked against the notes' own markers at the foot of the page, which are clearer. 'after' is the word printed just before the reference, with its punctuation, and 'context' the words before it on the same page, as many as make it occur once there; 'starts' the first words of the note after its marker. Page 8's '*' follows the heading's last word. Page 11's note 19 holds the numbered paragraphs 1. to 3. Pages 13, 25, 26, 40, 47 and 53 were added the same day, read the same way; page 40's 'beaten' is printed damaged. Pages 14, 32, 37, 59, 60, 61, 62, 63 and 66 were added on 24 November 2026, read the same way from the page images at 200 dpi, to check the links of the correct stage on the vision model's recorded answers (correct spec, section 9b); on page 66 the notes are printed in two columns, 175 to 177 in the left and 178 in the right.",
   "pages": [
     {
       "page_index": 8,
@@ -189,6 +189,103 @@
         {
           "marker": "23",
           "starts": "I have examined"
+        }
+      ]
+    },
+    {
+      "page_index": 14,
+      "references": [
+        {
+          "number": "24",
+          "after": "nomes,",
+          "context": "the southern nomes,"
+        },
+        {
+          "number": "25",
+          "after": "Delta,",
+          "context": "the Delta,"
+        },
+        {
+          "number": "26",
+          "after": "men.",
+          "context": "of 3,000 men."
+        },
+        {
+          "number": "27",
+          "after": "men,",
+          "context": "only 200 men,"
+        },
+        {
+          "number": "28",
+          "after": "men,",
+          "context": "wars 400 men,"
+        },
+        {
+          "number": "29",
+          "after": "men.",
+          "context": "Coptos, 600 men."
+        },
+        {
+          "number": "30",
+          "after": "gendarmes.",
+          "context": "necropolis gendarmes."
+        },
+        {
+          "number": "31",
+          "after": "Sinai.",
+          "context": "peninsula of Sinai."
+        },
+        {
+          "number": "32",
+          "after": "5,000.”",
+          "context": "total, 5,000.”"
+        },
+        {
+          "number": "33",
+          "after": "people,”",
+          "context": "“9,376 people,”"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "24",
+          "starts": "LD., II, 149d"
+        },
+        {
+          "marker": "25",
+          "starts": "LD., II, 149d"
+        },
+        {
+          "marker": "26",
+          "starts": "LD., II, 150a"
+        },
+        {
+          "marker": "27",
+          "starts": "Gol., Ham., III,"
+        },
+        {
+          "marker": "28",
+          "starts": "Ameni inscription (l. 12)."
+        },
+        {
+          "marker": "29",
+          "starts": "Ibid., ll. 14,"
+        },
+        {
+          "marker": "30",
+          "starts": "LD., II, 138c"
+        },
+        {
+          "marker": "31",
+          "starts": "LD., II, 137c"
+        },
+        {
+          "marker": "32",
+          "starts": "Pap. Anastasi, I,"
+        },
+        {
+          "marker": "33",
+          "starts": "Great Karnak inscription,"
         }
       ]
     },
@@ -417,6 +514,74 @@
       ]
     },
     {
+      "page_index": 32,
+      "references": [
+        {
+          "number": "82",
+          "after": "Aranami",
+          "context": "town of Aranami"
+        },
+        {
+          "number": "83",
+          "after": "vizier",
+          "context": "to the vizier"
+        },
+        {
+          "number": "84",
+          "after": "several.”",
+          "context": "we passed several.”"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "82",
+          "starts": "The variant is"
+        },
+        {
+          "marker": "83",
+          "starts": "Read t't; the"
+        },
+        {
+          "marker": "84",
+          "starts": "Op. cit., p. 557."
+        }
+      ]
+    },
+    {
+      "page_index": 37,
+      "references": [
+        {
+          "number": "90",
+          "after": "iter",
+          "context": "an iter"
+        },
+        {
+          "number": "91",
+          "after": "Amon?];",
+          "context": "[division of Amon?];"
+        },
+        {
+          "number": "92",
+          "after": "attendants.",
+          "context": "personal attendants."
+        }
+      ],
+      "notes": [
+        {
+          "marker": "90",
+          "starts": "A variable measure"
+        },
+        {
+          "marker": "91",
+          "starts": "The article is"
+        },
+        {
+          "marker": "92",
+          "starts": "The phrase: “alone"
+        }
+      ]
+    },
+    {
       "page_index": 40,
       "references": [
         {
@@ -641,6 +806,309 @@
         {
           "marker": "139",
           "starts": "The Poem (ll."
+        }
+      ]
+    },
+    {
+      "page_index": 59,
+      "references": [
+        {
+          "number": "150",
+          "after": "river.",
+          "context": "west of the river."
+        },
+        {
+          "number": "151",
+          "after": "river,",
+          "context": "down into the river,"
+        },
+        {
+          "number": "152",
+          "after": "whatever.",
+          "context": "significance whatever."
+        },
+        {
+          "number": "153",
+          "after": "right",
+          "context": "On the right"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "150",
+          "starts": "The drawing of"
+        },
+        {
+          "marker": "151",
+          "starts": "Literally, “caused them"
+        },
+        {
+          "marker": "152",
+          "starts": "If anyone doubts"
+        },
+        {
+          "marker": "153",
+          "starts": "On Plate I"
+        }
+      ]
+    },
+    {
+      "page_index": 60,
+      "references": [
+        {
+          "number": "154",
+          "after": "water",
+          "context": "backs up the water"
+        },
+        {
+          "number": "155",
+          "after": "bottom",
+          "context": "at the bottom"
+        },
+        {
+          "number": "156",
+          "after": "terms:",
+          "context": "in these terms:"
+        },
+        {
+          "number": "157",
+          "after": "9,000.”",
+          "context": "him, 9,000.”"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "154",
+          "starts": "The absurdity of"
+        },
+        {
+          "marker": "155",
+          "starts": "In both scenes"
+        },
+        {
+          "marker": "156",
+          "starts": "The same incident"
+        },
+        {
+          "marker": "157",
+          "starts": "I had no"
+        }
+      ]
+    },
+    {
+      "page_index": 61,
+      "references": [
+        {
+          "number": "158",
+          "after": "claws.”",
+          "context": "teeth and claws.”"
+        },
+        {
+          "number": "159",
+          "after": "says:",
+          "context": "Diodorus says:"
+        },
+        {
+          "number": "160",
+          "after": "ἐσήμαινεν.",
+          "context": "ἐσήμαινεν."
+        },
+        {
+          "number": "161",
+          "after": "Hecatæus’s",
+          "context": "in Hecatæus’s"
+        },
+        {
+          "number": "162",
+          "after": "Silsileh",
+          "context": "throne at Silsileh"
+        },
+        {
+          "number": "163",
+          "after": "Luxor",
+          "context": "throne at Luxor"
+        },
+        {
+          "number": "164",
+          "after": "camp;",
+          "context": "of the camp;"
+        },
+        {
+          "number": "165",
+          "after": "battle.",
+          "context": "with the battle."
+        }
+      ],
+      "notes": [
+        {
+          "marker": "158",
+          "starts": "Struggle of the Nations,"
+        },
+        {
+          "marker": "159",
+          "starts": "Vol. I, p. 48;"
+        },
+        {
+          "marker": "160",
+          "starts": "Diodorus’s alternative explanation"
+        },
+        {
+          "marker": "161",
+          "starts": "Diodorus’s description is"
+        },
+        {
+          "marker": "162",
+          "starts": "Champ., Mon., 111."
+        },
+        {
+          "marker": "163",
+          "starts": "Daressy, Rec., 21,"
+        },
+        {
+          "marker": "164",
+          "starts": "At Abu Simbel"
+        },
+        {
+          "marker": "165",
+          "starts": "The words “slayer"
+        }
+      ]
+    },
+    {
+      "page_index": 62,
+      "references": [
+        {
+          "number": "166",
+          "after": "tale,",
+          "context": "for the tale,"
+        },
+        {
+          "number": "167",
+          "after": "Maspero",
+          "context": "cited by Maspero"
+        },
+        {
+          "number": "168",
+          "after": "inscriptions",
+          "context": "accompanying inscriptions"
+        },
+        {
+          "number": "169",
+          "after": "my",
+          "context": "army with my"
+        },
+        {
+          "number": "170",
+          "after": "says:",
+          "context": "He says:"
+        },
+        {
+          "number": "171",
+          "after": "VII).",
+          "context": "Karnak (Plate VII)."
+        }
+      ],
+      "notes": [
+        {
+          "marker": "166",
+          "starts": "Besides being here"
+        },
+        {
+          "marker": "167",
+          "starts": "Champ., Mon., 25;"
+        },
+        {
+          "marker": "168",
+          "starts": "Mar. Ab., Vol."
+        },
+        {
+          "marker": "169",
+          "starts": "Publication has “his.”"
+        },
+        {
+          "marker": "170",
+          "starts": "Voyage dans la"
+        },
+        {
+          "marker": "171",
+          "starts": "On the outside"
+        }
+      ]
+    },
+    {
+      "page_index": 63,
+      "references": [
+        {
+          "number": "172",
+          "after": "Luxor.”",
+          "context": "left as at Luxor.”"
+        },
+        {
+          "number": "173",
+          "after": "reliefs",
+          "context": "or the reliefs"
+        },
+        {
+          "number": "174",
+          "after": "doubtful.",
+          "context": "this is doubtful."
+        }
+      ],
+      "notes": [
+        {
+          "marker": "172",
+          "starts": "This is on"
+        },
+        {
+          "marker": "173",
+          "starts": "Maspero’s reference (Struggle,"
+        },
+        {
+          "marker": "174",
+          "starts": "Müller (Asien, p."
+        }
+      ]
+    },
+    {
+      "page_index": 66,
+      "references": [
+        {
+          "number": "175",
+          "after": "perishing,”",
+          "context": "point of perishing,”"
+        },
+        {
+          "number": "176",
+          "after": "Qodshu”",
+          "context": "surrender of Qodshu”"
+        },
+        {
+          "number": "177",
+          "after": "him.”",
+          "context": "other with him.”"
+        },
+        {
+          "number": "178",
+          "after": "island",
+          "context": "of the island"
+        }
+      ],
+      "notes": [
+        {
+          "marker": "175",
+          "starts": "Maspero, Struggle, p."
+        },
+        {
+          "marker": "176",
+          "starts": "Ibid., p. 395."
+        },
+        {
+          "marker": "177",
+          "starts": "Around a column"
+        },
+        {
+          "marker": "178",
+          "starts": "In accordance with"
         }
       ]
     }
