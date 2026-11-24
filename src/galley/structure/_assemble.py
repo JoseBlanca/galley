@@ -63,6 +63,7 @@ from galley.structure._markers import (
     NoteMarker,
     book_marker_form,
     endnote_candidate,
+    marker_form,
     note_marker,
 )
 from galley.structure._measures import letters
@@ -88,12 +89,16 @@ from galley.structure._quotes import book_density, with_quotes
 from galley.structure._references import (
     BodyWord,
     Link,
+    NoteMark,
     NoteToMatch,
     foreign_signs,
     gap_links,
+    in_page_order,
     match_endnotes,
     match_footnotes,
+    note_score,
     sure_links,
+    through_score,
     with_own_numbers,
     with_values_in_order,
 )
@@ -547,6 +552,15 @@ def _with_margin_notes_placed(
     )
 
 
+def _mark(marker: str) -> NoteMark:
+    """What a footnote's `marker` tells of its reference (spec section 11,
+    "Matching"): a sign, or no marker, or else a number, read or not ("12",
+    "(3)", or "%" for a number the OCR could not read)."""
+    if not marker or marker_form(marker) is MarkerForm.SIGN:
+        return NoteMark.SIGN
+    return NoteMark.NUMBER
+
+
 def _digits_reading(marker: str) -> int | None:
     """What a note's marker of digits reads ("6", "12."), None for any
     other marker."""
@@ -581,7 +595,7 @@ def _links(
     stand-in or a row of notes started."""
     candidates = body_candidates(body)
     footnote_notes = tuple(
-        NoteToMatch(position, first_page(note.origin), value)
+        NoteToMatch(position, first_page(note.origin), value, _mark(note.marker))
         for position, (note, value) in enumerate(zip(notes, values, strict=True))
         if note.kind is NoteKind.FOOTNOTE and position not in uncounted
     )
@@ -592,6 +606,9 @@ def _links(
             tuple(_digits_reading(notes[note.note].marker) for note in footnote_notes),
             candidates,
         )
+    else:
+        # Spec section 11, "A value out of order".
+        footnote_notes = in_page_order(footnote_notes)
     # Spec section 11, "Sure links": in a book numbered per page, a note
     # with no marker of its own, and a sign, are linked only where the
     # page's order expects the reference.
@@ -604,7 +621,13 @@ def _links(
             return sure_links(footnote_notes, links, unmarked, guessed)
         return links
 
-    footnote_links = sure(match_footnotes(footnote_notes, candidates))
+    footnote_links = sure(
+        match_footnotes(
+            footnote_notes,
+            candidates,
+            through_score if numbering is Numbering.BY_MARKER else note_score,
+        )
+    )
     # Spec section 11, "A lone number": a footnote's reference set apart as
     # a word of its own.
     taken_by_footnotes = frozenset(
