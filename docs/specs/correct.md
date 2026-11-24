@@ -589,10 +589,18 @@ pages, all five of page 31's one note too far, and page 21's two, whose
 model numbers were 10 and then 7 for the printed 50 and 51. A number
 the model marks twice on a page names no note: neither reference gives a
 link, by its note line or by the order below, since which of the two the
-note line belongs to is not known. A misread number often repeats the
-next one: on page 9, the model's 8 read as 9 would put "thoroughness."
-before note 9, and the 9 it marks after "poem" shows the repeat (review
-of 24 November 2026). Then a link is kept only when it keeps the order
+note line belongs to is not known; nor does any reference after its
+first mark, since the count of the model's references is not known from
+there on. A misread number often repeats the next one: on page 9, the
+model's 8 read as 9 would put "thoroughness." before note 9, and the 9
+it marks after "poem" shows the repeat; on page 31 a 17 marked twice
+would put the model's note lines, one note off there, back in line with
+its references, and four links would go one note too far (reviews of 24
+November 2026). A reference whose number the next number the model
+marks skips past gives no link either: in 158, 159, 160, 162 the model
+may have left out 160 and read 161 as 160, as on page 61, where it
+leaves out 160, a 161 read as 160 would put "Hecatæus’s" before note
+160. Then a link is kept only when it keeps the order
 of the page's footnotes, checked in three steps, each on the links the
 step before kept:
 
@@ -614,8 +622,16 @@ step before kept:
   footnote with nothing before it, and page 21's first to the third.
   A reference the model marks after a galley word that galley's own
   reference follows directly, in the same span's word, counts once, as
-  that note marked, when it gives no link or a link to the same note:
-  on page 9 galley links "Chabas" to note 6, and the model's "Chabas"
+  that note marked, whatever note it names: the model marks the
+  reference galley read there, perhaps with its number misread. On page
+  61 galley links "Luxor" to note 159, whose reference the page prints
+  after "says:"; had the model read 159 as 160, note 159 counted as one
+  the model left out would have put "says:" before note 160 (review of
+  24 November 2026). Until that day a reference naming another note did
+  not count galley's as marked, so that on page 9, had galley linked
+  "Lenormant," to note 4 and the model marked only "Lenormant," [5],
+  the link to note 5 was kept; it is now dropped, one note past the
+  k-th. On page 9 galley links "Chabas" to note 6, and the model's "Chabas"
   [6], whose note line matches none of galley's notes, gives no link;
   counted both as the model's third reference and as a note galley
   references, it put the model's "Record" [7], its fourth, one note too
@@ -707,15 +723,16 @@ footnote: 2 and 3 go to the first and the second.
 footnote starts (pages 8 to 15, 29 to 33, 36 to 38, 59 to 63 and 66), on
 the answers of the 35B model recorded on 24 November 2026
 (`tests/fixtures/correct/kadesh_links/`), against galley's whole-book
-structure: the links went from 24 to 43, 36 of them kept by the three
-steps and 7 found by order. All 43 are right, checked against
+structure: the links went from 24 to 42, 35 of them kept by the three
+steps and 7 found by order. All 42 are right, checked against
 `tests/fixtures/expected/kadesh_reference/note_references.json`, the
 references read from the page images, which now covers the 14 pages
 with links. The links lost are on pages 13, 31, 36
 and 38 (galley's split, the note lines one note off, galley's note left
 in the body, note lines of one word), those after a split or a join on
-pages 11, 14, 62, 63 and 66, and 161 to 165 on page 61, after the
-reference the model leaves out. Counting the skipped number as a
+pages 11, 14, 62, 63 and 66, and 159 and 161 to 165 on page 61, around
+the reference the model leaves out (159 gives no edit: galley links its
+note elsewhere). Counting the skipped number as a
 reference gave those 5 too, all right, but made wrong links when a
 number was misread.
 
