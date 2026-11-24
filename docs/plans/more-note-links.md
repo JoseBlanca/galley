@@ -5,7 +5,8 @@ link the notes galley still leaves unlinked: first the endnotes of their
 own two books, then the footnotes of the public-domain books. The
 breakdown below was approved in chat that day. Dated 23 November 2026.
 State: done on 23 November 2026, but for the parts of work package 5
-that need LM Studio (the rest of 5.1, 5.2, 5.3), left for a later plan.
+that need LM Studio (the rest of 5.1, 5.2, 5.3), under way again on 24
+November 2026 on branch `plan/kadesh-links`.
 
 Specs: `docs/specs/structure.md` (notes, endnotes, note references,
 §34–§36), `docs/specs/correct.md` §9b (note links from the vision
