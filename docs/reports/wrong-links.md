@@ -138,3 +138,28 @@ have cost 5 more right links and was not kept.
 
 Left: page 54, where the reference to 144 was read "I'*" and takes note
 141. The other six books' blocks.json are byte-identical.
+
+## Review of work package 4 and the first fixes
+
+Four reviewers on 92526e8..2dff022 (the hand merge of the two streams
+included; it drops and adds nothing, the books built from it equal each
+stream's). No word lost, no new wrong link. Fixed (976ffde, db72cb0):
+
+- The one-digit rule would have cost right links in a book whose notes
+  restart at 1 in each chapter, or after one early misread; it now runs
+  only when the book's two-digit values rise through it (the longest
+  rising run holds at least half of them: Kadesh 45 of 73).
+- "A value out of order" decided no link once the one-digit rule ran
+  first, and was removed; the spec credits pages 14 and 61 to the
+  one-digit rule.
+- The confused next-marker cut got the tests that its gap, capital and
+  digit conditions lacked (without the gap condition, three links on
+  Domesday page 390 move).
+- A link from a lone number to a note whose head-of-page sign was
+  unlinked rests on the number read; Kadesh has none. Left, with a test.
+- Defaults that hid a choice made required; an unused function and four
+  copies of a grouping removed.
+
+All seven books' blocks.json byte-identical to before these fixes.
+Default pytest: 74.2 s, against 74.8 s on main a908204 measured the
+same way; the plan does not slow the tests.
