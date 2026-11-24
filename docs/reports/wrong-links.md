@@ -15,13 +15,14 @@ changed links is wrong; 3 right links were given up, all in Kadesh.
 | book (folder) | links | wrong before | wrong after | right links lost |
 |---|---|---|---|---|
 | Domesday (`domesdaybook00maituoft`) | 1,589 → 1,614 | 10 | 3 | 0 |
-| Haskins (`normansineuropea00hask`) | 69 → 69 | 2 | 1 | 0 |
+| Haskins (`normansineuropea00hask`) | 69 → 69 | 1 | 1 | 0 |
 | Gierke (`politicaltheorie00gieruoft`) | 296 → 296 | 1 (page 42) | 0 | 0 |
 | Kadesh (`battleofkadeshst00breauoft`), without the model | 45 → 33 | 15 | 1 | 3 |
 | Stubbs, Turney, Haynes | unchanged | — | — | — |
 
-Haskins' "wrong before" counts page 56, which work package 3 made wrong
-and fixed on the way. Notes that held the next note's text: Domesday
+In Haskins one wrong link (page 56, a record holding notes 2 and 3)
+became a link to the right note's neighbour and was then unlinked; the
+other (204) is left. Notes that held the next note's text: Domesday
 36 → 9, Haskins 1 → 0. Domesday's notes with the right reference
 (galley-eval): 1,563 → 1,594.
 
