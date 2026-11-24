@@ -91,6 +91,7 @@ from galley.structure._references import (
     gap_links,
     match_endnotes,
     match_footnotes,
+    sure_links,
     with_values_in_order,
 )
 from galley.structure._runs import EpigraphParts, LabelLine, QuotationForm
@@ -552,6 +553,7 @@ def _links(
     group_headings: Sequence[str | None],
     before_section: int,
     last_contents_page: int,
+    numbering: Numbering,
 ) -> tuple[Link, ...]:
     """The references of `body`, the body's blocks but the endnote
     section's, matched to `notes`, whose values are `values` and whose
@@ -560,14 +562,28 @@ def _links(
     numbering leaves out, then the endnotes, among the candidates of the first
     `before_section` blocks after the last contents page that no footnote
     took; with several note groups, whose headings are `group_headings`,
-    each group's endnotes among the candidates of its chapter."""
+    each group's endnotes among the candidates of its chapter. In a book
+    whose notes are numbered per page, `numbering`, the footnotes keep only
+    their sure links."""
     candidates = body_candidates(body)
     footnote_notes = tuple(
         NoteToMatch(position, first_page(note.origin), value)
         for position, (note, value) in enumerate(zip(notes, values, strict=True))
         if note.kind is NoteKind.FOOTNOTE and position not in uncounted
     )
-    footnote_links = match_footnotes(footnote_notes, candidates)
+    # Spec section 11, "Sure links": in a book numbered per page, a note
+    # with no marker of its own, and a sign, are linked only where the
+    # page's order expects the reference.
+    unmarked = frozenset(
+        position for position, note in enumerate(notes) if not note.marker
+    )
+
+    def sure(links: tuple[Link, ...]) -> tuple[Link, ...]:
+        if numbering is Numbering.PER_PAGE:
+            return sure_links(footnote_notes, links, unmarked)
+        return links
+
+    footnote_links = sure(match_footnotes(footnote_notes, candidates))
     # Spec section 11, "A lone number": a footnote's reference set apart as
     # a word of its own.
     taken_by_footnotes = frozenset(
@@ -591,7 +607,10 @@ def _links(
     # Spec section 11, "A trailing V": a "V" glued to a word, only between
     # two linked neighbours.
     # A lone number is never such a word, so the words are those above.
-    footnote_links += trailing_v_links(footnote_notes, paragraph_words, footnote_links)
+    footnote_links = sure(
+        footnote_links
+        + trailing_v_links(footnote_notes, paragraph_words, footnote_links)
+    )
     footnoted = frozenset(
         (link.candidate.block, link.candidate.word) for link in footnote_links
     )
@@ -937,6 +956,7 @@ def assemble(
             group_headings,
             sum(1 for p in kept_positions if p < min(in_section, default=len(entries))),
             max(contents_pages, default=-1),
+            numbering,
         ),
     )
     places = margin_note_places(

@@ -537,3 +537,43 @@ def gap_links(
         )
         taken.update((word.block, word.word) for word in found)
     return tuple(made)
+
+
+def sure_links(
+    notes: Sequence[NoteToMatch], links: Sequence[Link], unmarked: frozenset[int]
+) -> tuple[Link, ...]:
+    """`links` to footnotes, but those that are not sure (spec section 11,
+    "Sure links"): a link to a note of `unmarked`, the positions of the
+    notes with no marker of their own, is kept only when the note is its
+    page's only note, or when the note before it on the page is linked
+    and the reference reads one more than that note's value; a link whose
+    reference is a sign is kept only when its note is its page's first or
+    the note before it on the page is linked. `notes` are the book's
+    footnotes in order; the links kept are in the order of `links`."""
+    by_note = {link.note: link for link in links}
+    notes_by_page: dict[int, list[NoteToMatch]] = {}
+    for note in notes:
+        notes_by_page.setdefault(note.page_index, []).append(note)
+    kept: set[int] = set()
+    for page_notes in notes_by_page.values():
+        for place, note in enumerate(page_notes):
+            link = by_note.get(note.note)
+            if link is None:
+                continue
+            before = page_notes[place - 1] if place > 0 else None
+            before_linked = before is not None and before.note in kept
+            reference = link.candidate.reference
+            if note.note in unmarked:
+                sure = len(page_notes) == 1 or (
+                    before_linked
+                    and before is not None
+                    and before.value is not None
+                    and reference.value == before.value + 1
+                )
+            elif reference.form is ReferenceForm.SIGN:
+                sure = before is None or before_linked
+            else:
+                sure = True
+            if sure:
+                kept.add(note.note)
+    return tuple(link for link in links if link.note in kept)
