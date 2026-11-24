@@ -30,6 +30,7 @@ from galley.structure import make_blocks, reference_candidate
 from galley.structure._assemble import _links
 from galley.structure._endnotes import group_reaches
 from galley.structure._markers import Reference, ReferenceForm, endnote_candidate
+from galley.structure._notes import Numbering
 from galley.structure._references import (
     BodyWord,
     Candidate,
@@ -1133,10 +1134,54 @@ def _body_links(
         ("Chapter One",),
         len(body),
         last_contents_page,
+        Numbering.BY_MARKER,
     )
     return tuple(
         (body[link.candidate.block].words[link.candidate.word], notes[link.note].marker)
         for link in links
+    )
+
+
+@pytest.mark.parametrize(
+    ("numbering", "linked"),
+    [
+        (Numbering.PER_PAGE, (("land1.", "1"),)),
+        (Numbering.BY_MARKER, (("land1.", "1"), ("table3.", ""))),
+    ],
+    ids=["per_page", "by_marker"],
+)
+def test_unmarked_footnote_after_an_unlinked_note_is_linked_only_by_marker(
+    numbering: Numbering, linked: tuple[tuple[str, str], ...]
+) -> None:
+    # Spec section 11, "Sure links": notes 1 and 2 and a table's row
+    # without a marker given the value 3; note 2 is unlinked, and in a book
+    # numbered per page the row loses "table3.".
+    body = (_block(BlockKind.PARAGRAPH, "the land1. and the table3. ran", page=9),)
+    notes = (
+        _note(NoteKind.FOOTNOTE, "1"),
+        _note(NoteKind.FOOTNOTE, "2"),
+        _note(NoteKind.FOOTNOTE, ""),
+    )
+    links = _links(
+        body,
+        notes,
+        (1, 2, 3),
+        frozenset(),
+        (None, None, None),
+        (),
+        len(body),
+        -1,
+        numbering,
+    )
+    assert (
+        tuple(
+            (
+                body[link.candidate.block].words[link.candidate.word],
+                notes[link.note].marker,
+            )
+            for link in links
+        )
+        == linked
     )
 
 

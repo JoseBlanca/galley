@@ -86,12 +86,14 @@ from galley.structure._paragraphs import PageParts
 from galley.structure._plates import plate_survey
 from galley.structure._references import (
     Candidate,
+    Link,
     NoteToMatch,
     align,
     match_endnotes,
     match_footnotes,
     pair_score,
     reference_form,
+    sure_links,
 )
 from galley.structure._regions import region_kinds
 from galley.structure._unnumbered import Unnumbered, without_marker
@@ -4199,6 +4201,69 @@ def test_an_opening_quote_takes_a_note_only_where_no_other_candidate_can() -> No
     assert _footnote_links(
         (None, None, None), ("Salvolini‘", "Lenormant,*", "Chabas*")
     ) == ((0, 0), (1, 1), (2, 2))
+
+
+def _sure_kept(
+    values: tuple[int | None, ...],
+    unmarked: frozenset[int],
+    linked: tuple[tuple[int, str], ...],
+) -> tuple[int, ...]:
+    """The notes whose link `sure_links` keeps, of one page's notes of
+    `values`, those at the positions `unmarked` having no marker, linked
+    as `linked` says, each (note position, the reference's word)."""
+    notes = tuple(
+        NoteToMatch(position, 10, value) for position, value in enumerate(values)
+    )
+    links = tuple(
+        Link(Candidate(0, word, 10, _glued(text)), note)
+        for word, (note, text) in enumerate(linked)
+    )
+    return tuple(link.note for link in sure_links(notes, links, unmarked))
+
+
+def test_unmarked_table_row_under_the_last_note_loses_its_link() -> None:
+    # Spec section 11, "Sure links": Domesday's page 200, a table's row in
+    # the band after notes 1 and 2, given the value 3, takes "Chichester3"
+    # while note 2 is unlinked.
+    assert _sure_kept(
+        (1, 2, 3), frozenset({2}), ((0, "land1"), (2, "Chichester3"))
+    ) == (0,)
+
+
+def test_unmarked_rows_are_judged_against_the_links_kept_before_them() -> None:
+    # Page 499: two rows take "x2" and "y3" after an unlinked note 1; the
+    # second row's note before it is linked only until that link is undone.
+    assert _sure_kept((1, 2, 3), frozenset({1, 2}), ((1, "x2"), (2, "y3"))) == ()
+
+
+@pytest.mark.parametrize(
+    ("reference", "kept"),
+    [("hall2", (0, 1)), ("hall3", (0,)), ("justice*", (0,))],
+    ids=["next_number", "another_number", "sign"],
+)
+def test_unmarked_note_after_a_linked_note_keeps_only_the_next_number(
+    reference: str, kept: tuple[int, ...]
+) -> None:
+    # Domesday's page 134, note 10 without a marker after linked note 9;
+    # page 106, the signature mark "M." taken for note 6 takes a sign.
+    assert _sure_kept((1, 2), frozenset({1}), ((0, "land1"), (1, reference))) == kept
+
+
+@pytest.mark.parametrize("reference", ["spot*", "land1"])
+def test_unmarked_note_alone_on_its_page_keeps_its_link(reference: str) -> None:
+    # Haskins' pages 124 and 249: the page's only note, without a marker,
+    # linked to a sign.
+    assert _sure_kept((1,), frozenset({0}), ((0, reference),)) == (0,)
+
+
+def test_sign_paired_with_a_note_that_is_not_next_loses_its_link() -> None:
+    # Note 2's reference was lost, and a sign later on the page took note 3.
+    assert _sure_kept((1, 2, 3), frozenset(), ((0, "land1"), (2, "spot*"))) == (0,)
+
+
+def test_sign_on_the_page_first_note_or_after_a_linked_note_keeps_its_link() -> None:
+    # Haskins' page 29: "^" for both of its notes.
+    assert _sure_kept((1, 2), frozenset(), ((0, "spot^"), (1, "land^"))) == (0, 1)
 
 
 def test_referenced_endnotes_are_matched_in_the_order_of_their_values() -> None:
