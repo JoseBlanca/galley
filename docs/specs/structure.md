@@ -5269,7 +5269,12 @@ holds:
 Pencil marks on Haynes' and Haskins' pages are read as words, glued to
 a title or a number or apart: "(Tj" and "(^" glued to a title's
 first word (made-up examples: "(TjDark", "(^Unkind"), "(' 7.",
-"-^1.", "_ II,".
+"-^1.", "_ II,". A previous reader circled three of Haynes' chapter
+numbers in pen, those of chapters 1, 6 and 7; the text layer lost the
+first two numbers and gives, in their place, 3 and 2 characters glued
+to the title's first word, and gives the third as a word of two marks
+before its number. Rules 7, 11 and 12 take these marks out and give each chapter
+its number (revised on 24 November 2026).
 
 Terms:
 
@@ -5352,8 +5357,12 @@ kinds, as on any page.
    in any case, a chapter label word together with the word after it
    ("CHAPTER II."), or "§" together with the word after it ("§ 1."), and
    at least one word follows it. The words before it with no letter or
-   digit are part of the label ("(' 7."). The rest of the entry, up to
-   its page number, is its title.
+   digit, but a "§" that is part of the label, are marks a reader or
+   the scan left, not the printer: each is removed with the reason
+   `stray_mark`, one removal for the marks of each line, and the label
+   is the number alone, "7." for Haynes' chapter 7 and "VI." for
+   Haskins' "^ VI." (until 24 November 2026 they were part of the
+   label). The rest of the entry, up to its page number, is its title.
 8. **Depth.** A **topics entry**, an analytical summary or an entry of
    at least 2 lines whose title holds at least 2 dashes, "—" or "–" (the
    test of a chapter summary, section 15, rule 4), is one deeper than
@@ -5392,11 +5401,125 @@ kinds, as on any page.
     after it start a block. No chapter summary, verse or quote is made
     of a contents page's lines, as before (section 14).
 
+11. **Text that is not the heading's.** Once an entry is linked (rule
+    9), the start and the end of its title are compared with its
+    heading's text, the heading's spans without its label. A **piece**
+    is a stretch of text at the start of the title that:
+    - is at most 5 characters long, spaces not counted;
+    - is made only of signs ("^", "*."), or holds a character other than
+      a letter once the signs at its end are taken off ("(Tj", "-^1.",
+      "_ II,", "290."), so that a word of letters with a sign after it,
+      "Dr.", "Note:", is no piece; and is not made only of quotation
+      marks (`"`, `'`, `“`,
+      `”`, `‘`, `’`, `«`, `»`);
+    - ends at a space, or inside a word whose rest starts with a
+      capital ("(QzWord", invented, gives the piece "(Qz" before
+      "Word").
+
+    Two words **agree** as much as `difflib.SequenceMatcher(None, a, b,
+    autojunk=False).ratio()` of their **cores**, each word case-folded
+    with the characters that are not a letter or a digit taken off its
+    end; a word's start is kept, since that is where the marks are.
+    Among the pieces and the empty stretch, the one taken is the one
+    after which the title's next word agrees best with the heading's
+    first word, the shortest of equally good ones. It is **junk** when
+    it is a piece, not the empty stretch, and that agreement is at
+    least 0.7. Haskins' "_ II, THE COMING OF THE NORTHMEN", linked to
+    "THE COMING OF THE NORTHMEN": the empty stretch leaves "_" against
+    "THE", at 0; the piece "_ II," leaves "THE", at 1.0, and is junk.
+    "The Builder" against a heading "BUILDER" (made up) keeps "The", which is
+    no piece.
+
+    Junk at the end of the title is found the same way, mirrored: a
+    piece there starts at a space, or inside a word when the piece
+    itself starts with a capital, and the word before it agrees best
+    with the heading's last word. A piece at the end may also be "p"
+    or "pp" with one sign after it ("pp,"), the start of a page
+    reference the OCR misread. Agreement, not equality, so that an OCR
+    misreading in the heading ("AMD" for "AND", "EVTL" for "EVIL") does
+    not make a word of the title junk.
+
+    Junk at the start sits where a label would and is a reader's mark
+    or a speck, alone or with the number it was read together with: it
+    is removed with the reason `stray_mark`. Junk at the end sits where
+    a page number would: it is removed with the reason `page_number`
+    when it holds a digit or is "p" or "pp" with a sign (a page number
+    misread, or one at an ordinary space that rule 6 left in the
+    title), and as `stray_mark` otherwise. Junk glued to a word, as
+    "(Qz" is to "Word", is half of one word of the text layer, and the
+    fidelity check compares words: the word is first split in two by a
+    word change of the reason `case_split`, ("(QzWord",) to ("(Qz",
+    "Word"), whose check asks that the second part start with a
+    capital, and the removal then holds the first part. Junk glued at
+    the start of a title word in lower case, or at the end of a word
+    when the junk starts with a mark or a digit, stays: no change
+    reason splits it.
+
+    The removals take their boxes from the words of the entry's title
+    lines (rule 10's entry, which keeps every word's box): the box of
+    each word the junk holds, the whole word's box for junk glued to
+    a word, as a `misread_hyphen` removal does (section 5). Junk at the
+    start is on the page of the title's first line, junk at the end on
+    that of its last. The block's spans lose the junk and the space
+    after or before it.
+
+    Haynes' entries of chapters 1 and 6 lose the characters glued to
+    their first word, 3 for chapter 1 and 2 for chapter 6, and its
+    closing chapter's entry its misread page number, 3 characters with 2
+    digits. In the public-domain books (measured on 24 November 2026 on
+    the blocks of the builds of the plan wrong-links, the last before
+    this revision): Haskins' first three entries lose "-^1.", "_ II,"
+    and `"HI.`, each a pencil stroke read with the chapter's roman
+    numeral, which is lost with it and which rule 12 gives back; Domesday's
+    "PREFACE" loses a speck read "*." (page 14), "Note: The Angild
+    Clause," its page number "290." (page 17), and "Beyond Domesday,"
+    the "pp," read with a comma before its page numbers (page 20). Each
+    was checked against its page image. Turney, Stubbs, Gierke and
+    Kadesh lose nothing.
+12. **A label inferred.** A **number label** is a number of 1 or 2
+    digits with ".", "7.", or a well-formed roman numeral in capitals
+    with ".", "IV." (rule 7 reads no roman label in lower case, and the
+    OCR's "l" or "1" for "I" is not taken as one); two are of the same
+    **style** when both are digits or both roman numerals. In a contents run, labels are inferred for entries without a
+    label in two places, when the count fits exactly:
+    - between two entries whose number labels are of the same style,
+      M and N, with exactly N−M−1 entries between them and none of them
+      with a label: they get M+1 to N−1;
+    - before the run's first number label N, when the N−1 entries just
+      before it have no label: they get 1 to N−1. Entries before those
+      keep none.
+
+    Each inferred label is written in the style of its neighbours,
+    digits or a roman numeral in capitals, with ".". Haynes' run
+    starts with two front-matter entries without a label, then chapter
+    1's, then "2.": only chapter 1's entry gets "1."; its chapter 6
+    gets "6." between "5." and "7." once rule 7 has made chapter 7's
+    label "7.". Haskins' run starts with chapters I to III without a
+    label, then "IV.": they get "I.", "II." and "III." (extended to
+    roman numerals on 24 November 2026; until then they had no label).
+    No other book of the seven has such an entry. This label is
+    **inferred, not read**: the printer printed it, and the text layer
+    lost it, in Haynes under a reader's pen circle, in Haskins under a
+    pencil stroke. An inferred label is not marked in `blocks.json`, so
+    that the format does not change; only `lines.json`, which lacks the
+    number, tells it from a read one, and the fidelity check admits it
+    by this rule (section 31). It is applied with the entries, in step
+    3.1, and rule 11 then takes off the junk that the lost number left.
+    In the `haskins_front` excerpt the three entries are not linked
+    (section 32), so they get their labels and keep their junk.
+
 The entries and their page numbers are made in step 3.1, where the
 body stream is walked over page breaks, and the links in step 3.4,
-with the index entries, once every heading is known.
+with the index entries, once every heading is known; rule 11 runs in
+step 3.4 after the links, on the blocks and the words of their
+entries.
 
-**The thresholds.** The 5 pt of rule 4 is the indent of section 6's
+**The thresholds.** Rule 11's 5 characters hold a label of 2 digits
+in a pen circle, "(12)", and a page number of 3 digits with a sign,
+"290."; a word's agreement of 0.7 is rule 9's ratio for a title. Both
+were chosen, not measured: in the seven books every junk that rule 11
+takes is 2 to 5 characters and its next word agrees at 1.0 (24 November
+2026). The 5 pt of rule 4 is the indent of section 6's
 rule 1 and of the index (section 17). The 2 inline page references of
 rule 3 keep out a section line such as "§ 5. Sake and Soke, pp. 80 —
 107.", which holds "5." and "80" inside its one line: a summary has at
@@ -5438,7 +5561,8 @@ and Turney 13.4 to 14.9, where the other spaces of an entry reach 10.2
 pt; Haskins', Stubbs' and Gierke's numbers end within 1.2 pt of the
 column's right side and Domesday's within 3.7. The test leaves out
 Domesday's "290." after "Note : The Angild Clause," (page 17), at an
-ordinary space in the middle of the column, which stays in its title,
+ordinary space in the middle of the column, which stays in its title
+until rule 11 removes it, its entry being linked,
 and on Gierke's pages 52 to 67 the "d" of a signature line "M. d"
 (page 54) and 42 numbers of the table of pages 61 to 67 that the layout
 moved away from their column. The
@@ -5470,24 +5594,31 @@ heading; Turney's 16 likewise.
 ### What the rules give, and where they fail
 
 Haynes' page 8 gives the title "CONTENTS" as a heading and 22 entries
-of depth 1: "Acknowledgments", label `None`, page "ix", linked; "Bacon's
-New Engineers", label "2.", page "23", linked to "BACON'S NEW
-ENGINEERS" under "CHAPTER TWO". Stubbs gives 13 entries of depth 1
+of depth 1: "Acknowledgments", label `None`, page "ix", linked; chapter
+2's entry, label "2.", with its page number, linked to its heading
+under "CHAPTER TWO"; its 16 chapter entries have the labels
+"1." to "16.", two of them inferred (rule 12). Stubbs gives 13 entries of depth 1
 (the 12 chapters with their labels, and "Index") and 12 of depth 2, the
 topics, 8 of them with their page number; Domesday 8 of depth 1, 22 of
 depth 2 and 29 of depth 3. These stay wrong:
 
-- **A misread page number** stays in the title, and the EPUB shows it:
-  Haynes' "3x3", Gierke's "Ivi", "Ixiii", "lor", Stubbs' "P&ge I" (page
-  14, the word "Page" and the "1" read "I"), "n", "Page58" and
-  ". . .110", whose number is glued to its dots; the leader dots before
-  such a number stay too.
+- **A misread page number** stays in the title, and the EPUB shows it,
+  when its entry is not linked or the number is made only of letters or
+  is more than 5 characters (rule 11): Gierke's "Ivi", "Ixiii", "lor",
+  Stubbs' "P&ge I" (page 14, the word "Page" and the "1" read "I"), "n",
+  "Page58" and ". . .110", whose number is glued to its dots; the
+  leader dots before such a number stay too. Haynes' "3x3" is removed
+  since 24 November 2026.
 - **Depths in Domesday**: "Note : The Angild Clause" (page 17) is not
   centred and so of depth 1, and the sections § 4 to § 6 of Essay II
   after it are written nested under it; "Statistical Tables" (page 19),
   centred, is of depth 2, and the topics of § 2 are nested under it.
-- **Pencil marks** stay in the title or the label: "(TjDark Chemists
-  and Master Wagner" has no label; "-^1. NORMANDY…" neither.
+- **Pencil marks** before a label or at the start of a linked entry
+  are removed (rules 7 and 11, 24 November 2026), and a number read
+  together with one is lost with it; rule 12 gives it back only when
+  the count of entries fits, as for Haskins' chapters I to III. A mark
+  glued to a title word that starts in lower case, or at the start of
+  an entry that is not linked, stays.
 - **Column headings**, Domesday's "PAGE" (page 14) and Gierke's
   "PA'.R" (page 10), are entries of their own.
 - **Gierke's pages 52 to 67**: on pages 52 to 60, a topics line indented
@@ -5592,7 +5723,18 @@ other link stays an error.
 
 **At the structure boundary**, the check counts a block's `label` as
 words of the block whatever its kind, and a `contents_entry`'s
-`page_number` too; it verifies a `list_marker` change: one word before,
+`page_number` too, but for a label that section 30's rule 12 inferred:
+a word that the blocks hold more often than the lines, and that is the
+number label of value N (rule 12) of a contents entry whose next
+neighbour among the consecutive `contents_entry` blocks (the check does
+not know the runs; in the seven books a run's entries are consecutive
+blocks) has the label N+1 of the same style, and whose neighbour before
+has N−1 of that style or, when N is 1, none of the entries before it
+has a number label, is admitted, as many times as such entries hold it
+(24 November 2026). The
+check reads only `blocks.json`, so it cannot tell an inferred label
+from a read one; what it admits is a number that the rule could have
+inferred, never another word; it verifies a `list_marker` change: one word before,
 two after, the first after a dash, "—" or "–", and the two joined equal
 to the word before; and it reads `leader_dots` removals as any removal.
 
@@ -5630,6 +5772,22 @@ to the word before; and it reads `leader_dots` removals as any removal.
   WAGNER", "EDWARD I." and "EDWARD II." in that order, give the three
   links in order; an entry with no heading alike has none; two entries
   in the order opposite to their headings' give one link;
+- junk and inferred labels (rules 7, 11 and 12), on invented titles: a
+  mark word before "7." removed and the label "7."; "§ 1." kept whole;
+  an entry without a label between "5." and "7." labelled "6.", one
+  before "2." labelled "1.", three before "IV." labelled "I." to
+  "III.", two between "II." and "V." labelled "III." and "IV."; left
+  alone: one before "2." after an entry labelled "1.", one between
+  "IV." and "6.", and one between "2." and "5."; a linked title with a bracket and two
+  letters glued before its first word, with a bracket and a mark glued
+  there, with a word of 3 characters holding digits after its last
+  word, and with a mark word apart before its first word, each losing
+  the junk with the right reason and, when glued, a `case_split`
+  change; not junk: a first word the heading lacks made only of
+  letters ("The") or of letters and a sign after them ("Dr."), a
+  quotation mark the heading lacks, a word that
+  agrees with a heading word misread ("Evil" against "EVTL"), and the
+  start of an entry that is not linked;
 - the fidelity check passes on all of these and fails on a
   `list_marker` change whose first word is not a dash, a
   `contents_entry` whose `heading_ref` names a block that is not a
@@ -5647,7 +5805,7 @@ page images:
 
 | excerpt | page indices | what it checks |
 |---|---|---|
-| `haskins_front` | 14, 16 | the title "CONTENTS" a heading; 9 entries of depth 1, labels from "IV." to "VIII." ("^ VI." with its mark), none on the first three, whose numbers are glued to marks or read "II,", page numbers "i" to "251"; none linked: the others' chapters are outside the excerpt, and the excerpt's heading on page 16 holds the half-title before chapter I's title ("THE NORMANS IN EUROPEAN HISTORY I NORMANDY AND ITS PLACE IN HISTORY", section 14), which matches the first entry at 0.66 only; the whole book links it at 1.00 |
+| `haskins_front` | 14, 16 | the title "CONTENTS" a heading; 9 entries of depth 1, labels "I." to "III." inferred (rule 12) and "IV." to "VIII." read ("VI." without its mark, removed as `stray_mark`), the first three keeping in their titles their numbers glued to marks or read "II,", page numbers "i" to "251"; none linked: the others' chapters are outside the excerpt, and the excerpt's heading on page 16 holds the half-title before chapter I's title ("THE NORMANS IN EUROPEAN HISTORY I NORMANDY AND ITS PLACE IN HISTORY", section 14), which matches the first entry at 0.66 only; the whole book links it at 1.00 |
 | `stubbs_summaries_index` | 16, 312 | chapters IX to XII as entries of depth 1 with their labels, unlinked; their topics of depth 2 with pages "189", "212", "238" and "263"; "Index" with page "291" linked to the index's heading on page 312 |
 | `domesday_headings_quotes` | 14, 22, 30 | the front matter's entries and leader dots; "ESSAY I." with "DOMESDAY BOOK." linked to page 22's heading; the essay's topics an analytical summary of depth 2; "§ 1." with "Plan of the Survey," and page "pp. 9 — 26.", depth 2, linked to page 30's heading; its topics of depth 3 |
 | `gierke_front_flow` | 10 | 8 entries; page numbers "vii", "xlvii" and "i" taken and the leader dots before them removed; "Ivi", "Ixiii" and "lor" left in their titles with their dots; none linked |
@@ -5669,6 +5827,7 @@ on the owner's books, found and skipped as section 26 says:
 | `contents_entry` blocks on the contents page, all of depth 1 | 16 | 22 |
 | of them with a `page_number`; with a `heading_ref` | 16; 16 | 21; 22 |
 | headings of level 1 on the contents page (the title) | 1 | 1 |
+| chapter entries (linked to a heading whose label starts with "chapter", in any case) without a label; linked entries whose title has a word more or fewer than its heading, or a first or last word that does not agree with the heading's (rule 11) | 0; 0 | 0; 0 |
 
 On the public-domain books: `contents_entry` blocks with a
 `heading_ref`, at least 9 in Haskins, 13 in Stubbs, 23 in Domesday,

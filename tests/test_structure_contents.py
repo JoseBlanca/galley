@@ -8,15 +8,17 @@ used.
 """
 
 from collections.abc import Callable
+from dataclasses import replace
 
 import pytest
 
 from galley.book_folder import BookFolder
-from galley.errors import FidelityBoundary
+from galley.errors import FidelityBoundary, FidelityError
 from galley.fidelity import check_stage
 from galley.model import (
     BlockKind,
     Box,
+    ChangeReason,
     Line,
     LinesFile,
     Origin,
@@ -31,10 +33,12 @@ from galley.structure import make_blocks
 from galley.structure._contents import (
     ContentsEntry,
     ContentsTitle,
+    TitleJunk,
     contents_entries,
     contents_title,
     is_link_candidate,
     run_links,
+    title_junk,
 )
 from galley.structure._lines import PlacedLine
 from galley.structure._linking import body_candidates
@@ -143,7 +147,7 @@ def test_haynes_layout_gives_one_line_entries_with_labels_and_page_numbers() -> 
     assert _summary(contents_entries(lines)) == (
         (None, "Acknowledgments", "ix", 1),
         (None, "Introduction", "1", 1),
-        (None, "(TjDark Chemists and Master Wagner", "9", 1),
+        ("1.", "(TjDark Chemists and Master Wagner", "9", 1),
         ("2.", "Carver's New Engineers", "23", 1),
         ("10.", "A Later Chapter", "150", 1),
         (None, "Consequences 3x3", None, 1),
@@ -311,19 +315,282 @@ def test_lone_label_at_the_end_of_a_run_is_an_entry_with_an_empty_title() -> Non
     assert entries[1].title == ()
 
 
-def test_label_takes_the_marks_before_it_and_needs_a_word_after_it() -> None:
-    # Haskins' page 14: "^ VI." with a pencil mark; "_ II," read with a
-    # comma is no label.
+def test_label_loses_the_marks_before_it_and_needs_a_word_after_it() -> None:
+    # Haskins' page 14: "^ VI." with a pencil mark, removed as a stray
+    # mark (spec section 30, rule 7); "_ II," read with a comma is no
+    # label; "§" is part of a label.
     lines = _lines(
         ("^ VI. SICILY 189", 60, _RIGHT_PT),
         ("_ II, ENGLAND 23", 60, _RIGHT_PT),
         ("VII. 200", 60, _RIGHT_PT),
+        ("§ 1. Plan of the Survey 209", 60, _RIGHT_PT),
     )
-    assert _summary(contents_entries(lines)) == (
-        ("^ VI.", "SICILY", "189", 1),
+    entries = contents_entries(lines)
+    assert _summary(entries) == (
+        ("VI.", "SICILY", "189", 1),
         (None, "_ II, ENGLAND", "23", 1),
         (None, "VII.", "200", 1),
+        ("§ 1.", "Plan of the Survey", "209", 1),
     )
+    assert tuple(
+        (removal.text, removal.reason, removal.box)
+        for entry in entries
+        for removal in entry.stray_marks
+    ) == (("^", RemovalReason.STRAY_MARK, lines[0].line.words[0].box),)
+
+
+# Spec section 30, rule 12: a number label inferred.
+
+
+def test_entry_without_a_label_between_two_in_sequence_gets_the_number() -> None:
+    lines = _lines(
+        ("Foreword 1", 100, None),
+        ("Moths and Lanterns 9", 100, None),
+        ("2. The Silent Harbour 23", 92, None),
+        ("Winter Roads 40", 100, None),
+        ("(' 4. Salt and Iron 52", 85, None),
+        ("Afterword 60", 100, None),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == (
+        None,
+        "1.",
+        "2.",
+        "3.",
+        "4.",
+        None,
+    )
+
+
+def test_entry_without_a_label_out_of_sequence_gets_none() -> None:
+    lines = _lines(
+        ("1. Moths and Lanterns 9", 92, None),
+        ("Interlude 15", 100, None),
+        ("2. The Silent Harbour 23", 92, None),
+        ("Winter Roads 40", 100, None),
+        ("5. Salt and Iron 52", 92, None),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == (
+        "1.",
+        None,
+        "2.",
+        None,
+        "5.",
+    )
+
+
+def test_entries_without_a_label_before_iv_get_i_to_iii() -> None:
+    # Haskins' page 14: chapters I to III lost their numerals to pencil
+    # strokes; the run's first label is "IV.".
+    lines = _lines(
+        ("The First Title 1", 100, None),
+        ("The Second Title 26", 100, None),
+        ("The Third Title 52", 100, None),
+        ("IV. The Fourth Title 85", 92, None),
+        ("Index 251", 100, None),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == (
+        "I.",
+        "II.",
+        "III.",
+        "IV.",
+        None,
+    )
+
+
+def test_gap_of_two_between_roman_numerals_gets_roman_numerals() -> None:
+    lines = _lines(
+        ("II. A Title 1", 92, None),
+        ("Another Title 9", 100, None),
+        ("A Third Title 19", 100, None),
+        ("V. A Last Title 29", 92, None),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == (
+        "II.",
+        "III.",
+        "IV.",
+        "V.",
+    )
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        ("IV.", None, "6."),
+        ("2.", None, "5."),
+        ("1.", None, "2."),
+        ("III.", None, None, "IV."),
+    ],
+)
+def test_gap_whose_count_does_not_fit_keeps_no_label(
+    labels: tuple[str | None, ...],
+) -> None:
+    lines = _lines(
+        *(
+            (f"{label} A Title {n}" if label is not None else f"A Title {n}", 92, None)
+            for n, label in enumerate(labels, start=10)
+        ),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == labels
+
+
+# Spec section 30, rule 11: text that is not the heading's.
+
+
+@pytest.mark.parametrize(
+    ("title", "heading", "junk"),
+    [
+        ("(QzMoths and Lanterns", "MOTHS AND LANTERNS", TitleJunk("(Qz", "")),
+        ("(^Winter Roads", "WINTER ROADS", TitleJunk("(^", "")),
+        ("_ II, THE COMING", "THE COMING", TitleJunk("_ II,", "")),
+        ("^ Winter Roads", "WINTER ROADS", TitleJunk("^", "")),
+        ("Afterword 3x3", "AFTERWORD", TitleJunk("", "3x3")),
+        ("PREFACE *.", "PREFACE.", TitleJunk("", "*.")),
+        ("Note: A Clause, 290.", "NOTE. A Clause.", TitleJunk("", "290.")),
+        ("Beyond the Hills, pp,", "BEYOND THE HILLS.", TitleJunk("", "pp,")),
+        ("(QzMoths and Lanterns 3x3", "MOTHS AND LANTERNS", TitleJunk("(Qz", "3x3")),
+    ],
+)
+def test_text_at_an_end_of_a_title_that_is_not_the_headings_is_junk(
+    title: str, heading: str, junk: TitleJunk
+) -> None:
+    assert title_junk(title, heading) == junk
+
+
+@pytest.mark.parametrize(
+    ("title", "heading"),
+    [
+        ("The Builder as Hero", "BUILDER AS HERO"),
+        ("Dr. Wagner Again", "WAGNER AGAIN"),
+        ('"Evil" Ways', "EVIL WAYS"),
+        ("Evil Ways", "EVTL WAYS"),
+        ("Moths and Lanterns", "MOTHS AMD LANTERNS"),
+        ("(qzmoths and lanterns", "MOTHS AND LANTERNS"),
+        ("Psalm 23", "PSALM 23"),
+        ("A Long Word Here", "LONG WORD HERE"),
+    ],
+)
+def test_words_a_heading_lacks_or_misreads_are_no_junk(
+    title: str, heading: str
+) -> None:
+    assert title_junk(title, heading) == TitleJunk("", "")
+
+
+def _junk_book() -> LinesFile:
+    """A contents page whose reader circled numbers in pen, as Haynes' page
+    8, with invented titles, and the four chapters' first pages."""
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                *(
+                    _line(text, x0, 100 + 14 * number, apart=12.0)
+                    for number, (text, x0) in enumerate(
+                        (
+                            ("(QzMoths and Lanterns 9", 92),
+                            ("2. The Silent Harbour 23", 85),
+                            ("(^Winter Roads 40", 92),
+                            ("(' 4. Salt and Iron 52", 85),
+                            ("Afterword 3x3", 100),
+                        )
+                    )
+                ),
+            ),
+        ),
+        (),
+    )
+    headings = (
+        "MOTHS AND LANTERNS",
+        "THE SILENT HARBOUR",
+        "WINTER ROADS",
+        "SALT AMD IRON",
+        "AFTERWORD",
+    )
+    return LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(
+            contents,
+            *(_text_page(n + 1, heading) for n, heading in enumerate(headings)),
+        ),
+    )
+
+
+def test_contents_junk_is_removed_and_lost_labels_inferred() -> None:
+    lines = _junk_book()
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    entries = tuple(b for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY)
+    assert tuple(
+        (entry.label, block_text(entry), entry.page_number, entry.heading_ref is None)
+        for entry in entries
+    ) == (
+        ("1.", "Moths and Lanterns", "9", False),
+        ("2.", "The Silent Harbour", "23", False),
+        ("3.", "Winter Roads", "40", False),
+        ("4.", "Salt and Iron", "52", False),
+        (None, "Afterword", None, False),
+    )
+    assert tuple(
+        (removal.page_index, removal.text, removal.reason)
+        for removal in blocks.removals
+        if removal.reason is not RemovalReason.LEADER_DOTS
+    ) == (
+        (0, "('", RemovalReason.STRAY_MARK),
+        (0, "(Qz", RemovalReason.STRAY_MARK),
+        (0, "(^", RemovalReason.STRAY_MARK),
+        (0, "3x3", RemovalReason.PAGE_NUMBER),
+    )
+    glued = lines.pages[0].regions[0].lines[1].words[0]
+    assert next(r.box for r in blocks.removals if r.text == "(Qz") == glued.box
+    assert tuple(
+        (change.page_index, change.before, change.after, change.reason)
+        for change in blocks.word_changes
+    ) == (
+        (0, ("(QzMoths",), ("(Qz", "Moths"), ChangeReason.CASE_SPLIT),
+        (0, ("(^Winter",), ("(^", "Winter"), ChangeReason.CASE_SPLIT),
+    )
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_inferred_roman_labels_pass_the_fidelity_check() -> None:
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("_ Moths and Lanterns 9", 92, 100, apart=12.0),
+                _line("The Silent Harbour 23", 92, 114, apart=12.0),
+                _line("III. Winter Roads 40", 85, 128, apart=12.0),
+            ),
+        ),
+        (),
+    )
+    lines = LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(contents, _text_page(1, "WINTER ROADS")),
+    )
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    assert tuple(
+        b.label for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY
+    ) == ("I.", "II.", "III.")
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+
+
+def test_fidelity_check_admits_only_a_label_in_sequence() -> None:
+    lines = _junk_book()
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    wrong = tuple(
+        replace(block, label="8.") if block.label == "3." else block
+        for block in blocks.blocks
+    )
+    with pytest.raises(FidelityError, match="8"):
+        check_stage(FidelityBoundary.STRUCTURE, lines, replace(blocks, blocks=wrong))
 
 
 def test_entry_keeps_every_line_for_its_origin_with_its_label_line() -> None:
@@ -544,12 +811,12 @@ def test_haskins_front_contents_title_and_nine_entries(
     # heading holds the half-title in the excerpt (spec section 32).
     assert _contents_of(excerpt_books, "haskins_front", 7) == (
         ("heading", 1, None, "CONTENTS", None, None),
-        _entry(1, None, "-^1. NORMANDY AND ITS PLACE IN HISTORY", "i"),
-        _entry(1, None, "_ II, THE COMING OF THE NORTHMEN", "26"),
-        _entry(1, None, '"HI. NORMANDY AND ENGLAND', "52"),
+        _entry(1, "I.", "-^1. NORMANDY AND ITS PLACE IN HISTORY", "i"),
+        _entry(1, "II.", "_ II, THE COMING OF THE NORTHMEN", "26"),
+        _entry(1, "III.", '"HI. NORMANDY AND ENGLAND', "52"),
         _entry(1, "IV.", "THE NORMAN EMPIRE", "85"),
         _entry(1, "V.", "NORMANDY AND FRANCE", "116"),
-        _entry(1, "^ VI.", "NORMAN LIFE AND CULTURE", "148"),
+        _entry(1, "VI.", "NORMAN LIFE AND CULTURE", "148"),
         _entry(1, "VII.", "THE NORMANS IN THE SOUTH", "192"),
         _entry(1, "VIII.", "THE NORMAN KINGDOM OF SICILY", "218"),
         _entry(1, None, "INDEX", "251"),

@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, assert_never, overload
 
+from galley.contents_labels import NumberLabel, label_text, number_label
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
 from galley.hyphens import LINE_END_HYPHENS
 from galley.list_markers import (
@@ -608,19 +609,55 @@ def _places(words: Iterable[_PlacedWord], text: str) -> str:
     return ", ".join(places) if places else "none"
 
 
+def inferable_contents_labels(blocks: BlocksFile) -> Counter[str]:
+    """The labels of the contents entries that structure may have inferred
+    (structure spec sections 30, rule 12, and 31): a number label of value
+    N whose next neighbour among the consecutive contents entry blocks has
+    N+1 in its style, and whose neighbour before has N−1 in that style or,
+    for N = 1, none before it has a number label; each counted as often
+    as such entries hold it."""
+    runs: list[list[Block]] = [[]]
+    for block in blocks.blocks:
+        if block.kind is BlockKind.CONTENTS_ENTRY:
+            runs[-1].append(block)
+        elif runs[-1]:
+            runs.append([])
+    labels: Counter[str] = Counter()
+    for run in runs:
+        numbers = tuple(number_label(block.label) for block in run)
+        for position, number in enumerate(numbers):
+            if number is None:
+                continue
+            before = numbers[position - 1] if position > 0 else None
+            after = numbers[position + 1] if position + 1 < len(numbers) else None
+            follows = before == NumberLabel(number.style, number.value - 1) or (
+                number.value == 1
+                and all(earlier is None for earlier in numbers[:position])
+            )
+            if follows and after == NumberLabel(number.style, number.value + 1):
+                labels[label_text(number.style, number.value)] += 1
+    return labels
+
+
 def _check_words(
     boundary: FidelityBoundary,
     input_words: tuple[_PlacedWord, ...],
     output_words: tuple[_PlacedWord, ...],
     taken_out: tuple[_PlacedWord, ...],
     note_detail: str,
+    admitted: Counter[str] | None = None,
 ) -> None:
     """Raise FidelityError when the input words, as a multiset, are not the
     output words less those taken out, or when `note_detail` reports a
-    difference in the note counts; return otherwise."""
+    difference in the note counts; return otherwise. A word of `admitted`
+    that the output holds more often than the input is not invented, up
+    to its count there."""
     difference = Counter(word.text for word in input_words)
     difference.subtract(word.text for word in output_words)
     difference.update(word.text for word in taken_out)
+    for text, count in (admitted or Counter()).items():
+        if difference[text] < 0:
+            difference[text] += min(count, -difference[text])
     missing = frozendict(
         sorted((text, count) for text, count in difference.items() if count > 0)
     )
@@ -1068,7 +1105,9 @@ def check_stage(
     the words of lines.json against those of blocks.json's blocks and notes,
     with each block's label, each epigraph's source, each contents entry's
     page number, and each note's marker and group, plus its removals,
-    with each word change undone. markdown: the words of blocks.json, with
+    with each word change undone, admitting a contents entry's label that
+    structure may have inferred (a number between two in sequence, or
+    "1." before "2."). markdown: the words of blocks.json, with
     the edits applied, against book.md as `read_markdown` gives it, without
     the references to footnotes and the markers of referenced footnotes,
     and without the dash markdown writes before an epigraph's source;
@@ -1134,6 +1173,7 @@ def check_stage(
                 + _words_before_changes(after),
                 _words_after_changes(after),
                 "",
+                inferable_contents_labels(after),
             )
         case FidelityBoundary.MARKDOWN:
             if not (

@@ -24,7 +24,7 @@ import pytest
 
 from galley.book_folder import BookFolder
 from galley.cli import main
-from galley.fidelity import read_markdown
+from galley.fidelity import inferable_contents_labels, read_markdown
 from galley.model import (
     BlockKind,
     BlocksFile,
@@ -306,8 +306,14 @@ def _words_of_book_md_and_their_expected_count(
             *((block.label or "").split() if block.kind is BlockKind.LIST_ITEM else ()),
         )
     )
+    # A contents label that structure inferred is in book.md and in no
+    # words.json (structure spec section 30, rule 12), as the fidelity
+    # check admits it.
+    shown = Counter(word.text for word in markdown.words)
+    for label, count in inferable_contents_labels(blocks).items():
+        words[label] += min(count, max(shown[label] - words[label], 0))
     return (
-        Counter(word.text for word in markdown.words),
+        shown,
         +words,
         markdown.note_count,
         len(references),

@@ -30,6 +30,7 @@ from galley.structure._contents import (
     contents_entries,
     is_link_candidate,
     run_links,
+    without_junk,
 )
 from galley.structure._endnotes import (
     NoteGroup,
@@ -138,7 +139,8 @@ class Assembled:
     """The book's blocks and notes in order, with their ids, the word
     changes of their hyphen joins and note markers in reading order, and
     what was removed across pages: the leader dots of the contents
-    entries (spec section 30, rule 6)."""
+    entries, the marks before their labels and the junk of their titles
+    (spec section 30, rules 6, 7 and 11)."""
 
     blocks: tuple[Block, ...]
     notes: tuple[Note, ...]
@@ -840,6 +842,49 @@ def _with_contents_links(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _JunkFree:
+    """The blocks without the junk of their contents entries, and the
+    removals and word changes that record it (spec section 30, rule 11)."""
+
+    blocks: tuple[Block, ...]
+    removals: tuple[Removal, ...]
+    changes: tuple[WordChange, ...]
+
+
+def _without_contents_junk(
+    blocks: Sequence[Block], entries: Sequence[ContentsEntry]
+) -> _JunkFree:
+    """`blocks`, the body's in order, with the junk taken off each linked
+    contents entry (spec section 30, rule 11); `entries` are the contents
+    entries of the blocks, in their order."""
+    by_id = {block.id: block for block in blocks}
+    entry_of = dict(
+        zip(
+            (
+                position
+                for position, block in enumerate(blocks)
+                if block.kind is BlockKind.CONTENTS_ENTRY
+            ),
+            entries,
+            strict=True,
+        )
+    )
+    taken = {
+        position: without_junk(block, entry_of[position], by_id[block.heading_ref])
+        for position, block in enumerate(blocks)
+        if block.kind is BlockKind.CONTENTS_ENTRY and block.heading_ref is not None
+    }
+    return _JunkFree(
+        blocks=tuple(
+            taken[position].block if position in taken else block
+            for position, block in enumerate(blocks)
+        ),
+        removals=tuple(r for junk in taken.values() for r in junk.removals),
+        changes=tuple(c for junk in taken.values() for c in junk.changes),
+    )
+
+
 def assemble(
     parts: Sequence[PageParts],
     book_words: frozenset[str],
@@ -1019,16 +1064,24 @@ def assemble(
     # every heading is known; made on the numbered blocks, whose ids they
     # name.
     blocks = _with_contents_links(blocks, contents, contents_pages)
+    # Spec section 30, rule 11: the junk of the linked entries.
+    junk_free = _without_contents_junk(blocks, contents)
     return Assembled(
-        blocks=blocks,
+        blocks=junk_free.blocks,
         notes=numbered_notes,
-        removals=tuple(removal for entry in contents for removal in entry.leader_dots),
+        removals=tuple(
+            removal
+            for entry in contents
+            for removal in entry.leader_dots + entry.stray_marks
+        )
+        + junk_free.removals,
         word_changes=tuple(
             sorted(
                 changes_in_order(linked_body)
                 + changes_in_order(
                     tuple(block for note in linked_notes for block in note.blocks)
-                ),
+                )
+                + junk_free.changes,
                 key=lambda change: change.page_index,
             )
         ),
