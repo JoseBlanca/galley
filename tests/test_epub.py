@@ -58,27 +58,11 @@ CONFIG_WITH_COVER = BookConfig(
 def test_pandoc_arguments_without_a_cover() -> None:
     folder = BookFolder(Path("/books/kadesh"))
 
-    assert pandoc_arguments(folder, CONFIG, Path("/galley/epub/style.css")) == (
-        "/books/kadesh/book.md",
-        "--from",
-        "markdown-smart-auto_identifiers",
-        "--to",
-        "epub3",
-        "--output",
-        "/books/kadesh/book.epub",
-        "--css",
-        "/galley/epub/style.css",
-        "--resource-path",
-        "/books/kadesh",
-        "--fail-if-warnings",
-    )
-
-
-def test_pandoc_arguments_with_a_cover() -> None:
-    folder = BookFolder(Path("/books/kadesh"))
-
     assert pandoc_arguments(
-        folder, CONFIG_WITH_COVER, Path("/galley/epub/style.css")
+        folder,
+        CONFIG,
+        Path("/galley/epub/style.css"),
+        Path("/galley/epub/back_links.lua"),
     ) == (
         "/books/kadesh/book.md",
         "--from",
@@ -89,6 +73,34 @@ def test_pandoc_arguments_with_a_cover() -> None:
         "/books/kadesh/book.epub",
         "--css",
         "/galley/epub/style.css",
+        "--lua-filter",
+        "/galley/epub/back_links.lua",
+        "--resource-path",
+        "/books/kadesh",
+        "--fail-if-warnings",
+    )
+
+
+def test_pandoc_arguments_with_a_cover() -> None:
+    folder = BookFolder(Path("/books/kadesh"))
+
+    assert pandoc_arguments(
+        folder,
+        CONFIG_WITH_COVER,
+        Path("/galley/epub/style.css"),
+        Path("/galley/epub/back_links.lua"),
+    ) == (
+        "/books/kadesh/book.md",
+        "--from",
+        "markdown-smart-auto_identifiers",
+        "--to",
+        "epub3",
+        "--output",
+        "/books/kadesh/book.epub",
+        "--css",
+        "/galley/epub/style.css",
+        "--lua-filter",
+        "/galley/epub/back_links.lua",
         "--resource-path",
         "/books/kadesh",
         "--fail-if-warnings",
@@ -365,8 +377,15 @@ def test_the_epub_of_every_kind_and_of_a_footnote_and_endnotes_has_each_in_its_h
     # The reference to the endnote, in chapter III, points into the file of
     # the notes, where the endnotes are one list.
     assert (
-        'the Law<a href="ch002.xhtml#n-p0001-001" epub:type="noteref">1</a>' in chapters
-    )
+        'the Law<a href="ch002.xhtml#n-p0001-001" id="ref-n-p0001-001" '
+        'epub:type="noteref">1</a>'
+    ) in chapters
+    # The endnote's number links back to it, and the unreferenced
+    # endnote's number is plain text (architecture section 9, "Back links").
+    assert (
+        '<div id="b-p0001-003">\n<p><a href="ch001.xhtml#ref-n-p0001-001" '
+        'role="doc-backlink">1.</a> Digest, 1.</p>'
+    ) in chapters
     assert '<div class="endnotes">\n<div id="n-p0001-001" class="endnote">' in (
         chapters
     )
@@ -380,12 +399,114 @@ def test_the_epub_of_every_kind_and_of_a_footnote_and_endnotes_has_each_in_its_h
     assert re.search(
         r'<div id="b-p0002-004" class="figure">\s*<p><img src="[^"]+\.png"', chapters
     )
-    # The footnote is Pandoc's, its margin note inside it.
+    # The footnote is Pandoc's, its margin note inside it, and its number
+    # at the start of its paragraph, after the margin note, links back to
+    # Pandoc's reference.
     assert re.search(
         r'<aside epub:type="footnote"[^>]*>\s*<div id="b-p0000-007" '
-        r'class="margin-note">',
+        r'class="margin-note">\s*<p>The estates.</p>\s*</div>\s*'
+        r'<div id="b-p0000-008">\s*<p><a href="#fnref1" class="footnote-back" '
+        r'role="doc-backlink">1</a> '
+        r"See the rolls.</p>",
         chapters,
     )
+
+
+# Two chapters, the first with two footnotes, the second with one and an
+# unlinked footnote, which goes under the chapter's "Notes" heading.
+TWO_CHAPTERS = replace(
+    EVERY_KIND,
+    blocks=(
+        _block("b-p0000-001", BlockKind.HEADING, "ONE", level=1),
+        _block(
+            "b-p0000-002",
+            BlockKind.PARAGRAPH,
+            "Of Greece",
+            ("*", "n-p0000-001"),
+            " and Rome",
+            ("\u2020", "n-p0000-002"),
+            ".",
+        ),
+        _block("b-p0001-001", BlockKind.HEADING, "TWO", level=1),
+        _block("b-p0001-002", BlockKind.PARAGRAPH, "Of Gaul", ("1", "n-p0001-001")),
+    ),
+    notes=(
+        _note(
+            "n-p0000-001",
+            NoteKind.FOOTNOTE,
+            "*",
+            _block("b-p0000-003", BlockKind.PARAGRAPH, "Plato."),
+            referenced=True,
+        ),
+        _note(
+            "n-p0000-002",
+            NoteKind.FOOTNOTE,
+            "\u2020",
+            _block("b-p0000-004", BlockKind.PARAGRAPH, "Livy."),
+            referenced=True,
+        ),
+        _note(
+            "n-p0001-001",
+            NoteKind.FOOTNOTE,
+            "1",
+            _block("b-p0001-003", BlockKind.PARAGRAPH, "Caesar."),
+            referenced=True,
+        ),
+        _note(
+            "n-p0001-002",
+            NoteKind.FOOTNOTE,
+            "2",
+            _block("b-p0001-004", BlockKind.PARAGRAPH, "Strabo."),
+            referenced=False,
+        ),
+    ),
+)
+
+
+def _chapter_files(epub_path: Path) -> dict[str, str]:
+    with zipfile.ZipFile(epub_path) as book:
+        return {
+            name: book.read(name).decode("utf-8")
+            for name in sorted(book.namelist())
+            if name.startswith("EPUB/text/ch")
+        }
+
+
+@pytest.mark.pandoc
+def test_each_footnote_number_links_back_to_its_reference_in_its_chapter_file(
+    tmp_path: Path,
+) -> None:
+    folder, config = _book_of(tmp_path, TWO_CHAPTERS)
+
+    markdown.run(folder, config)
+    epub.run(folder, config)
+
+    files = _chapter_files(folder.book_epub)
+    back_links = {
+        name: re.findall(
+            r'<aside epub:type="footnote" role="doc-footnote" id="fn(\d+)">\s*'
+            r'<div id="[^"]+">\s*<p><a href="#fnref(\d+)" class="footnote-back" '
+            r'role="doc-backlink">'
+            r"(\d+)</a> (\w+)\.",
+            text,
+        )
+        for name, text in files.items()
+    }
+    references = {
+        name: re.findall(r'id="fnref(\d+)"[^>]*>(\d+)</a>', text)
+        for name, text in files.items()
+    }
+    assert back_links == {
+        "EPUB/text/ch001.xhtml": [("1", "1", "1", "Plato"), ("2", "2", "2", "Livy")],
+        "EPUB/text/ch002.xhtml": [("1", "1", "1", "Caesar")],
+    }
+    assert references == {
+        "EPUB/text/ch001.xhtml": [("1", "1"), ("2", "2")],
+        "EPUB/text/ch002.xhtml": [("1", "1")],
+    }
+    # The unlinked footnote keeps its marker as text, with no back link.
+    assert "<p>2 Strabo.</p>" in files["EPUB/text/ch002.xhtml"]
+    assert files["EPUB/text/ch002.xhtml"].count("doc-backlink") == 1
 
 
 # Java starts in about a second; the 8-thread run would start it 8 times.
@@ -406,4 +527,14 @@ def test_the_epubs_of_a_hand_written_book_md_of_every_kind_and_of_lists_pass_epu
     markdown.run(every_kind, config)
     epub.run(every_kind, config)
 
-    check_epubs(hand_written.book_epub, every_kind.book_epub, lists_book_epub.book_epub)
+    (tmp_path / "two_chapters").mkdir()
+    two_chapters, config = _book_of(tmp_path / "two_chapters", TWO_CHAPTERS)
+    markdown.run(two_chapters, config)
+    epub.run(two_chapters, config)
+
+    check_epubs(
+        hand_written.book_epub,
+        every_kind.book_epub,
+        two_chapters.book_epub,
+        lists_book_epub.book_epub,
+    )

@@ -322,6 +322,7 @@ def _markdown(*words: tuple[str, str | None]) -> MarkdownWords:
         words=tuple(MarkdownWord(text, block_id) for text, block_id in words),
         note_count=0,
         note_link_count=0,
+        back_link_count=0,
         list_item_count=0,
         shown_markers=(),
         contents_links=(),
