@@ -265,8 +265,13 @@ def test_every_page_number_of_blocks_json_is_a_page_number_removed_on_its_page(
 # book.md
 
 
+# The labels structure infers in the excerpts (structure spec section 30,
+# rule 12): Haskins' chapters I to III, whose numerals pencil strokes hid.
+_INFERRED_LABELS = {"haskins_front": ("I.", "II.", "III.")}
+
+
 def _words_of_book_md_and_their_expected_count(
-    folder: BookFolder,
+    name: str, folder: BookFolder
 ) -> tuple[Counter[str], Counter[str], int, int]:
     """The words of a folder's book.md as Pandoc reads them, those of its
     words.json less structure's records and the footnotes' markers and
@@ -306,6 +311,9 @@ def _words_of_book_md_and_their_expected_count(
             *((block.label or "").split() if block.kind is BlockKind.LIST_ITEM else ()),
         )
     )
+    # A contents label that structure inferred is in book.md and in no
+    # words.json (structure spec section 30, rule 12).
+    words.update(_INFERRED_LABELS.get(name, ()))
     return (
         Counter(word.text for word in markdown.words),
         +words,
@@ -325,7 +333,11 @@ def test_book_md_holds_the_words_of_words_json_less_structures_records_and_no_no
 ) -> None:
     with ThreadPoolExecutor(max_workers=_BOOK_MDS_READ_AT_ONCE) as pool:
         counts = tuple(
-            pool.map(_words_of_book_md_and_their_expected_count, excerpt_books.values())
+            pool.map(
+                _words_of_book_md_and_their_expected_count,
+                excerpt_books.keys(),
+                excerpt_books.values(),
+            )
         )
 
     for name, (words, expected_words, note_count, references) in zip(
@@ -472,8 +484,10 @@ def _is_written_as_a_footnote(note: Note) -> bool:
 
 def _text_without_footnote_numbers(element: ElementTree.Element) -> str:
     """The text of `element` without the numbers of Pandoc's footnote
-    references, links of class "footnote-ref"."""
-    if element.get("class") == "footnote-ref":
+    references, links of class "footnote-ref", and of the back links the
+    epub stage puts at the start of its footnotes, of class
+    "footnote-back" (architecture section 9, "Back links")."""
+    if element.get("class") in {"footnote-ref", "footnote-back"}:
         return element.tail or ""
     inner = "".join(_text_without_footnote_numbers(child) for child in element)
     return (element.text or "") + inner + (element.tail or "")

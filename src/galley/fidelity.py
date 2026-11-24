@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, assert_never, overload
 
+from galley.contents_labels import contents_runs, inferred_labels
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
 from galley.hyphens import LINE_END_HYPHENS
 from galley.list_markers import (
@@ -35,6 +36,7 @@ from galley.model import (
     Box,
     ChangeReason,
     LinesFile,
+    Note,
     NoteKind,
     Origin,
     RemovalReason,
@@ -42,6 +44,7 @@ from galley.model import (
     Word,
     WordChange,
     WordsFile,
+    block_text,
     is_junk_beside_its_copy,
     may_read,
     replaced_layer_words,
@@ -86,7 +89,9 @@ class MarkdownWords:
     """The words of book.md as Pandoc reads it, in order; the number of
     notes Pandoc found (its Note elements), which references to footnotes
     become; the number of links marked `epub:type="noteref"`, which
-    references to endnotes become; the number of items of the lists of
+    references to endnotes become; the number of links with the role
+    `doc-backlink`, which the markers of referenced endnotes become
+    (architecture section 9, "Back links"); the number of items of the lists of
     list items, each a list item of blocks.json; the marker Pandoc shows
     for each of those items; and the links of the contents entries, in
     order (structure spec section 31)."""
@@ -94,6 +99,7 @@ class MarkdownWords:
     words: tuple[MarkdownWord, ...]
     note_count: int
     note_link_count: int
+    back_link_count: int
     list_item_count: int
     shown_markers: tuple[ShownMarker, ...]
     contents_links: tuple[ContentsLink, ...]
@@ -467,6 +473,29 @@ def _note_count_detail(blocks: BlocksFile, markdown: MarkdownWords) -> str:
     )
 
 
+def gets_a_back_link(note: Note) -> bool:
+    """Whether a note's marker is written as a link back to its first
+    reference (architecture section 9, "Back links"): an endnote with
+    `referenced` true whose marker holds a word, a character other than
+    white space. markdown writes the links by it and the check counts
+    them by it."""
+    return (
+        note.kind is NoteKind.ENDNOTE and note.referenced and bool(note.marker.split())
+    )
+
+
+def _back_link_count_detail(blocks: BlocksFile, markdown: MarkdownWords) -> str:
+    """Empty when the links with the role `doc-backlink` are as many as the
+    notes that get a back link; otherwise both numbers."""
+    back_linked = sum(1 for note in blocks.notes if gets_a_back_link(note))
+    if back_linked == markdown.back_link_count:
+        return ""
+    return (
+        f"referenced endnotes with a marker in blocks.json: {back_linked}; "
+        f"back links in the Markdown: {markdown.back_link_count}"
+    )
+
+
 def _list_count_detail(blocks: BlocksFile, markdown: MarkdownWords) -> str:
     """Empty when the list items of blocks.json are as many as the items of
     the lists of list items in the Markdown, and the contents entries with
@@ -608,19 +637,101 @@ def _places(words: Iterable[_PlacedWord], text: str) -> str:
     return ", ".join(places) if places else "none"
 
 
+def _inside(box: Box, origin: tuple[Origin, ...], page_index: int) -> bool:
+    """Whether the centre of `box`, on page `page_index`, lies in the box of
+    an origin on that page."""
+    x = (box.x0 + box.x1) / 2
+    y = (box.top + box.bottom) / 2
+    return any(
+        part.page_index == page_index
+        and part.box.x0 <= x <= part.box.x1
+        and part.box.top <= y <= part.box.bottom
+        for part in origin
+    )
+
+
+def _label_lack(block: Block, page_words: frozendict[int, tuple[Word, ...]]) -> int:
+    """How many more times a contents entry block holds its label than the
+    words of lines.json inside its origin do (structure spec section 31):
+    0 for a label that was read."""
+    if block.label is None:
+        return 0
+    held = sum(
+        word == block.label
+        for word in (
+            *block.label.split(),
+            *block_text(block).split(),
+            *(block.page_number or "").split(),
+        )
+    )
+    read = sum(
+        part == block.label
+        for page_index in dict.fromkeys(part.page_index for part in block.origin)
+        for word in page_words.get(page_index, ())
+        if _inside(word.box, block.origin, page_index)
+        for part in word.text.split()
+    )
+    return max(held - read, 0)
+
+
+def _inferred_label_words(
+    lines: LinesFile, blocks: BlocksFile, contents_pages: frozenset[int]
+) -> Counter[str]:
+    """The labels of contents entry blocks that rule 12 of structure spec
+    section 30 inferred, as the check admits them (section 31): in each
+    contents run of `contents_pages`, the labels that their blocks hold
+    more often than their lines are set to none, rule 12 is applied, and
+    each such label that it gives back to its own block is counted as
+    many times as the block lacks it."""
+    page_words = frozendict(
+        {
+            page.index: tuple(
+                word
+                for region in page.regions
+                for line in region.lines
+                for word in line.words
+            )
+            for page in lines.pages
+        }
+    )
+    entries = tuple(b for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY)
+    admitted: Counter[str] = Counter()
+    for run in contents_runs(contents_pages):
+        in_run = tuple(b for b in entries if b.origin and b.origin[0].page_index in run)
+        lacks = tuple(_label_lack(block, page_words) for block in in_run)
+        given = inferred_labels(
+            tuple(
+                None if lack else block.label
+                for block, lack in zip(in_run, lacks, strict=True)
+            ),
+            tuple(block.level or 0 for block in in_run),
+        )
+        for position, (block, lack) in enumerate(zip(in_run, lacks, strict=True)):
+            if lack and block.label is not None and given.get(position) == block.label:
+                admitted[block.label] += lack
+    return admitted
+
+
 def _check_words(
     boundary: FidelityBoundary,
     input_words: tuple[_PlacedWord, ...],
     output_words: tuple[_PlacedWord, ...],
     taken_out: tuple[_PlacedWord, ...],
     note_detail: str,
+    *,
+    admitted: Counter[str],
 ) -> None:
     """Raise FidelityError when the input words, as a multiset, are not the
     output words less those taken out, or when `note_detail` reports a
-    difference in the note counts; return otherwise."""
+    difference in the note counts; return otherwise. A word of `admitted`
+    that the output holds more often than the input is not invented, up
+    to its count there."""
     difference = Counter(word.text for word in input_words)
     difference.subtract(word.text for word in output_words)
     difference.update(word.text for word in taken_out)
+    for text, count in admitted.items():
+        if difference[text] < 0:
+            difference[text] += min(count, -difference[text])
     missing = frozendict(
         sorted((text, count) for text, count in difference.items() if count > 0)
     )
@@ -1049,7 +1160,11 @@ def check_stage(
 ) -> None: ...
 @overload
 def check_stage(
-    stage: Literal[FidelityBoundary.STRUCTURE], before: LinesFile, after: BlocksFile
+    stage: Literal[FidelityBoundary.STRUCTURE],
+    before: LinesFile,
+    after: BlocksFile,
+    *,
+    contents_pages: frozenset[int] = ...,
 ) -> None: ...
 @overload
 def check_stage(
@@ -1059,6 +1174,8 @@ def check_stage(
     stage: FidelityBoundary,
     before: WordsFile | LinesFile | BlocksFile,
     after: LinesFile | BlocksFile | MarkdownWords,
+    *,
+    contents_pages: frozenset[int] = frozenset(),
 ) -> None:
     """Check that no word was lost or invented at one stage boundary.
 
@@ -1068,7 +1185,11 @@ def check_stage(
     the words of lines.json against those of blocks.json's blocks and notes,
     with each block's label, each epigraph's source, each contents entry's
     page number, and each note's marker and group, plus its removals,
-    with each word change undone. markdown: the words of blocks.json, with
+    with each word change undone, admitting a contents entry's label that
+    rule 12 of the structure spec inferred: one that the words of
+    lines.json inside its block lack and that rule 12, applied to the
+    entries of its contents run of `contents_pages` (page indices from 0,
+    the config's), gives back to that block. markdown: the words of blocks.json, with
     the edits applied, against book.md as `read_markdown` gives it, without
     the references to footnotes and the markers of referenced footnotes,
     and without the dash markdown writes before an epigraph's source;
@@ -1115,6 +1236,7 @@ def check_stage(
                 _lines_file_words(after) + _reread_layer_words(after),
                 _reread_ocr_words(after),
                 "",
+                admitted=Counter(),
             )
         case FidelityBoundary.STRUCTURE:
             if not (isinstance(before, LinesFile) and isinstance(after, BlocksFile)):
@@ -1134,6 +1256,7 @@ def check_stage(
                 + _words_before_changes(after),
                 _words_after_changes(after),
                 "",
+                admitted=_inferred_label_words(before, after, contents_pages),
             )
         case FidelityBoundary.MARKDOWN:
             if not (
@@ -1157,10 +1280,12 @@ def check_stage(
                     detail
                     for detail in (
                         _note_count_detail(before, after),
+                        _back_link_count_detail(before, after),
                         _list_count_detail(before, after),
                     )
                     if detail
                 ),
+                admitted=Counter(),
             )
         case _:
             assert_never(stage)
@@ -1185,12 +1310,14 @@ _PANDOC_ARGUMENTS = (
 class _Boundary(StrEnum):
     """Where a word of Pandoc's JSON ends: at a space or line break or the
     start or end of a block element, at the start of a note, at the start
-    of a link marked as a note reference, or at the start of an item of a
-    list of list items; the last three are also counted."""
+    of a link marked as a note reference or of a back link from a note, or
+    at the start of an item of a list of list items; the last four are
+    also counted."""
 
     BREAK = "break"
     NOTE = "note"
     NOTE_LINK = "note_link"
+    BACK_LINK = "back_link"
     LIST_ITEM = "list_item"
 
 
@@ -1199,13 +1326,29 @@ class _Boundary(StrEnum):
 _NOTE_LINK_ATTRIBUTE = ("epub:type", "noteref")
 
 
+# Architecture section 9, "Back links": the marker of a referenced endnote
+# is a link back to its reference with this attribute.
+_BACK_LINK_ATTRIBUTE = ("role", "doc-backlink")
+
+
+def _has_attribute(attributes: list[object], attribute: tuple[str, str]) -> bool:
+    """Whether a link's key-value attributes, as Pandoc's JSON gives them,
+    hold `attribute`."""
+    return any(
+        isinstance(given, list) and tuple(given) == attribute for given in attributes
+    )
+
+
 def _is_note_link(attributes: list[object]) -> bool:
     """Whether a link's key-value attributes, as Pandoc's JSON gives them,
     mark it as a note reference."""
-    return any(
-        isinstance(attribute, list) and tuple(attribute) == _NOTE_LINK_ATTRIBUTE
-        for attribute in attributes
-    )
+    return _has_attribute(attributes, _NOTE_LINK_ATTRIBUTE)
+
+
+def _is_back_link(attributes: list[object]) -> bool:
+    """Whether a link's key-value attributes, as Pandoc's JSON gives them,
+    mark it as a back link from a note to its reference."""
+    return _has_attribute(attributes, _BACK_LINK_ATTRIBUTE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1248,6 +1391,17 @@ def _inline_tokens(inline: object, block_id: str | None) -> tuple[_Token, ...]:
             # own (architecture section 13).
             return (
                 _Boundary.NOTE_LINK,
+                *_inlines_tokens(inlines, block_id),
+                _Boundary.BREAK,
+            )
+        case {
+            "t": "Link",
+            "c": [[_, _, list() as attributes], list() as inlines, _],
+        } if _is_back_link(attributes):
+            # The link's text is a referenced endnote's marker, a word of
+            # its own (architecture section 13).
+            return (
+                _Boundary.BACK_LINK,
                 *_inlines_tokens(inlines, block_id),
                 _Boundary.BREAK,
             )
@@ -1717,6 +1871,7 @@ def _token_words(tokens: tuple[_Token, ...]) -> tuple[MarkdownWord, ...]:
                 _Boundary.BREAK
                 | _Boundary.NOTE
                 | _Boundary.NOTE_LINK
+                | _Boundary.BACK_LINK
                 | _Boundary.LIST_ITEM
                 | ContentsLink()
                 | ShownMarker()
@@ -1743,6 +1898,7 @@ def _words_of_pandoc_json(pandoc_json: str) -> MarkdownWords:
         words=_token_words(tokens),
         note_count=sum(1 for token in tokens if token is _Boundary.NOTE),
         note_link_count=sum(1 for token in tokens if token is _Boundary.NOTE_LINK),
+        back_link_count=sum(1 for token in tokens if token is _Boundary.BACK_LINK),
         list_item_count=sum(1 for token in tokens if token is _Boundary.LIST_ITEM),
         shown_markers=tuple(
             token for token in tokens if isinstance(token, ShownMarker)
@@ -1803,12 +1959,12 @@ def read_markdown(markdown: str) -> MarkdownWords:
     markdown-smart-auto_identifiers --to json --fail-if-warnings`), each with
     the id of the innermost div or heading with an id it is in, the number
     of notes, the number of links marked `epub:type="noteref"`, the number
-    of items of the lists of list items, and the links of the contents
-    entries.
+    of back links (links with the role `doc-backlink`), the number of items
+    of the lists of list items, and the links of the contents entries.
 
     Words are split at spaces and line breaks, and at the start and end of
-    every block, note and link marked as a note reference, whose text is
-    read as its own words; emphasis does not split a word. The words of an
+    every block, note, link marked as a note reference and back link, whose
+    text is read as its own words; emphasis does not split a word. The words of an
     epigraph's source div count to the epigraph, without the dash markdown
     writes first, and those of a note group's div to the endnote whose div
     follows it. A heading of class `chapter-notes` whose text is "Notes",
@@ -1825,8 +1981,8 @@ def read_markdown(markdown: str) -> MarkdownWords:
     ExternalProgramError, with Pandoc's standard error, when `pandoc` is
     missing, fails or warns (a note definition no reference uses), runs
     longer than 60 s, or reads an element galley's Markdown does not make,
-    such as a list of another form, a link that is no note reference
-    outside a contents entry's div, or an image that is
+    such as a list of another form, a link that is no note reference or
+    back link outside a contents entry's div, or an image that is
     not alone in its paragraph, whose alt text is not its figure's caption,
     or that has a title or attributes; or a div inside an epigraph's div
     that is not its source's, a source's div that does not start with the

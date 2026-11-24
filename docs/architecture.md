@@ -600,7 +600,9 @@ page_numbers)`:
   ("subjection", ";") becomes ("subjection;",), a spaced sign attached
   in a book not in French. `case_split`: ("theAvre",) becomes ("the",
   "Avre"), a word the OCR glued at a case change
-  (`docs/specs/structure.md` §22 to §24). `list_marker`: ("—The",)
+  (`docs/specs/structure.md` §22 to §24); also a contents entry's
+  junk glued to a word that starts with a capital, split off and
+  removed (§30, rule 11). `list_marker`: ("—The",)
   becomes ("—", "The"), a list item's dash split off its first word,
   the dash going to the item's `label` (§29 of the same spec). A spec
   adds a reason when it needs one.
@@ -618,9 +620,14 @@ one by one),
 `inkless_page` (a word of an inkless page, which the OCR read in what
 shows through the paper or in an endpaper's pattern; a reason apart
 from `excluded_page` because analyze's rule, not the owner, chose the
-page), `running_head`, `page_number`, `signature_mark`, `plate_text`,
+page), `running_head`, `page_number` (a page's own number, or a
+contents entry's page number that its title kept, misread or at an
+ordinary space, structure §30 rule 11), `signature_mark`, `plate_text`,
 `stray_mark` (a line with no letter or digit above a running head or
-above the title of a printed contents, a speck of the scan),
+above the title of a printed contents, a speck of the scan; and a
+reader's pen mark or a speck read as text before a contents entry's
+label, at the start of its title with any number read together with
+it, or at its end, structure §30 rules 7 and 11),
 `guide_words` (the first letters of the first and last entries that
 Stubbs prints under the running head of an index page, "BUR CON"),
 `leader_dots` (the dots printed between a contents entry's title and
@@ -765,7 +772,10 @@ and each reference to one a link to it marked as a note reference
 (`epub:type="noteref"`), which a Kindle can show as a pop-up (Pandoc
 3.14 keeps an `epub:type` attribute on a link and a div, and points the
 link into the right chapter file, checked on 16 November 2026; the
-pop-up itself was not tried on a Kindle); a `verse` block with a hard
+pop-up itself was not tried on a Kindle); the number at the start of
+each note written as a link back to the place in the text that refers
+to it, so that the reader can go back (owner, 24 November 2026; the
+form is in "Back links" below); a `verse` block with a hard
 line break at each line feed; an `epigraph` as a div holding its
 quotation, with hard line breaks when it is verse, and a div of class
 `epigraph-source` holding a dash and its source, the dash written as text;
@@ -789,7 +799,75 @@ it back as written: "1. Of the three" at the start of a paragraph must
 not become a numbered list. `book.md` is read by Pandoc with smart quotes
 off (`-f markdown-smart`), so `"` stays `"`.
 
-**epub** runs Pandoc on `book.md` with the cover and a style sheet.
+**Back links.** Each note that a place in the text refers to starts
+with its number written as a link back to that place; a note referred
+to from several places links back to the first, in the order of
+blocks.json (the body's blocks, then the notes' blocks). No glyph or
+word is added for it: the number is the one the note already shows,
+its printed marker for an endnote and Pandoc's number for a footnote
+(section 17). A note no place refers to, a footnote or an endnote with
+`referenced` false, gets none. The link carries the attribute
+`role="doc-backlink"`, the ARIA role (a standard attribute that tells
+a reading system or a screen reader what an element is) of a link from
+a note back to its reference, which Pandoc's own HTML footnotes use and
+epubcheck accepts. The two kinds of note get it in two places:
+
+- An endnote, in `book.md`. The first reference to it is the link
+  above with an id, `ref-` and the note's id, which no block, note or
+  "Notes" heading id can equal, since those start with `b-`, `n-` and
+  `notes-`:
+  `[6](#n-p0190-001){#ref-n-p0190-001 epub:type="noteref"}`. Its
+  printed marker, the first word of its first block that is not a margin
+  note, is a link to that id with the role `doc-backlink`:
+  `[6](#ref-n-p0190-001){role="doc-backlink"}`. Pandoc points both links
+  into the right chapter file, as it does the reference. An endnote
+  whose marker holds no character other than white space has no
+  number to link and gets none; one predicate, `gets_a_back_link` of
+  `fidelity.py`, says which endnotes get one, for markdown and the
+  fidelity check. markdown
+  refuses a blocks.json in which a `ref-` id would equal another id, or
+  the id of a note it is made from is not one Pandoc and XML read as
+  written: a letter, then letters, digits, `-`, `_` and `.`.
+- A footnote with `referenced` true, in the EPUB only. `book.md` keeps
+  it as a Pandoc footnote, without its marker, and Pandoc's EPUB 3
+  writer makes it an `<aside epub:type="footnote">` at the end of its
+  chapter file, holding the note's text and no number. The epub stage
+  runs Pandoc with a Lua filter (a script in Lua, run by Pandoc itself
+  on the document it has read, before it writes the EPUB; `pandoc
+  --lua-filter`) kept in the package, `src/galley/epub/back_links.lua`,
+  that
+  puts at the start of each such note the number Pandoc shows at its
+  reference, as a link to the reference of class `footnote-back`, the
+  class Pandoc gives its own back links in HTML, which tells Pandoc's
+  number from an endnote's printed marker, and with the role
+  `doc-backlink`: `<aside epub:type="footnote" id="fn3"><p><a
+  href="#fnref3" class="footnote-back" role="doc-backlink">3</a> Called
+  by…`. The link
+  goes first into the note's first paragraph that is not in a margin
+  note's div. Pandoc 3.14 numbers the footnotes of each chapter file
+  from 1 and gives the reference to note *n* of a file the id `fnref`
+  *n* (checked on 24 November 2026), so the filter counts the notes in
+  the order of the text and starts again at each heading of level 1,
+  where Pandoc starts a file. That id is Pandoc's choice, not one
+  galley makes: a test of the epub stage checks that each back link
+  points to the reference of its own note, and epubcheck reports a link
+  to an id no file has, so a Pandoc that numbered otherwise would fail
+  both.
+
+  Two other forms were weighed. markdown could write these footnotes as
+  galley's own linked notes, as it writes endnotes; then the note would
+  be a div, since Pandoc writes an `<aside>` only for its own
+  footnotes, and a Kindle shows a pop-up for a note reference whose
+  target is an `<aside epub:type="footnote">` (Amazon's Kindle
+  Publishing Guidelines; not tried on a Kindle here), so the pop-up
+  could be lost, and the fidelity check and galley's numbering of the
+  notes would have to be rebuilt. Rewriting the EPUB's XHTML after
+  Pandoc would unpack and repack the EPUB for what a filter does inside
+  Pandoc. The filter keeps Pandoc's footnotes as they are, and the
+  pop-up with them.
+
+**epub** runs Pandoc on `book.md` with the cover, a style sheet and the
+Lua filter of the back links.
 epubcheck validates the result in the tests, not in a run (section 16). The cover is
 `images/cover.png` when the config has a `cover_page`.
 
@@ -869,6 +947,7 @@ A stage imports these and nothing else of galley.
 | `list_markers.py` | the readings of a list marker (`docs/specs/structure.md` §29, "Terms"): `marker_readings(word)`, its kind, form and value, a roman numeral before a letter; `starts_a_list`, `follows` and `is_bulleted`; and `DASHES`, which structure's list rules, markdown's lists and the fidelity check share, so that the three read a marker alike |
 | `caption_labels.py` | the caption labels of `docs/specs/figures.md` §1: `LABEL_NAMES` ("figure", "fig.", "fig", "plate", "map"), `is_numeral(text)`, a numeral as the OCR reads one, and `is_well_formed_numeral(text)`, one as printed (1 to 3 digits or a well-formed roman numeral in capitals). Moved from `structure/_figures.py` on 19 November 2026, so that structure's caption labels and extract's caption numbers under `redo` (`docs/specs/extract.md` §9) read a numeral alike |
 | `note_references.py` | `glued_reference(word) -> Reference \| None`: the glued number of `docs/specs/structure.md` §11, "Candidates", both its forms, a letter, any punctuation or none, 1 to 3 digits and only punctuation, not after a citation's abbreviation ("land3.", "Kadesh,12"; not "p.12"), and punctuation, 1 to 3 digits and only punctuation (";13"), with its parts; `Reference` and `ReferenceForm`, the values it gives; and the helpers structure's other reference forms share with it, `PUNCTUATION`, `is_punctuation` and `after_last_letter`. Moved whole from `structure/_markers.py` on 19 November 2026 (its private `_glued` and the two values), and structure's `reference_candidate` calls it, so that extract puts back under `redo` exactly the references structure looks for (`docs/specs/extract.md` §9) |
+| `contents_labels.py` | the number labels and the runs of a printed contents (`docs/specs/structure.md` §30, rule 12, and §31): `number_label(label)`, the style (digits or a roman numeral in capitals) and value of a label "7." or "IV.", None for any other; `label_text(style, value)`, the label of a value in a style; `contents_runs(pages)`, the contents runs of the contents pages; and `inferred_labels(labels, levels)`, rule 12's labels for a run's entries. structure infers labels with them and the fidelity check admits an inferred label with them, so that the two read the rule alike |
 | `hyphens.py` | `LINE_END_HYPHENS`, "-" and "¬", the hyphens that end a printed line in the OCR's text, which layout's reading score, structure's hyphen joins and the fidelity check share (`docs/specs/structure.md` §5) |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
 | `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc; Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`, and analyze and extract when it is `redo`) and stops naming any that is missing; and, when the command runs correct, LM Studio's server and its models (`correct.check_server`) |
@@ -880,7 +959,9 @@ the module. galley needs the lock off to run pages in parallel.
 ## 13. The fidelity check
 
 galley's first goal is that no word of the book is lost or invented. The
-fidelity check, `fidelity.check_stage(stage, before, after)`, makes that
+fidelity check, `fidelity.check_stage(stage, before, after)` (at the
+structure boundary also with the config's `contents_pages`, by which it
+admits a contents label structure inferred), makes that
 testable at each stage boundary. It works on the whole book: the words of
 a stage's input must equal, as a multiset, the words of its output plus
 the removals that stage made, once the stage's word changes are applied
@@ -969,7 +1050,8 @@ lists the words, with the pages they came from where the origins say.
   lines.json against blocks.json (the text of every body and note block,
   with a note's `marker` and `group`, a block's `label`, an epigraph's
   `source` and a contents entry's `page_number` counted as words of
-  it); markdown, blocks.json
+  it; a contents entry's label that structure §30 rule 12 inferred, a
+  number between two in sequence, is admitted, §31 of that spec); markdown, blocks.json
   with the edits applied against `book.md` as Pandoc reads it (`pandoc -f
   markdown-smart -t json`): a reference to a footnote is matched to
   Pandoc's note element and its marker is not compared as a word, because
@@ -981,10 +1063,15 @@ lists the words, with the pages they came from where the origins say.
   is found; an element galley's Markdown does not make is an error inside
   a link as anywhere else. The number of such links must equal the number
   of references to endnotes, as the number of Pandoc's notes must equal
-  the number of references to footnotes. A link from a contents entry
-  to its heading is the one other link (below). Any other link is an element
-  galley's Markdown does not make, and an error. An endnote stays where it was printed, so its
-  `marker` is written there and counted, referenced or not (section 9).
+  the number of references to footnotes. An endnote stays where it was
+  printed, so its `marker` is written there and counted, referenced or
+  not (section 9). The marker of a referenced endnote is a back link
+  (section 9, "Back links"), a `Link` element with the attribute
+  `role="doc-backlink"`, whose text is read as a word of its own, as a
+  note reference's is; the number of back links must equal the number
+  of endnotes with a reference and a marker. A link from a contents
+  entry to its heading is the one other link (below). Any other link is
+  an element galley's Markdown does not make, and an error.
   A heading's `label` is written in `book.md`, in the form the markdown
   spec gives, and counted as words of its block; so are an epigraph's
   `source`, in its `epigraph-source` div after the dash markdown writes
@@ -1214,6 +1301,15 @@ On 19 November 2026, after reading Kadesh, the owner decided:
   chapter**, under a heading "Notes", in the order printed, with its
   marker; endnotes and linked footnotes stay as they were
   (`docs/specs/structure.md` §36).
+
+On 24 November 2026 the owner asked for back links from the notes to
+the text:
+
+- **A note's number links back to its reference**, the first when
+  there are several; no glyph or word is added, and a note without a
+  reference gets none (section 9, "Back links"). That a referenced
+  footnote gets it in the EPUB by a Lua filter, keeping Pandoc's
+  footnotes and their pop-up, was decided while writing.
 
 ## 18. Not in this document
 

@@ -128,11 +128,13 @@ def _markdown(
     words: tuple[tuple[str, str | None], ...],
     note_count: int,
     note_link_count: int = 0,
+    back_link_count: int = 0,
 ) -> MarkdownWords:
     return MarkdownWords(
         words=tuple(MarkdownWord(text, block_id) for text, block_id in words),
         note_count=note_count,
         note_link_count=note_link_count,
+        back_link_count=back_link_count,
         list_item_count=0,
         shown_markers=(),
         contents_links=(),
@@ -1404,7 +1406,10 @@ def test_markdown_unreferenced_endnote_marker_is_a_word() -> None:
 def test_markdown_referenced_endnote_marker_and_link_text_are_words() -> None:
     blocks = _endnote_blocks(referenced=True)
     markdown = _markdown(
-        _ENDNOTE_MARKDOWN + _ENDNOTE_LINK_WORD, note_count=0, note_link_count=1
+        _ENDNOTE_MARKDOWN + _ENDNOTE_LINK_WORD,
+        note_count=0,
+        note_link_count=1,
+        back_link_count=1,
     )
 
     check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
@@ -1412,7 +1417,9 @@ def test_markdown_referenced_endnote_marker_and_link_text_are_words() -> None:
 
 def test_markdown_endnote_link_without_the_reference_text_fails() -> None:
     blocks = _endnote_blocks(referenced=True)
-    markdown = _markdown(_ENDNOTE_MARKDOWN, note_count=0, note_link_count=1)
+    markdown = _markdown(
+        _ENDNOTE_MARKDOWN, note_count=0, note_link_count=1, back_link_count=1
+    )
 
     with pytest.raises(FidelityError) as raised:
         check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
@@ -1427,6 +1434,7 @@ def test_markdown_endnote_link_with_a_word_put_into_it_fails() -> None:
         (*_ENDNOTE_MARKDOWN, *_ENDNOTE_LINK_WORD, ("and", "b-p0000-001")),
         note_count=0,
         note_link_count=1,
+        back_link_count=1,
     )
 
     with pytest.raises(FidelityError) as raised:
@@ -1439,7 +1447,10 @@ def test_markdown_endnote_link_with_a_word_put_into_it_fails() -> None:
 def test_markdown_endnote_counts_differing_with_footnote_counts_agreeing_fail() -> None:
     blocks = _endnote_blocks(referenced=True)
     markdown = _markdown(
-        _ENDNOTE_MARKDOWN + _ENDNOTE_LINK_WORD, note_count=0, note_link_count=0
+        _ENDNOTE_MARKDOWN + _ENDNOTE_LINK_WORD,
+        note_count=0,
+        note_link_count=0,
+        back_link_count=1,
     )
 
     with pytest.raises(FidelityError) as raised:
@@ -1481,6 +1492,7 @@ def test_markdown_endnote_reference_span_that_structure_would_refuse_fails(
         (*_ENDNOTE_MARKDOWN, (reference, "b-p0000-001")),
         note_count=0 if note_id == "n-p0001-001" else 1,
         note_link_count=1 if note_id == "n-p0001-001" else 0,
+        back_link_count=1,
     )
 
     with pytest.raises(FidelityError) as raised:
@@ -1497,6 +1509,7 @@ def test_markdown_referenced_endnote_without_its_marker_fails() -> None:
         + _ENDNOTE_LINK_WORD,
         note_count=0,
         note_link_count=1,
+        back_link_count=1,
     )
 
     with pytest.raises(FidelityError) as raised:
@@ -1512,7 +1525,10 @@ def test_markdown_endnote_reference_made_a_pandoc_note_fails() -> None:
     # note would show the endnote's text twice.
     blocks = _endnote_blocks(referenced=True)
     markdown = _markdown(
-        _ENDNOTE_MARKDOWN + _ENDNOTE_LINK_WORD, note_count=1, note_link_count=0
+        _ENDNOTE_MARKDOWN + _ENDNOTE_LINK_WORD,
+        note_count=1,
+        note_link_count=0,
+        back_link_count=1,
     )
 
     with pytest.raises(FidelityError) as raised:

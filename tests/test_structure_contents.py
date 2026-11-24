@@ -8,21 +8,28 @@ used.
 """
 
 from collections.abc import Callable
+from dataclasses import replace
 
 import pytest
 
 from galley.book_folder import BookFolder
-from galley.errors import FidelityBoundary
+from galley.errors import FidelityBoundary, FidelityError
 from galley.fidelity import check_stage
 from galley.model import (
+    Block,
     BlockKind,
+    BlocksFile,
     Box,
+    ChangeReason,
+    Emphasis,
     Line,
     LinesFile,
     Origin,
     PageLayout,
     Region,
+    Removal,
     RemovalReason,
+    Span,
     Word,
     block_text,
     read_blocks,
@@ -31,10 +38,13 @@ from galley.structure import make_blocks
 from galley.structure._contents import (
     ContentsEntry,
     ContentsTitle,
+    TitleJunk,
     contents_entries,
     contents_title,
     is_link_candidate,
     run_links,
+    title_junk,
+    without_junk,
 )
 from galley.structure._lines import PlacedLine
 from galley.structure._linking import body_candidates
@@ -143,7 +153,7 @@ def test_haynes_layout_gives_one_line_entries_with_labels_and_page_numbers() -> 
     assert _summary(contents_entries(lines)) == (
         (None, "Acknowledgments", "ix", 1),
         (None, "Introduction", "1", 1),
-        (None, "(TjDark Chemists and Master Wagner", "9", 1),
+        ("1.", "(TjDark Chemists and Master Wagner", "9", 1),
         ("2.", "Carver's New Engineers", "23", 1),
         ("10.", "A Later Chapter", "150", 1),
         (None, "Consequences 3x3", None, 1),
@@ -311,19 +321,576 @@ def test_lone_label_at_the_end_of_a_run_is_an_entry_with_an_empty_title() -> Non
     assert entries[1].title == ()
 
 
-def test_label_takes_the_marks_before_it_and_needs_a_word_after_it() -> None:
-    # Haskins' page 14: "^ VI." with a pencil mark; "_ II," read with a
-    # comma is no label.
+def test_label_loses_the_marks_before_it_and_needs_a_word_after_it() -> None:
+    # Haskins' page 14: "^ VI." with a pencil mark, removed as a stray
+    # mark (spec section 30, rule 7); "_ II," read with a comma is no
+    # label; "§" is part of a label.
     lines = _lines(
         ("^ VI. SICILY 189", 60, _RIGHT_PT),
         ("_ II, ENGLAND 23", 60, _RIGHT_PT),
         ("VII. 200", 60, _RIGHT_PT),
+        ("§ 1. Plan of the Survey 209", 60, _RIGHT_PT),
     )
-    assert _summary(contents_entries(lines)) == (
-        ("^ VI.", "SICILY", "189", 1),
+    entries = contents_entries(lines)
+    assert _summary(entries) == (
+        ("VI.", "SICILY", "189", 1),
         (None, "_ II, ENGLAND", "23", 1),
         (None, "VII.", "200", 1),
+        ("§ 1.", "Plan of the Survey", "209", 1),
     )
+    assert tuple(
+        (removal.text, removal.reason, removal.box)
+        for entry in entries
+        for removal in entry.stray_marks
+    ) == (("^", RemovalReason.STRAY_MARK, lines[0].line.words[0].box),)
+
+
+def test_bare_number_or_bracketed_number_or_letter_before_a_word_is_a_label() -> None:
+    lines = _lines(
+        ("12 The Old Order 40", 92, None),
+        ("(a) Introduction 3", 92, None),
+        ("(12) Moths and Lanterns 9", 92, None),
+        ("1066 The Conquest 50", 92, None),
+        ("7 15 30", 92, None),
+        apart=12.0,
+    )
+    assert _summary(contents_entries(lines)) == (
+        ("12", "The Old Order", "40", 1),
+        ("(a)", "Introduction", "3", 1),
+        ("(12)", "Moths and Lanterns", "9", 1),
+        (None, "1066 The Conquest", "50", 1),
+        (None, "7 15", "30", 1),
+    )
+
+
+# Spec section 30, rule 12: a number label inferred.
+
+
+def test_entry_without_a_label_between_two_in_sequence_gets_the_number() -> None:
+    lines = _lines(
+        ("Foreword 1", 100, None),
+        ("Moths and Lanterns 9", 100, None),
+        ("2. The Silent Harbour 23", 92, None),
+        ("Winter Roads 40", 100, None),
+        ("(' 4. Salt and Iron 52", 85, None),
+        ("Afterword 60", 100, None),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == (
+        None,
+        "1.",
+        "2.",
+        "3.",
+        "4.",
+        None,
+    )
+
+
+def test_entry_without_a_label_out_of_sequence_gets_none() -> None:
+    lines = _lines(
+        ("1. Moths and Lanterns 9", 92, None),
+        ("Interlude 15", 100, None),
+        ("2. The Silent Harbour 23", 92, None),
+        ("Winter Roads 40", 100, None),
+        ("5. Salt and Iron 52", 92, None),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == (
+        "1.",
+        None,
+        "2.",
+        None,
+        "5.",
+    )
+
+
+def test_entries_without_a_label_before_iv_get_i_to_iii() -> None:
+    # Haskins' page 14: chapters I to III lost their numerals to pencil
+    # strokes; the run's first label is "IV.".
+    lines = _lines(
+        ("The First Title 1", 100, None),
+        ("The Second Title 26", 100, None),
+        ("The Third Title 52", 100, None),
+        ("IV. The Fourth Title 85", 92, None),
+        ("Index 251", 100, None),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == (
+        "I.",
+        "II.",
+        "III.",
+        "IV.",
+        None,
+    )
+
+
+def test_gap_of_two_between_roman_numerals_gets_roman_numerals() -> None:
+    lines = _lines(
+        ("II. A Title 1", 92, None),
+        ("Another Title 9", 100, None),
+        ("A Third Title 19", 100, None),
+        ("V. A Last Title 29", 92, None),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == (
+        "II.",
+        "III.",
+        "IV.",
+        "V.",
+    )
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        ("IV.", None, "6."),
+        ("2.", None, "5."),
+        ("1.", None, "2."),
+        ("III.", None, None, "IV."),
+    ],
+)
+def test_gap_whose_count_does_not_fit_keeps_no_label(
+    labels: tuple[str | None, ...],
+) -> None:
+    lines = _lines(
+        *(
+            (f"{label} A Title {n}" if label is not None else f"A Title {n}", 92, None)
+            for n, label in enumerate(labels, start=10)
+        ),
+        apart=12.0,
+    )
+    assert tuple(entry.label for entry in contents_entries(lines)) == labels
+
+
+# Spec section 30, rule 11: text that is not the heading's.
+
+
+@pytest.mark.parametrize(
+    ("title", "heading", "junk"),
+    [
+        ("(QzMoths and Lanterns", "MOTHS AND LANTERNS", TitleJunk("(Qz", "")),
+        ("(^Winter Roads", "WINTER ROADS", TitleJunk("(^", "")),
+        ("_ II, THE COMING", "THE COMING", TitleJunk("_ II,", "")),
+        ("^ Winter Roads", "WINTER ROADS", TitleJunk("^", "")),
+        ("Afterword 3x3", "AFTERWORD", TitleJunk("", "3x3")),
+        ("PREFACE *.", "PREFACE.", TitleJunk("", "*.")),
+        ("Note: A Clause, 290.", "NOTE. A Clause.", TitleJunk("", "290.")),
+        ("Beyond the Hills, pp,", "BEYOND THE HILLS.", TitleJunk("", "pp,")),
+        ("(QzMoths and Lanterns 3x3", "MOTHS AND LANTERNS", TitleJunk("(Qz", "3x3")),
+    ],
+)
+def test_text_at_an_end_of_a_title_that_is_not_the_headings_is_junk(
+    title: str, heading: str, junk: TitleJunk
+) -> None:
+    # None of these entries has a page number (rule 6).
+    assert title_junk(title, heading, None) == junk
+
+
+def test_pages_abbreviation_is_junk_beside_a_page_number() -> None:
+    assert title_junk("Beyond the Hills, pp,", "BEYOND THE HILLS.", "9 — 26.") == (
+        TitleJunk("", "pp,")
+    )
+
+
+@pytest.mark.parametrize(
+    ("title", "heading"),
+    [
+        ("The Builder as Hero", "BUILDER AS HERO"),
+        ("Dr. Wagner Again", "WAGNER AGAIN"),
+        ('"Evil" Ways', "EVIL WAYS"),
+        ("Evil Ways", "EVTL WAYS"),
+        ("Moths and Lanterns", "MOTHS AMD LANTERNS"),
+        ("(qzmoths and lanterns", "MOTHS AND LANTERNS"),
+        ("Psalm 23", "PSALM 23"),
+        ("A Long Word Here", "LONG WORD HERE"),
+        # Printed text: a label, a number, a year, a word with a sign, a
+        # bracket the title closes (review of the branch reading-fixes).
+        ("1 Introduction", "INTRODUCTION"),
+        ("12 The Old Order", "THE OLD ORDER"),
+        ("(a) Introduction", "INTRODUCTION"),
+        ("(12) The Old Order", "THE OLD ORDER"),
+        ("1066 The Conquest", "THE CONQUEST"),
+        ("Edward I. 1272", "EDWARD I."),
+        ("Kings &c.", "KINGS"),
+        ("Wales (1)", "WALES"),
+        ("Arms A-B", "ARMS"),
+        ("1st Crusade", "CRUSADE"),
+        ("[Introduction]", "INTRODUCTION"),
+        ("(The Church)", "THE CHURCH"),
+        # A piece glued at the end that does not start with a capital.
+        ("Salt and Iron3x3", "SALT AND IRON"),
+        # The best agreement after a piece is under 0.7: "Word" against
+        # "WARDS" is 0.67.
+        ("(QzWord Apart", "WARDS APART"),
+    ],
+)
+def test_words_a_heading_lacks_or_misreads_are_no_junk(
+    title: str, heading: str
+) -> None:
+    assert title_junk(title, heading, None) == TitleJunk("", "")
+
+
+def test_piece_after_which_the_word_agrees_at_0_7_is_junk() -> None:
+    # "Word" against "WORD" agrees at 1.0, against "WARDS" at 0.67 (above).
+    assert title_junk("(QzWord Apart", "WORD APART", None) == TitleJunk("(Qz", "")
+
+
+def test_digits_at_the_end_are_junk_only_when_the_entry_has_no_page_number() -> None:
+    assert title_junk("Afterword 3x3", "AFTERWORD", "12") == TitleJunk("", "")
+    assert title_junk("Afterword 3x3", "AFTERWORD", None) == TitleJunk("", "3x3")
+
+
+def _entry_and_block(text: str, spans: tuple[str, ...]) -> tuple[ContentsEntry, Block]:
+    """The contents entry of the line `text` and a block of it with the
+    spans `spans` (as a block whose text a note reference or an edit cut
+    in two)."""
+    (entry,) = contents_entries(_lines((text, 92, None), apart=12.0))
+    block = Block(
+        id="b-p0000-001",
+        kind=BlockKind.CONTENTS_ENTRY,
+        level=1,
+        label=entry.label,
+        page_number=entry.page_number,
+        spans=tuple(
+            Span(text=part, emphasis=Emphasis.NONE, note_ref=None) for part in spans
+        ),
+        figure=None,
+        origin=(Origin(0, entry.lines[0].line.box),),
+    )
+    return entry, block
+
+
+@pytest.mark.parametrize(
+    ("text", "spans", "junk"),
+    [
+        # Junk across the boundary of two spans.
+        ("(QzMoths and Lanterns", ("(Q", "zMoths and Lanterns"), TitleJunk("(Qz", "")),
+        ("Afterword 3x3", ("Afterword 3", "x3"), TitleJunk("", "3x3")),
+        # A span that does not hold the junk (an edit changed it).
+        ("(QzMoths and Lanterns", ("(QxMoths and Lanterns",), TitleJunk("(Qz", "")),
+        ("Afterword 3x3", ("Afterword 3y3",), TitleJunk("", "3x3")),
+        # Junk that is the whole of a span.
+        ("-^1. NORMANDY", ("-^1. ", "NORMANDY"), TitleJunk("-^1.", "")),
+        ("Afterword 3x3", ("Afterword ", "3x3"), TitleJunk("", "3x3")),
+    ],
+)
+def test_junk_across_spans_or_filling_a_span_is_not_taken(
+    text: str, spans: tuple[str, ...], junk: TitleJunk
+) -> None:
+    entry, block = _entry_and_block(text, spans)
+    taken = without_junk(block, entry, junk)
+    assert (taken.block, taken.removals, taken.changes) == (block, (), ())
+
+
+def test_junk_in_one_span_is_taken_from_it() -> None:
+    entry, block = _entry_and_block(
+        "(QzMoths and Lanterns 3x3", ("(QzMoths and ", "Lanterns 3x3")
+    )
+    taken = without_junk(block, entry, TitleJunk("(Qz", "3x3"))
+    assert tuple(span.text for span in taken.block.spans) == ("Moths and ", "Lanterns")
+    assert tuple(removal.text for removal in taken.removals) == ("(Qz", "3x3")
+
+
+def test_junk_whose_words_are_not_the_titles_is_not_taken() -> None:
+    # The block's text has the junk, but the entry's title words do not
+    # (a hyphen joined across lines in the block, say): no record could
+    # name the junk's words, so it stays.
+    entry, block = _entry_and_block("Afterword 3x3", ("Afterword 3x3",))
+    other, _ = _entry_and_block("Afterword 3y3", ("Afterword 3y3",))
+    taken = without_junk(block, other, TitleJunk("", "3x3"))
+    assert (taken.block, taken.removals) == (block, ())
+    assert without_junk(block, entry, TitleJunk("", "3x3")).removals != ()
+
+
+def test_unlinked_entry_with_an_inferred_label_loses_the_mark_read_with_it() -> None:
+    # As Haskins' page 14 in the excerpt that lacks the chapters' pages:
+    # no entry is linked, the labels I. to III. are inferred, and the
+    # marks read with the lost numerals go; an entry whose label was read
+    # keeps its title whole.
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("-^1. NORMANDY AND ITS PLACE 1", 92, 100, apart=12.0),
+                _line("_ II, THE COMING 26", 92, 114, apart=12.0),
+                _line('"HI. NORMANDY AND ENGLAND 52', 92, 128, apart=12.0),
+                _line("IV. THE NORMAN EMPIRE 85", 85, 142, apart=12.0),
+                _line("V. ^ THE LAST TITLE 99", 85, 156, apart=12.0),
+            ),
+        ),
+        (),
+    )
+    lines = LinesFile(source_pdf_sha256="0" * 64, rereads=(), pages=(contents,))
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    assert tuple(
+        (block.label, block_text(block), block.heading_ref)
+        for block in blocks.blocks
+        if block.kind is BlockKind.CONTENTS_ENTRY
+    ) == (
+        ("I.", "NORMANDY AND ITS PLACE", None),
+        ("II.", "THE COMING", None),
+        ("III.", "NORMANDY AND ENGLAND", None),
+        ("IV.", "THE NORMAN EMPIRE", None),
+        ("V.", "^ THE LAST TITLE", None),
+    )
+    assert tuple(
+        (removal.text, removal.reason)
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.STRAY_MARK
+    ) == (
+        ("-^1.", RemovalReason.STRAY_MARK),
+        ("_ II,", RemovalReason.STRAY_MARK),
+        ('"HI.', RemovalReason.STRAY_MARK),
+    )
+    check_stage(
+        FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=frozenset({0})
+    )
+
+
+def _junk_book() -> LinesFile:
+    """A contents page whose reader circled numbers in pen, as Haynes' page
+    8, with invented titles, and the four chapters' first pages."""
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                *(
+                    _line(text, x0, 100 + 14 * number, apart=12.0)
+                    for number, (text, x0) in enumerate(
+                        (
+                            ("(QzMoths and Lanterns 9", 92),
+                            ("2. The Silent Harbour 23", 85),
+                            ("(^Winter Roads 40", 92),
+                            ("(' 4. Salt and Iron 52", 85),
+                            ("Afterword 3x3", 100),
+                        )
+                    )
+                ),
+            ),
+        ),
+        (),
+    )
+    headings = (
+        "MOTHS AND LANTERNS",
+        "THE SILENT HARBOUR",
+        "WINTER ROADS",
+        "SALT AMD IRON",
+        "AFTERWORD",
+    )
+    return LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(
+            contents,
+            *(_text_page(n + 1, heading) for n, heading in enumerate(headings)),
+        ),
+    )
+
+
+def test_contents_junk_is_removed_and_lost_labels_inferred() -> None:
+    lines = _junk_book()
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    entries = tuple(b for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY)
+    assert tuple(
+        (entry.label, block_text(entry), entry.page_number, entry.heading_ref is None)
+        for entry in entries
+    ) == (
+        ("1.", "Moths and Lanterns", "9", False),
+        ("2.", "The Silent Harbour", "23", False),
+        ("3.", "Winter Roads", "40", False),
+        ("4.", "Salt and Iron", "52", False),
+        (None, "Afterword", None, False),
+    )
+    assert tuple(
+        (removal.page_index, removal.text, removal.reason)
+        for removal in blocks.removals
+        if removal.reason is not RemovalReason.LEADER_DOTS
+    ) == (
+        (0, "('", RemovalReason.STRAY_MARK),
+        (0, "(Qz", RemovalReason.STRAY_MARK),
+        (0, "(^", RemovalReason.STRAY_MARK),
+        (0, "3x3", RemovalReason.PAGE_NUMBER),
+    )
+    glued = lines.pages[0].regions[0].lines[1].words[0]
+    assert next(r.box for r in blocks.removals if r.text == "(Qz") == glued.box
+    assert tuple(
+        (change.page_index, change.before, change.after, change.reason)
+        for change in blocks.word_changes
+    ) == (
+        (0, ("(QzMoths",), ("(Qz", "Moths"), ChangeReason.CASE_SPLIT),
+        (0, ("(^Winter",), ("(^", "Winter"), ChangeReason.CASE_SPLIT),
+    )
+    check_stage(
+        FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=frozenset({0})
+    )
+
+
+def test_inferred_roman_labels_pass_the_fidelity_check() -> None:
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("_ Moths and Lanterns 9", 92, 100, apart=12.0),
+                _line("The Silent Harbour 23", 92, 114, apart=12.0),
+                _line("III. Winter Roads 40", 85, 128, apart=12.0),
+            ),
+        ),
+        (),
+    )
+    lines = LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(contents, _text_page(1, "WINTER ROADS")),
+    )
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    assert tuple(
+        b.label for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY
+    ) == ("I.", "II.", "III.")
+    check_stage(
+        FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=frozenset({0})
+    )
+
+
+def test_fidelity_check_admits_only_a_label_in_sequence() -> None:
+    lines = _junk_book()
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    wrong = tuple(
+        replace(block, label="8.") if block.label == "3." else block
+        for block in blocks.blocks
+    )
+    with pytest.raises(FidelityError, match="8"):
+        check_stage(
+            FidelityBoundary.STRUCTURE,
+            lines,
+            replace(blocks, blocks=wrong),
+            contents_pages=frozenset({0}),
+        )
+
+
+def _relabelled(
+    lines: LinesFile, contents_pages: frozenset[int], labels: dict[str, str | None]
+) -> BlocksFile:
+    """The blocks of `lines`, each contents entry whose title is a key of
+    `labels` given that label."""
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=contents_pages, workers=1)
+    return replace(
+        blocks,
+        blocks=tuple(
+            replace(block, label=labels[block_text(block)])
+            if block_text(block) in labels
+            else block
+            for block in blocks.blocks
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        # "5." after "3.": the count does not fit.
+        {"Winter Roads": "5."},
+        # "1." with no "2." after it.
+        {"The Silent Harbour": "3.", "Winter Roads": "4.", "Salt and Iron": "5."},
+        # A label rule 12 gives no entry without one.
+        {"Afterword": "5."},
+    ],
+)
+def test_fidelity_check_refuses_a_label_rule_12_would_not_give_back(
+    labels: dict[str, str | None],
+) -> None:
+    lines = _junk_book()
+    blocks = _relabelled(lines, frozenset({0}), labels)
+    with pytest.raises(FidelityError, match="invented"):
+        check_stage(
+            FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=frozenset({0})
+        )
+
+
+def _read_roman_book() -> LinesFile:
+    """A contents page whose three labels "IV." to "VI." are all read, and
+    a chapter page."""
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("IV. Moths and Lanterns 9", 85, 100, apart=12.0),
+                _line("V. The Silent Harbour 23", 85, 114, apart=12.0),
+                _line("VI. Winter Roads 40", 85, 128, apart=12.0),
+            ),
+        ),
+        (),
+    )
+    return LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(contents, _text_page(1, "WINTER ROADS")),
+    )
+
+
+def test_fidelity_check_refuses_labels_invented_in_a_paragraph() -> None:
+    # "IV.", "V." and "VI." are contents labels in sequence, but read:
+    # the same words added to a paragraph are invented.
+    lines = _read_roman_book()
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    check_stage(
+        FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=frozenset({0})
+    )
+    paragraph = next(b for b in blocks.blocks if b.kind is BlockKind.PARAGRAPH)
+    invented = replace(
+        paragraph,
+        spans=(*paragraph.spans, replace(paragraph.spans[-1], text=" V. VI. IV.")),
+    )
+    wrong = tuple(invented if b is paragraph else b for b in blocks.blocks)
+    with pytest.raises(FidelityError, match="invented"):
+        check_stage(
+            FidelityBoundary.STRUCTURE,
+            lines,
+            replace(blocks, blocks=wrong),
+            contents_pages=frozenset({0}),
+        )
+
+
+def test_fidelity_check_infers_labels_within_one_contents_run() -> None:
+    # Two runs, pages 0 and 2: rule 12 gives the entry of page 0 no "1."
+    # from the "2." of page 2, and the check admits none.
+    first = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("Moths and Lanterns 9", 92, 100, apart=12.0),
+            ),
+        ),
+        (),
+    )
+    second = PageLayout(
+        2,
+        (
+            _region_of(
+                _line("2. The Silent Harbour 23", 85, 100, apart=12.0),
+                _line("3. Winter Roads 40", 85, 114, apart=12.0),
+            ),
+        ),
+        (),
+    )
+    lines = LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(first, _text_page(1, "MOTHS AND LANTERNS"), second),
+    )
+    pages = frozenset({0, 2})
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=pages, workers=1)
+    assert tuple(
+        b.label for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY
+    ) == (None, "2.", "3.")
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=pages)
+    forged = _relabelled(lines, pages, {"Moths and Lanterns": "1."})
+    with pytest.raises(FidelityError, match="invented"):
+        check_stage(FidelityBoundary.STRUCTURE, lines, forged, contents_pages=pages)
 
 
 def test_entry_keeps_every_line_for_its_origin_with_its_label_line() -> None:
@@ -511,6 +1078,54 @@ def test_whole_book_contents_entries_linked_to_headings(
     assert all(ref in headings for ref in refs)
 
 
+# Spec section 30, rules 7 and 11, on the whole books: the marks and
+# misread page numbers removed from inside the contents entries, each
+# checked against its page image on 24 November 2026; the other removals
+# of the contents pages are running heads and page numbers. Haskins' "^"
+# is rule 7's, before the label "VI."; the rest are rule 11's.
+_ENTRY_REMOVALS = {
+    "normansineuropea00hask": (
+        (14, "^", RemovalReason.STRAY_MARK),
+        (14, "-^1.", RemovalReason.STRAY_MARK),
+        (14, "_ II,", RemovalReason.STRAY_MARK),
+        (14, '"HI.', RemovalReason.STRAY_MARK),
+    ),
+    "domesdaybook00maituoft": (
+        (14, "*.", RemovalReason.STRAY_MARK),
+        (17, "290.", RemovalReason.PAGE_NUMBER),
+        (20, "pp,", RemovalReason.PAGE_NUMBER),
+    ),
+}
+
+
+def _inside_origin(removal: Removal, block: Block) -> bool:
+    return any(
+        part.page_index == removal.page_index
+        and part.box.x0 <= removal.box.x0
+        and removal.box.x1 <= part.box.x1
+        and part.box.top <= removal.box.top
+        and removal.box.bottom <= part.box.bottom
+        for part in block.origin
+    )
+
+
+@pytest.mark.whole_book
+@pytest.mark.timeout(900)
+@pytest.mark.parametrize("book", list(_ENTRY_REMOVALS))
+def test_whole_book_contents_entries_lose_only_their_marks_and_misread_numbers(
+    whole_book_run: Callable[[str], BookFolder], book: str
+) -> None:
+    blocks = read_blocks(whole_book_run(book).blocks_json)
+    entries = tuple(b for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY)
+    removed = tuple(
+        (removal.page_index, removal.text, removal.reason)
+        for removal in blocks.removals
+        if removal.reason is not RemovalReason.LEADER_DOTS
+        and any(_inside_origin(removal, entry) for entry in entries)
+    )
+    assert removed == _ENTRY_REMOVALS[book]
+
+
 # The excerpts (spec section 32, "Excerpt tests").
 
 
@@ -541,15 +1156,17 @@ def test_haskins_front_contents_title_and_nine_entries(
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     # Excerpt page 7 is the book's page 14. None is linked: chapter I's
-    # heading holds the half-title in the excerpt (spec section 32).
+    # heading holds the half-title in the excerpt (spec section 32). The
+    # labels I. to III. are inferred, and the pencil strokes read with the
+    # lost numerals removed (rules 11 and 12).
     assert _contents_of(excerpt_books, "haskins_front", 7) == (
         ("heading", 1, None, "CONTENTS", None, None),
-        _entry(1, None, "-^1. NORMANDY AND ITS PLACE IN HISTORY", "i"),
-        _entry(1, None, "_ II, THE COMING OF THE NORTHMEN", "26"),
-        _entry(1, None, '"HI. NORMANDY AND ENGLAND', "52"),
+        _entry(1, "I.", "NORMANDY AND ITS PLACE IN HISTORY", "i"),
+        _entry(1, "II.", "THE COMING OF THE NORTHMEN", "26"),
+        _entry(1, "III.", "NORMANDY AND ENGLAND", "52"),
         _entry(1, "IV.", "THE NORMAN EMPIRE", "85"),
         _entry(1, "V.", "NORMANDY AND FRANCE", "116"),
-        _entry(1, "^ VI.", "NORMAN LIFE AND CULTURE", "148"),
+        _entry(1, "VI.", "NORMAN LIFE AND CULTURE", "148"),
         _entry(1, "VII.", "THE NORMANS IN THE SOUTH", "192"),
         _entry(1, "VIII.", "THE NORMAN KINGDOM OF SICILY", "218"),
         _entry(1, None, "INDEX", "251"),

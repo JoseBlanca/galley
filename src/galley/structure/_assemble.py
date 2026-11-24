@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from typing import assert_never
 
 from galley.config import Language
+from galley.contents_labels import contents_runs
 from galley.model import (
     Block,
     BlockKind,
@@ -27,9 +28,13 @@ from galley.structure._body_notes import take_body_notes
 from galley.structure._case_split import split_glued_words
 from galley.structure._contents import (
     ContentsEntry,
+    TitleJunk,
     contents_entries,
     is_link_candidate,
     run_links,
+    title_junk,
+    unlinked_title_junk,
+    without_junk,
 )
 from galley.structure._endnotes import (
     NoteGroup,
@@ -138,7 +143,8 @@ class Assembled:
     """The book's blocks and notes in order, with their ids, the word
     changes of their hyphen joins and note markers in reading order, and
     what was removed across pages: the leader dots of the contents
-    entries (spec section 30, rule 6)."""
+    entries, the marks before their labels and the junk of their titles
+    (spec section 30, rules 6, 7 and 11)."""
 
     blocks: tuple[Block, ...]
     notes: tuple[Note, ...]
@@ -720,18 +726,6 @@ def _links(
     )
 
 
-def _contents_runs(contents_pages: frozenset[int]) -> tuple[tuple[int, ...], ...]:
-    """The contents runs of `contents_pages`, each its consecutive page
-    indices (spec section 30, "Terms")."""
-    runs: list[list[int]] = []
-    for page_index in sorted(contents_pages):
-        if runs and runs[-1][-1] == page_index - 1:
-            runs[-1].append(page_index)
-        else:
-            runs.append([page_index])
-    return tuple(tuple(run) for run in runs)
-
-
 def _run_lines(page: PageParts) -> frozenset[int]:
     """The positions in the page's body stream of the lines of its runs of
     section 2, step 2.3."""
@@ -747,7 +741,7 @@ def _contents_entries(
     section 30): each run's body stream but its title."""
     return tuple(
         entry
-        for run in _contents_runs(contents_pages)
+        for run in contents_runs(contents_pages)
         for entry in contents_entries(
             tuple(
                 line
@@ -822,7 +816,7 @@ def _with_contents_links(
     )
     headings = tuple(block_text(blocks[position]) for position in heading_positions)
     refs: dict[int, str] = {}
-    for run in _contents_runs(contents_pages):
+    for run in contents_runs(contents_pages):
         candidates = tuple(
             position
             for position, entry in zip(entry_positions, entries, strict=True)
@@ -838,6 +832,67 @@ def _with_contents_links(
         replace(block, heading_ref=refs[position]) if position in refs else block
         for position, block in enumerate(blocks)
     )
+
+
+@dataclass(frozen=True, slots=True)
+class _JunkFree:
+    """The blocks without the junk of their contents entries, and the
+    removals and word changes that record it (spec section 30, rule 11)."""
+
+    blocks: tuple[Block, ...]
+    removals: tuple[Removal, ...]
+    changes: tuple[WordChange, ...]
+
+
+def _without_contents_junk(
+    blocks: Sequence[Block], entries: Sequence[ContentsEntry]
+) -> _JunkFree:
+    """`blocks`, the body's in order, with the junk taken off each linked
+    contents entry, and off each unlinked one whose label was inferred
+    (spec section 30, rule 11); `entries` are the contents entries of the
+    blocks, in their order."""
+    by_id = {block.id: block for block in blocks}
+    entry_of = dict(
+        zip(
+            (
+                position
+                for position, block in enumerate(blocks)
+                if block.kind is BlockKind.CONTENTS_ENTRY
+            ),
+            entries,
+            strict=True,
+        )
+    )
+    taken = {
+        position: without_junk(block, entry_of[position], junk)
+        for position, block in enumerate(blocks)
+        if block.kind is BlockKind.CONTENTS_ENTRY
+        for junk in (_title_junk(block, entry_of[position], by_id),)
+        if junk != TitleJunk("", "")
+    }
+    return _JunkFree(
+        blocks=tuple(
+            taken[position].block if position in taken else block
+            for position, block in enumerate(blocks)
+        ),
+        removals=tuple(r for junk in taken.values() for r in junk.removals),
+        changes=tuple(c for junk in taken.values() for c in junk.changes),
+    )
+
+
+def _title_junk(
+    block: Block, entry: ContentsEntry, by_id: Mapping[str, Block]
+) -> TitleJunk:
+    """The junk of a contents entry's title (spec section 30, rule 11):
+    against its heading when it is linked, the mark read with a lost
+    number when it is not and its label was inferred, none otherwise."""
+    if block.heading_ref is not None:
+        return title_junk(
+            block_text(block), block_text(by_id[block.heading_ref]), block.page_number
+        )
+    if entry.label_inferred:
+        return unlinked_title_junk(block_text(block))
+    return TitleJunk("", "")
 
 
 def assemble(
@@ -1019,16 +1074,24 @@ def assemble(
     # every heading is known; made on the numbered blocks, whose ids they
     # name.
     blocks = _with_contents_links(blocks, contents, contents_pages)
+    # Spec section 30, rule 11: the junk of the linked entries.
+    junk_free = _without_contents_junk(blocks, contents)
     return Assembled(
-        blocks=blocks,
+        blocks=junk_free.blocks,
         notes=numbered_notes,
-        removals=tuple(removal for entry in contents for removal in entry.leader_dots),
+        removals=tuple(
+            removal
+            for entry in contents
+            for removal in entry.leader_dots + entry.stray_marks
+        )
+        + junk_free.removals,
         word_changes=tuple(
             sorted(
                 changes_in_order(linked_body)
                 + changes_in_order(
                     tuple(block for note in linked_notes for block in note.blocks)
-                ),
+                )
+                + junk_free.changes,
                 key=lambda change: change.page_index,
             )
         ),

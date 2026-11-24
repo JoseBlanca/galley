@@ -6,11 +6,20 @@ Positions are PDF points, origin at the top left of the page."""
 
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 from fractions import Fraction
 
-from galley.model import Removal, RemovalReason, Word
+from galley.contents_labels import inferred_labels
+from galley.model import (
+    Block,
+    ChangeReason,
+    Removal,
+    RemovalReason,
+    Span,
+    Word,
+    WordChange,
+)
 from galley.structure._headings import OCR_ROMAN_LABEL
 from galley.structure._heads import starts_with_chapter_label_word
 from galley.structure._lines import (
@@ -21,6 +30,7 @@ from galley.structure._lines import (
     with_words,
 )
 from galley.structure._measures import (
+    box_of,
     has_letter_or_digit,
     is_page_number_form,
     line_has_letter_or_digit,
@@ -66,6 +76,10 @@ _LEADER_CHARACTERS = frozenset(".•·…")
 # Spec section 30, rule 7: a number of 1 or 2 digits with ".", and the
 # English number words.
 _NUMBER_LABEL = re.compile(r"[0-9]{1,2}\.")
+# Spec section 30, rule 7: a number of 1 or 2 digits alone, or such a
+# number or one letter in round brackets, before a word that starts with a
+# letter ("12 The Old Order", "(a) Introduction").
+_BARE_OR_BRACKETED_LABEL = re.compile(r"[0-9]{1,2}|\((?:[0-9]{1,2}|[^\W\d_])\)")
 _NUMBER_WORDS = frozenset(
     {
         "one",
@@ -241,8 +255,11 @@ class ContentsEntry:
     printed before the title, its words joined by single spaces, None when
     it has none; `page_number` likewise; `level` its depth, from 1; and
     `leader_dots` the removals of the leader dots before its page number,
-    one per line; `topics` whether it is a topics entry (rule 8), which is
-    never linked to a heading (rule 9)."""
+    one per line; `stray_marks` the removals of the marks before its
+    label, one per line (rule 7); `topics` whether it is a topics entry
+    (rule 8), which is never linked to a heading (rule 9); and
+    `label_inferred` whether its label was inferred, not read (rule
+    12)."""
 
     lines: tuple[PlacedLine, ...]
     title: tuple[PlacedLine, ...]
@@ -250,7 +267,9 @@ class ContentsEntry:
     page_number: str | None
     level: int
     leader_dots: tuple[Removal, ...]
+    stray_marks: tuple[Removal, ...]
     topics: bool
+    label_inferred: bool = False
 
 
 def _pieces(lines: Sequence[PlacedLine]) -> tuple[tuple[PlacedLine, ...], ...]:
@@ -354,17 +373,26 @@ class _Placed:
     word: Word
 
 
-def _label_length(texts: Sequence[str]) -> int:
-    """How many of the first words of `texts` are an entry's label by rule
-    7 of spec section 30, the words with no letter or digit before it
-    among them; 0 when it has none or no word follows it."""
+def _label_length(texts: Sequence[str]) -> tuple[int, int]:
+    """How many of the first words of `texts` are marks before an entry's
+    label by rule 7 of spec section 30, words with no letter or digit but
+    a "§" that is part of the label, and how many after them are the
+    label; (0, 0) when it has none or no word follows it."""
     marks = _marks(texts)
+    if marks and texts[marks - 1] == _SECTION_SIGN:
+        marks -= 1
     rest = texts[marks:]
     if not rest:
-        return 0
+        return 0, 0
     first = rest[0]
+    bare_label = (
+        _BARE_OR_BRACKETED_LABEL.fullmatch(first) is not None
+        and len(rest) > 1
+        and rest[1][:1].isalpha()
+    )
     if (
-        _NUMBER_LABEL.fullmatch(first)
+        bare_label
+        or _NUMBER_LABEL.fullmatch(first)
         or (OCR_ROMAN_LABEL.fullmatch(first) and first.endswith("."))
         or first.rstrip(".").lower() in _NUMBER_WORDS
     ):
@@ -372,8 +400,8 @@ def _label_length(texts: Sequence[str]) -> int:
     elif starts_with_chapter_label_word(rest) or first == _SECTION_SIGN:
         length = 2
     else:
-        return 0
-    return marks + length if len(rest) > length else 0
+        return 0, 0
+    return (marks, length) if len(rest) > length else (0, 0)
 
 
 def _topics(raw: _Raw, title: Sequence[str]) -> bool:
@@ -384,11 +412,35 @@ def _topics(raw: _Raw, title: Sequence[str]) -> bool:
     )
 
 
-def _parts(
-    raw: _Raw, edges: frozendict[int, float]
-) -> tuple[str | None, tuple[_Placed, ...], str | None, tuple[Removal, ...]]:
-    """An entry's label, title words, page number and leader-dot removals
-    (spec section 30, rules 5 to 7)."""
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Parts:
+    """An entry's label, title words, page number, leader-dot removals and
+    removals of the marks before its label (spec section 30, rules 5 to
+    7)."""
+
+    label: str | None
+    placed: tuple[_Placed, ...]
+    page_number: str | None
+    leader_dots: tuple[Removal, ...]
+    stray_marks: tuple[Removal, ...]
+
+
+def _removals(
+    raw: _Raw, placed: Sequence[_Placed], reason: RemovalReason
+) -> tuple[Removal, ...]:
+    """One removal of the words of `placed` on each line of the entry."""
+    return tuple(
+        words_removal(
+            raw.lines[number].page_index,
+            tuple(item.word for item in placed if item.line == number),
+            reason,
+        )
+        for number in sorted({item.line for item in placed})
+    )
+
+
+def _parts(raw: _Raw, edges: frozendict[int, float]) -> _Parts:
+    """An entry's parts (spec section 30, rules 5 to 7)."""
     placed = tuple(
         _Placed(number, word)
         for number, line in enumerate(raw.lines)
@@ -396,7 +448,13 @@ def _parts(
     )
     if raw.summary:
         label = _joined(raw.label_lines) if raw.label_lines else None
-        return label, placed, None, ()
+        return _Parts(
+            label=label,
+            placed=placed,
+            page_number=None,
+            leader_dots=(),
+            stray_marks=(),
+        )
     texts = tuple(item.word.text for item in placed)
     number_length = (
         _page_number_length(
@@ -416,21 +474,23 @@ def _parts(
         page_number = " ".join(texts[words_before:])
         dots = placed[leading:words_before]
         placed = placed[:leading]
+    marks: tuple[_Placed, ...] = ()
     if raw.label_lines:
         label: str | None = _joined(raw.label_lines)
     else:
-        length = _label_length(tuple(item.word.text for item in placed))
-        label = " ".join(item.word.text for item in placed[:length]) or None
-        placed = placed[length:]
-    removals = tuple(
-        words_removal(
-            raw.lines[number].page_index,
-            tuple(item.word for item in dots if item.line == number),
-            RemovalReason.LEADER_DOTS,
+        mark_count, length = _label_length(tuple(item.word.text for item in placed))
+        marks = placed[:mark_count]
+        label = (
+            " ".join(item.word.text for item in placed[mark_count:][:length]) or None
         )
-        for number in sorted({item.line for item in dots})
+        placed = placed[mark_count + length :]
+    return _Parts(
+        label=label,
+        placed=placed,
+        page_number=page_number,
+        leader_dots=_removals(raw, dots, RemovalReason.LEADER_DOTS),
+        stray_marks=_removals(raw, marks, RemovalReason.STRAY_MARK),
     )
-    return label, placed, page_number, removals
 
 
 def _joined(lines: Sequence[PlacedLine]) -> str:
@@ -449,7 +509,8 @@ def contents_entries(lines: Sequence[PlacedLine]) -> tuple[ContentsEntry, ...]:
     chapters_seen = False
     edges = _right_edges(lines)
     for raw in _raw_entries(lines, edges):
-        label, placed, page_number, removals = _parts(raw, edges)
+        parts = _parts(raw, edges)
+        label, placed = parts.label, parts.placed
         title_texts = tuple(item.word.text for item in placed)
         chapter = label is not None and starts_with_chapter_label_word(
             tuple(label.split(" ")[_marks(label.split(" ")) :])
@@ -478,13 +539,30 @@ def contents_entries(lines: Sequence[PlacedLine]) -> tuple[ContentsEntry, ...]:
                     for number in sorted({item.line for item in placed})
                 ),
                 label=label,
-                page_number=page_number,
+                page_number=parts.page_number,
                 level=level,
-                leader_dots=removals,
+                leader_dots=parts.leader_dots,
+                stray_marks=parts.stray_marks,
                 topics=topics,
             )
         )
-    return tuple(entries)
+    return _with_labels_inferred(entries)
+
+
+def _with_labels_inferred(
+    entries: Sequence[ContentsEntry],
+) -> tuple[ContentsEntry, ...]:
+    """`entries`, a contents run's, with the labels rule 12 of spec
+    section 30 infers by their labels and depths, marked inferred."""
+    inferred = inferred_labels(
+        tuple(entry.label for entry in entries), tuple(entry.level for entry in entries)
+    )
+    return tuple(
+        replace(entry, label=inferred[position], label_inferred=True)
+        if position in inferred
+        else entry
+        for position, entry in enumerate(entries)
+    )
 
 
 # Spec section 30, rule 9: a candidate's title holds at least 4 letters; two
@@ -574,3 +652,364 @@ def run_links(
             links.append((i, paired))
             j = paired + 1
     return tuple(links)
+
+
+@dataclass(frozen=True, slots=True)
+class TitleJunk:
+    """The junk at the start and at the end of a contents entry's title
+    (spec section 30, rule 11), "" for none."""
+
+    start: str
+    end: str
+
+
+# Spec section 30, rule 11: a piece of junk is at most 5 characters long,
+# spaces not counted, which hold a mark read with a roman numeral, "_ II,",
+# or a page number of 3 digits with a sign, "290."; chosen, not measured
+# (section 30, "The thresholds").
+_JUNK_MAX_CHARACTERS = 5
+# Spec section 30, rule 11: the signs no printer sets in a title or its
+# label, and the brackets and quotation marks that are junk signs when
+# the title does not close them (at its start) or open them (at its end).
+_JUNK_SIGNS = frozenset("^_*~|\\<>{}=+#@$%`")
+_OPENERS = frozendict({"(": ")", "[": "]", '"': '"', "“": "”", "«": "»"})
+_CLOSERS = frozendict({")": "(", "]": "[", '"': '"', "”": "“", "»": "«"})
+_BRACKETS_AND_QUOTES = frozenset("()[]\"“”‘’«»'")
+# A piece at the end may be "p" or "pp" with one sign after it: "pp,".
+_PAGES_ABBREVIATION = re.compile(r"pp?[^\w\s]")
+# Spec section 30, rule 11: a number alone or in round brackets, or one
+# letter in round brackets, which may be a label or a year: never junk.
+_NUMBER_OR_BRACKETED = re.compile(r"(?:[0-9]+|\((?:[0-9]+|[^\W\d_])\))[.,]?")
+# Spec section 30, rule 11: what a digit at a title's end may be besides
+# a misread page number: a year, a number in brackets, an ordinal.
+_YEAR = re.compile(r"[0-9]{4}[.,]?")
+_BRACKETED_NUMBER = re.compile(r"\([0-9]+\)[.,]?")
+_ORDINAL = re.compile(r"[0-9]+(?:st|nd|rd|th|d)[.,]?")
+# Spec section 30, rule 11: the letters of a roman numeral that a mark is
+# read with, in an unlinked entry whose label was inferred ("_ II,").
+_ROMAN_LETTERS = frozenset("IVXLC")
+
+
+def _core(word: str) -> str:
+    """A word case-folded, the characters that are not a letter or a digit
+    taken off its end (spec section 30, rule 11)."""
+    folded = word.casefold()
+    end = len(folded)
+    while end > 0 and not folded[end - 1].isalnum():
+        end -= 1
+    return folded[:end]
+
+
+def _agreement(first: str, second: str) -> Fraction:
+    """How much two words agree: SequenceMatcher's ratio of their cores,
+    exact (spec section 30, rule 11)."""
+    a, b = _core(first), _core(second)
+    if not a and not b:
+        return Fraction(0)
+    matcher = SequenceMatcher(None, a, b, autojunk=False)
+    matched = sum(block.size for block in matcher.get_matching_blocks())
+    return Fraction(2 * matched, len(a) + len(b))
+
+
+def _has_start_junk_sign(piece: str, rest: str) -> bool:
+    """Whether `piece`, at the start of a title whose rest is `rest`, holds
+    a junk sign: a sign no printer sets, or an opening bracket or quotation
+    mark that nothing after it closes."""
+    return any(
+        character in _JUNK_SIGNS
+        or (character in _OPENERS and _OPENERS[character] not in piece[i + 1 :] + rest)
+        for i, character in enumerate(piece)
+    )
+
+
+def _has_end_junk_sign(piece: str, before: str) -> bool:
+    """Whether `piece`, at the end of a title whose text before it is
+    `before`, holds a junk sign: a sign no printer sets, or a closing
+    bracket or quotation mark that nothing before it opens."""
+    return any(
+        character in _JUNK_SIGNS
+        or (character in _CLOSERS and _CLOSERS[character] not in before + piece[:i])
+        for i, character in enumerate(piece)
+    )
+
+
+def _only_plain_signs(characters: str) -> bool:
+    """Whether `characters` hold no letter or digit and no bracket or
+    quotation mark."""
+    return not any(
+        character.isalnum() or character in _BRACKETS_AND_QUOTES
+        for character in characters
+    )
+
+
+def _is_start_piece(piece: str, rest: str) -> bool:
+    """Whether `piece`, at the start of a title whose rest is `rest`, has
+    the shape of junk (spec section 30, rule 11): at most 5 characters,
+    spaces not counted, not a number alone or in brackets nor a letter in
+    brackets, and holding a junk sign or made only of signs that are no
+    bracket or quotation mark."""
+    characters = piece.replace(" ", "")
+    if not characters or len(characters) > _JUNK_MAX_CHARACTERS:
+        return False
+    if _NUMBER_OR_BRACKETED.fullmatch(characters):
+        return False
+    return _has_start_junk_sign(characters, rest) or _only_plain_signs(characters)
+
+
+def _is_misread_page_number(characters: str, page_number: str | None) -> bool:
+    """Whether `characters` at a title's end are a page number the OCR
+    misread (spec section 30, rule 11): a digit, when the entry has no page
+    number, and not a year, a number in brackets or an ordinal."""
+    return (
+        page_number is None
+        and any(character.isdigit() for character in characters)
+        and not _YEAR.fullmatch(characters)
+        and not _BRACKETED_NUMBER.fullmatch(characters)
+        and not _ORDINAL.fullmatch(characters)
+    )
+
+
+def _is_end_piece(piece: str, before: str, page_number: str | None) -> bool:
+    """Whether `piece`, at the end of a title whose text before it is
+    `before`, of an entry whose page number is `page_number`, has the shape
+    of junk (spec section 30, rule 11): at most 5 characters, spaces not
+    counted, and a junk sign, signs only that are no bracket or quotation
+    mark, "p" or "pp" with a sign, or a misread page number."""
+    characters = piece.replace(" ", "")
+    if not characters or len(characters) > _JUNK_MAX_CHARACTERS:
+        return False
+    return (
+        _has_end_junk_sign(characters, before)
+        or _only_plain_signs(characters)
+        or _PAGES_ABBREVIATION.fullmatch(characters) is not None
+        or _is_misread_page_number(characters, page_number)
+    )
+
+
+def _start_junk(title: str, heading_word: str) -> str:
+    """The junk at the start of `title`, whose words are joined by single
+    spaces, against the heading's first word; "" for none."""
+    best = (_agreement(title.split(" ")[0], heading_word), 0)
+    for cut in range(1, len(title)):
+        piece, rest = title[:cut], title[cut:]
+        if len(piece.replace(" ", "")) > _JUNK_MAX_CHARACTERS:
+            break
+        if rest.startswith(" "):
+            continue
+        glued = not piece.endswith(" ")
+        if glued and not rest[0].isupper():
+            continue
+        if not _is_start_piece(piece.strip(), rest):
+            continue
+        agreement = _agreement(rest.split(" ")[0], heading_word)
+        if agreement > best[0]:
+            best = (agreement, cut)
+    agreement, cut = best
+    return title[:cut].strip() if cut and agreement >= _MATCH_MIN_RATIO else ""
+
+
+def _end_junk(title: str, heading_word: str, page_number: str | None) -> str:
+    """The junk at the end of `title`, whose words are joined by single
+    spaces, against the heading's last word, of an entry whose page number
+    is `page_number`; "" for none."""
+    best = (_agreement(title.split(" ")[-1], heading_word), len(title))
+    for cut in range(len(title) - 1, 0, -1):
+        rest, piece = title[:cut], title[cut:]
+        if len(piece.replace(" ", "")) > _JUNK_MAX_CHARACTERS:
+            break
+        if piece.startswith(" "):
+            continue
+        glued = not rest.endswith(" ")
+        if glued and not piece[0].isupper():
+            continue
+        if not _is_end_piece(piece, rest, page_number):
+            continue
+        agreement = _agreement(rest.rstrip(" ").split(" ")[-1], heading_word)
+        # The shortest of equally good pieces: the loop goes from short to
+        # long, so only a better one replaces it.
+        if agreement > best[0]:
+            best = (agreement, cut)
+    agreement, cut = best
+    return (
+        title[cut:].strip()
+        if cut < len(title) and agreement >= _MATCH_MIN_RATIO
+        else ""
+    )
+
+
+def title_junk(title: str, heading: str, page_number: str | None) -> TitleJunk:
+    """The junk at the start and at the end of a linked contents entry's
+    `title`, against its heading's text `heading` without its label, the
+    entry's page number being `page_number` (spec section 30, rule 11):
+    at most 5 characters with a junk sign, or signs only, after which, or
+    before which, the title's word agrees best with the heading's first,
+    or last, word, at 0.7 at least; at the end also "p" or "pp" with a
+    sign, or a misread page number when `page_number` is None. Junk at the
+    start may end inside a word whose rest starts with a capital; junk at
+    the end may start inside a word with a capital."""
+    title_words = title.split()
+    heading_words = heading.split()
+    if not title_words or not heading_words:
+        return TitleJunk("", "")
+    joined = " ".join(title_words)
+    start = _start_junk(joined, heading_words[0])
+    rest = joined[len(start) :].lstrip(" ") if start else joined
+    end = _end_junk(rest, heading_words[-1], page_number) if rest else ""
+    return TitleJunk(start, end)
+
+
+def unlinked_title_junk(title: str) -> TitleJunk:
+    """The junk at the start of the `title` of a contents entry that is not
+    linked and whose label rule 12 inferred (spec section 30, rule 11): the
+    longest piece that ends at a space and holds a junk sign and a digit
+    or a letter of a roman numeral, the mark read together with the lost
+    number; "" for none."""
+    joined = " ".join(title.split())
+    pieces = tuple(
+        piece
+        for cut in range(1, len(joined))
+        if joined[cut] == " "
+        for piece in (joined[:cut],)
+        if _is_start_piece(piece, joined[cut:])
+        and _has_start_junk_sign(piece.replace(" ", ""), joined[cut:])
+        and any(c.isdigit() or c in _ROMAN_LETTERS for c in piece)
+    )
+    return TitleJunk(pieces[-1] if pieces else "", "")
+
+
+@dataclass(frozen=True, slots=True)
+class JunkTaken:
+    """A contents entry's block without the junk of rule 11 of spec section
+    30, the removals of that junk and the word changes that split junk
+    glued to a word."""
+
+    block: Block
+    removals: tuple[Removal, ...]
+    changes: tuple[WordChange, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _SideTaken:
+    """One end of a title without its junk: the span left, the removal of
+    the junk and the change that split it off a word, if any."""
+
+    span: Span
+    removal: Removal
+    changes: tuple[WordChange, ...]
+
+
+def _end_reason(junk: str) -> RemovalReason:
+    """Junk at a title's end is a page number when it holds a digit (a
+    misread page number) or is "p" or "pp" with a sign, a stray mark
+    otherwise (rule 11)."""
+    if any(character.isdigit() for character in junk) or _PAGES_ABBREVIATION.fullmatch(
+        junk
+    ):
+        return RemovalReason.PAGE_NUMBER
+    return RemovalReason.STRAY_MARK
+
+
+def _taken(
+    junk: str,
+    reason: RemovalReason,
+    words: Sequence[Word],
+    expected: Sequence[str],
+    split: tuple[str, str] | None,
+    page_index: int,
+) -> tuple[Removal, tuple[WordChange, ...]] | None:
+    """The removal of `junk`, on page `page_index`, with the box of
+    `words`, the title's words it was read in, and, when the junk is glued
+    to a word, the change that splits that word into `split`; None when
+    the texts of `words` are not `expected`, since the record would then
+    name words that are not the junk's."""
+    if not words or tuple(word.text for word in words) != tuple(expected):
+        return None
+    removal = Removal(
+        page_index=page_index,
+        box=box_of(tuple(word.box for word in words)),
+        text=junk,
+        reason=reason,
+    )
+    if split is None:
+        return removal, ()
+    return removal, (
+        WordChange(
+            page_index=page_index,
+            before=("".join(split),),
+            after=split,
+            reason=ChangeReason.CASE_SPLIT,
+        ),
+    )
+
+
+def _start_taken(span: Span, junk: str, entry: ContentsEntry) -> _SideTaken | None:
+    """The first span `span` without the junk `junk` at its start; None
+    when the span does not hold it whole, would be left empty, or the
+    entry's first title words are not the junk's."""
+    first = span.text.lstrip()
+    rest = first[len(junk) :]
+    if not first.startswith(junk) or not rest.strip():
+        return None
+    parts = junk.split(" ")
+    split = None if rest.startswith(" ") else (parts[-1], rest.split(" ")[0])
+    expected = (*parts[:-1], "".join(split)) if split else parts
+    title_words = tuple(word for line in entry.title for word in line.line.words)
+    taken = _taken(
+        junk,
+        RemovalReason.STRAY_MARK,
+        title_words[: len(parts)],
+        expected,
+        split,
+        entry.title[0].page_index,
+    )
+    if taken is None:
+        return None
+    return _SideTaken(replace(span, text=rest.lstrip()), *taken)
+
+
+def _end_taken(span: Span, junk: str, entry: ContentsEntry) -> _SideTaken | None:
+    """The last span `span` without the junk `junk` at its end; None when
+    the span does not hold it whole, would be left empty, or the entry's
+    last title words are not the junk's."""
+    last = span.text.rstrip()
+    rest = last[: -len(junk)]
+    if not last.endswith(junk) or not rest.strip():
+        return None
+    parts = junk.split(" ")
+    split = None if rest.endswith(" ") else (rest.split(" ")[-1], parts[0])
+    expected = ("".join(split), *parts[1:]) if split else parts
+    title_words = tuple(word for line in entry.title for word in line.line.words)
+    taken = _taken(
+        junk,
+        _end_reason(junk),
+        title_words[-len(parts) :],
+        expected,
+        split,
+        entry.title[-1].page_index,
+    )
+    if taken is None:
+        return None
+    return _SideTaken(replace(span, text=rest.rstrip()), *taken)
+
+
+def without_junk(block: Block, entry: ContentsEntry, junk: TitleJunk) -> JunkTaken:
+    """`block`, the block of the contents entry `entry`, without `junk`,
+    the text at the start and end of its title that rule 11 of spec
+    section 30 finds is not the printer's, with the removals of that
+    text, from the words of the entry's title, and the word changes that
+    split it off a word it was glued to. Junk at the start is taken only
+    when it lies whole in the first span, at the end in the last, without
+    emptying that span, and when the title's words there are the junk's;
+    otherwise it stays."""
+    if not block.spans or not entry.title:
+        return JunkTaken(block, (), ())
+    start = _start_taken(block.spans[0], junk.start, entry) if junk.start else None
+    spans = (start.span, *block.spans[1:]) if start else block.spans
+    end = _end_taken(spans[-1], junk.end, entry) if junk.end else None
+    spans = (*spans[:-1], end.span) if end else spans
+    sides = tuple(side for side in (start, end) if side is not None)
+    return JunkTaken(
+        replace(block, spans=spans) if sides else block,
+        tuple(side.removal for side in sides),
+        tuple(change for side in sides for change in side.changes),
+    )
