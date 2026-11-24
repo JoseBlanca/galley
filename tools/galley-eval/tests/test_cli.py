@@ -41,13 +41,28 @@ def test_unknown_subcommand_exits_with_code_2() -> None:
     assert raised.value.code == 2
 
 
-def test_unknown_book_exits_with_code_2_and_names_it(
+def test_unknown_book_exits_with_code_2_names_it_and_makes_no_folder(
     capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # A repository of its own, whose runs/evaluation/ must not be made.
+    (tmp_path / "evaluation").mkdir()
+    shutil.copy(
+        _REPOSITORY / "evaluation" / "books.toml",
+        tmp_path / "evaluation" / "books.toml",
+    )
+    repository = galley_eval.cli._repository()
+    monkeypatch.setattr(
+        galley_eval.cli,
+        "_repository",
+        lambda: type(repository)(git=repository.git, root=tmp_path, commit="abc123"),
+    )
     with pytest.raises(SystemExit) as raised:
         main(["compare", "nosuchbook"])
     assert raised.value.code == 2
     assert "nosuchbook" in capsys.readouterr().err
+    assert not (tmp_path / "runs").exists()
 
 
 def test_book_toml_is_read_by_galley_with_every_field(

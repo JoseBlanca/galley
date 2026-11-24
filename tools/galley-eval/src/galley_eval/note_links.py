@@ -120,12 +120,13 @@ def _likeness(galley_keys: str, reference_keys: str) -> float:
 def begins_as(galley_keys: str, reference_keys: str) -> bool:
     """Whether a text of alignment keys written one after the other begins
     as another: their first characters, as many as the shorter has and at
-    most 30, have a difflib ratio of 0.6 or more. An empty text begins as
-    nothing."""
+    most _START_CHARACTERS, have a difflib ratio of _LEAST_RATIO or more.
+    An empty text begins as nothing."""
     return _likeness(galley_keys, reference_keys) >= _LEAST_RATIO
 
 
 def _keys(texts: Iterable[str]) -> str:
+    """The alignment keys of `texts`, written one after the other."""
     return "".join(alignment_key(text) for text in texts)
 
 
@@ -204,6 +205,11 @@ def _wrong_links(
     galley_texts: frozendict[str, str],
     reference_texts: tuple[str, ...],
 ) -> tuple[WrongLink, ...]:
+    """The galley note references, `note_references` with the reference
+    gap of each in `gaps` (None when it has none), whose note's text in
+    `galley_texts` begins as none of the reference notes, of
+    `reference_texts`, that Gutenberg references within
+    NOTE_REFERENCE_TOKENS gaps of it; each with the page of its token."""
     note_index = {note.note_id: index for index, note in enumerate(reference.notes)}
     gutenberg = tuple(
         (note_reference.gap.token_index, note_reference.note_id)
@@ -249,6 +255,11 @@ def _joined_notes(
     galley_pages: frozendict[str, int],
     reference_texts: tuple[str, ...],
 ) -> tuple[JoinedNote, ...]:
+    """The galley notes, of `galley_texts`, that begin as a reference note
+    aligned into them and whose text past that note's length, at least
+    _LEAST_REST keys, begins as the next reference note; each with its
+    page from `galley_pages`. `note_of` gives the galley note of each
+    galley token of the notes."""
     candidates: dict[str, set[int]] = {}
     for index, place in enumerate(places):
         if place.note_index is None:
