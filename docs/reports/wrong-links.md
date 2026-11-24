@@ -3,6 +3,40 @@
 For the owner. Started on 24 November 2026, at main a908204. The plan is
 `docs/plans/wrong-links.md`.
 
+## Summary
+
+Done on branch `plan/wrong-links`, 24 November 2026, but for task 5.2
+(Kadesh rebuilt with the vision model), which waits for LM Studio. The
+seven books are rebuilt in `runs/wrong-links/<folder>/`, all through
+epubcheck with no error or warning. Every link that changed against the
+builds before the plan was checked on the page images: none of the
+changed links is wrong; 3 right links were given up, all in Kadesh.
+
+| book (folder) | links | wrong before | wrong after | right links lost |
+|---|---|---|---|---|
+| Domesday (`domesdaybook00maituoft`) | 1,589 → 1,614 | 10 | 3 | 0 |
+| Haskins (`normansineuropea00hask`) | 69 → 69 | 2 | 1 | 0 |
+| Gierke (`politicaltheorie00gieruoft`) | 296 → 296 | 1 (page 42) | 0 | 0 |
+| Kadesh (`battleofkadeshst00breauoft`), without the model | 45 → 33 | 15 | 1 | 3 |
+| Stubbs, Turney, Haynes | unchanged | — | — | — |
+
+Haskins' "wrong before" counts page 56, which work package 3 made wrong
+and fixed on the way. Notes that held the next note's text: Domesday
+36 → 9, Haskins 1 → 0. Domesday's notes with the right reference
+(galley-eval): 1,563 → 1,594.
+
+Wrong links left: Domesday 154 and 498 (a sign read where nothing is
+printed, at the place the next reference is expected), Domesday 333 (a
+"2" read as 3), Haskins 204 (a "*" with nothing printed, on the page's
+only note), Kadesh 54 (the reference to 144 read "I'*").
+
+The right links given up, by the owner's rule of no wrong link: Kadesh
+pages 18, 26 and 52.
+
+Left open: Kadesh with the vision model (task 5.2, about 26 minutes of
+LM Studio; the earlier build with the model had 105 links, 95 right);
+the wrong links above; a link the model places one word off.
+
 ## Work package 2: unmarked notes and signs
 
 Done (99848e6 spec, 9682a3b code). In books numbered per page, a
