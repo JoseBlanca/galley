@@ -887,6 +887,100 @@ def test_no_note_is_placed_when_its_neighbours_numbers_skip_a_note() -> None:
     ]
 
 
+def _greek_notes(count: int, *, referenced: tuple[int, ...] = ()) -> tuple[Note, ...]:
+    """`count` notes of page 31 with first words no note line names."""
+    names = ("Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta")
+    return tuple(
+        _note(
+            f"n-p0031-{index:03d}",
+            f"{names[index - 1]} note {index}",
+            referenced=index in referenced,
+        )
+        for index in range(1, count + 1)
+    )
+
+
+def _by_order(
+    lines: str,
+    notes: tuple[Note, ...],
+    references: Mapping[int, str] = frozendict(),
+) -> list[tuple[str, str]]:
+    """The links of page 31 whose body is "w0 w1 ...", one word per
+    reference of `lines`, each "wK [n] x"; `references` gives galley's
+    reference after a word, by its position."""
+    reading = _line_page(*(f"w{index}" for index in range(8)))
+    galley = {}
+    for position, note_id in references.items():
+        place = reading[position].place
+        assert place is not None
+        galley[place] = note_id
+    links = page_links(31, reading, notes, link_answer(lines), frozendict(galley))
+    return [(link.text, link.note_id) for link in links]
+
+
+def test_a_number_far_below_the_next_links_finds_no_note() -> None:
+    # The fallback's note would lie before the page's first footnote.
+    lines = "w0 [3] x\nw1 [15] x\nNOTE 15 | Beta note 2\n"
+    assert _by_order(lines, _greek_notes(2)) == [("15", "n-p0031-002")]
+
+
+def test_no_note_galley_references_is_found_by_order() -> None:
+    # The model marks galley's reference to the second note with "*" and a
+    # note line that names none (counted as marked); its "2" would go by
+    # order to that note, which galley links already.
+    lines = (
+        "w0 [1] x\nw1 [2] x\nw2 [*] x\nw3 [4] x\n"
+        "NOTE 1 | Alpha note 1\nNOTE 4 | Delta note 4\n"
+    )
+    found = _by_order(lines, _greek_notes(4, referenced=(2,)), {2: "n-p0031-002"})
+    assert found == [("1", "n-p0031-001"), ("4", "n-p0031-004")]
+
+
+def test_no_note_a_dropped_link_names_is_found_by_order() -> None:
+    # "5" names the first note but breaks the order; "1", whose note line
+    # names none, would go by order to that note.
+    lines = (
+        "w0 [1] x\nw1 [5] x\nw2 [3] x\nNOTE 5 | Alpha note 1\nNOTE 3 | Gamma note 3\n"
+    )
+    assert _by_order(lines, _greek_notes(3)) == [("3", "n-p0031-003")]
+
+
+def test_a_note_found_by_order_must_be_the_k_th() -> None:
+    # "3" is the model's second reference, but by the numbers its note is
+    # the third: the model marked a reference that is none ("9"), or
+    # misread a number.
+    lines = (
+        "w0 [1] x\nw1 [3] x\nw2 [9] x\nw3 [4] x\n"
+        "NOTE 1 | Alpha note 1\nNOTE 4 | Delta note 4\n"
+    )
+    assert _by_order(lines, _greek_notes(4)) == [
+        ("1", "n-p0031-001"),
+        ("4", "n-p0031-004"),
+    ]
+
+
+def test_a_reference_at_galleys_reference_is_not_found_by_order() -> None:
+    # galley links the second word to a note of another page; the model's
+    # "2" there names no note, and is not moved to the page's second note.
+    lines = (
+        "w0 [1] x\nw1 [2] x\nw2 [3] x\nNOTE 1 | Alpha note 1\nNOTE 3 | Gamma note 3\n"
+    )
+    found = _by_order(lines, _greek_notes(3), {1: "n-p0030-001"})
+    assert found == [("1", "n-p0031-001"), ("3", "n-p0031-003")]
+
+
+def test_a_note_found_by_order_without_a_guard_is_linked() -> None:
+    # The cases above with the reference's number right: it is linked.
+    lines = (
+        "w0 [1] x\nw1 [2] x\nw2 [3] x\nNOTE 1 | Alpha note 1\nNOTE 3 | Gamma note 3\n"
+    )
+    assert _by_order(lines, _greek_notes(3)) == [
+        ("1", "n-p0031-001"),
+        ("2", "n-p0031-002"),
+        ("3", "n-p0031-003"),
+    ]
+
+
 def test_a_reference_the_model_marks_where_galley_links_the_note_counts_once() -> None:
     # Section 9b, Kadesh's page 9: galley links "Chabas" to note 6; the
     # model's "Chabas" [6] gives no link, its note line missing, and its

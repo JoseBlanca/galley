@@ -482,12 +482,16 @@ def _links_by_order(
     the page or one another reference names too, by the order of the page
     (section 9b): the footnote as many places before the note of the next
     link of `kept` as the reference's number is below that link's, when
-    the link before it in `kept`, if any, has a smaller number and as many
-    numbers below the next link's as notes, the footnote is the k-th as
-    `links_in_order` counts, galley references none of it and no link of
-    `named` goes to it. Two references that find one note give neither."""
+    the link before it in `kept`, if any, has as many numbers below the
+    next link's as notes, the footnote is the k-th as `links_in_order`
+    counts, galley references none of it and no link of `named` goes to
+    it. The k-th count also gives what section 9b asks besides: the link
+    before has a smaller number than the reference (else the note found
+    would be at or before that link's, whose count is smaller), and no
+    two references find one note (their ranks differ, so their counts
+    do)."""
     order = {note.id: index for index, note in enumerate(notes)}
-    found: list[Link] = []
+    found = []
     for item in placed:
         number = _number(item.reference.text)
         if number is None:
@@ -503,7 +507,6 @@ def _links_by_order(
             before_number = _number(before.text)
             if (
                 before_number is None
-                or before_number >= number
                 or after_number - before_number
                 != order[after.note_id] - order[before.note_id]
             ):
@@ -516,8 +519,7 @@ def _links_by_order(
         ):
             continue
         found.append(_link(page_index, item, note.id))
-    twice = _named_twice(found)
-    placed_links = tuple(link for link in found if link.note_id not in twice)
+    placed_links = tuple(found)
     if placed_links:
         _logger.info(
             "page %d: %d links placed by the order of the page's notes",
