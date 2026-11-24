@@ -5470,29 +5470,43 @@ kinds, as on any page.
     the blocks of the builds of the plan wrong-links, the last before
     this revision): Haskins' first three entries lose "-^1.", "_ II,"
     and `"HI.`, each a pencil stroke read with the chapter's roman
-    numeral, which is lost with it, so that these entries have no label
-    (they showed the stroke and the misread numeral before); Domesday's
+    numeral, which is lost with it and which rule 12 gives back; Domesday's
     "PREFACE" loses a speck read "*." (page 14), "Note: The Angild
     Clause," its page number "290." (page 17), and "Beyond Domesday,"
     the "pp," read with a comma before its page numbers (page 20). Each
     was checked against its page image. Turney, Stubbs, Gierke and
     Kadesh lose nothing.
-12. **A label inferred.** In a contents run, an entry without a label
-    whose entry before has the label "N−1." and entry after "N+1.", N a
-    number of 1 or 2 digits, gets the label "N."; so does an entry
-    without a label just before one labelled "2." when no entry before
-    it in the run has a number label. Haynes' run starts with two
-    front-matter entries without a label, then chapter 1's, then "2.":
-    only chapter 1's entry, the one just before "2.", gets "1.". This
-    label is **inferred, not read**: the printer printed it, and the
-    text layer lost it, in Haynes under a reader's pen circle. Haynes'
-    chapters 1 and 6 get "1." and "6.", once rule 7 has made chapter
-    7's label "7.". No other book has such an entry. An inferred label
-    is not marked in `blocks.json`, so that the format does not change;
-    only `lines.json`, which lacks the number, tells it from a read
-    one, and the fidelity check admits it by this rule (section 31).
-    It is applied with the entries, in step 3.1, and rule 11 then takes
-    off the junk that the lost number left.
+12. **A label inferred.** A **number label** is a number of 1 or 2
+    digits with ".", "7.", or a well-formed roman numeral in capitals
+    with ".", "IV." (rule 7 reads no roman label in lower case, and the
+    OCR's "l" or "1" for "I" is not taken as one); two are of the same
+    **style** when both are digits or both roman numerals. In a contents run, labels are inferred for entries without a
+    label in two places, when the count fits exactly:
+    - between two entries whose number labels are of the same style,
+      M and N, with exactly N−M−1 entries between them and none of them
+      with a label: they get M+1 to N−1;
+    - before the run's first number label N, when the N−1 entries just
+      before it have no label: they get 1 to N−1. Entries before those
+      keep none.
+
+    Each inferred label is written in the style of its neighbours,
+    digits or a roman numeral in capitals, with ".". Haynes' run
+    starts with two front-matter entries without a label, then chapter
+    1's, then "2.": only chapter 1's entry gets "1."; its chapter 6
+    gets "6." between "5." and "7." once rule 7 has made chapter 7's
+    label "7.". Haskins' run starts with chapters I to III without a
+    label, then "IV.": they get "I.", "II." and "III." (extended to
+    roman numerals on 24 November 2026; until then they had no label).
+    No other book of the seven has such an entry. This label is
+    **inferred, not read**: the printer printed it, and the text layer
+    lost it, in Haynes under a reader's pen circle, in Haskins under a
+    pencil stroke. An inferred label is not marked in `blocks.json`, so
+    that the format does not change; only `lines.json`, which lacks the
+    number, tells it from a read one, and the fidelity check admits it
+    by this rule (section 31). It is applied with the entries, in step
+    3.1, and rule 11 then takes off the junk that the lost number left.
+    In the `haskins_front` excerpt the three entries are not linked
+    (section 32), so they get their labels and keep their junk.
 
 The entries and their page numbers are made in step 3.1, where the
 body stream is walked over page breaks, and the links in step 3.4,
@@ -5600,10 +5614,9 @@ depth 2 and 29 of depth 3. These stay wrong:
   after it are written nested under it; "Statistical Tables" (page 19),
   centred, is of depth 2, and the topics of § 2 are nested under it.
 - **Pencil marks** before a label or at the start of a linked entry
-  are removed (rules 7 and 11, 24 November 2026), but the roman numeral
-  the OCR read together with one is lost with it: Haskins' entries of
-  chapters I to III have no label. Rule 12 infers only a number label
-  between two others or before "2.", so it gives them none. A mark
+  are removed (rules 7 and 11, 24 November 2026), and a number read
+  together with one is lost with it; rule 12 gives it back only when
+  the count of entries fits, as for Haskins' chapters I to III. A mark
   glued to a title word that starts in lower case, or at the start of
   an entry that is not linked, stays.
 - **Column headings**, Domesday's "PAGE" (page 14) and Gierke's
@@ -5712,11 +5725,13 @@ other link stays an error.
 words of the block whatever its kind, and a `contents_entry`'s
 `page_number` too, but for a label that section 30's rule 12 inferred:
 a word that the blocks hold more often than the lines, and that is the
-label "N." of a contents entry whose neighbours among the consecutive
-`contents_entry` blocks (the check does not know the runs; in the
-seven books a run's entries are consecutive blocks) are labelled "N−1." and "N+1.", or "1." of one
-whose next is "2." and no earlier one of which has a number label, is
-admitted, as many times as such entries hold it (24 November 2026). The
+number label of value N (rule 12) of a contents entry whose next
+neighbour among the consecutive `contents_entry` blocks (the check does
+not know the runs; in the seven books a run's entries are consecutive
+blocks) has the label N+1 of the same style, and whose neighbour before
+has N−1 of that style or, when N is 1, none of the entries before it
+has a number label, is admitted, as many times as such entries hold it
+(24 November 2026). The
 check reads only `blocks.json`, so it cannot tell an inferred label
 from a read one; what it admits is a number that the rule could have
 inferred, never another word; it verifies a `list_marker` change: one word before,
@@ -5760,8 +5775,10 @@ to the word before; and it reads `leader_dots` removals as any removal.
 - junk and inferred labels (rules 7, 11 and 12), on invented titles: a
   mark word before "7." removed and the label "7."; "§ 1." kept whole;
   an entry without a label between "5." and "7." labelled "6.", one
-  before "2." labelled "1.", and one before "2." after an entry
-  labelled "1." left alone; a linked title with a bracket and two
+  before "2." labelled "1.", three before "IV." labelled "I." to
+  "III.", two between "II." and "V." labelled "III." and "IV."; left
+  alone: one before "2." after an entry labelled "1.", one between
+  "IV." and "6.", and one between "2." and "5."; a linked title with a bracket and two
   letters glued before its first word, with a bracket and a mark glued
   there, with a word of 3 characters holding digits after its last
   word, and with a mark word apart before its first word, each losing
@@ -5788,7 +5805,7 @@ page images:
 
 | excerpt | page indices | what it checks |
 |---|---|---|
-| `haskins_front` | 14, 16 | the title "CONTENTS" a heading; 9 entries of depth 1, labels from "IV." to "VIII." ("VI." without its mark, removed as `stray_mark`), none on the first three, whose numbers are glued to marks or read "II,", page numbers "i" to "251"; none linked: the others' chapters are outside the excerpt, and the excerpt's heading on page 16 holds the half-title before chapter I's title ("THE NORMANS IN EUROPEAN HISTORY I NORMANDY AND ITS PLACE IN HISTORY", section 14), which matches the first entry at 0.66 only; the whole book links it at 1.00 |
+| `haskins_front` | 14, 16 | the title "CONTENTS" a heading; 9 entries of depth 1, labels "I." to "III." inferred (rule 12) and "IV." to "VIII." read ("VI." without its mark, removed as `stray_mark`), the first three keeping in their titles their numbers glued to marks or read "II,", page numbers "i" to "251"; none linked: the others' chapters are outside the excerpt, and the excerpt's heading on page 16 holds the half-title before chapter I's title ("THE NORMANS IN EUROPEAN HISTORY I NORMANDY AND ITS PLACE IN HISTORY", section 14), which matches the first entry at 0.66 only; the whole book links it at 1.00 |
 | `stubbs_summaries_index` | 16, 312 | chapters IX to XII as entries of depth 1 with their labels, unlinked; their topics of depth 2 with pages "189", "212", "238" and "263"; "Index" with page "291" linked to the index's heading on page 312 |
 | `domesday_headings_quotes` | 14, 22, 30 | the front matter's entries and leader dots; "ESSAY I." with "DOMESDAY BOOK." linked to page 22's heading; the essay's topics an analytical summary of depth 2; "§ 1." with "Plan of the Survey," and page "pp. 9 — 26.", depth 2, linked to page 30's heading; its topics of depth 3 |
 | `gierke_front_flow` | 10 | 8 entries; page numbers "vii", "xlvii" and "i" taken and the leader dots before them removed; "Ivi", "Ixiii" and "lor" left in their titles with their dots; none linked |
