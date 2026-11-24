@@ -779,7 +779,11 @@ A link is not proposed, and is logged, when:
   until 21 November 2026, the model's "Lenormant," to note 5 would be
   refused while galley links note 5 from "Chabas", and then "Salvolini"
   to note 4 too, since galley's "Lenormant," to note 4 stays;
-- two links of the book go to the same note: neither is proposed.
+- two links of the book go to the same note: neither is proposed;
+- two links of the book follow the same galley word: neither is
+  proposed. Markdown would put the second edit's link in place of the
+  first's, and which of the two references is right is not known
+  (review of 24 November 2026).
 
 **The edit.** `reason` `"vision_note_link"`; `old` galley's word, with
 the words before it in the same span added one at a time until it
