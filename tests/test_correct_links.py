@@ -1296,6 +1296,25 @@ RECORDED_LINKS = (
     (14, "27", "27", "men,", "was only 200 men", "Gox., Ham., III, 3. They brought"),
     (14, "28", "28", "men,", "Nubian wars 400 men", "4meni inscription (1. 12)."),
     (14, "29", "29", "men.", "to Coptos, 600 men", "Tbid., ll. 14, 15."),
+    # 32 and 33 since the structure stage's signs after "5,000.”" and
+    # "people,”" left notes 29 and 30 (structure spec section 11, "A value
+    # out of order").
+    (
+        14,
+        "32",
+        "32",
+        "5,000.”",
+        "Negroes, 880; total, 5,000",
+        "Pap, Anastasi, I, Plate XVII, 11",
+    ),
+    (
+        14,
+        "33",
+        "33",
+        "people,”",
+        "he slew 9,376 people",
+        "Great Karnak inscription, 1. 58,",
+    ),
     (
         15,
         "34",
