@@ -87,7 +87,9 @@ class MarkdownWords:
     """The words of book.md as Pandoc reads it, in order; the number of
     notes Pandoc found (its Note elements), which references to footnotes
     become; the number of links marked `epub:type="noteref"`, which
-    references to endnotes become; the number of items of the lists of
+    references to endnotes become; the number of links with the role
+    `doc-backlink`, which the markers of referenced endnotes become
+    (architecture section 9, "Back links"); the number of items of the lists of
     list items, each a list item of blocks.json; the marker Pandoc shows
     for each of those items; and the links of the contents entries, in
     order (structure spec section 31)."""
@@ -95,6 +97,7 @@ class MarkdownWords:
     words: tuple[MarkdownWord, ...]
     note_count: int
     note_link_count: int
+    back_link_count: int
     list_item_count: int
     shown_markers: tuple[ShownMarker, ...]
     contents_links: tuple[ContentsLink, ...]
@@ -465,6 +468,23 @@ def _note_count_detail(blocks: BlocksFile, markdown: MarkdownWords) -> str:
         f"notes in the Markdown: {markdown.note_count}; "
         f"references to endnotes in blocks.json: {to_endnotes}; "
         f"note reference links in the Markdown: {markdown.note_link_count}"
+    )
+
+
+def _back_link_count_detail(blocks: BlocksFile, markdown: MarkdownWords) -> str:
+    """Empty when the links with the role `doc-backlink` are as many as the
+    endnotes with `referenced` true and a marker (architecture section 9,
+    "Back links"); otherwise both numbers."""
+    back_linked = sum(
+        1
+        for note in blocks.notes
+        if note.kind is NoteKind.ENDNOTE and note.referenced and note.marker.strip()
+    )
+    if back_linked == markdown.back_link_count:
+        return ""
+    return (
+        f"referenced endnotes with a marker in blocks.json: {back_linked}; "
+        f"back links in the Markdown: {markdown.back_link_count}"
     )
 
 
@@ -1197,6 +1217,7 @@ def check_stage(
                     detail
                     for detail in (
                         _note_count_detail(before, after),
+                        _back_link_count_detail(before, after),
                         _list_count_detail(before, after),
                     )
                     if detail
@@ -1225,12 +1246,14 @@ _PANDOC_ARGUMENTS = (
 class _Boundary(StrEnum):
     """Where a word of Pandoc's JSON ends: at a space or line break or the
     start or end of a block element, at the start of a note, at the start
-    of a link marked as a note reference, or at the start of an item of a
-    list of list items; the last three are also counted."""
+    of a link marked as a note reference or of a back link from a note, or
+    at the start of an item of a list of list items; the last four are
+    also counted."""
 
     BREAK = "break"
     NOTE = "note"
     NOTE_LINK = "note_link"
+    BACK_LINK = "back_link"
     LIST_ITEM = "list_item"
 
 
@@ -1239,13 +1262,29 @@ class _Boundary(StrEnum):
 _NOTE_LINK_ATTRIBUTE = ("epub:type", "noteref")
 
 
+# Architecture section 9, "Back links": the marker of a referenced endnote
+# is a link back to its reference with this attribute.
+_BACK_LINK_ATTRIBUTE = ("role", "doc-backlink")
+
+
+def _has_attribute(attributes: list[object], attribute: tuple[str, str]) -> bool:
+    """Whether a link's key-value attributes, as Pandoc's JSON gives them,
+    hold `attribute`."""
+    return any(
+        isinstance(given, list) and tuple(given) == attribute for given in attributes
+    )
+
+
 def _is_note_link(attributes: list[object]) -> bool:
     """Whether a link's key-value attributes, as Pandoc's JSON gives them,
     mark it as a note reference."""
-    return any(
-        isinstance(attribute, list) and tuple(attribute) == _NOTE_LINK_ATTRIBUTE
-        for attribute in attributes
-    )
+    return _has_attribute(attributes, _NOTE_LINK_ATTRIBUTE)
+
+
+def _is_back_link(attributes: list[object]) -> bool:
+    """Whether a link's key-value attributes, as Pandoc's JSON gives them,
+    mark it as a back link from a note to its reference."""
+    return _has_attribute(attributes, _BACK_LINK_ATTRIBUTE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1288,6 +1327,17 @@ def _inline_tokens(inline: object, block_id: str | None) -> tuple[_Token, ...]:
             # own (architecture section 13).
             return (
                 _Boundary.NOTE_LINK,
+                *_inlines_tokens(inlines, block_id),
+                _Boundary.BREAK,
+            )
+        case {
+            "t": "Link",
+            "c": [[_, _, list() as attributes], list() as inlines, _],
+        } if _is_back_link(attributes):
+            # The link's text is a referenced endnote's marker, a word of
+            # its own (architecture section 13).
+            return (
+                _Boundary.BACK_LINK,
                 *_inlines_tokens(inlines, block_id),
                 _Boundary.BREAK,
             )
@@ -1757,6 +1807,7 @@ def _token_words(tokens: tuple[_Token, ...]) -> tuple[MarkdownWord, ...]:
                 _Boundary.BREAK
                 | _Boundary.NOTE
                 | _Boundary.NOTE_LINK
+                | _Boundary.BACK_LINK
                 | _Boundary.LIST_ITEM
                 | ContentsLink()
                 | ShownMarker()
@@ -1783,6 +1834,7 @@ def _words_of_pandoc_json(pandoc_json: str) -> MarkdownWords:
         words=_token_words(tokens),
         note_count=sum(1 for token in tokens if token is _Boundary.NOTE),
         note_link_count=sum(1 for token in tokens if token is _Boundary.NOTE_LINK),
+        back_link_count=sum(1 for token in tokens if token is _Boundary.BACK_LINK),
         list_item_count=sum(1 for token in tokens if token is _Boundary.LIST_ITEM),
         shown_markers=tuple(
             token for token in tokens if isinstance(token, ShownMarker)
@@ -1843,12 +1895,12 @@ def read_markdown(markdown: str) -> MarkdownWords:
     markdown-smart-auto_identifiers --to json --fail-if-warnings`), each with
     the id of the innermost div or heading with an id it is in, the number
     of notes, the number of links marked `epub:type="noteref"`, the number
-    of items of the lists of list items, and the links of the contents
+    of back links (links with the role `doc-backlink`), the number of items of the lists of list items, and the links of the contents
     entries.
 
     Words are split at spaces and line breaks, and at the start and end of
-    every block, note and link marked as a note reference, whose text is
-    read as its own words; emphasis does not split a word. The words of an
+    every block, note, link marked as a note reference and back link, whose
+    text is read as its own words; emphasis does not split a word. The words of an
     epigraph's source div count to the epigraph, without the dash markdown
     writes first, and those of a note group's div to the endnote whose div
     follows it. A heading of class `chapter-notes` whose text is "Notes",
@@ -1865,8 +1917,8 @@ def read_markdown(markdown: str) -> MarkdownWords:
     ExternalProgramError, with Pandoc's standard error, when `pandoc` is
     missing, fails or warns (a note definition no reference uses), runs
     longer than 60 s, or reads an element galley's Markdown does not make,
-    such as a list of another form, a link that is no note reference
-    outside a contents entry's div, or an image that is
+    such as a list of another form, a link that is no note reference or
+    back link outside a contents entry's div, or an image that is
     not alone in its paragraph, whose alt text is not its figure's caption,
     or that has a title or attributes; or a div inside an epigraph's div
     that is not its source's, a source's div that does not start with the

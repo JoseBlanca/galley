@@ -772,7 +772,10 @@ and each reference to one a link to it marked as a note reference
 (`epub:type="noteref"`), which a Kindle can show as a pop-up (Pandoc
 3.14 keeps an `epub:type` attribute on a link and a div, and points the
 link into the right chapter file, checked on 16 November 2026; the
-pop-up itself was not tried on a Kindle); a `verse` block with a hard
+pop-up itself was not tried on a Kindle); the number at the start of
+each note written as a link back to the place in the text that refers
+to it, so that the reader can go back (owner, 24 November 2026; the
+form is in "Back links" below); a `verse` block with a hard
 line break at each line feed; an `epigraph` as a div holding its
 quotation, with hard line breaks when it is verse, and a div of class
 `epigraph-source` holding a dash and its source, the dash written as text;
@@ -796,7 +799,72 @@ it back as written: "1. Of the three" at the start of a paragraph must
 not become a numbered list. `book.md` is read by Pandoc with smart quotes
 off (`-f markdown-smart`), so `"` stays `"`.
 
-**epub** runs Pandoc on `book.md` with the cover and a style sheet.
+**Back links.** Each note that a place in the text refers to starts
+with its number written as a link back to that place; a note referred
+to from several places links back to the first, in the order of
+blocks.json (the body's blocks, then the notes' blocks). No glyph or
+word is added for it: the number is the one the note already shows,
+its printed marker for an endnote and Pandoc's number for a footnote
+(section 17). A note no place refers to, a footnote or an endnote with
+`referenced` false, gets none. The link carries the attribute
+`role="doc-backlink"`, the ARIA role (a standard attribute that tells
+a reading system or a screen reader what an element is) of a link from
+a note back to its reference, which Pandoc's own HTML footnotes use and
+epubcheck accepts. The two kinds of note get it in two places:
+
+- An endnote, in `book.md`. The first reference to it is the link
+  above with an id, `ref-` and the note's id, which no block, note or
+  "Notes" heading id can equal, since those start with `b-`, `n-` and
+  `notes-`:
+  `[6](#n-p0190-001){#ref-n-p0190-001 epub:type="noteref"}`. Its
+  printed marker, the first word of its first block that is not a margin
+  note, is a link to that id with the role `doc-backlink`:
+  `[6](#ref-n-p0190-001){role="doc-backlink"}`. Pandoc points both links
+  into the right chapter file, as it does the reference. An endnote
+  with an empty marker has no number to link and gets none. markdown
+  refuses a blocks.json in which a `ref-` id would equal another id, or
+  the id of a note it is made from is not one Pandoc and XML read as
+  written: a letter, then letters, digits, `-`, `_` and `.`.
+- A footnote with `referenced` true, in the EPUB only. `book.md` keeps
+  it as a Pandoc footnote, without its marker, and Pandoc's EPUB 3
+  writer makes it an `<aside epub:type="footnote">` at the end of its
+  chapter file, holding the note's text and no number. The epub stage
+  runs Pandoc with a Lua filter (a script in Lua, run by Pandoc itself
+  on the document it has read, before it writes the EPUB; `pandoc
+  --lua-filter`) kept in the package, `src/galley/epub/back_links.lua`,
+  that
+  puts at the start of each such note the number Pandoc shows at its
+  reference, as a link to the reference of class `footnote-back`, the
+  class Pandoc gives its own back links in HTML, which tells Pandoc's
+  number from an endnote's printed marker, and with the role
+  `doc-backlink`: `<aside epub:type="footnote" id="fn3"><p><a
+  href="#fnref3" class="footnote-back" role="doc-backlink">3</a> Called
+  by…`. The link
+  goes first into the note's first paragraph that is not in a margin
+  note's div. Pandoc 3.14 numbers the footnotes of each chapter file
+  from 1 and gives the reference to note *n* of a file the id `fnref`
+  *n* (checked on 24 November 2026), so the filter counts the notes in
+  the order of the text and starts again at each heading of level 1,
+  where Pandoc starts a file. That id is Pandoc's choice, not one
+  galley makes: a test of the epub stage checks that each back link
+  points to the reference of its own note, and epubcheck reports a link
+  to an id no file has, so a Pandoc that numbered otherwise would fail
+  both.
+
+  Two other forms were weighed. markdown could write these footnotes as
+  galley's own linked notes, as it writes endnotes; then the note would
+  be a div, since Pandoc writes an `<aside>` only for its own
+  footnotes, and a Kindle shows a pop-up for a note reference whose
+  target is an `<aside epub:type="footnote">` (Amazon's Kindle
+  Publishing Guidelines; not tried on a Kindle here), so the pop-up
+  could be lost, and the fidelity check and galley's numbering of the
+  notes would have to be rebuilt. Rewriting the EPUB's XHTML after
+  Pandoc would unpack and repack the EPUB for what a filter does inside
+  Pandoc. The filter keeps Pandoc's footnotes as they are, and the
+  pop-up with them.
+
+**epub** runs Pandoc on `book.md` with the cover, a style sheet and the
+Lua filter of the back links.
 epubcheck validates the result in the tests, not in a run (section 16). The cover is
 `images/cover.png` when the config has a `cover_page`.
 
@@ -990,10 +1058,15 @@ lists the words, with the pages they came from where the origins say.
   is found; an element galley's Markdown does not make is an error inside
   a link as anywhere else. The number of such links must equal the number
   of references to endnotes, as the number of Pandoc's notes must equal
-  the number of references to footnotes. A link from a contents entry
-  to its heading is the one other link (below). Any other link is an element
-  galley's Markdown does not make, and an error. An endnote stays where it was printed, so its
-  `marker` is written there and counted, referenced or not (section 9).
+  the number of references to footnotes. An endnote stays where it was
+  printed, so its `marker` is written there and counted, referenced or
+  not (section 9). The marker of a referenced endnote is a back link
+  (section 9, "Back links"), a `Link` element with the attribute
+  `role="doc-backlink"`, whose text is read as a word of its own, as a
+  note reference's is; the number of back links must equal the number
+  of endnotes with a reference and a marker. A link from a contents
+  entry to its heading is the one other link (below). Any other link is
+  an element galley's Markdown does not make, and an error.
   A heading's `label` is written in `book.md`, in the form the markdown
   spec gives, and counted as words of its block; so are an epigraph's
   `source`, in its `epigraph-source` div after the dash markdown writes
@@ -1223,6 +1296,15 @@ On 19 November 2026, after reading Kadesh, the owner decided:
   chapter**, under a heading "Notes", in the order printed, with its
   marker; endnotes and linked footnotes stay as they were
   (`docs/specs/structure.md` §36).
+
+On 24 November 2026 the owner asked for back links from the notes to
+the text:
+
+- **A note's number links back to its reference**, the first when
+  there are several; no glyph or word is added, and a note without a
+  reference gets none (section 9, "Back links"). That a referenced
+  footnote gets it in the EPUB by a Lua filter, keeping Pandoc's
+  footnotes and their pop-up, was decided while writing.
 
 ## 18. Not in this document
 

@@ -1123,7 +1123,7 @@ Of Greece\\,[^n-p0005-001]
     :::
 
 ::: {#b-p0005-002}
-The Law[3](#n-p0009-001){epub:type="noteref"}
+The Law[3](#n-p0009-001){#ref-n-p0009-001 epub:type="noteref"}
 :::
 
 # NOTES\\. {#b-p0009-001}
@@ -1135,7 +1135,7 @@ Roman law\\.
 :::
 
 ::: {#b-p0009-003}
-3\\. Digest\\, 1\\.
+[3\\.](#ref-n-p0009-001){role="doc-backlink"} Digest\\, 1\\.
 :::
 
 ::: {#b-p0009-004 .quote}
@@ -1367,7 +1367,7 @@ def test_pandoc_reads_one_footnote_one_noteref_link_and_every_word_in_its_block(
 ):
     read = read_markdown(NOTES_MARKDOWN)
 
-    assert (read.note_count, read.note_link_count) == (1, 1)
+    assert (read.note_count, read.note_link_count, read.back_link_count) == (1, 1, 1)
     assert _words_by_block(NOTES_MARKDOWN) == {
         "b-p0005-001": ["Of", "Greece,"],
         "b-p0005-003": ["Greek", "law."],
@@ -1393,7 +1393,7 @@ def test_fidelity_check_passes_on_a_footnote_and_endnotes() -> None:
     [
         ("    See Plato\\.", "    See", "Plato."),
         ("Law[3](#n-p0009-001)", "Law[](#n-p0009-001)", "3"),
-        ("3\\. Digest", "Digest", "3."),
+        ("[3\\.](#ref-n-p0009-001)", "[](#ref-n-p0009-001)", "3."),
         ("    Greek law\\.", "    Greek", "law."),
     ],
     ids=[
@@ -1420,7 +1420,9 @@ def test_fidelity_check_finds_a_word_lost_from_a_footnote_or_endnote(
 
 @pytest.mark.pandoc
 def test_fidelity_check_finds_an_endnote_reference_written_as_a_plain_link() -> None:
-    markdown_text = NOTES_MARKDOWN.replace('{epub:type="noteref"}', "", 1)
+    markdown_text = NOTES_MARKDOWN.replace(
+        '{#ref-n-p0009-001 epub:type="noteref"}', "", 1
+    )
 
     with pytest.raises(ExternalProgramError, match="Link element in block b-p0005-002"):
         read_markdown(markdown_text)

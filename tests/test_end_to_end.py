@@ -478,8 +478,10 @@ def _is_written_as_a_footnote(note: Note) -> bool:
 
 def _text_without_footnote_numbers(element: ElementTree.Element) -> str:
     """The text of `element` without the numbers of Pandoc's footnote
-    references, links of class "footnote-ref"."""
-    if element.get("class") == "footnote-ref":
+    references, links of class "footnote-ref", and of the back links the
+    epub stage puts at the start of its footnotes, of class
+    "footnote-back" (architecture section 9, "Back links")."""
+    if element.get("class") in {"footnote-ref", "footnote-back"}:
         return element.tail or ""
     inner = "".join(_text_without_footnote_numbers(child) for child in element)
     return (element.text or "") + inner + (element.tail or "")
