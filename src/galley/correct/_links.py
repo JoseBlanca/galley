@@ -707,6 +707,15 @@ def _link_edit(
     )
 
 
+def _word_of(by_id: Mapping[str, Block], link: Link) -> tuple[str, int, int]:
+    """The galley word a link follows: its block, span and start."""
+    words = _words(by_id[link.place.block_id].spans[link.place.span_index].text)
+    start = next(
+        word.start for word in words if word.start <= link.place.start < word.end
+    )
+    return link.place.block_id, link.place.span_index, start
+
+
 def link_edits(
     blocks: BlocksFile,
     links: Sequence[Link],
@@ -715,17 +724,26 @@ def link_edits(
     model: str,
 ) -> tuple[Edit, ...]:
     """The link edits of `links` (section 9b), in their order, less those
-    refused and logged: two links to one note, a word the word edits
+    refused and logged: two links to one note or after one word, a word the word edits
     change, a reference after white space, a note galley references
     elsewhere that no link takes the place of, no `old` that occurs once."""
     by_id = {block.id: block for block in every_block(blocks)}
     counts = Counter(link.note_id for link in links)
+    after_word = Counter(_word_of(by_id, link) for link in links)
     changed = _changed_offsets(changes)
     prepared = []
     for link in links:
         if counts[link.note_id] > 1:
             _logger.info(
                 "page %d: two links to note %s; neither is proposed",
+                link.page_index,
+                link.note_id,
+            )
+            continue
+        if after_word[_word_of(by_id, link)] > 1:
+            _logger.info(
+                "page %d: two links after one word, one to note %s; neither "
+                "is proposed",
                 link.page_index,
                 link.note_id,
             )

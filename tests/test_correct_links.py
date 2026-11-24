@@ -389,6 +389,20 @@ def test_two_links_to_one_note_give_neither(caplog: pytest.LogCaptureFixture) ->
     assert "two links to note n-p0008-003" in caplog.text
 
 
+def test_two_links_after_one_word_give_neither(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Section 9b, review of 24 November 2026: markdown would put the second
+    # link in place of the first.
+    links = (
+        _link(BODY_BLOCK, "forces", "n-p0008-003", "2", "forces."),
+        _link(BODY_BLOCK, "forces", "n-p0008-004", "3", "forces."),
+    )
+    with caplog.at_level(logging.INFO, logger="galley.correct"):
+        assert link_edits(PAGE, links, (), (), MODEL) == ()
+    assert "two links after one word" in caplog.text
+
+
 def test_a_link_takes_the_place_of_galleys_link_to_another_note() -> None:
     # Kadesh page 9: galley links Lenormant to note 4, the model to 5, and
     # Salvolini to 4.
