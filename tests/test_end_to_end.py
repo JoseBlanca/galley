@@ -24,7 +24,7 @@ import pytest
 
 from galley.book_folder import BookFolder
 from galley.cli import main
-from galley.fidelity import inferable_contents_labels, read_markdown
+from galley.fidelity import read_markdown
 from galley.model import (
     BlockKind,
     BlocksFile,
@@ -265,8 +265,13 @@ def test_every_page_number_of_blocks_json_is_a_page_number_removed_on_its_page(
 # book.md
 
 
+# The labels structure infers in the excerpts (structure spec section 30,
+# rule 12): Haskins' chapters I to III, whose numerals pencil strokes hid.
+_INFERRED_LABELS = {"haskins_front": ("I.", "II.", "III.")}
+
+
 def _words_of_book_md_and_their_expected_count(
-    folder: BookFolder,
+    name: str, folder: BookFolder
 ) -> tuple[Counter[str], Counter[str], int, int]:
     """The words of a folder's book.md as Pandoc reads them, those of its
     words.json less structure's records and the footnotes' markers and
@@ -307,13 +312,10 @@ def _words_of_book_md_and_their_expected_count(
         )
     )
     # A contents label that structure inferred is in book.md and in no
-    # words.json (structure spec section 30, rule 12), as the fidelity
-    # check admits it.
-    shown = Counter(word.text for word in markdown.words)
-    for label, count in inferable_contents_labels(blocks).items():
-        words[label] += min(count, max(shown[label] - words[label], 0))
+    # words.json (structure spec section 30, rule 12).
+    words.update(_INFERRED_LABELS.get(name, ()))
     return (
-        shown,
+        Counter(word.text for word in markdown.words),
         +words,
         markdown.note_count,
         len(references),
@@ -331,7 +333,11 @@ def test_book_md_holds_the_words_of_words_json_less_structures_records_and_no_no
 ) -> None:
     with ThreadPoolExecutor(max_workers=_BOOK_MDS_READ_AT_ONCE) as pool:
         counts = tuple(
-            pool.map(_words_of_book_md_and_their_expected_count, excerpt_books.values())
+            pool.map(
+                _words_of_book_md_and_their_expected_count,
+                excerpt_books.keys(),
+                excerpt_books.values(),
+            )
         )
 
     for name, (words, expected_words, note_count, references) in zip(

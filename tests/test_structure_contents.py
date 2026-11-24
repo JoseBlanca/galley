@@ -17,6 +17,7 @@ from galley.errors import FidelityBoundary, FidelityError
 from galley.fidelity import check_stage
 from galley.model import (
     BlockKind,
+    BlocksFile,
     Box,
     ChangeReason,
     Line,
@@ -554,7 +555,9 @@ def test_contents_junk_is_removed_and_lost_labels_inferred() -> None:
         (0, ("(QzMoths",), ("(Qz", "Moths"), ChangeReason.CASE_SPLIT),
         (0, ("(^Winter",), ("(^", "Winter"), ChangeReason.CASE_SPLIT),
     )
-    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+    check_stage(
+        FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=frozenset({0})
+    )
 
 
 def test_inferred_roman_labels_pass_the_fidelity_check() -> None:
@@ -579,7 +582,9 @@ def test_inferred_roman_labels_pass_the_fidelity_check() -> None:
     assert tuple(
         b.label for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY
     ) == ("I.", "II.", "III.")
-    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+    check_stage(
+        FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=frozenset({0})
+    )
 
 
 def test_fidelity_check_admits_only_a_label_in_sequence() -> None:
@@ -590,7 +595,135 @@ def test_fidelity_check_admits_only_a_label_in_sequence() -> None:
         for block in blocks.blocks
     )
     with pytest.raises(FidelityError, match="8"):
-        check_stage(FidelityBoundary.STRUCTURE, lines, replace(blocks, blocks=wrong))
+        check_stage(
+            FidelityBoundary.STRUCTURE,
+            lines,
+            replace(blocks, blocks=wrong),
+            contents_pages=frozenset({0}),
+        )
+
+
+def _relabelled(
+    lines: LinesFile, contents_pages: frozenset[int], labels: dict[str, str | None]
+) -> BlocksFile:
+    """The blocks of `lines`, each contents entry whose title is a key of
+    `labels` given that label."""
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=contents_pages, workers=1)
+    return replace(
+        blocks,
+        blocks=tuple(
+            replace(block, label=labels[block_text(block)])
+            if block_text(block) in labels
+            else block
+            for block in blocks.blocks
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [
+        # "5." after "3.": the count does not fit.
+        {"Winter Roads": "5."},
+        # "1." with no "2." after it.
+        {"The Silent Harbour": "3.", "Winter Roads": "4.", "Salt and Iron": "5."},
+        # A label rule 12 gives no entry without one.
+        {"Afterword": "5."},
+    ],
+)
+def test_fidelity_check_refuses_a_label_rule_12_would_not_give_back(
+    labels: dict[str, str | None],
+) -> None:
+    lines = _junk_book()
+    blocks = _relabelled(lines, frozenset({0}), labels)
+    with pytest.raises(FidelityError, match="invented"):
+        check_stage(
+            FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=frozenset({0})
+        )
+
+
+def _read_roman_book() -> LinesFile:
+    """A contents page whose three labels "IV." to "VI." are all read, and
+    a chapter page."""
+    contents = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("IV. Moths and Lanterns 9", 85, 100, apart=12.0),
+                _line("V. The Silent Harbour 23", 85, 114, apart=12.0),
+                _line("VI. Winter Roads 40", 85, 128, apart=12.0),
+            ),
+        ),
+        (),
+    )
+    return LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(contents, _text_page(1, "WINTER ROADS")),
+    )
+
+
+def test_fidelity_check_refuses_labels_invented_in_a_paragraph() -> None:
+    # "IV.", "V." and "VI." are contents labels in sequence, but read:
+    # the same words added to a paragraph are invented.
+    lines = _read_roman_book()
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=frozenset({0}), workers=1)
+    check_stage(
+        FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=frozenset({0})
+    )
+    paragraph = next(b for b in blocks.blocks if b.kind is BlockKind.PARAGRAPH)
+    invented = replace(
+        paragraph,
+        spans=(*paragraph.spans, replace(paragraph.spans[-1], text=" V. VI. IV.")),
+    )
+    wrong = tuple(invented if b is paragraph else b for b in blocks.blocks)
+    with pytest.raises(FidelityError, match="invented"):
+        check_stage(
+            FidelityBoundary.STRUCTURE,
+            lines,
+            replace(blocks, blocks=wrong),
+            contents_pages=frozenset({0}),
+        )
+
+
+def test_fidelity_check_infers_labels_within_one_contents_run() -> None:
+    # Two runs, pages 0 and 2: rule 12 gives the entry of page 0 no "1."
+    # from the "2." of page 2, and the check admits none.
+    first = PageLayout(
+        0,
+        (
+            _region_of(
+                _centred("CONTENTS", 60),
+                _line("Moths and Lanterns 9", 92, 100, apart=12.0),
+            ),
+        ),
+        (),
+    )
+    second = PageLayout(
+        2,
+        (
+            _region_of(
+                _line("2. The Silent Harbour 23", 85, 100, apart=12.0),
+                _line("3. Winter Roads 40", 85, 114, apart=12.0),
+            ),
+        ),
+        (),
+    )
+    lines = LinesFile(
+        source_pdf_sha256="0" * 64,
+        rereads=(),
+        pages=(first, _text_page(1, "MOTHS AND LANTERNS"), second),
+    )
+    pages = frozenset({0, 2})
+    blocks = make_blocks(lines, _NO_WORDS, contents_pages=pages, workers=1)
+    assert tuple(
+        b.label for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY
+    ) == (None, "2.", "3.")
+    check_stage(FidelityBoundary.STRUCTURE, lines, blocks, contents_pages=pages)
+    forged = _relabelled(lines, pages, {"Moths and Lanterns": "1."})
+    with pytest.raises(FidelityError, match="invented"):
+        check_stage(FidelityBoundary.STRUCTURE, lines, forged, contents_pages=pages)
 
 
 def test_entry_keeps_every_line_for_its_origin_with_its_label_line() -> None:

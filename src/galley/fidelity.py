@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, assert_never, overload
 
-from galley.contents_labels import NumberLabel, label_text, number_label
+from galley.contents_labels import contents_runs, inferred_labels
 from galley.errors import ExternalProgramError, FidelityBoundary, FidelityError
 from galley.hyphens import LINE_END_HYPHENS
 from galley.list_markers import (
@@ -43,6 +43,7 @@ from galley.model import (
     Word,
     WordChange,
     WordsFile,
+    block_text,
     is_junk_beside_its_copy,
     may_read,
     replaced_layer_words,
@@ -629,34 +630,79 @@ def _places(words: Iterable[_PlacedWord], text: str) -> str:
     return ", ".join(places) if places else "none"
 
 
-def inferable_contents_labels(blocks: BlocksFile) -> Counter[str]:
-    """The labels of the contents entries that structure may have inferred
-    (structure spec sections 30, rule 12, and 31): a number label of value
-    N whose next neighbour among the consecutive contents entry blocks has
-    N+1 in its style, and whose neighbour before has N−1 in that style or,
-    for N = 1, none before it has a number label; each counted as often
-    as such entries hold it."""
-    runs: list[list[Block]] = [[]]
-    for block in blocks.blocks:
-        if block.kind is BlockKind.CONTENTS_ENTRY:
-            runs[-1].append(block)
-        elif runs[-1]:
-            runs.append([])
-    labels: Counter[str] = Counter()
-    for run in runs:
-        numbers = tuple(number_label(block.label) for block in run)
-        for position, number in enumerate(numbers):
-            if number is None:
-                continue
-            before = numbers[position - 1] if position > 0 else None
-            after = numbers[position + 1] if position + 1 < len(numbers) else None
-            follows = before == NumberLabel(number.style, number.value - 1) or (
-                number.value == 1
-                and all(earlier is None for earlier in numbers[:position])
+def _inside(box: Box, origin: tuple[Origin, ...], page_index: int) -> bool:
+    """Whether the centre of `box`, on page `page_index`, lies in the box of
+    an origin on that page."""
+    x = (box.x0 + box.x1) / 2
+    y = (box.top + box.bottom) / 2
+    return any(
+        part.page_index == page_index
+        and part.box.x0 <= x <= part.box.x1
+        and part.box.top <= y <= part.box.bottom
+        for part in origin
+    )
+
+
+def _label_lack(block: Block, page_words: frozendict[int, tuple[Word, ...]]) -> int:
+    """How many more times a contents entry block holds its label than the
+    words of lines.json inside its origin do (structure spec section 31):
+    0 for a label that was read."""
+    if block.label is None:
+        return 0
+    held = sum(
+        word == block.label
+        for word in (
+            *block.label.split(),
+            *block_text(block).split(),
+            *(block.page_number or "").split(),
+        )
+    )
+    read = sum(
+        part == block.label
+        for page_index in dict.fromkeys(part.page_index for part in block.origin)
+        for word in page_words.get(page_index, ())
+        if _inside(word.box, block.origin, page_index)
+        for part in word.text.split()
+    )
+    return max(held - read, 0)
+
+
+def _inferred_label_words(
+    lines: LinesFile, blocks: BlocksFile, contents_pages: frozenset[int]
+) -> Counter[str]:
+    """The labels of contents entry blocks that rule 12 of structure spec
+    section 30 inferred, as the check admits them (section 31): in each
+    contents run of `contents_pages`, the labels that their blocks hold
+    more often than their lines are set to none, rule 12 is applied, and
+    each such label that it gives back to its own block is counted as
+    many times as the block lacks it."""
+    page_words = frozendict(
+        {
+            page.index: tuple(
+                word
+                for region in page.regions
+                for line in region.lines
+                for word in line.words
             )
-            if follows and after == NumberLabel(number.style, number.value + 1):
-                labels[label_text(number.style, number.value)] += 1
-    return labels
+            for page in lines.pages
+        }
+    )
+    entries = tuple(b for b in blocks.blocks if b.kind is BlockKind.CONTENTS_ENTRY)
+    admitted: Counter[str] = Counter()
+    for run in contents_runs(contents_pages):
+        in_run = tuple(b for b in entries if b.origin and b.origin[0].page_index in run)
+        lacks = tuple(_label_lack(block, page_words) for block in in_run)
+        given = inferred_labels(
+            tuple(
+                None if lack else block.label
+                for block, lack in zip(in_run, lacks, strict=True)
+            ),
+            tuple(block.level or 0 for block in in_run),
+        )
+        for position, (block, lack) in enumerate(zip(in_run, lacks, strict=True)):
+            if lack and block.label is not None and given.get(position) == block.label:
+                admitted[block.label] += lack
+    return admitted
 
 
 def _check_words(
@@ -665,7 +711,8 @@ def _check_words(
     output_words: tuple[_PlacedWord, ...],
     taken_out: tuple[_PlacedWord, ...],
     note_detail: str,
-    admitted: Counter[str] | None = None,
+    *,
+    admitted: Counter[str],
 ) -> None:
     """Raise FidelityError when the input words, as a multiset, are not the
     output words less those taken out, or when `note_detail` reports a
@@ -675,7 +722,7 @@ def _check_words(
     difference = Counter(word.text for word in input_words)
     difference.subtract(word.text for word in output_words)
     difference.update(word.text for word in taken_out)
-    for text, count in (admitted or Counter()).items():
+    for text, count in admitted.items():
         if difference[text] < 0:
             difference[text] += min(count, -difference[text])
     missing = frozendict(
@@ -1106,7 +1153,11 @@ def check_stage(
 ) -> None: ...
 @overload
 def check_stage(
-    stage: Literal[FidelityBoundary.STRUCTURE], before: LinesFile, after: BlocksFile
+    stage: Literal[FidelityBoundary.STRUCTURE],
+    before: LinesFile,
+    after: BlocksFile,
+    *,
+    contents_pages: frozenset[int] = ...,
 ) -> None: ...
 @overload
 def check_stage(
@@ -1116,6 +1167,8 @@ def check_stage(
     stage: FidelityBoundary,
     before: WordsFile | LinesFile | BlocksFile,
     after: LinesFile | BlocksFile | MarkdownWords,
+    *,
+    contents_pages: frozenset[int] = frozenset(),
 ) -> None:
     """Check that no word was lost or invented at one stage boundary.
 
@@ -1126,8 +1179,10 @@ def check_stage(
     with each block's label, each epigraph's source, each contents entry's
     page number, and each note's marker and group, plus its removals,
     with each word change undone, admitting a contents entry's label that
-    structure may have inferred (a number between two in sequence, or
-    "1." before "2."). markdown: the words of blocks.json, with
+    rule 12 of the structure spec inferred: one that the words of
+    lines.json inside its block lack and that rule 12, applied to the
+    entries of its contents run of `contents_pages` (page indices from 0,
+    the config's), gives back to that block. markdown: the words of blocks.json, with
     the edits applied, against book.md as `read_markdown` gives it, without
     the references to footnotes and the markers of referenced footnotes,
     and without the dash markdown writes before an epigraph's source;
@@ -1174,6 +1229,7 @@ def check_stage(
                 _lines_file_words(after) + _reread_layer_words(after),
                 _reread_ocr_words(after),
                 "",
+                admitted=Counter(),
             )
         case FidelityBoundary.STRUCTURE:
             if not (isinstance(before, LinesFile) and isinstance(after, BlocksFile)):
@@ -1193,7 +1249,7 @@ def check_stage(
                 + _words_before_changes(after),
                 _words_after_changes(after),
                 "",
-                inferable_contents_labels(after),
+                admitted=_inferred_label_words(before, after, contents_pages),
             )
         case FidelityBoundary.MARKDOWN:
             if not (
@@ -1222,6 +1278,7 @@ def check_stage(
                     )
                     if detail
                 ),
+                admitted=Counter(),
             )
         case _:
             assert_never(stage)

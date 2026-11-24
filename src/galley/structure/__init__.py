@@ -163,7 +163,12 @@ def run(
         contents_pages=frozenset(config.contents_pages),
         workers=workers,
     )
-    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+    check_stage(
+        FidelityBoundary.STRUCTURE,
+        lines,
+        blocks,
+        contents_pages=frozenset(config.contents_pages),
+    )
     write_blocks(folder.blocks_json, blocks)
     _logger.info(
         "structure: %d blocks written to %s", len(blocks.blocks), folder.blocks_json
