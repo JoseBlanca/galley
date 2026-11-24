@@ -2018,13 +2018,13 @@ starts a note, with the stand-in as its marker and no value of its own
   page 135);
 - or no number is cut off later in its line and no later note line of
   the page, in any of its band regions, starts with a number, the gap
-  is at least 20 pt, the word after starts with a capital, the stand-in is no
-  lower-case letter, and the note it is cut from has a value its own
+  is at least 20 pt, the word after starts with a capital, and the note it is cut from has a value its own
   marker reads, not one given by its place: the page's last note ("1 D.
   B. i. 154. - D. B. i. 262 b.", page 213; "8 Ibid. 20 § b. « Ibid.
   24.", page 111).
 
-The last condition keeps page 240's "» D. B. 38 b, 44. «D. B. C4b. « D.
+(A lower-case letter there is cut by the rule for one lower-case letter
+above, as a marker that reads its number.) The last condition keeps page 240's "» D. B. 38 b, 44. «D. B. C4b. « D.
 B. 66." whole: its "»" is a sign whose value is its place, and the
 spaced "«" would take the value of the glued one. Page 500's "4 D. B. i.
 364 (Lincoln). . 6 See above" stays whole too, since the word after
