@@ -2000,7 +2000,12 @@ def test_whole_book_figure_blocks_are_one_for_each_in_page_figure(
 ) -> None:
     folder = whole_book_run(book)
     blocks = read_blocks(folder.blocks_json)
-    check_stage(FidelityBoundary.STRUCTURE, read_lines(folder.lines_json), blocks)
+    check_stage(
+        FidelityBoundary.STRUCTURE,
+        read_lines(folder.lines_json),
+        blocks,
+        contents_pages=frozenset(read_config(folder.book_toml).contents_pages),
+    )
     found = _in_page_blocks(blocks)
     assert {index: len(figures) for index, figures in found.items()} == (
         _WHOLE_BOOK_FIGURES[book]
