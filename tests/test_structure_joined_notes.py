@@ -25,6 +25,7 @@ from galley.structure._notes import page_notes
 from galley.structure._references import (
     Candidate,
     Link,
+    NoteMark,
     NoteToMatch,
     sure_links,
 )
@@ -185,6 +186,28 @@ def test_marker_one_confused_digit_from_the_next_value_starts_a_note() -> None:
     ) == ("5 D. B. iv. 3-4, 9, 15 (Chinbrige).", "8 D. B. iv. 61-2-3.")
 
 
+@pytest.mark.parametrize(
+    "line",
+    [
+        # Under 8 pt, the gap between two words of one note.
+        "5 D. B. iv. 3-4, 9, 15 (Chinbrige). |7.5| 8 D. B. iv. 61-2-3.",
+        # A lower-case word after the "8": a number in the note's text.
+        "5 D. B. iv. 3-4, 9, 15 (Chinbrige). |9.9| 8 hides in Kent.",
+        # A sign where the "8" is: no number to be one digit away.
+        "5 D. B. iv. 3-4, 9, 15 (Chinbrige). |9.9| * D. B. iv. 61-2-3.",
+    ],
+    ids=["gap_under_8_pt", "lower_case_after", "sign_in_place"],
+)
+def test_marker_one_confused_digit_away_needs_its_gap_capital_and_digits(
+    line: str,
+) -> None:
+    # Domesday's page 390 moves three links when the gap is not asked for
+    # (review of 24 November 2026).
+    assert _notes(_line(line, 10.0)) == (
+        " ".join(part for part in line.split(" ") if not part.startswith("|")),
+    )
+
+
 def test_marker_two_values_past_the_next_after_8_pt_starts_no_note() -> None:
     assert _notes(
         _line("5 D. B. iv. 3-4, 9, 15 (Chinbrige). |9.9| 9 D. B. iv. 61-2-3.", 10.0)
@@ -297,7 +320,7 @@ def _sign_links(linked: tuple[int, ...], guessed: frozenset[int]) -> tuple[int, 
     """The notes whose sign link `sure_links` keeps, of one page's three
     notes 1 to 3, the notes `linked` each linked to a sign "^", those at
     `guessed` started by a row of notes."""
-    notes = tuple(NoteToMatch(place, 0, place + 1) for place in range(3))
+    notes = tuple(NoteToMatch(place, 0, place + 1, NoteMark.SIGN) for place in range(3))
     links = tuple(
         Link(
             Candidate(

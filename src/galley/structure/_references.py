@@ -58,7 +58,7 @@ class NoteToMatch:
     note: int
     page_index: int
     value: int | None
-    mark: NoteMark = NoteMark.SIGN
+    mark: NoteMark
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,9 +69,7 @@ class Link:
     note: int
 
 
-def pair_score(
-    reference: Reference, note_value: int | None, mark: NoteMark = NoteMark.SIGN
-) -> int:
+def pair_score(reference: Reference, note_value: int | None, mark: NoteMark) -> int:
     """The score of pairing a candidate with a note of `note_value` whose
     marker is `mark`, 0 when they are never paired (spec section 11,
     "Matching"): a sign scores more against a note with no value whose
@@ -91,30 +89,16 @@ def pair_score(
     return 0
 
 
-def align(
-    values: Sequence[int | None],
-    references: Sequence[Reference],
-    score: Callable[[Reference, int | None], int] = pair_score,
-) -> tuple[tuple[int, int], ...]:
-    """The pairs (note position, candidate position) of the alignment of
-    notes of `values` with `references`, both in reading order, whose total
-    score is highest: each note with at most one candidate and each
-    candidate with at most one note, a later note never with an earlier
-    candidate. Of two alignments with the same total, the one that pairs
-    the first note with the earlier candidate wins, then the second note,
-    and so on; a note left alone counts as paired after every candidate.
-    `score` gives each pair's score, `pair_score` unless given."""
-    return _best_pairs(
-        tuple(
-            tuple(score(reference, value) for reference in references)
-            for value in values
-        )
-    )
-
-
 def _best_pairs(scores: Sequence[Sequence[int]]) -> tuple[tuple[int, int], ...]:
-    """The pairs of `align`, from the score of each note (row) with each
-    candidate (column), 0 for a pair never made."""
+    """The pairs (note position, candidate position) of the alignment of
+    notes with candidates, both in reading order, whose total score is
+    highest, from the score of each note (row) with each candidate
+    (column), 0 for a pair never made: each note with at most one
+    candidate and each candidate with at most one note, a later note never
+    with an earlier candidate. Of two alignments with the same total, the
+    one that pairs the first note with the earlier candidate wins, then
+    the second note, and so on; a note left alone counts as paired after
+    every candidate."""
     note_count = len(scores)
     candidate_count = len(scores[0]) if scores else 0
     # best[i][j]: the highest total of the notes from i and the candidates
@@ -151,7 +135,7 @@ def note_score(reference: Reference, note: NoteToMatch) -> int:
 def _matched(
     notes: Sequence[NoteToMatch],
     candidates: Sequence[Candidate],
-    score: Callable[[Reference, NoteToMatch], int] = note_score,
+    score: Callable[[Reference, NoteToMatch], int],
 ) -> tuple[Link, ...]:
     """The links of an alignment of `notes` with `candidates`, by `score`."""
     return tuple(
@@ -168,7 +152,7 @@ def _matched(
 def _matched_with_quotes(
     notes: Sequence[NoteToMatch],
     candidates: Sequence[Candidate],
-    score: Callable[[Reference, NoteToMatch], int] = note_score,
+    score: Callable[[Reference, NoteToMatch], int],
 ) -> tuple[Link, ...]:
     """The links of one page's `notes` with its `candidates` by `score`,
     those that are an opening single quotation mark only when they pair
@@ -187,19 +171,24 @@ def _matched_with_quotes(
     return with_quotes if len(with_quotes) > len(without) else without
 
 
+def _by_page(notes: Sequence[NoteToMatch]) -> dict[int, list[NoteToMatch]]:
+    """`notes` grouped by the page they start on, each page's in their
+    order."""
+    by_page: dict[int, list[NoteToMatch]] = {}
+    for note in notes:
+        by_page.setdefault(note.page_index, []).append(note)
+    return by_page
+
+
 def _per_page(
     notes: Sequence[NoteToMatch],
     candidates: Sequence[Candidate],
     keep: Callable[[Candidate], bool],
-    match: Callable[
-        [Sequence[NoteToMatch], Sequence[Candidate]], tuple[Link, ...]
-    ] = _matched,
+    match: Callable[[Sequence[NoteToMatch], Sequence[Candidate]], tuple[Link, ...]],
 ) -> tuple[Link, ...]:
     """The links of each page's notes with the page's candidates that
     `keep` keeps, page by page, each page's by `match`."""
-    notes_by_page: dict[int, list[NoteToMatch]] = {}
-    for note in notes:
-        notes_by_page.setdefault(note.page_index, []).append(note)
+    notes_by_page = _by_page(notes)
     candidates_by_page: dict[int, list[Candidate]] = {}
     for candidate in candidates:
         if keep(candidate):
@@ -223,7 +212,14 @@ def reference_form(
     values = {note.note: note.value for note in notes}
     exact = Counter(
         link.candidate.reference.form
-        for link in _per_page(notes, candidates, lambda _: True)
+        for link in _per_page(
+            notes,
+            candidates,
+            lambda _: True,
+            lambda page_notes, page_candidates: _matched(
+                page_notes, page_candidates, note_score
+            ),
+        )
         if link.candidate.reference.value is not None
         and link.candidate.reference.value == values[link.note]
     )
@@ -273,7 +269,7 @@ def through_score(reference: Reference, note: NoteToMatch) -> int:
 def match_footnotes(
     notes: Sequence[NoteToMatch],
     candidates: Sequence[Candidate],
-    score: Callable[[Reference, NoteToMatch], int] = note_score,
+    score: Callable[[Reference, NoteToMatch], int],
 ) -> tuple[Link, ...]:
     """The footnotes linked to the candidates of their page, in page order,
     each pair scored by `score` (spec section 11, "Matching"): a note
@@ -299,70 +295,58 @@ def match_footnotes(
     return _per_page(notes, candidates, keep, match)
 
 
-def in_page_order(notes: Sequence[NoteToMatch]) -> tuple[NoteToMatch, ...]:
-    """The footnotes of a book numbered through, `notes` in the book's
-    order, each without the value its marker reads when another note of
-    its page reads the same, or when the value is out of order against two
-    values of its page that are in order with each other (spec section 11,
-    "A value out of order"): of two notes of a page, the later has the
-    larger value. Kadesh's page 14 reads "29", "1", "32" for notes 29 to
-    32, and its page 61 "1", "1" for notes 159 and 160: none of these "1"
-    is a value."""
-    by_page: dict[int, list[int]] = {}
-    for place, note in enumerate(notes):
-        if note.value is not None:
-            by_page.setdefault(note.page_index, []).append(place)
-
-    def in_order(first: int, second: int) -> bool:
-        low, high = notes[min(first, second)].value, notes[max(first, second)].value
-        return low is not None and high is not None and low < high
-
-    given = list(notes)
-    for valued in by_page.values():
-        read = Counter(notes[place].value for place in valued)
-        for place in valued:
-            against = [
-                other
-                for other in valued
-                if other != place and not in_order(place, other)
-            ]
-            if read[notes[place].value] > 1 or any(
-                in_order(one, other)
-                for one, other in itertools.combinations(against, 2)
-            ):
-                given[place] = replace(notes[place], value=None)
-    return tuple(given)
+# Spec section 11, "A one-digit value": the share of a book's values of two
+# digits or more that its rise must hold for the book to rise through.
+# Kadesh's rise holds 45 of its 73 such values (24 November 2026); a book
+# of three chapters numbered 1 to 30 each holds a third. Guessed between.
+_RISE_SHARE = 0.5
+# The smallest value of two digits.
+_TWO_DIGITS = 10
 
 
-# Spec section 11, "A one-digit value": the values a marker of one digit
-# reads.
-_ONE_DIGIT = range(10)
+def _rise_start(values: Sequence[int]) -> tuple[int, int]:
+    """The length of a longest run of `values`, not necessarily next to one
+    another, each larger than the one before, and the place of the first
+    value that starts such a run (0 and 0 for no values)."""
+    longest_from = [1] * len(values)
+    for place in range(len(values) - 1, -1, -1):
+        for later in range(place + 1, len(values)):
+            if values[later] > values[place]:
+                longest_from[place] = max(longest_from[place], longest_from[later] + 1)
+    longest = max(longest_from, default=0)
+    return longest, next(
+        (place for place, length in enumerate(longest_from) if length == longest), 0
+    )
 
 
 def without_one_digit_values(
     notes: Sequence[NoteToMatch],
 ) -> tuple[NoteToMatch, ...]:
     """The footnotes of a book numbered through, `notes` in the book's
-    order, each without a value of one digit when it starts on a page after
-    the first page where a note's value has two digits or more (spec
-    section 11, "A one-digit value"): past note 9 the OCR read only the
-    first digit of the marker ("7" for 78)."""
-    first = next(
-        (
-            note.page_index
-            for note in notes
-            if note.value is not None and note.value not in _ONE_DIGIT
-        ),
-        None,
+    order, each without a value of one digit when it comes after the
+    first note of the book's rise (spec section 11, "A one-digit value"):
+    past note 9 the OCR read only the first digit of the marker
+    ("7" for 78). The rise is a longest run of the values of two digits or
+    more, in the book's order, each larger than the one before; the book
+    rises through when it holds at least half of those values. A book
+    whose notes start again at 1 in each chapter does not, and a value
+    misread early ("17" for 3) is out of its rise."""
+    large = [
+        place
+        for place, note in enumerate(notes)
+        if note.value is not None and note.value >= _TWO_DIGITS
+    ]
+    longest, start = _rise_start(
+        [value for place in large if (value := notes[place].value) is not None]
     )
+    if not longest or _RISE_SHARE * len(large) > longest:
+        return tuple(notes)
+    first = large[start]
     return tuple(
         replace(note, value=None)
-        if first is not None
-        and note.page_index > first
-        and note.value is not None
-        and note.value in _ONE_DIGIT
+        if place > first and note.value is not None and note.value < _TWO_DIGITS
         else note
-        for note in notes
+        for place, note in enumerate(notes)
     )
 
 
@@ -376,9 +360,7 @@ def sure_through(
     the book's footnotes in order; the links kept are in the order of
     `links`."""
     by_note = {link.note: link for link in links}
-    notes_by_page: dict[int, list[NoteToMatch]] = {}
-    for note in notes:
-        notes_by_page.setdefault(note.page_index, []).append(note)
+    notes_by_page = _by_page(notes)
     unsure = {
         page_notes[0].note
         for page_notes in notes_by_page.values()
@@ -444,7 +426,10 @@ def match_endnotes(
             )
         ):
             return 0
-        return pair_score(reference, note_value)
+        # An endnote's marker is its number: a sign is never its reference
+        # (match_endnotes keeps glued candidates only), so its mark does not
+        # count.
+        return pair_score(reference, note_value, NoteMark.SIGN)
 
     return _matched(valued, glued, score)
 
@@ -705,12 +690,11 @@ def sure_links(
     reference is a sign is kept only when its note is its page's first or
     the note before it on the page is linked, and, when the note after it
     on the page is one of `guessed`, the positions of the notes a row of
-    notes started, only when that note has a link too. `notes` are the book's footnotes in order; the
-    links kept are in the order of `links`."""
+    notes started, only when that note has a link too. `notes` are the
+    book's footnotes in order; the links kept are in the order of
+    `links`."""
     by_note = {link.note: link for link in links}
-    notes_by_page: dict[int, list[NoteToMatch]] = {}
-    for note in notes:
-        notes_by_page.setdefault(note.page_index, []).append(note)
+    notes_by_page = _by_page(notes)
     kept: set[int] = set()
     for page_notes in notes_by_page.values():
         for place, note in enumerate(page_notes):

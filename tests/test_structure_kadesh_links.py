@@ -1,6 +1,7 @@
 """Tests of the plan wrong-links, work package 4: the wrong links of a book
 whose footnotes are numbered through, Kadesh (docs/specs/structure.md,
-section 11, "Matching" and "A value out of order").
+section 11, "Matching", "A one-digit value" and "A sign at the head of a
+page").
 
 The unit tests make up a page's notes and candidates. The excerpt tests
 run on the Kadesh excerpts read with `ocr = "redo"`; each link's printed
@@ -20,13 +21,14 @@ import pytest
 
 from galley.book_folder import BookFolder
 from galley.model import every_block, read_blocks
+from galley.structure._lone_references import lone_links
 from galley.structure._markers import Reference, ReferenceForm
 from galley.structure._references import (
+    BodyWord,
     Candidate,
     Link,
     NoteMark,
     NoteToMatch,
-    in_page_order,
     match_footnotes,
     note_score,
     pair_score,
@@ -63,42 +65,6 @@ def _candidates(references: tuple[Reference, ...]) -> tuple[Candidate, ...]:
     )
 
 
-def test_a_value_out_of_order_on_its_page_is_dropped() -> None:
-    # Made up after Kadesh's page 14: notes 27 to 33, the marker of 31
-    # read "1".
-    notes = tuple(
-        NoteToMatch(place, 14, value, NoteMark.NUMBER)
-        for place, value in enumerate((27, 28, 29, None, 1, 32, 33))
-    )
-    assert tuple(note.value for note in in_page_order(notes)) == (
-        27,
-        28,
-        29,
-        None,
-        None,
-        32,
-        33,
-    )
-
-
-def test_two_values_that_disagree_alone_are_both_kept() -> None:
-    # Made up after Kadesh's page 32, notes 82 and 83 read "88" and "83":
-    # neither has a second value on its side.
-    notes = (NoteToMatch(0, 32, 88), NoteToMatch(1, 32, 83))
-    assert in_page_order(notes) == notes
-
-
-def test_values_of_other_pages_are_not_compared() -> None:
-    notes = (
-        NoteToMatch(0, 13, 22),
-        NoteToMatch(1, 13, 23),
-        NoteToMatch(2, 14, 1),
-        NoteToMatch(3, 15, 34),
-        NoteToMatch(4, 15, 35),
-    )
-    assert in_page_order(notes) == notes
-
-
 def test_a_sign_scores_less_against_a_note_whose_marker_stood_for_a_number() -> None:
     assert pair_score(_sign("enemy;"), None, NoteMark.SIGN) == 2
     assert pair_score(_sign("enemy;"), None, NoteMark.NUMBER) == 1
@@ -114,7 +80,7 @@ def test_a_sign_skips_a_note_whose_marker_stood_for_a_number() -> None:
         NoteToMatch(1, 14, None, NoteMark.SIGN),
         NoteToMatch(2, 14, None, NoteMark.SIGN),
     )
-    links = match_footnotes(notes, _candidates((_sign("2,052"),)))
+    links = match_footnotes(notes, _candidates((_sign("2,052"),)), note_score)
     assert [link.note for link in links] == [1]
 
 
@@ -123,41 +89,87 @@ def test_through_a_book_a_number_one_off_is_no_confused_reading() -> None:
     assert through_score(_glued("bottom", "155"), note) == 0
     assert note_score(_glued("bottom", "155"), note) == 2
     # Kadesh's page 40: "»aten108" is the reference to note 103.
-    assert through_score(_glued("»aten", "108"), NoteToMatch(0, 40, 103)) == 2
+    assert (
+        through_score(_glued("»aten", "108"), NoteToMatch(0, 40, 103, NoteMark.SIGN))
+        == 2
+    )
     assert through_score(_glued("bottom", "156"), note) == 3
 
 
 def test_through_a_book_a_reference_one_off_is_left_unlinked() -> None:
     # Made up after Kadesh's page 60: notes 154 to 157 read "184", "18",
     # "156" and "181"; "bottom155" is the reference to note 155.
-    notes = in_page_order(
-        tuple(
-            NoteToMatch(place, 60, value, NoteMark.NUMBER)
-            for place, value in enumerate((184, 18, 156, 181))
-        )
+    notes = tuple(
+        NoteToMatch(place, 60, value, NoteMark.NUMBER)
+        for place, value in enumerate((184, 18, 156, 181))
     )
     candidates = _candidates((_glued("bottom", "155"),))
     assert match_footnotes(notes, candidates, through_score) == ()
 
 
+def _values(pages_and_values: tuple[tuple[int, int], ...]) -> tuple[NoteToMatch, ...]:
+    return tuple(
+        NoteToMatch(place, page, value, NoteMark.NUMBER)
+        for place, (page, value) in enumerate(pages_and_values)
+    )
+
+
 def test_past_note_9_a_one_digit_value_is_dropped() -> None:
     # Made up after Kadesh: "1" and "2" on its first page of notes, "13"
-    # on its third, then "7" for note 78 and "79" on a later page.
+    # on its third, then "4" for 14 after it, and "7" for note 78 and
+    # "79" on a later page.
     notes = (
-        NoteToMatch(0, 8, 1),
-        NoteToMatch(1, 8, 2),
-        NoteToMatch(2, 10, 13),
-        NoteToMatch(3, 10, 4),
-        NoteToMatch(4, 31, 7),
-        NoteToMatch(5, 31, 79),
+        NoteToMatch(0, 8, 1, NoteMark.SIGN),
+        NoteToMatch(1, 8, 2, NoteMark.SIGN),
+        NoteToMatch(2, 10, 13, NoteMark.SIGN),
+        NoteToMatch(3, 10, 4, NoteMark.SIGN),
+        NoteToMatch(4, 31, 7, NoteMark.SIGN),
+        NoteToMatch(5, 31, 79, NoteMark.SIGN),
     )
     assert tuple(note.value for note in without_one_digit_values(notes)) == (
         1,
         2,
         13,
-        4,
+        None,
         None,
         79,
+    )
+
+
+def test_one_digit_values_stay_when_the_notes_start_again_each_chapter() -> None:
+    # Made up: three chapters numbered 1 to 12 each, by marker, four notes
+    # a page; the values of two digits rise in each chapter only.
+    chapter = tuple(range(1, 13))
+    notes = _values(
+        tuple(
+            (page, value)
+            for start in (0, 3, 6)
+            for page, value in zip(
+                (start + place // 4 for place in range(12)), chapter, strict=True
+            )
+        )
+    )
+    assert without_one_digit_values(notes) == notes
+
+
+def test_one_digit_values_stay_after_a_value_misread_early() -> None:
+    # Made up: note 3 read "17" on the first page, the book's values
+    # rising from 10 on its fourth.
+    notes = _values(
+        ((0, 1), (0, 2), (0, 17), (1, 4), (1, 5), (2, 6), (2, 7), (3, 8))
+        + ((3, 9), (3, 10), (4, 11), (4, 12), (5, 13), (5, 14))
+    )
+    assert without_one_digit_values(notes) == notes
+    # A one-digit value past the page where the rise starts is dropped.
+    later = _values(((0, 1), (0, 2), (0, 17), (3, 10), (4, 11), (5, 7), (5, 13)))
+    assert tuple(note.value for note in without_one_digit_values(later)) == (
+        1,
+        2,
+        17,
+        10,
+        11,
+        None,
+        13,
     )
 
 
@@ -168,18 +180,39 @@ def _link(note: int, reference: Reference) -> Link:
 def test_a_sign_at_a_page_head_needs_the_second_note_linked() -> None:
     # Made up after Kadesh's page 37: the reference to note 90 is lost,
     # and the sign of note 91 took note 90.
-    notes = tuple(NoteToMatch(place, 37, None) for place in range(3))
+    notes = tuple(NoteToMatch(place, 37, None, NoteMark.SIGN) for place in range(3))
     assert sure_through(notes, (_link(0, _sign("Amon?);")),)) == ()
     # Page 9: the signs of notes 4 and 5 confirm each other.
     both = (_link(0, _sign("Salvolini")), _link(1, _sign("Lenormant,")))
     assert sure_through(notes, both) == both
     # A page's only note keeps its sign; a glued number at the head stays.
-    only = (NoteToMatch(0, 25, None),)
+    only = (NoteToMatch(0, 25, None, NoteMark.SIGN),)
     assert sure_through(only, (_link(0, _sign("made.")),)) == (
         _link(0, _sign("made.")),
     )
     glued = (_link(0, _glued("Kadesh,", "12")),)
     assert sure_through(notes, glued) == glued
+
+
+def test_a_note_whose_head_sign_is_unlinked_may_take_a_lone_number() -> None:
+    # Made up: the sign at the head of page 37 is unlinked, its second
+    # note having no link; the lone "12." after "river" reads the first
+    # note's value and links it, on the number read.
+    notes = tuple(
+        NoteToMatch(place, 37, value, NoteMark.NUMBER)
+        for place, value in enumerate((12, 13))
+    )
+    links = sure_through(notes, (_link(0, _sign("Amon?);")),))
+    assert links == ()
+    words = (
+        BodyWord(0, 0, 37, "the", "", "river"),
+        BodyWord(0, 1, 37, "river", "the", "12."),
+        BodyWord(0, 2, 37, "12.", "river", "Then"),
+        BodyWord(0, 3, 37, "Then", "12.", ""),
+    )
+    assert [
+        (link.note, link.candidate.word) for link in lone_links(notes, words, links)
+    ] == [(0, 2)]
 
 
 def _alphanumeric(text: str) -> str:

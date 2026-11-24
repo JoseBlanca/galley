@@ -35,6 +35,7 @@ from galley.structure._references import (
     BodyWord,
     Candidate,
     Link,
+    NoteMark,
     NoteToMatch,
     foreign_signs,
     gap_links,
@@ -766,7 +767,8 @@ def _matched_pairs(
     """Each link as (the reference's word, the linked note's value), of
     endnotes `note_values` against glued references in reading order."""
     notes = tuple(
-        NoteToMatch(position, 9, value) for position, value in enumerate(note_values)
+        NoteToMatch(position, 9, value, NoteMark.SIGN)
+        for position, value in enumerate(note_values)
     )
     candidates = tuple(
         Candidate(0, position, 1, reference)
@@ -947,7 +949,8 @@ def _gap_made(
     `linked` are linked, the first in block 0 and the others in block 2,
     around the words of `text`."""
     notes = tuple(
-        NoteToMatch(position, 9, value) for position, value in enumerate(values)
+        NoteToMatch(position, 9, value, NoteMark.SIGN)
+        for position, value in enumerate(values)
     )
     reference = reference_candidate("word1.")
     assert reference is not None
@@ -1253,7 +1256,9 @@ def test_gap_word_is_taken_by_one_run_only() -> None:
     # Notes 11, 13, 14 and 16 linked at places 10, 50, 20 and 60, out of
     # order: the gaps of 12 (10 to 50) and of 15 (20 to 60) both hold the
     # sign at place 30, which goes to note 12 alone.
-    notes = tuple(NoteToMatch(value - 11, 9, value) for value in range(11, 17))
+    notes = tuple(
+        NoteToMatch(value - 11, 9, value, NoteMark.SIGN) for value in range(11, 17)
+    )
     texts = ["the"] * 70
     texts[29], texts[30] = "river.", "^"
     words = tuple(
@@ -1266,7 +1271,9 @@ def test_gap_word_is_taken_by_one_run_only() -> None:
 
 
 def test_gap_run_whose_first_reference_comes_after_its_second_takes_nothing() -> None:
-    notes = tuple(NoteToMatch(value - 11, 9, value) for value in range(11, 14))
+    notes = tuple(
+        NoteToMatch(value - 11, 9, value, NoteMark.SIGN) for value in range(11, 14)
+    )
     words = _gap_words("the river 12 ran on and on")
     links = tuple(
         replace(link, candidate=replace(link.candidate, block=block))
@@ -1277,7 +1284,7 @@ def test_gap_run_whose_first_reference_comes_after_its_second_takes_nothing() ->
 
 def test_endnote_out_of_order_between_its_neighbours_takes_their_middle_value() -> None:
     notes = tuple(
-        NoteToMatch(position, 9, value)
+        NoteToMatch(position, 9, value, NoteMark.SIGN)
         for position, value in enumerate((55, 56, 37, 58, 59, 7, 62))
     )
     assert tuple(note.value for note in with_values_in_order(notes)) == (

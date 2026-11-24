@@ -87,10 +87,12 @@ from galley.structure._plates import plate_survey
 from galley.structure._references import (
     Candidate,
     Link,
+    NoteMark,
     NoteToMatch,
-    align,
+    _best_pairs,
     match_endnotes,
     match_footnotes,
+    note_score,
     pair_score,
     reference_form,
     sure_links,
@@ -3426,7 +3428,12 @@ def test_referenced_page_s_leftover_note_end_is_not_counted() -> None:
 
 def test_referenced_8_for_5_is_a_confused_digit() -> None:
     # Spec section 11, "Matching": Domesday's "centuries8" for note 5.
-    assert pair_score(Reference("centuries", "8", "", ReferenceForm.GLUED, 8), 5) == 2
+    assert (
+        pair_score(
+            Reference("centuries", "8", "", ReferenceForm.GLUED, 8), 5, NoteMark.SIGN
+        )
+        == 2
+    )
 
 
 @pytest.mark.parametrize(
@@ -3608,7 +3615,12 @@ def test_referenced_alignment_pairs_the_highest_total_in_order(
 ) -> None:
     candidates = tuple(reference_candidate(word) for word in references)
     assert all(candidate is not None for candidate in candidates)
-    assert align(values, tuple(c for c in candidates if c is not None)) == pairs
+    found = tuple(c for c in candidates if c is not None)
+    scores = tuple(
+        tuple(pair_score(reference, value, NoteMark.SIGN) for reference in found)
+        for value in values
+    )
+    assert _best_pairs(scores) == pairs
 
 
 def _endnote_pages(
@@ -4156,7 +4168,7 @@ def test_referenced_pair_score_by_the_digits_the_ocr_confuses(
     word: str, value: int | None, score: int
 ) -> None:
     # "x81" against 3: one digit differs only if the lengths are equal.
-    assert pair_score(_glued(word), value) == score
+    assert pair_score(_glued(word), value, NoteMark.SIGN) == score
 
 
 def _candidate(word: str, position: int) -> Candidate:
@@ -4164,7 +4176,7 @@ def _candidate(word: str, position: int) -> Candidate:
 
 
 def test_referenced_book_form_on_a_tie_is_the_glued_number() -> None:
-    notes = (NoteToMatch(0, 0, 1), NoteToMatch(1, 0, 2))
+    notes = (NoteToMatch(0, 0, 1, NoteMark.SIGN), NoteToMatch(1, 0, 2, NoteMark.SIGN))
     candidates = (_candidate("x1", 0), _candidate("(2)", 1))
     assert reference_form(notes, candidates) is ReferenceForm.GLUED
 
@@ -4186,7 +4198,8 @@ def _footnote_links(
 ) -> tuple[tuple[int, int], ...]:
     """The (note, candidate) positions of `match_footnotes` on one page."""
     notes = tuple(
-        NoteToMatch(position, 10, value) for position, value in enumerate(values)
+        NoteToMatch(position, 10, value, NoteMark.SIGN)
+        for position, value in enumerate(values)
     )
     candidates = tuple(
         Candidate(0, position, 10, reference)
@@ -4194,7 +4207,8 @@ def _footnote_links(
         if (reference := reference_candidate(word)) is not None
     )
     return tuple(
-        (link.note, link.candidate.word) for link in match_footnotes(notes, candidates)
+        (link.note, link.candidate.word)
+        for link in match_footnotes(notes, candidates, note_score)
     )
 
 
@@ -4232,14 +4246,19 @@ def test_footnote_without_a_value_between_two_pages_takes_none() -> None:
     # Spec section 11: values are given only between two notes of one page;
     # the note of page 10 after its last value keeps none, so "land11" is no
     # match for it.
-    notes = (NoteToMatch(0, 10, 10), NoteToMatch(1, 10, None), NoteToMatch(2, 11, 12))
+    notes = (
+        NoteToMatch(0, 10, 10, NoteMark.SIGN),
+        NoteToMatch(1, 10, None, NoteMark.SIGN),
+        NoteToMatch(2, 11, 12, NoteMark.SIGN),
+    )
     candidates = (
         Candidate(0, 0, 10, _glued("land10")),
         Candidate(0, 1, 10, _glued("land11")),
         Candidate(0, 2, 11, _glued("land12")),
     )
     assert tuple(
-        (link.note, link.candidate.word) for link in match_footnotes(notes, candidates)
+        (link.note, link.candidate.word)
+        for link in match_footnotes(notes, candidates, note_score)
     ) == ((0, 0), (2, 2))
 
 
@@ -4262,7 +4281,8 @@ def _sure_kept(
     `values`, those at the positions `unmarked` having no marker, linked
     as `linked` says, each (note position, the reference's word)."""
     notes = tuple(
-        NoteToMatch(position, 10, value) for position, value in enumerate(values)
+        NoteToMatch(position, 10, value, NoteMark.SIGN)
+        for position, value in enumerate(values)
     )
     links = tuple(
         Link(Candidate(0, word, 10, _glued(text)), note)
@@ -4319,7 +4339,7 @@ def test_sign_on_the_page_first_note_or_after_a_linked_note_keeps_its_link() -> 
 def test_referenced_endnotes_are_matched_in_the_order_of_their_values() -> None:
     # Note 2 printed before note 1: in printed order note 2 would take "y2"
     # and note 1 could not take the earlier "x1".
-    notes = (NoteToMatch(0, 5, 2), NoteToMatch(1, 5, 1))
+    notes = (NoteToMatch(0, 5, 2, NoteMark.SIGN), NoteToMatch(1, 5, 1, NoteMark.SIGN))
     candidates = (_candidate("x1", 0), _candidate("y2", 1))
     assert tuple(
         (link.note, link.candidate.word) for link in match_endnotes(notes, candidates)
