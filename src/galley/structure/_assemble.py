@@ -28,9 +28,12 @@ from galley.structure._body_notes import take_body_notes
 from galley.structure._case_split import split_glued_words
 from galley.structure._contents import (
     ContentsEntry,
+    TitleJunk,
     contents_entries,
     is_link_candidate,
     run_links,
+    title_junk,
+    unlinked_title_junk,
     without_junk,
 )
 from galley.structure._endnotes import (
@@ -845,8 +848,9 @@ def _without_contents_junk(
     blocks: Sequence[Block], entries: Sequence[ContentsEntry]
 ) -> _JunkFree:
     """`blocks`, the body's in order, with the junk taken off each linked
-    contents entry (spec section 30, rule 11); `entries` are the contents
-    entries of the blocks, in their order."""
+    contents entry, and off each unlinked one whose label was inferred
+    (spec section 30, rule 11); `entries` are the contents entries of the
+    blocks, in their order."""
     by_id = {block.id: block for block in blocks}
     entry_of = dict(
         zip(
@@ -860,9 +864,11 @@ def _without_contents_junk(
         )
     )
     taken = {
-        position: without_junk(block, entry_of[position], by_id[block.heading_ref])
+        position: without_junk(block, entry_of[position], junk)
         for position, block in enumerate(blocks)
-        if block.kind is BlockKind.CONTENTS_ENTRY and block.heading_ref is not None
+        if block.kind is BlockKind.CONTENTS_ENTRY
+        for junk in (_title_junk(block, entry_of[position], by_id),)
+        if junk != TitleJunk("", "")
     }
     return _JunkFree(
         blocks=tuple(
@@ -872,6 +878,21 @@ def _without_contents_junk(
         removals=tuple(r for junk in taken.values() for r in junk.removals),
         changes=tuple(c for junk in taken.values() for c in junk.changes),
     )
+
+
+def _title_junk(
+    block: Block, entry: ContentsEntry, by_id: Mapping[str, Block]
+) -> TitleJunk:
+    """The junk of a contents entry's title (spec section 30, rule 11):
+    against its heading when it is linked, the mark read with a lost
+    number when it is not and its label was inferred, none otherwise."""
+    if block.heading_ref is not None:
+        return title_junk(
+            block_text(block), block_text(by_id[block.heading_ref]), block.page_number
+        )
+    if entry.label_inferred:
+        return unlinked_title_junk(block_text(block))
+    return TitleJunk("", "")
 
 
 def assemble(

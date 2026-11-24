@@ -1646,11 +1646,19 @@ def test_hanging_number_on_a_contents_page_starts_no_paragraph() -> None:
         _lines_of(page), _NO_WORDS, contents_pages=frozenset({0}), workers=1
     )
     assert not any(block.kind is BlockKind.PARAGRAPH for block in blocks.blocks)
+    # A bare number before a word is the entry's label (section 30, rule
+    # 7).
     assert tuple(
-        block_text(block).split(" ")[0]
+        (block.label, block_text(block).split(" ")[0])
         for block in blocks.blocks
         if block.kind is BlockKind.CONTENTS_ENTRY
-    ) == ("on", "note", "9", "10", "11")
+    ) == (
+        (None, "on"),
+        (None, "note"),
+        ("9", "Compare"),
+        ("10", "Compare"),
+        ("11", "Compare"),
+    )
 
 
 def test_group_reach_ends_at_the_next_group_that_has_a_chapter() -> None:

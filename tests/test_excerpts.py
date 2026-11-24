@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from galley.book_folder import BookFolder
+from galley.config import read_config
 from galley.errors import FidelityBoundary
 from galley.fidelity import check_stage, read_markdown
 from galley.model import (
@@ -414,7 +415,12 @@ def test_fidelity_check_passes_on_the_excerpt_at_every_boundary(
     lines = read_lines(folder.lines_json)
     blocks = read_blocks(folder.blocks_json)
     check_stage(FidelityBoundary.LAYOUT, words, lines)
-    check_stage(FidelityBoundary.STRUCTURE, lines, blocks)
+    check_stage(
+        FidelityBoundary.STRUCTURE,
+        lines,
+        blocks,
+        contents_pages=frozenset(read_config(folder.book_toml).contents_pages),
+    )
     markdown = read_markdown(folder.book_md.read_text(encoding="utf-8"))
     check_stage(FidelityBoundary.MARKDOWN, blocks, markdown)
 
