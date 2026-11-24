@@ -217,8 +217,9 @@ class Link:
     """A link the model's answer gives on page `page_index`: after the
     galley word that holds `place`, a reference to the note `note_id`;
     `text` is the reference as the model read it, `model_word` the word
-    the model printed before it, and `rank` how many references the model
-    marked on the page before it."""
+    the model printed before it, `rank` how many references the model
+    marked on the page before it, and `skipped` how many numbers its
+    references skip before it (159 then 161 skip one)."""
 
     page_index: int
     place: Place
@@ -226,6 +227,39 @@ class Link:
     text: str
     model_word: str
     rank: int = 0
+    skipped: int = 0
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Placed:
+    """A reference of the answer placed after a galley word: its rank and
+    skipped numbers as `Link` has them, the note its note line names (None
+    when it names none), and whether galley's own reference follows the
+    word."""
+
+    rank: int
+    skipped: int
+    reference: MarkedReference
+    place: Place
+    note_id: str | None
+    at_galley_reference: bool
+
+
+def _skipped(references: Sequence[MarkedReference]) -> tuple[int, ...]:
+    """For each reference, in order, how many numbers the references before
+    it and itself skip: 158, 159, 161 give 0, 0, 1. A number that falls
+    skips none and is where the count goes on from."""
+    found = []
+    skipped = 0
+    previous = None
+    for reference in references:
+        number = _number(reference.text)
+        if number is not None and previous is not None and number > previous + 1:
+            skipped += number - previous - 1
+        found.append(skipped)
+        if number is not None:
+            previous = number
+    return tuple(found)
 
 
 def page_links(
@@ -235,19 +269,23 @@ def page_links(
     answer: LinkAnswer,
     galley_references: Mapping[Place, str] = frozendict(),
 ) -> tuple[Link, ...]:
-    """The links of one page: each reference of the answer placed after a
-    word of galley's body and matched to one of `notes`, the notes that
-    start on the page, through its note line. `galley_references` gives,
-    by the place of a token, the note galley's own reference right after
-    its word refers to; a reference the model marks there that gives no
-    link, or one to that note, counts once in the numbers of the page, and
-    so does a reference with no place whose note galley references."""
+    """The links of one page (section 9b): each reference of the answer
+    placed after a word of galley's body and matched to one of `notes`, the
+    notes that start on the page, through its note line, less the links
+    that break the order of the page's notes; then the references whose
+    note line names no note, or a note another reference names too, placed
+    by that order between two links. `galley_references` gives, by the
+    place of a token, the note galley's own reference right after its word
+    refers to; a reference the model marks there that gives no link, or
+    one to that note, counts once in the numbers of the page, and so does
+    a reference with no place whose note galley references."""
     body = [
         token
         for token in reading
         if token.note_id is None and token.block_id is not None
     ]
-    links = []
+    skipped = _skipped(answer.references)
+    placed = []
     marked: set[str] = set()
     for rank, reference in enumerate(answer.references):
         position = reference_place(body, reference)
@@ -259,26 +297,58 @@ def page_links(
             marked.add(galley_note_id)
         if place is None and note_id is not None:
             marked.add(note_id)
-        if place is None or note_id is None:
-            continue
-        links.append(
-            Link(
-                page_index=page_index,
-                place=place,
-                note_id=note_id,
-                text=reference.text.replace("[", "").replace("]", ""),
-                model_word=reference.before[-1],
-                rank=rank,
+        if place is not None:
+            placed.append(
+                _Placed(
+                    rank=rank,
+                    skipped=skipped[rank],
+                    reference=reference,
+                    place=place,
+                    note_id=note_id,
+                    at_galley_reference=galley_note_id is not None,
+                )
             )
-        )
-    if not numbers_in_order(links, notes, frozenset(marked)):
+    links = tuple(
+        _link(page_index, item, item.note_id)
+        for item in placed
+        if item.note_id is not None
+    )
+    kept = links_in_order(links, notes, frozenset(marked))
+    if len(kept) < len(links):
         _logger.info(
-            "page %d: the numbers of the references and notes do not run in "
-            "order; no link on it",
+            "page %d: %d of the %d links break the order of the page's notes "
+            "and are not proposed",
             page_index,
+            len(links) - len(kept),
+            len(links),
         )
-        return ()
-    return tuple(links)
+    twice = _named_twice(links)
+    by_order = _links_by_order(
+        page_index,
+        tuple(
+            item
+            for item in placed
+            if not item.at_galley_reference
+            and (item.note_id is None or item.note_id in twice)
+        ),
+        kept,
+        notes,
+        _uncounted(links, frozenset(marked)),
+        frozenset(link.note_id for link in links) - twice,
+    )
+    return tuple(sorted(kept + by_order, key=lambda link: link.rank))
+
+
+def _link(page_index: int, item: _Placed, note_id: str) -> Link:
+    return Link(
+        page_index=page_index,
+        place=item.place,
+        note_id=note_id,
+        text=item.reference.text.replace("[", "").replace("]", ""),
+        model_word=item.reference.before[-1],
+        rank=item.rank,
+        skipped=item.skipped,
+    )
 
 
 def galley_references(
@@ -308,41 +378,140 @@ def _number(text: str) -> int | None:
     return int(digits) if digits.isdigit() else None
 
 
-def numbers_in_order(
+def _named_twice(links: Sequence[Link]) -> frozenset[str]:
+    counts = Counter(link.note_id for link in links)
+    return frozenset(note_id for note_id, count in counts.items() if count > 1)
+
+
+def _uncounted(links: Sequence[Link], marked: AbstractSet[str]) -> frozenset[str]:
+    """The notes that do not count as marked when galley references them:
+    those a link goes to, and those of `marked`, whose galley reference
+    the model marked already (section 9b)."""
+    return frozenset({link.note_id for link in links} | marked)
+
+
+def _slot(index: int, notes: Sequence[Note], uncounted: AbstractSet[str]) -> int:
+    """How many of the model's references come before the footnote `index`
+    of the page when its order holds: the footnotes before it, less those
+    galley references and that are not in `uncounted`, which the model
+    need not mark (section 9b)."""
+    return index - sum(
+        1 for note in notes[:index] if note.referenced and note.id not in uncounted
+    )
+
+
+def _fits(
+    index: int,
+    rank: int,
+    skipped: int,
+    notes: Sequence[Note],
+    uncounted: AbstractSet[str],
+) -> bool:
+    """Whether the footnote `index` is the one a reference of `rank`, after
+    `skipped` numbers, goes to in the page's order (section 9b)."""
+    return _slot(index, notes, uncounted) in (rank, rank + skipped)
+
+
+def links_in_order(
     links: Sequence[Link],
     notes: Sequence[Note],
     marked: AbstractSet[str] = frozenset(),
-) -> bool:
-    """Whether a page's links agree with each other (section 9b): each
-    link's note is the k-th footnote of the page when its reference is the
-    k-th the model marked on it, counted from 0, and the footnotes before
-    it that galley references and no link goes to are counted as marked
-    too (the heading's "*" on Kadesh's page 8, which the model does not
-    bracket), but for the notes of `marked`, whose galley reference the
-    model marked already; and in the order of the model's answer their
-    numbers rise. That their notes come in the order of the page's
-    footnotes, no note twice, follows from the first rule: from one linked
-    footnote to a later one, the footnotes counted as marked between them
-    grow by fewer than the footnotes, since the first is linked, so a later
-    footnote needs a later reference. The numbers are not compared with galley's
+) -> tuple[Link, ...]:
+    """The links of a page that keep the order of its notes (section 9b),
+    in the order of `links`, the model's answer: those to a note no other
+    link goes to; of these, those whose note is the k-th footnote of the
+    page when its reference is the k-th the model marked on it, counted
+    from 0, or counted with the numbers its references skip before it;
+    and of these, those that no other comes before in the answer with a
+    later note or a number not smaller. The footnotes before a link's note
+    that galley references, that no link goes to and that are not in
+    `marked`, whose galley reference the model marked already, count as
+    marked too (the heading's "*" on Kadesh's page 8, which the model
+    does not bracket). The numbers are not compared with galley's
     markers: the model misreads the tens of every number on Kadesh's pages
     26 and 53, and their links are right."""
     order = {note.id: index for index, note in enumerate(notes)}
-    indices = [order[link.note_id] for link in links]
-    linked = {link.note_id for link in links}
-    if any(
-        index
-        != link.rank
-        + sum(
-            1
-            for note in notes[:index]
-            if note.referenced and note.id not in linked and note.id not in marked
+    twice = _named_twice(links)
+    uncounted = _uncounted(links, marked)
+    fitting = [
+        link
+        for link in links
+        if link.note_id not in twice
+        and _fits(order[link.note_id], link.rank, link.skipped, notes, uncounted)
+    ]
+
+    def before(first: Link, second: Link) -> bool:
+        first_number = _number(first.text)
+        second_number = _number(second.text)
+        return order[first.note_id] < order[second.note_id] and (
+            first_number is None
+            or second_number is None
+            or first_number < second_number
         )
-        for index, link in zip(indices, links, strict=True)
-    ):
-        return False
-    known = [number for link in links if (number := _number(link.text)) is not None]
-    return known == sorted(set(known)) and len(set(known)) == len(known)
+
+    return tuple(
+        link
+        for position, link in enumerate(fitting)
+        if all(before(other, link) for other in fitting[:position])
+        and all(before(link, other) for other in fitting[position + 1 :])
+    )
+
+
+def _links_by_order(
+    page_index: int,
+    placed: Sequence[_Placed],
+    kept: Sequence[Link],
+    notes: Sequence[Note],
+    uncounted: AbstractSet[str],
+    named: AbstractSet[str],
+) -> tuple[Link, ...]:
+    """The links of `placed`, references whose note line names no note of
+    the page or one another reference names too, by the order of the page
+    (section 9b): the footnote as many places before the note of the next
+    link of `kept` as the reference's number is below that link's, when
+    the link before it in `kept`, if any, has a smaller number and as many
+    numbers below the next link's as notes, the footnote is the k-th as
+    `links_in_order` counts, galley references none of it and no link of
+    `named` goes to it. Two references that find one note give neither."""
+    order = {note.id: index for index, note in enumerate(notes)}
+    found: list[Link] = []
+    for item in placed:
+        number = _number(item.reference.text)
+        if number is None:
+            continue
+        after = next((link for link in kept if link.rank > item.rank), None)
+        before = next((link for link in reversed(kept) if link.rank < item.rank), None)
+        if after is None or (after_number := _number(after.text)) is None:
+            continue
+        index = order[after.note_id] - (after_number - number)
+        if index < 0 or number >= after_number:
+            continue
+        if before is not None:
+            before_number = _number(before.text)
+            if (
+                before_number is None
+                or before_number >= number
+                or after_number - before_number
+                != order[after.note_id] - order[before.note_id]
+            ):
+                continue
+        note = notes[index]
+        if (
+            note.referenced
+            or note.id in named
+            or not _fits(index, item.rank, item.skipped, notes, uncounted)
+        ):
+            continue
+        found.append(_link(page_index, item, note.id))
+    twice = _named_twice(found)
+    placed_links = tuple(link for link in found if link.note_id not in twice)
+    if placed_links:
+        _logger.info(
+            "page %d: %d links placed by the order of the page's notes",
+            page_index,
+            len(placed_links),
+        )
+    return placed_links
 
 
 # The edits.

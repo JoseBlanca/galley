@@ -2,11 +2,15 @@
 section 9b) and of how markdown applies a link edit (section 10)."""
 
 import dataclasses
+import json
 import logging
+import re
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
+from galley.book_folder import BookFolder
 from galley.correct import footnotes_starting
 from galley.correct._links import (
     Link,
@@ -14,14 +18,14 @@ from galley.correct._links import (
     galley_references,
     link_answer,
     link_edits,
+    links_in_order,
     misread_reference,
     note_of,
-    numbers_in_order,
     page_links,
     reference_place,
 )
 from galley.correct._merge import Change, ChangeKind
-from galley.correct._reading import GalleyToken, Place
+from galley.correct._reading import GalleyToken, Place, page_reading, split_counts
 from galley.errors import EditError
 from galley.markdown import FiledEdit, apply_edits
 from galley.model import (
@@ -36,6 +40,9 @@ from galley.model import (
     Origin,
     Span,
     block_sha256,
+    every_block,
+    read_blocks,
+    read_words,
 )
 
 MODEL = "qwen/qwen3.6-35b-a3b"
@@ -561,7 +568,7 @@ def test_links_are_asked_for_on_pages_where_a_footnote_starts_only() -> None:
     assert footnotes_starting(_blocks((BODY_BLOCK,), (endnote,)), 8) == ()
 
 
-def _numbered(note_id: str, number: str, rank: int) -> Link:
+def _numbered(note_id: str, number: str, rank: int, skipped: int = 0) -> Link:
     return Link(
         page_index=31,
         place=Place("b-p0031-001", 0, 0, 1),
@@ -569,6 +576,7 @@ def _numbered(note_id: str, number: str, rank: int) -> Link:
         text=number,
         model_word="x",
         rank=rank,
+        skipped=skipped,
     )
 
 
@@ -584,16 +592,16 @@ def _page_notes(*markers: str, referenced: tuple[int, ...] = ()) -> tuple[Note, 
 
 
 @pytest.mark.parametrize(
-    ("links", "markers", "referenced", "in_order"),
+    ("links", "markers", "referenced", "kept"),
     [
-        ((("n-p0031-001", "76", 0), ("n-p0031-002", "77", 1)), ("", ""), (), True),
+        ((("n-p0031-001", "76", 0), ("n-p0031-002", "77", 1)), ("", ""), (), (0, 1)),
         # Kadesh page 21 in the run of 19 November 2026: 10, then 7.
-        ((("n-p0031-001", "10", 0), ("n-p0031-002", "7", 1)), ("", ""), (), False),
-        ((("n-p0031-002", "76", 0), ("n-p0031-001", "77", 1)), ("", ""), (), False),
-        ((("n-p0031-001", "76", 0), ("n-p0031-001", "76", 1)), ("", ""), (), False),
+        ((("n-p0031-001", "10", 0), ("n-p0031-002", "7", 1)), ("", ""), (), ()),
+        ((("n-p0031-002", "76", 0), ("n-p0031-001", "77", 1)), ("", ""), (), ()),
+        ((("n-p0031-001", "76", 0), ("n-p0031-001", "76", 1)), ("", ""), (), ()),
         # galley reads note 2's marker 78, after the link's 77 on note 3:
         # the model's numbers are not compared with galley's markers.
-        ((("n-p0031-003", "77", 2),), ("", "78", ""), (), True),
+        ((("n-p0031-003", "77", 2),), ("", "78", ""), (), (0,)),
         # Kadesh page 26, 21 November 2026: the model reads 66 to 68 for the
         # printed 56 to 58, and galley's markers are 59, 62 and 63.
         (
@@ -604,7 +612,7 @@ def _page_notes(*markers: str, referenced: tuple[int, ...] = ()) -> tuple[Note, 
             ),
             ("8", "", "", "59", "1", "62", "63"),
             (4, 6),
-            True,
+            (0, 1, 2),
         ),
         # Kadesh page 53: 120 to 129 for 130 to 139, galley's marker 137.
         (
@@ -616,17 +624,50 @@ def _page_notes(*markers: str, referenced: tuple[int, ...] = ()) -> tuple[Note, 
             ),
             ("", "11", "13", "12", "", "", "36", "137", "188", ""),
             (),
-            True,
+            (0, 1, 2, 3),
         ),
         # galley's markers, cut by the OCR or not, are not compared.
-        ((("n-p0031-002", "77", 1),), ("8", ""), (), True),
-        ((("n-p0031-001", "76", 0),), ("", "77"), (), True),
+        ((("n-p0031-002", "77", 1),), ("8", ""), (), (0,)),
+        ((("n-p0031-001", "76", 0),), ("", "77"), (), (0,)),
         # Kadesh page 31: the model's first reference goes to the second
         # note, though nothing references the first: one note too far.
-        ((("n-p0031-002", "17", 0), ("n-p0031-003", "18", 1)), ("", "", ""), (), False),
+        ((("n-p0031-002", "17", 0), ("n-p0031-003", "18", 1)), ("", "", ""), (), ()),
         # Kadesh page 8: galley links the first note from the heading's
         # "*", which the model does not bracket.
-        ((("n-p0031-002", "2", 0), ("n-p0031-003", "3", 1)), ("", "", ""), (1,), True),
+        (
+            (("n-p0031-002", "2", 0), ("n-p0031-003", "3", 1)),
+            ("", "", ""),
+            (1,),
+            (0, 1),
+        ),
+        # Kadesh page 62: galley joins note 169 to 168, whose reference
+        # gives no link; 170 and 171 then go one note short, and only they
+        # are dropped.
+        (
+            (
+                ("n-p0031-001", "166", 0),
+                ("n-p0031-002", "167", 1),
+                ("n-p0031-003", "168", 2),
+                ("n-p0031-004", "170", 4),
+                ("n-p0031-005", "171", 5),
+            ),
+            ("", "", "", "", ""),
+            (),
+            (0, 1, 2),
+        ),
+        # A link out of order drops the links it is out of order with, and
+        # no other: 13 after 14 (no note twice, both k-th).
+        (
+            (
+                ("n-p0031-001", "12", 0),
+                ("n-p0031-002", "14", 1),
+                ("n-p0031-003", "13", 2),
+                ("n-p0031-004", "15", 3),
+            ),
+            ("", "", "", ""),
+            (),
+            (0, 3),
+        ),
     ],
     ids=[
         "rising",
@@ -640,21 +681,122 @@ def _page_notes(*markers: str, referenced: tuple[int, ...] = ()) -> tuple[Note, 
         "with_galleys_marker",
         "one_note_too_far",
         "a_note_galley_links",
+        "a_join_drops_the_links_after_it",
+        "only_the_links_out_of_order",
     ],
 )
-def test_the_links_of_a_page_must_number_its_notes_in_order(
+def test_the_links_that_break_the_order_of_a_pages_notes_are_dropped(
     links: tuple[tuple[str, str, int], ...],
     markers: tuple[str, ...],
     referenced: tuple[int, ...],
-    in_order: bool,
+    kept: tuple[int, ...],
 ) -> None:
     # Section 9b, review of 19 November 2026: page 31's five links each one
     # note too far, page 21's two.
-    found = numbers_in_order(
-        [_numbered(note_id, number, rank) for note_id, number, rank in links],
-        _page_notes(*markers, referenced=referenced),
+    numbered = [_numbered(note_id, number, rank) for note_id, number, rank in links]
+    found = links_in_order(numbered, _page_notes(*markers, referenced=referenced))
+    assert found == tuple(numbered[index] for index in kept)
+
+
+def test_the_numbers_the_model_skips_count_as_references() -> None:
+    # Section 9b, Kadesh page 61: the model leaves out 160, so 161 is its
+    # third reference and goes to the page's fourth footnote.
+    numbered = [
+        _numbered("n-p0031-001", "158", 0),
+        _numbered("n-p0031-002", "159", 1),
+        _numbered("n-p0031-004", "161", 2, skipped=1),
+        _numbered("n-p0031-005", "162", 3, skipped=1),
+    ]
+    assert links_in_order(numbered, _page_notes("", "", "", "", "")) == tuple(numbered)
+
+
+def test_a_skip_that_does_not_explain_the_note_is_dropped() -> None:
+    # 161 skips one number, but its note is the page's sixth footnote.
+    numbered = [
+        _numbered("n-p0031-001", "159", 0),
+        _numbered("n-p0031-006", "161", 1, skipped=1),
+    ]
+    assert links_in_order(numbered, _page_notes(*[""] * 6)) == (numbered[0],)
+
+
+def _line_page(*words: str) -> tuple[GalleyToken, ...]:
+    """galley's reading of a page whose body is `words`, one span."""
+    block = "b-p0011-001"
+    tokens = []
+    start = 0
+    for word in words:
+        tokens.append(
+            GalleyToken(
+                form=word.lower(),
+                place=Place(block, 0, start, start + len(word)),
+                block_id=block,
+                note_id=None,
+            )
+        )
+        start += len(word) + 1
+    return tuple(tokens)
+
+
+# Kadesh page 11 (section 9b): galley reads the first words of notes 16
+# and 17 as "Masrvuo's" and "i @engr.", so the model's note lines
+# "MASPERO's" and "Geogr." name no footnote.
+PAGE_11_WORDS = ("brief", "Record", "the", "Poem", "by", "Brugsch", "at", "Karnak")
+PAGE_11_ANSWER = (
+    "A brief Record [15] the\n"
+    "like the Poem [16] by\n"
+    "said by Brugsch [17] at\n"
+    "Luxor, at Karnak [18] and\n"
+    "NOTE 15 | Called by de\n"
+    "NOTE 16 | MASPERO's\n"
+    "NOTE 17 | Geogr.\n"
+    "NOTE 18 | Struggle of the\n"
+)
+
+
+def _page_11_notes() -> tuple[Note, ...]:
+    return (
+        _note("n-p0011-001", "Called by de Rougé the Bulletin."),
+        _note("n-p0011-002", "Masrvuo's statement (Struggle, p. 3%)"),
+        _note("n-p0011-003", "i @engr. Imackr., 11, 23."),
+        _note("n-p0011-004", "Strugyle of the Nations, p. 1."),
     )
-    assert found is in_order
+
+
+def test_a_note_line_that_names_no_note_is_placed_between_its_neighbours() -> None:
+    links = page_links(
+        11,
+        _line_page(*PAGE_11_WORDS),
+        _page_11_notes(),
+        link_answer(PAGE_11_ANSWER),
+    )
+    assert [(link.text, link.note_id) for link in links] == [
+        ("15", "n-p0011-001"),
+        ("16", "n-p0011-002"),
+        ("17", "n-p0011-003"),
+        ("18", "n-p0011-004"),
+    ]
+
+
+def test_no_note_is_placed_without_a_link_after_it() -> None:
+    # Kadesh page 62: by the link before alone, a reference whose note
+    # galley joined to the one before would go to the next note.
+    answer = link_answer(PAGE_11_ANSWER.replace("Karnak [18] and", "Karnak and"))
+    links = page_links(11, _line_page(*PAGE_11_WORDS), _page_11_notes(), answer)
+    assert [link.text for link in links] == ["15"]
+
+
+def test_no_note_is_placed_when_its_neighbours_numbers_skip_a_note() -> None:
+    # The model marks 15, 17 and 18, and 18 goes to the page's third
+    # footnote, its third reference: 15 and 18 are three numbers apart and
+    # their notes two places, so whether 17 is the second footnote is not
+    # known, and it is not placed.
+    answer = link_answer(PAGE_11_ANSWER.replace("Poem [16] by", "Poem by"))
+    notes = tuple(note for note in _page_11_notes() if note.id != "n-p0011-002")
+    links = page_links(11, _line_page(*PAGE_11_WORDS), notes, answer)
+    assert [(link.text, link.note_id) for link in links] == [
+        ("15", "n-p0011-001"),
+        ("18", "n-p0011-004"),
+    ]
 
 
 def test_a_reference_the_model_marks_where_galley_links_the_note_counts_once() -> None:
@@ -827,3 +969,140 @@ def test_a_reference_with_no_place_to_a_note_galley_references_counts_once() -> 
         ("n-p0040-004", "102"),
         ("n-p0040-006", "104"),
     ]
+
+
+# The vision model's answers to the links prompt on the 22 Kadesh pages of
+# the three excerpts where a footnote starts, recorded on 24 November 2026
+# (scripts/record_kadesh_link_answers.py), each file named by its page
+# index in the whole book.
+RECORDED = Path(__file__).parent / "fixtures" / "correct" / "kadesh_links"
+REFERENCE = (
+    Path(__file__).parent
+    / "fixtures"
+    / "expected"
+    / "kadesh_reference"
+    / "note_references.json"
+)
+# The excerpts read with `ocr = "redo"`, as the whole book is, and the
+# whole book's page index of each excerpt's page 0.
+LINK_EXCERPTS = (
+    ("kadesh_redo", 8, 15),
+    ("kadesh_29-38", 29, 38),
+    ("kadesh_59-68", 59, 68),
+)
+# The links the recorded answers give (section 9b): the page index in the
+# whole book, the number printed, the model's number, the model's word
+# before the reference, and the first characters of galley's note. Each
+# was checked on the page images and is in REFERENCE. Pages 11, 14, 15
+# and 29 have links found by order; pages 61 to 63 and 66, where galley
+# splits or joins a note or the model leaves a reference out, keep the
+# links that keep the order. Pages 10, 12, 13, 30, 31, 33, 36 and 38 have
+# none.
+RECORDED_LINKS = (
+    (8, "1", "1", "Greece,", "J, Kromayer, Ant"),
+    (8, "2", "2", "investigation.", "In Ramses III.'s"),
+    (8, "3", "3", "forces.", "®There is, howev"),
+    (9, "4", "4", "Salvolini", "Campagne de Rham"),
+    (9, "5", "5", "Lenormant,", "Sin Correspondan"),
+    (9, "7", "7", "“Record”", "This and the oth"),
+    (11, "15", "15", "RECORD", "Called by de Rou"),
+    (11, "16", "16", "Poem,", "Masrvuo's statem"),
+    (11, "17", "17", "Brugsch", "i @engr. Imackr."),
+    (11, "18", "18", 'Karnak."', "Strugyle of the "),
+    (14, "24", "24", "nomes,", "3¢ LD., 1, 149d "),
+    (14, "25", "25", "Delta,", "LD., Il, 149d = "),
+    (14, "27", "27", "men,", "Gox., Ham., III,"),
+    (14, "28", "28", "men,", "4meni inscriptio"),
+    (14, "29", "29", "men.", "Tbid., ll. 14, 1"),
+    (14, "33", "33", "people,”", "Great Karnak ins"),
+    (15, "34", "34", "enemy;", "The inscription "),
+    (15, "35", "35", "2,052", "On the back of t"),
+    (15, "36", "36", "soldiers;", "Cuawr., Not. des"),
+    (15, "37", "37", "soldiers.", "ueLD., Il, 22e."),
+    (15, "38", "38", "certain.", "The Hittite king"),
+    (29, "72", "2", 'line."', "Ip. ett. p. 168."),
+    (29, "73", "3", 'southwest."', "Op. cst., p. S43"),
+    (29, "74", "4", 'advanced."', "Op. cit., pp. S4"),
+    (32, "82", "82", "Aranami", "The variant is o"),
+    (32, "83", "83", "vizier", "Read the above i"),
+    (37, "90", "90", "iter", "®A variable meas"),
+    (37, "91", "91", "Amon?];", "“The article is "),
+    (37, "92", "92", "attendants.", "The phrase: “ al"),
+    (59, "150", "150", "river.", "1% The drawing o"),
+    (59, "152", "152", "whatever.", "Va? anyone doubt"),
+    (60, "154", "154", "water", "The absurdity of"),
+    (60, "155", "155", "bottom", "In both scenes a"),
+    (60, "156", "156", "terms:", "The same inciden"),
+    (60, "157", "157", '9,000."', "I had no photogr"),
+    (61, "158", "158", "claws.”", "Struggle of the "),
+    (61, "159", "159", "says:", "Vol. I, p. @; ad"),
+    (61, "161", "161", "Hecatæus’s", "Diedorus's descr"),
+    (61, "162", "162", "Silsileh", "CnHaup., Mon., 1"),
+    (61, "163", "163", "Luxor", "Danesay, Rec., 2"),
+    (61, "164", "164", "camp,", "At Abu Simbel ( "),
+    (61, "165", "165", "battle.", "1% The words “sl"),
+    (62, "166", "166", "tale,", "Besides being he"),
+    (62, "167", "167", "Maspero", "Cpamp., Mon., 25"),
+    (62, "168", "168", "inscriptions", "Mar. Ab., Vol. I"),
+    (63, "172", "172", "Luxor.", "'? This is on th"),
+    (63, "173", "173", "reliefs", "M seprge's refer"),
+    (66, "175", "175", "perishing,”", "M asPERO, Strugg"),
+    (66, "176", "176", "Qodshu”", "Jbid., p. 395."),
+)
+
+
+def _alphanumeric(text: str) -> str:
+    return re.sub(r"\W", "", text).casefold()
+
+
+# Reads the excerpts' runs, which Tesseract made.
+@pytest.mark.tesseract
+def test_the_recorded_answers_link_the_notes_the_pages_print(
+    redo_excerpt_run: Callable[[str], BookFolder],
+) -> None:
+    found = []
+    for name, first, last in LINK_EXCERPTS:
+        folder = redo_excerpt_run(name)
+        blocks = read_blocks(folder.blocks_json)
+        words = read_words(folder.words_json)
+        splits = {
+            block.id: split_counts(block, words)
+            for block in every_block(blocks)
+            if len(block.origin) > 1
+        }
+        for path in sorted(RECORDED.glob("k*.txt")):
+            book_page = int(path.stem[1:])
+            if not first <= book_page <= last:
+                continue
+            page = book_page - first
+            reading = page_reading(blocks, page, splits)
+            notes = footnotes_starting(blocks, page)
+            texts = {
+                note.id: " ".join(
+                    span.text for block in note.blocks for span in block.spans
+                )
+                for note in notes
+            }
+            links = page_links(
+                page,
+                reading,
+                notes,
+                link_answer(path.read_text(encoding="utf-8")),
+                galley_references(blocks, reading),
+            )
+            found.extend(
+                (book_page, link.text, link.model_word, texts[link.note_id][:16])
+                for link in links
+            )
+    assert found == [row[:1] + row[2:] for row in RECORDED_LINKS]
+
+
+def test_every_recorded_link_follows_the_word_the_page_prints() -> None:
+    reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
+    after = {
+        (page["page_index"], item["number"]): item["after"]
+        for page in reference["pages"]
+        for item in page["references"]
+    }
+    for book_page, printed, _, word, _ in RECORDED_LINKS:
+        assert _alphanumeric(after[book_page, printed]) == _alphanumeric(word)

@@ -249,7 +249,11 @@ EXCERPT_CONFIGS = frozendict(
 # 0 holds the journal's page number 81 where Tesseract boxes it, 634.8 to
 # 641.8 pt from the top, and nothing else (checked on the page at 300 dpi
 # on 19 November 2026); kadesh_8-17's region is 12 pt higher, where the
-# text layer misplaces it.
+# text layer misplaces it. kadesh_29-38 and kadesh_59-68 are read with
+# `ocr = "redo"` too, as the whole book is, for the tests of the correct
+# stage's note links on the vision model's recorded answers (correct spec
+# section 9b): their notes are those of the whole book's structure on
+# pages 29 to 38 and 59 to 68 (compared on 24 November 2026).
 REDO_EXCERPT_CONFIGS = frozendict(
     {
         "kadesh_redo": (
@@ -259,6 +263,18 @@ REDO_EXCERPT_CONFIGS = frozendict(
             'ocr = "redo"\n'
             "exclude_regions = [{page = 0, box = [240, 632, 252, 644]}]\n"
             "exclude_pages = [8]\n"
+        ),
+        "kadesh_29-38": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["James Henry Breasted"]\n'
+            'language = "en"\n'
+            'ocr = "redo"\n'
+        ),
+        "kadesh_59-68": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["James Henry Breasted"]\n'
+            'language = "en"\n'
+            'ocr = "redo"\n'
         ),
     }
 )
