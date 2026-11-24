@@ -608,19 +608,68 @@ def _places(words: Iterable[_PlacedWord], text: str) -> str:
     return ", ".join(places) if places else "none"
 
 
+# Structure spec section 30, rule 12: an inferred label is "N." of 1 or 2
+# digits, and the first of a run is "1." before "2.". Written here, as the
+# fidelity check reads no stage's code.
+_NUMBER_LABEL = re.compile(r"[0-9]{1,2}\.")
+_SECOND_NUMBER = 2
+
+
+def _label_number(label: str | None) -> int | None:
+    if label is None or _NUMBER_LABEL.fullmatch(label) is None:
+        return None
+    return int(label[:-1])
+
+
+def _inferable_labels(blocks: BlocksFile) -> Counter[str]:
+    """The labels of the contents entries that structure may have inferred
+    (structure spec sections 30, rule 12, and 31): "N." whose neighbours
+    among the consecutive contents entry blocks are "N−1." and "N+1.", or
+    "1." before "2." with no number label among the entries before it;
+    each counted as often as such entries hold it."""
+    runs: list[list[Block]] = [[]]
+    for block in blocks.blocks:
+        if block.kind is BlockKind.CONTENTS_ENTRY:
+            runs[-1].append(block)
+        elif runs[-1]:
+            runs.append([])
+    labels: Counter[str] = Counter()
+    for run in runs:
+        numbers = tuple(_label_number(block.label) for block in run)
+        for position, number in enumerate(numbers):
+            if number is None:
+                continue
+            before = numbers[position - 1] if position > 0 else None
+            after = numbers[position + 1] if position + 1 < len(numbers) else None
+            first = (
+                number == 1
+                and after == _SECOND_NUMBER
+                and all(earlier is None for earlier in numbers[:position])
+            )
+            if first or (before == number - 1 and after == number + 1):
+                labels[f"{number}."] += 1
+    return labels
+
+
 def _check_words(
     boundary: FidelityBoundary,
     input_words: tuple[_PlacedWord, ...],
     output_words: tuple[_PlacedWord, ...],
     taken_out: tuple[_PlacedWord, ...],
     note_detail: str,
+    admitted: Counter[str] | None = None,
 ) -> None:
     """Raise FidelityError when the input words, as a multiset, are not the
     output words less those taken out, or when `note_detail` reports a
-    difference in the note counts; return otherwise."""
+    difference in the note counts; return otherwise. A word of `admitted`
+    that the output holds more often than the input is not invented, up
+    to its count there."""
     difference = Counter(word.text for word in input_words)
     difference.subtract(word.text for word in output_words)
     difference.update(word.text for word in taken_out)
+    for text, count in (admitted or Counter()).items():
+        if difference[text] < 0:
+            difference[text] += min(count, -difference[text])
     missing = frozendict(
         sorted((text, count) for text, count in difference.items() if count > 0)
     )
@@ -1068,7 +1117,9 @@ def check_stage(
     the words of lines.json against those of blocks.json's blocks and notes,
     with each block's label, each epigraph's source, each contents entry's
     page number, and each note's marker and group, plus its removals,
-    with each word change undone. markdown: the words of blocks.json, with
+    with each word change undone, admitting a contents entry's label that
+    structure may have inferred (a number between two in sequence, or
+    "1." before "2."). markdown: the words of blocks.json, with
     the edits applied, against book.md as `read_markdown` gives it, without
     the references to footnotes and the markers of referenced footnotes,
     and without the dash markdown writes before an epigraph's source;
@@ -1134,6 +1185,7 @@ def check_stage(
                 + _words_before_changes(after),
                 _words_after_changes(after),
                 "",
+                _inferable_labels(after),
             )
         case FidelityBoundary.MARKDOWN:
             if not (
