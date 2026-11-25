@@ -75,13 +75,16 @@ def test_every_chapter_is_a_level_1_heading_with_its_label(
 ) -> None:
     labels = _level_1_headings(owner_book_run(book))
     # Distinct labels, so that a chapter found twice does not stand for a
-    # chapter missed.
+    # chapter missed. Counts made first, so that a failure prints no text
+    # of the owner's books (pytest shows the values in an assert).
     chapters = tuple(
         label.lower()
         for label in labels
         if label is not None and label.lower().startswith("chapter")
     )
-    assert len(set(chapters)) == len(chapters) == _CHAPTERS[book]
+    distinct_count = len(set(chapters))
+    chapter_count = len(chapters)
+    assert distinct_count == chapter_count == _CHAPTERS[book]
 
 
 @pytest.mark.parametrize("book", ["turney", "haynes"])
@@ -90,7 +93,8 @@ def test_at_least_5_level_1_headings_have_no_label(
 ) -> None:
     # The introduction, the notes, the bibliography, the index, and others.
     labels = _level_1_headings(owner_book_run(book))
-    assert sum(label is None for label in labels) >= 5
+    unlabelled_count = sum(label is None for label in labels)
+    assert unlabelled_count >= 5
 
 
 @pytest.mark.parametrize("book", ["turney", "haynes"])
@@ -103,10 +107,17 @@ def test_no_running_head_removed_starts_with_a_chapter_label_word(
         for removal in blocks.removals
         if removal.reason is RemovalReason.RUNNING_HEAD
     )
-    assert heads
-    assert not any(
-        head.split()[0].rstrip(".,:;").lower() in _LABEL_WORDS for head in heads
+    # Page indices, not the heads, so that a failure prints no text of the
+    # owner's books.
+    starting_with_label = tuple(
+        removal.page_index
+        for removal in blocks.removals
+        if removal.reason is RemovalReason.RUNNING_HEAD
+        and removal.text.split()[0].rstrip(".,:;").lower() in _LABEL_WORDS
     )
+    head_count = len(heads)
+    assert head_count > 0
+    assert starting_with_label == ()
 
 
 def test_turney_page_numbers_at_the_foot_of_at_least_14_of_its_15_opening_pages(
@@ -127,11 +138,13 @@ def test_no_margin_note_is_a_number_of_1_to_3_digits(
     owner_book_run: Callable[[str], BlocksFile], book: str
 ) -> None:
     blocks = owner_book_run(book)
-    assert not any(
-        re.fullmatch(r"[0-9]{1,3}", block_text(block))
-        for block in blocks.blocks
+    numeral_notes = tuple(
+        position
+        for position, block in enumerate(blocks.blocks)
         if block.kind is BlockKind.MARGIN_NOTE
+        and re.fullmatch(r"[0-9]{1,3}", block_text(block))
     )
+    assert numeral_notes == ()
 
 
 def _endnotes(blocks: BlocksFile) -> tuple[Note, ...]:
@@ -142,7 +155,9 @@ def _endnotes(blocks: BlocksFile) -> tuple[Note, ...]:
 def test_endnotes_number_at_least_the_target(
     owner_book_run: Callable[[str], BlocksFile], book: str
 ) -> None:
-    assert len(_endnotes(owner_book_run(book))) >= _ENDNOTES[book]
+    # The count made first: pytest shows the value of a call in an assert.
+    endnote_count = len(_endnotes(owner_book_run(book)))
+    assert endnote_count >= _ENDNOTES[book]
 
 
 @pytest.mark.parametrize("book", ["turney", "haynes"])
@@ -262,11 +277,14 @@ def test_every_endnote_link_reads_its_notes_number(
 ) -> None:
     # The note's number is its marker's digits; a marker the OCR read with
     # no digit gives none to compare, and a sign has no digits.
+    # Positions of the wrong links in reading order, not their text, so that
+    # a failure prints no text of the owner's books.
     links = _endnote_links(owner_book_run(book))
-    assert links
+    link_count = len(links)
+    assert link_count > 0
     wrong = tuple(
-        (reference, note.marker)
-        for reference, note in links
+        position
+        for position, (reference, note) in enumerate(links)
         if reference.isdigit()
         and (number := note.marker.rstrip(".")).isdigit()
         and not _reads_as(reference, number)
@@ -340,10 +358,11 @@ def test_epigraph_blocks_and_those_with_line_feeds_number_the_books_own(
         for block in owner_book_run(book).blocks
         if block.kind is BlockKind.EPIGRAPH
     )
-    assert (
+    counts = (
         len(epigraphs),
         sum("\n" in block_text(block) for block in epigraphs),
-    ) == _EPIGRAPHS[book]
+    )
+    assert counts == _EPIGRAPHS[book]
 
 
 @pytest.mark.parametrize("book", ["turney", "haynes"])

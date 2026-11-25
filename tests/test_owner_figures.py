@@ -89,7 +89,12 @@ def test_owner_book_analyze_finds_the_in_page_figures_of_section_2_and_no_other(
     assert {
         page.index: len(page.figure_boxes) for page in pages if page.figure_boxes
     } == _FIGURES[book]
-    assert all(page.kind is PageKind.TEXT for page in pages if page.figure_boxes)
+    not_text = tuple(
+        page.index
+        for page in pages
+        if page.figure_boxes and page.kind is not PageKind.TEXT
+    )
+    assert not_text == ()
 
 
 # structure's part (figures spec section 10): a figure block for each
@@ -138,10 +143,19 @@ def test_haynes_caption_of_each_figure_opens_with_figure_and_its_number(
     owner_book_run: Callable[[str], BlocksFile],
 ) -> None:
     figures = _figure_blocks(owner_book_run("haynes"))
-    assert tuple(
-        (words[0].lower(), words[1])
-        for words in (block_text(block).split(" ") for block in figures)
-    ) == tuple(("figure", number) for number in _HAYNES_NUMBERS)
+    # The figures whose caption opens otherwise, by position, not the
+    # caption's words, so that a failure prints no text of the owner's books.
+    captions = tuple(block_text(block).split(" ") for block in figures)
+    opening_otherwise = tuple(
+        position
+        for position, (words, number) in enumerate(
+            zip(captions, _HAYNES_NUMBERS, strict=False)
+        )
+        if (words[0].lower(), *words[1:2]) != ("figure", number)
+    )
+    figure_count = len(figures)
+    assert figure_count == len(_HAYNES_NUMBERS)
+    assert opening_otherwise == ()
     assert (
         tuple(len(block_text(block).split(" ")) for block in figures)
         == _HAYNES_CAPTION_WORDS
@@ -167,13 +181,22 @@ def test_turney_caption_of_11_figures_and_no_heading_on_page_174(
     owner_book_run: Callable[[str], BlocksFile],
 ) -> None:
     blocks = owner_book_run("turney")
-    assert (
-        tuple(
-            block_text(block).split(" ")[0] if block.spans else None
-            for block in _figure_blocks(blocks)
-        )
-        == _TURNEY_NUMBERS
+    # The figures whose caption opens otherwise, by position, not the
+    # caption's words, so that a failure prints no text of the owner's books.
+    figures = _figure_blocks(blocks)
+    openings = tuple(
+        block_text(block).split(" ")[0] if block.spans else None for block in figures
     )
+    opening_otherwise = tuple(
+        position
+        for position, (opening, number) in enumerate(
+            zip(openings, _TURNEY_NUMBERS, strict=False)
+        )
+        if opening != number
+    )
+    figure_count = len(figures)
+    assert figure_count == len(_TURNEY_NUMBERS)
+    assert opening_otherwise == ()
     assert (
         tuple(
             len(block_text(block).split(" ")) if block.spans else 0
@@ -181,8 +204,9 @@ def test_turney_caption_of_11_figures_and_no_heading_on_page_174(
         )
         == _TURNEY_CAPTION_WORDS
     )
-    assert not any(
+    headings_on_174 = sum(
         block.kind is BlockKind.HEADING
         and any(origin.page_index == 174 for origin in block.origin)
         for block in blocks.blocks
     )
+    assert headings_on_174 == 0
