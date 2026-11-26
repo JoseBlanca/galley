@@ -454,7 +454,9 @@ keep their layer under `redo`; the plates hold no note reference.
   the layer's words does not occur. A text or front-matter page without
   a layer whose source is `ocr` is read as any `ocr` page; the rules
   below find no layer word on it and change nothing (added on 26
-  November 2026).
+  November 2026). Should Tesseract read no word on such a page all the
+  same, extract logs it at WARNING, naming the page, and the page has
+  no words (added after the code review of 26 November 2026).
 - Every other page is read as with `verify`, the default, which reads
   the layer: a plate page with a layer keeps the layer's words and the
   source `text_layer` (on Kadesh's 9 plates Tesseract reads 0 to 140

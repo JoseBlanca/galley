@@ -171,7 +171,16 @@ of the books onto a blank leaf of the same book, and Tesseract in mode
 3 read none of them, while their ink was 0.006% to 0.065%, under the
 threshold. Such a page, printing only its page number, is blank. Nothing
 of the book's text is lost with it: structure removes page numbers
-from every page (architecture §8, the removal reason `page_number`). A page with ink
+from every page (architecture §8, the removal reason `page_number`).
+The same holds for a lone short word in body type: the code reviewer
+pasted "end" from Haskins 13 (and "viii") onto Haskins 4, a blank leaf,
+and Tesseract read nothing in modes 3, 6 and 11, while the ink was
+0.047%; the rule judges that page blank, and its word is lost. So that
+the owner looks at such a page, a blank page whose ink share is 0.04%
+or more, half the threshold, is logged at WARNING with its ink (§4); on
+the five books these are four blank pages, Gierke 5 and 286 (0.050% and
+0.046%), Kadesh 75 (0.050%) and Haskins 279 (0.062%) (corrected on 26
+November 2026 after the code review). A page with ink
 that Tesseract cannot read as text, a faint picture, writing, a printed
 line Tesseract misses, is a picture and not blank, so that the error
 the rule can make is to keep a page that holds nothing, never to drop
@@ -230,9 +239,9 @@ the rule; by Tesseract alone it would be blank.
 |---|---|---|---|---|
 | much text or text, page before the front-matter end | `front_matter` | `ocr` | false | WARNING |
 | much text or text, any other page | `text` | `ocr` | false | WARNING |
-| text or picture on a page the plate rule takes | `plate` | `none` | false | WARNING, by the plate rule |
+| text or picture on a page the plate rule takes | `plate` | `none` | false | WARNING, by the plate rule, with the audit's text words |
 | picture | `plate` | `none` | false | WARNING |
-| blank | `blank` | `none` | true | INFO |
+| blank | `blank` | `none` | true | INFO; WARNING with an ink share of 0.04% or more |
 
 Every page keeps `text_layer_score` `None` (§9), and `exclude_regions`
 as on any page.
@@ -263,7 +272,8 @@ them. No page of the five books has both text Tesseract reads and a
 picture, so this is not measured.
 
 analyze logs at WARNING each page the audit makes text, with its number
-of words and its first ten, and "add it to `exclude_pages` if it is not
+of Tesseract words, its number of text words and the first ten of
+these, and "add it to `exclude_pages` if it is not
 the book's": on the five books these are the Internet Archive's notice
 and two library labels (§5), which the owner may not want in the book.
 
@@ -272,7 +282,10 @@ takes (plates §2): extract renders the whole page as its image, and the
 page has no words. analyze logs it at WARNING with its ink share, its
 number of Tesseract words and their highest confidence, and "add it to
 `exclude_pages` if it is not one", as the plate rule logs the pages it
-takes.
+takes. When the plate rule takes a page without a text layer, its
+WARNING adds the number of text words the audit read there and the
+first ten of them, so that a page of text the rule takes is seen (on
+Stubbs' maps 9, 11, 52 and 54 the audit reads 4, 3, 6 and 18).
 
 **A blank page.** No words; extract does not read it
 (walking-skeleton §6). `blank_checked_by_ocr` true says that Tesseract
@@ -286,10 +299,16 @@ word of any file: removals live in `words.json`, which extract writes,
 and extract does not read a blank page. analyze logs at INFO each blank
 page, with its number of Tesseract words, their highest confidence and
 its ink share, so that a reader of the log sees what was found there
-(Kadesh 73: 26 words, the highest 51.7, ink 0.003%).
+(Kadesh 73: 26 words, the highest 51.7, ink 0.003%); a blank page with
+an ink share of 0.04% or more, at WARNING, with "check that it holds
+no print" (§3).
 
 analyze ends with one line at INFO that counts the pages the audit read
-and each verdict.
+and what each became: text (front matter included), a picture, blank,
+or a plate taken by the plate rule, which the rule of §2 decides before
+the verdicts text and picture. The verdict counted is that of the table
+above, not the bare reading of Tesseract and the ink: Stubbs' map 9,
+where the audit reads 4 text words, counts as taken by the plate rule.
 
 ## 5. What the rule gives on the five books
 
@@ -396,8 +415,9 @@ The other messages:
 ## 8. Cases
 
 - **A page of numerals only or a name only**: text, if Tesseract reads
-  one of its words at 70 or more; else a picture, if it has ink; else
-  blank (§3).
+  one of its words at 70 or more; else a picture, if it has ink of
+  0.08% or more; else blank (§3), logged at WARNING from 0.04% of ink.
+  A lone short word or numeral in body type can be judged blank.
 - **A page that prints only its page number**, which Tesseract misses:
   blank (§3); structure would remove the number anyway.
 - **A page of running text without a text layer**: text, by its 40
@@ -444,7 +464,9 @@ throughout is read from that layer unless the owner sets `ocr =
 
 The functions the pipeline and the tests call. `run` and
 `check_config_pages` are as in the walking skeleton; `classify_page`
-takes the audit's verdict; `require_text_layer` goes.
+takes the audit's verdict and raises `ValueError` when it is given a
+verdict other than `NOT_AUDITED` for a page with a text-layer word,
+which the audit does not read; `require_text_layer` goes.
 
 ```python
 # galley.analyze
@@ -508,8 +530,10 @@ expected text goes into `tests/fixtures/expected/blank_pages/`, read by
 eye from the page; the blank pages have no words and no removal; pages
 3 and 4 have one figure each, the whole page, and no words. analyze
 logs WARNING for excerpt pages 0 and 3 by the audit (and 4 by the
-plate rule), INFO for each of the seven blank pages. analyze with 1 worker and with 6 gives byte-identical
-`pages.json`.
+plate rule), INFO for six of the seven blank pages and WARNING for
+excerpt page 9 (Kadesh 75, ink 0.050%), and ends with "1 text, 1
+picture, 7 blank, 1 taken by the plate rule". analyze with 1 worker
+and with 6 gives byte-identical `pages.json`.
 
 **Unit tests**, with values made in the test:
 
@@ -553,6 +577,11 @@ the front-matter end the rule finds (Kadesh 1, end 8; Domesday 0, end
 has `blank_checked_by_ocr` true. The
 whole-book configs of `tests/conftest.py` stay as they are: they
 exclude these pages, so their tests do not change.
+
+**Not covered**: the audit's language. Every page measured is English,
+and no excerpt has a page without a text layer in another language, so
+no test shows that the audit reads with the book's language and not
+with English (noted after the code review of 26 November 2026).
 
 **The fidelity check** (architecture §13) is unchanged: every word of
 an `ocr` page is a word of `words.json` or a removal; a blank page and a
