@@ -448,8 +448,13 @@ keep their layer under `redo`; the plates hold no note reference.
 - An `ocr` page's `PageWords.text_source` is `ocr`; a text page whose
   words fell back to the layer, as above, has `text_layer`, and the
   page's `exclude_regions` apply to those words as to any. A text page
-  has a layer with words by analyze's rule, so a page with neither
-  Tesseract's nor the layer's words does not occur.
+  has a layer with words by analyze's rule, or no layer and words that
+  Tesseract read in analyze's audit on the same render
+  (`docs/specs/analyze.md` §3), so a page with neither Tesseract's nor
+  the layer's words does not occur. A text or front-matter page without
+  a layer whose source is `ocr` is read as any `ocr` page; the rules
+  below find no layer word on it and change nothing (added on 26
+  November 2026).
 - Every other page is read as with `verify`, the default, which reads
   the layer: a plate page with a layer keeps the layer's words and the
   source `text_layer` (on Kadesh's 9 plates Tesseract reads 0 to 140
