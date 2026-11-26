@@ -366,6 +366,106 @@ def test_run_runs_correct_only_with_correct_true(
     assert names("correct", config) == ["correct"]
 
 
+def _recorded_run(
+    folder: BookFolder, arguments: list[str], monkeypatch: pytest.MonkeyPatch
+) -> list[tuple[str, bool]]:
+    """The stages `galley2epub run` calls on `folder` with `arguments`, each
+    with the config's `correct` it receives; no stage does any work."""
+    calls: list[tuple[str, bool]] = []
+
+    def recorder(name: str) -> Callable[..., None]:
+        def record(folder: BookFolder, config: BookConfig, *, workers: int = 0) -> None:
+            del folder, workers
+            calls.append((name, config.correct))
+
+        return record
+
+    monkeypatch.setattr(
+        cli,
+        "_STAGES",
+        tuple(replace(stage, run=recorder(stage.name)) for stage in cli._STAGES),
+    )
+    main(["run", str(folder.root), *arguments])
+    return calls
+
+
+def test_run_with_correct_flag_runs_correct_although_the_config_has_correct_false(
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Architecture section 14. Kept answers leave the server check to the
+    # stage, which is recorded here, so no model is asked.
+    folder = _book(tmp_path, excerpt_book_toml[KADESH] + "correct = false\n")
+    folder.answers_dir.mkdir()
+
+    calls = _recorded_run(folder, ["--correct"], monkeypatch)
+
+    assert calls == [
+        ("analyze", True),
+        ("extract", True),
+        ("layout", True),
+        ("structure", True),
+        ("correct", True),
+        ("markdown", True),
+        ("epub", True),
+    ]
+
+
+def test_run_with_no_correct_flag_skips_correct_although_the_config_has_correct_true(
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    folder = _book(tmp_path, excerpt_book_toml[KADESH] + "correct = true\n")
+    folder.answers_dir.mkdir()
+
+    calls = _recorded_run(folder, ["--no-correct"], monkeypatch)
+
+    assert calls == [(stage, False) for stage in STAGES]
+
+
+@pytest.mark.parametrize(
+    ("correct", "expected_stages"),
+    [
+        ("false", STAGES),
+        ("true", (*STAGES[:4], "correct", *STAGES[4:])),
+    ],
+)
+def test_run_without_a_correct_flag_runs_correct_as_the_config_says(
+    correct: str,
+    expected_stages: tuple[str, ...],
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    folder = _book(tmp_path, excerpt_book_toml[KADESH] + f"correct = {correct}\n")
+    folder.answers_dir.mkdir()
+
+    calls = _recorded_run(folder, [], monkeypatch)
+
+    assert cli._parser().parse_args(["run", str(folder.root)]).correct is None
+    assert calls == [(stage, correct == "true") for stage in expected_stages]
+
+
+def test_run_with_no_correct_and_correct_true_does_not_check_lm_studio(
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # No answers/, so with correct = true the command would check the
+    # server, on a port where nothing listens, before analyze.
+    folder = _book(
+        tmp_path,
+        excerpt_book_toml[KADESH]
+        + 'correct = true\ncorrect_server = "http://localhost:9"\n',
+    )
+
+    calls = _recorded_run(folder, ["--no-correct"], monkeypatch)
+
+    assert [stage for stage, _ in calls] == list(STAGES)
+
+
 def test_a_words_json_of_the_other_excerpt_raises_naming_extract(
     tmp_path: Path,
     excerpt_book_toml: frozendict[str, str],

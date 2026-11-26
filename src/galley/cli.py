@@ -2,7 +2,9 @@
 every stage, and a stage's name runs that stage alone (spec section 9).
 
 The command reads `book.toml` from the folder and calls each stage's `run`.
-`run` runs the correct stage only when the config has `correct = true`.
+`run` runs the correct stage only when the config has `correct = true`,
+unless its flag `--correct` or `--no-correct` decides for that run
+(architecture section 14).
 Before any stage, it checks that LM Studio answers and has the config's
 models when the command runs correct (docs/specs/correct.md, section 4),
 and that Pandoc is installed when a stage it runs needs it; Tesseract's tools when
@@ -20,7 +22,7 @@ import logging
 import shutil
 import sys
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
@@ -178,7 +180,26 @@ def _parser() -> argparse.ArgumentParser:
             default=DEFAULT_WORKERS,
             help=f"threads for the per-page stages (default {DEFAULT_WORKERS})",
         )
+        if name == _RUN:
+            subcommand.add_argument(
+                "--correct",
+                action=argparse.BooleanOptionalAction,
+                default=None,
+                help="run the correct stage, or with --no-correct skip it, "
+                "whatever book.toml's correct says (default: as book.toml says)",
+            )
+    # The other subcommands have no flag, and so the config decides.
+    parser.set_defaults(correct=None)
     return parser
+
+
+def _with_correct_flag(config: BookConfig, *, correct_flag: bool | None) -> BookConfig:
+    """The config a run uses: `config` with its `correct` replaced by the
+    flag of run, `--correct` (True) or `--no-correct` (False), and `config`
+    itself when no flag was given (None)."""
+    if correct_flag is None:
+        return config
+    return replace(config, correct=correct_flag)
 
 
 def _stages_of(command: str, config: BookConfig) -> tuple[_Stage, ...]:
@@ -304,7 +325,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     running: str | None = None
     try:
         folder = _book_folder(arguments.folder)
-        config = read_config(folder.book_toml)
+        config = _with_correct_flag(
+            read_config(folder.book_toml), correct_flag=arguments.correct
+        )
         stages = _stages_of(command, config)
         _check_before_any_stage(stages, config, folder)
         for stage in stages:
