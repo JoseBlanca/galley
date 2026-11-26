@@ -4,7 +4,7 @@ Today analyze stops on any page that has no text layer and that the
 config does not exclude (`docs/specs/walking-skeleton.md` §6), so most
 whole books need `exclude_pages` before they convert, and the PDF form
 of `galley2epub run` (architecture §14) fails on them. The whole Gierke
-book (`politicaltheorie00gieruoft`) stopped on 13 pages. This plan
+book (`politicaltheorie00gieruoft`) stopped on 12 pages. This plan
 builds the first half of the OCR audit that architecture §7b already
 decides: every page without a text layer is read with Tesseract in
 analyze; a page where Tesseract finds no text is `blank`, recorded with
@@ -56,7 +56,7 @@ Deliverables:
    `tests/fixtures/pdf/` and `pdfplumber` finds no words on those pages.
 
 Tasks:
-- [ ] 1.1 Measure, write the spec and the excerpt.
+- [x] 1.1 Measure, write the spec and the excerpt.
 
 ## 2. The code
 
