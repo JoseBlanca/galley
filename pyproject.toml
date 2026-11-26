@@ -3,6 +3,8 @@ name = "galley"
 version = "0.1.0"
 description = "Turns the PDF of a mostly-text book into an EPUB"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Jose Blanca", email = "jblanca@upv.es" }
 ]

@@ -229,3 +229,7 @@ uv run --locked pytest --parallel-threads=8
 `uv run pytest -m whole_book` runs the slow tests on the whole books,
 after `uv run python scripts/fetch_samples.py` has downloaded them;
 some tests need epubcheck (`brew install epubcheck`) and skip without it.
+
+## Licence
+
+MIT; see `LICENSE`.
