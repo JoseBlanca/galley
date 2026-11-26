@@ -2635,13 +2635,18 @@ _UNMEASURED_EXCERPTS = frozenset({"haskins_endpapers"})
 # tests are in tests/test_ocr_redo.py.
 _REDO_EXCERPTS = frozenset({"kadesh_redo"})
 
+# The excerpt of the pages without a text layer (docs/specs/analyze.md
+# section 11), which has no config in tests/conftest.py and which analyze
+# cannot read until the plan blank-pages builds its audit (work package 2).
+_AUDIT_EXCERPTS = frozenset({"kadesh_blank"})
+
 
 @pytest.mark.parametrize(
     "excerpt",
     sorted(
         path.stem
         for path in _EXCERPTS_DIR.glob("*.pdf")
-        if path.stem not in _REDO_EXCERPTS
+        if path.stem not in _REDO_EXCERPTS | _AUDIT_EXCERPTS
     ),
 )
 def test_layout_of_an_excerpt_with_rereading_keeps_every_word(

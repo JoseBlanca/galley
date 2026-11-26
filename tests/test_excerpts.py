@@ -67,13 +67,14 @@ EXPECTED_EXCERPT_PAGES = {
     "stubbs_cut_in": 6,
     "kadesh_redo": 11,
     "domesday_run_on": 5,
+    "kadesh_blank": 10,
 }
 
 # The pages of each excerpt, by index in the excerpt, that have no word in
 # their text layer, as scripts/fetch_samples.py describes them: Kadesh's
 # blank page, the back of Kadesh's plate 34, Haskins' page index 276 (in
-# haskins_endpapers) and Haskins' blank page before
-# the index. Every other page
+# haskins_endpapers), Haskins' blank page before
+# the index, and every page of kadesh_blank (docs/specs/analyze.md). Every other page
 # has words.
 PAGES_WITHOUT_WORDS = {
     "kadesh_8-17": (9,),
@@ -103,6 +104,7 @@ PAGES_WITHOUT_WORDS = {
     "stubbs_cut_in": (),
     "kadesh_redo": (),
     "domesday_run_on": (),
+    "kadesh_blank": tuple(range(10)),
 }
 
 
@@ -405,8 +407,15 @@ def test_owner_books_wp1_page_gives_its_removals_numbers_headings_and_notes(
 # tests are in tests/test_ocr_redo.py.
 _REDO_EXCERPTS = frozenset({"kadesh_redo"})
 
+# The excerpt of the pages without a text layer (docs/specs/analyze.md
+# section 11), which has no config in tests/conftest.py and which analyze
+# cannot read until the plan blank-pages builds its audit (work package 2).
+_AUDIT_EXCERPTS = frozenset({"kadesh_blank"})
 
-@pytest.mark.parametrize("name", sorted(set(EXPECTED_EXCERPT_PAGES) - _REDO_EXCERPTS))
+
+@pytest.mark.parametrize(
+    "name", sorted(set(EXPECTED_EXCERPT_PAGES) - _REDO_EXCERPTS - _AUDIT_EXCERPTS)
+)
 def test_fidelity_check_passes_on_the_excerpt_at_every_boundary(
     excerpt_books: frozendict[str, BookFolder], name: str
 ) -> None:
@@ -1488,7 +1497,12 @@ def test_front_matter_of_gierke_front_flow_keeps_its_contents_5_and_errata_6(
 
 @pytest.mark.parametrize(
     "name",
-    sorted(set(EXPECTED_EXCERPT_PAGES) - set(FRONT_MATTER_EXCERPTS) - _REDO_EXCERPTS),
+    sorted(
+        set(EXPECTED_EXCERPT_PAGES)
+        - set(FRONT_MATTER_EXCERPTS)
+        - _REDO_EXCERPTS
+        - _AUDIT_EXCERPTS
+    ),
 )
 def test_front_matter_of_an_excerpt_cut_inside_the_book_is_no_page(
     excerpt_books: frozendict[str, BookFolder], name: str
