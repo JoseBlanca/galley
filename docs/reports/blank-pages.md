@@ -25,13 +25,14 @@ authors and language:
 Checks on the branch: pytest 3902 passed in 90 s (81 s before the
 plan); 8 threads pass; `-m whole_book` 176 passed in 630 s.
 
-## Open for the owner
+## Decided by the owner
+
+Both answered on 26 November 2026 as recommended (a):
 
 1. Picture pages without a layer (covers, boards, labels) stay in the
    book as images, each logged at WARNING; Stubbs' last page, a barcode
-   label, ends its text with "0 020 690 469 0". Meanwhile kept
-   (analyze.md Open 1).
-2. The config's `cover_page` is not audited. Meanwhile so (Open 2).
+   label, ends its text with "0 020 690 469 0". Kept (analyze.md Open 1).
+2. The config's `cover_page` is not audited. So it stays (Open 2).
 
 ## Limits
 

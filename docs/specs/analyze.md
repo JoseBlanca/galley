@@ -132,7 +132,7 @@ either (plates §2). Without a text layer it is `blank` with
 cover as on any page without a layer; architecture §8 said the flag is
 there so that a blank page is never a page nobody looked at, and now
 adds that the cover is the exception, a page the owner named
-(**Open 2**, below). `galley2epub run` on a
+(**Open 2**, answered: below). `galley2epub run` on a
 bare PDF writes no `cover_page`, so there the first page is audited like
 any other.
 
@@ -428,7 +428,7 @@ The other messages:
   are removals; Stubbs 343 is the book's last page, and its words, "0 020 690
   469 0" and a stray "Ae" (all of Tesseract's words are kept, §4), end
   the book's text unless the owner excludes the page
-  (**Open 1**, below).
+  (**Open 1**, answered: below).
 - **A cover or a cloth board with no text Tesseract reads** (Stubbs 0,
   Haskins 0, Gierke 0, Domesday 557, Gierke 289): a plate, logged, its
   image in the EPUB (**Open 1**).
@@ -588,7 +588,7 @@ an `ocr` page is a word of `words.json` or a removal; a blank page and a
 plate without a layer have none. The stray marks of a blank page are in
 no file, and the INFO line of §4 counts them.
 
-## 12. Open points
+## 12. Open points, answered
 
 1. **Covers, boards and library labels.** The rule keeps every page
    with ink: on the five books it makes 5 covers or cloth boards and 2
@@ -603,7 +603,7 @@ no file, and the INFO line of §4 counts them.
    measured on no book yet. Recommended: (a), because its error is a
    page too many, which the owner sees in the log and in the EPUB and
    removes with one line of `exclude_pages`, where (b)'s error is a page
-   lost. Meanwhile, (a).
+   lost. Decided by the owner on 26 November 2026: (a).
 
 2. **The cover without a text layer.** The config's `cover_page` is
    not audited and is `blank` with `blank_checked_by_ocr` false (§2).
@@ -613,8 +613,8 @@ no file, and the INFO line of §4 counts them.
    looked at; (b) audit the cover and, when it holds ink, give it a new
    kind, `cover`, which changes the format of `pages.json` for every
    stage that reads it. Recommended: (a), since the cover's picture is
-   in the EPUB either way and no reader sees the difference. Meanwhile,
-   (a).
+   in the EPUB either way and no reader sees the difference. Decided by
+   the owner on 26 November 2026: (a).
 
 ## 13. Not in this spec
 
