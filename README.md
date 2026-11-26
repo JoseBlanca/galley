@@ -18,8 +18,9 @@ picture of each printed page; the text layer is invisible text laid over
 each picture, made by **OCR** (optical character recognition, a program
 reading the letters in the picture). It is what lets you select and
 search the words in a PDF viewer. The PDFs of the Internet Archive have
-one. If you cannot select the words of your PDF, it has none, and galley
-cannot convert it yet.
+one. A page without a text layer, such as a blank page, a cover or a
+page the scanner's OCR skipped, galley reads itself with Tesseract (below).
+A PDF with no text layer on any page has not been tried.
 
 The OCR of an old scan misreads words. galley re-reads small print with
 Tesseract, an OCR program, where Tesseract reads it better, and can
@@ -99,12 +100,21 @@ from its folder instead, after you add them to that file:
 galley2epub run gierke
 ```
 
-Most whole books need this, because galley stops when a page has no text
-layer, and blank pages and covers often have none: galley cannot yet
-read such a page by itself. The error lists those pages; check in the
-PDF that they hold no text and put them in `exclude_pages`. The whole
-Gierke book from the Internet Archive (`politicaltheorie00gieruoft`)
-needs this:
+galley reads every page without a text layer with Tesseract. A page
+where it finds no text is left out as blank; one where it finds text
+is read with Tesseract; one with ink but no text, such as a cover, a
+cloth board or a library stamp, is kept as a picture. The log warns
+about each page kept as a picture or as text, and about a blank page
+that holds some ink, because a lone printed word or page number can
+look blank to Tesseract: look at those pages in the PDF and put any
+you do not want in `exclude_pages`. Five whole books from the Internet
+Archive converted this way from the PDF alone, with 3 to 8 such
+warnings each.
+
+A whole book usually reads better with a few settings: its table of
+contents named, so that its lines do not become headings, and the
+pages the log warned about checked. For the whole Gierke book
+(`politicaltheorie00gieruoft`):
 
 ```toml
 pdf = "../politicaltheorie00gieruoft.pdf"
@@ -196,7 +206,7 @@ yet.
 
 ## What galley does not do yet
 
-- A PDF without a text layer, or a page without one that holds text.
+- A PDF without a text layer on any page has not been tried.
 - Tables are not recognised: their cells come out as plain text.
 - Italic and bold are not kept; the text layer does not record them.
 - A printed index stays text; its page numbers do not link to the pages.

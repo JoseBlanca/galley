@@ -15,7 +15,7 @@ Tesseract as it already does under `ocr = "redo"`
 
 The owner chose this on 26 November 2026 ("go with option 1"), from a
 description of the option in chat, which stands as the approval of
-this breakdown. Dated 26 November 2026. State: under way.
+this breakdown. Dated 26 November 2026. State: done on 26 November 2026.
 
 ## In and out
 
@@ -74,9 +74,9 @@ Deliverables:
    unchanged.
 
 Tasks:
-- [ ] 2.1 Code and tests in `src/galley/analyze/` and `cli.py`.
-- [ ] 2.2 Review (reviewing-code), fixes.
-- [ ] 2.3 Whole-book runs and the README's limits.
+- [x] 2.1 Code and tests in `src/galley/analyze/` and `cli.py`.
+- [x] 2.2 Review (reviewing-code), fixes.
+- [x] 2.3 Whole-book runs and the README's limits.
 
 ## At the end
 
