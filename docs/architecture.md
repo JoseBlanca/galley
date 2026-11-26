@@ -60,6 +60,10 @@ which no stage deletes, in the new format `KeptAnswer` (sections 5 and
 8). Revised on 26 November 2026: `galley2epub run` takes `--correct` and
 `--no-correct`, which run or skip the correct stage for that one run
 whatever the config's `correct` says (sections 6, 10, 14 and 16).
+Revised again on 26 November 2026: `galley2epub run` also takes the PDF
+of a simple book, with its title, authors and language as options, and
+writes the book folder and its `book.toml` itself (sections 5, 6, 14 and
+17).
 
 Decisions marked "owner", with a date from 14 to 17 November 2026,
 were taken by the owner in chat; those of 18 November 2026 were taken
@@ -157,7 +161,9 @@ rerun.
 
 ## 5. The book folder
 
-Everything about one book lives in one folder, given to the command:
+Everything about one book lives in one folder, given to the command
+(or, for a simple book, made by `galley2epub run` beside the PDF it is
+given, section 14):
 
 ```
 kadesh/
@@ -181,7 +187,10 @@ kadesh/
 ```
 
 The owner writes `book.toml` and, through `galley2epub edits-from`, the
-edits. Every other file is generated. A stage, before it reads its
+edits. The one exception is a book given to `galley2epub run` as a PDF
+(section 14): the command then writes a `book.toml` of four keys, which
+the owner may edit afterwards like one of their own. Every other file is
+generated. A stage, before it reads its
 inputs, deletes its own file and the files of every later stage
 (`book_folder.delete_stage_outputs`), so that no file of a later stage
 can survive from an earlier run: in the review of the walking skeleton,
@@ -225,6 +234,10 @@ An unknown key or a wrong type is an error.
 | `reread_footnotes` | bool, `false` | whether layout re-reads each page's footnote band with Tesseract (`docs/specs/reocr.md` §3); off by default because Tesseract misreads note markers and loses note links (Domesday) |
 
 A stage spec adds the keys it needs, here and in `config.py` together.
+
+A book given to `galley2epub run` as a PDF gets a `book.toml` with the
+four required keys only, written by the command from its options
+(section 14); every other key takes its default.
 
 ## 7. Units, identifiers and the text of a block
 
@@ -1149,6 +1162,8 @@ lists the words, with the pages they came from where the origins say.
 galley2epub run <book folder>          every stage in order (correct only if the config says)
 galley2epub run <book folder> --correct      every stage, correct included
 galley2epub run <book folder> --no-correct   every stage but correct
+galley2epub run <book.pdf> --title TEXT --author TEXT [--author TEXT ...] --language CODE
+                                       the same, for a simple book: the book folder is made beside the PDF
 galley2epub <stage> <book folder>      one stage: analyze, extract, layout, structure, correct, markdown, epub
 galley2epub edits-from <book folder> <corrected book.md>
 ```
@@ -1169,6 +1184,58 @@ while LM Studio is stopped. Only
 config says. A run with `--no-correct` leaves no `edits/correct.jsonl`,
 as a run with `correct = false` does: structure deletes it, since its
 edits name blocks by the text structure wrote (section 5).
+
+`run` takes a book in two forms, and the form is chosen by what the
+path names. A book folder holding `book.toml` is the form for a book
+that needs settings beyond the four required keys of section 6: pages
+to exclude, a cover page, the contents pages, `ocr`. The PDF itself is
+the form for a simple book, one that needs none of them. The path is
+taken as a PDF when it names an existing file whose name ends in `.pdf`,
+in upper or lower case. Any other existing file, or a missing path
+ending in `.pdf`, is a `ConfigError` whose message names both forms; a
+`ConfigError` is galley's error for a wrong config or argument, which
+stops the command before any stage and is logged on stderr. Every other
+path is taken as a book folder, as before: a folder, or a missing path,
+without a `book.toml` is a `ConfigError` that names the missing file.
+
+With a PDF, `run` needs three options, which only `run` takes:
+
+- `--title TEXT`, the book's title;
+- `--author TEXT`, one author, given once for each author in the order
+  they are printed, which becomes `authors`;
+- `--language CODE`, one of the codes of `language` in section 6.
+
+A missing option is a `ConfigError` that names it, as is an empty title
+or author. The three options given with a book folder are a
+`ConfigError` too: a folder's settings live only in its `book.toml`.
+The options both forms take, `--correct`, `--no-correct` and `--workers`
+(the number of threads of the stages that work page by page), mean the
+same in each.
+
+The book folder of a PDF is a folder beside it named after the PDF
+without its extension: `books/haskins.pdf` gets `books/haskins/`. The
+command makes that folder and writes into it a `book.toml` with `pdf =
+"../haskins.pdf"` (relative, so that the two can be moved together),
+`title`, `authors` and `language`, then reads it back with `config.py`
+and runs exactly as it would on the folder, so the two forms give the
+same files. Every later file of the book, `book.epub` included, is in
+that folder, and the epub stage logs the EPUB's path on stderr when it
+writes it. A folder that exists without a `book.toml` is used, and the
+file written into it. The command never overwrites a `book.toml`:
+
+- when the folder already holds one whose config, as `config.py` reads
+  it, equals the one the options give, it is used as it is, so the same
+  command can be run again. The values are compared, not the text: a
+  key written with its default value, such as `ocr = "verify"`, or
+  another order of the keys, still counts as equal;
+- when it holds a different one (another title, or a key the owner
+  added, such as `cover_page`), the command stops with a `ConfigError`
+  that says to run the folder instead, or to remove its `book.toml`;
+- when a file, not a folder, has the folder's name, the command stops
+  with a `ConfigError`.
+
+The stage subcommands take only a book folder: once `run` has made one
+from a PDF, a stage is run again on that folder.
 
 Errors propagate to `cli.main`, the one place that catches broadly, which
 logs the error and raises it again. The `[project.scripts]` entry is added
@@ -1352,6 +1419,13 @@ the text:
   reference gets none (section 9, "Back links"). That a referenced
   footnote gets it in the EPUB by a Lua filter, keeping Pandoc's
   footnotes and their pop-up, was decided while writing.
+
+On 26 November 2026 the owner decided:
+
+- **`galley2epub run` takes the PDF of a simple book** with its title,
+  authors and language as options, and makes its book folder and
+  `book.toml` beside it; a book folder stays the form for a book that
+  needs more settings (section 14).
 
 ## 18. Not in this document
 
