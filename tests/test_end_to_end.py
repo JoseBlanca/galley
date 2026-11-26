@@ -460,6 +460,7 @@ def test_each_figure_block_div_of_the_epub_holds_one_image(
         "kadesh_59-68": 3,
         "domesday_headings_quotes": 2,
         "kadesh_29-38": 7,
+        "kadesh_blank": 2,
     }
 
 

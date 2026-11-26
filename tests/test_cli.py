@@ -63,6 +63,13 @@ def _names(folder: BookFolder) -> list[str]:
     return sorted(path.name for path in folder.root.iterdir())
 
 
+def _contents(folder: BookFolder) -> dict[Path, bytes]:
+    """Every file of the book folder, its subfolders' too, with its bytes."""
+    return {
+        path: path.read_bytes() for path in folder.root.rglob("*") if path.is_file()
+    }
+
+
 def _files_up_to(stage: str | None) -> list[str]:
     """The names in a book folder once every stage up to `stage` has run;
     None for no stage."""
@@ -586,13 +593,7 @@ def _path_with_pandoc_only(tmp_path: Path) -> str:
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
-@pytest.mark.parametrize(
-    ("command", "first_stage"),
-    [("run", "analyze"), ("analyze", "analyze"), ("structure", "structure")],
-)
-def test_a_command_running_analyze_or_structure_stops_without_tesseract_or_a_cached_word_list(
-    command: str,
-    first_stage: str,
+def test_structure_stops_without_tesseracts_tools_or_a_cached_word_list(
     tmp_path: Path,
     excerpt_books: frozendict[str, BookFolder],
     monkeypatch: pytest.MonkeyPatch,
@@ -602,15 +603,54 @@ def test_a_command_running_analyze_or_structure_stops_without_tesseract_or_a_cac
     monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", tmp_path / "no-cache")
 
     with pytest.raises(ExternalProgramError) as raised:
-        main([command, str(folder.root)])
+        main(["structure", str(folder.root)])
 
     assert str(raised.value) == (
         "tesseract, combine_tessdata and dawg2wordlist are not installed; "
-        f"{first_stage} needs them once to extract the word list of eng from "
+        "structure needs them once to extract the word list of eng from "
         "Tesseract's data: install them with `brew install tesseract`"
     )
     # No stage ran: each would have deleted its own file first.
     assert _names(folder) == _files_up_to("epub")
+
+
+# Changes PATH and the word list's cache folder for the whole process.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
+@pytest.mark.parametrize("command", ["run", "analyze"])
+@pytest.mark.parametrize("ocr", ["verify", "trust", "redo"])
+@pytest.mark.parametrize("word_list", ["cached", "not cached"])
+def test_a_command_running_analyze_stops_without_tesseract_which_reads_blank_pages(
+    command: str,
+    ocr: str,
+    word_list: str,
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # docs/specs/analyze.md, section 7: analyze reads the pages without a
+    # text layer with Tesseract under every `ocr`, and the command looks for
+    # it before any other check for Tesseract or its tools.
+    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
+    with folder.book_toml.open("a", encoding="utf-8") as toml:
+        toml.write(f'ocr = "{ocr}"\n')
+    monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
+    monkeypatch.setattr(
+        wordlist,
+        "DEFAULT_CACHE_DIR",
+        _cached_word_list(tmp_path) if word_list == "cached" else tmp_path / "no-cache",
+    )
+    before = _contents(folder)
+
+    with pytest.raises(ExternalProgramError) as raised:
+        main([command, str(folder.root)])
+
+    assert str(raised.value) == (
+        "tesseract is not installed; analyze reads the pages without a text "
+        "layer with it: install it with `brew install tesseract`"
+    )
+    # No stage ran: each would have deleted or written its own file first.
+    assert _contents(folder) == before
 
 
 # Changes PATH and the word list's cache folder for the whole process.
@@ -662,22 +702,21 @@ def _cached_word_list(tmp_path: Path) -> Path:
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
-@pytest.mark.parametrize("command", ["run", "layout"])
-def test_a_command_running_layout_that_rereads_stops_without_tesseract(
-    command: str,
+def test_layout_that_rereads_stops_without_tesseract(
     tmp_path: Path,
     excerpt_books: frozendict[str, BookFolder],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # docs/specs/reocr.md, section 3: layout re-reads small print with
     # Tesseract under ocr = "verify", the default, so the command checks
-    # for it first.
+    # for it first. Under run, analyze's check names analyze first (analyze
+    # spec section 7).
     folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
     monkeypatch.setenv("PATH", _path_with_pandoc_only(tmp_path))
     monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", _cached_word_list(tmp_path))
 
     with pytest.raises(ExternalProgramError) as raised:
-        main([command, str(folder.root)])
+        main(["layout", str(folder.root)])
 
     assert str(raised.value) == (
         "tesseract is not installed; layout reads small print with it when "
@@ -714,20 +753,15 @@ def test_layout_that_rereads_stops_without_the_tools_of_a_word_list_not_cached(
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
-@pytest.mark.parametrize(
-    ("command", "first_stage"),
-    [("run", "analyze"), ("analyze", "analyze"), ("extract", "extract")],
-)
-def test_a_command_running_analyze_or_extract_under_redo_stops_without_tesseract(
-    command: str,
-    first_stage: str,
+def test_extract_under_redo_stops_without_tesseract(
     tmp_path: Path,
     excerpt_books: frozendict[str, BookFolder],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Architecture section 7b: under ocr = "redo" extract reads every text
-    # page with Tesseract, and the command looks for it before analyze or
-    # extract starts, so that no run stops at extract.
+    # page with Tesseract, and the command looks for it before extract
+    # starts; when analyze runs, its own check names analyze (analyze spec
+    # section 7).
     folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
     with folder.book_toml.open("a", encoding="utf-8") as toml:
         toml.write('ocr = "redo"\n')
@@ -735,10 +769,10 @@ def test_a_command_running_analyze_or_extract_under_redo_stops_without_tesseract
     monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", _cached_word_list(tmp_path))
 
     with pytest.raises(ExternalProgramError) as raised:
-        main([command, str(folder.root)])
+        main(["extract", str(folder.root)])
 
     assert str(raised.value) == (
-        f'tesseract is not installed; with ocr = "redo" {first_stage} needs it, '
+        'tesseract is not installed; with ocr = "redo" extract needs it, '
         "as extract reads every text page with it: install it with "
         "`brew install tesseract`"
     )

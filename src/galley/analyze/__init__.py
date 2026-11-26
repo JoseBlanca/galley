@@ -1,14 +1,20 @@
-"""analyze: what each page of the PDF is, written to pages.json (walking
-skeleton spec section 6, plates spec sections 2 and 2b, figures spec
-section 3).
+"""analyze: what each page of the PDF is, written to pages.json (analyze
+spec, plates spec sections 2 and 2b, figures spec section 3).
 
 analyze measures every page with pdfplumber, its size in points and the
 words of its text layer, and renders every page that is neither excluded
 nor the cover at 36 dpi to test whether it is a plate (`is_plate`). A page
 is `excluded` when the config excludes it, a `plate` when the config's
-`plate_pages` names it or the plate rule takes it, `text` when its layer
-has a word, and `blank` otherwise. It runs no OCR, so a blank page stops
-the run: the owner checks it and adds it to `exclude_pages`. Under
+`plate_pages` names it or the plate rule takes it, and `text` when its
+layer has a word. Each page without a text layer that it tests so is
+audited (analyze spec sections 2 to 4): rendered at 300 dpi, read with
+Tesseract and measured for ink (`audit_verdict`). With 40 text words or
+more it is text even where the plate rule takes it; else the plate rule
+decides; else with a text word it is text, with ink a plate, and
+otherwise `blank`, recorded as checked by OCR. A page the audit makes
+text has the text source `ocr`, and extract reads it with Tesseract.
+The config's `cover_page` is not audited: without a layer it is `blank`.
+The audit runs under every value of `ocr`. Under
 `ocr = "redo"` the pages are classified from the layer all the same, and
 every text page is then read by OCR: its text source is `ocr`, and
 extract reads it with Tesseract (architecture section 7b). Each page the
@@ -33,8 +39,10 @@ from enum import StrEnum
 from typing import Final, assert_never
 
 import pdfplumber
+from PIL import Image
 
-from galley import pdfium, wordlist
+from galley import ocr, pdfium, wordlist
+from galley.analyze._audit import AuditVerdict, audit_verdict, ink_share, is_text_word
 from galley.analyze._figures import PictureGroup, figure_boxes, figure_groups
 from galley.analyze._inkless import InkRule, InkTest, is_inkless, measure_ink
 from galley.analyze._plates import (
@@ -46,8 +54,8 @@ from galley.analyze._plates import (
 )
 from galley.body_measures import group_rows
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
-from galley.config import BookConfig, OcrMode
-from galley.errors import ConfigError, PdfError
+from galley.config import BookConfig, OcrMode, tesseract_language
+from galley.errors import ConfigError
 from galley.model import (
     Box,
     PageInfo,
@@ -55,6 +63,7 @@ from galley.model import (
     PagesFile,
     RenderedPage,
     TextSource,
+    Word,
     box_holds_middle,
     pdf_sha256,
     write_pages,
@@ -63,18 +72,20 @@ from galley.parallel import DEFAULT_WORKERS, map_pages_with_source
 from galley.text_layer import layer_words, open_pdf
 
 __all__ = [
+    "AuditVerdict",
     "InkRule",
     "PageStart",
     "PictureArea",
     "PlateRule",
+    "audit_verdict",
     "check_config_pages",
     "classify_page",
     "figure_boxes",
     "front_matter_end",
+    "ink_share",
     "is_inkless",
     "is_plate",
     "picture_area",
-    "require_text_layer",
     "run",
 ]
 
@@ -104,6 +115,12 @@ _SEARCH_WINDOW_LEAST_PAGES: Final[int] = 10
 # median word count of the book's text pages. A guess, measured on Kadesh
 # alone: its median is 545 words, its front pages have at most 47.
 _RUNNING_TEXT_SHARE_OF_MEDIAN: Final[float] = 0.5
+# Analyze spec section 2, "Where it runs": Tesseract finds the blocks of the
+# whole page, as extract reads an `ocr` page (extract spec section 9), so
+# that extract finds the words the audit found.
+_AUDIT_PAGE_SEGMENTATION: Final[int] = 3
+# Analyze spec section 4: how many of a text page's words the WARNING quotes.
+_LOGGED_WORDS: Final[int] = 10
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -151,13 +168,26 @@ class _PlateTest:
 
 
 @dataclass(frozen=True, slots=True)
+class _Audit:
+    """What the audit found on a page without a text layer: every word
+    Tesseract read on its 300 dpi render, its ink share from 0 to 1, and
+    the verdict of the two (analyze spec section 3)."""
+
+    words: tuple[Word, ...]
+    ink: float
+    verdict: AuditVerdict
+
+
+@dataclass(frozen=True, slots=True)
 class _Measurement:
     """What analyze measures of one page: its size in points from
     pdfplumber, the number of words of its text layer, the words of the
     layer's topmost row (empty without words), the plate rule's test,
     None for a page it does not test, the inkless rule's test, None for a
-    page it does not test, and the in-page figures found on a page the
-    plate rule tests that has a text layer and is not a plate."""
+    page it does not test, the audit of a page without a text layer that
+    the plate rule tests, None for any other page, and the in-page figures
+    found on a page the plate rule tests that is not a plate and has a
+    text layer or text the audit read."""
 
     width_pt: float
     height_pt: float
@@ -165,6 +195,7 @@ class _Measurement:
     first_row: tuple[str, ...]
     plate_test: _PlateTest | None
     ink_test: InkTest | None
+    audit: _Audit | None
     figures: tuple[PictureGroup, ...]
 
 
@@ -180,14 +211,16 @@ def run(
     extracting it with Tesseract's tools the first time. The text pages
     before the front-matter end (`front_matter_end`) are `front_matter`. A
     page the inkless rule takes (`is_inkless`) is `inkless`, or
-    `front_matter` before the front-matter end. Under `ocr = "redo"` every
+    `front_matter` before the front-matter end. Each page without a text
+    layer that is not excluded, in `plate_pages` or the cover is read with
+    Tesseract and made text, a plate or blank (analyze spec sections 2 to
+    4), under every value of `ocr`. Under `ocr = "redo"` every
     text page has the text source `ocr`. Raises ConfigError when the
     config names a page past the end of the PDF or a contents
-    page before its `front_matter_end`, and
-    PdfError when a page that the config does not exclude
-    has no text layer and is not a plate. `workers` is the number of
-    threads that measure the pages; the renders are made in the one PDFium
-    thread.
+    page before its `front_matter_end`, and ExternalProgramError when
+    Tesseract is needed and missing or fails, before pages.json is
+    written. `workers` is the number of threads that measure the pages
+    and run Tesseract; the renders are made in the one PDFium thread.
     """
     delete_stage_outputs(folder, Stage.ANALYZE)
     page_count = pdfium.page_count(config.pdf)
@@ -215,6 +248,9 @@ def run(
                     ink_rule=InkRule.NOT_INKLESS
                     if measurement.ink_test is None
                     else measurement.ink_test.rule,
+                    audit=AuditVerdict.NOT_AUDITED
+                    if measurement.audit is None
+                    else measurement.audit.verdict,
                     front_matter_end=end,
                 ),
                 measurement.figures,
@@ -223,18 +259,15 @@ def run(
         )
 
     starts = tuple(
-        PageStart(
-            index=page.index,
-            kind=page.kind,
-            first_row=measurement.first_row,
-            word_count=measurement.layer_word_count,
-        )
+        _page_start(page, measurement)
         for page, measurement in zip(classify(0), measurements, strict=True)
     )
     end, step = _front_matter_end_and_step(starts, config)
     pages = classify(end)
     for page, measurement in zip(pages, measurements, strict=True):
         _log_plate_taken(page, measurement.plate_test)
+        if measurement.audit is not None:
+            _log_audited(page, measurement.audit, measurement.plate_test)
     _log_front_matter(end, step, pages, config)
     for page, measurement in zip(pages, measurements, strict=True):
         if page.kind is PageKind.INKLESS and measurement.ink_test is not None:
@@ -242,7 +275,7 @@ def run(
     for page, measurement in zip(pages, measurements, strict=True):
         if page.figure_boxes:
             _log_figures(page.index, measurement.figures)
-    require_text_layer(pages)
+    _log_audit_counts(measurements)
     write_pages(
         folder.pages_json,
         PagesFile(
@@ -263,7 +296,10 @@ def _measurer(
     """The function a worker thread runs on each page: it reads the page's
     text layer with the worker's pdfplumber document and, on a page the
     plate rule tests, has the PDFium thread render it and tests the render
-    in the worker, for a plate and for an inkless page."""
+    in the worker, for a plate and for an inkless page; on such a page
+    without a text layer, it has the page rendered at 300 dpi too and
+    audits it in the worker."""
+    language = tesseract_language(config.language)
 
     def measure(pdf: pdfplumber.PDF, page_index: int) -> _Measurement:
         with closing(pdf.pages[page_index]) as page:
@@ -288,17 +324,29 @@ def _measurer(
             if rendered is None
             else _test_plate(rendered, page_layer_words, lower_case_words)
         )
+        audit = (
+            _audit(config, page_index, language)
+            if rendered is not None and not page_layer_words
+            else None
+        )
         # Figures spec section 3: a page that may end as a text page is
         # searched for figures on the same render; classify_page decides.
+        # A page without a layer that the audit reads as text is searched
+        # with its text words in place of the layer's (analyze spec
+        # section 4).
+        figure_words = (
+            page_layer_words if page_layer_words else _audited_text_words(audit)
+        )
         figures = (
             ()
             if rendered is None
             or plate_test is None
-            or plate_test.rule is PlateRule.PLATE
-            or not page_layer_words
-            else figure_groups(
-                rendered, page_layer_words, region_boxes, lower_case_words
+            or not figure_words
+            or (
+                plate_test.rule is PlateRule.PLATE
+                and (audit is None or audit.verdict is not AuditVerdict.MUCH_TEXT)
             )
+            else figure_groups(rendered, figure_words, region_boxes, lower_case_words)
         )
         ink_test = (
             None
@@ -320,10 +368,136 @@ def _measurer(
             first_row=tuple(word.text for word in rows[0].words) if rows else (),
             plate_test=plate_test,
             ink_test=ink_test,
+            audit=audit,
             figures=figures,
         )
 
     return measure
+
+
+def _audit(config: BookConfig, page_index: int, language: str) -> _Audit:
+    """The audit of page `page_index` of `config.pdf`, which has no text
+    layer: rendered at 300 dpi in the PDFium thread, read with Tesseract in
+    page segmentation mode 3 and the language `language` (Tesseract's
+    code), and measured for ink, in the calling thread (analyze spec
+    sections 2 and 3)."""
+    rendered = pdfium.render(config.pdf, page_index, ocr.OCR_DPI)
+    words = ocr.read_image(
+        Image.frombytes("L", (rendered.width_px, rendered.height_px), rendered.pixels),
+        origin=(0.0, 0.0),
+        dpi=rendered.dpi,
+        psm=_AUDIT_PAGE_SEGMENTATION,
+        language=language,
+    )
+    ink = ink_share(rendered)
+    return _Audit(words=words, ink=ink, verdict=audit_verdict(words, ink))
+
+
+def _audited_text_words(audit: _Audit | None) -> tuple[tuple[str, Box], ...]:
+    """The text words of a page the audit reads as text, each its text and
+    box, for the figure search; none for any other page."""
+    if audit is None or audit.verdict not in {
+        AuditVerdict.MUCH_TEXT,
+        AuditVerdict.TEXT,
+    }:
+        return ()
+    return tuple((word.text, word.box) for word in audit.words if is_text_word(word))
+
+
+def _page_start(page: PageInfo, measurement: _Measurement) -> PageStart:
+    """What the front-matter rule needs of `page`, as classify_page makes it
+    before the front matter is known. A text page without a text layer has
+    the words Tesseract read on it, its topmost row the first row they
+    make (analyze spec section 4); any other page has its layer's."""
+    if page.kind is PageKind.TEXT and measurement.audit is not None:
+        rows = group_rows(measurement.audit.words)
+        return PageStart(
+            index=page.index,
+            kind=page.kind,
+            first_row=tuple(word.text for word in rows[0].words) if rows else (),
+            word_count=len(measurement.audit.words),
+        )
+    return PageStart(
+        index=page.index,
+        kind=page.kind,
+        first_row=measurement.first_row,
+        word_count=measurement.layer_word_count,
+    )
+
+
+def _highest_confidence(words: tuple[Word, ...]) -> str:
+    """The highest confidence of `words` with one decimal, "none" without
+    words."""
+    confidences = tuple(
+        word.ocr_confidence for word in words if word.ocr_confidence is not None
+    )
+    return f"{max(confidences):.1f}" if confidences else "none"
+
+
+def _log_audited(page: PageInfo, audit: _Audit, plate_test: _PlateTest | None) -> None:
+    """Logs what the audit made of `page` (analyze spec section 4): at
+    WARNING a page made text or front matter, with its number of words and
+    its first ten, and a plate the plate rule did not take, with its ink
+    share and its words' number and highest confidence; at INFO a blank
+    page, with the same measures. A plate the plate rule took is logged by
+    `_log_plate_taken`."""
+    match page.kind:
+        case PageKind.TEXT | PageKind.FRONT_MATTER:
+            _logger.warning(
+                "analyze: page index %d, without a text layer, is read by "
+                "Tesseract as %s: %d words, the first ten or fewer: %s; add it to "
+                "`exclude_pages` if it is not the book's",
+                page.index,
+                "text" if page.kind is PageKind.TEXT else "front matter",
+                len(audit.words),
+                " ".join(word.text for word in audit.words[:_LOGGED_WORDS]),
+            )
+        case PageKind.PLATE if plate_test is None or (
+            plate_test.rule is PlateRule.NOT_PLATE
+        ):
+            _logger.warning(
+                "analyze: page index %d, without a text layer, taken for a "
+                "plate: ink covers %.3f%% of it, Tesseract reads %d words, the "
+                "highest of confidence %s; add it to `exclude_pages` if it is "
+                "not one",
+                page.index,
+                audit.ink * 100,
+                len(audit.words),
+                _highest_confidence(audit.words),
+            )
+        case PageKind.BLANK:
+            _logger.info(
+                "analyze: page index %d, without a text layer, is blank: "
+                "Tesseract reads %d words, the highest of confidence %s, and ink "
+                "covers %.3f%% of it",
+                page.index,
+                len(audit.words),
+                _highest_confidence(audit.words),
+                audit.ink * 100,
+            )
+        case PageKind.PLATE | PageKind.EXCLUDED | PageKind.INKLESS:
+            return
+        case _:
+            assert_never(page.kind)
+
+
+def _log_audit_counts(measurements: tuple[_Measurement, ...]) -> None:
+    """Logs at INFO the number of pages the audit read and of each verdict
+    (analyze spec section 4)."""
+    verdicts = tuple(
+        measurement.audit.verdict
+        for measurement in measurements
+        if measurement.audit is not None
+    )
+    _logger.info(
+        "analyze: Tesseract read %d pages without a text layer: %s",
+        len(verdicts),
+        ", ".join(
+            f"{sum(1 for verdict in verdicts if verdict is kind)} {kind.value}"
+            for kind in AuditVerdict
+            if kind is not AuditVerdict.NOT_AUDITED
+        ),
+    )
 
 
 def _plate_rule_tests(page_index: int, config: BookConfig) -> bool:
@@ -463,40 +637,50 @@ def classify_page(
     *,
     plate_rule: PlateRule,
     ink_rule: InkRule,
+    audit: AuditVerdict,
     front_matter_end: int,
 ) -> PageInfo:
     """What page `index` (from 0) is, given its size in points, the number
-    of words of its text layer and what the plate rule and the inkless
-    rule found on it.
+    of words of its text layer and what the plate rule, the inkless rule
+    and the audit found on it, by the order of analyze spec section 2 and
+    the table of its section 4.
 
     A page in the config's `exclude_pages` is `excluded`; else a page in
     `plate_pages` is a `plate`; else a page the inkless rule takes is
     `front_matter` when its index is below `front_matter_end` and
     `inkless` otherwise, both with no text source, also when the plate
-    rule takes it; else a page the plate rule takes that is not the
+    rule takes it; else a page the audit finds MUCH_TEXT on, not the
+    `cover_page`, is read by OCR, `front_matter` below `front_matter_end`
+    and `text` otherwise; else a page the plate rule takes that is not the
     `cover_page` is a `plate`; a plate is read from its layer when it has
     a word; else a page with a layer word is `front_matter`, with no text
     source, when its index is below `front_matter_end`, and `text`
     otherwise, read from the layer, or by OCR when the config's `ocr` is
-    `redo` (architecture section 7b); else it is `blank`. `exclude_regions` holds
-    the boxes of the config's regions on this page, in the config's order.
-    No page is checked by OCR and none has a score.
+    `redo` (architecture section 7b). A page without a layer word takes
+    the audit's verdict: TEXT is read by OCR, `front_matter` or `text` as
+    MUCH_TEXT; PICTURE is a `plate` with no text source; BLANK is `blank`
+    with `blank_checked_by_ocr`; NOT_AUDITED, and the cover whatever the
+    verdict, is `blank` without it. `exclude_regions` holds the boxes of
+    the config's regions on this page, in the config's order. No page has
+    a score. ValueError for a verdict other than NOT_AUDITED on a page
+    with a layer word, which the audit does not read.
     """
-    match plate_rule:
-        case PlateRule.PLATE:
-            taken_by_rule = index != config.cover_page
-        case PlateRule.NOT_PLATE:
-            taken_by_rule = False
-        case _:
-            assert_never(plate_rule)
-    match ink_rule:
-        case InkRule.INKLESS:
-            inkless = layer_word_count > 0
-        case InkRule.NOT_INKLESS:
-            inkless = False
-        case _:
-            assert_never(ink_rule)
+    if audit is not AuditVerdict.NOT_AUDITED and layer_word_count > 0:
+        message = (
+            f"page index {index} has {layer_word_count} words in its text layer "
+            f"and the audit's verdict {audit}, but the audit reads only pages "
+            "without a text layer"
+        )
+        raise ValueError(message)
+    taken_by_rule = _takes_plate(plate_rule) and index != config.cover_page
+    inkless = _takes_inkless(ink_rule) and layer_word_count > 0
     layer_source = TextSource.TEXT_LAYER if layer_word_count > 0 else TextSource.NONE
+    is_cover = index == config.cover_page
+    read_as_text = (
+        PageKind.FRONT_MATTER if index < front_matter_end else PageKind.TEXT,
+        TextSource.OCR,
+    )
+    checked_blank = False
     if index in config.exclude_pages:
         kind, text_source = PageKind.EXCLUDED, TextSource.NONE
     elif index in config.plate_pages:
@@ -505,14 +689,18 @@ def classify_page(
         kind, text_source = PageKind.FRONT_MATTER, TextSource.NONE
     elif inkless:
         kind, text_source = PageKind.INKLESS, TextSource.NONE
+    elif audit is AuditVerdict.MUCH_TEXT and not is_cover:
+        kind, text_source = read_as_text
     elif taken_by_rule:
         kind, text_source = PageKind.PLATE, layer_source
     elif layer_word_count > 0 and index < front_matter_end:
         kind, text_source = PageKind.FRONT_MATTER, TextSource.NONE
     elif layer_word_count > 0:
         kind, text_source = PageKind.TEXT, _text_page_source(config.ocr)
-    else:
+    elif is_cover:
         kind, text_source = PageKind.BLANK, TextSource.NONE
+    else:
+        kind, text_source, checked_blank = _audited_page(audit, read_as_text)
     return PageInfo(
         index=index,
         width_pt=width_pt,
@@ -527,8 +715,50 @@ def classify_page(
         ),
         # analyze adds the boxes of a text page (figures spec section 3).
         figure_boxes=(),
-        blank_checked_by_ocr=False,
+        blank_checked_by_ocr=checked_blank,
     )
+
+
+def _takes_plate(plate_rule: PlateRule) -> bool:
+    """Whether the plate rule took the page."""
+    match plate_rule:
+        case PlateRule.PLATE:
+            return True
+        case PlateRule.NOT_PLATE:
+            return False
+        case _:
+            assert_never(plate_rule)
+
+
+def _takes_inkless(ink_rule: InkRule) -> bool:
+    """Whether the inkless rule took the page."""
+    match ink_rule:
+        case InkRule.INKLESS:
+            return True
+        case InkRule.NOT_INKLESS:
+            return False
+        case _:
+            assert_never(ink_rule)
+
+
+def _audited_page(
+    audit: AuditVerdict, read_as_text: tuple[PageKind, TextSource]
+) -> tuple[PageKind, TextSource, bool]:
+    """The kind, the text source and `blank_checked_by_ocr` of a page
+    without a text layer that no earlier rule took, by the audit's verdict
+    (analyze spec section 4); `read_as_text` is the kind and source of a
+    page the audit reads text on."""
+    match audit:
+        case AuditVerdict.MUCH_TEXT | AuditVerdict.TEXT:
+            return (*read_as_text, False)
+        case AuditVerdict.PICTURE:
+            return PageKind.PLATE, TextSource.NONE, False
+        case AuditVerdict.BLANK:
+            return PageKind.BLANK, TextSource.NONE, True
+        case AuditVerdict.NOT_AUDITED:
+            return PageKind.BLANK, TextSource.NONE, False
+        case _:
+            assert_never(audit)
 
 
 def _text_page_source(ocr: OcrMode) -> TextSource:
@@ -665,17 +895,3 @@ def check_config_pages(config: BookConfig, page_count: int) -> None:
                 "dropped with the front matter; correct one of the two keys"
             )
             raise ConfigError(message)
-
-
-def require_text_layer(pages: tuple[PageInfo, ...]) -> None:
-    """Raises PdfError listing every blank page: a page without a text layer
-    that the config does not exclude and that is not a plate, which the
-    walking skeleton cannot read, having no OCR."""
-    blank = tuple(page.index for page in pages if page.kind is PageKind.BLANK)
-    if blank:
-        message = (
-            f"page indices {', '.join(str(index) for index in blank)}: these "
-            "pages have no text layer, and the walking skeleton has no OCR; add "
-            "them to `exclude_pages` once you have checked that they hold no text"
-        )
-        raise PdfError(message)

@@ -1,0 +1,28 @@
+{
+  "read": "Transcribed from the image by the assistant on 26 November 2026: the page of the excerpt rendered at 300 dpi with pypdfium2 was read for what is printed (\"printed\"), in three centred lines over the faint picture of a temple and one line at the foot. \"expected_words\" are the printed words of the three lines, which docs/specs/analyze.md, section 11, says Tesseract reads as the page prints them; the link at the foot, its thirteenth word, it misreads, and the test does not compare it.",
+  "excerpt": "kadesh_blank",
+  "page": 0,
+  "book_page_index": 1,
+  "checks": "a page without a text layer that the audit reads as text, its words read by Tesseract in extract",
+  "printed": [
+    "Digitized by the Internet Archive",
+    "in 2007 with funding from",
+    "Microsoft Corporation",
+    "http://www.archive.org/details/battleofkadeshst00breauoft"
+  ],
+  "expected_words": [
+    "Digitized",
+    "by",
+    "the",
+    "Internet",
+    "Archive",
+    "in",
+    "2007",
+    "with",
+    "funding",
+    "from",
+    "Microsoft",
+    "Corporation"
+  ],
+  "expected_word_count": 13
+}

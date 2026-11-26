@@ -10,8 +10,8 @@ sections 4 to 6).
 
 Adapted from `tesseract_words` in the owner's ocr_lab
 (`~/devel/tomato_history_web_site/tools/ocr_lab/lib/common.py`), without
-its cache. Layout calls it now; analyze's audit and extract's OCR pages
-will (architecture section 7b).
+its cache. Layout calls it, extract for its `ocr` pages, and analyze for
+the pages without a text layer (architecture section 12).
 """
 
 import io
