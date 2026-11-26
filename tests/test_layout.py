@@ -2628,6 +2628,10 @@ def _assert_every_word_laid_out(words: WordsFile, lines: LinesFile) -> None:
 # (section 3): `haskins_endpapers` keeps words only on its colophon, page
 # index 275, its endpapers being inkless (plates spec section 2b).
 _UNMEASURED_EXCERPTS = frozenset({"haskins_endpapers"})
+# The excerpts measured whose pages are each one region: `kadesh_blank`
+# keeps words only on its page 0, the Internet Archive's notice and its
+# link, which Tesseract reads (docs/specs/analyze.md, section 11).
+_ONE_REGION_EXCERPTS = frozenset({"kadesh_blank"})
 
 
 # The excerpts read with `ocr = "redo"`, which the session's run of the
@@ -2650,7 +2654,7 @@ def test_layout_of_an_excerpt_with_rereading_keeps_every_word(
     # The session's one run of each excerpt (tests/conftest.py).
     folder = excerpt_books[excerpt]
     words, lines = read_words(folder.words_json), read_lines(folder.lines_json)
-    if excerpt in _UNMEASURED_EXCERPTS:
+    if excerpt in _UNMEASURED_EXCERPTS | _ONE_REGION_EXCERPTS:
         _assert_every_word_laid_out(words, lines)
     else:
         _assert_laid_out_in_regions(words, lines)
@@ -2686,7 +2690,7 @@ def test_cut_in_insets_of_the_excerpts_are_stubbs_and_domesday_tables_only(
         "domesday_notes": (43.2, None),
     }
     assert insets == {name: found.get(name, (None, None)) for name in excerpt_books}
-    assert len(insets) == 26
+    assert len(insets) == 27
 
 
 def test_cut_in_notes_of_stubbs_page_57_are_margin_regions(

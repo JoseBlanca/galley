@@ -10,8 +10,8 @@ sections 4 to 6).
 
 Adapted from `tesseract_words` in the owner's ocr_lab
 (`~/devel/tomato_history_web_site/tools/ocr_lab/lib/common.py`), without
-its cache. Layout calls it now; analyze's audit and extract's OCR pages
-will (architecture section 7b).
+its cache. Layout calls it, extract for its `ocr` pages, and analyze for
+the pages without a text layer (architecture section 12).
 """
 
 import io
@@ -30,6 +30,7 @@ from galley.pdfium import POINTS_PER_INCH
 
 __all__ = [
     "OCR_DPI",
+    "WHOLE_PAGE_SEGMENTATION",
     "lines_of_tsv",
     "point_box",
     "read_image",
@@ -40,6 +41,12 @@ __all__ = [
 # The resolution galley renders a page at for Tesseract (reocr spec,
 # section 3): the measurements of that spec were taken at it.
 OCR_DPI: Final[int] = 300
+
+# Tesseract's page segmentation mode that finds the blocks of a whole page,
+# with which extract reads an `ocr` page (extract spec section 9) and
+# analyze audits a page without a text layer (analyze spec section 2), so
+# that the two read the same words.
+WHOLE_PAGE_SEGMENTATION: Final[int] = 3
 
 # Guessed (reocr spec, section 5): 100 times the slowest whole page
 # measured, 0.88 s, with room for a slow machine.

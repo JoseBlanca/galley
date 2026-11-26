@@ -10,12 +10,14 @@ unless its flag `--correct` or `--no-correct` decides for that run
 (architecture section 14).
 Before any stage, it checks that LM Studio answers and has the config's
 models when the command runs correct (docs/specs/correct.md, section 4),
-and that Pandoc is installed when a stage it runs needs it; Tesseract's tools when
-analyze or structure runs, or layout re-reads small print, and the word
-list of the book's language is not cached; Tesseract when layout runs
-and the config's `ocr` is `verify`; and Tesseract when analyze or extract
-runs and the config's `ocr` is `redo`, under which extract reads every
-text page with it (architecture section 7b).
+and that Pandoc is installed when a stage it runs needs it; Tesseract
+whenever analyze runs, which reads the pages without a text layer with
+it (analyze spec section 7), before any other check for Tesseract or its
+tools; Tesseract's tools when analyze or structure runs, or layout
+re-reads small print, and the word list of the book's language is not
+cached; Tesseract when layout runs and the config's `ocr` is `verify`;
+and Tesseract when extract runs and the config's `ocr` is `redo`, under
+which extract reads every text page with it (architecture section 7b).
 Errors propagate to `main`, which logs them and raises them again
 (architecture section 14).
 """
@@ -74,9 +76,11 @@ class _Stage:
     language, which Tesseract's tools extract the first time, and whether
     it reads with Tesseract when the config's `ocr` is `verify`, as layout
     re-reads small print (docs/specs/reocr.md, section 3), needing the
-    word list too; and whether it needs Tesseract
-    under `ocr = "redo"`, as extract does to read every text page and
-    analyze, which runs before it (architecture section 7b); and whether
+    word list too; whether it reads the pages without a text layer with
+    Tesseract whatever the config's `ocr`, as analyze does (analyze spec
+    section 7); whether it needs Tesseract
+    under `ocr = "redo"`, as extract does to read every text page
+    (architecture section 7b); and whether
     `run` runs it only when the config has `correct = true`, as the correct
     stage."""
 
@@ -86,6 +90,7 @@ class _Stage:
     needs_pandoc: bool
     needs_word_list: bool
     reads_with_tesseract: bool
+    reads_pages_without_layer: bool
     needs_tesseract_under_redo: bool
     only_when_correct: bool = False
 
@@ -100,7 +105,8 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=True,
         reads_with_tesseract=False,
-        needs_tesseract_under_redo=True,
+        reads_pages_without_layer=True,
+        needs_tesseract_under_redo=False,
     ),
     _Stage(
         name="extract",
@@ -109,6 +115,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=False,
         reads_with_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=True,
     ),
     _Stage(
@@ -118,6 +125,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=False,
         reads_with_tesseract=True,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=False,
     ),
     _Stage(
@@ -127,6 +135,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=True,
         reads_with_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=False,
     ),
     _Stage(
@@ -136,6 +145,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=True,
         reads_with_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=False,
         only_when_correct=True,
     ),
@@ -146,6 +156,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=True,
         needs_word_list=False,
         reads_with_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=False,
     ),
     _Stage(
@@ -155,6 +166,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=True,
         needs_word_list=False,
         reads_with_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=False,
     ),
 )
@@ -364,11 +376,12 @@ def _check_before_any_stage(
     without kept answers, answers/, and LM Studio does not answer or lacks a
     model of the config (with kept answers the stage checks before its first
     request, and not at all when it sends none: correct spec, section 4); when a stage needs Pandoc and it is not on the PATH (spec section 9);
-    when analyze or structure, or layout re-reading small print, needs
+    when analyze runs and Tesseract is not on the PATH, whatever the
+    config's `ocr` (analyze spec section 7), checked before Tesseract's
+    tools; when analyze or structure, or layout re-reading small print, needs
     Tesseract's tools to extract the word list; or when layout reads with
     Tesseract, which it does only when the config's `ocr` is `verify`, or
-    analyze or extract runs under `ocr = "redo"`, and it is not on the
-    PATH."""
+    extract runs under `ocr = "redo"`, and it is not on the PATH."""
     if (
         any(stage.only_when_correct for stage in stages)
         and not folder.answers_dir.exists()
@@ -376,6 +389,15 @@ def _check_before_any_stage(
         correct.check_server(config)
     if any(stage.needs_pandoc for stage in stages) and shutil.which("pandoc") is None:
         message = "pandoc is not installed; install it with `brew install pandoc`"
+        raise ExternalProgramError(message)
+    reading_pages_without_layer = tuple(
+        stage.name for stage in stages if stage.reads_pages_without_layer
+    )
+    if reading_pages_without_layer and shutil.which("tesseract") is None:
+        message = (
+            f"tesseract is not installed; {reading_pages_without_layer[0]} reads the pages "
+            "without a text layer with it: install it with `brew install tesseract`"
+        )
         raise ExternalProgramError(message)
     needing_word_list = tuple(
         stage.name

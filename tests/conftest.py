@@ -240,6 +240,13 @@ EXCERPT_CONFIGS = frozendict(
             'authors = ["William Stubbs"]\n'
             'language = "en"\n'
         ),
+        # The pages without a text layer of docs/specs/analyze.md, section
+        # 11: the config `galley2epub run` writes for a bare PDF.
+        "kadesh_blank": (
+            'title = "The Battle of Kadesh"\n'
+            'authors = ["J. H. Breasted"]\n'
+            'language = "en"\n'
+        ),
     }
 )
 
@@ -296,7 +303,9 @@ REDO_EXCERPT_CONFIGS = frozendict(
 # excerpts stay.
 #
 # exclude_pages: the pages without a text layer that are not plates, which
-# analyze refuses unless excluded (the evaluation books' as in
+# analyze refused unless excluded until it read them with Tesseract
+# (docs/specs/analyze.md, which keeps these configs as they are; the
+# evaluation books' as in
 # evaluation/books.toml, Kadesh's and Gierke's as analyze listed them on 15
 # November 2026), and the pages that analyze's plate rule takes wrongly
 # (docs/specs/plates.md, sections 1 and 2): Kadesh 0, the cover, 16, the

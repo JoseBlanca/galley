@@ -122,6 +122,22 @@ BOOKS = (
                     "as centred junk (32), and a plate with a text layer (34)"
                 ),
             ),
+            Excerpt(
+                name="kadesh_blank",
+                page_indices=(1, 2, 3, 23, 69, 70, 71, 72, 73, 75),
+                covers=(
+                    "pages without a text layer, the reference pages of "
+                    "docs/specs/analyze.md: the Internet Archive's notice, "
+                    "printed, which Tesseract reads (page index 1); blank "
+                    "endpapers (2, 3); a faint relief that the plate rule "
+                    "misses and the audit takes for a picture (23); a "
+                    "photograph under blurred lines of text, a plate by the "
+                    "plate rule (69); boards of the back cover (70, 71, 75); "
+                    "a blank leaf with the next page showing through (72); and "
+                    "a blank leaf on which Tesseract reads 26 words of junk, "
+                    "none of confidence 52 or more (73)"
+                ),
+            ),
         ),
     ),
     Book(

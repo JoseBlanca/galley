@@ -63,7 +63,12 @@ whatever the config's `correct` says (sections 6, 10, 14 and 16).
 Revised again on 26 November 2026: `galley2epub run` also takes the PDF
 of a simple book, with its title, authors and language as options, and
 writes the book folder and its `book.toml` itself (sections 5, 6, 14 and
-17).
+17). Revised again on 26 November 2026 for the plan blank-pages: analyze
+reads every page without a text layer with Tesseract, under every
+`ocr`, and makes it blank, text read by OCR, or a plate
+(`docs/specs/analyze.md`); a front-matter page without a layer can have
+the text source `ocr`; `cli.py` looks for Tesseract whenever analyze
+runs (sections 7b, 8 and 16). No file changes its `format_version`.
 
 Decisions marked "owner", with a date from 14 to 17 November 2026,
 were taken by the owner in chat; those of 18 November 2026 were taken
@@ -281,23 +286,24 @@ config's `ocr` key sets how far:
 **`redo`** (decided for the owner on 19 November 2026, plan ocr-redo).
 analyze classifies the pages from the text layer as it does with
 `verify`: the plate, inkless, front-matter and in-page figure rules use
-the layer's word boxes, and a page without a layer is blank or a plate
-as before. Then every page that ends as a `text` page gets the text
+the layer's word boxes, and a page without a layer is audited as with
+`verify` (below). Then every page that ends as a `text` page gets the text
 source `ocr`; every other page keeps the source it has with `verify`. A
 plate keeps its layer, because Tesseract reads its picture as junk and
 the layer reads its caption better: on Kadesh's 9 plates Tesseract
 reads 0 to 140 words, the layer 2 to 24, and "PLATE II" where
 Tesseract reads "Puate II" (measured on 19 November 2026 on the whole
-book). analyze runs no audit and writes
+book). analyze runs no sample of the layer and writes
 `ocr_audit` `None`. extract reads each `ocr` page with Tesseract
 (`docs/specs/extract.md` §9), and keeps the layer's words where
 Tesseract read none, a line or a word it skipped, so that no printed
 word is lost (on Kadesh 45 words, each a printed word as the layer reads it); the words of an excluded, front-matter or
 inkless page are the layer's, recorded as removals, as with `verify`.
-layout re-reads nothing. `cli.py` looks for Tesseract before analyze or
-extract starts under `redo` and stops when it is missing (sections 12
-and 16), so that a run does not stop at extract after analyze has
-written its file; analyze itself calls Tesseract on no page. An excluded region
+layout re-reads nothing. `cli.py` looks for Tesseract before analyze
+starts, under every `ocr`, and before extract starts under `redo`, and
+stops when it is missing (sections 12 and 16), so that a run does not
+stop after a stage has written its file; analyze calls Tesseract only
+on the pages without a text layer. An excluded region
 drawn against the layer's boxes is checked on the page's render under
 `redo`, since Tesseract boxes a word where it is printed and the layer
 may box it elsewhere (Kadesh's "81" on page 8, 12 pt apart). Measured
@@ -309,15 +315,20 @@ on about 11 s with 6 threads, on an M5 Pro; page 9, whose layer reads
 
 The audit runs Tesseract on two sets of pages:
 
-- **Every page without a text layer.** In the two whole public-domain
-  books, 26 pages have none: 13 are blank, and 13 have something printed
-  that the scanner's OCR left out (Kadesh page index 69: a running head,
-  about five lines of text and a captioned figure). A page where
-  Tesseract finds no text at all is blank, recorded with
+- **Every page without a text layer** that is not excluded, named a
+  plate or the cover (`docs/specs/analyze.md`). In the five whole public-domain
+  books, 68 pages have none: 9 are plates, and of the other 59, 47 are
+  blank, 4 hold text Tesseract reads (the Internet Archive's notice,
+  two library labels) and 8 hold ink in which it reads no text (covers,
+  a faint relief, a reader's writing). A page where Tesseract reads no
+  word of confidence 70 or more with a letter or digit, and whose ink
+  covers less than 0.08% of it, is blank, recorded with
   `blank_checked_by_ocr`; a page of numerals or names only is not blank.
-  The threshold for stray marks is set in analyze's spec. A page where it finds text gets `text_source`
-  `ocr`, and extract reads it with Tesseract: the gap is filled, the run
-  goes on.
+  A page where it reads such a word gets `text_source` `ocr`, and
+  extract reads it with Tesseract: the gap is filled, the run goes on.
+  A page with more ink and no such word is a plate, so that no printed
+  page is dropped; one with 40 such words or more is text even where
+  the plate rule would take it.
 - **A sample of pages with a text layer**, spread through the book. Each
   is scored twice, the layer's words and Tesseract's, by the share found
   in the word list. Tesseract is not taken as the truth: on
@@ -338,7 +349,8 @@ every word it replaces (owner, 17 November 2026: re-read small print
 where the scan is good and the layer poor). `ocr = "trust"` turns it
 off.
 
-The sample size and the thresholds are set in analyze's spec. ocr_lab's
+The sample size and its thresholds are to be set in analyze's spec,
+which has only the first set of pages so far (`docs/specs/analyze.md` §9). ocr_lab's
 triage re-OCRed below a word-list share of 0.70 and checked between 0.70
 and 0.80, which tracked the measured gain closely (ρ = 0.90, as ocr_lab's notes report it)
 but was fitted on 16 books only.
@@ -418,16 +430,22 @@ Every file's top-level object has `format_version` and `source_pdf_sha256`.
   (`docs/specs/plates.md`). An inkless page is not `blank`: a blank page
   has no text layer.
 - `TextSource`: `text_layer`, `ocr`, `none` (blank, excluded,
-  front-matter and inkless pages, and plates without a text layer).
+  front-matter and inkless pages, and plates without a text layer). A
+  front-matter page without a text layer on which the audit found text
+  has `ocr`: extract reads it with Tesseract and records its words as
+  removals (`docs/specs/analyze.md` §4).
 - `text_layer_score`: the share of the layer's words found in the word
   list (section 12), from 0 to 1; `None` without a layer.
 - `blank_checked_by_ocr: bool`: true for a page without a text layer that
   the OCR audit read and found blank (section 7b), so that a blank page is
-  never a page nobody looked at.
+  never a page nobody looked at. The one exception is the config's
+  `cover_page` without a text layer: not audited, it is `blank` with the
+  flag false, since the owner named it and extract keeps its picture as
+  the cover (`docs/specs/analyze.md` §2).
 - `PagesFile` also has `ocr_audit: OcrAudit | None`: the pages sampled,
   the score of the text layer and of Tesseract on each, and the verdict
-  (section 7b). `None` when `ocr` is `trust` or `redo`, and in the walking
-  skeleton, which has no audit.
+  (section 7b). `None` when `ocr` is `trust` or `redo`, and, until the
+  sample of section 7b is built, always (`docs/specs/analyze.md` §9).
 - Page sizes are pdfplumber's (the media box). pypdfium2 reports the crop
   box, which can differ slightly (Gierke: 376.128 pt against
   376.1000061), so no stage takes a page size from pypdfium2.
@@ -978,7 +996,7 @@ A stage imports these and nothing else of galley.
 | `parallel.py` | `DEFAULT_WORKERS` (6); `map_pages(function, items, workers)`, which returns the results in input order; and `map_pages_with_source(open_source, function, items, workers)`, which opens one source per worker thread (a pdfplumber document) and passes it to every call on that thread. A source is closed when its thread ends, also when `function` raises; the exception propagates |
 | `text_layer.py` | `open_pdf(pdf) -> pdfplumber.PDF`: the one way galley opens a pdfplumber document. It opens under a lock, because pdfminer.six (20260107) interns PDF keywords in a shared table without one and can fail, about 1 run in 100 with several workers, when two threads open documents at once; reading pages stays parallel. A PDF pdfplumber cannot read becomes a `PdfError` naming the file. `layer_words(page) -> tuple[Word, ...]`: the one way galley reads a page's words from the text layer, in analyze and extract alike; `Character`, a frozen value (`text`, one character, and `box`), one glyph of the text layer; and `split_glued(characters)`, which cuts one word's characters into the words the OCR glued (`docs/specs/extract.md` §4 and §5) |
 | `wordlist.py` | `is_known_word(word, lower_case_words)`, whether a word counts as known on a plate (`docs/specs/plates.md` §2); `lower_case_word_list(language, cache_dir)`, the word list in lower case, made once per language and list folder, which structure, analyze and layout take; `word_list(language, cache_dir) -> frozenset[str]`, with the dictionary's case, extracted from Tesseract's language data with its `combine_tessdata` and `dawg2wordlist` tools, as the owner's ocr_lab does, and cached under `~/.cache/galley/`; `is_cached(language, cache_dir)`; `WORD_LIST_TOOLS` and `missing_tools(language, cache_dir)`, the tools not on the PATH when the list is not cached, which the command checks before analyze (plates, `docs/specs/plates.md`), layout (re-reading, `docs/specs/reocr.md`) and structure |
-| `ocr.py` | Tesseract: `read_image(image, origin, dpi, psm, language)`, the words of an image cropped from a page, with boxes in points and Tesseract's confidence, and `words_of_tsv`, its pure part; `read_image_lines` and `lines_of_tsv`, the same words grouped by Tesseract's lines; `point_box(box, origin, dpi)`, a box in pixels of a crop as a box in points on the page; `OCR_DPI` (300). Tesseract runs with `OMP_THREAD_LIMIT=1`, one core each, so that the parallelism is galley's; output without Tesseract's tsv header is an `ExternalProgramError` (`docs/specs/reocr.md` §5). layout uses it now, extract for the text pages under `ocr = "redo"` (`docs/specs/extract.md` §9), analyze's audit later |
+| `ocr.py` | Tesseract: `read_image(image, origin, dpi, psm, language)`, the words of an image cropped from a page, with boxes in points and Tesseract's confidence, and `words_of_tsv`, its pure part; `read_image_lines` and `lines_of_tsv`, the same words grouped by Tesseract's lines; `point_box(box, origin, dpi)`, a box in pixels of a crop as a box in points on the page; `OCR_DPI` (300); `WHOLE_PAGE_SEGMENTATION` (3), Tesseract's mode for a whole page, with which extract reads an `ocr` page and analyze audits a page without a text layer, so that the two read the same words. Tesseract runs with `OMP_THREAD_LIMIT=1`, one core each, so that the parallelism is galley's; output without Tesseract's tsv header is an `ExternalProgramError` (`docs/specs/reocr.md` §5). layout uses it, extract for the `ocr` pages (`docs/specs/extract.md` §9), and analyze for the pages without a text layer (`docs/specs/analyze.md`) |
 | `fidelity.py` | the fidelity check, section 13 |
 | `list_markers.py` | the readings of a list marker (`docs/specs/structure.md` §29, "Terms"): `marker_readings(word)`, its kind, form and value, a roman numeral before a letter; `starts_a_list`, `follows` and `is_bulleted`; and `DASHES`, which structure's list rules, markdown's lists and the fidelity check share, so that the three read a marker alike |
 | `caption_labels.py` | the caption labels of `docs/specs/figures.md` §1: `LABEL_NAMES` ("figure", "fig.", "fig", "plate", "map"), `is_numeral(text)`, a numeral as the OCR reads one, and `is_well_formed_numeral(text)`, one as printed (1 to 3 digits or a well-formed roman numeral in capitals). Moved from `structure/_figures.py` on 19 November 2026, so that structure's caption labels and extract's caption numbers under `redo` (`docs/specs/extract.md` §9) read a numeral alike |
@@ -986,7 +1004,7 @@ A stage imports these and nothing else of galley.
 | `contents_labels.py` | the number labels and the runs of a printed contents (`docs/specs/structure.md` §30, rule 12, and §31): `number_label(label)`, the style (digits or a roman numeral in capitals) and value of a label "7." or "IV.", None for any other; `label_text(style, value)`, the label of a value in a style; `contents_runs(pages)`, the contents runs of the contents pages; and `inferred_labels(labels, levels)`, rule 12's labels for a run's entries. structure infers labels with them and the fidelity check admits an inferred label with them, so that the two read the rule alike |
 | `hyphens.py` | `LINE_END_HYPHENS`, "-" and "¬", the hyphens that end a printed line in the OCR's text, which layout's reading score, structure's hyphen joins and the fidelity check share (`docs/specs/structure.md` §5) |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
-| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc; Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`, and analyze and extract when it is `redo`) and stops naming any that is missing; and, when the command runs correct on a book folder without `answers/`, LM Studio's server and its models (`correct.check_server`; with kept answers the correct stage checks them before its first request, and not at all when it sends none) |
+| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc; Tesseract, which analyze always needs, layout unless the config's `ocr` is `trust` or `redo`, and extract when it is `redo`) and stops naming any that is missing; and, when the command runs correct on a book folder without `answers/`, LM Studio's server and its models (`correct.check_server`; with kept answers the correct stage checks them before its first request, and not at all when it sends none) |
 
 `src/galley/__init__.py` imports gilguard first: a library that stops a
 program at any import that turns Python's global lock back on, and names
@@ -1258,7 +1276,7 @@ cost than one every run of `galley2epub` needs.
 | program | used by | when | why it is not rebuilt |
 |---|---|---|---|
 | Pandoc | markdown (to read `book.md` back for the fidelity check), epub | every run | writing a valid EPUB 3 with navigation, notes and metadata is a large, well-tested body of work |
-| Tesseract | analyze (the OCR audit), extract (OCR pages, every text page under `ocr = "redo"`), layout (re-reading small print), `wordlist.py` | runs that need OCR: layout unless `ocr` is `trust` or `redo`, and extract on every text page when it is `redo`, which `cli.py` checks before analyze starts; the word list, once per language | OCR is not something to rebuild |
+| Tesseract | analyze (the OCR audit), extract (OCR pages, every text page under `ocr = "redo"`), layout (re-reading small print), `wordlist.py` | every run of analyze, for the pages without a text layer; layout unless `ocr` is `trust` or `redo`; extract on every text page when it is `redo`; `cli.py` checks before the first stage; the word list, once per language | OCR is not something to rebuild |
 | epubcheck | the tests of the epub stage and the `whole_book` tests | development only | it is the reference validator of EPUB, and needs Java, which a run of galley should not |
 | LM Studio | correct, through HTTP on the local machine only | runs that run correct: `correct = true` without `--no-correct`, or `--correct` (section 14); `cli.py` checks that it answers and has the model before the first stage, unless the book folder holds kept answers, when the correct stage checks before its first request and not at all when every answer is kept | serving a vision model on the Mac's GPU is a large body of work; galley sends it a page and reads its text (`docs/specs/correct.md` §4) |
 

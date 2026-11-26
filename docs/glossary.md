@@ -12,6 +12,13 @@ when the marker holds a character other than white space; the epub
 stage gives each referenced footnote one, Pandoc's number at the
 start of the note (architecture section 9, "Back links").
 
+**blank page**: a page of the scan without a text layer on which
+Tesseract reads no word of confidence 70 or more with a letter or digit
+and whose ink covers less than 0.08% of it: an endpaper, a blank leaf,
+a board of the binding. analyze records it with `blank_checked_by_ocr`
+and it has no words (`docs/specs/analyze.md` §3). A page without a
+layer that holds more ink and no such word is a plate.
+
 **block**: a unit of the book's text after structure: a heading, a
 paragraph, a quote, verse, a chapter summary, an epigraph, a figure, a
 margin note, an index entry, a list item or a contents entry. Its kind says what the text is, never how it looks. It

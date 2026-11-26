@@ -17,6 +17,7 @@ import pytest
 
 from galley import analyze
 from galley.analyze import (
+    AuditVerdict,
     InkRule,
     PageStart,
     PictureArea,
@@ -27,11 +28,10 @@ from galley.analyze import (
     is_inkless,
     is_plate,
     picture_area,
-    require_text_layer,
 )
 from galley.book_folder import BookFolder
 from galley.config import BookConfig, ExcludedRegion, Language, OcrMode, read_config
-from galley.errors import ConfigError, PdfError
+from galley.errors import ConfigError
 from galley.model import (
     Box,
     PageInfo,
@@ -90,6 +90,7 @@ def test_page_with_layer_words_is_text_with_its_regions_in_config_order() -> Non
         CONFIG,
         plate_rule=PlateRule.NOT_PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     ) == PageInfo(
         index=3,
@@ -115,6 +116,7 @@ def test_page_in_exclude_pages_is_excluded_although_it_has_layer_words() -> None
         config,
         plate_rule=PlateRule.NOT_PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     ) == PageInfo(
         index=3,
@@ -141,6 +143,7 @@ def test_page_in_exclude_pages_without_layer_words_is_excluded_not_blank() -> No
             config,
             plate_rule=PlateRule.NOT_PLATE,
             ink_rule=InkRule.NOT_INKLESS,
+            audit=AuditVerdict.NOT_AUDITED,
             front_matter_end=0,
         ).kind
         is PageKind.EXCLUDED
@@ -156,6 +159,7 @@ def test_page_without_layer_words_is_blank_with_no_text_source() -> None:
         CONFIG,
         plate_rule=PlateRule.NOT_PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     ) == PageInfo(
         index=4,
@@ -182,6 +186,7 @@ def test_text_page_under_redo_is_read_by_ocr() -> None:
         replace(CONFIG, ocr=OcrMode.REDO),
         plate_rule=PlateRule.NOT_PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     )
 
@@ -240,6 +245,7 @@ def test_page_other_than_text_under_redo_keeps_the_source_of_verify(
             replace(CONFIG, ocr=ocr),
             plate_rule=plate_rule,
             ink_rule=ink_rule,
+            audit=AuditVerdict.NOT_AUDITED,
             front_matter_end=front_matter_end,
         )
         return page.kind, page.text_source
@@ -257,6 +263,7 @@ def test_excluded_page_under_redo_is_excluded_with_no_source() -> None:
         replace(CONFIG, ocr=OcrMode.REDO, exclude_pages=(3,)),
         plate_rule=PlateRule.NOT_PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     )
 
@@ -275,6 +282,7 @@ def test_page_the_plate_rule_takes_is_a_plate_read_from_its_layer() -> None:
         CONFIG,
         plate_rule=PlateRule.PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     )
 
@@ -291,6 +299,7 @@ def test_page_without_a_layer_the_plate_rule_takes_is_a_plate_with_no_source() -
         CONFIG,
         plate_rule=PlateRule.PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     )
 
@@ -315,6 +324,7 @@ def test_page_in_plate_pages_is_a_plate_whatever_the_rule_finds(
         config,
         plate_rule=PlateRule.NOT_PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     )
 
@@ -332,6 +342,7 @@ def test_cover_page_the_plate_rule_takes_is_never_a_plate() -> None:
         config,
         plate_rule=PlateRule.PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     )
 
@@ -349,6 +360,7 @@ def test_excluded_page_the_plate_rule_takes_is_excluded() -> None:
         config,
         plate_rule=PlateRule.PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     )
 
@@ -367,6 +379,7 @@ def test_page_the_inkless_rule_takes_is_inkless_with_no_text_source() -> None:
         CONFIG,
         plate_rule=PlateRule.NOT_PLATE,
         ink_rule=InkRule.INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     )
 
@@ -383,6 +396,7 @@ def test_page_the_inkless_and_plate_rules_both_take_is_inkless() -> None:
         CONFIG,
         plate_rule=PlateRule.PLATE,
         ink_rule=InkRule.INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     )
 
@@ -402,6 +416,7 @@ def test_inkless_page_before_front_matter_end_stays_front_matter(
         CONFIG,
         plate_rule=plate_rule,
         ink_rule=InkRule.INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=12,
     )
 
@@ -420,6 +435,7 @@ def test_inkless_page_in_exclude_pages_or_plate_pages_keeps_the_configs_kind() -
             config,
             plate_rule=PlateRule.NOT_PLATE,
             ink_rule=InkRule.INKLESS,
+            audit=AuditVerdict.NOT_AUDITED,
             front_matter_end=0,
         ).kind
         for index in (3, 4)
@@ -702,37 +718,6 @@ def test_word_box_wholly_off_the_page_has_no_ink() -> None:
     assert is_inkless(page, junk(Box(210.0, 30.0, 250.0, 40.0)), INK_WORD_LIST)
 
 
-# require_text_layer
-
-
-def test_require_text_layer_names_both_blank_pages_of_four() -> None:
-    pages = (
-        page(0, PageKind.TEXT, TextSource.TEXT_LAYER),
-        page(1, PageKind.BLANK, TextSource.NONE),
-        page(2, PageKind.EXCLUDED, TextSource.NONE),
-        page(3, PageKind.BLANK, TextSource.NONE),
-    )
-
-    with pytest.raises(
-        PdfError,
-        match=r"^page indices 1, 3: these pages have no text layer, and the "
-        r"walking skeleton has no OCR; add them to `exclude_pages` once you "
-        r"have checked that they hold no text$",
-    ):
-        require_text_layer(pages)
-
-
-def test_require_text_layer_accepts_text_excluded_and_plate_pages() -> None:
-    pages = (
-        page(0, PageKind.TEXT, TextSource.TEXT_LAYER),
-        page(1, PageKind.EXCLUDED, TextSource.NONE),
-        page(2, PageKind.PLATE, TextSource.NONE),
-        page(3, PageKind.PLATE, TextSource.TEXT_LAYER),
-    )
-
-    require_text_layer(pages)
-
-
 # check_config_pages
 
 
@@ -764,6 +749,7 @@ def test_page_in_plate_pages_and_exclude_pages_is_accepted_and_excluded() -> Non
         config,
         plate_rule=PlateRule.NOT_PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=0,
     )
 
@@ -1129,6 +1115,7 @@ def test_text_page_before_front_matter_end_is_front_matter_with_no_text_source()
         CONFIG,
         plate_rule=PlateRule.NOT_PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=4,
     )
 
@@ -1145,6 +1132,7 @@ def test_text_page_at_front_matter_end_stays_text() -> None:
         CONFIG,
         plate_rule=PlateRule.NOT_PLATE,
         ink_rule=InkRule.NOT_INKLESS,
+        audit=AuditVerdict.NOT_AUDITED,
         front_matter_end=3,
     )
 
@@ -1165,6 +1153,7 @@ def test_excluded_plate_and_blank_pages_before_front_matter_end_keep_their_kind(
             config,
             plate_rule=PlateRule.NOT_PLATE,
             ink_rule=InkRule.NOT_INKLESS,
+            audit=AuditVerdict.NOT_AUDITED,
             front_matter_end=10,
         ).kind
         for index, word_count in ((1, 12), (2, 12), (3, 0))
@@ -1239,8 +1228,14 @@ EXCERPT_PLATES = frozendict(
         "kadesh_59-68": (5, 6, 9),
         "domesday_headings_quotes": (3, 4),
         "kadesh_29-38": (5, 6),
+        # Kadesh 23, a faint relief the audit takes for a picture, and 69,
+        # which the plate rule takes (docs/specs/analyze.md, section 11).
+        "kadesh_blank": (3, 4),
     }
 )
+# The blank pages of each excerpt, which the audit read and found blank
+# (docs/specs/analyze.md, section 11).
+EXCERPT_BLANK = frozendict({"kadesh_blank": (1, 2, 5, 6, 7, 8, 9)})
 # The front-matter pages of each excerpt (front-matter spec section 6,
 # "Excerpt tests"): pages 0 to 4 of the three that open with the book's
 # front pages. The other eleven have none.
@@ -1265,6 +1260,7 @@ def test_the_excerpts_plates_and_front_matter_are_the_specs_and_other_pages_text
         plates = EXCERPT_PLATES.get(name, ())
         front_matter = EXCERPT_FRONT_MATTER.get(name, ())
         inkless = EXCERPT_INKLESS.get(name, ())
+        blank = EXCERPT_BLANK.get(name, ())
         # Haskins' blank page before the index and Kadesh's scan of a cover
         # are excluded by their configs, and so is Haskins' page index 276
         # in `haskins_endpapers`.
@@ -1280,10 +1276,13 @@ def test_the_excerpts_plates_and_front_matter_are_the_specs_and_other_pages_text
         assert tuple(page.index for page in pages if page.kind is PageKind.INKLESS) == (
             inkless
         ), name
+        assert tuple(page.index for page in pages if page.kind is PageKind.BLANK) == (
+            blank
+        ), name
         assert all(
             page.kind is PageKind.TEXT
             for page in pages
-            if page.index not in (*plates, *excluded, *front_matter, *inkless)
+            if page.index not in (*plates, *excluded, *front_matter, *inkless, *blank)
         ), name
 
 
@@ -1329,10 +1328,11 @@ def kadesh_folder(root: Path, pdf: Path, settings: str) -> BookFolder:
 
 
 @pytest.mark.thread_unsafe
-def test_haskins_without_exclude_pages_stops_naming_its_blank_page_8_and_leaves_no_file(
+def test_haskins_without_exclude_pages_makes_its_blank_page_8_blank_checked_by_ocr(
     tmp_path: Path, excerpt_pdf: frozendict[str, Path]
 ) -> None:
-    # Haskins' page 8 has no text layer and is not a plate.
+    # Haskins' page 8 has no text layer and is not a plate: the audit reads
+    # it and finds it blank (docs/specs/analyze.md, sections 3 and 4).
     folder = BookFolder(tmp_path)
     folder.book_toml.write_text(
         f"pdf = '{excerpt_pdf[HASKINS]}'\n"
@@ -1341,12 +1341,16 @@ def test_haskins_without_exclude_pages_stops_naming_its_blank_page_8_and_leaves_
         'language = "en"\n',
         encoding="utf-8",
     )
-    folder.pages_json.write_text("an old pages.json\n", encoding="utf-8")
 
-    with pytest.raises(PdfError, match=r"^page indices 8: these pages have no"):
-        analyze.run(folder, read_config(folder.book_toml))
+    analyze.run(folder, read_config(folder.book_toml))
 
-    assert not folder.pages_json.exists()
+    pages = read_pages(folder.pages_json).pages
+    assert [page.index for page in pages if page.kind is not PageKind.TEXT] == [8]
+    assert (pages[8].kind, pages[8].text_source, pages[8].blank_checked_by_ocr) == (
+        PageKind.BLANK,
+        TextSource.NONE,
+        True,
+    )
 
 
 @pytest.mark.thread_unsafe
@@ -1449,8 +1453,8 @@ def test_a_plate_without_a_layer_is_logged_with_its_share_of_the_page(
     assert [record.getMessage() for record in caplog.records] == [
         (
             "analyze: page index 9, without a text layer, taken for a plate: a "
-            "picture of 279 of its 476 squares; add it to `exclude_pages` if it "
-            "is not one"
+            "picture of 279 of its 476 squares, Tesseract reads 0 text words; add "
+            "it to `exclude_pages` if it is not one"
         )
     ]
 
@@ -1468,8 +1472,8 @@ def test_a_page_the_plate_rule_takes_is_logged_as_a_plate_only_when_it_is_one(
     plate_test = analyze._PlateTest(
         area=PictureArea(largest_group=70, squares=400),
         known_words=0,
-        has_layer=True,
         rule=PlateRule.PLATE,
+        audit=None,
     )
 
     with caplog.at_level(logging.WARNING, logger="galley.analyze"):

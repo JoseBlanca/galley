@@ -724,6 +724,13 @@ page:
    `text_layer`.
 3. Else the page is `blank`, `text_source` `none`.
 
+Superseded on 26 November 2026 by `docs/specs/analyze.md`, which takes
+over analyze: a page without a text layer no longer stops the run, but
+is read with Tesseract and made blank, a text page read by OCR, or a
+plate (analyze §2 to §4); `require_text_layer` and its `PdfError` go,
+and the test below that expects it with them. What follows is the
+skeleton as built.
+
 Then, when any page is `blank`, analyze stops with a `PdfError` that
 lists every such page and says: "these pages have no text layer, and the
 walking skeleton has no OCR; add them to `exclude_pages` once you have
