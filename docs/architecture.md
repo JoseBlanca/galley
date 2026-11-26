@@ -57,7 +57,9 @@ applies the edits files; the config gains `correct_model`,
 12 and 16). Revised on 25 November 2026 for the plan misread-words: the
 correct stage keeps the model's answers in `answers/` of the book folder,
 which no stage deletes, in the new format `KeptAnswer` (sections 5 and
-8).
+8). Revised on 26 November 2026: `galley2epub run` takes `--correct` and
+`--no-correct`, which run or skip the correct stage for that one run
+whatever the config's `correct` says (sections 6, 10, 14 and 16).
 
 Decisions marked "owner", with a date from 14 to 17 November 2026,
 were taken by the owner in chat; those of 18 November 2026 were taken
@@ -209,7 +211,7 @@ An unknown key or a wrong type is an error.
 | `authors` | list of strings, required | |
 | `language` | string, required | ISO 639-1 code: `en`, `es`, `fr`, `de`, `it`. `config.py` maps it to Tesseract's code (`eng`, `spa`…) and to the word list; structure treats spaced punctuation by it (`docs/specs/structure.md` §23) |
 | `ocr` | `verify` / `trust` / `redo`, `verify` | how far the book's own OCR is trusted (section 7b), and whether layout re-reads small print: not with `trust` or `redo` (`docs/specs/reocr.md`). With `redo`, every text page is read again with Tesseract and its words replace the text layer's (section 7b; `docs/specs/extract.md` §9): for a book whose layer is bad throughout, as Kadesh's, the only one of the eight books that needs it |
-| `correct` | bool, `false` | whether `galley2epub run` runs the correct stage |
+| `correct` | bool, `false` | whether `galley2epub run` runs the correct stage, unless `--correct` or `--no-correct` decides for that run (section 14) |
 | `correct_model` | string, `"qwen/qwen3.6-35b-a3b"` | the vision model the correct stage asks, as LM Studio names it (`docs/specs/correct.md` §3) |
 | `correct_server` | string, `"http://localhost:1234"` | LM Studio's address; only `http` on `localhost`, `127.0.0.1` or `[::1]`, so that a book's text never leaves the machine |
 | `correct_second_model` | string, none | a second model whose reading of each page's notes marks the correct stage's doubtful edits; none by default |
@@ -903,8 +905,9 @@ November 2026: patches, usable by agents too).
   and the new text, `new`, with who made it and why.
 - markdown applies `correct.jsonl` first, then the agents' files by file
   name, then `owner.jsonl` last, each from its first line to its last,
-  whatever the config's `correct` says: that key decides only whether
-  `run` runs the correct stage.
+  whatever the config's `correct` says: that key, and the flags
+  `--correct` and `--no-correct` of section 14, decide only whether `run`
+  runs the correct stage.
   The owner's edits come last because `edits-from` finds them on a
   `book.md` that already had every other edit applied. A missing file is
   simply no edits.
@@ -1144,9 +1147,28 @@ lists the words, with the pages they came from where the origins say.
 
 ```
 galley2epub run <book folder>          every stage in order (correct only if the config says)
+galley2epub run <book folder> --correct      every stage, correct included
+galley2epub run <book folder> --no-correct   every stage but correct
 galley2epub <stage> <book folder>      one stage: analyze, extract, layout, structure, correct, markdown, epub
 galley2epub edits-from <book folder> <corrected book.md>
 ```
+
+The correct stage, which asks a local vision model and takes hours on a
+whole book, is off unless the book's config has `correct = true`. The
+flags of `run` decide it for one run without editing `book.toml`:
+`--correct` runs the stage although the config has `correct = false` or
+no `correct` key, and `--no-correct` skips it although the config has
+`correct = true`. With neither flag, the config decides. The flag
+governs everything that depends on whether correct runs: the check that
+LM Studio answers before the first stage, made when the book folder has
+no kept answers in `answers/` (section 16), is made under `--correct` as
+under `correct = true`, and never under `--no-correct`, so
+that a book with `correct = true` can be built without the model's edits
+while LM Studio is stopped. Only
+`run` takes the flags; `galley2epub correct` runs the stage whatever the
+config says. A run with `--no-correct` leaves no `edits/correct.jsonl`,
+as a run with `correct = false` does: structure deletes it, since its
+edits name blocks by the text structure wrote (section 5).
 
 Errors propagate to `cli.main`, the one place that catches broadly, which
 logs the error and raises it again. The `[project.scripts]` entry is added
@@ -1171,7 +1193,7 @@ cost than one every run of `galley2epub` needs.
 | Pandoc | markdown (to read `book.md` back for the fidelity check), epub | every run | writing a valid EPUB 3 with navigation, notes and metadata is a large, well-tested body of work |
 | Tesseract | analyze (the OCR audit), extract (OCR pages, every text page under `ocr = "redo"`), layout (re-reading small print), `wordlist.py` | runs that need OCR: layout unless `ocr` is `trust` or `redo`, and extract on every text page when it is `redo`, which `cli.py` checks before analyze starts; the word list, once per language | OCR is not something to rebuild |
 | epubcheck | the tests of the epub stage and the `whole_book` tests | development only | it is the reference validator of EPUB, and needs Java, which a run of galley should not |
-| LM Studio | correct, through HTTP on the local machine only | runs with `correct = true`; `cli.py` checks that it answers and has the model before the first stage, unless the book folder holds kept answers, when the correct stage checks before its first request and not at all when every answer is kept | serving a vision model on the Mac's GPU is a large body of work; galley sends it a page and reads its text (`docs/specs/correct.md` §4) |
+| LM Studio | correct, through HTTP on the local machine only | runs that run correct: `correct = true` without `--no-correct`, or `--correct` (section 14); `cli.py` checks that it answers and has the model before the first stage, unless the book folder holds kept answers, when the correct stage checks before its first request and not at all when every answer is kept | serving a vision model on the Mac's GPU is a large body of work; galley sends it a page and reads its text (`docs/specs/correct.md` §4) |
 
 The epub stage does not run epubcheck: an EPUB is checked while
 developing, on the excerpts and the whole books, and the tests that need

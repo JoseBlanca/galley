@@ -6,7 +6,9 @@ each fix as an edit that the markdown stage applies. It has a vision model
 lines the model's words up with galley's words of the same page, and,
 where two words that line up differ, proposes the model's word. It is
 optional and off by default: `galley2epub run` runs it only when the
-book's `book.toml` has `correct = true`.
+book's `book.toml` has `correct = true`, or for one run when given
+`--correct`; `--no-correct` skips it for one run although the config
+has `correct = true` (architecture section 14).
 
 Dated 19 November 2026. It builds what the measurement of the plan
 notes-vision recommends, `docs/reports/notes-vision-measure.md` ("the
@@ -1269,9 +1271,9 @@ markdown reads every `*.jsonl` file under `edits/`, `correct.jsonl`
 first, then the others by file name, then `owner.jsonl` last
 (architecture section 10), and applies each file's edits from its first
 line to its last, to the blocks of blocks.json, before it writes
-`book.md`. It applies whatever files are there: the config's `correct`
-decides whether `run` runs the correct stage, not whether its file is
-read.
+`book.md`. It applies whatever files are there: the config's `correct`,
+and the flags `--correct` and `--no-correct` of `run`, decide whether
+`run` runs the correct stage, not whether its file is read.
 
 An edit applies when:
 
@@ -1330,8 +1332,9 @@ show in the EPUB.
 - To reject it for good: write the old word back in the owner's own
   edits, `edits/owner.jsonl`, which apply after correct's; by hand until
   `galley2epub edits-from` is built.
-- To undo them all: delete the file, or set `correct = false` and run
-  `galley2epub run`.
+- To undo them all: delete the file, or run `galley2epub run <book
+  folder> --no-correct`, or set `correct = false` and run `galley2epub
+  run <book folder>`.
 - To undo a note link: delete its line, as any edit's. A link that took
   the place of a wrong link of galley's brings that one back; when
   another link of the stage gave its note a reference, the footnote is
@@ -1381,7 +1384,8 @@ def check_server(config: BookConfig) -> None:
 
 The command: `galley2epub correct <book folder>` runs the stage whatever
 `correct` says; `galley2epub run <book folder>` runs it between structure
-and markdown when `correct = true`.
+and markdown when `correct = true` or when given `--correct`, and not
+when given `--no-correct` (architecture section 14).
 
 markdown gains `apply_edits(blocks, edits) -> BlocksFile`, the blocks with
 the edits applied by section 10, where `edits` holds each edit with its
