@@ -1,11 +1,19 @@
-"""The galley-eval command: `run`, `compare` and `summary` (spec section 9).
+"""The galley-eval command: `run`, `compare`, `summary`, `edits`,
+`edits-score` and `edits-compare` (spec sections 9 and 9b).
 
 - `run [<name> ...]` writes each book's `book.toml` from
   `evaluation/books.toml` into `runs/evaluation/<name>/`, runs
   `galley2epub run` on that folder as a separate process, records the
   commit of galley that made the files, then compares;
 - `compare [<name> ...]` compares the files already in the book folders;
-- `summary` rewrites `runs/evaluation/summary.md` from the scorecards.
+- `summary` rewrites `runs/evaluation/summary.md` from the scorecards;
+- `edits <run>` writes a sample of the correct stage's edits of the run
+  folder `<run>`, each with an image of its lines, and a sheet to write
+  verdicts into;
+- `edits-score <sheet>` prints the verdicts of a sheet counted by kind of
+  edit;
+- `edits-compare <sheet> <correct.jsonl>` prints which of a sheet's judged
+  edits a new run of correct still makes.
 
 With no name, every book of `evaluation/books.toml`. The paths are those of
 the repository the command is run in (git's top level): its
@@ -41,8 +49,20 @@ from typing import assert_never
 
 from galley.book_folder import BookFolder
 from galley.errors import GalleyError
+from galley.model import read_edits
 from galley_eval.books import EvaluationBook, read_books
-from galley_eval.errors import EvaluationError, GalleyRunError
+from galley_eval.edit_sheet import (
+    DEFAULT_COUNT,
+    DEFAULT_SEED,
+    SHEET_NAME,
+    compare_sheet,
+    comparison_report,
+    edit_sheet,
+    read_sheet,
+    scores_table,
+    sheet_scores,
+)
+from galley_eval.errors import EditSheetError, EvaluationError, GalleyRunError
 from galley_eval.evaluate import Evaluation, evaluate
 from galley_eval.output import (
     RunInfo,
@@ -69,6 +89,9 @@ class Subcommand(StrEnum):
     RUN = "run"
     COMPARE = "compare"
     SUMMARY = "summary"
+    EDITS = "edits"
+    EDITS_SCORE = "edits-score"
+    EDITS_COMPARE = "edits-compare"
 
 
 _BOOK_NAMES_HELP = "names of books in evaluation/books.toml; all books when none"
@@ -78,8 +101,54 @@ _HELP = frozendict(
         Subcommand.RUN: "run galley on each book, then compare",
         Subcommand.COMPARE: "compare the files already in the book folders",
         Subcommand.SUMMARY: "rewrite runs/evaluation/summary.md from the scorecards",
+        Subcommand.EDITS: "write images of a sample of a run's edits of correct, "
+        "and a sheet for their verdicts",
+        Subcommand.EDITS_SCORE: "count the verdicts of a sheet by kind of edit",
+        Subcommand.EDITS_COMPARE: "say which judged edits of a sheet a new run "
+        "of correct still makes",
     }
 )
+
+# Where `edits` writes when --out is not given, under the run folder: the
+# tool's own folder there (spec section 7), never galley's edits/.
+_EDITS_OUT = Path("evaluation") / "edits"
+
+
+def _positive(text: str) -> int:
+    number = int(text)
+    if number < 1:
+        message = f"{number} is not a positive number"
+        raise argparse.ArgumentTypeError(message)
+    return number
+
+
+def _add_edits_arguments(sub: argparse.ArgumentParser) -> None:
+    sub.add_argument("run", type=Path, help="the run folder of a book")
+    sub.add_argument(
+        "--count",
+        type=_positive,
+        default=DEFAULT_COUNT,
+        help=f"the number of edits of the sample (default {DEFAULT_COUNT})",
+    )
+    sub.add_argument(
+        "--seed",
+        type=int,
+        default=DEFAULT_SEED,
+        help=f"the seed of the random sample (default {DEFAULT_SEED})",
+    )
+    sub.add_argument(
+        "--kinds",
+        nargs="+",
+        metavar="KIND",
+        help="only edits of these kinds (their reason: vision_word, "
+        "vision_missing_words, vision_note_link); all when not given",
+    )
+    sub.add_argument(
+        "--out",
+        type=Path,
+        help=f"the folder of the images and {SHEET_NAME} (default <run>/{_EDITS_OUT})",
+    )
+
 
 # A whole book took galley 15.5 s at most on an M5 Pro (spec section 2 and
 # the first run); ten minutes means a hang. Guessed from that measurement.
@@ -122,6 +191,15 @@ def _parser() -> argparse.ArgumentParser:
                 sub.add_argument("names", nargs="*", help=_BOOK_NAMES_HELP)
             case Subcommand.SUMMARY:
                 pass  # takes no book
+            case Subcommand.EDITS:
+                _add_edits_arguments(sub)
+            case Subcommand.EDITS_SCORE:
+                sub.add_argument("sheet", type=Path, help=f"a {SHEET_NAME}")
+            case Subcommand.EDITS_COMPARE:
+                sub.add_argument("sheet", type=Path, help=f"a judged {SHEET_NAME}")
+                sub.add_argument(
+                    "edits", type=Path, help="the edits/correct.jsonl of a new run"
+                )
             case _:
                 assert_never(subcommand)
     return parser
@@ -319,20 +397,83 @@ def _galley_program() -> RunGalley:
     return lambda folder: run_galley(program, folder)
 
 
+def _edits(arguments: argparse.Namespace) -> None:
+    run = Path(arguments.run)
+    out = run / _EDITS_OUT if arguments.out is None else Path(arguments.out)
+    sheet = edit_sheet(
+        run,
+        out,
+        count=arguments.count,
+        seed=arguments.seed,
+        kinds=None if arguments.kinds is None else frozenset(arguments.kinds),
+    )
+    imaged = sum(1 for entry in sheet.edits if entry.image is not None)
+    _logger.info(
+        "wrote %s: %d of %d edits, %d with an image",
+        out / SHEET_NAME,
+        len(sheet.edits),
+        sheet.edits_in_file,
+        imaged,
+    )
+
+
+def _edits_score(arguments: argparse.Namespace) -> None:
+    print(scores_table(sheet_scores(read_sheet(arguments.sheet))), end="")  # noqa: T201
+
+
+def _edits_compare(arguments: argparse.Namespace) -> None:
+    sheet = read_sheet(arguments.sheet)
+    path = Path(arguments.edits)
+    if not path.is_file():
+        message = f"no edits file {path}"
+        raise EditSheetError(message)
+    report = comparison_report(compare_sheet(sheet, read_edits(path)))
+    print(report, end="")  # noqa: T201
+
+
+_EDITS_COMMANDS: frozendict[Subcommand, Callable[[argparse.Namespace], None]] = (
+    frozendict(
+        {
+            Subcommand.EDITS: _edits,
+            Subcommand.EDITS_SCORE: _edits_score,
+            Subcommand.EDITS_COMPARE: _edits_compare,
+        }
+    )
+)
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     """Run galley-eval with the arguments `argv`, or those of the command
     line when it is None. argparse exits with code 2 on arguments it
     rejects, among them an unknown book; the command exits with code 1
-    when a book failed, after rewriting runs/evaluation/summary.md."""
+    when a book failed, after rewriting runs/evaluation/summary.md, and
+    when `edits`, `edits-score` or `edits-compare` fails, with the error."""
     parser = _parser()
     arguments = parser.parse_args(argv)
     logging.basicConfig(
         level=logging.INFO, stream=sys.stderr, format="%(levelname)s %(message)s"
     )
+    subcommand = Subcommand(arguments.command)
+    match subcommand:
+        case Subcommand.EDITS | Subcommand.EDITS_SCORE | Subcommand.EDITS_COMPARE:
+            try:
+                _EDITS_COMMANDS[subcommand](arguments)
+            except (EvaluationError, GalleyError) as err:
+                parser.exit(1, f"galley-eval {subcommand.value}: {err}\n")
+        case Subcommand.RUN | Subcommand.COMPARE | Subcommand.SUMMARY:
+            _books_main(subcommand, arguments, parser)
+        case _:
+            assert_never(subcommand)
+
+
+def _books_main(
+    subcommand: Subcommand,
+    arguments: argparse.Namespace,
+    parser: argparse.ArgumentParser,
+) -> None:
     repository = _repository()
     books = read_books(repository.root / "evaluation" / "books.toml")
     runs_dir = repository.root / "runs" / "evaluation"
-    subcommand = Subcommand(arguments.command)
     # The books are checked before runs/evaluation/ is made, so that an
     # unknown book leaves no folder behind.
     selected = (
@@ -352,6 +493,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                 commit=repository.commit,
                 galley=_galley_program() if subcommand is Subcommand.RUN else None,
             )
+        case Subcommand.EDITS | Subcommand.EDITS_SCORE | Subcommand.EDITS_COMPARE:
+            message = f"{subcommand.value} reads no book of books.toml"
+            raise AssertionError(message)
         case _:
             assert_never(subcommand)
     summary = write_books_summary(runs_dir, tuple(book.name for book in books))

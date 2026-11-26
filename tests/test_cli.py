@@ -666,3 +666,21 @@ def test_layout_with_ocr_trust_or_redo_rereads_nothing_and_runs_without_tesserac
 
     assert _names(folder) == _files_up_to("layout")
     assert read_lines(folder.lines_json).rereads == ()
+
+
+def test_correct_on_a_folder_with_kept_answers_leaves_the_server_check_to_the_stage(
+    tmp_path: Path, excerpt_book_toml: frozendict[str, str]
+) -> None:
+    # Correct spec, section 4: the stage checks LM Studio before its first
+    # request only, so that a book is rebuilt from its kept answers without it.
+    server = f"http://127.0.0.1:{_closed_port()}"
+    folder = _book(
+        tmp_path,
+        excerpt_book_toml[KADESH] + f'correct = true\ncorrect_server = "{server}"\n',
+    )
+    config = read_config(folder.book_toml)
+    stages = cli._stages_of("correct", config)
+    with pytest.raises(ExternalProgramError, match="LM Studio's server is not running"):
+        cli._check_before_any_stage(stages, config, folder)
+    folder.answers_dir.mkdir()
+    cli._check_before_any_stage(stages, config, folder)

@@ -53,6 +53,12 @@ class BookFolder:
         return self.root / "blocks.json"
 
     @property
+    def answers_dir(self) -> Path:
+        """Written by correct: the vision model's answers, kept; never
+        deleted by a stage (docs/specs/correct.md, section 4b)."""
+        return self.root / "answers"
+
+    @property
     def edits_dir(self) -> Path:
         """The edits files, `<author>.jsonl`; never written by a stage run."""
         return self.root / "edits"
@@ -104,8 +110,8 @@ def delete_stage_outputs(folder: BookFolder, stage: Stage) -> None:
     """Delete the files `stage` writes and those of every later stage, so
     that no file in the folder outlives the file it was made from (spec
     section 3). A file that does not exist is skipped; `images/` is deleted
-    with what it holds. Nothing else is touched: never book.toml, and of
-    edits/ only correct.jsonl, the correct stage's file.
+    with what it holds. Nothing else is touched: never book.toml or
+    answers/, and of edits/ only correct.jsonl, the correct stage's file.
     """
     outputs = _stage_outputs(folder)
     first = [listed for listed, _ in outputs].index(stage)

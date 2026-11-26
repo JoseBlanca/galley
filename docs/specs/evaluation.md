@@ -39,6 +39,12 @@ sections 1 to 9, and the rules and examples that name Mariéjol, are the
 set as it was measured before then, Mariéjol included. Revised on 24
 November 2026 to list the wrong note links and the notes that hold the
 next note's start (section 6, "Wrong note links and joined notes").
+Revised on 25 November 2026 to add `galley-eval edits` and
+`galley-eval edits-score`, which cut a sample of the correct stage's
+edits from the page images for judging and count the verdicts (section
+9b), for the plan `docs/plans/misread-words.md`, and the same day
+`galley-eval edits-compare`, which says which of the judged edits a new
+run of correct still makes (section 9b, "A sheet against a new run").
 It builds
 on `docs/architecture.md` and `docs/glossary.md`; "architecture §8" is
 a section of that document, "section 6" a section of this spec. No
@@ -1101,13 +1107,20 @@ tool in its development dependencies, so that `uv run galley-eval` works
 from the root, and adds `tools/galley-eval/tests` to pytest's
 `testpaths`, so that `uv run pytest` runs the tool's tests with galley's. It uses only galley's public modules: `galley.model` and
 `galley.book_folder`, to read galley's files; `galley.fidelity.read_markdown`,
-to read `book.md`; `galley.config`, for the language codes; and
-`galley.wordlist`.
+to read `book.md`; `galley.config`, for the language codes and, for
+`edits`, the PDF a book folder's `book.toml` names; `galley.wordlist`;
+and, for `edits` only, `galley.pdfium`, to render pages in galley's one
+PDFium thread, and Pillow, which galley depends on, to cut and write
+the images.
 
 ```
 galley-eval run [<name> ...]       run galley on each book, then compare; all books when none is named
 galley-eval compare [<name> ...]   compare the files already in the book folders
 galley-eval summary                rewrite runs/evaluation/summary.md from the scorecards
+galley-eval edits <run> [options]  images of a sample of a run's edits of correct, and a sheet (section 9b)
+galley-eval edits-score <sheet>    count a sheet's verdicts by kind of edit (section 9b)
+galley-eval edits-compare <sheet> <correct.jsonl>
+                                   which judged edits a new run of correct still makes (section 9b)
 ```
 
 `run` writes each book's `book.toml` from `books.toml` and runs
@@ -1130,6 +1143,182 @@ def evaluate(book: EvaluationBook, folder: BookFolder, reference_html: Path) -> 
 `EvaluationBook` is one entry of `books.toml`. `Evaluation` holds the
 scorecard, the differences and the page table, as frozen values; writing
 them is a separate function.
+
+## 9b. Judging the edits of correct
+
+The correct stage (`docs/specs/correct.md`) has a vision model read each
+text page and writes an edit wherever the model reads a word otherwise
+than galley: one line of `edits/correct.jsonl` per edit, with galley's
+words (`old`), the model's (`new`), the block, the page and a `reason`
+(`correct.md` §8). Whether an edit is right is seen only on the page.
+`galley-eval edits` makes that look quick: it picks a sample of a run's
+edits and cuts, for each, an image of the printed lines where the edit
+sits, so that a person or a subagent reading the image can write a
+verdict beside it. `galley-eval edits-score` counts the verdicts. The
+tool compares nothing with a reference here; it works on any book
+folder that holds edits of correct.
+
+```
+galley-eval edits <run> [--count N] [--seed S] [--kinds KIND ...] [--out DIR]
+galley-eval edits-score <sheet>
+galley-eval edits-compare <sheet> <correct.jsonl>
+```
+
+- `<run>` is a book folder (architecture §5): its `book.toml`, read
+  with galley's config reader, gives the PDF; `blocks.json`,
+  `lines.json` and `edits/correct.jsonl` are read from it.
+- `--count`, 60 by default, the number of edits of the sample, the
+  number the plan `misread-words` judges a book on. When the file, or the kinds asked for, has
+  no more edits than that, every one is taken.
+- `--seed`, 0 by default: the sample is Python's `random.Random(seed)`
+  `sample` of the edits, so the same seed, count and kinds on the same
+  file give the same sample.
+- `--kinds`: only edits whose `reason` is one of these, the edit's
+  **kind** in this section: `vision_word`, `vision_missing_words` or
+  `vision_note_link`. A kind that no edit of the file has is an error
+  that names the kinds there are.
+- `--out`, by default `<run>/evaluation/edits/`: the folder of the images
+  and of `sheet.json`. When it already holds a `sheet.json`, the command
+  stops with an error rather than overwrite verdicts.
+
+An edit's **id** is its line number in `edits/correct.jsonl`, from 1.
+The id names the edit as long as correct does not rewrite the file.
+
+### Where an edit is printed
+
+An edit of correct has no box: it names its block and page. Its words
+are found among the words of `lines.json`, which hold a box each and are
+the words structure made the block's text from, after layout's
+re-readings. In this order:
+
+1. **Among the block's words.** The words of the edit's page in
+   `lines.json` whose middle is inside the block's box on that page,
+   the rectangle `blocks.json` records for each page a block is printed
+   on (its `origin`; a note's block is looked for among the
+   notes' blocks too), followed by the block's words on its next page.
+   The edit's `old` is looked for in these words run together, white
+   space and hyphens left out of both, so that "campaigns", which
+   structure joined from "cam-" and "paigns" at a line end, is found,
+   and so is a word broken across a page (Kadesh, edit 442,
+   "particular" from "par-" on page 18 and "ticular" on page 20). The
+   first place where it starts on the edit's page is taken. `old`
+   occurs once in the block's text (`correct.md` §8), but the words
+   run together may hold it more than once; the first is then taken,
+   and may be the wrong one.
+2. **Among the page's words**, the same way, when the block's box does
+   not hold them.
+3. **The block's box** on the page, when the words are not found: the
+   image then shows the whole block, with no frame.
+4. **Not found**, when the block is not in `blocks.json` or not printed
+   on the edit's page: no image.
+
+For an edit with no page (one written by a person), the block's pages
+are tried in order. The sheet records which of the four found each edit
+(`located`), and the command logs every edit not found by the first.
+On Kadesh, run on 24 November 2026 (`runs/reading-fixes2/`), all 1,126
+edits were found by the first.
+
+### The image
+
+The page is rendered in grayscale at 300 dpi, once for all the edits of
+the page, through galley's PDFium thread. The image is cut, across, to
+the lines that hold the edit's words; down, it also holds the nearest
+line above and the nearest line below that overlap those lines across,
+in whatever region of the page they are, so that a word is seen in its
+line and between its neighbours; and 6 points of margin around. A gray
+frame, 1.5 points outside the words' boxes, marks the words of `old`,
+one frame on each line they are on.
+At 300 dpi the books' body text, about 10 points high, is some 40 pixels
+high. The image is `edit-<id, 4 digits>-p<page index, 4 digits>.png`.
+
+### The sheet
+
+`sheet.json`, JSON with an indent of one space:
+
+| field | what it holds |
+|---|---|
+| `format_version` | 1 |
+| `run` | the run folder, as given |
+| `pdf` | the PDF the pages were rendered from |
+| `seed`, `count`, `kinds` | the options; `kinds` null when not given |
+| `edits_in_file` | the number of edits in `edits/correct.jsonl` |
+| `edits` | one object per edit of the sample, in the order of their ids |
+
+Each edit:
+
+| field | what it holds |
+|---|---|
+| `id` | the edit's line number in `edits/correct.jsonl` |
+| `page_index` | the page of the image |
+| `kind` | the edit's `reason` |
+| `block_id` | the edit's block |
+| `galley` | galley's words, the edit's `old` |
+| `edit` | the edit's words, its `new` |
+| `second_reading` | the edit's `second_reading`: what a second vision model read at that place (`correct.md` §9), or null |
+| `located` | `block_words`, `page_words`, `block_box` or `not_found` (above) |
+| `image` | the image's file name, beside the sheet; null when not found |
+| `verdict` | `""`, for the judge to write `right`, `wrong` or `unclear` |
+| `note` | `""`, for the judge's note |
+
+A verdict is `right` when the edit's words are what the page prints,
+`wrong` when they are not (galley's were right, or both are wrong), and
+`unclear` when the image does not settle it.
+
+A judge may add fields of its own to an edit, such as the `language` of
+its passage that Gierke's and Domesday's sheets hold; the commands
+ignore them. The judged sheets of the public-domain books are kept in
+`tests/fixtures/expected/edits/`, one per book named by its folder
+(`battleofkadeshst00breauoft.json`), with the paths of `run` and `pdf`
+relative to the repository; those of the owner's books stay in their
+run folders and are never committed.
+
+`edits-score` reads a sheet and prints a Markdown table: one row per
+kind, in alphabetical order, and a row `all`, with the counts of
+`right`, `wrong`, `unclear`, not judged (`""`) and edits. A sheet that is
+not JSON, of another `format_version`, with a field missing or of the
+wrong type, or with a verdict other than the three and `""`, is an
+error that names the sheet and the edit.
+
+On Kadesh, 60 edits on their pages took the command 2.7 s, 5 edits 1.0
+s (25 November 2026, Apple M5 Pro).
+
+### A sheet against a new run
+
+A rule added to correct is measured on the edits already judged: the
+stage is run again on a copy of the book folder, its model's answers
+kept from the judged run (`correct.md` §4b), so that no model is asked
+and only the rules differ, and the judged edits are looked for in the
+new edits file. A rule is good when the wrong edits it removes are many
+and the right ones few.
+
+```
+galley-eval edits-compare <sheet> <correct.jsonl>
+```
+
+`<sheet>` is a `sheet.json` with verdicts, read as `edits-score` reads
+it; `<correct.jsonl>` the edits file of the new run. A judged edit is
+**kept** when the file has an edit with the same `page_index`,
+`block_id`, `old` (the sheet's `galley`) and `new` (the sheet's `edit`),
+and **dropped** when it has none. An edit whose `old` gained or lost
+context words is kept too: the stage widens `old` with neighbouring
+words until it occurs once in the block, and stops at a word another
+edit changes (`correct.md` §8), so when a rule removes one edit of a
+block another edit's `old` may change. Such an edit is on the same page
+and block, its `old` holds the sheet's `galley` or is held by it, and
+its `old` and `new` less the characters they share at the start and at
+the end are the sheet's `galley` and `edit` less theirs ("puem was" to
+"poem was" and "puem" to "poem" both come to "u" to "o"); the
+command counts these apart, as kept with other context.
+
+It prints a Markdown table, one row per verdict, `right`, `wrong`,
+`unclear` and not judged, and a row `all`, with the counts of kept,
+dropped and judged edits; then the number of edits in the judged run
+(the sheet's `edits_in_file`) and in the new file; the number kept with
+other context; and the ids of the right edits dropped and of the wrong
+and unclear edits kept, by id only, so that the output of a run on a
+copyrighted book holds none of its words. A sheet that `edits-score`
+refuses, or an edits file galley cannot read, is an error that names
+the file.
 
 ## 10. How it is verified
 
@@ -1195,6 +1384,23 @@ them is a separate function.
 - **The reading rules of each book**, marked `whole_book` because they
   need the downloaded HTML: the reader finds each book's
   `expected_counts`, such as Domesday's 1,729 notes and 593 margin notes.
+- **The edits sample** (section 9b), on the excerpt `haskins_eval`, its
+  committed `blocks.json` and `lines.json`, and a hand-made
+  `edits/correct.jsonl` under `tests/fixtures/evaluation/`: an edit of
+  one word, of two words, of a word broken at a line end, written whole
+  as structure joins it, found among the block's words, with the
+  lines above and below in the crop; an edit whose words are not in its
+  block's box but on its page; one whose words are nowhere, cut to the
+  block's box; one whose block is not in `blocks.json`, with no image;
+  the sample of a seed, the same twice and of the size asked, all edits
+  when fewer, the filter of kinds and an unknown kind; the images
+  written at 300 dpi; a sheet that already exists left alone; and
+  `edits-score` on verdicts written into a sheet, and on a sheet with a
+  wrong verdict, a wrong `format_version`, a field missing and text that
+  is not JSON. `edits-compare` on a sheet and a hand-made edits file
+  that holds one judged edit as it was, one with a context word more,
+  one with another `new`, and none of a fourth: kept, kept with other
+  context, dropped, dropped; the counts by verdict and the ids printed.
 - **The whole set** is not a test. It is run by hand with `galley-eval
   run` at the end of a plan, because its numbers are what is measured,
   not something to pass or fail.

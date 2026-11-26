@@ -9,7 +9,15 @@ from dataclasses import dataclass, replace
 from galley.body_measures import group_rows
 from galley.correct._align import align_free_tail
 from galley.correct._tokens import Token, tokens
-from galley.model import Block, BlocksFile, Box, Removal, RemovalReason, WordsFile
+from galley.model import (
+    Block,
+    BlockKind,
+    BlocksFile,
+    Box,
+    Removal,
+    RemovalReason,
+    WordsFile,
+)
 
 # Step 1 of section 5: the removals the models print as text.
 _PRINTED_REMOVALS = frozenset(
@@ -40,7 +48,11 @@ class GalleyToken:
     the body and for a removal; `starts_note` is true on a note's first
     token on the page. `first_half` is the place of the first half of a
     word split at a line end when this token is its second half (section
-    7), None otherwise."""
+    7), None otherwise. `block_kind` is the kind of the token's block, None
+    when `block_id` is. `after_space` is true when the token before it in
+    its span has only white space between their cores; that token may be
+    printed on the page before, so a caller checks that it is the token
+    before in the reading of the page."""
 
     form: str
     place: Place | None
@@ -48,13 +60,24 @@ class GalleyToken:
     note_id: str | None
     starts_note: bool = False
     first_half: Place | None = None
+    block_kind: BlockKind | None = None
+    after_space: bool = False
 
 
 def _fixed(
-    text: str, block_id: str | None, note_id: str | None
+    text: str,
+    block_id: str | None,
+    note_id: str | None,
+    block_kind: BlockKind | None = None,
 ) -> tuple[GalleyToken, ...]:
     return tuple(
-        GalleyToken(form=token.form, place=None, block_id=block_id, note_id=note_id)
+        GalleyToken(
+            form=token.form,
+            place=None,
+            block_id=block_id,
+            note_id=note_id,
+            block_kind=block_kind,
+        )
         for token in tokens(text)
     )
 
@@ -75,8 +98,9 @@ def _follows_hyphen(text: str, before: Token, token: Token) -> bool:
 
 
 def _span_tokens(
-    block_id: str, span_index: int, text: str, note_id: str | None
+    block: Block, span_index: int, text: str, note_id: str | None
 ) -> tuple[GalleyToken, ...]:
+    block_id = block.id
     span_tokens = tokens(text)
     return tuple(
         GalleyToken(
@@ -87,6 +111,8 @@ def _span_tokens(
             first_half=Place(block_id, span_index, before.start, before.end)
             if before is not None and _follows_hyphen(text, before, token)
             else None,
+            block_kind=block.kind,
+            after_space=before is not None and text[before.end : token.start].isspace(),
         )
         for before, token in zip((None, *span_tokens), span_tokens, strict=False)
     )
@@ -98,15 +124,15 @@ def block_tokens(block: Block, note_id: str | None) -> tuple[GalleyToken, ...]:
     are not note references are changeable."""
     found: list[GalleyToken] = []
     if block.label is not None:
-        found.extend(_fixed(block.label, block.id, note_id))
+        found.extend(_fixed(block.label, block.id, note_id, block.kind))
     for span_index, span in enumerate(block.spans):
         if span.note_ref is not None:
-            found.extend(_fixed(span.text, block.id, note_id))
+            found.extend(_fixed(span.text, block.id, note_id, block.kind))
             continue
-        found.extend(_span_tokens(block.id, span_index, span.text, note_id))
+        found.extend(_span_tokens(block, span_index, span.text, note_id))
     for extra in (block.source, block.page_number):
         if extra is not None:
-            found.extend(_fixed(extra, block.id, note_id))
+            found.extend(_fixed(extra, block.id, note_id, block.kind))
     return tuple(found)
 
 

@@ -5,8 +5,9 @@ sets, floats for positions in PDF points with the origin at the top left of
 the page, page indices from 0 (architecture sections 7 and 8). Each of the
 four JSON files, pages.json, words.json, lines.json and blocks.json, has a
 `write_<file>` and a `read_<file>`; the edits files under `edits/` have
-`write_edits` and `read_edits`. No stage writes or parses these files by
-itself.
+`write_edits` and `read_edits`; a kept answer of the vision model under
+`answers/` has `write_kept_answer` and `read_kept_answer`. No stage writes
+or parses these files by itself.
 """
 
 import bisect
@@ -46,6 +47,9 @@ WORDS_FORMAT_VERSION = 3
 LINES_FORMAT_VERSION = 4
 BLOCKS_FORMAT_VERSION = 5
 EDITS_FORMAT_VERSION = 2
+# Since the plan misread-words, 25 November 2026: a kept answer of the
+# vision model (docs/specs/correct.md, section 4b).
+KEPT_ANSWER_FORMAT_VERSION = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -1189,6 +1193,39 @@ class Edit:
     second_reading: str | None = None
 
 
+# answers/<kind>-<page index, 4 digits>.json
+
+
+class AnswerKind(StrEnum):
+    """Which of the correct stage's requests an answer is to
+    (docs/specs/correct.md, section 4b)."""
+
+    PAGE = "page"  # the reading of the page, section 1, step 1
+    BAND = "band"  # the second reading of its footnote band, section 9
+    LINKS = "links"  # the reading with the note references marked, section 9b
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class KeptAnswer:
+    """The vision model's answer to one request of the correct stage, kept
+    so that the same request is not sent again (docs/specs/correct.md,
+    section 4b). `request_sha256` is the SHA-256, in hex, of the bytes of
+    the request's body, and alone decides whether the answer is used;
+    `model`, `prompt` and `image_sha256` (of the PNG sent) are for a
+    person to read. `cut_short` is true when the answer stopped at the
+    request's max_tokens."""
+
+    format_version: int = KEPT_ANSWER_FORMAT_VERSION
+    page_index: int
+    kind: AnswerKind
+    model: str
+    prompt: str
+    image_sha256: str
+    request_sha256: str
+    text: str
+    cut_short: bool
+
+
 # Not a file: what pdfium.render returns.
 
 
@@ -1564,17 +1601,18 @@ def _utf8(text: str, content: object, json_path: str) -> bytes:
 
 def _replace_file(path: Path, data: bytes) -> None:
     """Writes `data` to a temporary file beside `path`, then moves it over
-    `path`, so that a failed write leaves the old file as it was. The
-    temporary name is unique to the process and the thread."""
+    `path`, so that a failed write or move leaves the old file as it was
+    and no temporary file. The temporary name is unique to the process and
+    the thread."""
     temporary = path.with_name(
         f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp"
     )
     try:
         temporary.write_bytes(data)
+        temporary.replace(path)
     except OSError:
         temporary.unlink(missing_ok=True)
         raise
-    temporary.replace(path)
 
 
 def _write_json(path: Path, value: object) -> None:
@@ -1597,20 +1635,29 @@ def _read_json[T](path: Path, cls: type[T], current_version: int, stage: str) ->
     except UnicodeDecodeError as err:
         message = f"{path} is not UTF-8 text: {err}"
         raise InputFileError(message) from err
+    return _decoded_json(
+        path, text, cls, current_version, f"; run `galley2epub {stage}` again", ""
+    )
+
+
+def _decoded_json[T](
+    path: Path, text: str, cls: type[T], current_version: int, rerun: str, remedy: str
+) -> T:
+    """The value of `cls` in `text`, the content of the JSON file at `path`,
+    every field checked. Raises InputFileError at the first problem; one of
+    the format version ends with `rerun`, every other with `remedy`."""
     try:
         content = json.loads(text, object_pairs_hook=_object_pairs)
     except json.JSONDecodeError as err:
         message = (
             f"{path} is not valid JSON: {err.msg} at line {err.lineno}, "
-            f"column {err.colno}"
+            f"column {err.colno}{remedy}"
         )
         raise InputFileError(message) from err
     try:
-        return _decode_file(
-            cls, content, current_version, f"; run `galley2epub {stage}` again"
-        )
+        return _decode_file(cls, content, current_version, rerun)
     except _FieldError as err:
-        message = f"{path}: {err}"
+        message = f"{path}: {err}{remedy}"
         raise InputFileError(message) from err
 
 
@@ -1857,6 +1904,41 @@ def block_sha256(block: Block) -> str:
     return hashlib.sha256(block_text(block).encode("utf-8")).hexdigest()[
         :_BLOCK_SHA256_DIGITS
     ]
+
+
+def write_kept_answer(path: Path, answer: KeptAnswer) -> None:
+    """Writes a kept answer: UTF-8 JSON, keys in field order, indent 1,
+    through a temporary file beside `path`, so that a run stopped while
+    writing leaves the old file or the new one, never part of one."""
+    _write_json(path, answer)
+
+
+# What every error of read_kept_answer ends with.
+_DELETE_KEPT_ANSWER = "; delete it to have the model read the page again"
+
+
+def read_kept_answer(path: Path) -> KeptAnswer | None:
+    """The kept answer at `path`, as write_kept_answer wrote it; None when
+    there is no file. Raises InputFileError, naming the file and saying to
+    delete it, for a file that is not UTF-8, not JSON, of another format
+    version, or with a field missing, unknown or of the wrong type
+    (docs/specs/correct.md, section 4b)."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        # No answer kept: the stage asks the model (section 4b).
+        return None
+    except UnicodeDecodeError as err:
+        message = f"{path} is not UTF-8 text: {err}{_DELETE_KEPT_ANSWER}"
+        raise InputFileError(message) from err
+    return _decoded_json(
+        path,
+        text,
+        KeptAnswer,
+        KEPT_ANSWER_FORMAT_VERSION,
+        _DELETE_KEPT_ANSWER,
+        _DELETE_KEPT_ANSWER,
+    )
 
 
 def write_edits(path: Path, edits: tuple[Edit, ...]) -> None:

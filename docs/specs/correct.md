@@ -24,14 +24,16 @@ and markdown refuses any edit.
 
 | reads | writes |
 |---|---|
-| the PDF, `pages.json`, `words.json`, `blocks.json`, the config | `edits/correct.jsonl` |
+| the PDF, `pages.json`, `words.json`, `blocks.json`, the config, the model's kept answers under `answers/` | `edits/correct.jsonl`, and an answer under `answers/` for each request it sends (section 4b) |
 
 The architecture (`docs/architecture.md`) gives the book folder (section
 5), the config (6), the formats (8), the edits (10) and the fidelity check
 (13), the test that no word is lost or invented between a stage's input
 and its output. This spec adds four config keys, a second version of the
 edit's format, the stage `correct` to `book_folder.py`, and the rules by
-which markdown applies an edit; the architecture is revised with it.
+which markdown applies an edit; and, on 25 November 2026, the folder
+`answers/` and the format of a kept answer (section 4b). The
+architecture is revised with it.
 
 ## 1. What it does
 
@@ -39,7 +41,9 @@ For each text page of the book, in parallel:
 
 1. Render the page at 300 dpi, grayscale, and send the image to the vision
    model, through LM Studio, with the prompt of section 4. The model
-   answers with the page's text, line by line.
+   answers with the page's text, line by line. An answer kept from an
+   earlier run to the same request is read from the book folder instead
+   (section 4b).
 2. Make galley's reading of the page: the words of the blocks and notes
    printed on it, from blocks.json, with the words the stage may not
    change marked fixed (section 5).
@@ -121,12 +125,17 @@ library's `urllib`, and to no other host: not through a proxy, though the
 environment names one (`http_proxy`, which `urllib` follows by default),
 and not to the address of a redirect, which is an error.
 
-**Before any page.** The stage asks `GET <server>/v1/models`, with a
-timeout of 10 s, and checks that `correct_model` (and
-`correct_second_model`, when given) is among the models listed. `cli.py`
+**Before the first request.** The stage asks `GET <server>/v1/models`,
+with a timeout of 10 s, and checks that `correct_model` (and
+`correct_second_model`, when given) is among the models listed. It does
+so once in a run, just before the first request it actually sends, and
+not at all when every answer it needs is kept (section 4b), so that a
+book is rebuilt from its kept answers with LM Studio stopped. `cli.py`
 makes the same check before the first stage of a command that runs
-correct, so that `galley2epub run` stops before analyze rather than after
-structure. Each failure is an `ExternalProgramError` whose message says
+correct when the book folder has no `answers/` yet, so that a first
+`galley2epub run` stops before analyze rather than after structure; when
+`answers/` exists, it leaves the check to the stage, which may need no
+model. Each failure is an `ExternalProgramError` whose message says
 what to do:
 
 - nothing answers at the address (the connection is refused, or 10 s
@@ -182,6 +191,110 @@ pages, and the first request also waits for LM Studio to load the model's
 
 The stage does not load or unload models: LM Studio loads the model on the
 first request and unloads it after its own idle time.
+
+## 4b. The kept answers
+
+Added on 25 November 2026 for the plan misread-words
+(`docs/plans/misread-words.md`, work package 1). The stage keeps every
+answer the model gives in the book folder, and a later run that would
+send the same request reads the answer there instead of asking the model.
+The model takes about 11 s a page with the 35B model (sections 11 and
+16), 1 to 3 hours for a whole book; with the answers kept, the merge's
+rules can be changed and measured again on whole books, and a book
+rebuilt after structure ran again, at the cost of rendering the pages
+and merging. Rendering a page at 300 dpi and making its PNG took 0.15 s
+on average over the ten pages of the excerpt `kadesh_redo`, one thread,
+on the owner's M5 Pro (25 November 2026).
+
+**Where.** One JSON file for each request, in `answers/` of the book
+folder, named `<kind>-<page index, 4 digits>.json`: the kind `page` for
+the reading of the page (section 1, step 1), `band` for the second
+reading of its footnote band (section 9) and `links` for the reading
+with the note references marked (section 9b). Kadesh's page 11 has
+`answers/page-0011.json`, `answers/band-0011.json` and
+`answers/links-0011.json`.
+
+**What a file holds** (architecture section 8, the kept answer):
+
+| field | what it is |
+|---|---|
+| `format_version` | 1 |
+| `page_index` | the page, an integer |
+| `kind` | `page`, `band` or `links` |
+| `model` | the model that answered |
+| `prompt` | the prompt it was sent |
+| `image_sha256` | the SHA-256 of the PNG it was sent, in hex |
+| `request_sha256` | the SHA-256, in hex, of the bytes of the request's body as section 4 gives it, the image in it |
+| `text` | the model's text, `choices[0].message.content` |
+| `cut_short` | true when the answer was cut short, `finish_reason` `"length"`; false otherwise |
+
+Only `request_sha256` decides whether the answer is used. The model,
+prompt, image digest, page and kind are there for a person, or a tool
+such as the plan's `galley-eval edits`, to read, and are not checked
+against the file's name or the request; a `text` corrected by hand is
+used as it stands.
+
+**When an answer is used.** For each request, the stage first makes the
+body it would send, as JSON with its keys sorted, so that the order they
+are written in the code does not count, no space after a comma or colon,
+and the characters as they are (not escaped), in UTF-8; it sends exactly
+these bytes, and computes their SHA-256. When the request's file exists and holds that `request_sha256`,
+the stage takes its `text` and `cut_short` and sends nothing. Otherwise
+it sends the request, as section 4 says, and writes the answer to the
+file, in place of the one there. So anything that changes what is sent
+asks the model again: another model or prompt, another temperature,
+`max_tokens` or `reasoning_effort`, a field added to the body, and
+another image, as when structure moved a note and with it the top of the
+footnote band, or a new version of PDFium or Pillow renders or encodes
+the page otherwise (then every page is asked again). The server's address
+is not in the body and does not count. The page is rendered on every
+run, since its image is part of the request.
+
+**A request that fails, or an answer cut short.** A request that fails
+(a refused connection, a timeout, an HTTP error status, an answer
+without its text) keeps nothing, and the stage stops as section 4 says;
+the answers already written stay, so the next run asks only for the
+rest. An answer cut short is kept, with `cut_short` true, and the next
+run uses it as such: the page again gets no edits (or no links) and the
+warning of section 4. Asked again at temperature 0, the model would most
+likely run on to 6,000 tokens again, the longest request the stage
+makes. To have the page read again, delete its file.
+
+**Written whole.** Each file is written to a temporary file beside it,
+`.<name>.<process id>.<thread id>.tmp`, then moved over it, so that a
+run stopped at any moment leaves the old answer, the new one, or none,
+never part of one. A temporary file a killed run leaves is never read
+and may be deleted.
+
+**A file that cannot be read** — not UTF-8, not JSON, of another
+`format_version`, or with a field missing, unknown or of the wrong type —
+is an `InputFileError` that names the file and says to delete it, and
+the stage stops without writing `edits/correct.jsonl`. It is not taken
+for a missing answer: since the stage writes every file whole, such a
+file was made by something else, a hand edit or a damaged disk, and
+asking the model again in silence would hide that.
+
+**Never deleted by a stage.** An answer depends only on the request,
+and the request only on the config and the image (for the footnote band,
+cut where blocks.json's highest note on the page starts), so no file of
+another stage can make an answer stale without changing the request's
+SHA-256.
+`book_folder.delete_stage_outputs` never touches `answers/`, and
+`galley2epub run` keeps it whatever stages it runs. A file of a page that
+is no longer a text page, or of a kind no longer asked for (`correct_links`
+false, no `correct_second_model`), stays and is not read. To have the
+model read every page again, delete `answers/`.
+
+**Threads.** A file is read and written only by the worker that has its
+page, so no two threads touch one file; `answers/` is made before the
+workers start. The check of the server (section 4) is made under a lock
+by the first worker about to send a request; the others that are about
+to send one wait for it, and none checks again once it passed. When it
+fails, the stage stops with its error. Rendering stays in PDFium's thread
+(section 13).
+
+The stage's last log line says how many answers it read from
+`answers/` and how many it asked the model for.
 
 ## 5. galley's reading of a page
 
@@ -355,6 +468,69 @@ From the pairs:
   from 5.3 wrong words in 100 to 6.3, since "tothe" stayed where "the" had
   been put; taking both words brings them back to 5.3, with no word lost.
 
+  Such a split is refused, as a replacement of one token would be, when
+  it would lose what galley read (review of 26 November 2026, on the
+  whole-book reruns): when the model's two tokens joined, letters and
+  digits alone, are shorter than galley's form and its start or its end
+  (Domesday's margin note "towitesand" became "wites and", losing "to";
+  Stubbs' "andadventurous," became "and adventu-,"); when a digit of
+  galley's core is not kept, in order, among the joined tokens' digits,
+  which is (b) for the pair (Domesday's table row "909" became "0 9",
+  six such rows; "1800" became "140 360", numbers of other rows;
+  "4v=120A" became "V = 120"); and when the model's first token ends in
+  a hyphen and the two joined are not galley's form, a line-end half
+  the answer did not join (Stubbs' "discontented" became
+  "discon-Henry"). A hyphen whose join is galley's word stays allowed:
+  "nonLibyan" against "non-" and "Libyan" gives "non-Libyan". Nor is
+  it made when the model's tokens joined hold three letters or more
+  than galley's form and a token of galley's reading of the page shares
+  with them a run of four characters or more that galley's form lacks:
+  galley holds the second half of a word broken at a line end
+  elsewhere, where layout placed it beside a margin note, alone or
+  glued to the next word, and the split would print that half twice
+  (Stubbs' page 72: galley's "howfind" became "however, find" while
+  galley's "ever," stayed further on; page 202, "marand" became
+  "marriage and" beside galley's "augriage"). The four characters are
+  guessed, not measured. No right judged split on the seven sheets adds a letter.
+
+  When galley glued three words or more, the split takes the model's
+  unpaired tokens after the two, then before them, as long as all of
+  them joined are the start, or the end, of galley's form: Gierke's
+  "nature~~of~an" becomes "nature of an" rather than "nature of", which
+  lost "an", and Domesday's "towitesand" becomes "to wites and". A
+  refused split's tokens, and the unpaired ones beside them that
+  galley's form holds, are not put in elsewhere: Domesday's
+  "4v=120A." against "V = 120. A" kept the "4" but had "A" put in after
+  it.
+
+  A word galley holds twice or more in its text of the book is
+  not split so: it is a word, printed as galley reads it, and the model
+  read a gap in it or the end of a line. On Stubbs' page 291 the model's
+  "of" and "tained" for the printed "ob-" and "tained" split "obtained",
+  printed 22 times in the book, into "of tained"; on Domesday's page 99
+  "Ælfric", read by galley as "^Elfric" six times, became "Ælf ric".
+  Measured on the seven judged sheets (26 November 2026): of the 17
+  judged splits of one of galley's words into two, 4 are wrong, and the
+  rule takes 2 of the 4, these two, whose word galley holds more than
+  once. The other two wrong ones are of words galley holds once and
+  stay: Domesday's "haula," to "haul a," and "680A." to "H.=680. A".
+  Each of the 13 right ones is of a word galley holds once: glued words
+  ("thedeterminative", "shouldbe"), a number glued to what follows it
+  ("220f.)" to "220 f.)", "1.7" to "1. 7"), and junk or a hyphen read
+  between two words ("by^Ockhatn." to "by Ockham.", "act-of" to "act
+  of"). The limit was three until the review of 26 November 2026 found
+  Domesday's "Brungar" split into "Brun gar" and Stubbs' "Geddington"
+  into "Gedding ton", each held twice; at two the judged splits give
+  the same counts.
+
+  A split into pieces that are each a word of the list, digits or a
+  form galley's text holds was measured and is not a rule: it takes 1
+  of the 4 wrong judged splits and none of the 13 right ones, but on
+  the excerpt `kadesh_redo`, whose ten pages hold few forms, it refuses
+  5 right splits of its 469 edits ("Golénischeff'stext", "n.s.",
+  "1,300,520,"). Domesday's "Wulfsige" to "Wulf sige", "Wulfsige" held
+  once, and "haula," to "haul a," stay.
+
   **A word galley left split at a line end.** structure joins a word
   hyphenated at a line end only when the joined word is known, so a
   misread half stays as printed, "cam- P#@igns" on Kadesh's page 8, while
@@ -392,6 +568,69 @@ From the pairs:
   with, "Erldu-" with "Erläuterungen" on page 20, is not covered: there
   galley's second half, "Sees...", may also hold the printed "etc.",
   which a replacement of both halves would lose.
+- **Two of galley's words for one printed word.** When galley's token
+  pairs with the model's, the token just before or just after it in the
+  same span pairs with none of the model's, only white space stands
+  between their cores, and either the two forms joined are the model's
+  form or each of the two is one character and the model's form two,
+  the replacement covers both: the model's core replaces the text from
+  the first core to the second, the space between them included. (a)
+  and (b) are checked on the two cores joined without the space.
+  structure split one printed word in two, at a gap between its letters
+  or at a broken letter, and the model read it whole. On Domesday's page
+  29 (`domesdaybook00maituoft`, the trial of 25 November 2026) the page
+  prints "It," where galley has "I i,"; the model's "It" replaced the
+  second token alone and the page read "I It,". On Haskins' book galley
+  has "11 56" for the printed year 1156, and the model's "1156" replaced
+  "56" alone: "11 1156", one of its 21 wrong judged edits. On the
+  excerpt `kadesh_redo` the rule makes one edit, "require ments" to
+  "requirements". On the whole books, rerun from their kept answers (25
+  November 2026), it makes 28 edits: Haynes' book 18, Turney's 3,
+  Haskins' 7 (five years such as "11 79" and "A versa" for the town
+  Aversa twice); read against galley's text, not the page images, all
+  but two or three are one printed word (a compound may be printed with
+  a space). Without it, the rule of a neighbour's word repeated, below,
+  refuses most of these, and galley's split word stays. A stray letter
+  beside a word the model read otherwise, "a hous" against "house", is
+  not merged, since the "a" may be a printed word the model left out.
+  Two digits are merged only when they join to the model's form: on
+  Domesday's table of page 428 galley's "0 8 0" against the model's
+  "0 18" would have taken "18", a number of another row, for "8 0"
+  (review of 26 November 2026). When they do not, the model's two
+  digits replace neither of them: "8" alone would become "18". The token just before is tried first,
+  then the one just after. A token
+  is merged once: when two merges would take the same token ("Ram ses
+  tes" against the model's "Ramses" and "sestes"), the first in galley's
+  reading is made and the second gives no edit, since the two, both made,
+  would join into one edit that deletes a word.
+
+  Two guards keep a merge from gluing two printed words. A word here is
+  one of galley's word list of the book's language (`galley.wordlist`,
+  the list structure joins hyphens with), a word of one character only
+  when it is a letter in the list in its own case and not a lower-case
+  roman numeral ("I" and "a" are words; "i" and "x", which the English
+  list holds as numerals, are not), a longer one in any case. When a
+  guard holds, the stage makes no edit there. The first version counted
+  "i" as a word, since the list holds it, and refused Domesday's "I i,"
+  on page 29, the case the merge was made for.
+
+  - When each of the two is one character, they are not merged if both
+    are words: "I a" against the model's "It" would lose the "a".
+  - When the model's word is one section 6 joined at a line end, they
+    are not merged if both are words and the model's word is neither a
+    word nor a token of galley's text of the book. The model reads a
+    dash at a line end as a hyphen: on Stubbs' page 167
+    (`earlyplantagenet01stub`) the page prints "of the body—" and
+    "elected" on the next line, the model "body-" and "elected", and the
+    merge gave "bodyelected". A word the line end broke has a half that
+    is no word, "recog nized", or is printed whole elsewhere in the book,
+    "per ishing" (the list has no "perishing"), and stays merged.
+
+  Measured on the whole books rerun from their kept answers (26 November
+  2026): of the merges, the guards refuse Stubbs' "body elected" and
+  nothing else on Haynes', Turney's, Haskins' and Stubbs' books; with
+  the word list alone, without the book's text, they also refused
+  "per ishing". No judged edit changes.
 - **A block whose words are out of place.** When galley's reading of a
   block on a page is in another order than the model's, the alignment
   pairs words that have nothing to do with each other, and each such pair
@@ -405,6 +644,128 @@ From the pairs:
   a page are 3 or more and their mean likeness is below 0.3, the stage
   makes no edit in that block on that page, neither replacement nor
   insertion, and logs it.
+- **An index or contents entry.** In a block of kind `index_entry` or
+  `contents_entry` a replacement needs three more things: the forms at least 0.6 alike; every digit of
+  galley's core kept, in order, among the model's digits (made-up
+  examples: "12on." to "120n." keeps "1", "2"; "125," to "115," does
+  not); and no more digits in the model's core than galley's has digits
+  and letters "o", "O", "l", "I" and "i", the letters a digit is read as
+  (the letters shaped like 0 and 1, guessed, not measured; "12on." to
+  "120n." has three, as many as galley's "1", "2" and "o";
+  "116," to "11-16," four against three). An index is printed in two columns of short entries, mostly
+  names and page numbers; when the model reads its lines in another
+  order than galley, a name pairs with a name of another entry and a
+  number with another number, both short enough to pass the 0.3 limit,
+  and each block is too small for the rule of words out of place.
+  Measured on the 60 judged edits of Haynes' book (an owner's book, so
+  described in words; 25 November 2026): 16 are on the index pages, 13
+  wrong, each a name or a page number of another line put in the entry,
+  and 3 right, each a misread letter in a page number's "n." or an "o"
+  read for a zero. The wrong ones are 0.33 to 0.55 alike or change a
+  digit; the right ones are 0.6 to 0.86 alike and keep galley's digits.
+  The rule takes the 13 wrong and keeps the 3 right. No judged Kadesh
+  edit is in an index. The third condition came from Haskins' index
+  (`normansineuropea00hask`, 60 judged edits): of its 6 judged index
+  edits 5 are wrong, and three of them add digits to a page number that
+  galley read right, "73," to "72-83,", "116," to "11-16,", "10." to
+  "160.", forms alike enough and galley's digits kept. On Turney's book
+  the first two conditions take 13 wrong index edits and 1 right one, a
+  page range whose first number galley read as two letters (made-up
+  example: "ia-17," to "111-17,"). A contents entry is the same kind of
+  short line in columns: on Gierke's contents (`politicaltheorie00gieruoft`,
+  80 judged edits, 26 November 2026) structure found the page numbers of
+  few entries, so most stay in the entry's text, where the stage may
+  change them, and 4 of the 5 judged contents edits are wrong, page
+  numbers and short words of another entry ("76" to "68", "of" to
+  "Pope"); the three conditions take those 4 and keep the right one.
+  A known miss: one more wrong edit on that page, "205" to "227", is in
+  a line of the contents that structure made a margin note, so this
+  rule does not reach it; the fix is structure's.
+- **Three rules for one token.** The three rules that follow, a piece
+  of galley's word, a word of another line and a neighbour's word
+  repeated, apply only where one of galley's tokens is replaced by one
+  of the model's: never to the two halves of a word split at a line end,
+  to two of galley's words for one printed word, or to a word galley
+  glued that the model reads as two.
+- **A piece of galley's word.** A replacement is refused when the
+  model's form, its letters and digits alone, is two characters or more
+  shorter than galley's and is its start or its end. The model then
+  read a piece of the word galley holds whole: the first half of a word
+  broken at a line end, which section 6 did not join because the
+  model's next line starts otherwise than with a lower-case letter, or
+  the second half alone at a column break, or the word without its last
+  letters. On Kadesh's page 8 "orientalists" became "orientalis". On
+  the seven judged sheets (25 and 26 November 2026), the edits whose
+  model form is such a piece are 33 wrong and 1 unclear, and none
+  right: Kadesh 1 wrong; Haskins' book 10 wrong, line-end halves such
+  as "Norman" to "Nor-"; Stubbs' book 16 wrong, first halves such as
+  "Cistercian" to "Cister-" and second halves such as "disinherited"
+  to "herited"; Haynes' book 2 wrong, two long words cut back to their
+  first syllables and a hyphen; Turney's book 4 wrong, three first
+  halves with a hyphen and one second half, and 1 unclear, junk after a
+  word taken off with the word's punctuation; Gierke's and Domesday's
+  none. One character
+  shorter is not refused: on the excerpt `kadesh_redo`, with its
+  recorded answers, those are mostly a stray letter galley read before
+  a word, rightly taken off ("tof" to "of", "tp." to "p.", "def" to
+  "de"), while two characters or more refuse 3 edits there, all wrong:
+  "orientalists" twice and "asthe" to "as", which lost "the". The cost
+  is 2 wrong judged edits of Haynes' book that the rule would take at
+  one character, a possessive's "s" dropped and a misread opening quote
+  read as a letter of the word.
+- **A word of another line.** A replacement of one token is refused
+  when the model's form is six characters or more, less than 0.5 alike
+  galley's, and galley's reading of the page holds the same form among
+  the 25 tokens before or the 25 after galley's token. The six
+  characters were measured (below); the 0.5 and the 25 tokens are
+  guessed, not measured. The alignment
+  then paired galley's word with a word printed on a line nearby, which
+  the model read in another order, often because a margin note sits
+  among the lines of a paragraph: on Stubbs' page 87
+  (`earlyplantagenet01stub`) "accession," became "Chancellor,", a word
+  of the line below, and on page 152 "not" became "almost". Measured on
+  the five judged sheets (Kadesh, Haskins, Stubbs and the owner's books
+  of Haynes and Turney, 25 November 2026): with these three conditions
+  the rule refuses 5 of Stubbs' 38 wrong edits and no right edit. With a
+  shorter word it would also refuse right ones, where a short word
+  galley misread is printed again nearby ("foe" to "the" on Stubbs'
+  page; "alene" to "above" and "Ill," to "III," on Kadesh's), so the
+  shorter wrong ones of this kind ("at" to "way", "sidered." to
+  "great.") stay.
+- **A neighbour's word repeated.** A replacement that covers one of
+  galley's tokens is refused when the model's form, its letters and
+  digits alone, is that token's form with a part of two characters or
+  more, or of digits, before it that is at least 0.5 alike the form of the token just
+  before it in galley's reading of the page, or with such a part after
+  it alike the form of the token just after it; a fixed token counts, a
+  note reference among them. The model then read two printed words, or
+  two halves of a word, as one, and the replacement would print the
+  neighbour twice. The 0.5 lets a neighbour the model also misread
+  count, and is guessed, not measured; the two characters keep "II]," to "III]," beside a roman "I"
+  (the excerpt `kadesh_redo`, page 5), while one digit is the end of a
+  page range or a note's number glued again. On Kadesh's page 27 the page
+  prints "wavy-" at a line end and "lined" on the next line; galley kept
+  both halves, the model's "wavylined" replaced "lined", and the page
+  read "wavy- wavylined". On the excerpt `kadesh_redo`, with its
+  recorded answers, the rule takes 3 of 475 edits, all of this kind:
+  "require ments", "can. not" and "con. jectural", where galley split a
+  word at a line end and read its hyphen as a space or a full stop, and
+  the model's whole word replaced the second half alone. On the 60
+  judged edits of Haynes' book (25 November 2026), 7 of the 28 wrong
+  edits are of this kind: four where the model read an em dash as a
+  hyphen, making the words on both sides one token that replaced one of
+  them, so that the word before or after the dash is printed twice; a
+  number printed again before itself after a colon; a word broken at a
+  line end whose first half was printed again before the whole word;
+  and a note reference, a span of its own in galley's block, whose
+  number the model glued to the word before it. On Turney's book (an
+  owner's book; 60 judged edits, 36 wrong), 11 of the wrong edits are of
+  this kind, 7 of them page ranges in the bibliography printed with an
+  en dash that galley read as an em dash, so that the range's two
+  numbers are two tokens, and the model's one token for the range
+  replaced one of them. The two halves of a word
+  split at a line end (above) and two of galley's words for one printed
+  word (above) are replaced together, and are not refused.
 - **An insertion**: a run of the model's tokens that pair with none of
   galley's, inside a note: the galley token before the run is a token of
   the note (its marker or a word of its blocks), and the one after is a
@@ -412,8 +773,12 @@ From the pairs:
   The run's tokens that are only digits are left out of it: they are the
   notes' own numbers, which the model prints and galley holds as markers
   (83 of Kadesh's 183 note markers give no token, empty or "*" or "%"),
-  and the page number the model prints between two note columns. The
-  run's other words, joined by one space, go into the note: after
+  and the page number the model prints between two note columns. So are
+  its tokens that hold no letter, digits with signs such as "1/2": on
+  Kadesh's page 33 the model put "1/2" after galley's "4:G", where the
+  page prints "4:45 (P. M.)", and no insertion of the four judged sheets
+  that holds no letter is right (1 judged, wrong). The run's other
+  words, joined by one space, go into the note: after
   galley's token just before the run when the stage may change it; when
   it is fixed (the run comes right after the marker or a note reference),
   before the first word after the run that the stage may change, in the
@@ -425,12 +790,37 @@ From the pairs:
   already holds, the same words one after the other, is not put in: it is
   the model reading a line twice or the alignment placing a line of
   another block there (page 32 "Read the above is a typographical error"
-  in its note twice; page 51 words of the body put into note 132). A run
+  in its note twice; page 51 words of the body put into note 132). Nor
+  is a run whose forms, joined, are inside the form of galley's word it
+  would go beside: the model read again letters that word holds (in
+  Haynes' book a word printed with its letters spaced out, which galley
+  holds whole and the model read as the word and then three of its
+  letters again; 1 of the 28 wrong judged edits). This holds only for a
+  run of two one-letter words or more: one letter is often a word the
+  model read right, "à" after "appartenant" on the excerpt
+  `kadesh_redo`'s page 1, and words of two letters or more were found
+  inside a word galley glued ("is in the" beside "thenumeralisinthe").
+  Nor is a run whose first word is galley's token just after it, or
+  whose last word is galley's token just before it: the model read a
+  word twice, or the alignment met galley's word in another line
+  (review of 26 November 2026: Domesday's page 37, "-by Illustrations"
+  put in before galley's "-by,", the "by" of a margin note whose
+  galley reading is "Tllustrations"). On the seven judged sheets it
+  takes 2 wrong insertions, both Domesday's, and none of the 7 right
+  ones. Nor is a run each of
+  whose words is a word of a margin note printed on the page: the model
+  read the margin note into the line beside it. On Gierke's book 5 of
+  the 8 wrong judged insertions are so ("rules" with "Majorities", a
+  margin note's first word, after it), and none of the 7 right judged
+  insertions on the seven sheets has a word of a margin note. A run
   elsewhere, in the body, before the page's first token or after its
   last, is not put in: there it is page numbers and running heads.
 - A pair with a fixed token, a pair less alike than 0.3, a pair that may
   hold more words on galley's side, a pair in a block whose words are out
-  of place, and a galley token paired with nothing, give nothing:
+  of place, a pair in an index or contents entry that fails its conditions, a
+  pair whose model word is a piece of galley's, repeats a neighbour of
+  it or is a word of another line, and a galley token paired with
+  nothing, give nothing:
   galley's word stays.
 
 What the stage never changes, whatever the model reads: a note marker, a
@@ -972,11 +1362,15 @@ The stage's entry point, as every stage's (architecture section 9):
 ```python
 def run(folder: BookFolder, config: BookConfig, *, workers: int = DEFAULT_WORKERS) -> None:
     """Write edits/correct.jsonl: the vision model's fixes to galley's words
-    of every text page, as edits. Raises ExternalProgramError when LM Studio
-    does not answer or lacks the model, InputFileError for stale inputs."""
+    of every text page, as edits, its answers kept in answers/ and read
+    from there when the request is the same (section 4b). Raises
+    ExternalProgramError when LM Studio does not answer or lacks the model,
+    InputFileError for stale inputs or a kept answer it cannot read."""
 ```
 
-The check `cli.py` makes before any stage when a command runs correct:
+The check `cli.py` makes before any stage when a command runs correct
+and the book folder has no `answers/`, and the stage before its first
+request:
 
 ```python
 def check_server(config: BookConfig) -> None:
@@ -997,7 +1391,8 @@ file and line; it raises `EditError` as section 10 says.
 
 Over pages, with `parallel.map_pages`: each worker renders its page
 through `pdfium.render` (which runs PDFium in its own thread), makes the
-PNG with Pillow, sends the request and waits, then makes the page's edits
+PNG with Pillow, reads the kept answer or, after the one check of the
+server (section 4), sends the request and waits (section 4b), then makes the page's edits
 from the model's answer and galley's reading, a pure function. A page
 needs nothing from another page but the split of a block printed on two
 pages (section 5), which is made before the workers start, from
@@ -1060,6 +1455,16 @@ wait either way.
   values; markdown's four rules, each broken in a case of its own, with
   the file and line in the error; the config's three keys with values
   other than their defaults, and an address that is not local refused.
+- **The kept answers** (section 4b), their tests named with
+  `answer_store`: the excerpt `kadesh_redo` run twice in one book folder
+  with the test's server, the second run sending no request and writing
+  the same `edits/correct.jsonl`; run a third time with another model,
+  every request sent again; and, on one request with a literal image,
+  another prompt or model asking again, the same request asking nothing,
+  an answer cut short kept and used, a failed request keeping nothing, a
+  file cut in the middle, not JSON or of another `format_version` an
+  `InputFileError` naming it, and `answers/` left by
+  `delete_stage_outputs`.
 - **The calls**, with a small HTTP server inside the test, on localhost,
   that answers with recorded answers: the request's body; the
   `ExternalProgramError` when nothing listens on the port, when the model
@@ -1098,6 +1503,24 @@ wait either way.
   3.4 and against galley's reading without the edits; the share of wrong
   note edits the second reading would flag, from the recorded 27B
   answers; and the time for the book.
+
+**What the fidelity check cannot see.** markdown's fidelity check
+(architecture section 13) compares the words of blocks.json with those
+of book.md less the removals and counts every edit's change as allowed,
+so a word an edit loses or puts in twice passes it: the review of 26
+November 2026 found such edits on the whole-book reruns ("towitesand"
+to "wites and", "909" to "0 9", "-by Illustrations -by,") with the
+check passing. A check that could see them, proposed and not built:
+for each edit, compare the tokens of `old` and `new` by least edits
+(section 7) and count the tokens of `old` that pair with none of
+`new`'s and the tokens of `new` that pair with none of `old`'s, less
+the ones the edit's kind allows (one token of `new` for each split of
+a glued word, the run of an insertion, none lost for a replacement or
+a merge, whose letters and digits must hold all of `old`'s but for the
+ones read otherwise); the stage would log every edit with a token
+lost or put in beyond that and the evaluation tool would list them
+beside the sheet, so that a rule that loses words shows on the whole
+book and not only on the judged sample.
 
 ## 16. Decided
 
@@ -1212,6 +1635,69 @@ wait either way.
    the body, as on page 316, checked too. Leaving out the pages whose
    tables structure turned into notes would remove the table's harm; it
    is not built.
+
+3. **Rules measured on the judged edits and not adopted** (25 November
+   2026, plan `misread-words`, work package 3). Seven books' samples
+   were judged against the page images, 60 edits a book for Kadesh,
+   Haskins (`normansineuropea00hask`), Stubbs (`earlyplantagenet01stub`)
+   and the owner's books of Haynes and Turney, and 80 for Gierke
+   (`politicaltheorie00gieruoft`) and Domesday (`domesdaybook00maituoft`).
+   Each item below names the sheets it was counted on; the first four
+   were counted on Kadesh, Haskins, Haynes and Turney, before the other
+   sheets were judged. These rules took as many right edits as wrong
+   ones or more, outside what the rules of section 7 already take, and
+   are not in the stage:
+
+   - **A stricter likeness for every replacement**, 0.5 instead of 0.3:
+     outside the index pages it refuses 3 right edits (Kadesh 2, as
+     "Ill," to "III,", and 1 on Haskins' book), and
+     the wrong ones it would take are mostly on index pages, which the
+     rule of an index entry takes already.
+   - **No change of one digit into another**: outside the index pages
+     the four sheets hold 3 such edits, all right (Kadesh "1985," to
+     "1885," and "349." to "549.", and one number on Turney's book).
+     Gierke's sheet has one wrong such edit outside an index or
+     contents entry, "205" to "227" on page 65: a line of the contents
+     that structure made a margin note, so the rule of a contents entry
+     does not reach it. That miss is structure's, not this stage's.
+   - **A letter with a diacritic galley read kept**: 1 wrong edit
+     (Kadesh's "Hammamét," to "Hammāmāt,", printed with circumflexes)
+     against 1 right (Haskins' "Béhmer," to "Böhmer,").
+   - **No accent put on a name the model read in small capitals**: it
+     would take Kadesh's "GurEyssE" to "Guéysse", 1 wrong edit, and
+     undo "Dirporr- MCiuer," to "Dindorf-Müller," (section 14), right.
+
+   - **No real word replaced by another real word one letter away**,
+     for spellings the model modernises (Stubbs' "Despensers" to
+     "Despencers", five judged edits, and "ascendency." to
+     "ascendancy."): with both words in galley's word list it refuses
+     1 wrong edit on the five sheets and 39 right ones (Kadesh 15,
+     Haskins 10, Stubbs 7, Turney 6, Haynes 1), since the OCR's own
+     errors are often real words ("fer" for "for"); with galley's word
+     printed the same way 3 times or more in the book and more often
+     than the model's, it refuses 7 wrong (Stubbs' five "Despensers"
+     among them) and 12 right, since a misreading the OCR repeats on
+     every page, as "rn" read "m", is as frequent as a true spelling.
+
+   - **A Latin word not changed by one vowel or one letter**: galley's
+     word of four letters or more in Tesseract's Latin list and not in
+     the English one, changed by one vowel or one letter more or less.
+     On Gierke's sheet (80 judged edits, Latin 13 right and 5 wrong) it
+     refuses 2 wrong; on Domesday's (80 judged, Latin 20 right and 4
+     wrong) none; it also refuses 1 right edit on Kadesh's sheet and 1
+     on Stubbs'.
+   - **No insertion of a run galley's reading of the page holds**, one
+     word or more, anywhere on the page: on the seven sheets it refuses
+     8 wrong insertions, 5 of them those the margin-note rule takes, and
+     3 right ones (Kadesh's "AA", Domesday's "i" and "Gloucester").
+     **No insertion of one-letter words**: 4 wrong (Haskins' "f",
+     Domesday's "a" and the signature mark "M", and one on Haynes' book
+     that the rule of letters held already takes) and 1 right
+     (Domesday's "i", a volume of a citation).
+
+   Passages in another language, which the Domesday trial found
+   wrongly corrected, wait for the whole-book runs of Domesday and
+   Gierke.
 
 ## 17. Not in this spec
 

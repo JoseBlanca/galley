@@ -54,7 +54,10 @@ galley's where the two line up, as edits; the edit format goes to
 version 2 with `page_index`, `model` and `second_reading`; markdown
 applies the edits files; the config gains `correct_model`,
 `correct_server` and `correct_second_model` (sections 4 to 6, 8 to 10,
-12 and 16).
+12 and 16). Revised on 25 November 2026 for the plan misread-words: the
+correct stage keeps the model's answers in `answers/` of the book folder,
+which no stage deletes, in the new format `KeptAnswer` (sections 5 and
+8).
 
 Decisions marked "owner", with a date from 14 to 17 November 2026,
 were taken by the owner in chat; those of 18 November 2026 were taken
@@ -164,6 +167,9 @@ kadesh/
                        figure-<page index, 4 digits>-<n>.png), and cover.png
   lines.json           layout
   blocks.json          structure
+  answers/             correct: the vision model's answers, kept
+                       (<kind>-<page index, 4 digits>.json, the kind
+                       page, band or links)
   edits/
     correct.jsonl      correct
     owner.jsonl        the owner's edits (section 10)
@@ -182,7 +188,12 @@ markdown run alone after analyze and extract built `book.md` from a stale
 `edits/correct.jsonl`, is deleted with the files of structure and of
 every stage before it, since its edits name blocks by their text as
 structure wrote it. No other edits file is ever written or deleted by a
-stage. Folders of the owner's
+stage. `answers/` is never deleted by a stage: each of its files is the
+model's answer to one request, kept with the SHA-256 of the request, and
+the correct stage uses it only when it would send the same request again
+and replaces it otherwise (`docs/specs/correct.md` §4b), so it cannot
+outlive what it was made from; it is what lets a book be rebuilt without
+the model's hours. Folders of the owner's
 books live outside the repository or under `runs/`, which git ignores;
 tests make theirs under pytest's temporary directory.
 
@@ -658,6 +669,15 @@ version 1 was ever applied. The version is on every line, not in a header, so th
 file is no edits; a blank or malformed line is an error that names the
 file and line.
 
+**KeptAnswer**, one JSON file under `answers/` (`docs/specs/correct.md`
+§4b): `format_version` (1), `page_index`, `kind` (`page`, `band` or
+`links`, which request of the correct stage it answers), `model`,
+`prompt`, `image_sha256` (of the PNG sent), `request_sha256` (of the
+bytes of the request's body, keys sorted, the image in it), `text` (the
+model's answer) and `cut_short` (whether it stopped at the request's
+`max_tokens`). Written whole through a temporary file, as every file;
+one that cannot be read is an `InputFileError` that says to delete it.
+
 **RenderedPage**, not a file but what `pdfium.render` returns:
 `page_index`, `dpi`, `width_px`, `height_px`, `pixels: bytes` (8-bit
 grayscale, row by row). Frozen, so it can go to a worker thread, which
@@ -950,7 +970,7 @@ A stage imports these and nothing else of galley.
 | `contents_labels.py` | the number labels and the runs of a printed contents (`docs/specs/structure.md` §30, rule 12, and §31): `number_label(label)`, the style (digits or a roman numeral in capitals) and value of a label "7." or "IV.", None for any other; `label_text(style, value)`, the label of a value in a style; `contents_runs(pages)`, the contents runs of the contents pages; and `inferred_labels(labels, levels)`, rule 12's labels for a run's entries. structure infers labels with them and the fidelity check admits an inferred label with them, so that the two read the rule alike |
 | `hyphens.py` | `LINE_END_HYPHENS`, "-" and "¬", the hyphens that end a printed line in the OCR's text, which layout's reading score, structure's hyphen joins and the fidelity check share (`docs/specs/structure.md` §5) |
 | `body_measures.py` | the rules that measure a book's body text, which layout and structure both use, so that they are written once: `group_rows(words)`, the rows of a page's words (layout §1, "Row"); `edge_counts(edges)`, each edge rounded to the point with the number of edges within 2 pt of it, and `commonest(edges)`, the value with the most (layout §1); `median_word_height(words)`; `measured_pages(rows_by_page)`, the pages of at least 15 rows, or of 3 when none has 15, and `measured_page_positions(rows_by_page)`, their positions in `rows_by_page`; and `body_measures(rows_by_page) -> BodyMeasures \| None`, the body word height and body line pitch (layout §3), `None` when no page has 3 rows. It takes rows, not words, so that a stage groups each page once and uses the rows for its own work too |
-| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc; Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`, and analyze and extract when it is `redo`) and stops naming any that is missing; and, when the command runs correct, LM Studio's server and its models (`correct.check_server`) |
+| `cli.py` | the `galley2epub` command. Before any work it finds, with `shutil.which`, the external programs the requested stages need (Pandoc; Tesseract, which layout needs unless the config's `ocr` is `trust` or `redo`, and analyze and extract when it is `redo`) and stops naming any that is missing; and, when the command runs correct on a book folder without `answers/`, LM Studio's server and its models (`correct.check_server`; with kept answers the correct stage checks them before its first request, and not at all when it sends none) |
 
 `src/galley/__init__.py` imports gilguard first: a library that stops a
 program at any import that turns Python's global lock back on, and names
@@ -1151,7 +1171,7 @@ cost than one every run of `galley2epub` needs.
 | Pandoc | markdown (to read `book.md` back for the fidelity check), epub | every run | writing a valid EPUB 3 with navigation, notes and metadata is a large, well-tested body of work |
 | Tesseract | analyze (the OCR audit), extract (OCR pages, every text page under `ocr = "redo"`), layout (re-reading small print), `wordlist.py` | runs that need OCR: layout unless `ocr` is `trust` or `redo`, and extract on every text page when it is `redo`, which `cli.py` checks before analyze starts; the word list, once per language | OCR is not something to rebuild |
 | epubcheck | the tests of the epub stage and the `whole_book` tests | development only | it is the reference validator of EPUB, and needs Java, which a run of galley should not |
-| LM Studio | correct, through HTTP on the local machine only | runs with `correct = true`; `cli.py` checks that it answers and has the model before the first stage | serving a vision model on the Mac's GPU is a large body of work; galley sends it a page and reads its text (`docs/specs/correct.md` §4) |
+| LM Studio | correct, through HTTP on the local machine only | runs with `correct = true`; `cli.py` checks that it answers and has the model before the first stage, unless the book folder holds kept answers, when the correct stage checks before its first request and not at all when every answer is kept | serving a vision model on the Mac's GPU is a large body of work; galley sends it a page and reads its text (`docs/specs/correct.md` §4) |
 
 The epub stage does not run epubcheck: an EPUB is checked while
 developing, on the excerpts and the whole books, and the tests that need

@@ -22,29 +22,33 @@ import pytest
 from PIL import Image
 
 from galley import correct, pdfium
-from galley.book_folder import BookFolder
+from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig, read_config
 from galley.correct import edits_of, footnote_band_top, page_png, token_cores
 from galley.correct._align import Pair, align, align_free_tail
+from galley.correct._answers import AnswerSource, kept_or_read, once
 from galley.correct._lmstudio import (
     LINKS_PROMPT,
     PROMPT,
     check_models,
     read_image,
     request_body,
+    request_data,
 )
 from galley.correct._merge import answer, cased, page_changes
 from galley.correct._reading import page_reading, split_counts
 from galley.correct._tokens import clean_answer, comparison_form, tokens
-from galley.errors import EditError, ExternalProgramError
+from galley.errors import EditError, ExternalProgramError, InputFileError
 from galley.markdown import FiledEdit, apply_edits, read_edits_files
 from galley.model import (
+    AnswerKind,
     Block,
     BlockKind,
     BlocksFile,
     Box,
     Edit,
     Emphasis,
+    KeptAnswer,
     Note,
     NoteKind,
     Origin,
@@ -61,9 +65,12 @@ from galley.model import (
     block_text,
     read_blocks,
     read_edits,
+    read_kept_answer,
     read_pages,
     read_words,
     write_edits,
+    write_kept_answer,
+    write_pages,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "correct"
@@ -800,7 +807,8 @@ class _FakeLmStudio:
     of a run with one worker, in the order of its requests. A request with
     the prompt of the note links (section 9b) is answered the same way
     from `link_answers` and `links_in_order`, and with nothing when they
-    have no answer for it."""
+    have no answer for it. A request to a model of `by_model` gets its
+    text, whatever the image."""
 
     models: tuple[str, ...]
     answers: dict[str, str] = field(default_factory=dict)
@@ -810,7 +818,9 @@ class _FakeLmStudio:
     in_order: list[str] = field(default_factory=list)
     link_answers: dict[str, str] = field(default_factory=dict)
     links_in_order: list[str] = field(default_factory=list)
+    by_model: dict[str, str] = field(default_factory=dict)
     bodies: list[dict[str, object]] = field(default_factory=list)
+    raw_bodies: list[bytes] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -836,9 +846,11 @@ def _handler(fake: _FakeLmStudio) -> type[BaseHTTPRequestHandler]:
             self._send(200, {"data": [{"id": model} for model in fake.models]})
 
         def do_POST(self) -> None:
-            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            raw = self.rfile.read(int(self.headers["Content-Length"]))
+            body = json.loads(raw)
             with fake.lock:
                 fake.bodies.append(body)
+                fake.raw_bodies.append(raw)
             if fake.redirect is not None:
                 self.send_response(302)
                 self.send_header("Location", fake.redirect)
@@ -855,9 +867,12 @@ def _handler(fake: _FakeLmStudio) -> type[BaseHTTPRequestHandler]:
             answers = fake.link_answers if links else fake.answers
             in_order = fake.links_in_order if links else fake.in_order
             with fake.lock:
-                if key not in answers and in_order:
-                    answers[key] = in_order.pop(0)
-                text = answers.get(key, "")
+                if body["model"] in fake.by_model:
+                    text = fake.by_model[body["model"]]
+                else:
+                    if key not in answers and in_order:
+                        answers[key] = in_order.pop(0)
+                    text = answers.get(key, "")
             self._send(
                 200,
                 {
@@ -997,13 +1012,33 @@ KADESH_REDO = "kadesh_redo"
 
 
 def _excerpt_folder(
-    tmp_path: Path, redo_excerpt_run: Callable[[str], BookFolder], server: str
+    tmp_path: Path,
+    redo_excerpt_run: Callable[[str], BookFolder],
+    server: str,
+    text_pages: frozenset[int] | None = None,
 ) -> tuple[BookFolder, BookConfig]:
+    """A book folder of the excerpt kadesh_redo for the correct stage; with
+    `text_pages`, its other text pages are marked excluded, so that a test
+    that needs only a few pages renders only those."""
     source = redo_excerpt_run(KADESH_REDO)
     tmp_path.mkdir(parents=True, exist_ok=True)
     folder = BookFolder(tmp_path)
     for name in ("pages.json", "words.json", "lines.json", "blocks.json"):
         (tmp_path / name).write_bytes((source.root / name).read_bytes())
+    if text_pages is not None:
+        pages = read_pages(folder.pages_json)
+        write_pages(
+            folder.pages_json,
+            dataclasses.replace(
+                pages,
+                pages=tuple(
+                    page
+                    if page.kind is not PageKind.TEXT or page.index in text_pages
+                    else dataclasses.replace(page, kind=PageKind.EXCLUDED)
+                    for page in pages.pages
+                ),
+            ),
+        )
     shutil.copytree(source.images_dir, folder.images_dir)
     toml = source.book_toml.read_text(encoding="utf-8")
     folder.book_toml.write_text(
@@ -1034,8 +1069,17 @@ EXCERPT_EDITS = (
 )
 # The number of edits on the excerpt with the recorded answers, so that a
 # change of the rules shows: without the split of a block printed on two
-# pages the stage made about 230 more (review of 19 November 2026).
-EXCERPT_EDIT_COUNT = 475
+# pages the stage made about 230 more (review of 19 November 2026). 475
+# before a replacement that repeats a neighbouring word was refused (25
+# November 2026): "require ments", "can. not" and "con. jectural" each
+# had their second half replaced by the whole word. 472 before a piece of
+# galley's word was refused: "orientalists" to "orientalis" twice and
+# "asthe" to "as". 469 before two of galley's words were replaced together
+# by the model's one: "require ments" to "requirements".
+# 470 before a split of galley's word had to keep galley's digits: "100,10;"
+# to "109, 110;" is no longer made, a digit read otherwise (26 November
+# 2026).
+EXCERPT_EDIT_COUNT = 469
 
 
 @dataclass(frozen=True, slots=True)
@@ -1254,3 +1298,426 @@ def test_excerpt_note_links_are_the_references_the_page_prints(
     assert "Lenormant\\,[^n-p0001-002]" in book
     assert "Chabas[^n-p0001-003]" in book
     assert "Record\u201d[^n-p0001-004]" in book
+
+
+# The kept answers (section 4b): every test's name holds answer_store.
+
+# The excerpt's pages the tests of the kept answers run on: page 1, whose
+# paragraph runs on to page 2, and page 3, with notes; the whole excerpt
+# took the four tests 31 s together (26 November 2026).
+_FEW_PAGES = frozenset({1, 3})
+
+# A kept answer as write_kept_answer writes it.
+_KEPT_JSON = (
+    b'{\n "format_version": 1,\n "page_index": 11,\n "kind": "page",\n'
+    b' "model": "qwen/qwen3.6-35b-a3b",\n "prompt": "Read it.",\n'
+    b' "image_sha256": "00",\n "request_sha256": "00",\n "text": "",\n'
+    b' "cut_short": false\n}\n'
+)
+
+
+def _keep(
+    answers_dir: Path,
+    server: str,
+    *,
+    model: str = MODEL,
+    prompt: str = PROMPT,
+    png: bytes = b"png",
+) -> tuple[str, AnswerSource]:
+    reading, source = kept_or_read(
+        answers_dir,
+        AnswerKind.PAGE,
+        11,
+        server,
+        model,
+        png,
+        "page 11",
+        prompt,
+        lambda: check_models(server, (model,)),
+    )
+    return reading.text, source
+
+
+def test_answer_store_keeps_an_answer_and_reads_it_for_the_same_request(
+    tmp_path: Path, lm_studio: Callable[..., tuple[_FakeLmStudio, str]]
+) -> None:
+    fake, server = lm_studio()
+    fake.answers[_image_key(b"png")] = "a poem in rhymed strophes"
+    assert _keep(tmp_path, server) == ("a poem in rhymed strophes", AnswerSource.ASKED)
+    kept = read_kept_answer(tmp_path / "page-0011.json")
+    assert kept == KeptAnswer(
+        page_index=11,
+        kind=AnswerKind.PAGE,
+        model=MODEL,
+        prompt=PROMPT,
+        image_sha256=_image_key(b"png"),
+        request_sha256=hashlib.sha256(request_data(MODEL, b"png")).hexdigest(),
+        text="a poem in rhymed strophes",
+        cut_short=False,
+    )
+    fake.answers[_image_key(b"png")] = "another answer"
+    assert _keep(tmp_path, server) == ("a poem in rhymed strophes", AnswerSource.KEPT)
+    assert len(fake.bodies) == 1
+    # The key is the SHA-256 of the bytes the server got.
+    assert kept is not None
+    assert hashlib.sha256(fake.raw_bodies[0]).hexdigest() == kept.request_sha256
+
+
+def test_answer_store_asks_again_for_another_prompt_model_or_image_and_replaces_it(
+    tmp_path: Path, lm_studio: Callable[..., tuple[_FakeLmStudio, str]]
+) -> None:
+    fake, server = lm_studio(models=(MODEL, SECOND))
+    fake.answers[_image_key(b"png")] = "first"
+    fake.answers[_image_key(b"other png")] = "second"
+    path = tmp_path / "page-0011.json"
+    assert _keep(tmp_path, server)[1] is AnswerSource.ASKED
+    assert _keep(tmp_path, server, prompt=LINKS_PROMPT)[1] is AnswerSource.ASKED
+    kept = read_kept_answer(path)
+    assert kept is not None
+    assert kept.prompt == LINKS_PROMPT
+    assert _keep(tmp_path, server, prompt=LINKS_PROMPT)[1] is AnswerSource.KEPT
+    assert _keep(tmp_path, server, model=SECOND)[1] is AnswerSource.ASKED
+    kept = read_kept_answer(path)
+    assert kept is not None
+    assert kept.model == SECOND
+    assert _keep(tmp_path, server, model=SECOND, png=b"other png") == (
+        "second",
+        AnswerSource.ASKED,
+    )
+    assert len(fake.bodies) == 4
+    assert [body["model"] for body in fake.bodies] == [MODEL, MODEL, SECOND, SECOND]
+
+
+def test_answer_store_keeps_an_answer_cut_short_and_uses_it_as_such(
+    tmp_path: Path, lm_studio: Callable[..., tuple[_FakeLmStudio, str]]
+) -> None:
+    fake, server = lm_studio(finish="length")
+    first, source = kept_or_read(
+        tmp_path,
+        AnswerKind.LINKS,
+        3,
+        server,
+        MODEL,
+        b"png",
+        "page 3",
+        LINKS_PROMPT,
+        lambda: None,
+    )
+    assert (first.cut_short, source) == (True, AnswerSource.ASKED)
+    again, source = kept_or_read(
+        tmp_path,
+        AnswerKind.LINKS,
+        3,
+        server,
+        MODEL,
+        b"png",
+        "page 3",
+        LINKS_PROMPT,
+        lambda: None,
+    )
+    assert (again, source) == (first, AnswerSource.KEPT)
+    assert (tmp_path / "links-0003.json").exists()
+    assert len(fake.bodies) == 1
+
+
+def test_answer_store_keeps_nothing_of_a_failed_request(
+    tmp_path: Path, lm_studio: Callable[..., tuple[_FakeLmStudio, str]]
+) -> None:
+    _, server = lm_studio(status=400)
+    with pytest.raises(ExternalProgramError, match="HTTP 400"):
+        _keep(tmp_path, server)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_answer_store_the_cases_of_an_unreadable_file_differ_from_a_good_one(
+    tmp_path: Path,
+) -> None:
+    # The two cases below break only what they name.
+    (tmp_path / "page-0011.json").write_bytes(_KEPT_JSON)
+    assert read_kept_answer(tmp_path / "page-0011.json") is not None
+
+
+@pytest.mark.parametrize(
+    ("content", "problem"),
+    [
+        # A file cut in the middle, as no write of galley's leaves one.
+        (b'{"format_version": 1, "page_index": 11, "kind": "pa', "not valid JSON"),
+        (b"\xff\xfe", "not UTF-8"),
+        (b'{"format_version": 2}', "format version 2"),
+        (b'{"format_version": 1, "page_index": 11}', "kind"),
+        (
+            _KEPT_JSON.replace(b'"cut_short"', b'"confidence": 1, "cut_short"'),
+            "confidence",
+        ),
+        (_KEPT_JSON.replace(b'"page_index": 11', b'"page_index": "11"'), "page_index"),
+    ],
+)
+def test_answer_store_a_file_it_cannot_read_is_an_error_naming_it(
+    tmp_path: Path,
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+    content: bytes,
+    problem: str,
+) -> None:
+    fake, server = lm_studio()
+    path = tmp_path / "page-0011.json"
+    path.write_bytes(content)
+    with pytest.raises(InputFileError) as raised:
+        _keep(tmp_path, server)
+    message = str(raised.value)
+    assert str(path) in message
+    assert problem in message
+    assert message.endswith("delete it to have the model read the page again")
+    assert fake.bodies == []
+    assert path.read_bytes() == content
+
+
+def test_answer_store_is_left_by_every_stage_that_deletes_its_outputs(
+    tmp_path: Path,
+) -> None:
+    folder = BookFolder(tmp_path)
+    folder.answers_dir.mkdir()
+    (folder.answers_dir / "page-0011.json").write_text("{}", encoding="utf-8")
+    folder.edits_dir.mkdir()
+    folder.correct_jsonl.write_text("", encoding="utf-8")
+    delete_stage_outputs(folder, Stage.ANALYZE)
+    assert not folder.correct_jsonl.exists()
+    assert (folder.answers_dir / "page-0011.json").exists()
+
+
+# Renders with PDFium.
+@pytest.mark.thread_unsafe
+@pytest.mark.tesseract
+def test_answer_store_a_second_run_asks_nothing_and_another_model_asks_again(
+    tmp_path: Path,
+    redo_excerpt_run: Callable[[str], BookFolder],
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake, server = lm_studio(models=(MODEL, SECOND))
+    folder, config = _excerpt_folder(tmp_path, redo_excerpt_run, server, _FEW_PAGES)
+    fake.in_order.extend(_recorded_answers(folder))
+    fake.links_in_order.extend(_recorded_link_answers(folder))
+    correct.run(folder, config, workers=1)
+    first = folder.correct_jsonl.read_bytes()
+    first_edits = read_edits(folder.correct_jsonl)
+    assert first_edits != ()
+    asked = len(fake.bodies)
+    pages = len(_recorded_answers(folder))
+    assert asked == pages + len(_recorded_link_answers(folder))
+    assert len(list(folder.answers_dir.glob("*.json"))) == asked
+    # The second run, with other workers, reads every answer kept.
+    with caplog.at_level(logging.INFO, logger="galley.correct"):
+        correct.run(folder, config, workers=2)
+    assert len(fake.bodies) == asked
+    assert folder.correct_jsonl.read_bytes() == first
+    assert f"from {asked} answers kept in" in caplog.text
+    assert "and 0 asked of the model" in caplog.text
+    # Another model is another request: every page is asked again.
+    correct.run(folder, dataclasses.replace(config, correct_model=SECOND), workers=2)
+    assert len(fake.bodies) == 2 * asked
+    assert {body["model"] for body in fake.bodies[asked:]} == {SECOND}
+    # The fake answers as before, so the edits differ only by their model.
+    assert (
+        tuple(
+            dataclasses.replace(edit, model=MODEL)
+            for edit in read_edits(folder.correct_jsonl)
+        )
+        == first_edits
+    )
+    assert {edit.model for edit in read_edits(folder.correct_jsonl)} == {SECOND}
+
+
+# Renders with PDFium.
+@pytest.mark.thread_unsafe
+@pytest.mark.tesseract
+def test_answer_store_a_run_with_every_answer_kept_needs_no_server(
+    tmp_path: Path,
+    redo_excerpt_run: Callable[[str], BookFolder],
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+) -> None:
+    # Section 4: the server is checked only before a request is sent.
+    fake, server = lm_studio()
+    folder, config = _excerpt_folder(tmp_path, redo_excerpt_run, server, _FEW_PAGES)
+    fake.in_order.extend(_recorded_answers(folder))
+    fake.links_in_order.extend(_recorded_link_answers(folder))
+    correct.run(folder, config, workers=1)
+    first = folder.correct_jsonl.read_bytes()
+    no_server = f"http://127.0.0.1:{_closed_port()}"
+    correct.run(
+        folder, dataclasses.replace(config, correct_server=no_server), workers=2
+    )
+    assert folder.correct_jsonl.read_bytes() == first
+    # A page whose answer is not kept needs the server, and finds none.
+    (folder.answers_dir / "page-0003.json").unlink()
+    with pytest.raises(ExternalProgramError, match="not running"):
+        correct.run(
+            folder, dataclasses.replace(config, correct_server=no_server), workers=2
+        )
+    assert not folder.correct_jsonl.exists()
+
+
+def test_answer_store_server_check_runs_once_from_many_threads_and_again_after_failing() -> (
+    None
+):
+    calls: list[int] = []
+    gate = threading.Barrier(8)
+
+    def check() -> None:
+        calls.append(1)
+
+    check_once = once(check)
+
+    def call() -> None:
+        gate.wait()
+        check_once()
+
+    threads = [threading.Thread(target=call) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert calls == [1]
+
+    def failing() -> None:
+        calls.append(2)
+        message = "not running"
+        raise ExternalProgramError(message)
+
+    failing_once = once(failing)
+    for _ in range(2):
+        with pytest.raises(ExternalProgramError):
+            failing_once()
+    assert calls == [1, 2, 2]
+
+
+# Renders with PDFium.
+@pytest.mark.thread_unsafe
+@pytest.mark.tesseract
+def test_answer_store_keeps_the_second_reading_of_each_footnote_band(
+    tmp_path: Path,
+    redo_excerpt_run: Callable[[str], BookFolder],
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+) -> None:
+    # Sections 4b and 9: the second model's reading of a page's footnote
+    # band is kept as band-<page>.json, with the prompt of section 4.
+    fake, server = lm_studio(models=(MODEL, SECOND))
+    fake.by_model[SECOND] = "Called by de Rouge the Bulletin."
+    folder, config = _excerpt_folder(tmp_path, redo_excerpt_run, server, _FEW_PAGES)
+    config = dataclasses.replace(
+        config, correct_second_model=SECOND, correct_links=False
+    )
+    fake.in_order.extend(_recorded_answers(folder))
+    correct.run(folder, config, workers=1)
+    first = folder.correct_jsonl.read_bytes()
+    asked = len(fake.bodies)
+    blocks = read_blocks(folder.blocks_json)
+    pages_read = sorted(
+        int(path.stem.removeprefix("page-"))
+        for path in folder.answers_dir.glob("page-*.json")
+    )
+    with_band = [
+        page for page in pages_read if footnote_band_top(blocks, page) is not None
+    ]
+    assert with_band != []
+    bands = sorted(
+        int(path.stem.removeprefix("band-"))
+        for path in folder.answers_dir.glob("band-*.json")
+    )
+    assert bands == with_band
+    for page in bands:
+        kept = read_kept_answer(folder.answers_dir / f"band-{page:04d}.json")
+        assert kept is not None
+        assert (kept.kind, kept.model, kept.prompt) == (
+            AnswerKind.BAND,
+            SECOND,
+            PROMPT,
+        )
+        assert kept.text == "Called by de Rouge the Bulletin."
+    page_answers = [
+        read_kept_answer(folder.answers_dir / f"page-{page:04d}.json")
+        for page in pages_read
+    ]
+    assert {answer.model for answer in page_answers if answer is not None} == {MODEL}
+    assert asked == len(pages_read) + len(bands)
+    assert any(
+        edit.second_reading is not None for edit in read_edits(folder.correct_jsonl)
+    )
+    correct.run(folder, config, workers=2)
+    assert len(fake.bodies) == asked
+    assert folder.correct_jsonl.read_bytes() == first
+
+
+# Replaces Path.replace for the whole process.
+@pytest.mark.thread_unsafe
+def test_answer_store_a_write_that_fails_leaves_the_old_answer_whole(
+    tmp_path: Path,
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Section 4b: the file is written beside and moved over the old one.
+    fake, server = lm_studio(models=(MODEL, SECOND))
+    fake.answers[_image_key(b"png")] = "first"
+    _keep(tmp_path, server)
+    path = tmp_path / "page-0011.json"
+    old = path.read_bytes()
+    replace = Path.replace
+
+    def failing_once(self: Path, target: Path) -> Path:
+        del self, target
+        monkeypatch.setattr(Path, "replace", replace)
+        message = "disk full"
+        raise OSError(message)
+
+    monkeypatch.setattr(Path, "replace", failing_once)
+    with pytest.raises(OSError, match="disk full"):
+        _keep(tmp_path, server, model=SECOND)
+    assert path.read_bytes() == old
+    assert [entry.name for entry in tmp_path.iterdir()] == ["page-0011.json"]
+    assert _keep(tmp_path, server, model=SECOND)[1] is AnswerSource.ASKED
+    kept = read_kept_answer(path)
+    assert kept is not None
+    assert kept.model == SECOND
+
+
+# Renders with PDFium.
+@pytest.mark.thread_unsafe
+@pytest.mark.tesseract
+def test_answer_store_a_run_stops_on_an_unreadable_answer_and_uses_one_cut_short(
+    tmp_path: Path,
+    redo_excerpt_run: Callable[[str], BookFolder],
+    lm_studio: Callable[..., tuple[_FakeLmStudio, str]],
+) -> None:
+    fake, server = lm_studio()
+    folder, config = _excerpt_folder(tmp_path, redo_excerpt_run, server, _FEW_PAGES)
+    config = dataclasses.replace(config, correct_links=False)
+    fake.in_order.extend(_recorded_answers(folder))
+    correct.run(folder, config, workers=1)
+    edits = read_edits(folder.correct_jsonl)
+    assert any(edit.page_index == 3 for edit in edits)
+    path = folder.answers_dir / "page-0003.json"
+    kept = read_kept_answer(path)
+    assert kept is not None
+    # Section 4b: an unreadable answer stops the run, and no edits are written.
+    path.write_bytes(path.read_bytes()[:100])
+    with pytest.raises(InputFileError, match="page-0003.json"):
+        correct.run(folder, config, workers=2)
+    assert not folder.correct_jsonl.exists()
+    # Section 4: an answer kept cut short gives its page no edits.
+    write_kept_answer(path, dataclasses.replace(kept, cut_short=True))
+    asked = len(fake.bodies)
+    correct.run(folder, config, workers=2)
+    assert len(fake.bodies) == asked
+    assert read_edits(folder.correct_jsonl) == tuple(
+        edit for edit in edits if edit.page_index != 3
+    )
+
+
+def test_answer_store_an_answer_with_a_lone_surrogate_is_an_error_naming_the_page(
+    tmp_path: Path, lm_studio: Callable[..., tuple[_FakeLmStudio, str]]
+) -> None:
+    # A lone surrogate cannot be written as UTF-8, so it cannot be kept.
+    fake, server = lm_studio()
+    fake.answers[_image_key(b"png")] = "Masp\ud800ero"
+    with pytest.raises(ExternalProgramError, match="page 11.*surrogate"):
+        _keep(tmp_path, server)
+    assert list(tmp_path.iterdir()) == []

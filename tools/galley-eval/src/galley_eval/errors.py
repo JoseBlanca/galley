@@ -39,3 +39,9 @@ class GalleyFilesError(EvaluationError):
 class GalleyRunError(EvaluationError):
     """`galley2epub run` on a book folder is not installed, failed, or did
     not finish in time."""
+
+
+class EditSheetError(EvaluationError):
+    """A sample of edits cannot be made or a sheet of verdicts cannot be
+    read: a sheet that would be overwritten, a kind no edit has, a sheet
+    that is not JSON or has a wrong field or verdict (spec section 9b)."""

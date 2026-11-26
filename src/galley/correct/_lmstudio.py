@@ -3,6 +3,7 @@ section 4): the list of its models, and a page's image read by a model."""
 
 import base64
 import json
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -37,6 +38,9 @@ _LIST_TIMEOUT_S: Final[float] = 10
 # Section 4, guessed: a page took 12.8 s on average with the 35B model, and
 # the first request also waits for LM Studio to load the model.
 _PAGE_TIMEOUT_S: Final[float] = 600
+# A surrogate code point alone, which JSON's "\ud800" gives and UTF-8
+# cannot encode.
+_LONE_SURROGATE: Final = re.compile("[\ud800-\udfff]")
 # How much of an unexpected answer an error message quotes.
 _QUOTED: Final[int] = 200
 
@@ -82,8 +86,8 @@ def _not_running(server: str) -> ExternalProgramError:
     )
 
 
-def _quoted(data: bytes) -> str:
-    return data[:_QUOTED].decode("utf-8", errors="replace")
+def _quoted(answer_bytes: bytes) -> str:
+    return answer_bytes[:_QUOTED].decode("utf-8", errors="replace")
 
 
 def list_models(server: str) -> tuple[str, ...]:
@@ -93,14 +97,14 @@ def list_models(server: str) -> tuple[str, ...]:
     url = f"{server}/v1/models"
     try:
         with _OPENER.open(url, timeout=_LIST_TIMEOUT_S) as response:
-            data = response.read()
+            answer_bytes = response.read()
     except (urllib.error.URLError, TimeoutError, ConnectionError) as err:
         raise _not_running(server) from err
     try:
-        listed = json.loads(data)
+        listed = json.loads(answer_bytes)
         return tuple(str(model["id"]) for model in listed["data"])
     except (ValueError, KeyError, TypeError) as err:
-        message = f"{url} did not answer with a list of models: {_quoted(data)}"
+        message = f"{url} did not answer with a list of models: {_quoted(answer_bytes)}"
         raise ExternalProgramError(message) from err
 
 
@@ -141,6 +145,19 @@ def request_body(model: str, png: bytes, prompt: str = PROMPT) -> dict[str, obje
     }
 
 
+def request_data(model: str, png: bytes, prompt: str = PROMPT) -> bytes:
+    """The bytes of the request's body as read_image sends them: the JSON of
+    request_body with its keys sorted, no space after a separator, the
+    characters not escaped, in UTF-8 (section 4b: their SHA-256 is the key
+    of a kept answer)."""
+    return json.dumps(
+        request_body(model, png, prompt),
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
 def read_image(
     server: str, model: str, png: bytes, what: str, prompt: str = PROMPT
 ) -> Reading:
@@ -151,12 +168,12 @@ def read_image(
     url = f"{server}/v1/chat/completions"
     request = urllib.request.Request(
         url,
-        data=json.dumps(request_body(model, png, prompt)).encode("utf-8"),
+        data=request_data(model, png, prompt),
         headers={"Content-Type": "application/json"},
     )
     try:
         with _OPENER.open(request, timeout=_PAGE_TIMEOUT_S) as response:
-            data = response.read()
+            answer_bytes = response.read()
     except urllib.error.HTTPError as err:
         with err:
             said = _quoted(err.read())
@@ -174,14 +191,26 @@ def read_image(
         )
         raise ExternalProgramError(message) from err
     try:
-        answer = json.loads(data)
+        answer = json.loads(answer_bytes)
         choice = answer["choices"][0]
         text = choice["message"]["content"]
         finish = choice.get("finish_reason")
     except (ValueError, KeyError, IndexError, TypeError) as err:
-        message = f"LM Studio at {server} gave no text for {what}: {_quoted(data)}"
+        message = (
+            f"LM Studio at {server} gave no text for {what}: {_quoted(answer_bytes)}"
+        )
         raise ExternalProgramError(message) from err
     if not isinstance(text, str):
-        message = f"LM Studio at {server} gave no text for {what}: {_quoted(data)}"
+        message = (
+            f"LM Studio at {server} gave no text for {what}: {_quoted(answer_bytes)}"
+        )
+        raise ExternalProgramError(message)
+    if (surrogate := _LONE_SURROGATE.search(text)) is not None:
+        # Section 4b: such a text cannot be written as UTF-8, so not kept.
+        message = (
+            f"LM Studio at {server} gave for {what} a text with a lone surrogate, "
+            f"U+{ord(surrogate.group()):04X}, at character {surrogate.start()}, "
+            "which is no character"
+        )
         raise ExternalProgramError(message)
     return Reading(text, cut_short=finish == "length")

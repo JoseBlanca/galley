@@ -26,13 +26,16 @@ type SmallEvaluation = Callable[[EvaluationBook | None], Evaluation]
 _REPOSITORY = Path(__file__).resolve().parents[3]
 
 
-def test_help_lists_the_three_subcommands_and_exits_with_code_0(
+def test_help_lists_the_six_subcommands_and_exits_with_code_0(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     with pytest.raises(SystemExit) as raised:
         main(["--help"])
     assert raised.value.code == 0
-    assert "{run,compare,summary}" in capsys.readouterr().out
+    assert (
+        "{run,compare,summary,edits,edits-score,edits-compare}"
+        in capsys.readouterr().out
+    )
 
 
 def test_unknown_subcommand_exits_with_code_2() -> None:

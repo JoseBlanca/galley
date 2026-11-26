@@ -120,7 +120,7 @@ _STAGES: tuple[_Stage, ...] = (
         help="a local vision model's fixes to the words: edits/correct.jsonl",
         run=correct.run,
         needs_pandoc=False,
-        needs_word_list=False,
+        needs_word_list=True,
         reads_with_tesseract=False,
         needs_tesseract_under_redo=False,
         only_when_correct=True,
@@ -202,15 +202,22 @@ def _book_folder(path: Path) -> BookFolder:
     return BookFolder(path)
 
 
-def _check_before_any_stage(stages: tuple[_Stage, ...], config: BookConfig) -> None:
-    """ExternalProgramError when the correct stage runs and LM Studio does
-    not answer or lacks a model of the config; when a stage needs Pandoc and it is not on the PATH (spec section 9);
+def _check_before_any_stage(
+    stages: tuple[_Stage, ...], config: BookConfig, folder: BookFolder
+) -> None:
+    """ExternalProgramError when the correct stage runs on a book folder
+    without kept answers, answers/, and LM Studio does not answer or lacks a
+    model of the config (with kept answers the stage checks before its first
+    request, and not at all when it sends none: correct spec, section 4); when a stage needs Pandoc and it is not on the PATH (spec section 9);
     when analyze or structure, or layout re-reading small print, needs
     Tesseract's tools to extract the word list; or when layout reads with
     Tesseract, which it does only when the config's `ocr` is `verify`, or
     analyze or extract runs under `ocr = "redo"`, and it is not on the
     PATH."""
-    if any(stage.only_when_correct for stage in stages):
+    if (
+        any(stage.only_when_correct for stage in stages)
+        and not folder.answers_dir.exists()
+    ):
         correct.check_server(config)
     if any(stage.needs_pandoc for stage in stages) and shutil.which("pandoc") is None:
         message = "pandoc is not installed; install it with `brew install pandoc`"
@@ -299,7 +306,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         folder = _book_folder(arguments.folder)
         config = read_config(folder.book_toml)
         stages = _stages_of(command, config)
-        _check_before_any_stage(stages, config)
+        _check_before_any_stage(stages, config, folder)
         for stage in stages:
             running = stage.name
             _logger.info("running %s on %s", stage.name, folder.root)

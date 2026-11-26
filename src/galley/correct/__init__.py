@@ -3,21 +3,26 @@ text page, and where its words line up with galley's and differ, its words
 become edits in edits/correct.jsonl, which markdown applies
 (docs/specs/correct.md).
 
-It reads the PDF, pages.json, words.json and blocks.json, and writes only
-edits/correct.jsonl. It never changes a note marker or reference, a label,
+It reads the PDF, pages.json, words.json and blocks.json, and writes
+edits/correct.jsonl; it keeps every answer of the model under answers/ and
+reads it there instead of asking again when the request is the same
+(section 4b). It never changes a note marker or reference, a label,
 a running head, the order of blocks, or a page that is not a text page.
 """
 
 import io
 import logging
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
 from PIL import Image
 
-from galley import pdfium
+from galley import pdfium, wordlist
 from galley.book_folder import BookFolder, Stage, delete_stage_outputs
 from galley.config import BookConfig
+from galley.correct._answers import AnswerSource, kept_or_read, once
 from galley.correct._links import (
     Link,
     galley_references,
@@ -25,17 +30,20 @@ from galley.correct._links import (
     link_edits,
     page_links,
 )
-from galley.correct._lmstudio import LINKS_PROMPT, Reading, check_models, read_image
+from galley.correct._lmstudio import LINKS_PROMPT, PROMPT, Reading, check_models
 from galley.correct._merge import (
     Answer,
     Change,
+    WordList,
     answer,
     block_edits,
     is_doubtful,
     page_changes,
 )
 from galley.correct._reading import GalleyToken, Place, page_reading, split_counts
+from galley.correct._tokens import tokens
 from galley.model import (
+    AnswerKind,
     BlocksFile,
     Edit,
     Note,
@@ -103,6 +111,8 @@ class _PageResult:
     cut_short: bool
     links: tuple[Link, ...] = ()
     links_cut_short: bool = False
+    # Where each of the page's answers came from (section 4b).
+    sources: tuple[AnswerSource, ...] = ()
 
 
 def footnote_band_top(blocks: BlocksFile, page_index: int) -> float | None:
@@ -132,33 +142,67 @@ def page_png(rendered: RenderedPage, top_pt: float | None) -> bytes:
     return buffer.getvalue()
 
 
-def _read_page(config: BookConfig, work: _PageWork) -> _PageResult:
+def _read_page(
+    config: BookConfig,
+    answers_dir: Path,
+    check_server_once: Callable[[], None],
+    known_words: WordList,
+    work: _PageWork,
+) -> _PageResult:
     """Render the page, have the model read it (and the second model its
     footnote band), and make its changes; on a page where a note starts,
-    have the model mark the note references too (section 9b)."""
+    have the model mark the note references too (section 9b). Each answer
+    is the one kept in `answers_dir` when the request is the same (section
+    4b); `check_server_once` runs before a request is sent. `known_words`
+    is the book's word list, for the guards of a merge (section 7)."""
     rendered = pdfium.render(config.pdf, work.page_index, _DPI)
     png = page_png(rendered, None)
     what = f"page {work.page_index}"
-    reading = read_image(config.correct_server, config.correct_model, png, what)
+    sources: list[AnswerSource] = []
+
+    def read(
+        kind: AnswerKind, model: str, image: bytes, about: str, prompt: str
+    ) -> Reading:
+        reading, source = kept_or_read(
+            answers_dir,
+            kind,
+            work.page_index,
+            config.correct_server,
+            model,
+            image,
+            about,
+            prompt,
+            check_server_once,
+        )
+        sources.append(source)
+        return reading
+
+    reading = read(AnswerKind.PAGE, config.correct_model, png, what, PROMPT)
     changes: tuple[Change, ...] = ()
     if not reading.cut_short:
         second: Answer | None = None
         if config.correct_second_model is not None and work.band_top is not None:
-            second_reading: Reading = read_image(
-                config.correct_server,
+            second_reading = read(
+                AnswerKind.BAND,
                 config.correct_second_model,
                 page_png(rendered, work.band_top),
                 f"the footnote band of {what}",
+                PROMPT,
             )
             second = answer(second_reading.text)
         changes = page_changes(
-            work.page_index, work.reading, answer(reading.text), work.cores, second
+            work.page_index,
+            work.reading,
+            answer(reading.text),
+            work.cores,
+            second,
+            known_words=known_words,
         )
     links: tuple[Link, ...] = ()
     links_cut_short = False
     if work.notes:
-        marked = read_image(
-            config.correct_server,
+        marked = read(
+            AnswerKind.LINKS,
             config.correct_model,
             png,
             f"the note references of {what}",
@@ -179,6 +223,7 @@ def _read_page(config: BookConfig, work: _PageWork) -> _PageResult:
         cut_short=reading.cut_short,
         links=links,
         links_cut_short=links_cut_short,
+        sources=tuple(sources),
     )
 
 
@@ -237,9 +282,13 @@ def run(
     """Write edits/correct.jsonl: the vision model's fixes to galley's words
     of every text page, as edits (docs/specs/correct.md).
 
-    Deletes edits/correct.jsonl, book.md and book.epub first. Raises
-    ExternalProgramError when LM Studio does not answer or lacks the model,
-    and InputFileError for an input made from another PDF.
+    Deletes edits/correct.jsonl, book.md and book.epub first, never
+    answers/: each answer of the model is kept there and read instead of
+    asking again when the request is the same (section 4b). Raises
+    ExternalProgramError when a request is to be sent and LM Studio does
+    not answer or lacks the model,
+    and InputFileError for an input made from another PDF or a kept answer
+    that cannot be read.
     """
     delete_stage_outputs(folder, Stage.CORRECT)
     pages, blocks = read_checked_input(
@@ -249,7 +298,6 @@ def run(
     check_source_pdf(
         folder.words_json, words.source_pdf_sha256, pages.source_pdf_sha256
     )
-    check_server(config)
     splits = {
         block.id: split_counts(block, words)
         for block in every_block(blocks)
@@ -275,7 +323,27 @@ def run(
                     else frozendict(),
                 )
             )
-    results = map_pages(lambda item: _read_page(config, item), work, workers)
+    folder.answers_dir.mkdir(exist_ok=True)
+    # Section 4: LM Studio is checked once, before the first request sent.
+    check_server_once = once(lambda: check_server(config))
+    known_words = WordList.of(
+        wordlist.word_list(config.language, wordlist.DEFAULT_CACHE_DIR),
+        frozendict(
+            Counter(
+                token.form
+                for block in every_block(blocks)
+                for span in block.spans
+                for token in tokens(span.text)
+            )
+        ),
+    )
+    results = map_pages(
+        lambda item: _read_page(
+            config, folder.answers_dir, check_server_once, known_words, item
+        ),
+        work,
+        workers,
+    )
     changes = tuple(change for result in results for change in result.changes)
     word_edits = edits_of(blocks, changes, config.correct_model)
     links = link_edits(
@@ -303,12 +371,17 @@ def run(
             page_index,
         )
     doubtful = sum(1 for change in changes if is_doubtful(change))
+    sources = [source for result in results for source in result.sources]
     _logger.info(
-        "wrote %s: %d edits, %d of them note links, on %d pages%s%s",
+        "wrote %s: %d edits, %d of them note links, on %d pages, from %d "
+        "answers kept in %s and %d asked of the model%s%s",
         folder.correct_jsonl,
         len(edits),
         len(links),
         len(work),
+        sources.count(AnswerSource.KEPT),
+        folder.answers_dir,
+        sources.count(AnswerSource.ASKED),
         f", {doubtful} doubtful by the second reading"
         if config.correct_second_model is not None
         else "",
