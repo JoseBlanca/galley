@@ -2,6 +2,9 @@
 every stage, and a stage's name runs that stage alone (spec section 9).
 
 The command reads `book.toml` from the folder and calls each stage's `run`.
+`run` also takes the book's PDF with `--title`, `--author` and
+`--language`, and then first writes the book folder beside the PDF and
+its `book.toml`, or reuses an equal one (architecture section 14).
 `run` runs the correct stage only when the config has `correct = true`,
 unless its flag `--correct` or `--no-correct` decides for that run
 (architecture section 14).
@@ -37,7 +40,14 @@ from galley import (
     wordlist,
 )
 from galley.book_folder import BookFolder
-from galley.config import BookConfig, OcrMode, read_config, tesseract_language
+from galley.config import (
+    BookConfig,
+    Language,
+    OcrMode,
+    book_toml_text,
+    read_config,
+    tesseract_language,
+)
 from galley.errors import ConfigError, ExternalProgramError
 from galley.parallel import DEFAULT_WORKERS
 
@@ -47,6 +57,8 @@ _logger = logging.getLogger(__name__)
 
 _RUN = "run"
 _RUN_HELP = "every stage in order, from the PDF to book.epub"
+_PDF_SUFFIX = ".pdf"
+_PDF_OPTIONS = ("--title", "--author", "--language")
 
 
 class _StageRun(Protocol):
@@ -171,9 +183,20 @@ def _parser() -> argparse.ArgumentParser:
     commands = ((_RUN, _RUN_HELP), *((stage.name, stage.help) for stage in _STAGES))
     for name, help_text in commands:
         subcommand = subcommands.add_parser(name, help=help_text, description=help_text)
-        subcommand.add_argument(
-            "folder", type=Path, help="the book folder, which holds book.toml"
-        )
+        if name == _RUN:
+            subcommand.add_argument(
+                "path",
+                type=Path,
+                help="the book folder, which holds book.toml, or the book's PDF "
+                "for a simple book",
+            )
+        else:
+            subcommand.add_argument(
+                "path",
+                metavar="folder",
+                type=Path,
+                help="the book folder, which holds book.toml",
+            )
         subcommand.add_argument(
             "--workers",
             type=_workers,
@@ -188,9 +211,43 @@ def _parser() -> argparse.ArgumentParser:
                 help="run the correct stage, or with --no-correct skip it, "
                 "whatever book.toml's correct says (default: as book.toml says)",
             )
-    # The other subcommands have no flag, and so the config decides.
-    parser.set_defaults(correct=None)
+            subcommand.add_argument(
+                "--title", help="with a PDF: the book's title (required)"
+            )
+            subcommand.add_argument(
+                "--author",
+                action="append",
+                dest="authors",
+                help="with a PDF: an author, once for each in printed order (required)",
+            )
+            subcommand.add_argument(
+                "--language",
+                choices=tuple(language.value for language in Language),
+                help="with a PDF: the book's language (required)",
+            )
+    # The other subcommands have no flag, and so the config decides; and
+    # they take only a book folder.
+    parser.set_defaults(correct=None, title=None, authors=None, language=None)
     return parser
+
+
+@dataclass(frozen=True, slots=True)
+class _PdfOptions:
+    """The options of run that give a PDF's book.toml; None when not given."""
+
+    title: str | None
+    authors: tuple[str, ...] | None
+    language: str | None
+
+
+def _given(pdf_options: _PdfOptions) -> tuple[str, ...]:
+    """The options of `pdf_options` given, by their names on the command line."""
+    values = (pdf_options.title, pdf_options.authors, pdf_options.language)
+    return tuple(
+        option
+        for option, value in zip(_PDF_OPTIONS, values, strict=True)
+        if value is not None
+    )
 
 
 def _with_correct_flag(config: BookConfig, *, correct_flag: bool | None) -> BookConfig:
@@ -212,8 +269,33 @@ def _stages_of(command: str, config: BookConfig) -> tuple[_Stage, ...]:
     return tuple(stage for stage in _STAGES if stage.name == command)
 
 
-def _book_folder(path: Path) -> BookFolder:
-    """The book folder at `path`; ConfigError when `path` is a file."""
+def _is_pdf(path: Path) -> bool:
+    """Whether the name of `path` ends in .pdf, in any case."""
+    return path.suffix.lower() == _PDF_SUFFIX
+
+
+def _book_folder(command: str, path: Path, pdf_options: _PdfOptions) -> BookFolder:
+    """The book folder of `command` at `path`: under run, when `path` is
+    a PDF, the folder beside it with its book.toml, made from
+    `pdf_options` (architecture section 14); otherwise `path` itself.
+    ConfigError when `path` is another file, a missing PDF, or a folder
+    given with options of a PDF."""
+    if command == _RUN and path.is_file() and _is_pdf(path):
+        return _folder_of_pdf(path, pdf_options)
+    if command == _RUN and (path.is_file() or (_is_pdf(path) and not path.exists())):
+        problem = "is a file but not a PDF" if path.is_file() else "does not exist"
+        message = (
+            f"{path} {problem}; run takes the book's PDF or its book folder, "
+            "which holds book.toml"
+        )
+        raise ConfigError(message)
+    given = _given(pdf_options)
+    if given:
+        message = (
+            f"{given[0]} is taken only with a PDF; the settings of the book "
+            f"folder {path} are in its book.toml"
+        )
+        raise ConfigError(message)
     if path.is_file():
         message = (
             f"{path} is a file; the argument must be the book folder, "
@@ -221,6 +303,58 @@ def _book_folder(path: Path) -> BookFolder:
         )
         raise ConfigError(message)
     return BookFolder(path)
+
+
+def _required[T: (str, tuple[str, ...])](value: T | None, option: str) -> T:
+    """The value of an option the PDF form needs; ConfigError when it is
+    missing or empty."""
+    if value is None:
+        message = f"{option} is missing; run on a PDF needs {', '.join(_PDF_OPTIONS)}"
+        raise ConfigError(message)
+    if len(value) == 0:
+        message = f"{option} must not be empty"
+        raise ConfigError(message)
+    return value
+
+
+def _folder_of_pdf(pdf: Path, pdf_options: _PdfOptions) -> BookFolder:
+    """The book folder of `pdf`, beside it and named after it without its
+    extension, holding a book.toml with the four keys of `pdf_options`:
+    written when the folder has none, reused when it reads to the same
+    config, never overwritten (architecture section 14)."""
+    title = _required(pdf_options.title, "--title")
+    authors = _required(pdf_options.authors, "--author")
+    for author in authors:
+        _required(author, "--author")
+    language = Language(_required(pdf_options.language, "--language"))
+    folder = BookFolder(pdf.parent / pdf.stem)
+    if folder.root.exists() and not folder.root.is_dir():
+        message = (
+            f"{folder.root} is a file, not the book folder of {pdf}; "
+            "move it away, or rename the PDF"
+        )
+        raise ConfigError(message)
+    wanted = BookConfig(
+        pdf=pdf.resolve(), title=title, authors=authors, language=language
+    )
+    if folder.book_toml.exists():
+        if read_config(folder.book_toml) != wanted:
+            message = (
+                f"{folder.root} already holds a different book.toml; run "
+                f"galley2epub run on {folder.root} instead, or remove its book.toml"
+            )
+            raise ConfigError(message)
+        _logger.info("using %s, which equals the options", folder.book_toml)
+        return folder
+    folder.root.mkdir(exist_ok=True)
+    folder.book_toml.write_text(
+        book_toml_text(
+            pdf=f"../{pdf.name}", title=title, authors=authors, language=language
+        ),
+        encoding="utf-8",
+    )
+    _logger.info("wrote %s", folder.book_toml)
+    return folder
 
 
 def _check_before_any_stage(
@@ -324,7 +458,16 @@ def main(argv: Sequence[str] | None = None) -> None:
     command = str(arguments.command)
     running: str | None = None
     try:
-        folder = _book_folder(arguments.folder)
+        authors = arguments.authors
+        folder = _book_folder(
+            command,
+            arguments.path,
+            _PdfOptions(
+                title=arguments.title,
+                authors=None if authors is None else tuple(authors),
+                language=arguments.language,
+            ),
+        )
         config = _with_correct_flag(
             read_config(folder.book_toml), correct_flag=arguments.correct
         )

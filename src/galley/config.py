@@ -351,6 +351,45 @@ def _box(value: object, key: str, path: Path) -> Box:
     return Box(x0, top, x1, bottom)
 
 
+def book_toml_text(
+    *, pdf: str, title: str, authors: tuple[str, ...], language: Language
+) -> str:
+    """The text of a `book.toml` with only the four required keys, which
+    `read_config` reads back to these values: `pdf` as given, relative to
+    the file's folder or absolute (architecture section 14)."""
+    authors_list = ", ".join(_toml_string(author) for author in authors)
+    return (
+        f"pdf = {_toml_string(pdf)}\n"
+        f"title = {_toml_string(title)}\n"
+        f"authors = [{authors_list}]\n"
+        f"language = {_toml_string(language.value)}\n"
+    )
+
+
+# The characters a TOML basic string must escape besides the control
+# characters: the quote and the backslash (TOML 1.0, "String").
+_TOML_ESCAPES = frozendict({'"': '\\"', "\\": "\\\\"})
+# The last control character below the space, and DEL, which TOML also
+# forbids unescaped.
+_LAST_LOW_CONTROL = 0x1F
+_DELETE = 0x7F
+
+
+def _toml_string(text: str) -> str:
+    """`text` as a TOML basic string, "..."; characters outside ASCII are
+    written as they are, since the file is UTF-8."""
+    escaped = "".join(
+        _TOML_ESCAPES.get(character)
+        or (
+            f"\\u{ord(character):04X}"
+            if ord(character) <= _LAST_LOW_CONTROL or ord(character) == _DELETE
+            else character
+        )
+        for character in text
+    )
+    return f'"{escaped}"'
+
+
 def tesseract_language(language: Language) -> str:
     """Tesseract's code of the language: en gives eng, es spa, fr fra, de deu, it ita."""
     match language:

@@ -12,6 +12,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tomllib
 import zipfile
 from collections.abc import Callable
 from dataclasses import replace
@@ -23,7 +24,7 @@ import pytest
 from galley import cli, wordlist
 from galley.book_folder import BookFolder
 from galley.cli import main
-from galley.config import BookConfig, read_config
+from galley.config import BookConfig, Language, read_config
 from galley.errors import ConfigError, ExternalProgramError, InputFileError
 from galley.model import read_lines
 from galley.parallel import DEFAULT_WORKERS
@@ -784,3 +785,254 @@ def test_correct_on_a_folder_with_kept_answers_leaves_the_server_check_to_the_st
         cli._check_before_any_stage(stages, config, folder)
     folder.answers_dir.mkdir()
     cli._check_before_any_stage(stages, config, folder)
+
+
+# run on a PDF (architecture section 14)
+
+# A small excerpt: the stages are stand-ins, so only its being a file matters.
+SMALL_PDF = "haskins_endpapers"
+PDF_OPTIONS = ("--title", "A Title", "--author", "An Author", "--language", "en")
+
+
+def _pdf_in(tmp_path: Path, excerpt_pdf: frozendict[str, Path], name: str) -> Path:
+    """A copy of a small excerpt PDF in `tmp_path`, named `name`."""
+    return Path(shutil.copy(excerpt_pdf[SMALL_PDF], tmp_path / name))
+
+
+def _recorded_stages(
+    path: Path, arguments: list[str], monkeypatch: pytest.MonkeyPatch
+) -> list[tuple[str, Path, BookConfig]]:
+    """The stages `galley2epub run` calls on `path` with `arguments`, each
+    with the book folder and the config it receives; no stage does any work."""
+    calls: list[tuple[str, Path, BookConfig]] = []
+
+    def recorder(name: str) -> Callable[..., None]:
+        def record(folder: BookFolder, config: BookConfig, *, workers: int = 0) -> None:
+            del workers
+            calls.append((name, folder.root, config))
+
+        return record
+
+    monkeypatch.setattr(
+        cli,
+        "_STAGES",
+        tuple(replace(stage, run=recorder(stage.name)) for stage in cli._STAGES),
+    )
+    main(["run", str(path), *arguments])
+    return calls
+
+
+def test_run_on_a_pdf_writes_book_toml_beside_it_and_runs_every_stage_there(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = _pdf_in(tmp_path, excerpt_pdf, "haskins.pdf")
+
+    calls = _recorded_stages(
+        pdf,
+        ["--title", "The Normans", "--author", "C. H. Haskins", "--language", "fr"],
+        monkeypatch,
+    )
+
+    book_toml = tmp_path / "haskins" / "book.toml"
+    with book_toml.open("rb") as toml:
+        assert tomllib.load(toml) == {
+            "pdf": "../haskins.pdf",
+            "title": "The Normans",
+            "authors": ["C. H. Haskins"],
+            "language": "fr",
+        }
+    expected = BookConfig(
+        pdf=pdf.resolve(),
+        title="The Normans",
+        authors=("C. H. Haskins",),
+        language=Language.FR,
+    )
+    assert read_config(book_toml) == expected
+    assert calls == [(stage, tmp_path / "haskins", expected) for stage in STAGES]
+
+
+def test_run_on_a_pdf_keeps_the_order_of_repeated_authors_and_takes_upper_case_pdf(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = _pdf_in(tmp_path, excerpt_pdf, "Book.PDF")
+    authors = ("Zoe Zed", "Adam Ant", "Mia Em")
+
+    calls = _recorded_stages(
+        pdf,
+        ["--title", "T", "--language", "en"]
+        + [option for author in authors for option in ("--author", author)],
+        monkeypatch,
+    )
+
+    assert read_config(tmp_path / "Book" / "book.toml").authors == authors
+    assert {config.authors for _, _, config in calls} == {authors}
+
+
+def test_run_on_a_pdf_writes_a_title_with_quotes_backslashes_and_accents_that_reads_back(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    title = 'The "Book" of C:\\dos\\ \'\'\' and """ é Ñandú 東京\tend'
+    author = 'O\'Brien "the \\ Elder"'
+    pdf = _pdf_in(tmp_path, excerpt_pdf, 'odd "name" \\ é.pdf')
+
+    _recorded_stages(
+        pdf,
+        ["--title", title, "--author", author, "--language", "es"],
+        monkeypatch,
+    )
+
+    config = read_config(tmp_path / 'odd "name" \\ é' / "book.toml")
+    assert (config.pdf, config.title, config.authors) == (
+        pdf.resolve(),
+        title,
+        (author,),
+    )
+
+
+@pytest.mark.parametrize("missing", ["--title", "--author", "--language"])
+def test_run_on_a_pdf_without_an_option_raises_config_error_naming_it(
+    missing: str,
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = _pdf_in(tmp_path, excerpt_pdf, "book.pdf")
+    position = PDF_OPTIONS.index(missing)
+    options = [*PDF_OPTIONS[:position], *PDF_OPTIONS[position + 2 :]]
+
+    with pytest.raises(ConfigError, match=f"{missing} is missing"):
+        _recorded_stages(pdf, options, monkeypatch)
+
+    assert not (tmp_path / "book").exists()
+
+
+@pytest.mark.parametrize("empty", ["--title", "--author"])
+def test_run_on_a_pdf_with_an_empty_title_or_author_raises_config_error(
+    empty: str,
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = _pdf_in(tmp_path, excerpt_pdf, "book.pdf")
+    position = PDF_OPTIONS.index(empty)
+    options = [*PDF_OPTIONS[: position + 1], "", *PDF_OPTIONS[position + 2 :]]
+
+    with pytest.raises(ConfigError, match=f"{empty} must not be empty"):
+        _recorded_stages(pdf, options, monkeypatch)
+
+    assert not (tmp_path / "book").exists()
+
+
+@pytest.mark.parametrize("option", ["--title", "--author", "--language"])
+def test_run_on_a_folder_with_a_pdf_option_raises_config_error(
+    option: str,
+    tmp_path: Path,
+    excerpt_book_toml: frozendict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    folder = _book(tmp_path, excerpt_book_toml[KADESH])
+    value = PDF_OPTIONS[PDF_OPTIONS.index(option) + 1]
+
+    with pytest.raises(ConfigError, match=f"{option} is taken only with a PDF"):
+        _recorded_stages(folder.root, [option, value], monkeypatch)
+
+
+def test_run_on_a_pdf_reuses_an_equal_book_toml_and_leaves_it_unchanged(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = _pdf_in(tmp_path, excerpt_pdf, "book.pdf")
+    folder = BookFolder(tmp_path / "book")
+    folder.root.mkdir()
+    # Other text, the same values: keys reordered, a default written out,
+    # and the PDF given by its absolute path.
+    own_toml = (
+        '# my book\nlanguage = "en"\nocr = "verify"\nauthors = ["An Author"]\n'
+        f"title = 'A Title'\npdf = '{pdf}'\n"
+    ).encode()
+    folder.book_toml.write_bytes(own_toml)
+
+    calls = _recorded_stages(pdf, list(PDF_OPTIONS), monkeypatch)
+
+    assert [stage for stage, _, _ in calls] == list(STAGES)
+    assert folder.book_toml.read_bytes() == own_toml
+
+
+def test_run_on_a_pdf_whose_folder_holds_a_different_book_toml_raises_and_keeps_it(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = _pdf_in(tmp_path, excerpt_pdf, "book.pdf")
+    folder = BookFolder(tmp_path / "book")
+    folder.root.mkdir()
+    own_toml = (
+        b'pdf = "../book.pdf"\ntitle = "A Title"\nauthors = ["An Author"]\n'
+        b'language = "en"\ncover_page = 0\n'
+    )
+    folder.book_toml.write_bytes(own_toml)
+
+    with pytest.raises(ConfigError, match="already holds a different book.toml"):
+        _recorded_stages(pdf, list(PDF_OPTIONS), monkeypatch)
+
+    assert folder.book_toml.read_bytes() == own_toml
+    assert _names(folder) == ["book.toml"]
+
+
+def test_run_on_a_pdf_whose_folder_name_is_a_file_raises_config_error(
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = _pdf_in(tmp_path, excerpt_pdf, "book.pdf")
+    (tmp_path / "book").write_text("not a folder", encoding="utf-8")
+
+    with pytest.raises(ConfigError, match="is a file, not the book folder"):
+        _recorded_stages(pdf, list(PDF_OPTIONS), monkeypatch)
+
+    assert (tmp_path / "book").read_text(encoding="utf-8") == "not a folder"
+
+
+@pytest.mark.parametrize(
+    ("flag", "expected_stages"),
+    [
+        ("--no-correct", STAGES),
+        ("--correct", (*STAGES[:4], "correct", *STAGES[4:])),
+    ],
+)
+def test_run_on_a_pdf_takes_correct_and_no_correct(
+    flag: str,
+    expected_stages: tuple[str, ...],
+    tmp_path: Path,
+    excerpt_pdf: frozendict[str, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = _pdf_in(tmp_path, excerpt_pdf, "book.pdf")
+    # A folder made beforehand, without book.toml, is used. Its kept
+    # answers leave the server check to the stage, a stand-in here.
+    (tmp_path / "book" / "answers").mkdir(parents=True)
+
+    calls = _recorded_stages(pdf, [*PDF_OPTIONS, flag], monkeypatch)
+
+    assert [(stage, config.correct) for stage, _, config in calls] == [
+        (stage, flag == "--correct") for stage in expected_stages
+    ]
+
+
+@pytest.mark.parametrize("name", ["notes.txt", "missing.pdf"])
+def test_run_on_a_file_not_a_pdf_or_a_missing_pdf_raises_naming_both_forms(
+    name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / name
+    if name.endswith(".txt"):
+        path.write_text("text", encoding="utf-8")
+
+    with pytest.raises(ConfigError, match="the book's PDF or its book folder"):
+        _recorded_stages(path, list(PDF_OPTIONS), monkeypatch)
