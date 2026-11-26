@@ -6,9 +6,9 @@ words of its text layer, and renders every page that is neither excluded
 nor the cover at 36 dpi to test whether it is a plate (`is_plate`). A page
 is `excluded` when the config excludes it, a `plate` when the config's
 `plate_pages` names it or the plate rule takes it, and `text` when its
-layer has a word. Each page without a text layer that it tests so is
-audited (analyze spec sections 2 to 4): rendered at 300 dpi, read with
-Tesseract and measured for ink (`audit_verdict`). With 40 text words or
+layer has a word. A page without a text layer that the plate rule tests
+is also audited (analyze spec sections 2 to 4): rendered at 300 dpi, read
+with Tesseract and measured for ink (`audit_verdict`). With 40 text words or
 more it is text even where the plate rule takes it; else the plate rule
 decides; else with a text word it is text, with ink a plate, and
 otherwise `blank`, recorded as checked by OCR. A page the audit makes
@@ -42,7 +42,13 @@ import pdfplumber
 from PIL import Image
 
 from galley import ocr, pdfium, wordlist
-from galley.analyze._audit import AuditVerdict, audit_verdict, ink_share, is_text_word
+from galley.analyze._audit import (
+    AuditVerdict,
+    audit_verdict,
+    image_ink_share,
+    ink_share,
+    is_text_word,
+)
 from galley.analyze._figures import PictureGroup, figure_boxes, figure_groups
 from galley.analyze._inkless import InkRule, InkTest, is_inkless, measure_ink
 from galley.analyze._plates import (
@@ -115,10 +121,11 @@ _SEARCH_WINDOW_LEAST_PAGES: Final[int] = 10
 # median word count of the book's text pages. A guess, measured on Kadesh
 # alone: its median is 545 words, its front pages have at most 47.
 _RUNNING_TEXT_SHARE_OF_MEDIAN: Final[float] = 0.5
-# Analyze spec section 2, "Where it runs": Tesseract finds the blocks of the
-# whole page, as extract reads an `ocr` page (extract spec section 9), so
-# that extract finds the words the audit found.
-_AUDIT_PAGE_SEGMENTATION: Final[int] = 3
+# Analyze spec sections 3 and 4: half the ink share from which a page is a
+# picture; a blank page with this much ink is logged at WARNING, as a page
+# whose lone word Tesseract may have missed (Haskins 4 with a pasted "end":
+# 0.047%).
+_BLANK_LOOK_LEAST_INK_SHARE: Final[float] = 0.0004
 # Analyze spec section 4: how many of a text page's words the WARNING quotes.
 _LOGGED_WORDS: Final[int] = 10
 
@@ -156,18 +163,6 @@ class PlateRule(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class _PlateTest:
-    """What the plate rule measured on a page it tested: its picture area,
-    the known words of its text layer (0 without one), whether it has a
-    layer, and the rule's finding."""
-
-    area: PictureArea
-    known_words: int
-    has_layer: bool
-    rule: PlateRule
-
-
-@dataclass(frozen=True, slots=True)
 class _Audit:
     """What the audit found on a page without a text layer: every word
     Tesseract read on its 300 dpi render, its ink share from 0 to 1, and
@@ -179,15 +174,30 @@ class _Audit:
 
 
 @dataclass(frozen=True, slots=True)
+class _PlateTest:
+    """What analyze measured on a page the plate rule tested: its picture
+    area, the known words of its text layer (0 without one), the rule's
+    finding, and the audit of a page without a text layer (None for a page
+    with one)."""
+
+    area: PictureArea
+    known_words: int
+    rule: PlateRule
+    audit: _Audit | None
+
+
+@dataclass(frozen=True, slots=True)
 class _Measurement:
-    """What analyze measures of one page: its size in points from
-    pdfplumber, the number of words of its text layer, the words of the
-    layer's topmost row (empty without words), the plate rule's test,
-    None for a page it does not test, the inkless rule's test, None for a
-    page it does not test, the audit of a page without a text layer that
-    the plate rule tests, None for any other page, and the in-page figures
-    found on a page the plate rule tests that is not a plate and has a
-    text layer or text the audit read."""
+    """What analyze measures of one page.
+
+    Its size in points is pdfplumber's. `layer_word_count` counts the
+    words of its text layer, and `first_row` holds those of the layer's
+    topmost row, empty without words. `plate_test` is the plate rule's
+    test with the page's audit, None for a page the rule does not test;
+    `ink_test` is the inkless rule's, None likewise. `figures` are the
+    in-page figures found on a page the plate rule tests that is not a
+    plate and has a text layer or text the audit read.
+    """
 
     width_pt: float
     height_pt: float
@@ -195,8 +205,12 @@ class _Measurement:
     first_row: tuple[str, ...]
     plate_test: _PlateTest | None
     ink_test: InkTest | None
-    audit: _Audit | None
     figures: tuple[PictureGroup, ...]
+
+
+def _audit_of(measurement: _Measurement) -> _Audit | None:
+    """The audit of the measured page, None for a page it did not read."""
+    return None if measurement.plate_test is None else measurement.plate_test.audit
 
 
 def run(
@@ -248,9 +262,7 @@ def run(
                     ink_rule=InkRule.NOT_INKLESS
                     if measurement.ink_test is None
                     else measurement.ink_test.rule,
-                    audit=AuditVerdict.NOT_AUDITED
-                    if measurement.audit is None
-                    else measurement.audit.verdict,
+                    audit=_verdict(_audit_of(measurement)),
                     front_matter_end=end,
                 ),
                 measurement.figures,
@@ -265,9 +277,9 @@ def run(
     end, step = _front_matter_end_and_step(starts, config)
     pages = classify(end)
     for page, measurement in zip(pages, measurements, strict=True):
-        _log_plate_taken(page, measurement.plate_test)
-        if measurement.audit is not None:
-            _log_audited(page, measurement.audit, measurement.plate_test)
+        if measurement.plate_test is not None:
+            _log_plate_taken(page, measurement.plate_test)
+            _log_audited(page, measurement.plate_test)
     _log_front_matter(end, step, pages, config)
     for page, measurement in zip(pages, measurements, strict=True):
         if page.kind is PageKind.INKLESS and measurement.ink_test is not None:
@@ -275,7 +287,7 @@ def run(
     for page, measurement in zip(pages, measurements, strict=True):
         if page.figure_boxes:
             _log_figures(page.index, measurement.figures)
-    _log_audit_counts(measurements)
+    _log_audit_counts(pages, measurements)
     write_pages(
         folder.pages_json,
         PagesFile(
@@ -322,31 +334,24 @@ def _measurer(
         plate_test = (
             None
             if rendered is None
-            else _test_plate(rendered, page_layer_words, lower_case_words)
-        )
-        audit = (
-            _audit(config, page_index, language)
-            if rendered is not None and not page_layer_words
-            else None
+            else _test_plate(
+                rendered,
+                page_layer_words,
+                lower_case_words,
+                None if page_layer_words else _audit(config, page_index, language),
+            )
         )
         # Figures spec section 3: a page that may end as a text page is
         # searched for figures on the same render; classify_page decides.
         # A page without a layer that the audit reads as text is searched
         # with its text words in place of the layer's (analyze spec
         # section 4).
-        figure_words = (
-            page_layer_words if page_layer_words else _audited_text_words(audit)
-        )
         figures = (
             ()
-            if rendered is None
-            or plate_test is None
-            or not figure_words
-            or (
-                plate_test.rule is PlateRule.PLATE
-                and (audit is None or audit.verdict is not AuditVerdict.MUCH_TEXT)
+            if rendered is None or plate_test is None
+            else _figures(
+                rendered, plate_test, page_layer_words, region_boxes, lower_case_words
             )
-            else figure_groups(rendered, figure_words, region_boxes, lower_case_words)
         )
         ink_test = (
             None
@@ -368,7 +373,6 @@ def _measurer(
             first_row=tuple(word.text for word in rows[0].words) if rows else (),
             plate_test=plate_test,
             ink_test=ink_test,
-            audit=audit,
             figures=figures,
         )
 
@@ -382,21 +386,51 @@ def _audit(config: BookConfig, page_index: int, language: str) -> _Audit:
     code), and measured for ink, in the calling thread (analyze spec
     sections 2 and 3)."""
     rendered = pdfium.render(config.pdf, page_index, ocr.OCR_DPI)
+    image = Image.frombytes(
+        "L", (rendered.width_px, rendered.height_px), rendered.pixels
+    )
     words = ocr.read_image(
-        Image.frombytes("L", (rendered.width_px, rendered.height_px), rendered.pixels),
+        image,
         origin=(0.0, 0.0),
         dpi=rendered.dpi,
-        psm=_AUDIT_PAGE_SEGMENTATION,
+        psm=ocr.WHOLE_PAGE_SEGMENTATION,
         language=language,
     )
-    ink = ink_share(rendered)
+    ink = image_ink_share(image)
     return _Audit(words=words, ink=ink, verdict=audit_verdict(words, ink))
 
 
-def _audited_text_words(audit: _Audit | None) -> tuple[tuple[str, Box], ...]:
+def _verdict(audit: _Audit | None) -> AuditVerdict:
+    """The audit's verdict, NOT_AUDITED for a page it did not read."""
+    return AuditVerdict.NOT_AUDITED if audit is None else audit.verdict
+
+
+def _figures(
+    rendered: RenderedPage,
+    plate_test: _PlateTest,
+    page_layer_words: tuple[tuple[str, Box], ...],
+    region_boxes: tuple[Box, ...],
+    lower_case_words: frozenset[str],
+) -> tuple[PictureGroup, ...]:
+    """The in-page figures of a page the plate rule tested, on its 36 dpi
+    render (figures spec section 3): searched among the words of its text
+    layer, or on a page without one that the audit reads as text, among
+    its text words (analyze spec section 4); none on a page that ends as a
+    plate or has no such words."""
+    audit = plate_test.audit
+    words = page_layer_words if audit is None else _audited_text_words(audit)
+    if not words or (
+        plate_test.rule is PlateRule.PLATE
+        and _verdict(audit) is not AuditVerdict.MUCH_TEXT
+    ):
+        return ()
+    return figure_groups(rendered, words, region_boxes, lower_case_words)
+
+
+def _audited_text_words(audit: _Audit) -> tuple[tuple[str, Box], ...]:
     """The text words of a page the audit reads as text, each its text and
     box, for the figure search; none for any other page."""
-    if audit is None or audit.verdict not in {
+    if audit.verdict not in {
         AuditVerdict.MUCH_TEXT,
         AuditVerdict.TEXT,
     }:
@@ -409,13 +443,14 @@ def _page_start(page: PageInfo, measurement: _Measurement) -> PageStart:
     before the front matter is known. A text page without a text layer has
     the words Tesseract read on it, its topmost row the first row they
     make (analyze spec section 4); any other page has its layer's."""
-    if page.kind is PageKind.TEXT and measurement.audit is not None:
-        rows = group_rows(measurement.audit.words)
+    audit = _audit_of(measurement)
+    if page.kind is PageKind.TEXT and audit is not None:
+        rows = group_rows(audit.words)
         return PageStart(
             index=page.index,
             kind=page.kind,
             first_row=tuple(word.text for word in rows[0].words) if rows else (),
-            word_count=len(measurement.audit.words),
+            word_count=len(audit.words),
         )
     return PageStart(
         index=page.index,
@@ -434,27 +469,46 @@ def _highest_confidence(words: tuple[Word, ...]) -> str:
     return f"{max(confidences):.1f}" if confidences else "none"
 
 
-def _log_audited(page: PageInfo, audit: _Audit, plate_test: _PlateTest | None) -> None:
-    """Logs what the audit made of `page` (analyze spec section 4): at
-    WARNING a page made text or front matter, with its number of words and
-    its first ten, and a plate the plate rule did not take, with its ink
-    share and its words' number and highest confidence; at INFO a blank
-    page, with the same measures. A plate the plate rule took is logged by
-    `_log_plate_taken`."""
+def _text_words(audit: _Audit) -> tuple[Word, ...]:
+    """The text words of the audited page, in Tesseract's order."""
+    return tuple(word for word in audit.words if is_text_word(word))
+
+
+def _text_words_read(audit: _Audit) -> str:
+    """The number of text words of the audited page and, when it has any,
+    the first ten of them, for its WARNING: "2 text words, the first ten
+    or fewer: TO MY"."""
+    text_words = _text_words(audit)
+    if not text_words:
+        return "0 text words"
+    return f"{len(text_words)} text words, the first ten or fewer: " + " ".join(
+        word.text for word in text_words[:_LOGGED_WORDS]
+    )
+
+
+def _log_audited(page: PageInfo, plate_test: _PlateTest) -> None:
+    """Logs what the audit made of `page`, when it read it (analyze spec
+    section 4). A page made text or front matter is logged at WARNING with
+    its numbers of words and of text words and its first ten text words.
+    A plate the plate rule did not take is logged at WARNING with its ink
+    share and its words' number and highest confidence; one the rule took
+    is logged by `_log_plate_taken`. A blank page is logged with the same
+    measures, at INFO, or at WARNING when its ink share is 0.04% or more."""
+    audit = plate_test.audit
+    if audit is None:
+        return
     match page.kind:
         case PageKind.TEXT | PageKind.FRONT_MATTER:
             _logger.warning(
                 "analyze: page index %d, without a text layer, is read by "
-                "Tesseract as %s: %d words, the first ten or fewer: %s; add it to "
-                "`exclude_pages` if it is not the book's",
+                "Tesseract as %s: %d words, %s; add it to `exclude_pages` if it "
+                "is not the book's",
                 page.index,
                 "text" if page.kind is PageKind.TEXT else "front matter",
                 len(audit.words),
-                " ".join(word.text for word in audit.words[:_LOGGED_WORDS]),
+                _text_words_read(audit),
             )
-        case PageKind.PLATE if plate_test is None or (
-            plate_test.rule is PlateRule.NOT_PLATE
-        ):
+        case PageKind.PLATE if plate_test.rule is PlateRule.NOT_PLATE:
             _logger.warning(
                 "analyze: page index %d, without a text layer, taken for a "
                 "plate: ink covers %.3f%% of it, Tesseract reads %d words, the "
@@ -464,6 +518,16 @@ def _log_audited(page: PageInfo, audit: _Audit, plate_test: _PlateTest | None) -
                 audit.ink * 100,
                 len(audit.words),
                 _highest_confidence(audit.words),
+            )
+        case PageKind.BLANK if audit.ink >= _BLANK_LOOK_LEAST_INK_SHARE:
+            _logger.warning(
+                "analyze: page index %d, without a text layer, is blank: "
+                "Tesseract reads %d words, the highest of confidence %s, and ink "
+                "covers %.3f%% of it; check that it holds no print",
+                page.index,
+                len(audit.words),
+                _highest_confidence(audit.words),
+                audit.ink * 100,
             )
         case PageKind.BLANK:
             _logger.info(
@@ -481,22 +545,40 @@ def _log_audited(page: PageInfo, audit: _Audit, plate_test: _PlateTest | None) -
             assert_never(page.kind)
 
 
-def _log_audit_counts(measurements: tuple[_Measurement, ...]) -> None:
-    """Logs at INFO the number of pages the audit read and of each verdict
-    (analyze spec section 4)."""
-    verdicts = tuple(
-        measurement.audit.verdict
-        for measurement in measurements
-        if measurement.audit is not None
+def _log_audit_counts(
+    pages: tuple[PageInfo, ...], measurements: tuple[_Measurement, ...]
+) -> None:
+    """Logs at INFO the number of pages the audit read and what they
+    became: text (front matter included), a picture, blank, or a plate the
+    plate rule took (analyze spec section 4)."""
+    audited = tuple(
+        (page.kind, measurement.plate_test.rule)
+        for page, measurement in zip(pages, measurements, strict=True)
+        if measurement.plate_test is not None
+        and measurement.plate_test.audit is not None
+    )
+    text = sum(
+        1 for kind, _ in audited if kind in {PageKind.TEXT, PageKind.FRONT_MATTER}
+    )
+    picture = sum(
+        1
+        for kind, rule in audited
+        if kind is PageKind.PLATE and rule is PlateRule.NOT_PLATE
+    )
+    blank = sum(1 for kind, _ in audited if kind is PageKind.BLANK)
+    taken = sum(
+        1
+        for kind, rule in audited
+        if kind is PageKind.PLATE and rule is PlateRule.PLATE
     )
     _logger.info(
-        "analyze: Tesseract read %d pages without a text layer: %s",
-        len(verdicts),
-        ", ".join(
-            f"{sum(1 for verdict in verdicts if verdict is kind)} {kind.value}"
-            for kind in AuditVerdict
-            if kind is not AuditVerdict.NOT_AUDITED
-        ),
+        "analyze: Tesseract read %d pages without a text layer: %d text, %d "
+        "picture, %d blank, %d taken by the plate rule",
+        len(audited),
+        text,
+        picture,
+        blank,
+        taken,
     )
 
 
@@ -514,11 +596,13 @@ def _test_plate(
     rendered: RenderedPage,
     layer_words: tuple[tuple[str, Box], ...],
     lower_case_words: frozenset[str],
+    audit: _Audit | None,
 ) -> _PlateTest:
     """The plate rule on a page rendered as `rendered` whose text layer
     holds `layer_words`, each its text and box in points (none without a
     layer): its picture area, its words found in `lower_case_words`, and
-    whether the rule takes it as a plate (plates spec, section 2)."""
+    whether the rule takes it as a plate (plates spec, section 2); with
+    `audit`, the audit of a page without a text layer, None with one."""
     word_boxes = tuple(box for _, box in layer_words) if layer_words else None
     known_words = sum(
         1 for text, _ in layer_words if wordlist.is_known_word(text, lower_case_words)
@@ -529,9 +613,7 @@ def _test_plate(
         if is_plate_by_area(area, word_boxes, known_words)
         else PlateRule.NOT_PLATE
     )
-    return _PlateTest(
-        area=area, known_words=known_words, has_layer=bool(layer_words), rule=rule
-    )
+    return _PlateTest(area=area, known_words=known_words, rule=rule, audit=audit)
 
 
 def _log_inkless(page_index: int, ink_test: InkTest) -> None:
@@ -599,17 +681,15 @@ def _log_front_matter(
         )
 
 
-def _log_plate_taken(page: PageInfo, plate_test: _PlateTest | None) -> None:
+def _log_plate_taken(page: PageInfo, plate_test: _PlateTest) -> None:
     """Logs at WARNING a page the plate rule takes, with what it measured,
     when its kind is `plate`: not an inkless page the rule also takes, which
-    is `inkless` or `front_matter` (plates spec section 2b)."""
-    if (
-        plate_test is None
-        or plate_test.rule is PlateRule.NOT_PLATE
-        or page.kind is not PageKind.PLATE
-    ):
+    is `inkless` or `front_matter` (plates spec section 2b). A page without
+    a text layer is logged with the text words the audit read on it
+    (analyze spec section 4)."""
+    if plate_test.rule is PlateRule.NOT_PLATE or page.kind is not PageKind.PLATE:
         return
-    if plate_test.has_layer:
+    if plate_test.audit is None:
         _logger.warning(
             "analyze: page index %d taken for a plate: a picture of %d squares, "
             "%d known words; add it to `exclude_pages` if it is not one",
@@ -620,11 +700,12 @@ def _log_plate_taken(page: PageInfo, plate_test: _PlateTest | None) -> None:
     else:
         _logger.warning(
             "analyze: page index %d, without a text layer, taken for a plate: a "
-            "picture of %d of its %d squares; add it to `exclude_pages` if it "
-            "is not one",
+            "picture of %d of its %d squares, Tesseract reads %s; add it to "
+            "`exclude_pages` if it is not one",
             page.index,
             plate_test.area.largest_group,
             plate_test.area.squares,
+            _text_words_read(plate_test.audit),
         )
 
 

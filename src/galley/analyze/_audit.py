@@ -20,7 +20,13 @@ from PIL import Image, ImageChops, ImageFilter
 from galley.model import RenderedPage, Word
 from galley.ocr import OCR_DPI
 
-__all__ = ["AuditVerdict", "audit_verdict", "ink_share", "is_text_word"]
+__all__ = [
+    "AuditVerdict",
+    "audit_verdict",
+    "image_ink_share",
+    "ink_share",
+    "is_text_word",
+]
 
 # Analyze spec section 3: the stray marks of the 47 pages judged blank of
 # the five books reach 51.7, the best word of the printed page read worst
@@ -98,7 +104,15 @@ def ink_share(page: RenderedPage) -> float:
             f"{OCR_DPI} dpi, not at {page.dpi}"
         )
         raise ValueError(message)
-    image = Image.frombytes("L", (page.width_px, page.height_px), page.pixels)
+    return image_ink_share(
+        Image.frombytes("L", (page.width_px, page.height_px), page.pixels)
+    )
+
+
+def image_ink_share(image: Image.Image) -> float:
+    """The ink share of `ink_share`, for `image`, an 8-bit gray render of a
+    page at 300 dpi that the caller has already made, so that a page read
+    by Tesseract is not turned into an image twice."""
     halved = image.reduce(_HALVING)
     background = halved.filter(ImageFilter.BoxBlur(_BACKGROUND_RADIUS_PX))
     darkness = ImageChops.subtract(background, halved)

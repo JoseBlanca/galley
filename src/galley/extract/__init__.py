@@ -86,8 +86,6 @@ _COVER_DPI: Final[int] = 300
 _PLATE_DPI: Final[int] = 300
 # Figures spec section 4: an in-page figure is cut from a render at 300 dpi.
 _FIGURE_DPI: Final[int] = 300
-# Extract spec section 9: Tesseract finds the blocks of the whole page.
-_OCR_PAGE_SEGMENTATION: Final[int] = 3
 
 
 def run(
@@ -188,7 +186,7 @@ def _page_reader(
                 _image(ocr_render),
                 origin=(0.0, 0.0),
                 dpi=ocr_render.dpi,
-                psm=_OCR_PAGE_SEGMENTATION,
+                psm=ocr.WHOLE_PAGE_SEGMENTATION,
                 language=language,
             )
         )
@@ -204,6 +202,18 @@ def _page_reader(
                 else pdfium.render(pdf_path, page.index, _FIGURE_DPI),
                 page,
                 book_root,
+            )
+        if (
+            page.text_source is TextSource.OCR
+            and not tesseract_words
+            and not page_layer_words
+        ):
+            # Extract spec section 9: analyze's audit read words on this
+            # render, so this should not occur; the page is not left silent.
+            _logger.warning(
+                "extract: page index %d, read by OCR, has no text layer and "
+                "Tesseract found no word on it; it has no words",
+                page.index,
             )
         read = _words_read(page, tesseract_words, page_layer_words)
         if read.page.text_source is not page.text_source:

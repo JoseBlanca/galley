@@ -14,7 +14,6 @@ once.
 import json
 import logging
 import logging.handlers
-from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Final
@@ -26,9 +25,12 @@ from galley import analyze, extract, pdfium
 from galley.analyze import (
     AuditVerdict,
     InkRule,
+    PageStart,
+    PictureArea,
     PlateRule,
     audit_verdict,
     classify_page,
+    front_matter_end,
     ink_share,
     is_plate,
 )
@@ -38,6 +40,7 @@ from galley.config import BookConfig, Language, OcrMode, read_config
 from galley.model import (
     Box,
     FigureKind,
+    PageInfo,
     PageKind,
     RenderedPage,
     TextSource,
@@ -162,21 +165,6 @@ BLACK: Final[int] = 0
 LINE_ROWS: Final[tuple[int, ...]] = tuple(1400 + 40 * line for line in range(10))
 
 
-def gray_page(gray: Callable[[int, int], int], dpi: int = 300) -> RenderedPage:
-    """A page whose pixel at (`across`, `down`) is `gray(across, down)`."""
-    image = Image.new("L", (WIDTH_PX, HEIGHT_PX))
-    image.putdata(
-        [gray(across, down) for down in range(HEIGHT_PX) for across in range(WIDTH_PX)]
-    )
-    return RenderedPage(
-        page_index=0,
-        dpi=dpi,
-        width_px=WIDTH_PX,
-        height_px=HEIGHT_PX,
-        pixels=image.tobytes(),
-    )
-
-
 def lines_page(left_px: int, right_px: int) -> RenderedPage:
     """A white page with the black lines of LINE_ROWS from `left_px` to
     `right_px`."""
@@ -215,7 +203,7 @@ def test_black_lines_across_a_blank_page_are_ink_their_share_after_halving() -> 
     # Halved, the page is 1000 by 1500 pixels, each line 1 pixel high; the
     # bands leave 840 by 1320 pixels, of which each line covers 840.
     expected = len(LINE_ROWS) * 840 / (840 * 1320)
-    assert ink_share(lines_page(0, WIDTH_PX)) == pytest.approx(expected, rel=0.03)
+    assert ink_share(lines_page(0, WIDTH_PX)) == pytest.approx(expected, rel=1e-9)
 
 
 def test_black_lines_inside_the_left_band_of_8_percent_are_no_ink_of_a_blank_page() -> (
@@ -437,8 +425,11 @@ def test_kadesh_blank_plates_have_one_figure_each_the_whole_page_and_blank_pages
     ]
 
 
-# analyze on kadesh_blank in a folder of its own, with 1 worker, its log
-# kept: once for the tests that read it.
+# analyze on kadesh_blank in a folder of its own, with 1 worker and
+# `ocr = "trust"`, its log kept: once for the tests that read it. Its
+# pages.json is compared with the session's run under `verify` with 6
+# workers: the audit is the same under every `ocr` (docs/specs/analyze.md,
+# section 6), and so are the pages without a text layer.
 
 
 @dataclass(frozen=True, slots=True)
@@ -468,7 +459,9 @@ def kadesh_blank_folder(root: Path, pdf: Path, settings: str = "") -> BookFolder
 def one_worker_run(
     tmp_path_factory: pytest.TempPathFactory, excerpt_pdf: frozendict[str, Path]
 ) -> AnalyzeRun:
-    folder = kadesh_blank_folder(tmp_path_factory.mktemp(EXCERPT), excerpt_pdf[EXCERPT])
+    folder = kadesh_blank_folder(
+        tmp_path_factory.mktemp(EXCERPT), excerpt_pdf[EXCERPT], 'ocr = "trust"\n'
+    )
     logger = logging.getLogger("galley.analyze")
     kept = logging.handlers.BufferingHandler(_KEPT_RECORDS)
     level = logger.level
@@ -496,6 +489,17 @@ def _blank(index: int, words: int, highest: str, ink: str) -> tuple[int, str]:
     )
 
 
+def _blank_to_look_at(index: int, ink: str) -> tuple[int, str]:
+    return (
+        logging.WARNING,
+        (
+            f"analyze: page index {index}, without a text layer, is blank: "
+            "Tesseract reads 0 words, the highest of confidence none, and ink "
+            f"covers {ink}% of it; check that it holds no print"
+        ),
+    )
+
+
 @pytest.mark.thread_unsafe
 @pytest.mark.tesseract
 def test_kadesh_blank_logs_a_warning_for_text_and_plates_and_info_for_blank_pages(
@@ -512,9 +516,9 @@ def test_kadesh_blank_logs_a_warning_for_text_and_plates_and_info_for_blank_page
             logging.WARNING,
             (
                 "analyze: page index 0, without a text layer, is read by Tesseract as "
-                "text: 13 words, the first ten or fewer: Digitized by the Internet "
-                "Archive in 2007 with funding from; add it to `exclude_pages` if it is "
-                "not the book's"
+                "text: 13 words, 12 text words, the first ten or fewer: Digitized by "
+                "the Internet Archive in 2007 with funding from; add it to "
+                "`exclude_pages` if it is not the book's"
             ),
         ),
         _blank(1, 0, "none", "0.031"),
@@ -531,20 +535,20 @@ def test_kadesh_blank_logs_a_warning_for_text_and_plates_and_info_for_blank_page
             logging.WARNING,
             (
                 "analyze: page index 4, without a text layer, taken for a plate: a "
-                "picture of 169 of its 476 squares; add it to `exclude_pages` if it "
-                "is not one"
+                "picture of 169 of its 476 squares, Tesseract reads 0 text words; add "
+                "it to `exclude_pages` if it is not one"
             ),
         ),
         _blank(5, 0, "none", "0.001"),
         _blank(6, 0, "none", "0.039"),
         _blank(7, 0, "none", "0.013"),
         _blank(8, 26, "51.7", "0.003"),
-        _blank(9, 0, "none", "0.050"),
+        _blank_to_look_at(9, "0.050"),
         (
             logging.INFO,
             (
-                "analyze: Tesseract read 10 pages without a text layer: 0 much_text, "
-                "1 text, 2 picture, 7 blank"
+                "analyze: Tesseract read 10 pages without a text layer: 1 text, 1 "
+                "picture, 7 blank, 1 taken by the plate rule"
             ),
         ),
     )
@@ -552,7 +556,7 @@ def test_kadesh_blank_logs_a_warning_for_text_and_plates_and_info_for_blank_page
 
 @pytest.mark.thread_unsafe
 @pytest.mark.tesseract
-def test_kadesh_blank_audit_with_1_worker_writes_the_bytes_of_the_run_with_6(
+def test_kadesh_blank_audit_with_1_worker_under_trust_writes_the_bytes_of_6_under_verify(
     one_worker_run: AnalyzeRun, excerpt_books: frozendict[str, BookFolder]
 ) -> None:
     # The session's run uses DEFAULT_WORKERS, 6 on a machine of 6 cores or
@@ -562,16 +566,15 @@ def test_kadesh_blank_audit_with_1_worker_writes_the_bytes_of_the_run_with_6(
 
 @pytest.mark.thread_unsafe
 @pytest.mark.tesseract
-@pytest.mark.parametrize("ocr", ["trust", "redo"])
-def test_kadesh_blank_pages_are_audited_alike_under_ocr_trust_and_redo(
-    ocr: str,
+def test_kadesh_blank_pages_are_audited_alike_under_ocr_redo(
     tmp_path: Path,
     excerpt_pdf: frozendict[str, Path],
     excerpt_books: frozendict[str, BookFolder],
 ) -> None:
     # docs/specs/analyze.md, section 6: the same rule and verdicts under every
-    # `ocr`, so pages.json is the one of `verify`, the default.
-    folder = kadesh_blank_folder(tmp_path, excerpt_pdf[EXCERPT], f'ocr = "{ocr}"\n')
+    # `ocr`, so pages.json is the one of `verify`, the default; `trust` is
+    # compared by the module's run of its own.
+    folder = kadesh_blank_folder(tmp_path, excerpt_pdf[EXCERPT], 'ocr = "redo"\n')
 
     analyze.run(folder, read_config(folder.book_toml))
 
@@ -581,8 +584,14 @@ def test_kadesh_blank_pages_are_audited_alike_under_ocr_trust_and_redo(
 
 
 # A page of running text without a text layer (docs/specs/analyze.md,
-# section 11): Kadesh 9, excerpt page 1 of kadesh_8-17, rendered at 300 dpi
-# and saved as a one-page PDF, which has no text layer.
+# section 11): Kadesh 9, excerpt page 1 of kadesh_8-17, rendered at 300 dpi,
+# cut to its top 35% so that Tesseract reads less, and saved as a one-page
+# PDF, which has no text layer. The plate rule still takes it.
+
+
+# The share of the page's height kept from the top: 185 Tesseract words,
+# the first line whole (checked by the code reviewer on 26 November 2026).
+TOP_SHARE_KEPT: Final[float] = 0.35
 
 
 @pytest.mark.thread_unsafe
@@ -592,9 +601,9 @@ def test_running_text_without_a_layer_is_text_read_by_ocr_though_the_plate_rule_
 ) -> None:
     rendered = pdfium.render(excerpt_pdf["kadesh_8-17"], 1, 300)
     pdf = tmp_path / "kadesh_9.pdf"
-    Image.frombytes("L", (rendered.width_px, rendered.height_px), rendered.pixels).save(
-        pdf, format="PDF", resolution=300.0
-    )
+    Image.frombytes("L", (rendered.width_px, rendered.height_px), rendered.pixels).crop(
+        (0, 0, rendered.width_px, int(rendered.height_px * TOP_SHARE_KEPT))
+    ).save(pdf, format="PDF", resolution=300.0)
     (tmp_path / "book").mkdir()
     folder = kadesh_blank_folder(tmp_path / "book", pdf)
     config = read_config(folder.book_toml)
@@ -715,3 +724,179 @@ def test_analyze_of_a_whole_book_without_exclude_pages_reads_its_blank_pages(
         if page.index
         in (*expected.get(PageKind.TEXT, ()), *expected.get(PageKind.FRONT_MATTER, ()))
     ), book
+
+
+# What analyze logs and measures of an audited page, on values made here
+# (docs/specs/analyze.md, sections 3 and 4).
+
+AREA = PictureArea(largest_group=40, squares=400)
+
+
+def page_of(kind: PageKind, text_source: TextSource = TextSource.NONE) -> PageInfo:
+    return PageInfo(
+        index=4,
+        width_pt=400.0,
+        height_pt=600.0,
+        kind=kind,
+        text_source=text_source,
+        text_layer_score=None,
+        exclude_regions=(),
+        figure_boxes=(),
+        blank_checked_by_ocr=kind is PageKind.BLANK,
+    )
+
+
+def audited(
+    words: tuple[Word, ...], ink: float, rule: PlateRule = PlateRule.NOT_PLATE
+) -> analyze._PlateTest:
+    """The plate test of a page without a text layer, with its audit."""
+    return analyze._PlateTest(
+        area=AREA,
+        known_words=0,
+        rule=rule,
+        audit=analyze._Audit(words=words, ink=ink, verdict=audit_verdict(words, ink)),
+    )
+
+
+# Stray marks around two text words, "MAP" and "Ae".
+MIXED_WORDS = (
+    word("a", 30.0),
+    word("MAP", 90.0),
+    word("=", 95.0),
+    word("Ae", 80.0),
+    word("oe", 40.0),
+)
+
+
+@pytest.mark.thread_unsafe
+@pytest.mark.parametrize(
+    ("ink", "level"), [(0.0004, logging.WARNING), (0.00039, logging.INFO)]
+)
+def test_a_blank_page_with_ink_from_0_04_percent_is_logged_at_warning(
+    ink: float, level: int, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.INFO, logger="galley.analyze"):
+        analyze._log_audited(page_of(PageKind.BLANK), audited((), ink))
+
+    assert [record.levelno for record in caplog.records] == [level]
+
+
+@pytest.mark.thread_unsafe
+def test_a_page_without_a_layer_the_plate_rule_takes_logs_the_audits_text_words(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="galley.analyze"):
+        analyze._log_plate_taken(
+            page_of(PageKind.PLATE), audited(MIXED_WORDS, 0.01, PlateRule.PLATE)
+        )
+
+    assert [record.getMessage() for record in caplog.records] == [
+        (
+            "analyze: page index 4, without a text layer, taken for a plate: a "
+            "picture of 40 of its 400 squares, Tesseract reads 2 text words, the "
+            "first ten or fewer: MAP Ae; add it to `exclude_pages` if it is not one"
+        )
+    ]
+
+
+@pytest.mark.thread_unsafe
+def test_a_text_page_without_a_layer_quotes_its_text_words_not_its_stray_marks(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="galley.analyze"):
+        analyze._log_audited(
+            page_of(PageKind.TEXT, TextSource.OCR), audited(MIXED_WORDS, 0.01)
+        )
+
+    assert [record.getMessage() for record in caplog.records] == [
+        (
+            "analyze: page index 4, without a text layer, is read by Tesseract as "
+            "text: 5 words, 2 text words, the first ten or fewer: MAP Ae; add it to "
+            "`exclude_pages` if it is not the book's"
+        )
+    ]
+
+
+def test_the_figure_search_of_a_text_page_without_a_layer_takes_its_text_words_only() -> (
+    None
+):
+    plate_test = audited(MIXED_WORDS, 0.01)
+    assert plate_test.audit is not None
+
+    assert analyze._audited_text_words(plate_test.audit) == (
+        ("MAP", BOX),
+        ("Ae", BOX),
+    )
+
+
+def test_a_text_page_without_a_layer_gives_the_front_matter_rule_its_tesseract_rows() -> (
+    None
+):
+    # Front-matter spec section 2, as analyze spec section 4 extends it: the
+    # topmost row of the words Tesseract read on page 1 names a preface.
+    preface = (
+        Word("PREFACE", Box(150.0, 60.0, 250.0, 75.0), 92.0),
+        *(
+            Word(
+                "words",
+                Box(50.0 + 60 * column, 120.0, 100.0 + 60 * column, 132.0),
+                90.0,
+            )
+            for column in range(5)
+        ),
+    )
+    measurement = analyze._Measurement(
+        width_pt=400.0,
+        height_pt=600.0,
+        layer_word_count=0,
+        first_row=(),
+        plate_test=audited(preface, 0.01),
+        ink_test=None,
+        figures=(),
+    )
+    starts = (
+        PageStart(index=0, kind=PageKind.BLANK, first_row=(), word_count=0),
+        analyze._page_start(
+            replace(page_of(PageKind.TEXT, TextSource.OCR), index=1), measurement
+        ),
+        *(
+            PageStart(
+                index=index, kind=PageKind.TEXT, first_row=("THE",), word_count=400
+            )
+            for index in range(2, 12)
+        ),
+    )
+
+    assert starts[1] == PageStart(
+        index=1, kind=PageKind.TEXT, first_row=("PREFACE",), word_count=6
+    )
+    assert front_matter_end(starts, CONFIG) == 1
+
+
+# extract on an `ocr` page without a text layer on which Tesseract reads
+# nothing (extract spec section 9): Tesseract stubbed to read no word.
+
+
+@pytest.mark.thread_unsafe
+@pytest.mark.tesseract
+def test_extract_warns_of_an_ocr_page_without_a_layer_where_tesseract_reads_nothing(
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    folder = BookFolder(tmp_path)
+    for file in (excerpt_books[EXCERPT].book_toml, excerpt_books[EXCERPT].pages_json):
+        (tmp_path / file.name).write_bytes(file.read_bytes())
+    monkeypatch.setattr("galley.extract.ocr.read_image", lambda *_, **__: ())
+
+    with caplog.at_level(logging.WARNING, logger="galley.extract"):
+        extract.run(folder, read_config(folder.book_toml))
+
+    assert [record.getMessage() for record in caplog.records] == [
+        (
+            "extract: page index 0, read by OCR, has no text layer and Tesseract "
+            "found no word on it; it has no words"
+        )
+    ]
+    assert read_words(folder.words_json).pages[0].words == ()

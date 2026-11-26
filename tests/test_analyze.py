@@ -1453,8 +1453,8 @@ def test_a_plate_without_a_layer_is_logged_with_its_share_of_the_page(
     assert [record.getMessage() for record in caplog.records] == [
         (
             "analyze: page index 9, without a text layer, taken for a plate: a "
-            "picture of 279 of its 476 squares; add it to `exclude_pages` if it "
-            "is not one"
+            "picture of 279 of its 476 squares, Tesseract reads 0 text words; add "
+            "it to `exclude_pages` if it is not one"
         )
     ]
 
@@ -1472,8 +1472,8 @@ def test_a_page_the_plate_rule_takes_is_logged_as_a_plate_only_when_it_is_one(
     plate_test = analyze._PlateTest(
         area=PictureArea(largest_group=70, squares=400),
         known_words=0,
-        has_layer=True,
         rule=PlateRule.PLATE,
+        audit=None,
     )
 
     with caplog.at_level(logging.WARNING, logger="galley.analyze"):

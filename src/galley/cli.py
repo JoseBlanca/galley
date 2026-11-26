@@ -76,8 +76,8 @@ class _Stage:
     language, which Tesseract's tools extract the first time, and whether
     it reads with Tesseract when the config's `ocr` is `verify`, as layout
     re-reads small print (docs/specs/reocr.md, section 3), needing the
-    word list too; whether it needs Tesseract whatever the config's `ocr`,
-    as analyze does to read the pages without a text layer (analyze spec
+    word list too; whether it reads the pages without a text layer with
+    Tesseract whatever the config's `ocr`, as analyze does (analyze spec
     section 7); whether it needs Tesseract
     under `ocr = "redo"`, as extract does to read every text page
     (architecture section 7b); and whether
@@ -90,7 +90,7 @@ class _Stage:
     needs_pandoc: bool
     needs_word_list: bool
     reads_with_tesseract: bool
-    needs_tesseract: bool
+    reads_pages_without_layer: bool
     needs_tesseract_under_redo: bool
     only_when_correct: bool = False
 
@@ -105,7 +105,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=True,
         reads_with_tesseract=False,
-        needs_tesseract=True,
+        reads_pages_without_layer=True,
         needs_tesseract_under_redo=False,
     ),
     _Stage(
@@ -115,7 +115,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=False,
         reads_with_tesseract=False,
-        needs_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=True,
     ),
     _Stage(
@@ -125,7 +125,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=False,
         reads_with_tesseract=True,
-        needs_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=False,
     ),
     _Stage(
@@ -135,7 +135,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=True,
         reads_with_tesseract=False,
-        needs_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=False,
     ),
     _Stage(
@@ -145,7 +145,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=False,
         needs_word_list=True,
         reads_with_tesseract=False,
-        needs_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=False,
         only_when_correct=True,
     ),
@@ -156,7 +156,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=True,
         needs_word_list=False,
         reads_with_tesseract=False,
-        needs_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=False,
     ),
     _Stage(
@@ -166,7 +166,7 @@ _STAGES: tuple[_Stage, ...] = (
         needs_pandoc=True,
         needs_word_list=False,
         reads_with_tesseract=False,
-        needs_tesseract=False,
+        reads_pages_without_layer=False,
         needs_tesseract_under_redo=False,
     ),
 )
@@ -390,10 +390,12 @@ def _check_before_any_stage(
     if any(stage.needs_pandoc for stage in stages) and shutil.which("pandoc") is None:
         message = "pandoc is not installed; install it with `brew install pandoc`"
         raise ExternalProgramError(message)
-    needing_tesseract = tuple(stage.name for stage in stages if stage.needs_tesseract)
-    if needing_tesseract and shutil.which("tesseract") is None:
+    reading_pages_without_layer = tuple(
+        stage.name for stage in stages if stage.reads_pages_without_layer
+    )
+    if reading_pages_without_layer and shutil.which("tesseract") is None:
         message = (
-            f"tesseract is not installed; {needing_tesseract[0]} reads the pages "
+            f"tesseract is not installed; {reading_pages_without_layer[0]} reads the pages "
             "without a text layer with it: install it with `brew install tesseract`"
         )
         raise ExternalProgramError(message)

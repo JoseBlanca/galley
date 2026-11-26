@@ -617,6 +617,36 @@ def test_structure_stops_without_tesseracts_tools_or_a_cached_word_list(
 # Changes PATH and the word list's cache folder for the whole process.
 @pytest.mark.thread_unsafe
 @pytest.mark.pandoc
+@pytest.mark.tesseract
+def test_analyze_with_tesseract_stops_without_its_tools_and_a_cached_word_list(
+    tmp_path: Path,
+    excerpt_books: frozendict[str, BookFolder],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Tesseract is there, so analyze's check for it passes, and the word
+    # list's tools are checked next (analyze spec section 7).
+    folder = _copy_of_run(tmp_path, excerpt_books[KADESH])
+    path = _path_with_pandoc_only(tmp_path)
+    tesseract = shutil.which("tesseract")
+    assert tesseract is not None
+    (Path(path) / "tesseract").symlink_to(tesseract)
+    monkeypatch.setenv("PATH", path)
+    monkeypatch.setattr(wordlist, "DEFAULT_CACHE_DIR", tmp_path / "no-cache")
+
+    with pytest.raises(ExternalProgramError) as raised:
+        main(["analyze", str(folder.root)])
+
+    assert str(raised.value) == (
+        "combine_tessdata and dawg2wordlist are not installed; analyze needs "
+        "them once to extract the word list of eng from Tesseract's data: "
+        "install them with `brew install tesseract`"
+    )
+    assert _names(folder) == _files_up_to("epub")
+
+
+# Changes PATH and the word list's cache folder for the whole process.
+@pytest.mark.thread_unsafe
+@pytest.mark.pandoc
 @pytest.mark.parametrize("command", ["run", "analyze"])
 @pytest.mark.parametrize("ocr", ["verify", "trust", "redo"])
 @pytest.mark.parametrize("word_list", ["cached", "not cached"])
